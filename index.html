@@ -7,63 +7,70 @@
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#20385C; --edge:#2B4C73;
+      --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#25456B; --edge:#2B4C73;
       --txt:#FFFFFF; --mut:#8AA5C4; --title:#F5F9FF;
-      --table-bg:#14273E; --table-head:#1E3657; --table-line:#2C4A73; --table-head-txt:#D6E4F7; --table-val:#FFFFFF; --table-row-hov:#20385C;
-      --badge:#E53935;
+      --table-bg:#14273E; --table-head:#1E3657; --table-line:#2C4A73;
+      --table-head-txt:#D6E4F7; --table-val:#FFFFFF; --table-row-hov:#20385C;
+      --badge:#E53935; --menu:#152A42; --menu-hov:#1E3A5C;
     }
     *{ box-sizing:border-box; }
     html,body{ margin:0; background:var(--bg); color:var(--txt); font-family:'Quicksand',sans-serif; }
 
-    /* Topbar mit mittigen Icons */
-    .topbar{
-      position:sticky; top:0; z-index:10;
-      background:var(--nav);
-      border-bottom:1px solid rgba(255,255,255,.04);
-    }
-    .nav{
-      max-width:1200px; margin:0 auto; height:68px;
-      display:flex; align-items:center; justify-content:center;
-      gap:22px; padding:0 20px;
-    }
+    /* === TOPBAR (Icons mittig, 80x50 Buttons, 40px Icons) === */
+    .topbar{ position:sticky; top:0; z-index:10; background:var(--nav); border-bottom:1px solid rgba(255,255,255,.04); }
+    .nav{ max-width:1200px; margin:0 auto; height:68px; display:flex; align-items:center; justify-content:center; gap:24px; padding:0 20px; }
+
+    .nav-item{ position:relative; }
     .nav-icon{
-      position:relative; width:44px; height:44px; border-radius:12px;
-      display:grid; place-items:center; text-decoration:none; color:var(--txt);
-      transition:background .2s;
+      position:relative; width:80px; height:50px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      color:var(--txt); text-decoration:none; transition:background .2s ease;
     }
-    .nav-icon img{ width:22px; height:22px; opacity:.9; }
-    .nav-icon:hover{ background:rgba(255,255,255,.06); }
+    .nav-icon:hover{ background:var(--tile-hov); }
     .nav-icon.active{ background:#1F3B5D; }
+    .nav-icon img{ width:40px; height:40px; opacity:.95; display:block; }
     .badge{
-      position:absolute; top:-6px; right:-6px;
+      position:absolute; top:2px; right:4px;
       min-width:18px; height:18px; padding:0 5px;
       background:var(--badge); color:#fff; border-radius:999px;
       display:flex; align-items:center; justify-content:center;
       font-size:11px; font-weight:700; border:1px solid rgba(0,0,0,.25);
     }
 
-    /* Seite */
+    /* === DROPDOWNS === */
+    .dropdown .menu{
+      position:absolute; top:62px; left:50%; transform:translateX(-50%);
+      min-width:220px; background:var(--menu); border:1px solid var(--edge); border-radius:14px;
+      padding:10px; display:none; z-index:20; box-shadow:0 16px 36px rgba(0,0,0,.35);
+    }
+    .dropdown .menu::before{
+      content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%);
+      border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--menu);
+      filter:drop-shadow(0 -1px 0 var(--edge));
+    }
+    .dropdown:hover .menu, .dropdown:focus-within .menu{ display:block; }
+    .menu a{
+      display:block; padding:11px 12px; border-radius:10px;
+      color:#fff; text-decoration:none; font-size:14px;
+    }
+    .menu a:hover{ background:var(--menu-hov); }
+
+    /* === CONTENT === */
     .container{ max-width:1100px; margin:0 auto; padding:22px 20px 28px; }
     h1{ margin:14px 0 22px; font-size:28px; color:var(--title); font-weight:700; letter-spacing:.3px; }
 
-    /* Cards */
     .grid{ display:grid; gap:16px; grid-template-columns:repeat(3,1fr); }
     @media (max-width:980px){ .grid{ grid-template-columns:repeat(2,1fr); } }
     @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
     .card{
-      background:var(--tile); border:1px solid var(--edge);
-      border-radius:16px; padding:18px; box-shadow:0 6px 20px rgba(0,0,0,.22);
-      transition:transform .15s ease, background .2s ease, box-shadow .2s ease;
+      background:var(--tile); border:1px solid var(--edge); border-radius:16px; padding:18px;
+      box-shadow:0 6px 20px rgba(0,0,0,.22); transition:transform .15s ease, background .2s ease, box-shadow .2s ease;
     }
-    .card:hover{ background:var(--tile-hov); transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.28); }
+    .card:hover{ background:#20385C; transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.28); }
     .card h3{ margin:0 0 6px; font-size:18px; color:var(--title); }
     .card p{ margin:0; color:var(--mut); font-size:14px; }
 
-    /* Tabelle */
-    .table-wrap{
-      margin-top:16px; background:var(--table-bg); border:1px solid var(--edge);
-      border-radius:16px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,.2);
-    }
+    .table-wrap{ margin-top:16px; background:var(--table-bg); border:1px solid var(--edge); border-radius:16px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,.2); }
     table{ width:100%; border-collapse:collapse; font-size:14px; }
     thead th{ background:var(--table-head); color:var(--table-head-txt); text-align:left; padding:12px 16px; font-weight:700; border-bottom:1px solid var(--table-line); }
     tbody td{ color:var(--table-val); padding:14px 16px; border-bottom:1px solid var(--table-line); }
@@ -72,39 +79,99 @@
 </head>
 <body>
 
-  <!-- Top Navigation (icons centered) -->
+  <!-- === TOPBAR === -->
   <div class="topbar">
-    <div class="nav">
-      <a class="nav-icon active" href="/index.html" title="Home" id="nav-dashboard">
-        <img src="https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" alt="Home">
-      </a>
-      <a class="nav-icon" href="/player/index.html" title="Player" id="nav-players">
-        <img src="https://i.postimg.cc/s2D3xgBt/iconplayer1.png" alt="Player">
-      </a>
-      <a class="nav-icon" href="/guilds/index.html" title="Guilds" id="nav-guilds">
-        <img src="https://i.postimg.cc/zGkJqgfC/iconguilds1.png" alt="Guilds">
-      </a>
-      <a class="nav-icon" href="/servers/index.html" title="Servers" id="nav-servers">
-        <img src="https://i.postimg.cc/3wSYvQmW/iconserver1.png" alt="Servers">
-      </a>
-      <a class="nav-icon" href="/latest-scan/index.html" title="Latest Scan" id="nav-latest">
-        <img src="https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" alt="Latest Scan">
-      </a>
-      <a class="nav-icon" href="/old-scans/index.html" title="Old Scans" id="nav-old">
-        <img src="https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" alt="Old Scans">
-      </a>
-      <a class="nav-icon" href="/notifications/index.html" title="Notifications" id="nav-bell">
-        <img src="https://i.postimg.cc/XNTNLWhC/iconclock1.png" alt="Notifications">
-        <span class="badge" id="badge-noti">3</span>
-      </a>
-      <a class="nav-icon" href="/favorites/index.html" title="Favorites" id="nav-fav">
-        <img src="https://i.postimg.cc/RZmSrRvC/iconfavorit1.png" alt="Favorites">
-        <span class="badge" id="badge-fav">1</span>
-      </a>
-    </div>
+    <nav class="nav">
+
+      <!-- Home (ohne Dropdown) -->
+      <div class="nav-item">
+        <a class="nav-icon active" href="/index.html" id="nav-dashboard" title="Home">
+          <img src="https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" alt="Home">
+        </a>
+      </div>
+
+      <!-- Spieler (Dropdown) -->
+      <div class="nav-item dropdown">
+        <a class="nav-icon" href="/player/index.html" id="nav-players" title="Player">
+          <img src="https://i.postimg.cc/s2D3xgBt/iconplayer1.png" alt="Player">
+        </a>
+        <div class="menu" role="menu" aria-label="Players">
+          <a href="/player/index.html">Overview</a>
+          <a href="/player/index.html#compare">Compare</a>
+          <a href="/player/index.html#classes">Class Analysis</a>
+          <a href="/player/index.html#top">Top Players</a>
+        </div>
+      </div>
+
+      <!-- Gilden (Dropdown) -->
+      <div class="nav-item dropdown">
+        <a class="nav-icon" href="/guilds/index.html" id="nav-guilds" title="Guilds">
+          <img src="https://i.postimg.cc/zGkJqgfC/iconguilds1.png" alt="Guilds">
+        </a>
+        <div class="menu" role="menu" aria-label="Guilds">
+          <a href="/guilds/index.html">Overview</a>
+          <a href="/guilds/index.html#compare">Compare</a>
+          <a href="/guilds/index.html#dream-squad">Dream Squad</a>
+          <a href="/guilds/index.html#hydra">Hydra Trends</a>
+        </div>
+      </div>
+
+      <!-- Server (Dropdown) -->
+      <div class="nav-item dropdown">
+        <a class="nav-icon" href="/servers/index.html" id="nav-servers" title="Servers">
+          <img src="https://i.postimg.cc/3wSYvQmW/iconserver1.png" alt="Servers">
+        </a>
+        <div class="menu" role="menu" aria-label="Servers">
+          <a href="/servers/index.html">Overview</a>
+          <a href="/servers/index.html#compare">Compare</a>
+          <a href="/servers/index.html#trends">Trends</a>
+        </div>
+      </div>
+
+      <!-- Latest Scan (Dropdown) -->
+      <div class="nav-item dropdown">
+        <a class="nav-icon" href="/latest-scan/index.html" id="nav-latest" title="Latest Scan">
+          <img src="https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" alt="Latest">
+        </a>
+        <div class="menu" role="menu" aria-label="Latest Scan">
+          <a href="/latest-scan/index.html">Heute</a>
+          <a href="/latest-scan/index.html#summary">Summary</a>
+          <a href="/latest-scan/index.html#details">Details</a>
+        </div>
+      </div>
+
+      <!-- Old Scans (Dropdown) -->
+      <div class="nav-item dropdown">
+        <a class="nav-icon" href="/old-scans/index.html" id="nav-old" title="Old Scans">
+          <img src="https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" alt="Old Scans">
+        </a>
+        <div class="menu" role="menu" aria-label="Old Scans">
+          <a href="/old-scans/index.html">Archiv</a>
+          <a href="/old-scans/index.html#compare">Scans vergleichen</a>
+          <a href="/old-scans/index.html#exports">Exporte</a>
+        </div>
+      </div>
+
+      <!-- Notifications (ohne Dropdown) -->
+      <div class="nav-item">
+        <a class="nav-icon" href="/notifications/index.html" id="nav-bell" title="Notifications">
+          <img src="https://i.postimg.cc/XNTNLWhC/iconclock1.png" alt="Notifications">
+          <span class="badge" id="badge-noti">3</span>
+        </a>
+      </div>
+
+      <!-- Favorites (ohne Dropdown) -->
+      <div class="nav-item">
+        <a class="nav-icon" href="/favorites/index.html" id="nav-fav" title="Favorites">
+          <img src="https://i.postimg.cc/RZmSrRvC/iconfavorit1.png" alt="Favorites">
+          <span class="badge" id="badge-fav">1</span>
+        </a>
+      </div>
+
+    </nav>
   </div>
 
-  <!-- Content -->
+  <!-- === CONTENT === -->
   <div class="container">
     <h1>S&F Data Hub</h1>
 
@@ -119,9 +186,7 @@
 
     <div class="table-wrap">
       <table>
-        <thead>
-          <tr><th>Spieler</th><th>Gilde</th><th>Server</th><th>Power</th></tr>
-        </thead>
+        <thead><tr><th>Spieler</th><th>Gilde</th><th>Server</th><th>Power</th></tr></thead>
         <tbody>
           <tr><td>HeroX</td><td>Welten im Wandel</td><td>F28</td><td>1.245k</td></tr>
           <tr><td>Arcane</td><td>Nightwatch</td><td>EU3</td><td>1.102k</td></tr>
@@ -132,16 +197,17 @@
   </div>
 
   <script>
-    // Aktiven Tab gemäß Pfad setzen (falls Seite nicht Home ist)
+    // Aktive Kachel anhand Pfad
     (function(){
       const p = location.pathname.toLowerCase();
       const map = [
         ['players','nav-players'],['guilds','nav-guilds'],['servers','nav-servers'],
-        ['latest-scan','nav-latest'],['old-scans','nav-old'],['notifications','nav-bell'],['favorites','nav-fav']
+        ['latest-scan','nav-latest'],['old-scans','nav-old'],
+        ['notifications','nav-bell'],['favorites','nav-fav']
       ];
-      let active='nav-dashboard';
-      for(const [seg,id] of map){ if(p.includes('/'+seg+'/')){ active=id; break; } }
-      document.querySelectorAll('.nav-icon').forEach(i=>i.classList.remove('active'));
+      let active = 'nav-dashboard';
+      for(const [seg,id] of map){ if(p.includes('/'+seg+'/')){ active = id; break; } }
+      document.querySelectorAll('.nav-icon').forEach(i => i.classList.remove('active'));
       document.getElementById(active)?.classList.add('active');
     })();
   </script>
