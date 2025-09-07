@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Old Scans — S&F Data Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#25456B; --edge:#2B4C73;
+      --txt:#FFFFFF; --menu:#152A42; --menu-hov:#1E3A5C; --gold:#D4AF37; --badge:#E53935;
+    }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--txt); font-family:'Quicksand',sans-serif; }
+
+    /* NAVBAR (gleich wie auf index.html) */
+    .navbar{
+      display:flex; align-items:center; justify-content:center; gap:24px;
+      padding:10px; background:transparent;
+    }
+    .nav-icon{
+      position:relative; width:80px; height:50px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; border-radius:12px; transition:background .3s ease;
+      color:var(--txt); text-decoration:none;
+    }
+    .nav-icon img, .nav-icon .label{ position:absolute; transition:opacity .25s ease; pointer-events:none; }
+    .nav-icon img{ width:40px; height:40px; opacity:1; display:block; }
+    .nav-icon .label{ opacity:0; font-size:14px; font-weight:600; }
+    .nav-icon:hover{ background:var(--tile-hov); }
+    .nav-icon:hover img{ opacity:0; }
+    .nav-icon:hover .label{ opacity:1; }
+    .nav-icon.active{ background:var(--tile-hov); }
+    .nav-icon.active img{ opacity:1; }
+    .nav-icon.active .label{ display:none; }
+    .badge{
+      position:absolute; top:2px; right:4px;
+      min-width:18px; height:18px; padding:0 5px;
+      background:var(--badge); color:#fff; border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; font-weight:700; line-height:1; border:1px solid rgba(0,0,0,.25);
+    }
+    .badge.hidden{ display:none; }
+    .nav-icon.fav.has-favs{ box-shadow:0 0 0 2px var(--gold), 0 0 12px rgba(212,175,55,.45); background:var(--tile); }
+    .nav-icon.dropdown{ overflow:visible; }
+    .nav-icon .menu{
+      position:absolute; top:56px; left:50%; transform:translateX(-50%);
+      background:var(--menu); border:1px solid var(--edge); border-radius:12px;
+      min-width:200px; padding:8px; display:none; z-index:10; box-shadow:0 12px 24px rgba(0,0,0,.35);
+    }
+    .nav-icon .menu::before{
+      content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%);
+      border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--menu);
+    }
+    .nav-icon .menu ul{ list-style:none; margin:0; padding:0; }
+    .nav-icon .menu li{ margin:0; padding:0; }
+    .nav-icon .menu a{ width:100%; display:block; padding:10px 12px; color:var(--txt); text-decoration:none; border-radius:8px; }
+    .nav-icon .menu a:hover{ background:var(--menu-hov); }
+    .nav-icon.dropdown:hover .menu, .nav-icon.dropdown:focus-within .menu, .nav-icon.dropdown.open .menu{ display:block; }
+    .nav-icon:not(.active){ background:transparent; }
+
+    /* Seitenlayout */
+    .bar{ display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--nav); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+    .bar h1{ font-size:16px; margin:0; }
+    .wrap{ height:calc(100% - 68px); } /* Navbar (50) + Bar (18) grob */
+    iframe{ width:100%; height:100%; border:0; background:#0C1C2E; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <div class="navbar" id="navbar"></div>
+  <div class="bar"><h1>Old Scans</h1></div>
+
+  <!-- LOOKER (offizieller Embed, Filter benutzbar) -->
+  <div class="wrap">
+    <iframe
+      src="https://lookerstudio.google.com/embed/reporting/ebeb3447-efd1-4cef-a4fe-bef4bc4f7831/page/qgeWF"
+      allowfullscreen
+      frameborder="0"
+      style="border:0">
+    </iframe>
+  </div>
+
+  <script>
+    /* ---------- NAV-Daten (gleich wie index.html) ---------- */
+    const NAV_ITEMS = [
+      { key:"dashboard", label:"Dashboard", href:"./index.html", img:"https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" },
+      { key:"players",   label:"Player",    href:"#players",     img:"https://i.postimg.cc/s2D3xgBt/iconplayer1.png" },
+      {
+        key:"guilds", label:"Guilds", href:"#guilds", img:"https://i.postimg.cc/zGkJqgfC/iconguilds1.png", dropdown:true, submenu:[
+          { key:"guilds",         label:"Overview",    href:"#guilds" },
+          { key:"guilds_compare", label:"Compare",     href:"#guilds-compare" },
+          { key:"dream_squad",    label:"Dream Squad", href:"#dream-squad" },
+          { key:"hydra_trends",   label:"Hydra Trends",href:"#hydra-trends" }
+        ]
+      },
+      { key:"servers",      label:"Server",      href:"#servers",      img:"https://i.postimg.cc/3wSYvQmW/iconserver1.png" },
+      { key:"latest_scan",  label:"Latest Scan", href:"#latest-scan",  img:"https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" },
+      { key:"old_scans",    label:"Old Scans",   href:"./old-scans.html", img:"https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" },
+      { key:"notifications",label:"Notifications",href:"#notifications", img:"https://i.postimg.cc/XNTNLWhC/iconclock1.png", badgeId:"badge-noti" },
+      { key:"favorites",    label:"Favorite",    href:"#favorites",   img:"https://i.postimg.cc/RZmSrRvC/iconfavorit1.png", badgeId:"badge-fav", isFav:true }
+    ];
+
+    const navbarEl = document.getElementById('navbar');
+
+    function renderNav(){
+      navbarEl.innerHTML = "";
+      NAV_ITEMS.forEach(item => {
+        const isDropdown = !!item.dropdown;
+        if (isDropdown){
+          const a = document.createElement('a');
+          a.href = item.href; a.target = "_self";
+          a.className = 'nav-icon dropdown';
+          a.id = `nav-${item.key}`;
+          a.setAttribute('data-goto', item.key);
+          a.innerHTML = `
+            <img src="${item.img}" alt="${item.label}">
+            <span class="label">${item.label}</span>
+            <div class="menu" role="menu">
+              <ul>
+                ${item.submenu.map(s => `<li><a href="${s.href}" data-goto="${s.key}">${s.label}</a></li>`).join("")}
+              </ul>
+            </div>
+          `;
+          a.addEventListener('click', (e) => {
+            const isMenu = e.target.closest('.menu'); if (!isMenu) a.classList.toggle('open');
+          });
+          document.addEventListener('click', (e) => { if (!e.target.closest(`#nav-${item.key}`)) a.classList.remove('open'); });
+          navbarEl.appendChild(a);
+        } else {
+          const a = document.createElement('a');
+          a.href = item.href; a.target = "_self";
+          a.className = 'nav-icon'; a.id = `nav-${item.key}`; a.setAttribute('data-goto', item.key);
+          a.innerHTML = `
+            <img src="${item.img}" alt="${item.label}">
+            <span class="label">${item.label}</span>
+            ${item.badgeId ? `<span class="badge hidden" id="${item.badgeId}">0</span>` : ""}
+          `;
+          if (item.isFav) a.classList.add('fav');
+          navbarEl.appendChild(a);
+        }
+      });
+    }
+
+    function setActive(){
+      // aktiv nach Dateiname bestimmen
+      const path = location.pathname.toLowerCase();
+      let key = path.endsWith('/old-scans.html') ? 'old_scans' : (path.endsWith('/index.html') || path.endsWith('/') ? 'dashboard' : null);
+      if (!key && location.hash) key = location.hash.replace('#','');
+      document.querySelectorAll('.nav-icon').forEach(n => n.classList.remove('active'));
+      if (key) document.getElementById(`nav-${key}`)?.classList.add('active');
+    }
+
+    // (Optionale) Badges Demo
+    function setupBadges(){
+      const noti = document.getElementById('badge-noti'); if (noti){ noti.textContent = '3'; noti.classList.remove('hidden'); }
+      const fav  = document.getElementById('badge-fav');  if (fav){ fav.classList.add('hidden'); }
+    }
+
+    renderNav(); setActive(); setupBadges();
+    window.addEventListener('hashchange', setActive);
+  </script>
+</body>
+</html>
