@@ -1,344 +1,284 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>S&F Data Hub</title>
-  <!-- Google Font: Quicksand -->
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" />
 
   <style>
+    /* =========================
+       Farbpalette (fix laut Projekt)
+    ========================== */
     :root{
-      --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#25456B; --edge:#2B4C73;
-      --txt:#FFFFFF; --mut:#B0C4D9; --icon:#5C8BC6; --active:#1F3B5D; --menu:#152A42; --menu-hov:#1E3A5C;
-      --gold:#D4AF37; --badge:#E53935;
+      --bg:#0C1C2E;               /* Seitenhintergrund */
+      --tile:#1A2F4A;             /* Kachel normal */
+      --tile-hov:#25456B;         /* Kachel Hover */
+      --edge:#2B4C73;             /* Kachel-Rahmen / Linien */
+      --nav:#0A1728;              /* Nav-Bar */
+      --nav-hover:#2D4E78;        /* Nav-Hover (Option) */
+      --active:#1F3B5D;           /* Aktiver Menüpunkt */
+      --text:#FFFFFF;             /* Standard-Text */
+      --text-sec:#B0C4D9;         /* Sekundärtext */
+      --title:#F5F9FF;            /* Titeltext */
+      --muted:#8AA5C4;            /* Inaktive Menütexte */
+      --tbl-bg:#14273E;           /* Tabellen: Hintergrund */
+      --tbl-head:#1E3657;         /* Tabellen: Header */
+      --tbl-line:#2C4A73;         /* Tabellen: Linien */
+      --tbl-head-text:#D6E4F7;    /* Tabellen: Header-Schrift */
+      --tbl-val:#FFFFFF;          /* Tabellen: Werte-Schrift */
+      --tbl-hover:#20385C;        /* Tabellen: Hover-Zeile */
+      --btn:#1E2F47;              /* Buttons: HG */
+      --btn-hov:#2A4C72;          /* Buttons: Hover */
+      --btn-txt:#FFFFFF;          /* Buttons: Text */
     }
 
-    body{ margin:0; font-family:'Quicksand',sans-serif; background:transparent; color:var(--txt); }
+    /* =========================
+       Base
+    ========================== */
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:'Quicksand',system-ui,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    a{color:inherit;text-decoration:none}
 
+    /* =========================
+       Navbar
+    ========================== */
     .navbar{
-      display:flex; align-items:center; justify-content:center; gap:24px;
-      padding:10px; background:transparent;
+      position:sticky; top:0; z-index:50;
+      display:flex; align-items:center; justify-content:center; gap:20px;
+      background:var(--nav);
+      padding:10px 14px;
+      border-bottom:1px solid var(--edge);
     }
-
-    .nav-icon{
-      position:relative; width:80px; height:50px;
+    .nav-item{
+      position:relative;
       display:flex; align-items:center; justify-content:center;
-      cursor:pointer; border-radius:12px; transition:background .3s ease;
-      color:var(--txt); text-decoration:none;
+      width:86px; height:54px; border-radius:14px;
+      transition:background .25s ease, color .25s ease;
+      color:var(--muted);
     }
-
-    .nav-icon img, .nav-icon .label{
-      position:absolute; transition:opacity .25s ease; pointer-events:none;
+    .nav-item img{width:36px;height:36px;transition:opacity .2s ease}
+    .nav-item .label{
+      position:absolute; font-size:13px; font-weight:600; opacity:0; transition:opacity .2s ease;
+      color:var(--text);
     }
-
-    .nav-icon img{ width:40px; height:40px; opacity:1; display:block; }
-    .nav-icon .label{ opacity:0; font-size:14px; font-weight:600; }
-
-    /* Hover: Icon aus, Text an, Button-HG */
-    .nav-icon:hover{ background:var(--tile-hov); }
-    .nav-icon:hover img{ opacity:0; }
-    .nav-icon:hover .label{ opacity:1; }
-
-    /* Aktiver Button: HG bleibt, Icon sichtbar, Text aus */
-    .nav-icon.active{ background:var(--tile-hov); }
-    .nav-icon.active img{ opacity:1; }
-    .nav-icon.active .label{ display:none; }
-
-    /* Badges */
+    .nav-item:hover{ background:var(--tile-hov); color:var(--text); }
+    .nav-item:hover img{ opacity:0; }
+    .nav-item:hover .label{ opacity:1; }
+    .nav-item.active{
+      background:var(--active);
+      color:var(--text);
+    }
     .badge{
-      position:absolute; top:2px; right:4px;
-      min-width:18px; height:18px; padding:0 5px;
-      background:var(--badge); color:#fff; border-radius:999px;
-      display:flex; align-items:center; justify-content:center;
-      font-size:11px; font-weight:700; line-height:1;
-      border:1px solid rgba(0,0,0,.25);
+      position:absolute; top:4px; right:6px; min-width:18px; height:18px; padding:0 6px;
+      border-radius:999px; background:#E53935; color:#fff; font-size:11px; font-weight:700;
+      display:flex; align-items:center; justify-content:center; border:1px solid rgba(0,0,0,.25);
     }
-    .badge.hidden{ display:none; }
+    .badge.hidden{display:none}
 
-    /* ⭐ Favoriten: Gold-Glow, wenn es Favoriten gibt */
-    .nav-icon.fav.has-favs{
-      box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(212,175,55,.45);
-      background: var(--tile);
+    /* =========================
+       Page Wrap + Header
+    ========================== */
+    .wrap{max-width:1200px;margin:24px auto;padding:0 20px}
+    .page-head{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      margin-bottom:18px;
     }
+    .page-head h1{
+      margin:0; font-size:28px; color:var(--title); letter-spacing:.2px;
+    }
+    .btn{
+      background:var(--btn); color:var(--btn-txt);
+      border:1px solid var(--edge);
+      padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600;
+      transition:background .2s ease, transform .02s ease;
+    }
+    .btn:hover{ background:var(--btn-hov); }
+    .btn:active{ transform:translateY(1px); }
 
-    /* ▼ Dropdown für Guilds */
-    .nav-icon.dropdown{ overflow:visible; }
-    .nav-icon .menu{
-      position:absolute; top:56px; left:50%; transform:translateX(-50%);
-      background:var(--menu); border:1px solid var(--edge); border-radius:12px;
-      min-width:200px; padding:8px; display:none; z-index:10;
-      box-shadow:0 12px 24px rgba(0,0,0,0.35);
+    /* =========================
+       Kachel-Grid (Startseite)
+    ========================== */
+    .grid{
+      display:grid; gap:16px;
+      grid-template-columns:repeat(12,1fr);
     }
-    .nav-icon .menu::before{
-      content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%);
-      border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--menu);
-    }
-    .nav-icon .menu ul{ list-style:none; margin:0; padding:0; }
-    .nav-icon .menu li{ margin:0; padding:0; }
-    .nav-icon .menu a,
-    .nav-icon .menu button{
-      width:100%; background:transparent; border:0; text-align:left; display:block;
-      padding:10px 12px; color:var(--txt); font-family:inherit; font-size:14px;
-      border-radius:8px; cursor:pointer; text-decoration:none;
-    }
-    .nav-icon .menu a:hover, .nav-icon .menu button:hover{ background:var(--menu-hov); }
+    @media (max-width:1200px){ .grid{grid-template-columns:repeat(8,1fr);} }
+    @media (max-width:800px){ .grid{grid-template-columns:repeat(4,1fr);} }
 
-    /* Dropdown sichtbar bei Hover, Fokus oder .open (für Touch) */
-    .nav-icon.dropdown:hover .menu,
-    .nav-icon.dropdown:focus-within .menu,
-    .nav-icon.dropdown.open .menu{ display:block; }
+    .card{
+      grid-column:span 4;
+      background:var(--tile);
+      border:1px solid var(--edge);
+      border-radius:18px; padding:16px;
+      transition:background .2s ease, transform .06s ease, box-shadow .2s ease;
+      box-shadow:0 8px 18px rgba(0,0,0,.25);
+    }
+    .card:hover{ background:var(--tile-hov); transform:translateY(-1px); }
+    .card h3{ margin:0 0 8px; font-size:18px; color:var(--title); }
+    .card p{ margin:0; color:var(--text-sec); font-size:14px; }
 
-    /* Optional: Standard ohne Aktiv-HG */
-    .nav-icon:not(.active){ background:transparent; }
+    /* =========================
+       Beispiel: Tabelle im Projektstil
+    ========================== */
+    .table{
+      width:100%;
+      background:var(--tbl-bg);
+      border:1px solid var(--edge);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .table table{ width:100%; border-collapse:collapse; }
+    .table thead th{
+      background:var(--tbl-head);
+      color:var(--tbl-head-text);
+      text-align:left; padding:10px 12px; font-weight:700; font-size:14px;
+      border-bottom:1px solid var(--tbl-line);
+    }
+    .table tbody td{
+      color:var(--tbl-val);
+      padding:10px 12px; font-size:14px;
+      border-bottom:1px solid var(--tbl-line);
+    }
+    .table tbody tr:hover{ background:var(--tbl-hover); }
   </style>
 </head>
 <body>
 
-  <!-- NAVBAR wird per JS erzeugt (damit URLs zentral konfiguriert sind) -->
-  <div class="navbar" id="navbar"></div>
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar"></nav>
+
+  <!-- CONTENT -->
+  <main class="wrap">
+    <div class="page-head">
+      <h1>S&F Data Hub</h1>
+      <a class="btn" href="/player/">Zu Spieler →</a>
+    </div>
+
+    <!-- Kachel-Grid -->
+    <section class="grid">
+      <a class="card" href="/player/">
+        <h3>Spieler</h3>
+        <p>Profile, Filter & Vergleiche.</p>
+      </a>
+
+      <a class="card" href="/guilds/">
+        <h3>Gilden</h3>
+        <p>Übersicht, Compare, Dream Squad, Hydra.</p>
+      </a>
+
+      <a class="card" href="/servers/">
+        <h3>Server</h3>
+        <p>EU/INT Trends & Verteilung.</p>
+      </a>
+
+      <a class="card" href="/latest-scan/">
+        <h3>Letzter Scan</h3>
+        <p>Aktuelle Daten, Stand heute.</p>
+      </a>
+
+      <a class="card" href="/old-scans/">
+        <h3>Alte Scans</h3>
+        <p>Historische Daten & Archiv.</p>
+      </a>
+
+      <a class="card" href="/favorites/">
+        <h3>Favoriten</h3>
+        <p>Schnellzugriff auf gespeicherte Einträge.</p>
+      </a>
+    </section>
+
+    <!-- Beispiel: Tabelle im Projektstil -->
+    <section style="margin-top:22px" class="table">
+      <table>
+        <thead>
+          <tr>
+            <th>Spieler</th>
+            <th>Gilde</th>
+            <th>Server</th>
+            <th>Power</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>HeroX</td><td>Welten im Wandel</td><td>F28</td><td>1.245k</td></tr>
+          <tr><td>Arcane</td><td>Nightwatch</td><td>EU3</td><td>1.102k</td></tr>
+          <tr><td>Nova</td><td>Hydra</td><td>INT1</td><td>987k</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
 
   <script>
     /* =========================
-       KONFIGURATION – deine echten IDs
-    ==========================*/
-    const REPORT_ID = "7d34cb59-5874-470c-ad64-58a5c7aa9e01";  // <-- fest aus deiner URL
-
-    // Page-IDs: die beiden bekannten gesetzt, Rest zunächst null → Hash-Fallback
-    const PAGE = {
-      dashboard:     "ZcEXF",         // Dashboard (Home)
-      players:       null,            // später ergänzen
-      guilds:        null,            // Overview
-      guilds_compare:null,
-      dream_squad:   null,
-      hydra_trends:  null,
-      servers:       null,
-      latest_scan:   null,
-      old_scans:     "p_ssob7p70vd",  // Old Scans
-      notifications: null,
-      favorites:     null
-    };
-
-    // Helper: baue absolute Looker-URL
-    const pageURL  = (pageId) => pageId ? `https://lookerstudio.google.com/reporting/${REPORT_ID}/page/${pageId}` : null;
-    const pageHref = (pageId, hashFallback) => pageURL(pageId) || `#${hashFallback}`;
-
-    /* =========================
-       NAV-DEFINITION (Reihenfolge & Labels)
-    ==========================*/
-    const NAV_ITEMS = [
-      { key:"dashboard", label:"Dashboard", img:"https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" },
-      { key:"players",   label:"Player",    img:"https://i.postimg.cc/s2D3xgBt/iconplayer1.png" },
-      {
-        key:"guilds", label:"Guilds", img:"https://i.postimg.cc/zGkJqgfC/iconguilds1.png", dropdown:true, submenu:[
-          { key:"guilds",         label:"Overview"     },
-          { key:"guilds_compare", label:"Compare"      },
-          { key:"dream_squad",    label:"Dream Squad"  },
-          { key:"hydra_trends",   label:"Hydra Trends" }
-        ]
-      },
-      { key:"servers",      label:"Server",      img:"https://i.postimg.cc/3wSYvQmW/iconserver1.png" },
-      { key:"latest_scan",  label:"Latest Scan", img:"https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" },
-      { key:"old_scans",    label:"Old Scans",   img:"https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" },
-      { key:"notifications",label:"Notifications",img:"https://i.postimg.cc/XNTNLWhC/iconclock1.png", badgeId:"badge-noti" },
-      { key:"favorites",    label:"Favorite",    img:"https://i.postimg.cc/RZmSrRvC/iconfavorit1.png", badgeId:"badge-fav", isFav:true }
+       NAVIGATION: Root-relative Pfade
+       mit aktiver Markierung nach URL
+    ========================== */
+    const NAV = [
+      { key:"dashboard", label:"Home",    path:"/",             img:"https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" },
+      { key:"players",   label:"Player",  path:"/player/",      img:"https://i.postimg.cc/s2D3xgBt/iconplayer1.png" },
+      { key:"guilds",    label:"Guilds",  path:"/guilds/",      img:"https://i.postimg.cc/zGkJqgfC/iconguilds1.png" },
+      { key:"servers",   label:"Server",  path:"/servers/",     img:"https://i.postimg.cc/3wSYvQmW/iconserver1.png" },
+      { key:"latest",    label:"Latest",  path:"/latest-scan/", img:"https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" },
+      { key:"old",       label:"Archive", path:"/old-scans/",   img:"https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" },
+      { key:"noti",      label:"Alerts",  path:"/notifications/", img:"https://i.postimg.cc/XNTNLWhC/iconclock1.png", badgeId:"badge-noti" },
+      { key:"fav",       label:"Fav",     path:"/favorites/",   img:"https://i.postimg.cc/RZmSrRvC/iconfavorit1.png", badgeId:"badge-fav" }
     ];
 
-    /* =========================
-       Favoriten (localStorage)
-    ==========================*/
-    const FAV_KEY = 'sf_favorites';
-    const loadFavs = () => { try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch { return []; } };
-    const saveFavs = (list) => localStorage.setItem(FAV_KEY, JSON.stringify(list));
-    const formatCount = (n) => (n>99 ? "99+" : String(n));
+    const nav = document.getElementById('navbar');
 
-    /* =========================
-       Navbar rendern
-    ==========================*/
-    const navbarEl = document.getElementById('navbar');
+    function normalize(p){
+      if (!p) return '/';
+      let x = p.startsWith('/') ? p : '/'+p;
+      if (x !== '/' && !x.endsWith('/')) x += '/';
+      return x;
+    }
 
-    function renderNav(){
-      navbarEl.innerHTML = ""; // reset
-
-      NAV_ITEMS.forEach(item => {
-        const href = pageHref(PAGE[item.key], item.key);
-
-        if (item.dropdown) {
-          // Dropdown-Icon als klickbare Kachel (führt standardmäßig zu Overview-Link)
-          const wrapper = document.createElement('a');
-          wrapper.href = href;
-          wrapper.target = "_parent";
-          wrapper.className = 'nav-icon dropdown';
-          wrapper.id = `nav-${item.key}`;
-          wrapper.setAttribute('data-goto', item.key);
-
-          wrapper.innerHTML = `
-            <img src="${item.img}" alt="${item.label}">
-            <span class="label">${item.label}</span>
-            <div class="menu" role="menu" aria-label="${item.label} submenu">
-              <ul>
-                ${item.submenu.map(s => {
-                  const subHref = pageHref(PAGE[s.key], s.key);
-                  return `<li><a href="${subHref}" target="_parent" data-goto="${s.key}">${s.label}</a></li>`;
-                }).join("")}
-              </ul>
-            </div>
-          `;
-
-          // Für Touch: erster Tap öffnet Menü, zweiter folgt Link
-          wrapper.addEventListener('click', (e) => {
-            const isMenu = e.target.closest('.menu');
-            if (!isMenu) wrapper.classList.toggle('open');
-          });
-
-          // Außerhalb-Klick schließt
-          document.addEventListener('click', (e) => {
-            if (!e.target.closest(`#nav-${item.key}`)) wrapper.classList.remove('open');
-          });
-
-          navbarEl.appendChild(wrapper);
-        } else {
-          // Normale Kacheln als Links
-          const a = document.createElement('a');
-          a.href = href;
-          a.target = "_parent";
-          a.className = 'nav-icon';
-          a.id = `nav-${item.key}`;
-          a.setAttribute('data-goto', item.key);
-          a.innerHTML = `
-            <img src="${item.img}" alt="${item.label}">
-            <span class="label">${item.label}</span>
-            ${item.badgeId ? `<span class="badge hidden" id="${item.badgeId}">0</span>` : ""}
-          `;
-          if (item.isFav) a.classList.add('fav');
-          navbarEl.appendChild(a);
-        }
+    function render(){
+      nav.innerHTML = '';
+      NAV.forEach(item=>{
+        const a = document.createElement('a');
+        a.href = item.path;
+        a.className = 'nav-item';
+        a.id = 'nav-'+item.key;
+        a.innerHTML = `
+          <img src="${item.img}" alt="${item.label}">
+          <span class="label">${item.label}</span>
+          ${item.badgeId ? `<span class="badge hidden" id="${item.badgeId}">0</span>` : ``}
+        `;
+        nav.appendChild(a);
       });
     }
 
-    /* =========================
-       Active erkennen (echte URL + Hash)
-       Erkennt /page/<PAGE_ID> oder #<key>
-    ==========================*/
-    function setActiveFromURL(){
-      const url = new URL(window.location.href);
-      const path = url.pathname;
-      const hash = (url.hash || "").replace(/^#/, "");
-
-      let activeKey = null;
-
-      // 1) /page/<PAGE_ID>
-      const match = path.match(/\/page\/([A-Za-z0-9_-]+)/);
-      if (match) {
-        const pageId = match[1];
-        activeKey = Object.keys(PAGE).find(k => PAGE[k] === pageId) || null;
+    function setActive(){
+      const here = normalize(window.location.pathname);
+      let active = 'dashboard';
+      for (const it of NAV){
+        const base = normalize(it.path);
+        if (here === base || (base !== '/' && here.startsWith(base))) active = it.key;
       }
-
-      // 2) Fallback: Hash
-      if (!activeKey && hash) {
-        if (PAGE[hash] !== undefined || NAV_ITEMS.some(n => n.key === hash)) {
-          activeKey = hash;
-        }
-      }
-
-      // setzen
-      document.querySelectorAll('.nav-icon').forEach(i => i.classList.remove('active'));
-      if (activeKey) {
-        const el = document.getElementById(`nav-${activeKey}`);
-        if (el) el.classList.add('active');
-      } else {
-        // Default: Dashboard aktiv
-        const def = document.getElementById('nav-dashboard');
-        def && def.classList.add('active');
-      }
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const el = document.getElementById('nav-'+active);
+      el && el.classList.add('active');
     }
 
-    /* =========================
-       Kontext-Entity für ⭐ (aus URL)
-    ==========================*/
-    function getEntityFromURL(){
-      const url = new URL(window.location.href);
-      const params = url.searchParams;
-      let type = params.get('type');
-      let id   = params.get('id');
-      let name = params.get('name');
-
-      if (!type || !id) {
-        const hash = (url.hash || '').replace(/^#/, '');
-        if (hash) {
-          const parts = hash.split(':');
-          if (parts.length >= 2) {
-            type = type || parts[0];
-            id   = id   || parts[1];
-            if (!name && parts[2]) name = decodeURIComponent(parts.slice(2).join(':'));
-          }
-        }
-      }
-      if (!type || !id) return null;
-      return { type, id, name: name || `${type}:${id}` };
+    function demoBadges(){
+      const b1 = document.getElementById('badge-noti');
+      if (b1){ b1.textContent = '3'; b1.classList.remove('hidden'); }
+      const b2 = document.getElementById('badge-fav');
+      if (b2){ b2.textContent = '1'; b2.classList.remove('hidden'); }
     }
 
-    function updateFavUI(){
-      const favIcon  = document.getElementById('nav-favorites');
-      const favBadge = document.getElementById('badge-fav');
-      if (!favIcon || !favBadge) return;
-
-      const favs = loadFavs();
-      const count = favs.length;
-
-      if (count > 0){
-        favBadge.textContent = formatCount(count);
-        favBadge.classList.remove('hidden');
-        favIcon.classList.add('has-favs');
-      } else {
-        favBadge.classList.add('hidden');
-        favIcon.classList.remove('has-favs');
-      }
-    }
-
-    function wireInteractions(){
-      // ⭐ Toggle
-      const favIcon = document.getElementById('nav-favorites');
-      if (favIcon){
-        favIcon.addEventListener('click', () => {
-          const entity = getEntityFromURL();
-          if (!entity){ console.warn("Kein Entitäts-Kontext für Favorit."); return; }
-          let favs = loadFavs();
-          const exists = favs.some(x => x.id===entity.id && x.type===entity.type);
-          favs = exists ? favs.filter(x => !(x.id===entity.id && x.type===entity.type)) : (favs.push(entity), favs);
-          saveFavs(favs);
-          updateFavUI();
-        });
-      }
-
-      // 🔔 Beispielwert (später dynamisch)
-      const noti = document.getElementById('badge-noti');
-      if (noti){
-        const setNotificationCount = (n) => {
-          if (n>0){ noti.textContent = formatCount(n); noti.classList.remove('hidden'); }
-          else { noti.classList.add('hidden'); }
-        };
-        setNotificationCount(3);
-      }
-
-      // Visuelles Active-Feedback auf Klick
-      document.querySelectorAll('.nav-icon[data-goto], .nav-icon .menu [data-goto]').forEach(el=>{
-        el.addEventListener('click', ()=>{
-          document.querySelectorAll('.nav-icon').forEach(i=>i.classList.remove('active'));
-          const key = el.getAttribute('data-goto');
-          const target = document.getElementById(`nav-${key}`) || el.closest('.nav-icon');
-          target && target.classList.add('active');
-        });
-      });
-
-      // Hash-Änderungen beobachten (für Hash-Fallback)
-      window.addEventListener('hashchange', setActiveFromURL);
-    }
-
-    // Render + Init
-    renderNav();
-    setActiveFromURL();
-    updateFavUI();
-    wireInteractions();
+    render();
+    setActive();
+    demoBadges();
+    window.addEventListener('popstate', setActive);
   </script>
 </body>
 </html>
