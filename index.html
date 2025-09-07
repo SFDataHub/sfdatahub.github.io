@@ -7,17 +7,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root{
-      /* Palette */
       --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#20385C; --edge:#2B4C73;
       --txt:#FFFFFF; --mut:#8AA5C4; --title:#F5F9FF;
       --table-bg:#14273E; --table-head:#1E3657; --table-line:#2C4A73; --table-head-txt:#D6E4F7; --table-val:#FFFFFF; --table-row-hov:#20385C;
-      --badge:#E53935; --gold:#D4AF37; --icon:#5C8BC6;
+      --badge:#E53935;
     }
-
     *{ box-sizing:border-box; }
     html,body{ margin:0; background:var(--bg); color:var(--txt); font-family:'Quicksand',sans-serif; }
 
-    /* Topbar / Icon-Navi */
+    /* Topbar mit mittigen Icons */
     .topbar{
       position:sticky; top:0; z-index:10;
       background:var(--nav);
@@ -25,23 +23,17 @@
     }
     .nav{
       max-width:1200px; margin:0 auto; height:68px;
-      display:flex; align-items:center; gap:22px; padding:0 20px;
+      display:flex; align-items:center; justify-content:center;
+      gap:22px; padding:0 20px;
     }
-    .spacer{ flex:1; }
-
     .nav-icon{
-      position:relative;
-      width:44px; height:44px; border-radius:12px;
-      display:grid; place-items:center;
-      cursor:pointer; text-decoration:none;
-      color:var(--txt);
-      transition:background .2s ease, filter .2s ease;
+      position:relative; width:44px; height:44px; border-radius:12px;
+      display:grid; place-items:center; text-decoration:none; color:var(--txt);
+      transition:background .2s;
     }
-    .nav-icon img{ width:22px; height:22px; filter:drop-shadow(0 0 0 rgba(0,0,0,0)); opacity:.9; }
+    .nav-icon img{ width:22px; height:22px; opacity:.9; }
     .nav-icon:hover{ background:rgba(255,255,255,.06); }
     .nav-icon.active{ background:#1F3B5D; }
-    .nav-icon.active img{ opacity:1; }
-
     .badge{
       position:absolute; top:-6px; right:-6px;
       min-width:18px; height:18px; padding:0 5px;
@@ -49,100 +41,66 @@
       display:flex; align-items:center; justify-content:center;
       font-size:11px; font-weight:700; border:1px solid rgba(0,0,0,.25);
     }
-    .badge.hidden{ display:none; }
 
-    /* Page header */
+    /* Seite */
     .container{ max-width:1100px; margin:0 auto; padding:22px 20px 28px; }
     h1{ margin:14px 0 22px; font-size:28px; color:var(--title); font-weight:700; letter-spacing:.3px; }
 
-    /* CTA rechts */
-    .cta-right{
-      margin-left:auto;
-      background:#1E2F47; border:1px solid var(--edge); color:#fff;
-      padding:10px 16px; border-radius:12px; text-decoration:none; font-weight:600;
-      transition:background .2s ease, transform .15s ease;
-    }
-    .cta-right:hover{ background:#2A4C72; transform:translateY(-1px); }
-
-    /* Cards grid */
+    /* Cards */
     .grid{ display:grid; gap:16px; grid-template-columns:repeat(3,1fr); }
     @media (max-width:980px){ .grid{ grid-template-columns:repeat(2,1fr); } }
     @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
-
     .card{
       background:var(--tile); border:1px solid var(--edge);
-      border-radius:16px; padding:18px 18px;
-      box-shadow:0 6px 20px rgba(0,0,0,.22);
+      border-radius:16px; padding:18px; box-shadow:0 6px 20px rgba(0,0,0,.22);
       transition:transform .15s ease, background .2s ease, box-shadow .2s ease;
     }
     .card:hover{ background:var(--tile-hov); transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.28); }
     .card h3{ margin:0 0 6px; font-size:18px; color:var(--title); }
     .card p{ margin:0; color:var(--mut); font-size:14px; }
 
-    /* Table */
+    /* Tabelle */
     .table-wrap{
-      margin-top:16px;
-      background:var(--table-bg); border:1px solid var(--edge);
+      margin-top:16px; background:var(--table-bg); border:1px solid var(--edge);
       border-radius:16px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,.2);
     }
     table{ width:100%; border-collapse:collapse; font-size:14px; }
-    thead th{
-      background:var(--table-head);
-      color:var(--table-head-txt); text-align:left; padding:12px 16px; font-weight:700;
-      border-bottom:1px solid var(--table-line);
-    }
-    tbody td{
-      color:var(--table-val); padding:14px 16px; border-bottom:1px solid var(--table-line);
-    }
+    thead th{ background:var(--table-head); color:var(--table-head-txt); text-align:left; padding:12px 16px; font-weight:700; border-bottom:1px solid var(--table-line); }
+    tbody td{ color:var(--table-val); padding:14px 16px; border-bottom:1px solid var(--table-line); }
     tbody tr:hover{ background:var(--table-row-hov); }
-
-    /* Section header row with CTA */
-    .row{
-      display:flex; align-items:center; gap:12px; margin-top:8px; margin-bottom:18px;
-    }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation -->
+  <!-- Top Navigation (icons centered) -->
   <div class="topbar">
     <div class="nav">
       <a class="nav-icon active" href="/index.html" title="Home" id="nav-dashboard">
         <img src="https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" alt="Home">
       </a>
-
       <a class="nav-icon" href="/player/index.html" title="Player" id="nav-players">
         <img src="https://i.postimg.cc/s2D3xgBt/iconplayer1.png" alt="Player">
       </a>
-
       <a class="nav-icon" href="/guilds/index.html" title="Guilds" id="nav-guilds">
         <img src="https://i.postimg.cc/zGkJqgfC/iconguilds1.png" alt="Guilds">
       </a>
-
       <a class="nav-icon" href="/servers/index.html" title="Servers" id="nav-servers">
         <img src="https://i.postimg.cc/3wSYvQmW/iconserver1.png" alt="Servers">
       </a>
-
       <a class="nav-icon" href="/latest-scan/index.html" title="Latest Scan" id="nav-latest">
         <img src="https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" alt="Latest Scan">
       </a>
-
       <a class="nav-icon" href="/old-scans/index.html" title="Old Scans" id="nav-old">
         <img src="https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" alt="Old Scans">
       </a>
-
       <a class="nav-icon" href="/notifications/index.html" title="Notifications" id="nav-bell">
         <img src="https://i.postimg.cc/XNTNLWhC/iconclock1.png" alt="Notifications">
         <span class="badge" id="badge-noti">3</span>
       </a>
-
       <a class="nav-icon" href="/favorites/index.html" title="Favorites" id="nav-fav">
         <img src="https://i.postimg.cc/RZmSrRvC/iconfavorit1.png" alt="Favorites">
         <span class="badge" id="badge-fav">1</span>
       </a>
-
-      <div class="spacer"></div>
-      <a class="cta-right" href="/player/index.html">Zu Spieler →</a>
     </div>
   </div>
 
@@ -151,90 +109,38 @@
     <h1>S&F Data Hub</h1>
 
     <div class="grid">
-      <div class="card">
-        <h3>Spieler</h3>
-        <p>Profile, Filter &amp; Vergleiche.</p>
-      </div>
-
-      <div class="card">
-        <h3>Gilden</h3>
-        <p>Übersicht, Compare, Dream Squad, Hydra.</p>
-      </div>
-
-      <div class="card">
-        <h3>Server</h3>
-        <p>EU/INT Trends &amp; Verteilung.</p>
-      </div>
-
-      <div class="card">
-        <h3>Letzter Scan</h3>
-        <p>Aktuelle Daten, Stand heute.</p>
-      </div>
-
-      <div class="card">
-        <h3>Alte Scans</h3>
-        <p>Historische Daten &amp; Archiv.</p>
-      </div>
-
-      <div class="card">
-        <h3>Favoriten</h3>
-        <p>Schnellzugriff auf gespeicherte Einträge.</p>
-      </div>
-    </div>
-
-    <div class="row">
-      <!-- Platz für kleine Hinweise / Filter-Shortcuts etc. -->
+      <div class="card"><h3>Spieler</h3><p>Profile, Filter &amp; Vergleiche.</p></div>
+      <div class="card"><h3>Gilden</h3><p>Übersicht, Compare, Dream Squad, Hydra.</p></div>
+      <div class="card"><h3>Server</h3><p>EU/INT Trends &amp; Verteilung.</p></div>
+      <div class="card"><h3>Letzter Scan</h3><p>Aktuelle Daten, Stand heute.</p></div>
+      <div class="card"><h3>Alte Scans</h3><p>Historische Daten &amp; Archiv.</p></div>
+      <div class="card"><h3>Favoriten</h3><p>Schnellzugriff auf gespeicherte Einträge.</p></div>
     </div>
 
     <div class="table-wrap">
       <table>
         <thead>
-          <tr>
-            <th>Spieler</th>
-            <th>Gilde</th>
-            <th>Server</th>
-            <th>Power</th>
-          </tr>
+          <tr><th>Spieler</th><th>Gilde</th><th>Server</th><th>Power</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td>HeroX</td>
-            <td>Welten im Wandel</td>
-            <td>F28</td>
-            <td>1.245k</td>
-          </tr>
-          <tr>
-            <td>Arcane</td>
-            <td>Nightwatch</td>
-            <td>EU3</td>
-            <td>1.102k</td>
-          </tr>
-          <tr>
-            <td>Nova</td>
-            <td>Hydra</td>
-            <td>INT1</td>
-            <td>987k</td>
-          </tr>
+          <tr><td>HeroX</td><td>Welten im Wandel</td><td>F28</td><td>1.245k</td></tr>
+          <tr><td>Arcane</td><td>Nightwatch</td><td>EU3</td><td>1.102k</td></tr>
+          <tr><td>Nova</td><td>Hydra</td><td>INT1</td><td>987k</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <script>
-    // Aktiven Tab anhand Pfad setzen (falls nicht Home)
+    // Aktiven Tab gemäß Pfad setzen (falls Seite nicht Home ist)
     (function(){
       const p = location.pathname.toLowerCase();
       const map = [
-        ['players','nav-players'],
-        ['guilds','nav-guilds'],
-        ['servers','nav-servers'],
-        ['latest-scan','nav-latest'],
-        ['old-scans','nav-old'],
-        ['notifications','nav-bell'],
-        ['favorites','nav-fav']
+        ['players','nav-players'],['guilds','nav-guilds'],['servers','nav-servers'],
+        ['latest-scan','nav-latest'],['old-scans','nav-old'],['notifications','nav-bell'],['favorites','nav-fav']
       ];
-      let active = 'nav-dashboard';
-      for (const [seg,id] of map){ if(p.includes('/'+seg+'/')){ active = id; break; } }
+      let active='nav-dashboard';
+      for(const [seg,id] of map){ if(p.includes('/'+seg+'/')){ active=id; break; } }
       document.querySelectorAll('.nav-icon').forEach(i=>i.classList.remove('active'));
       document.getElementById(active)?.classList.add('active');
     })();
