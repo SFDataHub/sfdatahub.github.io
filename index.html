@@ -16,7 +16,7 @@
     *{ box-sizing:border-box; }
     html,body{ margin:0; background:var(--bg); color:var(--txt); font-family:'Quicksand',sans-serif; }
 
-    /* === TOPBAR (Icons mittig, 80x50 Buttons, 40px Icons) === */
+    /* === TOPBAR === */
     .topbar{ position:sticky; top:0; z-index:10; background:var(--nav); border-bottom:1px solid rgba(255,255,255,.04); }
     .nav{ max-width:1200px; margin:0 auto; height:68px; display:flex; align-items:center; justify-content:center; gap:24px; padding:0 20px; }
 
@@ -29,6 +29,8 @@
     .nav-icon:hover{ background:var(--tile-hov); }
     .nav-icon.active{ background:#1F3B5D; }
     .nav-icon img{ width:40px; height:40px; opacity:.95; display:block; }
+    .nav-icon.logo:hover{ background:transparent; cursor:default; }
+
     .badge{
       position:absolute; top:2px; right:4px;
       min-width:18px; height:18px; padding:0 5px;
@@ -83,7 +85,7 @@
   <div class="topbar">
     <nav class="nav">
 
-      <!-- Home (ohne Dropdown) -->
+      <!-- Home -->
       <div class="nav-item">
         <a class="nav-icon active" href="/index.html" id="nav-dashboard" title="Home">
           <img src="https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" alt="Home">
@@ -95,7 +97,7 @@
         <a class="nav-icon" href="/player/index.html" id="nav-players" title="Player">
           <img src="https://i.postimg.cc/s2D3xgBt/iconplayer1.png" alt="Player">
         </a>
-        <div class="menu" role="menu" aria-label="Players">
+        <div class="menu">
           <a href="/player/index.html">Overview</a>
           <a href="/player/index.html#compare">Compare</a>
           <a href="/player/index.html#classes">Class Analysis</a>
@@ -108,7 +110,7 @@
         <a class="nav-icon" href="/guilds/index.html" id="nav-guilds" title="Guilds">
           <img src="https://i.postimg.cc/zGkJqgfC/iconguilds1.png" alt="Guilds">
         </a>
-        <div class="menu" role="menu" aria-label="Guilds">
+        <div class="menu">
           <a href="/guilds/index.html">Overview</a>
           <a href="/guilds/index.html#compare">Compare</a>
           <a href="/guilds/index.html#dream-squad">Dream Squad</a>
@@ -121,10 +123,17 @@
         <a class="nav-icon" href="/servers/index.html" id="nav-servers" title="Servers">
           <img src="https://i.postimg.cc/3wSYvQmW/iconserver1.png" alt="Servers">
         </a>
-        <div class="menu" role="menu" aria-label="Servers">
+        <div class="menu">
           <a href="/servers/index.html">Overview</a>
           <a href="/servers/index.html#compare">Compare</a>
           <a href="/servers/index.html#trends">Trends</a>
+        </div>
+      </div>
+
+      <!-- Logo (Deko) -->
+      <div class="nav-item">
+        <div class="nav-icon logo" title="S&F Data Hub">
+          <img src="https://i.postimg.cc/SsrbKmgn/logo3trans.png" alt="Logo" style="width:42px; height:auto;">
         </div>
       </div>
 
@@ -133,7 +142,7 @@
         <a class="nav-icon" href="/latest-scan/index.html" id="nav-latest" title="Latest Scan">
           <img src="https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" alt="Latest">
         </a>
-        <div class="menu" role="menu" aria-label="Latest Scan">
+        <div class="menu">
           <a href="/latest-scan/index.html">Heute</a>
           <a href="/latest-scan/index.html#summary">Summary</a>
           <a href="/latest-scan/index.html#details">Details</a>
@@ -145,14 +154,14 @@
         <a class="nav-icon" href="/old-scans/index.html" id="nav-old" title="Old Scans">
           <img src="https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" alt="Old Scans">
         </a>
-        <div class="menu" role="menu" aria-label="Old Scans">
+        <div class="menu">
           <a href="/old-scans/index.html">Archiv</a>
           <a href="/old-scans/index.html#compare">Scans vergleichen</a>
           <a href="/old-scans/index.html#exports">Exporte</a>
         </div>
       </div>
 
-      <!-- Notifications (ohne Dropdown) -->
+      <!-- Notifications -->
       <div class="nav-item">
         <a class="nav-icon" href="/notifications/index.html" id="nav-bell" title="Notifications">
           <img src="https://i.postimg.cc/XNTNLWhC/iconclock1.png" alt="Notifications">
@@ -160,7 +169,7 @@
         </a>
       </div>
 
-      <!-- Favorites (ohne Dropdown) -->
+      <!-- Favorites -->
       <div class="nav-item">
         <a class="nav-icon" href="/favorites/index.html" id="nav-fav" title="Favorites">
           <img src="https://i.postimg.cc/RZmSrRvC/iconfavorit1.png" alt="Favorites">
@@ -197,7 +206,7 @@
   </div>
 
   <script>
-    // Aktive Kachel anhand Pfad
+    // Aktiven Tab anhand Pfad setzen
     (function(){
       const p = location.pathname.toLowerCase();
       const map = [
