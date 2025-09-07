@@ -1,21 +1,19 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>S&F Data Hub — Dashboard</title>
+  <title>S&F Data Hub Navigation</title>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root{
       --bg:#0C1C2E; --nav:#0A1728; --tile:#1A2F4A; --tile-hov:#25456B; --edge:#2B4C73;
-      --txt:#FFFFFF; --mut:#B0C4D9; --menu:#152A42; --menu-hov:#1E3A5C; --gold:#D4AF37; --badge:#E53935;
+      --txt:#FFFFFF; --mut:#B0C4D9; --menu:#152A42; --menu-hov:#1E3A5C;
+      --gold:#D4AF37; --badge:#E53935;
     }
-    html, body { margin:0; background:var(--bg); color:var(--txt); font-family:'Quicksand',sans-serif; }
-
-    /* NAVBAR (wie auf old-scans.html) */
+    body{ margin:0; font-family:'Quicksand',sans-serif; background:transparent; color:var(--txt); }
     .navbar{ display:flex; align-items:center; justify-content:center; gap:24px; padding:10px; background:transparent; }
     .nav-icon{ position:relative; width:80px; height:50px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:12px; transition:background .3s ease; color:var(--txt); text-decoration:none; }
-    .nav-icon img, .nav-icon .label{ position:absolute; transition:opacity .25s ease; pointer-events:none; }
+    .nav-icon img,.nav-icon .label{ position:absolute; transition:opacity .25s ease; pointer-events:none; }
     .nav-icon img{ width:40px; height:40px; opacity:1; display:block; }
     .nav-icon .label{ opacity:0; font-size:14px; font-weight:600; }
     .nav-icon:hover{ background:var(--tile-hov); }
@@ -26,7 +24,7 @@
     .nav-icon.active .label{ display:none; }
     .badge{ position:absolute; top:2px; right:4px; min-width:18px; height:18px; padding:0 5px; background:var(--badge); color:#fff; border-radius:999px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; line-height:1; border:1px solid rgba(0,0,0,.25); }
     .badge.hidden{ display:none; }
-    .nav-icon.fav.has-favs{ box-shadow:0 0 0 2px var(--gold), 0 0 12px rgba(212,175,55,.45); background: var(--tile); }
+    .nav-icon.fav.has-favs{ box-shadow:0 0 0 2px var(--gold), 0 0 12px rgba(212,175,55,.45); background:var(--tile); }
     .nav-icon.dropdown{ overflow:visible; }
     .nav-icon .menu{ position:absolute; top:56px; left:50%; transform:translateX(-50%); background:var(--menu); border:1px solid var(--edge); border-radius:12px; min-width:200px; padding:8px; display:none; z-index:10; box-shadow:0 12px 24px rgba(0,0,0,.35); }
     .nav-icon .menu::before{ content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%); border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--menu); }
@@ -36,113 +34,99 @@
     .nav-icon .menu a:hover{ background:var(--menu-hov); }
     .nav-icon.dropdown:hover .menu, .nav-icon.dropdown:focus-within .menu, .nav-icon.dropdown.open .menu{ display:block; }
     .nav-icon:not(.active){ background:transparent; }
-
-    /* Startseiten-Inhalt (Platzhalter) */
-    .hero{ max-width:1100px; margin:10px auto; padding:18px; background:rgba(20,39,62,.35); border:1px solid var(--edge); border-radius:16px; }
-    .hero h1{ margin:0 0 8px 0; font-size:22px; }
-    .grid{ max-width:1100px; margin:16px auto; display:grid; gap:12px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
-    .card{ background:var(--tile); border:1px solid var(--edge); border-radius:14px; padding:14px; min-height:90px; }
-    .card a{ color:#fff; text-decoration:none; display:block; }
-    .card:hover{ background:#20385C; }
-    .mut{ color:var(--mut); font-size:13px; }
   </style>
 </head>
 <body>
-
-  <!-- NAVBAR -->
   <div class="navbar" id="navbar"></div>
 
-  <!-- Startseite-Content (Beispiel/Platzhalter) -->
-  <section class="hero">
-    <h1>S&F Data Hub — Dashboard</h1>
-    <p class="mut">Navigation oben: Hover zeigt Texte, Klick wechselt die Seite. „Old Scans“ öffnet den eingebetteten Looker-Report.</p>
-  </section>
-
-  <section class="grid">
-    <div class="card"><a href="./old-scans.html">📄 Old Scans öffnen</a></div>
-    <div class="card"><a href="#players">🧙 Spieler-Bereich (Platzhalter)</a></div>
-    <div class="card"><a href="#guilds">🛡️ Gilden-Bereich (Platzhalter)</a></div>
-    <div class="card"><a href="#servers">🌍 Server-Bereich (Platzhalter)</a></div>
-  </section>
-
   <script>
-    /* ---------- NAV-Daten (gleich wie old-scans.html) ---------- */
+    /* ---- feste Links für sfdatahub.github.io ---- */
     const NAV_ITEMS = [
-      { key:"dashboard", label:"Dashboard", href:"./index.html", img:"https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" },
-      { key:"players",   label:"Player",    href:"#players",     img:"https://i.postimg.cc/s2D3xgBt/iconplayer1.png" },
+      { key:"dashboard",   label:"Dashboard",    href:"/index.html",             img:"https://i.postimg.cc/gcwk3jMp/Chat-GPT-Image-7-Sept-2025-10-55-58.png" },
+      { key:"players",     label:"Player",       href:"/player/index.html",      img:"https://i.postimg.cc/s2D3xgBt/iconplayer1.png" },
       {
-        key:"guilds", label:"Guilds", href:"#guilds", img:"https://i.postimg.cc/zGkJqgfC/iconguilds1.png", dropdown:true, submenu:[
-          { key:"guilds",         label:"Overview",    href:"#guilds" },
-          { key:"guilds_compare", label:"Compare",     href:"#guilds-compare" },
-          { key:"dream_squad",    label:"Dream Squad", href:"#dream-squad" },
-          { key:"hydra_trends",   label:"Hydra Trends",href:"#hydra-trends" }
+        key:"guilds", label:"Guilds", href:"/guilds/index.html", img:"https://i.postimg.cc/zGkJqgfC/iconguilds1.png",
+        dropdown:true, submenu:[
+          { key:"guilds",         label:"Overview",     href:"/guilds/index.html" },
+          { key:"guilds_compare", label:"Compare",      href:"#guilds-compare" },
+          { key:"dream_squad",    label:"Dream Squad",  href:"#dream-squad" },
+          { key:"hydra_trends",   label:"Hydra Trends", href:"#hydra-trends" }
         ]
       },
-      { key:"servers",      label:"Server",      href:"#servers",      img:"https://i.postimg.cc/3wSYvQmW/iconserver1.png" },
-      { key:"latest_scan",  label:"Latest Scan", href:"#latest-scan",  img:"https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" },
-      { key:"old_scans",    label:"Old Scans",   href:"./old-scans.html", img:"https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" },
-      { key:"notifications",label:"Notifications",href:"#notifications", img:"https://i.postimg.cc/XNTNLWhC/iconclock1.png", badgeId:"badge-noti" },
-      { key:"favorites",    label:"Favorite",    href:"#favorites",   img:"https://i.postimg.cc/RZmSrRvC/iconfavorit1.png", badgeId:"badge-fav", isFav:true }
+      { key:"servers",      label:"Server",       href:"/servers/index.html",     img:"https://i.postimg.cc/3wSYvQmW/iconserver1.png" },
+      { key:"latest_scan",  label:"Latest Scan",  href:"/latest-scan/index.html", img:"https://i.postimg.cc/QxLJy5gm/iconlatestscan2.png" },
+      { key:"old_scans",    label:"Old Scans",    href:"/old-scans/index.html",   img:"https://i.postimg.cc/VLnfHTQH/iconoldscans1.png" },
+      { key:"notifications",label:"Notifications",href:"/notifications/index.html", img:"https://i.postimg.cc/XNTNLWhC/iconclock1.png", badgeId:"badge-noti" },
+      { key:"favorites",    label:"Favorite",     href:"/favorites/index.html",   img:"https://i.postimg.cc/RZmSrRvC/iconfavorit1.png", badgeId:"badge-fav", isFav:true }
     ];
 
-    const navbarEl = document.getElementById('navbar');
+    /* ---- Favoriten-Count/Glow (optional) ---- */
+    const FAV_KEY='sf_favorites';
+    const loadFavs=()=>{try{return JSON.parse(localStorage.getItem(FAV_KEY))||[];}catch{return[];}};
+    const formatCount=(n)=>n>99?"99+":String(n);
+
+    const navbarEl=document.getElementById('navbar');
 
     function renderNav(){
-      navbarEl.innerHTML = "";
-      NAV_ITEMS.forEach(item => {
-        if (item.dropdown){
-          const a = document.createElement('a');
-          a.href = item.href; a.target = "_self";
-          a.className = 'nav-icon dropdown';
-          a.id = `nav-${item.key}`;
-          a.setAttribute('data-goto', item.key);
-          a.innerHTML = `
+      navbarEl.innerHTML="";
+      NAV_ITEMS.forEach(item=>{
+        if(item.dropdown){
+          const a=document.createElement('a');
+          a.href=item.href;a.className='nav-icon dropdown';a.id=`nav-${item.key}`;a.setAttribute('data-goto',item.key);
+          a.innerHTML=`
             <img src="${item.img}" alt="${item.label}">
             <span class="label">${item.label}</span>
-            <div class="menu" role="menu">
-              <ul>
-                ${item.submenu.map(s => `<li><a href="${s.href}" data-goto="${s.key}">${s.label}</a></li>`).join("")}
-              </ul>
-            </div>
-          `;
-          a.addEventListener('click', (e) => {
-            const isMenu = e.target.closest('.menu'); if (!isMenu) a.classList.toggle('open');
-          });
-          document.addEventListener('click', (e) => { if (!e.target.closest(`#nav-${item.key}`)) a.classList.remove('open'); });
+            <div class="menu" role="menu"><ul>
+              ${item.submenu.map(s=>`<li><a href="${s.href}" data-goto="${s.key}">${s.label}</a></li>`).join("")}
+            </ul></div>`;
+          a.addEventListener('click',e=>{const isMenu=e.target.closest('.menu'); if(!isMenu)a.classList.toggle('open');});
+          document.addEventListener('click',e=>{if(!e.target.closest(`#nav-${item.key}`)) a.classList.remove('open');});
           navbarEl.appendChild(a);
-        } else {
-          const a = document.createElement('a');
-          a.href = item.href; a.target = "_self";
-          a.className = 'nav-icon'; a.id = `nav-${item.key}`;
-          a.setAttribute('data-goto', item.key);
-          a.innerHTML = `
+        }else{
+          const a=document.createElement('a');
+          a.href=item.href;a.className='nav-icon';a.id=`nav-${item.key}`;a.setAttribute('data-goto',item.key);
+          a.innerHTML=`
             <img src="${item.img}" alt="${item.label}">
             <span class="label">${item.label}</span>
-            ${item.badgeId ? `<span class="badge hidden" id="${item.badgeId}">0</span>` : ""}
+            ${item.badgeId?`<span class="badge hidden" id="${item.badgeId}">0</span>`:""}
           `;
-          if (item.isFav) a.classList.add('fav');
+          if(item.isFav)a.classList.add('fav');
           navbarEl.appendChild(a);
         }
       });
     }
 
-    function setActive(){
-      const path = location.pathname.toLowerCase();
-      let key = path.endsWith('/index.html') || path.endsWith('/') ? 'dashboard'
-              : path.endsWith('/old-scans.html') ? 'old_scans'
-              : null;
-      if (!key && location.hash) key = location.hash.replace('#','');
-      document.querySelectorAll('.nav-icon').forEach(n => n.classList.remove('active'));
-      if (key) document.getElementById(`nav-${key}`)?.classList.add('active');
+    function setActiveFromPath(){
+      const p=location.pathname.toLowerCase();
+      let key='dashboard';
+      if(p.endsWith('/')||p.endsWith('/index.html')) key='dashboard';
+      if(p.includes('/player/')) key='players';
+      if(p.includes('/guilds/')) key='guilds';
+      if(p.includes('/servers/')) key='servers';
+      if(p.includes('/latest-scan/')) key='latest_scan';
+      if(p.includes('/old-scans/')) key='old_scans';
+      if(p.includes('/notifications/')) key='notifications';
+      if(p.includes('/favorites/')) key='favorites';
+      document.querySelectorAll('.nav-icon').forEach(i=>i.classList.remove('active'));
+      document.getElementById(`nav-${key}`)?.classList.add('active');
     }
 
     function setupBadges(){
-      const noti = document.getElementById('badge-noti'); if (noti){ noti.textContent = '3'; noti.classList.remove('hidden'); }
-      const fav  = document.getElementById('badge-fav');  if (fav){ fav.classList.add('hidden'); }
+      // Notifications Demo (später dynamisch)
+      const noti=document.getElementById('badge-noti'); if(noti){noti.textContent='3';noti.classList.remove('hidden');}
+      // Favorites Count
+      const favBadge=document.getElementById('badge-fav');
+      const favIcon=document.getElementById('nav-favorites');
+      const favs=loadFavs();
+      if(favBadge){
+        if(favs.length>0){favBadge.textContent=formatCount(favs.length); favBadge.classList.remove('hidden'); favIcon?.classList.add('has-favs');}
+        else {favBadge.classList.add('hidden'); favIcon?.classList.remove('has-favs');}
+      }
     }
 
-    renderNav(); setActive(); setupBadges();
-    window.addEventListener('hashchange', setActive);
+    renderNav();
+    setActiveFromPath();
+    setupBadges();
   </script>
 </body>
 </html>
