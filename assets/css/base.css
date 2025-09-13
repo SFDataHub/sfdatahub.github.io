@@ -13,7 +13,8 @@
 
   --header-h:80px;
   --logo-dock-w:208px;
-  --sidebar-collapsed-w:56px;
+  /* NEU: eingeklappt etwas breiter, damit Login-Icon nicht übersteht */
+  --sidebar-collapsed-w:64px;
   --sidebar-expanded-w:var(--logo-dock-w);
   --sidebar-w: var(--sidebar-collapsed-w);
 }
@@ -45,8 +46,7 @@ button{ font:inherit }
   background:var(--nav); z-index:30;
   display:flex; align-items:center; gap:16px;
   padding:0 24px 0 calc(var(--logo-dock-w) + 16px);
-  /* kein border, kein shadow */
-  border-bottom:none; box-shadow:none;
+  border-bottom:none; box-shadow:none; /* keine Linien */
 }
 .topbar .btn-ico{ padding:10px; display:inline-flex; align-items:center; justify-content:center }
 
@@ -75,8 +75,7 @@ button{ font:inherit }
   width:var(--sidebar-w); background:var(--nav); z-index:20;
   display:grid; grid-template-rows:auto 1fr auto;
   transition:width .25s ease;
-  /* kein border, kein shadow */
-  border-right:none; box-shadow:none;
+  border-right:none; box-shadow:none; /* keine Linien */
 }
 .sidebar.expanded{ width:var(--sidebar-expanded-w) }
 
@@ -94,7 +93,7 @@ button{ font:inherit }
   gap:12px; padding:0 12px; border-radius:16px; background:transparent; border:0; color:var(--text); cursor:pointer;
   transition:background .15s ease;
 }
-.sidebar:not(.expanded) .nav-btn{ justify-content:center; padding:0 }
+.sidebar:not(.expanded) .nav-btn{ justify-content:center; padding:0 } /* Icons exakt mittig */
 .nav-btn:hover{ background:var(--tile-hover) }
 .txt-glow:hover{
   text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8)
@@ -120,11 +119,17 @@ button{ font:inherit }
   width:100%; padding:8px 12px; border-radius:12px;
   display:flex; align-items:center; justify-content:center; gap:8px
 }
-.legal{
-  font-size:11px; opacity:.8; color:var(--text-soft);
-  display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px
+/* WICHTIG: Im eingeklappten Zustand Login-Button wie Icon-Buttons zentrieren,
+   mit gleichem Abstand beidseitig und ohne Überstand */
+.sidebar:not(.expanded) .footer .login{
+  width:40px; height:40px;           /* gleiche Box wie Nav-Icons */
+  padding:0;                          /* kein Innenabstand, sonst versetzt */
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto;                      /* sauber mittig in der schmalen Spalte */
+  border-radius:16px;
 }
-.muted{ font-size:11px; opacity:.6; color:var(--text-soft); margin-top:6px }
+/* Icon-Größe für den Login-Button angleichen */
+.footer .login i[data-lucide]{ width:20px; height:20px }
 
 /* ===================== Content ===================== */
 .content{
