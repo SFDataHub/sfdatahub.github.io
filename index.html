@@ -1,1 +1,48 @@
 
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="sf-version" content="0.1.0">
+  <meta name="sf-build" content="2025-09-13">
+  <title>SF Data Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/base.css">
+</head>
+<body>
+
+  <!-- Partials (werden per JS geladen) -->
+  <div data-include="partials/logo.html"></div>
+  <div data-include="partials/topbar.html"></div>
+  <div data-include="partials/sidebar.html" data-sidebar></div>
+
+  <!-- Seiteninhalt -->
+  <main class="content" id="content">
+    <section class="section">
+      <div class="sec-left">
+        <i data-lucide="list-ordered"></i>
+        <div>
+          <div style="font-size:14px; color:var(--text-soft)">Aktiver Bereich</div>
+          <div style="font-weight:600; font-size:18px; color:var(--title)">Toplisten</div>
+        </div>
+      </div>
+      <div class="sec-subtabs">
+        <button class="pill active">Alle</button>
+        <button class="pill">Server</button>
+        <button class="pill">Klassen</button>
+      </div>
+    </section>
+
+    <div style="height:420px; display:grid; place-items:center; opacity:.6">
+      <div>Template‑Platzhalter — füge später deinen Seiten‑Content ein</div>
+    </div>
+  </main>
+
+  <!-- libs + boot -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="assets/js/boot.js" defer></script>
+</body>
+</html>
