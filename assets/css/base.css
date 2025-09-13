@@ -17,6 +17,7 @@
   --sidebar-expanded-w:var(--logo-dock-w);
   --sidebar-w: var(--sidebar-collapsed-w);
 }
+
 *{ box-sizing:border-box }
 html,body{ height:100% }
 body{
@@ -28,7 +29,7 @@ button{ font:inherit }
 .btn{ background:var(--btn); border:0; color:var(--text); border-radius:12px; cursor:pointer }
 .btn:focus{ outline:2px solid rgba(255,255,255,.15); outline-offset:2px }
 
-/* Logo-Dock */
+/* ===================== Logo-Dock (links oben, fix) ===================== */
 .logo-dock{
   position:fixed; inset:0 auto auto 0;
   width:var(--logo-dock-w); height:var(--header-h);
@@ -38,18 +39,22 @@ button{ font:inherit }
 }
 .logo-dock img{ max-height:72px; width:auto; display:block }
 
-/* Topbar */
+/* ===================== Topbar (starr, OHNE Rahmen) ===================== */
 .topbar{
   position:fixed; inset:0 0 auto 0; height:var(--header-h);
   background:var(--nav); z-index:30;
   display:flex; align-items:center; gap:16px;
   padding:0 24px 0 calc(var(--logo-dock-w) + 16px);
-  border-bottom:1px solid var(--line);
+  /* kein border, kein shadow */
+  border-bottom:none; box-shadow:none;
 }
 .topbar .btn-ico{ padding:10px; display:inline-flex; align-items:center; justify-content:center }
 
 .search-wrap{ position:relative; flex:1; max-width:680px }
-.search{ width:100%; border-radius:18px; padding:9px 12px 9px 36px; border:1px solid var(--line); background:var(--tile); color:var(--text) }
+.search{
+  width:100%; border-radius:18px; padding:9px 12px 9px 36px;
+  border:1px solid var(--line); background:var(--tile); color:var(--text)
+}
 .search::placeholder{ color:var(--text-soft) }
 .search-ico{ position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:.7 }
 
@@ -58,23 +63,25 @@ button{ font:inherit }
 .avatar-btn{ padding:2px; border-radius:999px; background:var(--tile); border:none; cursor:pointer }
 .avatar{ width:36px; height:36px; border-radius:999px; display:block; object-fit:cover }
 
-/* Linke Spalte in Sidebar-Farbe (unter Logo bis unten) */
+/* ===== Linke Spalte in Sidebar-Farbe (unter Logo bis unten) ===== */
 .logo-fill{
   position:fixed; left:0; top:var(--header-h); bottom:0; width:var(--sidebar-w);
   background:var(--nav); z-index:0; pointer-events:none; transition:width .25s ease;
 }
 
-/* Sidebar */
+/* ===================== Sidebar (Hover-Expand, OHNE Rahmen) ===================== */
 .sidebar{
   position:fixed; left:0; top:var(--header-h); height:calc(100vh - var(--header-h));
   width:var(--sidebar-w); background:var(--nav); z-index:20;
   display:grid; grid-template-rows:auto 1fr auto;
   transition:width .25s ease;
-  border-right:1px solid var(--line);
+  /* kein border, kein shadow */
+  border-right:none; box-shadow:none;
 }
 .sidebar.expanded{ width:var(--sidebar-expanded-w) }
-.nav-scroll{ overflow:auto; }
-/* Scrollbar verstecken */
+
+.nav-scroll{ overflow:auto }
+/* Scrollbar verstecken (aber weiterhin scrollbar) */
 .nav-scroll{ scrollbar-width:none; -ms-overflow-style:none }
 .nav-scroll::-webkit-scrollbar{ width:0; height:0; background:transparent }
 
@@ -89,48 +96,69 @@ button{ font:inherit }
 }
 .sidebar:not(.expanded) .nav-btn{ justify-content:center; padding:0 }
 .nav-btn:hover{ background:var(--tile-hover) }
-.txt-glow:hover{ text-shadow:0 0 15px rgba(92,139,198,1),0 0 25px rgba(92,139,198,.8) }
+.txt-glow:hover{
+  text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8)
+}
 
-/* Aktiver Bereich Block */
+/* Aktiver Bereich Block (optisch wie Kategorien, starr) */
 .active-block{ padding:10px 12px 8px }
 .active-head{ display:flex; align-items:center; gap:12px; height:40px; padding:0 12px }
 .sidebar:not(.expanded) .active-head{ justify-content:center; padding:0 }
 .subcol{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
 
-/* Pills für Subtabs im Content */
-.pill{ padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:var(--tile); font-size:14px; white-space:nowrap }
+/* ===================== Pills (Subtabs im Content) ===================== */
+.pill{
+  padding:6px 10px; border-radius:999px;
+  border:1px solid var(--line); background:var(--tile);
+  font-size:14px; white-space:nowrap
+}
 .pill.active{ background:var(--active) }
 
-/* Footer */
+/* ===================== Footer (Sidebar) ===================== */
 .footer{ padding:12px }
-.footer .login{ width:100%; padding:8px 12px; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:8px }
-.legal{ font-size:11px; opacity:.8; color:var(--text-soft); display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px }
+.footer .login{
+  width:100%; padding:8px 12px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center; gap:8px
+}
+.legal{
+  font-size:11px; opacity:.8; color:var(--text-soft);
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px
+}
 .muted{ font-size:11px; opacity:.6; color:var(--text-soft); margin-top:6px }
 
-/* Content */
-.content{ margin-left:var(--sidebar-w); padding: calc(var(--header-h) + 0px) 16px 24px 16px; transition: margin-left .25s ease; min-height:100vh }
+/* ===================== Content ===================== */
+.content{
+  margin-left:var(--sidebar-w);
+  padding: calc(var(--header-h) + 0px) 16px 24px 16px;
+  transition: margin-left .25s ease;
+  min-height:100vh
+}
 .content .section{
   background:transparent; border:0; padding:12px 8px;
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px
 }
 .sec-left{ display:flex; gap:12px; align-items:center }
 .sec-subtabs{ display:flex; gap:8px; overflow:auto }
 
-/* Sichtbarkeit je nach Sidebar-Status */
+/* ===================== Sichtbarkeit je nach Sidebar-Status ===================== */
 .sidebar:not(.expanded) .label,
 .sidebar:not(.expanded) .only-expanded{ display:none }
 .sidebar.expanded .only-collapsed{ display:none }
 
-/* --- NEU: Collapsed Cleanup (keine Titel/Legal/Build im eingeklappten Zustand) --- */
+/* Collapsed Cleanup: keine Titel/Legal/Build im eingeklappten Zustand */
 .sidebar:not(.expanded) .nav-title,
 .sidebar:not(.expanded) .legal,
-.sidebar:not(.expanded) .muted {
-  display: none;
-}
+.sidebar:not(.expanded) .muted { display:none }
 
-/* --- NEU: Icon-Größe leicht erhöhen und vereinheitlichen --- */
-.nav-btn i[data-lucide] { width:20px; height:20px; }
+/* Icon-Größe leicht erhöhen / vereinheitlichen */
+.nav-btn i[data-lucide]{ width:20px; height:20px }
 .topbar .btn-ico i[data-lucide],
-.upload i[data-lucide] { width:20px; height:20px; }
+.upload i[data-lucide]{ width:20px; height:20px }
 
-/* (Optional) kleine optische Tweaks kannst du hier ergänzen */
+/* ===================== (Optional) Partial-Error Overlay ===================== */
+.partial-error{
+  position:fixed; inset:0; display:grid; place-items:center;
+  background:rgba(12,28,46,.92); color:#fff; z-index:1000;
+  padding:24px; text-align:center; font-size:14px
+}
+.partial-error a{ text-decoration:underline }
