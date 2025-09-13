@@ -4,8 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SF Data Hub – Dashboard</title>
-
-  <!-- Favicon vermeiden 404 -->
   <link rel="icon" href="data:," />
 
   <!-- Tailwind (CDN) -->
@@ -19,7 +17,7 @@
   <!-- Framer Motion (UMD, version-gepinnt) -->
   <script src="https://unpkg.com/framer-motion@10.18.0/dist/framer-motion.umd.js"></script>
 
-  <!-- Lucide Icons (Vanilla) -->
+  <!-- Lucide (Vanilla) -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
@@ -29,11 +27,10 @@
 <body>
   <div id="root"></div>
 
-  <!-- App -->
   <script type="text/babel" data-presets="env,react">
     const { useState, useEffect } = React;
 
-    // Framer-Motion sicher verwenden (Fallback, falls CDN nicht geladen)
+    // Framer-Motion: sicherer Fallback
     const FM = (window && window.framerMotion) || {};
     const motion = FM.motion || (({ children, ...rest }) => <div {...rest}>{children}</div>);
     const AnimatePresence = FM.AnimatePresence || (({ children }) => <>{children}</>);
@@ -42,7 +39,7 @@
     const colors = {
       page:"#0C1C2E", tile:"#152A42", tileHover:"#1E3A5C", nav:"#0A1728",
       active:"#1F3B5D", text:"#FFFFFF", textSoft:"#B0C4D9", title:"#F5F9FF",
-      line:"#2C4A73", icon:"#5C8BC6", btn:"#1E2F47", tableHeader:"#1E3657", tableBg:"#14273E"
+      line:"#2C4A73", icon:"#5C8BC6", btn:"#1E2F47", tableBg:"#14273E"
     };
 
     // Assets & Layout
@@ -56,7 +53,7 @@
     ];
     const HEADER_H=80, LOGO_DOCK_W=208, COLLAPSED_W=56, EXPANDED_W=LOGO_DOCK_W;
 
-    // Icon-Helper über Lucide
+    // Lucide-Icon Helper
     function Icon({ name, size=18, color=colors.icon }) {
       return <span style={{color}}><i data-lucide={name} style={{width:size,height:size}}/></span>;
     }
@@ -69,7 +66,7 @@
       { key:"gilde", label:"Gilde", icon:"users" },
       { key:"server", label:"Server", icon:"server" },
       { key:"toplisten", label:"Toplisten", icon:"list-ordered" },
-      { key:"scans", label:"Scans", icon:"list" }, /* sicherer Lucide-Name */
+      { key:"scans", label:"Scans", icon:"list" }, /* sicherer Name */
       { key:"community", label:"Community", icon:"message-square-text" },
       { key:"einstellungen", label:"Settings", icon:"settings" },
     ];
@@ -127,8 +124,11 @@
         if(first) setActiveTab(first);
       };
 
+      // Auto-Play Karussell
       useEffect(()=>{ if(!autoPlay) return; const id=setInterval(()=>setSlide(s=>(s+1)%slides.length),3500); return ()=>clearInterval(id); },[autoPlay]);
+      // Tabs an Sektion koppeln
       useEffect(()=>{ const arr=tabsBySection[activeSection]; setActiveTab(arr && arr.length ? arr[0] : ""); },[activeSection]);
+      // Lucide Icons jedes Mal setzen
       useEffect(()=>{ try{ window.lucide && window.lucide.createIcons(); }catch{} },[isCollapsed,activeSection,activeTab]);
 
       const asideW=isCollapsed?COLLAPSED_W:EXPANDED_W;
@@ -186,12 +186,10 @@
                     </div>
                     <AnimatePresence initial={false} mode="wait">
                       {!isCollapsed && (subsByKey[activeSection]||[]).length ? (
-                        <motion.div initial={{opacity:0,y:6}}
-                                    animate={{opacity:1,y:0,transition:{duration:.35,ease:"easeOut"}}}
+                        <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0,transition:{duration:.35,ease:"easeOut"}}}
                                     className="mt-2 flex flex-col gap-1">
                           {(subsByKey[activeSection]||[]).map(sub=>(
-                            <button key={sub}
-                                    onClick={()=>setActiveTab(sub)}
+                            <button key={sub} onClick={()=>setActiveTab(sub)}
                                     className="group nav-row w-full h-10 flex items-center rounded-2xl px-3 transition-colors">
                               <span className="font-medium txt-glow">{sub}</span>
                             </button>
@@ -225,7 +223,7 @@
               </div>
             </div>
 
-            <!-- Footer -->
+            {/* Footer */}
             <div className="p-3">
               <div className="mb-2">
                 {isCollapsed?(
@@ -241,10 +239,11 @@
               <div className="text-xs" style={{color:colors.textSoft}}>© 2025 SF Data Hub</div>
             </div>
 
+            {/* Hover-Glow & Scrollbar */}
             <style>{`
-              .txt-glow:hover,.group:hover .txt-glow{ text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8) }
-              .nav-scroll{ scrollbar-width:none; -ms-overflow-style:none }
-              .nav-scroll::-webkit-scrollbar{ width:0; height:0; background:transparent }
+              .txt-glow:hover,.group:hover .txt-glow{ text-shadow:0 0 15px rgba(92,139,198,1),0 0 25px rgba(92,139,198,.8) }
+              .nav-scroll{scrollbar-width:none;-ms-overflow-style:none}
+              .nav-scroll::-webkit-scrollbar{width:0;height:0;background:transparent}
             `}</style>
           </aside>
 
@@ -310,7 +309,7 @@
               </div>
             </header>
 
-            {/* Platzhalter unter fester Topbar */}
+            {/* Platzhalter unter der festen Topbar */}
             <div style={{height:HEADER_H}}></div>
 
             {/* Content */}
