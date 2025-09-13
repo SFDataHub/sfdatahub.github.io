@@ -7,27 +7,38 @@
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- React 18 + Babel (JSX ohne Build) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <!-- Framer Motion (UMD) -->
   <script src="https://unpkg.com/framer-motion/dist/framer-motion.umd.js"></script>
-  <!-- Lucide (Vanilla) -->
+
+  <!-- Lucide Icons (Vanilla) -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <style>html,body{height:100%;background:#0C1C2E;color:#fff;margin:0}</style>
+
+  <style>
+    html,body{height:100%;margin:0;background:#0C1C2E;color:#fff}
+  </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- Deine App (JSX) -->
-  <script type="text/babel">
+  <!-- App (KEIN TypeScript, mit Presets) -->
+  <script type="text/babel" data-presets="env,react">
     const { useState, useEffect } = React;
-    const { motion, AnimatePresence } = window.framerMotion;
+    // Framer Motion: robustes Fallback, falls CDN nicht lädt
+    const FM = window.framerMotion || {};
+    const motion = FM.motion || (({children, ...rest}) => <div {...rest}>{children}</div>);
+    const AnimatePresence = FM.AnimatePresence || (({children}) => <>{children}</>);
 
-    const colors = { page:"#0C1C2E", tile:"#152A42", tileHover:"#1E3A5C", nav:"#0A1728",
+    const colors = {
+      page:"#0C1C2E", tile:"#152A42", tileHover:"#1E3A5C", nav:"#0A1728",
       active:"#1F3B5D", text:"#FFFFFF", textSoft:"#B0C4D9", title:"#F5F9FF",
-      line:"#2C4A73", icon:"#5C8BC6", btn:"#1E2F47", tableHeader:"#1E3657", tableBg:"#14273E" };
+      line:"#2C4A73", icon:"#5C8BC6", btn:"#1E2F47", tableHeader:"#1E3657", tableBg:"#14273E"
+    };
 
     const LOGO_URL="https://i.postimg.cc/SsrbKmgn/logo3trans.png";
     const AVATAR_URL="https://i.pravatar.cc/80?img=68";
@@ -37,56 +48,85 @@
       {name:"Chiyo (Mage)",avatarUrl:"https://i.pravatar.cc/80?img=47"},
       {name:"Dax (Assa)",avatarUrl:"https://i.pravatar.cc/80?img=29"},
     ];
+
     const HEADER_H=80, LOGO_DOCK_W=208, COLLAPSED_W=56, EXPANDED_W=LOGO_DOCK_W;
+
+    const navItems=[
+      { key:"home", label:"Home", icon:"home" },
+      { key:"dashboard", label:"Dashboard", icon:"bar-chart-3" },
+      { key:"spieler", label:"Spieler", icon:"users" },
+      { key:"gilden", label:"Gilden", icon:"users" },
+      { key:"gilde", label:"Gilde", icon:"users" },
+      { key:"server", label:"Server", icon:"server" },
+      { key:"toplisten", label:"Toplisten", icon:"list-ordered" },
+      { key:"scans", label:"Scans", icon:"list" },         /* sicherer Lucide-Name */
+      { key:"community", label:"Community", icon:"message-square-text" },
+      { key:"einstellungen", label:"Settings", icon:"settings" },
+    ];
+
+    const tabsBySection={
+      home:["Übersicht","Neuigkeiten"],
+      spieler:["Profil","Statistiken","Vergleich"],
+      gilden:["Übersicht","Gildenplaner","Historie"],
+      server:["Alle Server","EU Server","Fusion Server"],
+      toplisten:["Alle","Server","Klassen"],
+      scans:["Uploads","Abdeckung","Fehler-Log"],
+      community:["Scans","Prognosen","Content Creator"],
+      einstellungen:["Allgemein","Profil","Account"],
+    };
+
+    const slides=[
+      {id:1,title:"How to HAR-Import in SFDataHub",url:"https://www.youtube.com/watch?v=dQw4w9WgXcQ",img:"https://images.unsplash.com/photo-1526378722484-bd91ca387e72?q=80&w=1600&auto=format&fit=crop"},
+      {id:2,title:"Gildenplaner – Quick Tour",url:"https://www.youtube.com/watch?v=oHg5SJYRHA0",img:"https://images.unsplash.com/photo-1529101091764-c3526daf38fe?q=80&w=1600&auto=format&fit=crop"},
+      {id:3,title:"Toplisten & Filter nutzen",url:"https://www.youtube.com/watch?v=ub82Xb1C8os",img:"https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop"},
+    ];
 
     function Icon({ name, size=18, color=colors.icon }) {
       return <span style={{color}}><i data-lucide={name} style={{width:size,height:size}}/></span>;
     }
 
-    const navItems=[{key:"home",label:"Home",icon:"home"},{key:"dashboard",label:"Dashboard",icon:"bar-chart-3"},
-      {key:"spieler",label:"Spieler",icon:"users"},{key:"gilden",label:"Gilden",icon:"users"},
-      {key:"gilde",label:"Gilde",icon:"users"},{key:"server",label:"Server",icon:"server"},
-      {key:"toplisten",label:"Toplisten",icon:"list-ordered"},{key:"scans",label:"Scans",icon:"scan-line"},
-      {key:"community",label:"Community",icon:"message-square-text"},{key:"einstellungen",label:"Settings",icon:"settings"}];
-
-    const tabsBySection={home:["Übersicht","Neuigkeiten"],spieler:["Profil","Statistiken","Vergleich"],
-      gilden:["Übersicht","Gildenplaner","Historie"],server:["Alle Server","EU Server","Fusion Server"],
-      toplisten:["Alle","Server","Klassen"],scans:["Uploads","Abdeckung","Fehler-Log"],
-      community:["Scans","Prognosen","Content Creator"],einstellungen:["Allgemein","Profil","Account"]};
-
-    const slides=[{id:1,title:"How to HAR-Import in SFDataHub",url:"https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    img:"https://images.unsplash.com/photo-1526378722484-bd91ca387e72?q=80&w=1600&auto=format&fit=crop"},
-                  {id:2,title:"Gildenplaner – Quick Tour",url:"https://www.youtube.com/watch?v=oHg5SJYRHA0",
-                    img:"https://images.unsplash.com/photo-1529101091764-c3526daf38fe?q=80&w=1600&auto=format&fit=crop"},
-                  {id:3,title:"Toplisten & Filter nutzen",url:"https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop",
-                    img:"https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop"}];
-
     function App(){
       const [activeSection,setActiveSection]=useState("home");
       const [activeTab,setActiveTab]=useState(tabsBySection["home"][0]);
       const [profileOpen,setProfileOpen]=useState(false);
-      const [query,setQuery]=useState(""); const [slide,setSlide]=useState(0);
-      const [autoPlay,setAutoPlay]=useState(true); const [isCollapsed,setIsCollapsed]=useState(true);
-      const [isLoggedIn,setIsLoggedIn]=useState(true); const [mainChar,setMainChar]=useState(MAIN_CHAR_OPTIONS[0]);
+      const [query,setQuery]=useState("");
+      const [slide,setSlide]=useState(0);
+      const [autoPlay,setAutoPlay]=useState(true);
+      const [isCollapsed,setIsCollapsed]=useState(true);
+      const [isLoggedIn,setIsLoggedIn]=useState(true);
+      const [mainChar,setMainChar]=useState(MAIN_CHAR_OPTIONS[0]);
 
-      const subsByKey={toplisten:["Spieler","Server","Klassen"],gilden:["Übersicht","Fusionen","Warteliste"],
-        einstellungen:["Profil","Benachrichtigungen","Design"],spieler:["Übersicht","Rangverlauf","Vergleiche","Historie"],
-        gilde:["Übersicht","Mitglieder","Bewerbungen","Allianzen","Events"],server:["Übersicht","Population","Regionen","Status","Wartung"],
-        scans:["Neue Scans","Archiv","Diff-Ansicht","Validierung","Zeitpläne"],community:["News","Guides","Ankündigungen","Feedback"],home:[],dashboard:[]};
+      const subsByKey={
+        toplisten:["Spieler","Server","Klassen"],
+        gilden:["Übersicht","Fusionen","Warteliste"],
+        einstellungen:["Profil","Benachrichtigungen","Design"],
+        spieler:["Übersicht","Rangverlauf","Vergleiche","Historie"],
+        gilde:["Übersicht","Mitglieder","Bewerbungen","Allianzen","Events"],
+        server:["Übersicht","Population","Regionen","Status","Wartung"],
+        scans:["Neue Scans","Archiv","Diff-Ansicht","Validierung","Zeitpläne"],
+        community:["News","Guides","Ankündigungen","Feedback"],
+        home:[], dashboard:[]
+      };
 
-      const navGroups=[{title:"Hauptsektionen",keys:["toplisten","gilden","einstellungen"]},
-        {title:"Direkt",keys:["spieler","gilde","server","toplisten","scans","community","einstellungen"]}];
+      const navGroups=[
+        { title:"Hauptsektionen", keys:["toplisten","gilden","einstellungen"] },
+        { title:"Direkt", keys:["spieler","gilde","server","toplisten","scans","community","einstellungen"] },
+      ];
 
-      const getLabel=(k)=>navItems.find(n=>n.key===k)?.label||k;
-      const getIcon=(k)=>navItems.find(n=>n.key===k)?.icon||"home";
-      const handleNav=(k)=>{ setActiveSection(k); const first=subsByKey[k]?.[0]; if(first) setActiveTab(first); };
+      const getLabel = (k)=> (navItems.find(n=>n.key===k)?.label || k);
+      const getIconName = (k)=> (navItems.find(n=>n.key===k)?.icon || "home");
+      const handleNavClick = (k)=>{
+        setActiveSection(k);
+        const first = (subsByKey[k]||[])[0];
+        if(first) setActiveTab(first);
+      };
 
       useEffect(()=>{ if(!autoPlay) return; const id=setInterval(()=>setSlide(s=>(s+1)%slides.length),3500); return ()=>clearInterval(id); },[autoPlay]);
-      useEffect(()=>{ const arr=tabsBySection[activeSection]; setActiveTab(arr&&arr.length?arr[0]:""); },[activeSection]);
-      useEffect(()=>{ try{ window.lucide&&window.lucide.createIcons(); }catch{} },[isCollapsed,activeSection,activeTab]);
+      useEffect(()=>{ const arr = tabsBySection[activeSection]; setActiveTab(arr && arr.length ? arr[0] : ""); },[activeSection]);
+      useEffect(()=>{ try{ window.lucide && window.lucide.createIcons(); }catch{} },[isCollapsed,activeSection,activeTab]);
 
-      const asideW=isCollapsed?COLLAPSED_W:EXPANDED_W;
-      const contentLeft=asideW;
+      const asideW = isCollapsed ? COLLAPSED_W : EXPANDED_W;
+      const contentLeft = asideW;
 
       return (
         <div className="min-h-screen w-full flex" style={{backgroundColor:colors.page,color:colors.text}}>
@@ -96,57 +136,62 @@
             <img src={LOGO_URL} alt="SFDataHub Logo" className="max-h-[72px] w-auto"/>
           </div>
 
-          {/* Linke Spalte (folgt Sidebar-Breite) */}
+          {/* Linke Spalte unter Logo (folgt Sidebar-Breite) */}
           <div className="fixed left-0 z-0"
-               style={{top:HEADER_H,bottom:0,width:contentLeft,backgroundColor:colors.nav,pointerEvents:"none"}}/>
+               style={{top:HEADER_H,bottom:0,width:contentLeft,backgroundColor:colors.nav,pointerEvents:"none"}} />
 
-          {/* Sidebar */}
+          {/* Sidebar (Hover) */}
           <aside className="hidden md:grid md:grid-rows-[auto,1fr,auto] md:shrink-0 fixed left-0 top-20 z-20 h-[calc(100vh-80px)] transition-[width] duration-300 ease-in-out"
                  style={{backgroundColor:colors.nav,width:asideW}}
                  onMouseEnter={()=>setIsCollapsed(false)} onMouseLeave={()=>setIsCollapsed(true)}>
 
-            <div className="relative overflow-y-auto nav-scroll" onMouseEnter={()=>setIsCollapsed(false)} onMouseLeave={()=>setIsCollapsed(true)}>
+            <div className="relative overflow-y-auto nav-scroll"
+                 onMouseEnter={()=>setIsCollapsed(false)} onMouseLeave={()=>setIsCollapsed(true)}>
               <div className="h-full" style={{width:"100%"}}>
                 {/* Home */}
                 <div className="p-3">
-                  <button onClick={()=>handleNav("home")}
-                    className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
-                    style={{backgroundColor:"transparent",color:colors.text}}>
-                    <span><i data-lucide="home" style={{width:18,height:18}}/></span>
+                  <button onClick={()=>handleNavClick("home")}
+                          className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
+                          style={{color:colors.text}}>
+                    <Icon name="home" />
                     {!isCollapsed && <span className="ml-3 font-medium txt-glow">Home</span>}
                   </button>
                 </div>
 
-                {/* Dashboard (nur eingeloggt) */}
+                {/* Dashboard */}
                 {isLoggedIn && (
                   <div className="px-3">
-                    <button onClick={()=>handleNav("dashboard")}
-                      className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
-                      style={{backgroundColor:"transparent",color:colors.text}}>
-                      <span><i data-lucide="bar-chart-3" style={{width:18,height:18}}/></span>
+                    <button onClick={()=>handleNavClick("dashboard")}
+                            className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
+                            style={{color:colors.text}}>
+                      <Icon name="bar-chart-3" />
                       {!isCollapsed && <span className="ml-3 font-medium txt-glow">Dashboard</span>}
                     </button>
                   </div>
                 )}
 
-                {/* Aktive Sektion + Unterseiten */}
+                {/* Aktiver Bereich + Unterseiten */}
                 {activeSection!=="home" && activeSection!=="dashboard" && (
                   <div className="px-3 pt-3 pb-2">
                     {!isCollapsed && (<div className="text-xs mb-2 opacity-70" style={{color:colors.textSoft}}>Aktiver Tab</div>)}
                     <div className={isCollapsed?"h-10 flex items-center justify-center":"h-10 flex items-center gap-3 px-3"}>
-                      <span><i data-lucide={getIcon(activeSection)} style={{width:18,height:18}}/></span>
+                      <Icon name={getIconName(activeSection)} />
                       {!isCollapsed && (<div className="font-semibold" style={{color:colors.title}}>{getLabel(activeSection)}</div>)}
                     </div>
-                    <div className="mt-2 flex flex-col gap-1">
-                      {!isCollapsed && (["a"].concat([]), (subsByKey[activeSection]||[]).map(sub=>(
-                        <button key={sub}
-                          className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
-                          style={{backgroundColor:"transparent",color:colors.text}}
-                          onClick={()=>setActiveTab(sub)}>
-                          <span className="font-medium txt-glow">{sub}</span>
-                        </button>
-                      )))}
-                    </div>
+                    <AnimatePresence initial={false} mode="wait">
+                      {!isCollapsed && (subsByKey[activeSection]||[]).length ? (
+                        <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0,transition:{duration:.35,ease:"easeOut"}}}
+                                    className="mt-2 flex flex-col gap-1">
+                          {(subsByKey[activeSection]||[]).map(sub=>(
+                            <button key={sub}
+                                    onClick={()=>setActiveTab(sub)}
+                                    className="group nav-row w-full h-10 flex items-center rounded-2xl px-3 transition-colors">
+                              <span className="font-medium txt-glow">{sub}</span>
+                            </button>
+                          ))}
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
                   </div>
                 )}
 
@@ -159,10 +204,10 @@
                         {!isCollapsed && (<div className="text-xs mb-2 opacity-70" style={{color:colors.textSoft}}>{group.title}</div>)}
                         <div className="space-y-1">
                           {group.keys.map(key=>(
-                            <button key={key} onClick={()=>handleNav(key)}
-                              className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
-                              style={{backgroundColor:"transparent",color:colors.text}}>
-                              <span><i data-lucide={getIcon(key)} style={{width:18,height:18}}/></span>
+                            <button key={key} onClick={()=>handleNavClick(key)}
+                                    className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
+                                    style={{color:colors.text}}>
+                              <Icon name={getIconName(key)} />
                               {!isCollapsed && <span className="ml-3 font-medium txt-glow">{getLabel(key)}</span>}
                             </button>
                           ))}
@@ -173,12 +218,12 @@
               </div>
             </div>
 
-            {/* Footer */}
+            <!-- Footer -->
             <div className="p-3">
               <div className="mb-2">
                 {isCollapsed?(
                   <button onClick={()=>setIsLoggedIn(v=>!v)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{backgroundColor:colors.btn}} title={isLoggedIn?"Logout":"Login"}>
-                    <i data-lucide={isLoggedIn?"log-out":"log-in"} style={{width:18,height:18}}/>
+                    <Icon name={isLoggedIn?"log-out":"log-in"} />
                   </button>
                 ):(
                   <button onClick={()=>setIsLoggedIn(v=>!v)} className="w-full px-3 py-2 rounded-xl text-sm" style={{backgroundColor:colors.btn}}>
@@ -190,32 +235,26 @@
             </div>
 
             <style>{`
-              .txt-glow:hover,.group:hover .txt-glow{text-shadow:0 0 15px rgba(92,139,198,1),0 0 25px rgba(92,139,198,0.8)}
-              .nav-scroll{scrollbar-width:none;-ms-overflow-style:none}
-              .nav-scroll::-webkit-scrollbar{width:0;height:0;background:transparent}
+              .txt-glow:hover,.group:hover .txt-glow{ text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8) }
+              .nav-scroll{ scrollbar-width:none; -ms-overflow-style:none }
+              .nav-scroll::-webkit-scrollbar{ width:0; height:0; background:transparent }
             `}</style>
           </aside>
 
-          {/* Main – rückt mit Sidebar ein */}
+          {/* Main rückt mit Sidebar ein */}
           <div className="flex-1 flex flex-col min-w-0" style={{marginLeft:contentLeft}}>
             {/* Topbar (starr) */}
             <header data-testid="topbar" className="fixed top-0 left-0 right-0 z-30 w-full"
                     style={{backgroundColor:colors.nav,paddingLeft:LOGO_DOCK_W+16}}>
               <div className="h-20 px-4 md:px-6 flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <button className="p-2 rounded-xl" style={{backgroundColor:colors.btn}} title="Benachrichtigungen">
-                    <i data-lucide="bell" style={{width:20,height:20}}/>
-                  </button>
-                  <button className="p-2 rounded-xl" style={{backgroundColor:colors.btn}} title="Favoriten">
-                    <i data-lucide="star" style={{width:20,height:20}}/>
-                  </button>
+                  <button className="p-2 rounded-xl" style={{backgroundColor:colors.btn}} title="Benachrichtigungen"><Icon name="bell" size={20}/></button>
+                  <button className="p-2 rounded-xl" style={{backgroundColor:colors.btn}} title="Favoriten"><Icon name="star" size={20}/></button>
                 </div>
                 <div className="flex items-center gap-2 flex-1 max-w-xl ml-1">
                   <div className="relative w-full">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-70">
-                      <i data-lucide="search" style={{width:18,height:18}}/>
-                    </span>
-                    <input value={query} onChange={(e)=>setQuery(e.target.value)}
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-70"><Icon name="search" size={18} color={colors.textSoft}/></span>
+                    <input value={query} onChange={e=>setQuery(e.target.value)}
                       className="w-full rounded-2xl pl-9 pr-3 py-2 outline-none"
                       placeholder="Suchen (Spieler, Gilde, Server)…"
                       style={{backgroundColor:colors.tile,color:colors.text,border:`1px solid ${colors.line}`}}/>
@@ -223,13 +262,13 @@
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <button className="px-3 py-2 rounded-xl text-sm flex items-center gap-2" style={{backgroundColor:colors.btn}}>
-                    <i data-lucide="upload" style={{width:20,height:20}}/> Scan hochladen
+                    <Icon name="upload" size={20}/> Scan hochladen
                   </button>
                   <div className="relative">
                     <button onClick={()=>setProfileOpen(v=>!v)} className="p-1 rounded-full" style={{backgroundColor:colors.tile}} aria-label="Profilmenü öffnen">
                       <img src={(mainChar&&mainChar.avatarUrl)||AVATAR_URL} alt="Avatar" className="h-9 w-9 rounded-full object-cover"/>
                     </button>
-                    {profileOpen&&(
+                    {profileOpen && (
                       <div className="absolute right-0 mt-2 w-80 rounded-2xl p-3" style={{backgroundColor:colors.tile,border:`1px solid ${colors.line}`}}>
                         <div className="flex items-center gap-3 mb-3">
                           <img src={(mainChar&&mainChar.avatarUrl)||AVATAR_URL} alt="Avatar" className="h-10 w-10 rounded-full object-cover"/>
@@ -245,8 +284,8 @@
                           <div className="flex items-center gap-2">
                             {MAIN_CHAR_OPTIONS.map(opt=>(
                               <button key={opt.name} className="p-0.5 rounded-full border"
-                                style={{borderColor:opt.name===mainChar.name?colors.icon:colors.line,backgroundColor:colors.page}}
-                                onClick={()=>setMainChar(opt)} title={opt.name}>
+                                      style={{borderColor:opt.name===mainChar.name?colors.icon:colors.line,backgroundColor:colors.page}}
+                                      onClick={()=>setMainChar(opt)} title={opt.name}>
                                 <img src={opt.avatarUrl} alt={opt.name} className="h-8 w-8 rounded-full object-cover"/>
                               </button>
                             ))}
@@ -271,12 +310,10 @@
               <section className="px-0 md:px-0">
                 <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <i data-lucide={navItems.find(n=>n.key===activeSection)?.icon||"home"} style={{width:18,height:18}}/>
+                    <Icon name={getIconName(activeSection)} />
                     <div>
                       <div className="text-sm" style={{color:colors.textSoft}}>Aktiver Bereich</div>
-                      <div className="font-semibold text-lg" style={{color:colors.title}}>
-                        {navItems.find(n=>n.key===activeSection)?.label}
-                      </div>
+                      <div className="font-semibold text-lg" style={{color:colors.title}}>{getLabel(activeSection)}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto">
@@ -324,7 +361,7 @@
 
               <section className="rounded-2xl p-0 border overflow-hidden" style={{backgroundColor:colors.tile,borderColor:colors.line}}>
                 <div className="flex items-center justify-between px-4 py-3 border-b" style={{borderColor:colors.line}}>
-                  <div className="flex items-center gap-2"><i data-lucide="bar-chart-3" style={{width:16,height:16}}/> <span className="font-semibold">YouTube Karussell</span></div>
+                  <div className="flex items-center gap-2"><Icon name="bar-chart-3" size={16}/> <span className="font-semibold">YouTube Karussell</span></div>
                   <div className="flex items-center gap-2">
                     <button className="px-2 py-1 rounded-lg text-xs" onClick={()=>setAutoPlay(v=>!v)} style={{backgroundColor:colors.btn}}>
                       {autoPlay? "Pause":"Play"}
@@ -337,14 +374,14 @@
                     <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
                       <div className="font-semibold">{slides[slide].title}</div>
                       <a href={slides[slide].url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline opacity-90">
-                        Auf YouTube öffnen <i data-lucide="external-link" style={{width:14,height:14}}/>
+                        Auf YouTube öffnen <Icon name="external-link" size={14}/>
                       </a>
                     </div>
                   </div>
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {slides.map((s,i)=>(
                       <button key={s.id} onClick={()=>setSlide(i)} className="rounded-xl overflow-hidden border text-left"
-                        style={{borderColor:i===slide?colors.icon:colors.line,backgroundColor:colors.page}}>
+                              style={{borderColor:i===slide?colors.icon:colors.line,backgroundColor:colors.page}}>
                         <img src={s.img} alt={s.title} className="h-24 w-full object-cover"/>
                         <div className="p-2 text-xs line-clamp-2">{s.title}</div>
                       </button>
