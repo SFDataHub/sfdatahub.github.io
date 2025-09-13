@@ -168,3 +168,14 @@ button{ font:inherit }
   padding:24px; text-align:center; font-size:14px
 }
 .partial-error a{ text-decoration:underline }
+
+/* === Footer-Schrift verkleinern === */
+.footer .legal,
+.footer .legal a,
+.footer .muted{
+  font-size:10px !important;   /* ggf. auf 9px stellen, wenn du noch kleiner willst */
+  line-height:1.25;
+}
+
+/* etwas weniger Abstand um die Trennpunkte (•) */
+.footer .legal span{ margin:0 4px; }
