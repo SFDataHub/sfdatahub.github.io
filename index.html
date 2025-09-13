@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SF Data Hub – Dashboard</title>
 
-  <!-- Tailwind -->
+  <!-- Favicon vermeiden 404 -->
+  <link rel="icon" href="data:," />
+
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- React 18 + Babel (JSX ohne Build) -->
@@ -13,8 +16,8 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Framer Motion (UMD) -->
-  <script src="https://unpkg.com/framer-motion/dist/framer-motion.umd.js"></script>
+  <!-- Framer Motion (UMD, version-gepinnt) -->
+  <script src="https://unpkg.com/framer-motion@10.18.0/dist/framer-motion.umd.js"></script>
 
   <!-- Lucide Icons (Vanilla) -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -26,20 +29,23 @@
 <body>
   <div id="root"></div>
 
-  <!-- App (KEIN TypeScript, mit Presets) -->
+  <!-- App -->
   <script type="text/babel" data-presets="env,react">
     const { useState, useEffect } = React;
-    // Framer Motion: robustes Fallback, falls CDN nicht lädt
-    const FM = window.framerMotion || {};
-    const motion = FM.motion || (({children, ...rest}) => <div {...rest}>{children}</div>);
-    const AnimatePresence = FM.AnimatePresence || (({children}) => <>{children}</>);
 
+    // Framer-Motion sicher verwenden (Fallback, falls CDN nicht geladen)
+    const FM = (window && window.framerMotion) || {};
+    const motion = FM.motion || (({ children, ...rest }) => <div {...rest}>{children}</div>);
+    const AnimatePresence = FM.AnimatePresence || (({ children }) => <>{children}</>);
+
+    // Farben
     const colors = {
       page:"#0C1C2E", tile:"#152A42", tileHover:"#1E3A5C", nav:"#0A1728",
       active:"#1F3B5D", text:"#FFFFFF", textSoft:"#B0C4D9", title:"#F5F9FF",
       line:"#2C4A73", icon:"#5C8BC6", btn:"#1E2F47", tableHeader:"#1E3657", tableBg:"#14273E"
     };
 
+    // Assets & Layout
     const LOGO_URL="https://i.postimg.cc/SsrbKmgn/logo3trans.png";
     const AVATAR_URL="https://i.pravatar.cc/80?img=68";
     const MAIN_CHAR_OPTIONS=[
@@ -48,8 +54,12 @@
       {name:"Chiyo (Mage)",avatarUrl:"https://i.pravatar.cc/80?img=47"},
       {name:"Dax (Assa)",avatarUrl:"https://i.pravatar.cc/80?img=29"},
     ];
-
     const HEADER_H=80, LOGO_DOCK_W=208, COLLAPSED_W=56, EXPANDED_W=LOGO_DOCK_W;
+
+    // Icon-Helper über Lucide
+    function Icon({ name, size=18, color=colors.icon }) {
+      return <span style={{color}}><i data-lucide={name} style={{width:size,height:size}}/></span>;
+    }
 
     const navItems=[
       { key:"home", label:"Home", icon:"home" },
@@ -59,7 +69,7 @@
       { key:"gilde", label:"Gilde", icon:"users" },
       { key:"server", label:"Server", icon:"server" },
       { key:"toplisten", label:"Toplisten", icon:"list-ordered" },
-      { key:"scans", label:"Scans", icon:"list" },         /* sicherer Lucide-Name */
+      { key:"scans", label:"Scans", icon:"list" }, /* sicherer Lucide-Name */
       { key:"community", label:"Community", icon:"message-square-text" },
       { key:"einstellungen", label:"Settings", icon:"settings" },
     ];
@@ -80,10 +90,6 @@
       {id:2,title:"Gildenplaner – Quick Tour",url:"https://www.youtube.com/watch?v=oHg5SJYRHA0",img:"https://images.unsplash.com/photo-1529101091764-c3526daf38fe?q=80&w=1600&auto=format&fit=crop"},
       {id:3,title:"Toplisten & Filter nutzen",url:"https://www.youtube.com/watch?v=ub82Xb1C8os",img:"https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1600&auto=format&fit=crop"},
     ];
-
-    function Icon({ name, size=18, color=colors.icon }) {
-      return <span style={{color}}><i data-lucide={name} style={{width:size,height:size}}/></span>;
-    }
 
     function App(){
       const [activeSection,setActiveSection]=useState("home");
@@ -113,20 +119,20 @@
         { title:"Direkt", keys:["spieler","gilde","server","toplisten","scans","community","einstellungen"] },
       ];
 
-      const getLabel = (k)=> (navItems.find(n=>n.key===k)?.label || k);
-      const getIconName = (k)=> (navItems.find(n=>n.key===k)?.icon || "home");
-      const handleNavClick = (k)=>{
+      const getLabel=(k)=> (navItems.find(n=>n.key===k)?.label || k);
+      const getIconName=(k)=> (navItems.find(n=>n.key===k)?.icon || "home");
+      const handleNav=(k)=>{
         setActiveSection(k);
-        const first = (subsByKey[k]||[])[0];
+        const first=(subsByKey[k]||[])[0];
         if(first) setActiveTab(first);
       };
 
       useEffect(()=>{ if(!autoPlay) return; const id=setInterval(()=>setSlide(s=>(s+1)%slides.length),3500); return ()=>clearInterval(id); },[autoPlay]);
-      useEffect(()=>{ const arr = tabsBySection[activeSection]; setActiveTab(arr && arr.length ? arr[0] : ""); },[activeSection]);
+      useEffect(()=>{ const arr=tabsBySection[activeSection]; setActiveTab(arr && arr.length ? arr[0] : ""); },[activeSection]);
       useEffect(()=>{ try{ window.lucide && window.lucide.createIcons(); }catch{} },[isCollapsed,activeSection,activeTab]);
 
-      const asideW = isCollapsed ? COLLAPSED_W : EXPANDED_W;
-      const contentLeft = asideW;
+      const asideW=isCollapsed?COLLAPSED_W:EXPANDED_W;
+      const contentLeft=asideW;
 
       return (
         <div className="min-h-screen w-full flex" style={{backgroundColor:colors.page,color:colors.text}}>
@@ -150,7 +156,7 @@
               <div className="h-full" style={{width:"100%"}}>
                 {/* Home */}
                 <div className="p-3">
-                  <button onClick={()=>handleNavClick("home")}
+                  <button onClick={()=>handleNav("home")}
                           className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
                           style={{color:colors.text}}>
                     <Icon name="home" />
@@ -161,7 +167,7 @@
                 {/* Dashboard */}
                 {isLoggedIn && (
                   <div className="px-3">
-                    <button onClick={()=>handleNavClick("dashboard")}
+                    <button onClick={()=>handleNav("dashboard")}
                             className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
                             style={{color:colors.text}}>
                       <Icon name="bar-chart-3" />
@@ -180,7 +186,8 @@
                     </div>
                     <AnimatePresence initial={false} mode="wait">
                       {!isCollapsed && (subsByKey[activeSection]||[]).length ? (
-                        <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0,transition:{duration:.35,ease:"easeOut"}}}
+                        <motion.div initial={{opacity:0,y:6}}
+                                    animate={{opacity:1,y:0,transition:{duration:.35,ease:"easeOut"}}}
                                     className="mt-2 flex flex-col gap-1">
                           {(subsByKey[activeSection]||[]).map(sub=>(
                             <button key={sub}
@@ -204,7 +211,7 @@
                         {!isCollapsed && (<div className="text-xs mb-2 opacity-70" style={{color:colors.textSoft}}>{group.title}</div>)}
                         <div className="space-y-1">
                           {group.keys.map(key=>(
-                            <button key={key} onClick={()=>handleNavClick(key)}
+                            <button key={key} onClick={()=>handleNav(key)}
                                     className={isCollapsed?"group w-full h-10 flex items-center justify-center rounded-2xl transition-colors":"group w-full h-10 flex items-center rounded-2xl px-3 transition-colors"}
                                     style={{color:colors.text}}>
                               <Icon name={getIconName(key)} />
@@ -303,10 +310,12 @@
               </div>
             </header>
 
+            {/* Platzhalter unter fester Topbar */}
             <div style={{height:HEADER_H}}></div>
 
             {/* Content */}
             <main className="p-4 md:p-6 space-y-6">
+              {/* Aktiver Bereich + Tabs */}
               <section className="px-0 md:px-0">
                 <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -328,6 +337,7 @@
                 </div>
               </section>
 
+              {/* KPI Cards */}
               <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 {[{label:"Gesamt-Scans",value:"12.584",sub:"+142 heute"},
                   {label:"Spieler erfasst",value:"3.921",sub:"+18 neu"},
@@ -341,6 +351,7 @@
                 ))}
               </section>
 
+              {/* Zeitraum-Auswahl */}
               <section className="rounded-2xl p-4 border" style={{backgroundColor:colors.tile,borderColor:colors.line}}>
                 <div className="text-sm mb-3" style={{color:colors.textSoft}}>Zeitraum wählen (Scan-abhängig)</div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -359,6 +370,7 @@
                 </div>
               </section>
 
+              {/* Carousel */}
               <section className="rounded-2xl p-0 border overflow-hidden" style={{backgroundColor:colors.tile,borderColor:colors.line}}>
                 <div className="flex items-center justify-between px-4 py-3 border-b" style={{borderColor:colors.line}}>
                   <div className="flex items-center gap-2"><Icon name="bar-chart-3" size={16}/> <span className="font-semibold">YouTube Karussell</span></div>
@@ -380,7 +392,7 @@
                   </div>
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {slides.map((s,i)=>(
-                      <button key={s.id} onClick={()=>setSlide(i)} className="rounded-xl overflow-hidden border text-left"
+                      <button key={s.id} onClick={()=>setSlide(i)} className="rounded-2xl overflow-hidden border text-left"
                               style={{borderColor:i===slide?colors.icon:colors.line,backgroundColor:colors.page}}>
                         <img src={s.img} alt={s.title} className="h-24 w-full object-cover"/>
                         <div className="p-2 text-xs line-clamp-2">{s.title}</div>
@@ -390,6 +402,7 @@
                 </div>
               </section>
 
+              {/* Hinweis */}
               <section className="rounded-2xl p-4 border" style={{backgroundColor:colors.tile,borderColor:colors.line}}>
                 <div className="text-sm" style={{color:colors.textSoft}}>
                   Topbar <strong>und</strong> Sidebar bleiben siteweit konsistent. Die Sidebar liefert die Unternavigation & Filter,
