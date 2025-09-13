@@ -13,7 +13,7 @@
 
   --header-h:80px;
   --logo-dock-w:208px;
-  /* NEU: eingeklappt etwas breiter, damit Login-Icon nicht übersteht */
+  /* Collapsed etwas breiter, damit der Login-Icon-Block nicht übersteht */
   --sidebar-collapsed-w:64px;
   --sidebar-expanded-w:var(--logo-dock-w);
   --sidebar-w: var(--sidebar-collapsed-w);
@@ -30,7 +30,7 @@ button{ font:inherit }
 .btn{ background:var(--btn); border:0; color:var(--text); border-radius:12px; cursor:pointer }
 .btn:focus{ outline:2px solid rgba(255,255,255,.15); outline-offset:2px }
 
-/* ===================== Logo-Dock (links oben, fix) ===================== */
+/* ===== Logo-Dock (links oben, fix) ===== */
 .logo-dock{
   position:fixed; inset:0 auto auto 0;
   width:var(--logo-dock-w); height:var(--header-h);
@@ -40,13 +40,13 @@ button{ font:inherit }
 }
 .logo-dock img{ max-height:72px; width:auto; display:block }
 
-/* ===================== Topbar (starr, OHNE Rahmen) ===================== */
+/* ===== Topbar (starr, ohne Rahmen) ===== */
 .topbar{
   position:fixed; inset:0 0 auto 0; height:var(--header-h);
   background:var(--nav); z-index:30;
   display:flex; align-items:center; gap:16px;
   padding:0 24px 0 calc(var(--logo-dock-w) + 16px);
-  border-bottom:none; box-shadow:none; /* keine Linien */
+  border-bottom:none; box-shadow:none;
 }
 .topbar .btn-ico{ padding:10px; display:inline-flex; align-items:center; justify-content:center }
 
@@ -69,18 +69,18 @@ button{ font:inherit }
   background:var(--nav); z-index:0; pointer-events:none; transition:width .25s ease;
 }
 
-/* ===================== Sidebar (Hover-Expand, OHNE Rahmen) ===================== */
+/* ===== Sidebar (Hover-Expand, ohne Rahmen) ===== */
 .sidebar{
   position:fixed; left:0; top:var(--header-h); height:calc(100vh - var(--header-h));
   width:var(--sidebar-w); background:var(--nav); z-index:20;
   display:grid; grid-template-rows:auto 1fr auto;
   transition:width .25s ease;
-  border-right:none; box-shadow:none; /* keine Linien */
+  border-right:none; box-shadow:none;
 }
 .sidebar.expanded{ width:var(--sidebar-expanded-w) }
 
 .nav-scroll{ overflow:auto }
-/* Scrollbar verstecken (aber weiterhin scrollbar) */
+/* Scrollbar unsichtbar lassen */
 .nav-scroll{ scrollbar-width:none; -ms-overflow-style:none }
 .nav-scroll::-webkit-scrollbar{ width:0; height:0; background:transparent }
 
@@ -95,17 +95,15 @@ button{ font:inherit }
 }
 .sidebar:not(.expanded) .nav-btn{ justify-content:center; padding:0 } /* Icons exakt mittig */
 .nav-btn:hover{ background:var(--tile-hover) }
-.txt-glow:hover{
-  text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8)
-}
+.txt-glow:hover{ text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8) }
 
-/* Aktiver Bereich Block (optisch wie Kategorien, starr) */
+/* ===== Aktiver Bereich Block ===== */
 .active-block{ padding:10px 12px 8px }
 .active-head{ display:flex; align-items:center; gap:12px; height:40px; padding:0 12px }
 .sidebar:not(.expanded) .active-head{ justify-content:center; padding:0 }
 .subcol{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
 
-/* ===================== Pills (Subtabs im Content) ===================== */
+/* ===== Pills (Subtabs im Content) ===== */
 .pill{
   padding:6px 10px; border-radius:999px;
   border:1px solid var(--line); background:var(--tile);
@@ -113,25 +111,28 @@ button{ font:inherit }
 }
 .pill.active{ background:var(--active) }
 
-/* ===================== Footer (Sidebar) ===================== */
+/* ===== Footer (Sidebar) ===== */
 .footer{ padding:12px }
+/* Standard (expanded) bleibt Button-Style */
 .footer .login{
   width:100%; padding:8px 12px; border-radius:12px;
   display:flex; align-items:center; justify-content:center; gap:8px
 }
-/* WICHTIG: Im eingeklappten Zustand Login-Button wie Icon-Buttons zentrieren,
-   mit gleichem Abstand beidseitig und ohne Überstand */
+/* Collapsed: Login wie die anderen Icon-Zeilen behandeln */
 .sidebar:not(.expanded) .footer .login{
-  width:40px; height:40px;           /* gleiche Box wie Nav-Icons */
-  padding:0;                          /* kein Innenabstand, sonst versetzt */
+  width:40px; height:40px;           /* gleiche Box wie Icon-Zeilen */
+  padding:0;
+  margin:0 auto;                      /* mittig in der 64px-Spalte */
   display:flex; align-items:center; justify-content:center;
-  margin:0 auto;                      /* sauber mittig in der schmalen Spalte */
   border-radius:16px;
+  background:transparent;             /* KEIN fester Button-Hintergrund */
 }
-/* Icon-Größe für den Login-Button angleichen */
+.sidebar:not(.expanded) .footer .login:hover{
+  background:var(--tile-hover);       /* identischer Hover wie oben */
+}
 .footer .login i[data-lucide]{ width:20px; height:20px }
 
-/* ===================== Content ===================== */
+/* ===== Content ===== */
 .content{
   margin-left:var(--sidebar-w);
   padding: calc(var(--header-h) + 0px) 16px 24px 16px;
@@ -145,7 +146,7 @@ button{ font:inherit }
 .sec-left{ display:flex; gap:12px; align-items:center }
 .sec-subtabs{ display:flex; gap:8px; overflow:auto }
 
-/* ===================== Sichtbarkeit je nach Sidebar-Status ===================== */
+/* ===== Sichtbarkeit je nach Sidebar-Status ===== */
 .sidebar:not(.expanded) .label,
 .sidebar:not(.expanded) .only-expanded{ display:none }
 .sidebar.expanded .only-collapsed{ display:none }
@@ -155,12 +156,12 @@ button{ font:inherit }
 .sidebar:not(.expanded) .legal,
 .sidebar:not(.expanded) .muted { display:none }
 
-/* Icon-Größe leicht erhöhen / vereinheitlichen */
+/* Icon-Größe angleichen */
 .nav-btn i[data-lucide]{ width:20px; height:20px }
 .topbar .btn-ico i[data-lucide],
 .upload i[data-lucide]{ width:20px; height:20px }
 
-/* ===================== (Optional) Partial-Error Overlay ===================== */
+/* (Optional) Overlay bei Partials-Fehlern */
 .partial-error{
   position:fixed; inset:0; display:grid; place-items:center;
   background:rgba(12,28,46,.92); color:#fff; z-index:1000;
