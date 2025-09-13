@@ -173,7 +173,7 @@ button{ font:inherit }
 .footer .legal,
 .footer .legal a,
 .footer .muted{
-  font-size:10px !important;   /* ggf. auf 9px stellen, wenn du noch kleiner willst */
+  font-size:8px !important;   /* ggf. auf 9px stellen, wenn du noch kleiner willst */
   line-height:1.25;
 }
 
