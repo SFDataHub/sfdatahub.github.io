@@ -1,4 +1,4 @@
-// Simple i18n handler
+// Simple i18n handler 
 (function(){
   const defaultLang = 'en';
   const supported = ['en','de'];
