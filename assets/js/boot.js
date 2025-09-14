@@ -1,14 +1,13 @@
 (function(){
   const includes = Array.from(document.querySelectorAll('[data-include]'));
   const fetches = includes.map(el => {
-    const url = el.getAttribute('data-include');
+    const url = window.location.origin + '/' + el.getAttribute('data-include');
     return fetch(url, {cache: 'no-cache'}).then(r => r.text()).then(html => {
       el.outerHTML = html;
     });
   });
 
   Promise.all(fetches).then(() => {
-    // After injecting, initialize behaviour
     const sidebar = document.getElementById('sidebar');
     const avatarBtn = document.getElementById('avatarBtn');
     const profileMenu = document.getElementById('profileMenu');
@@ -36,7 +35,7 @@
       document.addEventListener('click', ()=> profileMenu.style.display = 'none');
     }
 
-    // Language flags in profileMenu (added dynamically)
+    // Language flags in profileMenu
     const menuBox = profileMenu?.querySelector("div[style*='position:absolute']");
     if(menuBox){
       const langBox = document.createElement('div');
@@ -69,16 +68,30 @@
     const vb = document.getElementById('verBuild');
     if(vb) vb.textContent = `v${ver} • Build ${build}`;
 
-    // Active tab highlight (based on URL)
+    // Active section handling
     const path = window.location.pathname;
-    const activeBlock = document.querySelector('.active-block .label + .active-head .label');
-    if(activeBlock){
-      if(path.includes('/players/')) activeBlock.textContent = "Players";
-      else if(path.includes('/guilds/')) activeBlock.textContent = "Guilds";
-      else if(path.includes('/community/')) activeBlock.textContent = "Community";
-      else if(path.includes('/toplists/')) activeBlock.textContent = "Toplists";
-      else if(path.includes('/dashboard/')) activeBlock.textContent = "Dashboard";
-      else activeBlock.textContent = "Home";
+    function showSubnav(section){
+      document.querySelectorAll('.subcol').forEach(el=>{
+        el.style.display = (el.dataset.section === section) ? "flex" : "none";
+      });
+    }
+
+    if(path.includes('/players/')){
+      showSubnav('players');
+    } else if(path.includes('/guilds/')){
+      showSubnav('guilds');
+    } else if(path.includes('/community/')){
+      showSubnav('community');
+    } else if(path.includes('/toplists/')){
+      showSubnav('toplists');
+    } else if(path.includes('/settings/')){
+      showSubnav('settings');
+    } else if(path.includes('/account/')){
+      showSubnav('account');
+    } else if(path.includes('/dashboard/')){
+      showSubnav(null); // Dashboard has no subs
+    } else {
+      showSubnav(null); // Home
     }
 
     // Init lucide icons
