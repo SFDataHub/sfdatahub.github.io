@@ -1,1 +1,30 @@
-function detectLanguage(){const l=navigator.languages||[navigator.language||'en'];const p=(l[0]||'en').split('-')[0].toLowerCase();return ['en','de'].includes(p)?p:'en';}async function loadLanguage(g){try{const r=await fetch('/assets/i18n/'+g+'.json');const d=await r.json();document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.getAttribute('data-i18n');if(d[k]!==undefined){if(e.tagName==='INPUT'||e.tagName==='TEXTAREA'){e.placeholder=d[k];}else{e.textContent=d[k];}}});if(d.title) document.title=d.title;localStorage.setItem('lang',g);document.documentElement.setAttribute('lang',g);}catch(e){console.error('i18n load error',e);}}function initI18n(){let g=localStorage.getItem('lang');if(!g){g=detectLanguage();localStorage.setItem('lang',g);}loadLanguage(g);document.addEventListener('click',e=>{const b=e.target.closest('[data-lang]');if(!b) return;const n=b.getAttribute('data-lang');if(n){loadLanguage(n);localStorage.setItem('lang',n);}});}document.addEventListener('DOMContentLoaded',initI18n);
+// Simple i18n handler
+(function(){
+  const defaultLang = 'en';
+  const supported = ['en','de'];
+
+  function getBrowserLang(){
+    const lang = navigator.language.slice(0,2).toLowerCase();
+    return supported.includes(lang) ? lang : defaultLang;
+  }
+
+  window.setLanguage = function(lang){
+    if(!supported.includes(lang)) lang = defaultLang;
+    localStorage.setItem('lang', lang);
+    applyLanguage(lang);
+  };
+
+  function applyLanguage(lang){
+    fetch(`/assets/i18n/${lang}.json`)
+      .then(r=>r.json())
+      .then(dict=>{
+        document.querySelectorAll('[data-i18n]').forEach(el=>{
+          const key = el.getAttribute('data-i18n');
+          if(dict[key]) el.textContent = dict[key];
+        });
+      });
+  }
+
+  const saved = localStorage.getItem('lang') || getBrowserLang();
+  applyLanguage(saved);
+})();
