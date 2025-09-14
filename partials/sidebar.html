@@ -1,38 +1,65 @@
-<nav class="sidebar" data-sidebar>
-  <ul class="sidebar-menu">
-    <li><a href="/" data-section="home"><i data-lucide="home"></i> Home</a></li>
+<div class="logo-fill" id="logoFill"></div>
 
-    <li><a href="/pages/dashboard/" data-section="dashboard"><i data-lucide="gauge"></i> Dashboard</a></li>
-    <nav class="subnav" data-subnav="dashboard" hidden></nav>
+<aside class="sidebar" id="sidebar" aria-label="Navigation">
+  <div class="nav-scroll">
+    <!-- Home -->
+    <div class="pad">
+      <button class="nav-btn">
+        <i data-lucide="home"></i><span class="label txt-glow">Home</span>
+      </button>
+    </div>
 
-    <li><a href="/pages/players/" data-section="players"><i data-lucide="users"></i> Players</a></li>
-    <nav class="subnav" data-subnav="players" hidden>
-      <a href="/pages/players/analysis/">Analysis</a>
-      <a href="/pages/players/compare/">Compare</a>
-      <a href="/pages/players/profile/">Profile</a>
-    </nav>
+    <!-- Dashboard -->
+    <div class="pad" style="padding-top:0">
+      <button class="nav-btn">
+        <i data-lucide="bar-chart-3"></i><span class="label txt-glow">Dashboard</span>
+      </button>
+    </div>
 
-    <li><a href="/pages/guilds/" data-section="guilds"><i data-lucide="shield"></i> Guilds</a></li>
-    <nav class="subnav" data-subnav="guilds" hidden>
-      <a href="/pages/guilds/planner/">Planner</a>
-      <a href="/pages/guilds/fusion/">Fusion</a>
-      <a href="/pages/guilds/academy/">Academy</a>
-    </nav>
+    <!-- Aktiver Bereich + Unterseiten -->
+    <div class="active-block">
+      <div class="label" style="font-size:12px; opacity:.7; color:var(--text-soft); margin:0 0 6px 2px">Aktiver Tab</div>
+      <div class="active-head">
+        <i data-lucide="list-ordered"></i>
+        <div class="label" style="font-weight:600; color:var(--title)">Toplisten</div>
+      </div>
+      <div class="subcol only-expanded">
+        <button class="nav-btn" style="height:36px"><span class="txt-glow">Spieler</span></button>
+        <button class="nav-btn" style="height:36px"><span class="txt-glow">Server</span></button>
+        <button class="nav-btn" style="height:36px"><span class="txt-glow">Klassen</span></button>
+      </div>
+    </div>
 
-    <li><a href="/pages/community/" data-section="community"><i data-lucide="message-square"></i> Community</a></li>
-    <nav class="subnav" data-subnav="community" hidden>
-      <a href="/pages/community/scans/">Scans</a>
-      <a href="/pages/community/predictions/">Predictions</a>
-      <a href="/pages/community/creatorhub/">Creator Hub</a>
-    </nav>
+    <!-- Kategorien -->
+    <div class="nav-title">Hauptsektionen</div>
+    <div class="nav-col">
+      <button class="nav-btn"><i data-lucide="list-ordered"></i><span class="label txt-glow">Toplisten</span></button>
+      <button class="nav-btn"><i data-lucide="users"></i><span class="label txt-glow">Gilden</span></button>
+      <button class="nav-btn"><i data-lucide="settings"></i><span class="label txt-glow">Settings</span></button>
+    </div>
 
-    <li><a href="/pages/toplists/" data-section="toplists"><i data-lucide="list-ordered"></i> Top Lists</a></li>
+    <div class="nav-title">Direkt</div>
+    <div class="nav-col">
+      <button class="nav-btn"><i data-lucide="users"></i><span class="label txt-glow">Spieler</span></button>
+      <button class="nav-btn"><i data-lucide="users"></i><span class="label txt-glow">Gilde</span></button>
+      <button class="nav-btn"><i data-lucide="server"></i><span class="label txt-glow">Server</span></button>
+      <button class="nav-btn"><i data-lucide="list-ordered"></i><span class="label txt-glow">Toplisten</span></button>
+      <button class="nav-btn"><i data-lucide="scan"></i><span class="label txt-glow">Scans</span></button>
+      <button class="nav-btn"><i data-lucide="message-square-text"></i><span class="label txt-glow">Community</span></button>
+      <button class="nav-btn"><i data-lucide="settings"></i><span class="label txt-glow">Settings</span></button>
+    </div>
+  </div>
 
-    <li><a href="/pages/settings/" data-section="settings"><i data-lucide="settings"></i> Settings</a></li>
-
-    <li><a href="/pages/account/" data-section="account"><i data-lucide="user"></i> Account</a></li>
-    <nav class="subnav" data-subnav="account" hidden>
-      <a href="/pages/account/auth/">Login / Auth</a>
-    </nav>
-  </ul>
-</nav>
+  <!-- Footer -->
+  <div class="footer" data-testid="sidebar-footer">
+    <button class="btn login"><i data-lucide="log-out" class="only-expanded"></i><span class="only-expanded">Logout</span><i data-lucide="log-out" class="only-collapsed"></i></button>
+    <div class="legal">
+      <span id="legalText"></span>
+      <span>•</span><a href="/impressum.html">Impressum</a>
+      <span>•</span><a href="/datenschutz.html">Datenschutz</a>
+      <span>•</span><a href="https://status.sfdatahub.example">Status</a>
+      <span>•</span><a href="/hilfe.html">Hilfe</a>
+    </div>
+    <div class="muted" id="verBuild"></div>
+  </div>
+</aside>
