@@ -1,1 +1,0 @@
-// placeholder for external image/icon fallbacks
