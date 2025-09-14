@@ -1,7 +1,7 @@
 (function(){
   const includes = Array.from(document.querySelectorAll('[data-include]'));
   const fetches = includes.map(el => {
-    const url = window.location.origin + '/' + el.getAttribute('data-include');
+    const url = el.getAttribute('data-include');
     return fetch(url, {cache: 'no-cache'}).then(r => r.text()).then(html => {
       el.outerHTML = html;
     });
@@ -35,26 +35,66 @@
       document.addEventListener('click', ()=> profileMenu.style.display = 'none');
     }
 
-    // Language flags in profileMenu
-    const menuBox = profileMenu?.querySelector("div[style*='position:absolute']");
-    if(menuBox){
-      const langBox = document.createElement('div');
-      langBox.style.marginTop = "12px";
-      langBox.style.display = "flex";
-      langBox.style.gap = "8px";
-      langBox.innerHTML = `
-        <img src="https://flagcdn.com/w20/gb.png" alt="English" title="English" data-lang="en" style="cursor:pointer; border-radius:3px; border:1px solid var(--line)">
-        <img src="https://flagcdn.com/w20/de.png" alt="Deutsch" title="Deutsch" data-lang="de" style="cursor:pointer; border-radius:3px; border:1px solid var(--line)">
-      `;
-      menuBox.appendChild(langBox);
+    // --- Active Tab dynamisch füllen ---
+    const path = window.location.pathname;
+    const activeHead = document.getElementById('activeHead');
+    const activeSubnav = document.getElementById('activeSubnav');
 
-      langBox.querySelectorAll('img').forEach(img=>{
-        img.addEventListener('click', ()=>{
-          if(window.setLanguage){
-            window.setLanguage(img.dataset.lang);
-          }
-        });
-      });
+    function setActiveTab(icon, title, subs){
+      if(activeHead){
+        activeHead.innerHTML = `<i data-lucide="${icon}"></i>
+          <div class="label" style="font-weight:600; color:var(--title)">${title}</div>`;
+      }
+      if(activeSubnav){
+        activeSubnav.innerHTML = "";
+        if(subs && subs.length){
+          subs.forEach(s=>{
+            const btn = document.createElement("button");
+            btn.className = "nav-btn";
+            btn.style.height = "36px";
+            btn.dataset.target = s.href;
+            btn.innerHTML = `<span class="txt-glow">${s.label}</span>`;
+            btn.addEventListener("click", ()=> window.location.href = s.href);
+            activeSubnav.appendChild(btn);
+          });
+        }
+      }
+      if(window.lucide) window.lucide.createIcons();
+    }
+
+    if(path.includes('/players/')){
+      setActiveTab("users", "Players", [
+        {label:"Analysis", href:"/pages/players/analysis/index.html"},
+        {label:"Compare", href:"/pages/players/compare/index.html"},
+        {label:"Profile", href:"/pages/players/profile/index.html"}
+      ]);
+    } else if(path.includes('/guilds/')){
+      setActiveTab("shield", "Guilds", [
+        {label:"Planner", href:"/pages/guilds/planner/index.html"},
+        {label:"Fusion", href:"/pages/guilds/fusion/index.html"},
+        {label:"Academy", href:"/pages/guilds/academy/index.html"}
+      ]);
+    } else if(path.includes('/community/')){
+      setActiveTab("message-square-text", "Community", [
+        {label:"Scans", href:"/pages/community/scans/index.html"},
+        {label:"Predictions", href:"/pages/community/predictions/index.html"},
+        {label:"Creator Hub", href:"/pages/community/creatorhub/index.html"}
+      ]);
+    } else if(path.includes('/toplists/')){
+      setActiveTab("list-ordered", "Toplists", [
+        {label:"Toplists", href:"/pages/toplists/index.html"}
+      ]);
+    } else if(path.includes('/settings/')){
+      setActiveTab("settings", "Settings", [
+        {label:"Settings", href:"/pages/settings/index.html"}
+      ]);
+    } else if(path.includes('/account/')){
+      setActiveTab("user", "Account", [
+        {label:"Auth", href:"/pages/account/auth/index.html"}
+      ]);
+    } else {
+      // Home oder Dashboard → keine Subnav
+      setActiveTab("home", "Home", []);
     }
 
     // Footer dynamic year + version/build
@@ -67,32 +107,6 @@
     const build = document.querySelector('meta[name="sf-build"]')?.getAttribute('content') || (new Date()).toISOString().slice(0,10);
     const vb = document.getElementById('verBuild');
     if(vb) vb.textContent = `v${ver} • Build ${build}`;
-
-    // Active section handling
-    const path = window.location.pathname;
-    function showSubnav(section){
-      document.querySelectorAll('.subcol').forEach(el=>{
-        el.style.display = (el.dataset.section === section) ? "flex" : "none";
-      });
-    }
-
-    if(path.includes('/players/')){
-      showSubnav('players');
-    } else if(path.includes('/guilds/')){
-      showSubnav('guilds');
-    } else if(path.includes('/community/')){
-      showSubnav('community');
-    } else if(path.includes('/toplists/')){
-      showSubnav('toplists');
-    } else if(path.includes('/settings/')){
-      showSubnav('settings');
-    } else if(path.includes('/account/')){
-      showSubnav('account');
-    } else if(path.includes('/dashboard/')){
-      showSubnav(null); // Dashboard has no subs
-    } else {
-      showSubnav(null); // Home
-    }
 
     // Init lucide icons
     if(window.lucide){ window.lucide.createIcons(); }
