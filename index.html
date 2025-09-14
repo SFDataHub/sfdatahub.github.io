@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="de">
 <head>
@@ -7,10 +6,26 @@
   <meta name="sf-version" content="0.1.0">
   <meta name="sf-build" content="2025-09-13">
   <title>SF Data Hub</title>
+
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Basis-Styles -->
   <link rel="stylesheet" href="assets/css/base.css">
+
+  <!-- NEU: App/PWA-Icons + Manifest (Icons lokal unter assets/icons/) -->
+  <meta name="theme-color" content="#0C1C2E">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" sizes="32x32" href="assets/icons/favicon-32x32.png">
+  <link rel="icon" sizes="16x16" href="assets/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+  <link rel="mask-icon" href="assets/icons/safari-pinned-tab.svg" color="#1F3B5D">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- NEU: Fallbacks für externe Bilder (Playa/CDN) -->
+  <link rel="stylesheet" href="assets/css/fallbacks.css">
 </head>
 <body>
 
@@ -37,12 +52,18 @@
     </section>
 
     <div style="height:420px; display:grid; place-items:center; opacity:.6">
-      <div>Template‑Platzhalter — füge später deinen Seiten‑Content ein</div>
+      <div>Template-Platzhalter — füge später deinen Seiten-Content ein</div>
     </div>
   </main>
 
+  <noscript style="color:#fff;background:#a33;padding:.5rem 1rem;display:inline-block;margin:1rem;border-radius:.5rem">
+    JavaScript ist deaktiviert – Partials & Icons-Fallbacks funktionieren dann nicht.
+  </noscript>
+
   <!-- libs + boot -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- NEU: Fallback-Logik vor deinem Boot laden -->
+  <script src="assets/js/fallbacks.js" defer></script>
   <script src="assets/js/boot.js" defer></script>
 </body>
 </html>
