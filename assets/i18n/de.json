@@ -1,4 +1,14 @@
 {
-  "title": "SFDataHub \u2013 Startseite",
-  "welcome": "Willkommen"
+  "title": "SF Data Hub",
+  "home": "Startseite",
+  "dashboard": "Dashboard",
+  "players": "Spieler",
+  "guilds": "Gilden",
+  "community": "Community",
+  "toplists": "Toplisten",
+  "settings": "Einstellungen",
+  "logout": "Abmelden",
+  "welcome": "Willkommen bei SF Data Hub",
+  "choose_category": "Wähle eine Kategorie aus der Sidebar oder starte mit den Toplisten.",
+  "go_toplists": "Zu den Toplisten"
 }
