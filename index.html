@@ -1,0 +1,74 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="sf-version" content="0.1.0">
+  <meta name="sf-build" content="2025-09-13">
+  <title data-i18n="title">SF Data Hub</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/fallbacks.css">
+
+  <!-- PWA / Icons -->
+  <meta name="theme-color" content="#0C1C2E">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" sizes="32x32" href="assets/icons/favicon-32x32.png">
+  <link rel="icon" sizes="16x16" href="assets/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+  <link rel="mask-icon" href="assets/icons/safari-pinned-tab.svg" color="#1F3B5D">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+  <!-- Partials -->
+  <div w3-include-html="partials/topbar.html"></div>
+  <div w3-include-html="partials/sidebar.html"></div>
+
+  <!-- Seiteninhalt: Startseite -->
+  <main class="content" id="content">
+    <section class="section">
+      <div class="sec-left">
+        <i data-lucide="home"></i>
+        <div>
+          <div style="font-size:14px; color:var(--text-soft)">Current Section</div>
+          <div style="font-weight:600; font-size:18px; color:var(--title)">Home</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:24px 0">
+      <h1 style="margin:0 0 12px; color:var(--title)">Welcome to SF Data Hub</h1>
+      <p style="color:var(--text-soft); margin:0 0 20px;">
+        Choose a category from the sidebar or start with the toplists.
+      </p>
+      <a class="pill" href="pages/toplists/">Go to Toplists</a>
+    </section>
+
+    <div style="height:320px; display:grid; place-items:center; opacity:.6">
+      <div>Template placeholder — add your dashboard content here later</div>
+    </div>
+  </main>
+
+  <noscript style="color:#fff;background:#a33;padding:.5rem 1rem;display:inline-block;margin:1rem;border-radius:.5rem">
+    JavaScript is disabled – Partials & Fallbacks will not work.
+  </noscript>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://www.w3schools.com/lib/w3.js"></script>
+  <script src="assets/js/fallbacks.js" defer></script>
+  <script src="assets/js/boot.js" defer></script>
+  <script src="assets/js/nav.js" defer></script>
+  <script src="assets/js/i18n.js" defer></script>
+</body>
+</html>
