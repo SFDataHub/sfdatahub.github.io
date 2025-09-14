@@ -1,24 +1,89 @@
-document.addEventListener('DOMContentLoaded',()=>{
- if(window.w3&&w3.includeHTML){w3.includeHTML(()=>{
-   if(window.lucide&&lucide.createIcons){try{lucide.createIcons();}catch(e){}}
-   if(typeof initI18n==='function') initI18n();
-   const btn=document.getElementById('avatarBtn'), menu=document.getElementById('profileMenu');
-   if(btn&&menu){btn.addEventListener('click',()=>{menu.style.display=(menu.style.display==='block')?'none':'block'});
-     document.addEventListener('click',(e)=>{if(!menu.contains(e.target)&&!btn.contains(e.target)) menu.style.display='none';});
-     const wrap=document.createElement('div');wrap.style.marginTop='12px';wrap.innerHTML='<div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">Language</div><div style="display:flex;gap:8px"><img data-lang="en" src="/assets/img/icons/flag-en.png" style="width:28px;height:20px;border:1px solid var(--line);border-radius:4px;cursor:pointer"><img data-lang="de" src="/assets/img/icons/flag-de.png" style="width:28px;height:20px;border:1px solid var(--line);border-radius:4px;cursor:pointer"></div>'; menu.firstElementChild.appendChild(wrap); }
-   const sb=document.getElementById('sidebar'); if(sb){ const path=location.pathname.replace(/\/index\.html$/,'').replace(/\/$/,'/');
-     const map=[
-       {re:/^\/$/,icon:'home',label:'Home',items:['Spieler','Server','Klassen']},
-       {re:/^\/pages\/dashboard\//,icon:'bar-chart-3',label:'Dashboard',items:['Overview','Widgets','Reports']},
-       {re:/^\/pages\/players\//,icon:'users',label:'Players',items:['Analysis','Compare','Profile']},
-       {re:/^\/pages\/guilds\//,icon:'shield',label:'Guilds',items:['Planner','Fusion','Academy']},
-       {re:/^\/pages\/community\//,icon:'message-square-text',label:'Community',items:['Scans','Predictions','Creator Hub']},
-       {re:/^\/pages\/toplists\//,icon:'list-ordered',label:'Toplisten',items:['Global','EU','NA']},
-       {re:/^\/pages\/settings\//,icon:'settings',label:'Settings',items:['Account','Privacy','About']},
-       {re:/^\/pages\/account\//,icon:'user',label:'Account',items:['Auth','Security','Billing']}
-     ]; const m=map.find(m=>m.re.test(path))||map[0];
-     const head=sb.querySelector('.active-head'); if(head){ const i=head.querySelector('i[data-lucide]'); if(i) i.setAttribute('data-lucide', m.icon); const lab=head.querySelector('.label'); if(lab) lab.textContent=m.label; }
-     const sub=sb.querySelector('.active-block .subcol'); if(sub){ sub.innerHTML=''; m.items.forEach(t=>{const b=document.createElement('button'); b.className='nav-btn'; b.style.height='36px'; b.innerHTML='<span class="txt-glow">'+t+'</span>'; sub.appendChild(b); }); }
-     if(window.lucide&&lucide.createIcons){try{lucide.createIcons();}catch(e){}}
-   }
- });}});
+(function(){
+  const includes = Array.from(document.querySelectorAll('[data-include]'));
+  const fetches = includes.map(el => {
+    const url = el.getAttribute('data-include');
+    return fetch(url, {cache: 'no-cache'}).then(r => r.text()).then(html => {
+      el.outerHTML = html;
+    });
+  });
+
+  Promise.all(fetches).then(() => {
+    // After injecting, initialize behaviour
+    const sidebar = document.getElementById('sidebar');
+    const avatarBtn = document.getElementById('avatarBtn');
+    const profileMenu = document.getElementById('profileMenu');
+
+    function setSidebar(expanded){
+      const cs = getComputedStyle(document.documentElement);
+      const w = cs.getPropertyValue(expanded ? '--sidebar-expanded-w' : '--sidebar-collapsed-w').trim();
+      document.documentElement.style.setProperty('--sidebar-w', w);
+      if(sidebar) sidebar.classList.toggle('expanded', !!expanded);
+    }
+
+    // initial collapsed
+    setSidebar(false);
+
+    if(sidebar){
+      sidebar.addEventListener('mouseenter', ()=> setSidebar(true));
+      sidebar.addEventListener('mouseleave', ()=> setSidebar(false));
+    }
+
+    if(avatarBtn && profileMenu){
+      avatarBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        profileMenu.style.display = profileMenu.style.display === 'block' ? 'none' : 'block';
+      });
+      document.addEventListener('click', ()=> profileMenu.style.display = 'none');
+    }
+
+    // Language flags in profileMenu (added dynamically)
+    const menuBox = profileMenu?.querySelector("div[style*='position:absolute']");
+    if(menuBox){
+      const langBox = document.createElement('div');
+      langBox.style.marginTop = "12px";
+      langBox.style.display = "flex";
+      langBox.style.gap = "8px";
+      langBox.innerHTML = `
+        <img src="https://flagcdn.com/w20/gb.png" alt="English" title="English" data-lang="en" style="cursor:pointer; border-radius:3px; border:1px solid var(--line)">
+        <img src="https://flagcdn.com/w20/de.png" alt="Deutsch" title="Deutsch" data-lang="de" style="cursor:pointer; border-radius:3px; border:1px solid var(--line)">
+      `;
+      menuBox.appendChild(langBox);
+
+      langBox.querySelectorAll('img').forEach(img=>{
+        img.addEventListener('click', ()=>{
+          if(window.setLanguage){
+            window.setLanguage(img.dataset.lang);
+          }
+        });
+      });
+    }
+
+    // Footer dynamic year + version/build
+    const legal = document.getElementById('legalText');
+    if(legal){
+      const year = new Date().getFullYear();
+      legal.textContent = `© ${year} SFDataHub — Alle Marken- und Bildrechte liegen bei den jeweiligen Inhabern.`;
+    }
+    const ver = document.querySelector('meta[name="sf-version"]')?.getAttribute('content') || '0.1.0';
+    const build = document.querySelector('meta[name="sf-build"]')?.getAttribute('content') || (new Date()).toISOString().slice(0,10);
+    const vb = document.getElementById('verBuild');
+    if(vb) vb.textContent = `v${ver} • Build ${build}`;
+
+    // Active tab highlight (based on URL)
+    const path = window.location.pathname;
+    const activeBlock = document.querySelector('.active-block .label + .active-head .label');
+    if(activeBlock){
+      if(path.includes('/players/')) activeBlock.textContent = "Players";
+      else if(path.includes('/guilds/')) activeBlock.textContent = "Guilds";
+      else if(path.includes('/community/')) activeBlock.textContent = "Community";
+      else if(path.includes('/toplists/')) activeBlock.textContent = "Toplists";
+      else if(path.includes('/dashboard/')) activeBlock.textContent = "Dashboard";
+      else activeBlock.textContent = "Home";
+    }
+
+    // Init lucide icons
+    if(window.lucide){ window.lucide.createIcons(); }
+  }).catch(err => {
+    console.error('Partial include failed:', err);
+  });
+})();
