@@ -17,48 +17,42 @@
       </button>
     </div>
 
-    <!-- Players -->
-    <div class="nav-title">Players</div>
-    <div class="subcol" data-section="players">
-      <button class="nav-btn" data-target="/pages/players/analysis/index.html">Analysis</button>
-      <button class="nav-btn" data-target="/pages/players/compare/index.html">Compare</button>
-      <button class="nav-btn" data-target="/pages/players/profile/index.html">Profile</button>
+    <!-- Aktiver Bereich + Unterseiten -->
+    <div class="active-block">
+      <div class="label" style="font-size:12px; opacity:.7; color:var(--text-soft); margin:0 0 6px 2px">active tab</div>
+      <div class="active-head" id="activeHead">
+        <i data-lucide="list-ordered"></i>
+        <div class="label" style="font-weight:600; color:var(--title)">Home</div>
+      </div>
+      <div class="subcol only-expanded" id="activeSubnav">
+        <!-- JS füllt hier dynamisch die Unterseiten ein -->
+      </div>
     </div>
 
-    <!-- Guilds -->
-    <div class="nav-title">Guilds</div>
-    <div class="subcol" data-section="guilds">
-      <button class="nav-btn" data-target="/pages/guilds/planner/index.html">Planner</button>
-      <button class="nav-btn" data-target="/pages/guilds/fusion/index.html">Fusion</button>
-      <button class="nav-btn" data-target="/pages/guilds/academy/index.html">Academy</button>
+    <!-- Kategorien -->
+    <div class="nav-title">Hauptsektionen</div>
+    <div class="nav-col">
+      <button class="nav-btn" data-target="/pages/toplists/index.html">
+        <i data-lucide="list-ordered"></i><span class="label txt-glow">Toplisten</span>
+      </button>
+      <button class="nav-btn" data-target="/pages/guilds/planner/index.html">
+        <i data-lucide="users"></i><span class="label txt-glow">Gilden</span>
+      </button>
+      <button class="nav-btn" data-target="/pages/settings/index.html">
+        <i data-lucide="settings"></i><span class="label txt-glow">Settings</span>
+      </button>
     </div>
 
-    <!-- Community -->
-    <div class="nav-title">Community</div>
-    <div class="subcol" data-section="community">
-      <button class="nav-btn" data-target="/pages/community/scans/index.html">Scans</button>
-      <button class="nav-btn" data-target="/pages/community/predictions/index.html">Predictions</button>
-      <button class="nav-btn" data-target="/pages/community/creatorhub/index.html">Creator Hub</button>
+    <div class="nav-title">Direkt</div>
+    <div class="nav-col">
+      <button class="nav-btn" data-target="/pages/players/analysis/index.html"><i data-lucide="users"></i><span class="label txt-glow">Spieler</span></button>
+      <button class="nav-btn" data-target="/pages/guilds/planner/index.html"><i data-lucide="users"></i><span class="label txt-glow">Gilde</span></button>
+      <button class="nav-btn" data-target="/pages/servers/index.html"><i data-lucide="server"></i><span class="label txt-glow">Server</span></button>
+      <button class="nav-btn" data-target="/pages/toplists/index.html"><i data-lucide="list-ordered"></i><span class="label txt-glow">Toplisten</span></button>
+      <button class="nav-btn" data-target="/pages/scans/index.html"><i data-lucide="scan"></i><span class="label txt-glow">Scans</span></button>
+      <button class="nav-btn" data-target="/pages/community/scans/index.html"><i data-lucide="message-square-text"></i><span class="label txt-glow">Community</span></button>
+      <button class="nav-btn" data-target="/pages/settings/index.html"><i data-lucide="settings"></i><span class="label txt-glow">Settings</span></button>
     </div>
-
-    <!-- Toplists -->
-    <div class="nav-title">Toplists</div>
-    <div class="subcol" data-section="toplists">
-      <button class="nav-btn" data-target="/pages/toplists/index.html">Toplists</button>
-    </div>
-
-    <!-- Settings -->
-    <div class="nav-title">Settings</div>
-    <div class="subcol" data-section="settings">
-      <button class="nav-btn" data-target="/pages/settings/index.html">Settings</button>
-    </div>
-
-    <!-- Account -->
-    <div class="nav-title">Account</div>
-    <div class="subcol" data-section="account">
-      <button class="nav-btn" data-target="/pages/account/auth/index.html">Auth</button>
-    </div>
-
   </div>
 
   <!-- Footer -->
