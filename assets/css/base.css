@@ -63,26 +63,47 @@ button{ font:inherit }
 .avatar-btn{ padding:2px; border-radius:999px; background:var(--tile); border:none; cursor:pointer }
 .avatar{ width:36px; height:36px; border-radius:999px; display:block; object-fit:cover }
 .topbar-disclaimer {
-  background: var(--tile);       /* deine SFDataHub-Farbpalette */
+  background: var(--tile);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 2px 6px;
   font-size: 11px;
   color: var(--text-soft);
-  white-space: nowrap;           /* verhindert Zeilenumbruch */
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
+/* Link */
 .topbar-disclaimer a {
-  color: var(--accent, #5C8BC6); /* Fallback falls kein accent gesetzt ist */
+  color: var(--accent, #5C8BC6);
   text-decoration: none;
 }
-
 .topbar-disclaimer a:hover {
   text-decoration: underline;
 }
+
+/* Standard: Icon verstecken */
+.topbar-disclaimer .disclaimer-icon {
+  display: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-soft);
+  cursor: help;
+}
+
+/* Mobile: nur Icon anzeigen */
+@media (max-width: 700px) {
+  .topbar-disclaimer span,
+  .topbar-disclaimer a {
+    display: none;
+  }
+  .topbar-disclaimer .disclaimer-icon {
+    display: inline-block;
+  }
+}
+
 
 /* ===== Sidebar ===== */
 .logo-fill{
