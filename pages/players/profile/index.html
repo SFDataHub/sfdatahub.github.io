@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <title>Players – Profile</title>
@@ -7,20 +7,221 @@
   <link rel="stylesheet" href="../../../assets/css/fallbacks.css">
 </head>
 <body>
+  <!-- Partials -->
   <div data-include="../../../partials/logo.html"></div>
   <div data-include="../../../partials/topbar.html"></div>
   <div class="layout">
     <div data-include="../../../partials/sidebar.html"></div>
     <main class="content">
-      <h1>Players – Profile</h1>
-      <p>Dummy page for player profiles.</p>
+
+      <!-- Profil Header -->
+      <div class="profile-card">
+        <div class="profile-info">
+          <img src="../../../assets/img/avatar-placeholder.png" alt="Avatar" class="profile-avatar">
+          <div class="profile-details">
+            <h2>Spielername</h2>
+            <div class="profile-meta">Level 123 • Krieger • Server DE1 • Gilde: Beispielgilde</div>
+          </div>
+        </div>
+        <div class="last-update">Zuletzt aktualisiert: 15.09.2025 18:45 <span class="ampel green"></span></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="overview">Übersicht</button>
+        <button class="tab-btn" data-tab="stats">Statistiken</button>
+        <button class="tab-btn" data-tab="charts">Charts</button>
+        <button class="tab-btn" data-tab="progress">Fortschritt</button>
+        <button class="tab-btn" data-tab="compare">Vergleich</button>
+        <button class="tab-btn" data-tab="history">Historie</button>
+      </div>
+
+      <!-- Übersicht -->
+      <div id="overview" class="tab-content active">
+        <h3>Allgemeine Übersicht</h3>
+        <p>Hier stehen allgemeine Infos, z. B. Accountdaten, Favoriten usw.</p>
+      </div>
+
+      <!-- Statistiken -->
+      <div id="stats" class="tab-content">
+        <div class="sub-tabs">
+          <button class="sub-tab-btn active" data-subtab="basestats">Base Stats</button>
+          <button class="sub-tab-btn" data-subtab="totalstats">Total Stats</button>
+          <button class="sub-tab-btn" data-subtab="fortress">Festung</button>
+          <button class="sub-tab-btn" data-subtab="gems">Edelsteine</button>
+        </div>
+        <div id="basestats" class="sub-tab-content active">
+          <div class="profile-stats">
+            <h3>Base Stats</h3>
+            <div class="stat">⚔️ Stärke: 12345</div>
+            <div class="stat">🏹 Geschick: 9876</div>
+            <div class="stat">📖 Intelligenz: 5432</div>
+            <div class="stat">🛡️ Ausdauer: 8765</div>
+            <div class="stat">🍀 Glück: 4321</div>
+          </div>
+        </div>
+        <div id="totalstats" class="sub-tab-content">
+          <div class="profile-stats">
+            <h3>Total Stats</h3>
+            <div class="stat">⚔️ Gesamtstärke: 22345</div>
+            <div class="stat">🏹 Gesamtgeschick: 19876</div>
+            <div class="stat">📖 Gesamtintelligenz: 15432</div>
+            <div class="stat">🛡️ Gesamtausdauer: 18765</div>
+            <div class="stat">🍀 Gesamtglück: 14321</div>
+          </div>
+        </div>
+        <div id="fortress" class="sub-tab-content">
+          <div class="profile-stats"><h3>Festung</h3><p>Festungsgebäude und Ausbaustufen.</p></div>
+        </div>
+        <div id="gems" class="sub-tab-content">
+          <div class="profile-stats"><h3>Edelsteine</h3><p>Übersicht über eingesetzte und gefundene Edelsteine.</p></div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div id="charts" class="tab-content">
+        <div class="profile-charts">
+          <div class="chart">📈 Level-Verlauf</div>
+          <div class="chart">📊 Scrapbook-Fortschritt</div>
+        </div>
+      </div>
+
+      <!-- Fortschritt -->
+      <div id="progress" class="tab-content">
+        <div class="profile-progress">
+          <h3>Fortschritt</h3>
+          <p>Level- und Scrapbook-Entwicklung über die Zeit.</p>
+        </div>
+      </div>
+
+      <!-- Vergleich -->
+      <div id="compare" class="tab-content">
+        <div class="profile-compare">
+          <h3>Spielervergleich</h3>
+          <div class="filter-tabs">
+            <button class="filter-btn active" data-filter="manual">Manuell wählen</button>
+            <button class="filter-btn" data-filter="class">Klassen-Ranking</button>
+            <button class="filter-btn" data-filter="server">Server-Ranking</button>
+          </div>
+
+          <!-- Manuell -->
+          <div id="manual" class="filter-content active">
+            <div class="compare-grid">
+              <div class="compare-card">
+                <h4>Spielername (Du)</h4>
+                <div class="compare-meta">Level 123 • Krieger • Server DE1</div>
+                <div class="compare-lastupdate">Update: 15.09.2025 <span class="ampel green"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span class="better">12345</span></div>
+                <div class="compare-stat">🏹 Geschick <span class="worse">9876</span></div>
+              </div>
+              <div class="compare-card">
+                <h4>Spieler X</h4>
+                <div class="compare-meta">Level 121 • Magier • Server DE2</div>
+                <div class="compare-lastupdate">Update: 14.09.2025 <span class="ampel yellow"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span>12000</span></div>
+                <div class="compare-stat">🏹 Geschick <span class="better">11000</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Klassen -->
+          <div id="class" class="filter-content">
+            <h4>Klassenvergleich</h4>
+            <div class="compare-grid">
+              <div class="compare-card">
+                <h4>Spielername (Du)</h4>
+                <div class="compare-meta">Level 123 • Krieger • Server DE1</div>
+                <div class="compare-lastupdate">Update: 15.09.2025 <span class="ampel green"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span>12345</span></div>
+                <div class="compare-stat">🏹 Geschick <span>9876</span></div>
+              </div>
+              <div class="compare-card">
+                <h4>Spieler A</h4>
+                <div class="compare-meta">Level 124 • Kundschafter • Server DE1</div>
+                <div class="compare-lastupdate">Update: 12.09.2025 <span class="ampel orange"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span>12200</span></div>
+                <div class="compare-stat">🏹 Geschick <span class="better">10000</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Server -->
+          <div id="server" class="filter-content">
+            <h4>Serververgleich</h4>
+            <div class="compare-grid">
+              <div class="compare-card">
+                <h4>Spielername (Du)</h4>
+                <div class="compare-meta">Level 123 • Krieger • Server DE1</div>
+                <div class="compare-lastupdate">Update: 15.09.2025 <span class="ampel green"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span>12345</span></div>
+                <div class="compare-stat">🏹 Geschick <span>9876</span></div>
+              </div>
+              <div class="compare-card">
+                <h4>Spieler B</h4>
+                <div class="compare-meta">Level 125 • Magier • Server DE1</div>
+                <div class="compare-lastupdate">Update: 10.09.2025 <span class="ampel red"></span></div>
+                <div class="compare-stat">⚔️ Stärke <span>12500</span></div>
+                <div class="compare-stat">🏹 Geschick <span>9500</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historie -->
+      <div id="history" class="tab-content">
+        <div class="profile-history">
+          <h3>Historie</h3>
+          <p>Scan-Historie und zeitliche Entwicklung.</p>
+        </div>
+      </div>
+
     </main>
   </div>
   <div data-include="../../../partials/footer.html"></div>
 
+  <!-- Scripts -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script src="../../../assets/js/boot.js" defer></script>
   <script src="../../../assets/js/nav.js" defer></script>
   <script src="../../../assets/js/i18n.js" defer></script>
+  <script>
+    const buttons = document.querySelectorAll('.tab-btn');
+    const tabs = document.querySelectorAll('.tab-content');
+    const subButtons = document.querySelectorAll('.sub-tab-btn');
+    const subTabs = document.querySelectorAll('.sub-tab-content');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const filterContents = document.querySelectorAll('.filter-content');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    subButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        subButtons.forEach(b => b.classList.remove('active'));
+        subTabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.subtab).classList.add('active');
+      });
+    });
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        filterContents.forEach(fc => fc.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.filter);
+        if (target) {
+          target.classList.add('active');
+        }
+      });
+    });
+  </script>
 </body>
 </html>
