@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "home": "Start",
+    "dashboard": "Dashboard",
+    "players": "Spieler",
+    "guilds": "Gilden",
+    "servers": "Server",
+    "toplists": "Top-Listen",
+    "oldscans": "Alte Scans",
+    "favorites": "Favoriten",
+    "notifications": "Benachrichtigungen",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "license": "Lizenzen"
+  },
+  "topbar": {
+    "search": "Suchen…  /",
+    "settings": "Einstellungen",
+    "profile": "Profil",
+    "signout": "Abmelden",
+    "notifications": "Benachrichtigungen",
+    "help": "Hilfe",
+    "theme": "Theme",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "language": "Sprache",
+    "lang_en": "English",
+    "lang_de": "Deutsch"
+  }
+}
