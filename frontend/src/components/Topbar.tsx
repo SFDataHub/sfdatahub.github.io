@@ -1,7 +1,7 @@
 // frontend/src/components/Topbar.tsx
 import { useTranslation } from "react-i18next";
 // ⬇️ Pfad/Name bei Bedarf anpassen (z. B. "../assets/logo.svg")
-import logoUrl from "../assets/logo_sfdatahub.png";
+import logoUrl from "../assets/logo_sfdatahub";
 
 export default function Topbar() {
   const { i18n } = useTranslation();
