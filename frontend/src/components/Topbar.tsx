@@ -1,6 +1,5 @@
-// frontend/src/components/Topbar.tsx
 import { useTranslation } from "react-i18next";
-import logoUrl from "../assets/logo_sfdatahub.png"; // ggf. Dateiname anpassen
+import Logo from "./Logo";
 
 export default function Topbar() {
   const { i18n } = useTranslation();
@@ -9,13 +8,10 @@ export default function Topbar() {
     <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-slate-900/70 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img
-            src={logoUrl}
-            alt="SFDataHub"
-            className="h-6 w-6 rounded-sm ring-1 ring-white/20" /* test-Rahmen */
-            draggable={false}
-          />
-          <span className="text-slate-200 font-semibold tracking-wide">SFDataHub</span>
+          <Logo size={24} className="rounded-sm ring-1 ring-white/20" />
+          <span className="text-slate-200 font-semibold tracking-wide">
+            SFDataHub
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
