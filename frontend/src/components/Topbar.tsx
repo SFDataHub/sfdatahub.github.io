@@ -1,16 +1,35 @@
-import { useTranslation } from 'react-i18next'
+import React from "react";
+import { useTranslation } from "react-i18next";
+import logoUrl from "../assets/logo_sfdatahub.png"; // <-- passt zum Screenshot
 
 export default function Topbar() {
-  const { t, i18n } = useTranslation()
+  const { i18n } = useTranslation();
+
   return (
-    <header className="bg-sd-nav border-b border-sd-card-border">
-      <div className="mx-auto max-w-[1400px] px-4 h-14 flex items-center justify-between">
-        <div className="font-semibold text-sd-title">{t('app.title')}</div>
+    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-slate-900/70 backdrop-blur">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+        {/* Logo + Titel */}
+        <div className="flex items-center gap-3">
+          <img src={logoUrl} alt="SFDataHub" className="h-6 w-6 rounded-sm" />
+          <span className="text-slate-200 font-semibold tracking-wide">SFDataHub</span>
+        </div>
+
+        {/* Language Switch */}
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1 rounded-2xl bg-sd-btn hover:bg-sd-btn-hover" onClick={() => i18n.changeLanguage('en')}>EN</button>
-          <button className="px-3 py-1 rounded-2xl bg-sd-btn hover:bg-sd-btn-hover" onClick={() => i18n.changeLanguage('de')}>DE</button>
+          <button
+            onClick={() => i18n.changeLanguage("en")}
+            className="rounded-md px-2 py-1 text-xs text-slate-200/90 hover:bg-slate-700/50"
+          >
+            EN
+          </button>
+          <button
+            onClick={() => i18n.changeLanguage("de")}
+            className="rounded-md px-2 py-1 text-xs text-slate-200/90 hover:bg-slate-700/50"
+          >
+            DE
+          </button>
         </div>
       </div>
     </header>
-  )
+  );
 }
