@@ -1,0 +1,23 @@
+{
+  "app.title": "SFDataHub",
+  "nav.home": "Start",
+  "nav.players": "Spieler",
+  "nav.player": "Spielerprofil",
+  "nav.guilds": "Gilden",
+  "nav.servers": "Server",
+  "nav.toplists": "Top Lists",
+  "nav.latest": "Letzter Scan",
+  "nav.old": "Alte Scans",
+  "nav.favorites": "Favoriten",
+  "nav.notifications": "Benachrichtigungen",
+  "page.home.title": "Willkommen",
+  "page.players.title": "Spieler",
+  "page.player.title": "Spielerprofil",
+  "page.guilds.title": "Gilden",
+  "page.servers.title": "Server",
+  "page.toplists.title": "Top Lists",
+  "page.latest.title": "Letzter Scan",
+  "page.old.title": "Alte Scans",
+  "page.favorites.title": "Favoriten",
+  "page.notifications.title": "Benachrichtigungen"
+}

@@ -1,0 +1,23 @@
+{
+  "app.title": "SFDataHub",
+  "nav.home": "Home",
+  "nav.players": "Players",
+  "nav.player": "Player",
+  "nav.guilds": "Guilds",
+  "nav.servers": "Servers",
+  "nav.toplists": "Top Lists",
+  "nav.latest": "Latest Scan",
+  "nav.old": "Old Scans",
+  "nav.favorites": "Favorites",
+  "nav.notifications": "Notifications",
+  "page.home.title": "Welcome",
+  "page.players.title": "Players",
+  "page.player.title": "Player",
+  "page.guilds.title": "Guilds",
+  "page.servers.title": "Servers",
+  "page.toplists.title": "Top Lists",
+  "page.latest.title": "Latest Scan",
+  "page.old.title": "Old Scans",
+  "page.favorites.title": "Favorites",
+  "page.notifications.title": "Notifications"
+}
