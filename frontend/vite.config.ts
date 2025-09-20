@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// WICHTIG: relative Assets, damit /preview/ funktioniert
 export default defineConfig({
   plugins: [react()],
-  base: './',            // <— wichtig: relative Assets für Unterordner wie /preview
+  base: './',
   build: { outDir: 'dist' }
 })
