@@ -1,0 +1,566 @@
+:root{
+  --page:#0C1C2E;
+  --tile:#152A42;
+  --tile-hover:#1E3A5C;
+  --nav:#0A1728;
+  --active:#1F3B5D;
+  --text:#FFFFFF;
+  --text-soft:#B0C4D9;
+  --title:#F5F9FF;
+  --line:#2C4A73;
+  --icon:#5C8BC6;
+  --btn:#1E2F47;
+
+  --header-h:80px;
+  --logo-dock-w:208px;
+  /* Collapsed etwas breiter, damit der Login-Icon-Block nicht übersteht */
+  --sidebar-collapsed-w:64px;
+  --sidebar-expanded-w:var(--logo-dock-w);
+  --sidebar-w: var(--sidebar-collapsed-w);
+}
+
+*{ box-sizing:border-box }
+html,body{ height:100% }
+body{
+  margin:0; background:var(--page); color:var(--text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+a{ color:inherit; text-decoration:none }
+button{ font:inherit }
+.btn{ background:var(--btn); border:0; color:var(--text); border-radius:12px; cursor:pointer }
+.btn:focus{ outline:2px solid rgba(255,255,255,.15); outline-offset:2px }
+
+/* ===== Logo-Dock ===== */
+.logo-dock{
+  position:fixed; inset:0 auto auto 0;
+  width:var(--logo-dock-w); height:var(--header-h);
+  background:var(--nav); z-index:40;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 8px;
+}
+.logo-dock img{ max-height:72px; width:auto; display:block }
+
+/* ===== Topbar ===== */
+.topbar{
+  position:fixed; inset:0 0 auto 0; height:var(--header-h);
+  background:var(--nav); z-index:30;
+  display:flex; align-items:center; gap:16px;
+  padding:0 24px 0 calc(var(--logo-dock-w) + 16px);
+  border-bottom:none; box-shadow:none;
+}
+.topbar .btn-ico{ padding:10px; display:inline-flex; align-items:center; justify-content:center }
+
+.search-wrap{ position:relative; flex:1; max-width:680px }
+.search{
+  width:100%; border-radius:18px; padding:9px 12px 9px 36px;
+  border:1px solid var(--line); background:var(--tile); color:var(--text)
+}
+.search::placeholder{ color:var(--text-soft) }
+.search-ico{ position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:.7 }
+
+.upload{ padding:8px 12px; display:inline-flex; gap:8px; align-items:center; border-radius:12px }
+
+.avatar-btn{ padding:2px; border-radius:999px; background:var(--tile); border:none; cursor:pointer }
+.avatar{ width:36px; height:36px; border-radius:999px; display:block; object-fit:cover }
+.topbar-disclaimer {
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Link */
+.topbar-disclaimer a {
+  color: var(--accent, #5C8BC6);
+  text-decoration: none;
+}
+.topbar-disclaimer a:hover {
+  text-decoration: underline;
+}
+
+/* Standard: Icon verstecken */
+.topbar-disclaimer .disclaimer-icon {
+  display: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-soft);
+  cursor: help;
+}
+
+/* Mobile: nur Icon anzeigen */
+@media (max-width: 700px) {
+  .topbar-disclaimer span,
+  .topbar-disclaimer a {
+    display: none;
+  }
+  .topbar-disclaimer .disclaimer-icon {
+    display: inline-block;
+  }
+}
+
+
+/* ===== Sidebar ===== */
+.logo-fill{
+  position:fixed; left:0; top:var(--header-h); bottom:0; width:var(--sidebar-w);
+  background:var(--nav); z-index:0; pointer-events:none; transition:width .25s ease;
+}
+
+.sidebar{
+  position:fixed; left:0; top:var(--header-h); height:calc(100vh - var(--header-h));
+  width:var(--sidebar-w); background:var(--nav); z-index:20;
+  display:grid; grid-template-rows:auto 1fr auto;
+  transition:width .25s ease;
+  border-right:none; box-shadow:none;
+}
+.sidebar.expanded{ width:var(--sidebar-expanded-w) }
+
+.nav-scroll{ overflow:auto }
+.nav-scroll{ scrollbar-width:none; -ms-overflow-style:none }
+.nav-scroll::-webkit-scrollbar{ width:0; height:0; background:transparent }
+
+.pad{ padding:12px }
+.nav-title{ font-size:12px; opacity:.7; color:var(--text-soft); margin:8px 12px }
+.nav-col{ display:flex; flex-direction:column; gap:6px; padding:0 12px }
+
+.nav-btn{
+  height:40px; width:100%; display:flex; align-items:center; justify-content:flex-start;
+  gap:12px; padding:0 12px; border-radius:16px; background:transparent; border:0; color:var(--text); cursor:pointer;
+  transition:background .15s ease;
+}
+.sidebar:not(.expanded) .nav-btn{ justify-content:center; padding:0 }
+.nav-btn:hover{ background:var(--tile-hover) }
+.txt-glow:hover{ text-shadow:0 0 15px rgba(92,139,198,1), 0 0 25px rgba(92,139,198,.8) }
+
+.active-block{ padding:10px 12px 8px }
+.active-head{ display:flex; align-items:center; gap:12px; height:40px; padding:0 12px }
+.sidebar:not(.expanded) .active-head{ justify-content:center; padding:0 }
+.subcol{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
+
+.pill{
+  padding:6px 10px; border-radius:999px;
+  border:1px solid var(--line); background:var(--tile);
+  font-size:14px; white-space:nowrap
+}
+.pill.active{ background:var(--active) }
+
+.footer{ padding:12px }
+.footer .login{
+  width:100%; padding:8px 12px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center; gap:8px
+}
+.sidebar:not(.expanded) .footer .login{
+  width:40px; height:40px;
+  padding:0;
+  margin:0 auto;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:16px;
+  background:transparent;
+}
+.sidebar:not(.expanded) .footer .login:hover{
+  background:var(--tile-hover);
+}
+.footer .login i[data-lucide]{ width:20px; height:20px }
+
+.content{
+  margin-left:var(--sidebar-w);
+  padding: calc(var(--header-h) + 0px) 16px 24px 16px;
+  transition: margin-left .25s ease;
+  min-height:100vh
+}
+.content .section{
+  background:transparent; border:0; padding:12px 8px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px
+}
+.sec-left{ display:flex; gap:12px; align-items:center }
+.sec-subtabs{ display:flex; gap:8px; overflow:auto }
+
+.sidebar:not(.expanded) .label,
+.sidebar:not(.expanded) .only-expanded{ display:none }
+.sidebar.expanded .only-collapsed{ display:none }
+.sidebar:not(.expanded) .nav-title,
+.sidebar:not(.expanded) .legal,
+.sidebar:not(.expanded) .muted { display:none }
+
+.nav-btn i[data-lucide]{ width:20px; height:20px }
+.topbar .btn-ico i[data-lucide],
+.upload i[data-lucide]{ width:20px; height:20px }
+
+.partial-error{
+  position:fixed; inset:0; display:grid; place-items:center;
+  background:rgba(12,28,46,.92); color:#fff; z-index:1000;
+  padding:24px; text-align:center; font-size:14px
+}
+.partial-error a{ text-decoration:underline }
+
+.footer .legal,
+.footer .legal a,
+.footer .muted{
+  font-size:9px !important;
+  line-height:1.25;
+}
+.footer .legal span{ margin:0 4px; }
+
+/* ==== SVG-KILL SWITCH (global) ==== */
+/* Icons in Sidebar/Topbar dürfen sichtbar bleiben */
+.topbar .ico, .sidebar .ico { width:20px; height:20px; display:inline-block; }
+
+/* Alles andere SVG im gesamten App-DOM ausknipsen */
+svg { display:none !important; }
+
+/* Whitelist: Sidebar/Topbar dürfen ihre SVGs anzeigen */
+.topbar svg, .sidebar svg { display:inline-block !important; }
+
+/* ===== FINAL NUKES GEGEN DAS HAUS ===== */
+
+/* 1) Erlaube nur Icons in Topbar/Sidebar (haben .ico) */
+.topbar .ico, .sidebar .ico { width:20px; height:20px; display:inline-block; }
+
+/* 2) ALLE <svg> überall verstecken – außer Topbar/Sidebar-Icons */
+svg { display:none !important; }
+.topbar svg, .sidebar svg { display:inline-block !important; }
+
+/* 3) <img> mit SVG-Quelle verstecken (falls das Haus als <img src="*.svg"> kommt) */
+img[src$=".svg"], img[src*="data:image/svg+xml"] { display:none !important; }
+/* Logo in der Logo-Dock ist PNG – unaffected. */
+
+/* 4) Direkt unter #root platzierte Fremd-Elemente killen (häufige Altlast) */
+#root > svg, #root > img[src$=".svg"], #root > img[src*="data:image/svg+xml"] { display:none !important; }
+
+/* 5) SVG als CSS-Hintergrund/Masken entfernen */
+#root * { 
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+#root *[style*="svg+xml"], #root *[style*=".svg"] {
+  background-image: none !important;
+}
+
+/* 6) Sicherheitsnetz für Section-Content */
+.content svg:not(.ico):not([data-allow-big]),
+.content img[src$=".svg"],
+.content img[src*="data:image/svg+xml"] { display:none !important; }
+
+/* --- Feinheiten: aktive Sidebar, Hover-Expand, Topbar-Spacing --- */
+
+/* aktive Route klarer hervorheben */
+.nav-btn.active {
+  background: var(--active) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+}
+
+/* Icon-Buttons oben optisch wie OG */
+.topbar .btn-ico {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--tile);
+  border: 1px solid var(--line);
+}
+.topbar .btn-ico:hover { background: var(--tile-hover); }
+
+/* Suchfeld minimal höher & tighter */
+.search { height: 36px; padding-top: 8px; padding-bottom: 8px; }
+
+/* Sidebar: Hover -> Expand exakt wie OG */
+.sidebar:hover { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .logo-fill { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .content { margin-left: var(--sidebar-expanded-w); }
+
+/* Labels nur zeigen, wenn breit */
+.sidebar:not(.expanded):hover .label { display: inline; }
+
+/* aktive Sidebar-Route sichtbar */
+.nav-btn.active {
+  background: var(--active) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* Sidebar Hover-Expand 1:1 Verhalten */
+.sidebar:hover { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .logo-fill { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .content { margin-left: var(--sidebar-expanded-w); }
+
+/* Topbar: rechte Seite sauber */
+.topbar .btn-ico { width:40px; height:40px; border-radius:12px; background:var(--tile); border:1px solid var(--line); }
+.topbar .btn-ico:hover { background: var(--tile-hover); }
+
+/* Icons (lucide-react) */
+.ico { width:20px; height:20px; display:inline-block; }
+
+/* ===== Layout-Finishing ===== */
+
+/* 4.1 – Größen und Farben */
+:root{
+  --header-h:96px;                  /* Topbar etwas höher */
+  --logo-dock-w:240px;              /* Logo/Sidebar-breit */
+  --sidebar-collapsed-w:72px;       /* Collapsed etwas breiter */
+  --sidebar-expanded-w:var(--logo-dock-w);
+}
+
+.logo-dock img{ max-height:108px; } /* ~50% größer als vorher */
+
+/* Icons von lucide reagieren auf currentColor -> auf weiß setzen */
+.ico { width:22px; height:22px; color: var(--text); }
+
+/* Icon-Buttons in der Topbar */
+.topbar .btn-ico { 
+  width:40px; height:40px; border-radius:12px;
+  background:var(--tile); border:1px solid var(--line);
+}
+.topbar .btn-ico:hover{ background:var(--tile-hover); }
+.topbar .btn-ico .ico { color:var(--text); }
+
+/* Suche + rechter Block */
+.search-wrap{ flex:1; }
+.topbar-right{ margin-left:auto; display:flex; gap:12px; align-items:center; }
+
+/* 4.2 – Sidebar größer und linksbündig */
+.nav-btn{
+  height:44px; 
+  padding:0 12px; 
+  gap:12px; 
+  border-radius:16px;
+  justify-content:flex-start; 
+  align-items:center;
+  font-size:15px;
+}
+.nav-col .nav-btn .label{ text-align:left; }
+
+/* Sidebar Hover -> Expand */
+.sidebar:hover { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .logo-fill { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .content { margin-left: var(--sidebar-expanded-w); }
+
+/* 4.3 – KEINE doppelte Aktiv-Markierung im Menü-Bereich */
+.nav-col .nav-btn.active{
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+/* Der Active-Tab-Block darf hervorgehoben bleiben */
+.active-head{ 
+  height:40px; display:flex; align-items:center; gap:12px; 
+  padding:0 12px;
+}
+.active-block .subcol .nav-btn:hover{ background:var(--tile-hover); }
+
+/* 4.4 – Suchfeld etwas höher */
+.search{ height:38px; }
+
+/* Sicherheit: Icons immer weiß, auch in Buttons/Pills */
+.pill .ico, .btn .ico { color:var(--text); }
+
+/* ================== LOGO / HEADER: deutlich größer ================== */
+:root{
+  /* Header/Logo-Dock deutlich anheben – vorher z. B. 64–80px */
+  --header-h: 128px;            /* ~doppelt so hoch */
+  --logo-dock-w: 280px;         /* Sidebar-Startbreite (breiter, damit Logo wirkt) */
+  --sidebar-collapsed-w: 76px;  /* auch collapsed etwas breiter */
+  --sidebar-expanded-w: var(--logo-dock-w);
+}
+
+/* Logo-Dock behält sich die volle Höhe; Bild nutzt fast die komplette Höhe */
+.logo-dock{
+  position: fixed;
+  inset: 0 auto auto 0;
+  height: var(--header-h);
+  width: var(--logo-dock-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nav);
+  z-index: 40;
+  padding: 0 12px;
+}
+
+/* Egal ob <img> oder deine <Logo/>-Komponente */
+.logo-dock img,
+.logo-dock .logo-img{
+  max-height: calc(var(--header-h) - 16px);
+  width: auto;
+  display: block;
+}
+
+/* Topbar rückt automatisch passend ein */
+.topbar{
+  padding-left: calc(var(--logo-dock-w) + 16px);
+  height: var(--header-h);
+}
+
+/* Sidebar-/Content-Rand aktualisieren (gleiche Werte wie oben) */
+.logo-fill{ left: 0; top: var(--header-h); width: var(--sidebar-w); }
+.sidebar{  top: var(--header-h); width: var(--sidebar-w); }
+.content{  margin-left: var(--sidebar-w); padding-top: var(--header-h); }
+
+/* Hover-Expand bleibt erhalten */
+.sidebar:hover { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .logo-fill { width: var(--sidebar-expanded-w); }
+.sidebar:hover ~ .content { margin-left: var(--sidebar-expanded-w); }
+
+/* ================== FOOTER Styling ================== */
+.content-inner{
+  /* Platz für Footer dynamisch berechnen */
+  min-height: calc(100vh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+}
+.content-body{ flex: 1; }
+
+.site-footer{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--nav);
+  border-top: 1px solid var(--line);
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+.site-footer .footer-left,
+.site-footer .footer-right{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.site-footer .muted{ color: var(--text-soft); }
+.site-footer .dot{ opacity: .5; }
+
+.site-footer .pill{
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.site-footer .version{ font-size: 12px; }
+
+/* Sicherheit: Icon-Farben innen immer weiß */
+.site-footer .ico{ width: 18px; height: 18px; color: var(--text); }
+
+/* ================== KLEINE VERBESSERUNGEN ================== */
+/* Topbar rechter Block bleibt rechts */
+.topbar-right{ margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* Buttons/Icons: weiß, nicht schwarz */
+.btn-ico .ico,
+.pill .ico,
+.btn .ico { color: var(--text); }
+
+/* ====== Entkopple Topbar-Höhe von Logo-Höhe ====== */
+:root{
+  /* Kleinere Topbar wie vorher */
+  --topbar-h: 72px;               /* <— deine „alte“ Topbar-Höhe (z.B. 64–80px) */
+
+  /* Großes Logo-Dock, unabhängig von der Topbar */
+  --logo-dock-h: 128px;           /* <— Logo darf groß sein */
+  --logo-dock-w: 280px;
+
+  /* Sidebar-Breiten (wie aktuell) */
+  --sidebar-collapsed-w: 76px;
+  --sidebar-expanded-w: var(--logo-dock-w);
+  --sidebar-w: var(--sidebar-collapsed-w);
+}
+
+/* Logo-Dock bleibt groß – beeinflusst Layout aber nicht mehr */
+.logo-dock{
+  position: fixed;
+  inset: 0 auto auto 0;
+  height: var(--logo-dock-h);
+  width: var(--logo-dock-w);
+  background: var(--nav);
+  z-index: 40;                    /* Topbar liegt darüber */
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 12px;
+}
+.logo-dock img,
+.logo-dock .logo-img{
+  max-height: calc(var(--logo-dock-h) - 16px);
+  width: auto; display:block;
+}
+
+/* Topbar richtet sich NUR nach --topbar-h */
+.topbar{
+  position: fixed; inset: 0 0 auto 0;
+  height: var(--topbar-h);
+  background: var(--nav);
+  z-index: 50;                    /* über dem Logo-Dock */
+  display:flex; align-items:center; gap:16px;
+  padding: 0 24px 0 calc(var(--logo-dock-w) + 16px);
+  border-bottom: none; box-shadow: none;
+}
+
+/* Sidebar/Content starten an der Topbar-Unterkante */
+.logo-fill{ position:fixed; left:0; top:var(--topbar-h); bottom:0; width:var(--sidebar-w); background:var(--nav); z-index:0; transition:width .25s ease; }
+.sidebar{  position:fixed; left:0; top:var(--topbar-h); height:calc(100vh - var(--topbar-h)); width:var(--sidebar-w); background:var(--nav); z-index:20; transition:width .25s ease; }
+.content{  margin-left:var(--sidebar-w); padding-top:var(--topbar-h); min-height:100vh; transition:margin-left .25s ease; }
+
+/* Hover-Expand bleibt erhalten */
+.sidebar:hover{ width:var(--sidebar-expanded-w) }
+.sidebar:hover ~ .logo-fill{ width:var(--sidebar-expanded-w) }
+.sidebar:hover ~ .content{ margin-left:var(--sidebar-expanded-w) }
+
+/* (optional) Suchfeldhöhe in der kleineren Topbar */
+.search{ height: 36px; }
+
+/* ===== Logo über der Topbar, Dock transparent ===== */
+
+/* Topbar ist die durchgehende Leiste */
+.topbar{
+  z-index: 50;                     /* Leiste unten */
+  background: var(--nav);
+}
+
+/* Logo-Dock liegt darüber, ohne eigenen Hintergrund */
+.logo-dock{
+  background: transparent;         /* keine harte Kante mehr */
+  z-index: 60;                     /* über der Topbar */
+  pointer-events: none;            /* klicks gehen durch (Schaltflächen bleiben bedienbar) */
+}
+
+/* Das Bild selbst darf bedienbar sein (falls später Link/Tooltip) */
+.logo-dock .logo-img{
+  pointer-events: auto;
+  /* optional: leichte Kontur/Lesbarkeit auf dunklem Hintergrund */
+  /* filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); */
+}
+
+/* ===== Logo vertikal exakt zur Topbar zentrieren ===== */
+/* Feintuning in Pixeln: Minus = höher, Plus = tiefer */
+:root{
+  --logo-offset-y: -2px;   /* bei Bedarf anpassen (-6px, -10px, …) */
+}
+
+/* Logo-Dock bleibt transparent und über der Topbar */
+.logo-dock{
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--logo-dock-w);
+  height: var(--logo-dock-h);
+  background: transparent;
+  z-index: 60;             /* über der Topbar */
+  pointer-events: none;    /* Buttons/Inputs in der Topbar bleiben klickbar */
+}
+
+/* Logo selbst exakt auf die Mittelachse der Topbar ausrichten */
+.logo-dock .logo-img{
+  position: absolute;
+  left: 50%;
+  top: calc(var(--topbar-h) / 2);          /* Mitte der Topbar */
+  transform: translate(-50%, calc(-50% + var(--logo-offset-y)));
+  max-height: calc(var(--logo-dock-h) - 16px);
+  width: auto;
+  pointer-events: auto;                    /* falls später klickbar */
+}
