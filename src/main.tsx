@@ -1,3 +1,4 @@
+// src/main.tsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './styles/base.css'
@@ -5,45 +6,58 @@ import './i18n'
 import { HashRouter, Route, Routes, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 
-import Home from './pages/Home'
-import Dashboard from './pages/Dashboard'
-import TopLists from './pages/TopLists'
-import Guilds from './pages/Guilds'
-import Settings from './pages/Settings'
-import Players from './pages/Players'
-import Player from './pages/Player'
-import Guild from './pages/Guild'
-import Servers from './pages/Servers'
-import Scans from './pages/Scans'
-import Community from './pages/Community'
-import LatestScan from './pages/LatestScan'
-import OldScans from './pages/OldScans'
-import Favorites from './pages/Favorites'
-import Notifications from './pages/Notifications'
+// Seiten (neue Struktur mit Unterordnern)
+import Home from './pages/home/Home'
+import Dashboard from './pages/dashboard/Dashboard'
 
-/** ---- sehr kleine Platzhalter für Unterseiten ---- **/
-const P = (t:string)=>()=><div style={{padding:16}}><h2 style={{color:'var(--title)'}}>{t}</h2></div>;
-const GuildPlanner   = P('Guilds / Planner');
-const GuildFusion    = P('Guilds / Fusion');
-const GuildAcademy   = P('Guilds / Academy');
+import TopLists from './pages/toplists/TopLists'
 
-const TopPlayers     = P('Toplisten / Players');
-const TopGuilds      = P('Toplisten / Guilds');
-const TopServers     = P('Toplisten / Servers');
+import Guilds from './pages/guilds/Guilds'
+import Guild from './pages/guilds/Guild'
 
-const SettingsProfile     = P('Settings / Profile');
-const SettingsAccount     = P('Settings / Account');
-const SettingsAppearance  = P('Settings / Appearance');
+import Settings from './pages/settings/Settings'
 
-const PlayerSearch   = P('Spieler / Suche');
-const PlayerCompare  = P('Spieler / Vergleich');
+import Players from './pages/players/Players'
+import Player from './pages/players/Player'
+import PlayerProfile from './pages/players/PlayerProfile'
 
-const ServerList     = P('Server / Liste');
-const ServerTrend    = P('Server / Trends');
+import Servers from './pages/servers/Servers'
 
-const ScansUpload    = P('Scans / Upload');
-const ScansHistory   = P('Scans / Historie');
-/** -------------------------------------------------- **/
+import Scans from './pages/scans/Scans'
+import LatestScan from './pages/scans/LatestScan'
+import OldScans from './pages/scans/OldScans'
+
+import Community from './pages/community/Community'
+import Favorites from './pages/favorites/Favorites'
+import Notifications from './pages/notifications/Notifications'
+
+// ---- sehr kleine Platzhalter für Unterseiten (kannst du später ersetzen) ----
+const P = (t: string) => () => (
+  <div style={{ padding: 16 }}>
+    <h2 style={{ color: 'var(--title)' }}>{t}</h2>
+  </div>
+)
+const GuildPlanner   = P('Guilds / Planner')
+const GuildFusion    = P('Guilds / Fusion')
+const GuildAcademy   = P('Guilds / Academy')
+
+const TopPlayers     = P('Toplisten / Players')
+const TopGuilds      = P('Toplisten / Guilds')
+const TopServers     = P('Toplisten / Servers')
+
+const SettingsProfile     = P('Settings / Profile')
+const SettingsAccount     = P('Settings / Account')
+const SettingsAppearance  = P('Settings / Appearance')
+
+const PlayerSearch   = P('Spieler / Suche')
+const PlayerCompare  = P('Spieler / Vergleich')
+
+const ServerList     = P('Server / Liste')
+const ServerTrend    = P('Server / Trends')
+
+const ScansUpload    = P('Scans / Upload')
+const ScansHistory   = P('Scans / Historie')
+// -----------------------------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -73,7 +87,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/favorites"  element={<Favorites />} />
           <Route path="/notifications" element={<Notifications />} />
 
-          {/* ---- Unterseiten damit kein Redirect auf "/" mehr passiert ---- */}
+          {/* ---- Unterseiten (kein Redirect mehr auf "/") ---- */}
           {/* Guilds */}
           <Route path="/guilds/planner" element={<GuildPlanner />} />
           <Route path="/guilds/fusion"  element={<GuildFusion  />} />
@@ -90,8 +104,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/settings/appearance" element={<SettingsAppearance />} />
 
           {/* Players */}
-          <Route path="/players/search"  element={<PlayerSearch  />} />
-          <Route path="/players/compare" element={<PlayerCompare />} />
+          <Route path="/players/search"   element={<PlayerSearch   />} />
+          <Route path="/players/compare"  element={<PlayerCompare  />} />
+          <Route path="/players/profile"  element={<PlayerProfile  />} />     {/* NEU: native, ohne iframe */}
+          <Route path="/players/profile/:playerId" element={<PlayerProfile />} /> {/* optional mit ID */}
 
           {/* Servers */}
           <Route path="/servers/list"   element={<ServerList  />} />
