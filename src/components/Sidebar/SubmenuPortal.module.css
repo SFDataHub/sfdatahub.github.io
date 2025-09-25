@@ -1,0 +1,37 @@
+.panel {
+  position: fixed;           /* vom Viewport, nicht vom Sidebar abh. */
+  min-width: 224px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: #0a1728;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.35);
+  z-index: 4000;             /* sicher über Content */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(2px);
+  transition: opacity .12s ease, transform .12s ease, visibility .12s ease;
+}
+
+.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.link {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.link:hover { background: var(--tile-hover); }
+.linkActive  { background: var(--active); }

@@ -1,0 +1,31 @@
+:root{
+  --page:#0C1C2E;
+  --tile:#152A42;
+  --tile-hover:#1E3A5C;
+  --nav:#0A1728;
+  --active:#1F3B5D;
+  --text:#FFFFFF;
+  --text-soft:#B0C4D9;
+  --title:#F5F9FF;
+  --line:#2C4A73;
+  --icon:#5C8BC6;
+  --btn:#1E2F47;
+  --sidebar-pad: 12px;
+
+  /* Grundhöhen/-breiten */
+  --topbar-h:72px;          /* entkoppelt vom Logo-Dock */
+  --logo-dock-h:128px;      /* großes, unabhängiges Logo-Dock */
+  --logo-dock-w:280px;
+
+  /* Sidebar-Breiten */
+  --sidebar-collapsed-w:200px;
+  --sidebar-expanded-w:var(--logo-dock-w);
+  --sidebar-w:var(--sidebar-collapsed-w);
+
+  /* Sonstiges */
+  --radius-xxl:16px;
+  --radius-xl:16px;
+  --radius-lg:12px;
+  --radius-md:10px;
+  --radius-sm:8px;
+}

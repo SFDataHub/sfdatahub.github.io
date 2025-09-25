@@ -1,0 +1,140 @@
+/* ====== Container (eigener Stacking-Context, ganz oben) ====== */
+.root{
+  position: fixed;
+  left: 0;
+  top: var(--topbar-h);
+  bottom: 0;
+  width: var(--sidebar-w);                 /* collapsed (Token) */
+  background: var(--nav);
+  isolation: isolate;                      /* eigener Stacking-Context */
+  z-index: 1000;                           /* über Content + dessen Eltern */
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  transition: width .2s ease;
+  overflow: visible;                       /* Popouts dürfen raus */
+}
+.expanded{ width: var(--sidebar-expanded-w); } /* expanded = Logo-Breite */
+
+.root *, .root *::before, .root *::after{ box-sizing: border-box; }
+
+/* ====== Header ====== */
+.headRow{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:10px var(--sidebar-pad);
+}
+.headTitle{ display:flex; align-items:center; gap:8px; color:var(--text-soft); font-size:12px; }
+.headDot{ width:6px; height:6px; background:#3aa0ff; border-radius:999px; display:inline-block; }
+.headLabel{ text-transform:uppercase; letter-spacing:.06em; }
+.pinBtn{
+  width:32px; height:32px; border-radius:8px;
+  background:var(--tile); border:1px solid var(--line); color:var(--text);
+}
+
+/* ====== KEIN Clipping durch Scrollcontainer ====== */
+.navScroll{ overflow: visible; }           /* keine Scrollbox, Popouts frei */
+.pad{ padding-inline: var(--sidebar-pad); padding-top:8px; padding-bottom:8px; }
+
+/* ====== Karten ====== */
+.segCard{
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: #0e1b2c;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(12,28,46,.2) inset;
+  overflow: visible;                        /* nie clippen */
+}
+.segTitle{
+  color: var(--text-soft);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 4px 6px 8px;
+}
+
+/* ====== Liste ====== */
+.navCol{ display:flex; flex-direction:column; gap:6px; width:100%; }
+.navItemWrap{ position:relative; display:flex; align-items:center; gap:6px; width:100%; overflow:visible; }
+
+/* Haupt-Button */
+.navBtn{
+  display:flex; align-items:center; gap:10px;
+  width:100%;
+  padding:10px 12px;
+  border-radius:16px;
+  background:transparent;
+  color:var(--text);
+  border:0; text-decoration:none;
+  white-space:nowrap;
+  overflow:hidden;                   /* nie innere Scrollbars */
+}
+.navBtn:hover{ background: var(--tile-hover); }
+.navBtnActive{ background: var(--active) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+
+.label{ white-space:nowrap; }
+.ico{ width:18px; height:18px; }
+
+/* Collapsed: nur Icons */
+.root[data-collapsed="true"] .navBtn{ justify-content: center; }
+.root[data-collapsed="true"] .label{ display: none; }
+
+/* ====== Deko-Chevron rechts ====== */
+.trailing{
+  margin-left:auto; padding-left:8px;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:18px; height:18px; opacity:.6;
+  pointer-events:none; background:transparent; border:0;
+}
+.trailing .ico{ width:16px; height:16px; }
+.root[data-collapsed="true"] .trailing{ display: none; }
+
+/* ====== Submenu (überlappt Content) ====== */
+.submenuPanel{
+  position:absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  width:224px; padding:8px;
+  border:1px solid var(--line);
+  background:#0a1728;
+  border-radius:12px;
+  box-shadow:0 12px 28px rgba(0,0,0,.35);
+  opacity:0; visibility:hidden; transform:translateY(2px);
+  transition:opacity .12s ease, transform .12s ease, visibility .12s ease;
+  z-index: 2000;                     /* sicher über Content */
+  pointer-events:auto;
+}
+.isOpen > .submenuPanel{
+  opacity:1; visibility:visible; transform:translateY(0);
+}
+
+/* Hover-Bridge (gegen Lücke) */
+.hoverBridge{ position:absolute; left:-8px; top:0; width:8px; height:100%; }
+
+/* Submenu-Links */
+.submenuCol{ display:flex; flex-direction:column; gap:6px; }
+.submenuLink{
+  display:block; padding:9px 10px; border-radius:12px;
+  color:var(--text); text-decoration:none;
+}
+.submenuLink:hover{ background: var(--tile-hover); }
+.submenuLinkActive{ background: var(--active); }
+
+/* ====== Footer ====== */
+.footer{ width:100%; }
+.login{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:10px;
+  background:#152a42; border:1px solid var(--line); border-radius:10px;
+  color:var(--text);
+}
+.legal{ margin-top:8px; font-size:10px; line-height:1.25; color:var(--text-soft); }
+
+/* ====== Sicherheitsnetze gegen Scrollbars in Items ====== */
+.navItemWrap, .navBtn, .trailing{
+  overflow: hidden !important;
+  scrollbar-width: none;
+}
+.navItemWrap::-webkit-scrollbar,
+.navBtn::-webkit-scrollbar,
+.trailing::-webkit-scrollbar{ display: none; }

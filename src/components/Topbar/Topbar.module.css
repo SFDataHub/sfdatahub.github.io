@@ -1,0 +1,105 @@
+.topbar{
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--topbar-h);
+  background: var(--nav);
+  z-index: 50; /* liegt unter dem Logo-Dock (z:60), aber über Content */
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px 0 calc(var(--logo-dock-w) + 16px);
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* Linke/ rechte Seite */
+.topbarRight{ margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* Icons */
+.ico{ width:20px; height:20px; color: var(--text); }
+
+/* Suche */
+.searchWrap{ position: relative; flex: 1; max-width: 680px; }
+.search{
+  width: 100%;
+  height: 36px;
+  border-radius: 18px;
+  padding: 9px 12px 9px 36px;
+  border: 1px solid var(--line);
+  background: var(--tile);
+  color: var(--text);
+}
+.search::placeholder{ color: var(--text-soft); }
+.searchIco{
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: .7;
+}
+
+/* Icon-Buttons */
+.btnIco{
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.btnIco:hover{ background: var(--tile-hover); }
+
+/* Upload-Button (kein globales .btn nötig) */
+.upload{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--btn);
+  color: var(--text);
+  border: 0;
+  cursor: pointer;
+}
+.upload:focus{
+  outline: 2px solid rgba(255,255,255,.15);
+  outline-offset: 2px;
+}
+
+/* Externer Link-Pill */
+.pill{
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Optional: nur anzeigen, wenn Sidebar expanded ist.
+   -> Ohne Sibling-CSS bleibt diese Klasse neutral;
+   -> Wenn du ein Signal (Prop/Context) liefern willst, können wir hier togglen. */
+.onlyExpanded{}
+
+/* Avatar */
+.avatarBtn{
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--tile);
+  border: none;
+  cursor: pointer;
+}
+.avatar{
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: block;
+  object-fit: cover;
+}
