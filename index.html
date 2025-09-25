@@ -1,13 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>SF Data Hub</title>
+
+    <!-- PWA: Manifest + Farben -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0C1C2E" />
+
+    <!-- Favicon & Apple Touch Icon -->
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+
+    <!-- (Optional) maskable icon hint for some platforms -->
+    <link rel="icon" sizes="512x512" href="/icons/icon-512-maskable.png" />
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Deine App -->
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- PWA: Service Worker Registrierung -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .catch(console.error);
+        });
+      }
+    </script>
   </body>
 </html>
