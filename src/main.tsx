@@ -80,6 +80,16 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 // Settings
 import Settings from "./pages/Settings";
 
+// Playground
+import PlaygroundIndex from "./pages/Playground/Index";
+import HUDIndex from "./pages/Playground/HUD/index";
+import GameButtonsPlayground from "./pages/Playground/HUD/GameButtonsPlayground";
+import ThemeMaker from "./pages/Playground/ThemeMaker";
+import ListViews from "./pages/Playground/ListViews";
+import RescanWidget from "./pages/Playground/RescanWidget";
+import UploadSim from "./pages/Playground/UploadSim";
+import ThemeMakerPro from "./pages/Playground/ThemeMakerPro";
+
 // ---- kleine Platzhalter (falls alte Deep-Links auftauchen) ----
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
@@ -163,8 +173,20 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
           {/* Settings */}
           <Route path="/settings" element={<Settings />} />
-
-          {/* --- Redirects von alten Routen --- */}
+	
+{/* Playground */}
+<Route path="/playground" element={<PlaygroundIndex />}>
+  <Route index element={<div style={{color:'#B0C4D9'}}>Choose an item on the left.</div>} />
+  <Route path="list-views" element={<ListViews />} />
+  <Route path="rescan-widget" element={<RescanWidget />} />
+  <Route path="upload-sim" element={<UploadSim />} />
+  {/* NEU: HUD */}
+  <Route path="hud" element={<HUDIndex />} />
+  <Route path="hud/game-buttons" element={<GameButtonsPlayground />} />
+<Route path="theme-maker" element={<ThemeMaker />} />
+<Route path="theme-maker-pro" element={<ThemeMakerPro />} />
+</Route>
+	  {/* --- Redirects von alten Routen --- */}
           <Route path="/toplists" element={<Navigate to="/discover" replace />} />
           <Route path="/latest-scan" element={<Navigate to="/scans/latest" replace />} />
           <Route path="/old-scans" element={<Navigate to="/scans/archive" replace />} />

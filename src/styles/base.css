@@ -1,3 +1,8 @@
+/* --- Tailwind aktivieren (muss vor eigenen Regeln stehen) --- */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Fallbacks / Tokens, falls nicht schon woanders definiert */
 :root{
   /* Fallback: Wenn RootLayout die Var noch nicht setzt, nimm Basisbreite */

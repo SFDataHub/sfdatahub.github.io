@@ -3,7 +3,7 @@
   min-width: 224px;
   padding: 18px;
   border: 1px solid var(--line);
-  background: #0a1728;
+  background: #0F2030;
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(0,0,0,.35);
   z-index: 4000;             /* sicher über Content */
@@ -22,7 +22,7 @@
 .col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .link {

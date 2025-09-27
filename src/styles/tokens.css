@@ -1,8 +1,8 @@
 :root{
   --page:#0C1C2E;
-  --tile:#152A42;
+  --tile:#1E2F47;
   --tile-hover:#1E3A5C;
-  --nav:#0A1728;
+  --nav:transparent;
   --active:#1F3B5D;
   --text:#FFFFFF;
   --text-soft:#B0C4D9;
@@ -10,7 +10,7 @@
   --line:#2C4A73;
   --icon:#5C8BC6;
   --btn:#1E2F47;
-  --sidebar-pad: 12px;
+  --sidebar-pad: 5px;
 
   /* Grundhöhen/-breiten */
   --topbar-h:72px;          /* entkoppelt vom Logo-Dock */

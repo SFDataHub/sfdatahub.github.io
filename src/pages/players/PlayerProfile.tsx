@@ -1,21 +1,22 @@
+// src/pages/PlayerProfile.tsx  (Pfad ggf. anpassen)
 import React, { useMemo, useState } from "react";
+import ContentShell from "../../components/ContentShell"; // <— ggf. auf "../../components/ContentShell" ändern
 
 /**
- * PlayerProfile – contained layout (kein full-bleed mehr)
- * - Einheitlicher Container (maxWidth 1200px, padding 0 16px) für:
- *   Header, Switcher, KPI-Tiles, Tabs und Inhalte
- * - Keine 50vw/negative margins → Tabs & Header fluchten sauber
+ * PlayerProfile – contained layout
+ * - Einheitlicher Container (maxWidth 1200px, padding 0 16px)
+ * - Läuft innerhalb unseres ContentShell/Frame (kein eigener Page-Background)
  */
 
 const PALETTE = {
-  page: "#0C1C2E",
-  tile: "#152A42",
-  tileAlt: "#14273E",
-  line: "#2C4A73",
-  text: "#FFFFFF",
-  textSoft: "#B0C4D9",
-  title: "#F5F9FF",
-  active: "#2D4E78",
+  page: "transparent",                    // Frame liefert Hintergrund
+  tile: "var(--tile, #152A42)",
+  tileAlt: "var(--tile, #14273E)",
+  line: "var(--line, #2C4A73)",
+  text: "var(--text, #FFFFFF)",
+  textSoft: "var(--text-soft, #B0C4D9)",
+  title: "var(--title, #F5F9FF)",
+  active: "var(--active, #2D4E78)",
 };
 
 type Character = {
@@ -31,7 +32,7 @@ type Character = {
   activityScore?: number; // 0..100
 };
 
-// --- Demo-Daten (später durch echte ersetzen) ---
+// --- Demo-Daten (später ersetzen) ---
 const DEMO_OWN: Character[] = [
   { id: "nox", name: "Nox", className: "Demon Hunter", level: 500, guild: "Night Watch", server: "EU 1", scrapbookPct: 96.7, totalStats: 123456, lastScanDays: 2, activityScore: 82 },
   { id: "nox-alt", name: "Nox Alt", className: "Warrior", level: 420, guild: "Night Watch", server: "EU 1", scrapbookPct: 88.3, totalStats: 98765, lastScanDays: 5, activityScore: 61 },
@@ -41,7 +42,7 @@ const DEMO_FAVS: Character[] = [
   { id: "ally-2", name: "Rook", className: "Scout", level: 498, guild: "Blackfeather", server: "EU 2", scrapbookPct: 92.5, totalStats: 118200, lastScanDays: 3, activityScore: 78 },
 ];
 
-// ---------- kleine UI-Bausteine ----------
+/* ---------- kleine UI-Bausteine ---------- */
 function Container({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px", ...style }}>
@@ -82,6 +83,7 @@ function StatTile({ label, value, hint }: StatTileProps) {
         border: `1px solid ${PALETTE.line}`,
         borderRadius: 16,
         padding: 16,
+        boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
       }}
     >
       <div style={{ fontSize: 12, color: PALETTE.textSoft, marginBottom: 4 }}>{label}</div>
@@ -91,7 +93,7 @@ function StatTile({ label, value, hint }: StatTileProps) {
   );
 }
 
-// ---------- Switcher ----------
+/* ---------- Switcher ---------- */
 function CharacterSwitcher({
   all,
   favIds,
@@ -146,7 +148,7 @@ function CharacterSwitcher({
   );
 }
 
-// ---------- Tabs + Inhalte (contained) ----------
+/* ---------- Tabs + Inhalte (contained) ---------- */
 function ProfileTabs({ char }: { char: Character }) {
   const [tab, setTab] = useState<"overview" | "stats" | "charts" | "progress" | "compare" | "history">("overview");
   const [subtab, setSubtab] = useState<"basestats" | "totalstats" | "fortress" | "gems">("basestats");
@@ -189,7 +191,13 @@ function ProfileTabs({ char }: { char: Character }) {
   );
 
   const SectionCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div style={{ background: PALETTE.tileAlt, padding: 15, borderRadius: 12 }}>{children}</div>
+    <div style={{
+      background: PALETTE.tileAlt,
+      padding: 15,
+      borderRadius: 12,
+      border: `1px solid ${PALETTE.line}`,
+      boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)"
+    }}>{children}</div>
   );
 
   const level = char.level ?? 0;
@@ -202,6 +210,8 @@ function ProfileTabs({ char }: { char: Character }) {
         style={{
           background: PALETTE.tileAlt, padding: 15, borderRadius: 12,
           display: "flex", alignItems: "center", justifyContent: "space-between",
+          border: `1px solid ${PALETTE.line}`,
+          boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)"
         }}
       >
         <div>
@@ -216,7 +226,10 @@ function ProfileTabs({ char }: { char: Character }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", background: "#1A2F4A", marginTop: 12, borderRadius: 6, overflow: "hidden" }}>
+      <div style={{
+        display: "flex", background: "#1A2F4A", marginTop: 12, borderRadius: 6, overflow: "hidden",
+        border: `1px solid ${PALETTE.line}`
+      }}>
         <TabsButton value="overview">Übersicht</TabsButton>
         <TabsButton value="stats">Statistiken</TabsButton>
         <TabsButton value="charts">Charts</TabsButton>
@@ -234,7 +247,7 @@ function ProfileTabs({ char }: { char: Character }) {
   );
 }
 
-// ---------- Hauptseite ----------
+/* ---------- Hauptseite ---------- */
 export default function PlayerProfile() {
   const [own] = useState<Character[]>(DEMO_OWN);
   const [favs] = useState<Character[]>(DEMO_FAVS);
@@ -260,9 +273,14 @@ export default function PlayerProfile() {
   );
 
   return (
-    <div style={{ background: PALETTE.page, color: PALETTE.text, minHeight: "100vh" }}>
+    <ContentShell
+      title="Spielerprofil"
+      subtitle="Charaktere, KPIs & Verlauf"
+      centerFramed={false}  // wir rendern eigene Cards im Inhalt
+      padded
+    >
       {/* Sticky Header im gleichen Container */}
-      <div style={{ position: "sticky", top: 0, zIndex: 2, background: "#0A1728", borderBottom: `1px solid ${PALETTE.line}` }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 2, background: "transparent", borderBottom: `1px solid ${PALETTE.line}` }}>
         <Container style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
           <AvatarCircle label={active.name} size={36} />
           <div>
@@ -288,6 +306,6 @@ export default function PlayerProfile() {
 
       {/* Tabs & Inhalte (contained) */}
       <ProfileTabs char={active} />
-    </div>
+    </ContentShell>
   );
 }

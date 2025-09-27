@@ -3,19 +3,29 @@ import { NavLink } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff
+  ChevronRight, Pin, PinOff, Aperture
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
 
 /* ---------------- Daten ---------------- */
-type Item = { to: string; label: string; icon: React.ReactNode; end?: boolean };
+/* ---------------- Daten ---------------- */
 type SubItem = { to: string; label: string };
 
+type Item = {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  end?: boolean;
+}; // 👈 sauber geschlossen, KEIN submenu hier nötig
+// main
 const main: Item[] = [
-  { to: "/",          label: "Home",      icon: <Home className="ico" />, end: true },
-  { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="ico" /> },
+  { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true },
+  { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" /> },
+  { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" /> },
+  { to: "/playground", label: "Playground", icon: <Aperture className="ico" /> }, // <- ohne "/"
 ];
+
 
 const categories: Item[] = [
   { to: "/discover",  label: "Discover",  icon: <Compass className="ico" /> },
@@ -23,10 +33,9 @@ const categories: Item[] = [
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" /> },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" /> },
   { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" /> },
-  { to: "/guild-hub", label: "Guild Hub", icon: <Shield className="ico" /> },
 ];
 
-const SUBTABS: Record<string, SubItem[]> = {
+ const SUBTABS: Record<string, SubItem[]> = {
   "/discover": [
     { to: "/players",            label: "Players" },
     { to: "/players/profile",    label: "Player Profile" },
@@ -40,7 +49,15 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/settings/account",    label: "Account" },
     { to: "/settings/appearance", label: "Appearance" },
   ],
+   "/playground": [
+    { to: "/playground/list-views",       label: "List Views" },
+    { to: "/playground/rescan-widget",    label: "Rescan Widget" },
+    { to: "/playground/upload-sim",       label: "Upload Simulator" },
+    { to: "/playground/hud/game-buttons", label: "HUD · Game Buttons" },
+  ],
 };
+
+
 
 /* ---------------- Hover-Hilfe ---------------- */
 const CLOSE_MENU_DELAY = 220;
@@ -58,6 +75,50 @@ function useDelayedHover(delay = CLOSE_MENU_DELAY) {
   return { open, onEnter, onLeave, setOpen };
 }
 
+/* ---------------- Hilfs-Renderer: animiertes Label (Typewriter, ohne Cursor) ---------------- */
+function AnimatedLabel({
+  text,
+  isOpen,
+  duration = 1,  // per-char flip duration (ms)
+  step = 45,     // typing speed between chars (ms)
+}: {
+  text: string;
+  isOpen: boolean;
+  duration?: number;
+  step?: number;
+}) {
+  const chars = React.useMemo(() => Array.from(text), [text]);
+
+  return (
+    <span className={styles.label}>
+      <span
+        className={styles.labelText}
+        data-open={isOpen ? "true" : "false"}
+        aria-label={text}
+        role="text"
+        style={
+          {
+            "--duration": `${duration}ms`,
+            "--step": `${step}ms`,
+            "--count": chars.length,
+          } as React.CSSProperties
+        }
+      >
+        {chars.map((ch, i) => (
+          <span
+            key={`${text}-${i}`}
+            className={styles.char}
+            style={{ ["--i" as any]: i }}
+            aria-hidden="true"
+          >
+            {ch === " " ? "\u00A0" : ch}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 /* ---------------- Ein Kategorie-Item mit Portal-Submenu ---------------- */
 function CategoryItem({
   it, collapsed, allowSubmenus,
@@ -70,27 +131,10 @@ function CategoryItem({
   const { open, onEnter, onLeave, setOpen } = useDelayedHover();
   const rowRef = React.useRef<HTMLDivElement | null>(null);
 
-  // Erste Phase: Sidebar expandiert → erst dann Submenu „armed“
   const handleEnter = React.useCallback(() => {
     if (!allowSubmenus || !hasSub) { setOpen(false); return; }
     onEnter();
   }, [allowSubmenus, hasSub, onEnter, setOpen]);
-
-  const renderLink = React.useCallback(
-    (s: { to: string; label: string }) => (
-      <NavLink
-        key={s.to}
-        to={s.to}
-        className={({ isActive }) =>
-          // Submenu-Styles stammen aus Portal-CSS, nicht Sidebar.module.css
-          `${"link"} ${isActive ? "linkActive" : ""}`
-        }
-      >
-        {s.label}
-      </NavLink>
-    ),
-    []
-  );
 
   return (
     <div
@@ -107,7 +151,7 @@ function CategoryItem({
         }
       >
         {it.icon}
-        <span className={styles.label}>{it.label}</span>
+        <AnimatedLabel text={it.label} isOpen={!collapsed} />
         {hasSub && !collapsed && (
           <span className={styles.trailing} aria-hidden="true">
             <ChevronRight className="ico" />
@@ -115,7 +159,6 @@ function CategoryItem({
         )}
       </NavLink>
 
-      {/* Portal-Submenu (überlappt immer Content) */}
       {hasSub && (
         <SubmenuPortal
           anchorEl={rowRef.current}
@@ -125,9 +168,7 @@ function CategoryItem({
             <NavLink
               key={s.to}
               to={s.to}
-              className={({ isActive }) =>
-                `${"link"} ${isActive ? "linkActive" : ""}`
-              }
+              className={({ isActive }) => `${"link"} ${isActive ? "linkActive" : ""}`}
             >
               {s.label}
             </NavLink>
@@ -166,7 +207,7 @@ function Block({
               }
             >
               {it.icon}
-              <span className={styles.label}>{it.label}</span>
+              <AnimatedLabel text={it.label} isOpen={!collapsed} />
             </NavLink>
           )
         )}
@@ -204,7 +245,7 @@ export default function Sidebar({
   const handleEnter = React.useCallback(() => {
     if (!hoverToExpand || pinned) return;
     clearTimers();
-    setSubmenuArmed(false); // erster Hover: nur Sidebar öffnen
+    setSubmenuArmed(false);
     openTimer.current = window.setTimeout(() => setExpanded(true), HOVER_OPEN_DELAY);
   }, [hoverToExpand, pinned, clearTimers, setExpanded]);
 
@@ -229,7 +270,6 @@ export default function Sidebar({
     }
   };
 
-  // Fallback, falls transitionend nicht feuert
   React.useEffect(() => {
     if (expanded && !pinned) {
       const id = window.setTimeout(() => setSubmenuArmed(true), 250);
@@ -267,21 +307,25 @@ export default function Sidebar({
 
       <div className={styles.navScroll}>
         <div className={styles.pad}>
-          <div className={styles.segCard}>
+          {/* Main */}
+          <div className={`${styles.segCard} ${styles.mainNavCard}`}>
             <Block items={main} collapsed={collapsed} allowSubmenus={allowSubmenus} />
           </div>
 
           <div className={styles.segTitle}>Kategorien</div>
-          <div className={styles.segCard}>
+
+          {/* Kategorien */}
+          <div className={`${styles.segCard} ${styles.mainNavCard}`}>
             <Block items={categories} collapsed={collapsed} allowSubmenus={allowSubmenus} />
           </div>
         </div>
       </div>
 
-      <div className={`${styles.footer} ${styles.segCard}`}>
+      {/* Footer */}
+      <div className={`${styles.footer} ${styles.segCard} ${styles.mainNavCard}`}>
         <button className={styles.login} type="button">
           <Shield className="ico" />
-          <span className={styles.label}>Logout</span>
+          <AnimatedLabel text="Logout" isOpen={!collapsed} />
         </button>
         <div className={styles.legal}>
           © 2025 SFDataHub — Alle Marken- und Bildrechte bei den jeweiligen Inhabern.
