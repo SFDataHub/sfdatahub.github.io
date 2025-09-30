@@ -1,9 +1,15 @@
 import React from "react";
 import { useFilters } from "./FilterContext";
 
-/** Rendert die Liste je nach View (Cards | Buttons | Table). */
+/** Rendert NUR Cards oder Buttons.
+ *  Bei listView === "table" rendert diese Komponente NICHTS
+ *  (die echte Tabelle kommt von der Toplists-Seite).
+ */
 export default function ListSwitcher() {
   const { list, filtered, listView } = useFilters();
+
+  // Table-View wird extern gerendert → hier nichts anzeigen
+  if (listView === "table") return null;
 
   return (
     <div style={{ background:"#1A2F4A", border:"1px solid #2B4C73", borderRadius:16, padding:12 }}>
@@ -42,36 +48,10 @@ export default function ListSwitcher() {
           ))}
         </div>
       )}
-
-      {listView === "table" && (
-        <div style={{ overflow:"auto", border:"1px solid #2B4C73", borderRadius:14 }}>
-          <table style={{ width:"100%", minWidth:720, borderCollapse:"separate", borderSpacing:0, color:"#F5F9FF" }}>
-            <thead style={{ position:"sticky", top:0, zIndex:1, background:"#1E3657" }}>
-              <tr>
-                <Th>Name</Th><Th>Server</Th><Th>Class</Th><Th right>Level</Th><Th right>Scrapbook</Th><Th>Active</Th><Th right>Last Scan (d)</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0,100).map((p, idx)=>(
-                <tr key={p.id} style={{ background: idx%2 ? "#14273E" : "#162A44" }}>
-                  <Td>{p.name}</Td><Td>{p.server}</Td><Td style={{ textTransform:"uppercase" }}>{p.class}</Td>
-                  <Td right>{p.level}</Td><Td right>{p.scrapbook}</Td><Td>{p.active ? "Yes" : "No"}</Td><Td right>{p.lastScanDays}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
 
 function Badge({ children }:{ children: React.ReactNode }){
   return <span style={{ background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.15)", borderRadius:999, padding:"2px 8px", fontSize:11 }}>{children}</span>;
-}
-function Th({ children, right }:{ children:React.ReactNode; right?:boolean }){
-  return <th style={{ padding:"8px 12px", textAlign:right?"right":"left", fontSize:12, fontWeight:600 }}>{children}</th>;
-}
-function Td({ children, right }:{ children:React.ReactNode; right?:boolean }){
-  return <td style={{ padding:"8px 12px", textAlign:right?"right":"left", color:"#B0C4D9" }}>{children}</td>;
 }

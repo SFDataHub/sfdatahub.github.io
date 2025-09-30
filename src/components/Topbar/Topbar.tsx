@@ -2,10 +2,20 @@ import React from "react";
 import { Bell, Star, Search, Upload, Globe } from "lucide-react";
 import styles from "./Topbar.module.css";
 
-export default function Topbar({ user }: { user?: { name: string } }) {
+/** NEU: Upload-Center-Context einbinden */
+import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
+
+export default function Topbar({ user }: { user?: { name: string; role?: string } }) {
+  const { open, canUse } = useUploadCenter(); // <- liefert open()
+
+  const onUploadClick = () => {
+    // optional: direkt mit Tab "json" starten
+    open({ tab: "json" });
+  };
+
   return (
     <header className={styles.topbar}>
-      {/* LINKS: Icon-Buttons */}
+      {/* LINKS */}
       <div className={styles.topbarLeft}>
         <button className={styles.btnIco} aria-label="Benachrichtigungen">
           <Bell className={styles.ico} />
@@ -15,7 +25,7 @@ export default function Topbar({ user }: { user?: { name: string } }) {
         </button>
       </div>
 
-      {/* MITTE: Suche (zentriert im Grid) */}
+      {/* MITTE: Suche */}
       <div className={styles.searchWrap}>
         <Search className={`${styles.ico} ${styles.searchIco}`} aria-hidden />
         <input
@@ -37,7 +47,14 @@ export default function Topbar({ user }: { user?: { name: string } }) {
           www.sfgame.net
         </a>
 
-        <button className={styles.upload} aria-label="Scan hochladen">
+        {/* Upload öffnet das Upload Center */}
+        <button
+          className={styles.upload}
+          aria-label="Scan hochladen"
+          onClick={onUploadClick}
+          disabled={!canUse} /* falls Rolle keinen Zugriff hat */
+          title={!canUse ? "Kein Zugriff (Rolle benötigt)" : "Scan hochladen"}
+        >
           <Upload className={styles.ico} />
           <span className={styles.label}>Scan hochladen</span>
         </button>

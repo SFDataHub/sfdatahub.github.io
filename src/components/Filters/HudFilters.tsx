@@ -80,20 +80,23 @@ export default function HudFilters() {
         ))}
       </div>
 
-      {/* Sort */}
-      <label className={styles.sortLabel}>
+      {/* Sort (mit id/name + Labelbindung) */}
+      <label className={styles.sortLabel} htmlFor="toplists-sort">
         Sort
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-          className={styles.sortSelect}
-        >
-          <option value="level">Level</option>
-          <option value="scrapbook">Scrapbook</option>
-          <option value="activity">Activity</option>
-          <option value="lastScan">Last scan</option>
-        </select>
       </label>
+      <select
+        id="toplists-sort"
+        name="toplists-sort"
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value as any)}
+        className={styles.sortSelect}
+        aria-label="Sort"
+      >
+        <option value="level">Level</option>
+        <option value="scrapbook">Scrapbook</option>
+        <option value="activity">Activity</option>
+        <option value="lastScan">Last scan</option>
+      </select>
 
       {/* Quick chips */}
       <button

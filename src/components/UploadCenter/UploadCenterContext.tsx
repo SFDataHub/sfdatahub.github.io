@@ -1,11 +1,14 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
+type TabKey = "json" | "csv";
+
 type UploadCenterState = {
   isOpen: boolean;
-  open: (opts?: { tab?: "json" }) => void;
+  open: (opts?: { tab?: TabKey }) => void;
   close: () => void;
-  activeTab: "json";
-  // Optional: Rollen-/Gatekeeping
+  activeTab: TabKey;
+  setTab: (t: TabKey) => void;
+  // Rollen-/Gatekeeping
   canUse: boolean;
 };
 
@@ -13,18 +16,18 @@ const Ctx = createContext<UploadCenterState | null>(null);
 
 type Props = {
   children: React.ReactNode;
-  // Rolle aus deinem User-System; z. B. "admin" oder "uploader"
   role?: string | null;
 };
 
 export function UploadCenterProvider({ children, role }: Props) {
   const [isOpen, setOpen] = useState(false);
-  const [activeTab] = useState<"json">("json");
+  const [activeTab, setActiveTab] = useState<TabKey>("json");
 
   const canUse = !!role && (role === "admin" || role === "uploader" || role === "dev");
 
-  const open = useCallback((_opts?: { tab?: "json" }) => {
-    if (!canUse) return; // falls kein Zugriff: einfach ignorieren
+  const open = useCallback((opts?: { tab?: TabKey }) => {
+    if (!canUse) return;
+    if (opts?.tab) setActiveTab(opts.tab);
     setOpen(true);
   }, [canUse]);
 
@@ -35,6 +38,7 @@ export function UploadCenterProvider({ children, role }: Props) {
     open,
     close,
     activeTab,
+    setTab: setActiveTab,
     canUse,
   }), [isOpen, open, close, activeTab, canUse]);
 

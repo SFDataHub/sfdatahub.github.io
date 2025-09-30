@@ -2,19 +2,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-// Globale Styles (neu gesplittet)
 import "./styles/index.css";
-
-// i18n (wie gehabt, falls vorhanden)
 import "./i18n";
 
-// Router
 import { HashRouter, Route, Routes, Navigate } from "react-router-dom";
-
-// Shell
 import RootLayout from "./layout/RootLayout";
 
-// Seiten (neue Struktur)
 import Home from "./pages/Home";
 
 // Dashboard
@@ -29,16 +22,18 @@ import Discover from "./pages/Discover/Index";
 // Toplists
 import ToplistsIndex from "./pages/Toplists/index";
 
-// Entity Hubs
+// Entity Hubs – Players
 import PlayersIndex from "./pages/players/Index";
 import PlayersRankings from "./pages/players/Rankings";
 import PlayersStats from "./pages/players/Stats";
 import PlayerProfile from "./pages/players/PlayerProfile";
 
+// Entity Hubs – Guilds
 import GuildsIndex from "./pages/guilds/Index";
 import GuildsRankings from "./pages/guilds/Rankings";
 import GuildsStats from "./pages/guilds/Stats";
 
+// Entity Hubs – Servers
 import ServersIndex from "./pages/servers/Index";
 import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
@@ -83,7 +78,7 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 // Settings
 import Settings from "./pages/Settings";
 
-// Playground (Index bleibt klein, weil deine Datei so heißt)
+// Playground
 import PlaygroundIndex from "./pages/Playground/index";
 import HUDIndex from "./pages/Playground/HUD/index";
 import GameButtonsPlayground from "./pages/Playground/HUD/GameButtonsPlayground";
@@ -93,7 +88,6 @@ import ListViews from "./pages/Playground/ListViews";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 
-// ✅ Groß geschriebene Ordner (entspricht den ZIPs)
 import HARImportPage from "./pages/Playground/Import/HARImportPage";
 import JSONCSVImportPage from "./pages/Playground/Import/JSONCSVImportPage";
 import IndexSchemaViewerPage from "./pages/Playground/Import/IndexSchemaViewerPage";
@@ -135,16 +129,16 @@ import JobsQueuesPage from "./pages/Playground/Admin/JobsQueuesPage";
 import FeatureFlagsPage from "./pages/Playground/Admin/FeatureFlagsPage";
 
 import TablePerformanceLabPage from "./pages/Playground/Performance/TablePerformanceLabPage";
-
 import MobileBottomSheetFiltersPage from "./pages/Playground/Mobile/MobileBottomSheetFiltersPage";
-
 import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 
-// ⬇️ Upload Center Provider + Modal global einhängen
+/** ⬇️ Upload Center: Provider + Modal am Root einhängen
+ *  ACHTUNG: Pfad hier auf `./ui/...` gestellt, passend zu deinen Dateien.
+ *  (Wenn deine Dateien unter ./components/UploadCenter liegen, ändere den Pfad zurück.)
+ */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 
-// ---- kleine Platzhalter (falls alte Deep-Links auftauchen) ----
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
     <h2 style={{ color: "var(--title)" }}>{t}</h2>
@@ -152,12 +146,10 @@ const P = (t: string) => () => (
 );
 const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht mehr.");
 
-// -----------------------------------------------------------------------------
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {/* ⬇️ Rolle vorerst fest „admin“, bis dein Auth-Store dranhängt */}
-    <UploadCenterProvider role={"admin"}>
+    {/* Rolle vorerst fix – später aus Auth/Store lesen */}
+    <UploadCenterProvider role="admin">
       <HashRouter>
         <Routes>
           <Route element={<RootLayout />}>
@@ -172,8 +164,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* Discover */}
             <Route path="/discover" element={<Discover />} />
+
             {/* Toplists */}
             <Route path="/toplists" element={<ToplistsIndex />} />
+
             {/* Players */}
             <Route path="/players" element={<PlayersIndex />} />
             <Route path="/players/rankings" element={<PlayersRankings />} />
@@ -289,8 +283,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="qa/a11y" element={<A11yPassPage />} />
             </Route>
 
-            {/* --- Redirects von alten Routen --- */}
-            <Route path="/toplists" element={<Navigate to="/discover" replace />} />
+            {/* Redirects alte Routen */}
             <Route path="/latest-scan" element={<Navigate to="/scans/latest" replace />} />
             <Route path="/old-scans" element={<Navigate to="/scans/archive" replace />} />
 
@@ -319,7 +312,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Routes>
       </HashRouter>
 
-      {/* ⬇️ Modal am Root, damit es über allem liegt */}
+      {/* Modal am Root – muss außerhalb der Routes liegen */}
       <UploadCenterModal />
     </UploadCenterProvider>
   </React.StrictMode>
