@@ -1,25 +1,37 @@
+/* Topbar als 3-Spalten-Grid: links | mitte (zentriert) | rechts */
 .topbar{
   position: fixed;
   inset: 0 0 auto 0;
   height: var(--topbar-h);
   background: var(--nav);
-  z-index: 50; /* liegt unter dem Logo-Dock (z:60), aber über Content */
-  display: flex;
+  z-index: 50;
+  display: grid; /* ← Grid statt Flex */
+  grid-template-columns: 1fr minmax(200px, 680px) 1fr;
   align-items: center;
-  gap: 16px;
+  column-gap: 12px;
   padding: 0 24px 0 calc(var(--logo-dock-w) + 16px);
-  border-bottom: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border-bottom: 0;
   box-shadow: none;
 }
 
-/* Linke/ rechte Seite */
-.topbarRight{ margin-left: auto; display: flex; align-items: center; gap: 12px; }
+/* LINKS */
+.topbarLeft{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+}
 
-/* Icons */
-.ico{ width:20px; height:20px; color: var(--text); }
-
-/* Suche */
-.searchWrap{ position: relative; flex: 1; max-width: 680px; }
+/* MITTE (zentriert) */
+.searchWrap{
+  position: relative;
+  justify-self: center;
+  width: 100%;
+  max-width: 680px;
+  min-width: 200px;
+}
 .search{
   width: 100%;
   height: 36px;
@@ -36,9 +48,25 @@
   top: 50%;
   transform: translateY(-50%);
   opacity: .7;
+  pointer-events: none;
 }
 
-/* Icon-Buttons */
+/* RECHTS */
+.topbarRight{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+}
+
+/* Icon-Grundstil */
+.ico{
+  width: 20px;
+  height: 20px;
+  color: var(--text);
+}
+
+/* Icon-Buttons (Glocke, Stern) */
 .btnIco{
   width: 40px;
   height: 40px;
@@ -50,10 +78,26 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: transform .12s ease, background .12s ease;
 }
-.btnIco:hover{ background: var(--tile-hover); }
+.btnIco:hover{ background: var(--tile-hover); transform: translateY(-1px); }
+.btnIco:active{ transform: none; }
 
-/* Upload-Button (kein globales .btn nötig) */
+/* Pill-Link (optional sichtbar) */
+.pill{
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+.onlyExpanded{} /* neutral */
+
+/* Upload-Button */
 .upload{
   display: inline-flex;
   align-items: center;
@@ -69,24 +113,7 @@
   outline: 2px solid rgba(255,255,255,.15);
   outline-offset: 2px;
 }
-
-/* Externer Link-Pill */
-.pill{
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  background: var(--tile);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 10px;
-  color: var(--text);
-  text-decoration: none;
-}
-
-/* Optional: nur anzeigen, wenn Sidebar expanded ist.
-   -> Ohne Sibling-CSS bleibt diese Klasse neutral;
-   -> Wenn du ein Signal (Prop/Context) liefern willst, können wir hier togglen. */
-.onlyExpanded{}
+.label{ white-space: nowrap; }
 
 /* Avatar */
 .avatarBtn{
@@ -102,4 +129,16 @@
   border-radius: 999px;
   display: block;
   object-fit: cover;
+}
+
+/* Responsive: Mitte darf flexibel, rechts wird kompakter */
+@media (max-width: 920px){
+  .topbar{ grid-template-columns: 1fr minmax(160px, 1fr) 1fr; }
+  .pill{ display:none; }
+  .label{ display:none; }
+}
+
+/* Bevorzugt reduzierte Bewegung */
+@media (prefers-reduced-motion: reduce){
+  .btnIco{ transition: none; }
 }

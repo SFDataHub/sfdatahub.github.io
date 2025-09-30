@@ -103,3 +103,19 @@
 /* Optional, aber hilfreich: Content-Inner-Struktur */
 #app-shell .content-inner{ min-height: calc(100vh - var(--topbar-h)); display:flex; flex-direction:column; }
 #app-shell .content-body{ flex:1; }
+/* Seite selbst scrollt NICHT */
+html, body { height: 100%; overflow: hidden; }
+#app-shell, #app-shell .content, #app-shell .content-inner, #app-shell .content-body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Unsichtbarer Scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
+
+/* Höhe der globalen Topbar (für die Shell-Höhe) */
+#app-shell { --app-topbar-h: 72px; } /* ggf. anpassen */

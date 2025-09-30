@@ -10,11 +10,11 @@
   --line:#2C4A73;
   --icon:#5C8BC6;
   --btn:#1E2F47;
-  --sidebar-pad: 5px;
+  --sidebar-pad: 20px;
 
   /* Grundhöhen/-breiten */
-  --topbar-h:72px;          /* entkoppelt vom Logo-Dock */
-  --logo-dock-h:128px;      /* großes, unabhängiges Logo-Dock */
+  --topbar-h:90px;          /* entkoppelt vom Logo-Dock */
+  --logo-dock-h:180px;      /* großes, unabhängiges Logo-Dock */
   --logo-dock-w:280px;
 
   /* Sidebar-Breiten */

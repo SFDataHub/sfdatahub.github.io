@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture
+  ChevronRight, Pin, PinOff, Aperture, Trophy
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
@@ -29,6 +29,7 @@ const main: Item[] = [
 
 const categories: Item[] = [
   { to: "/discover",  label: "Discover",  icon: <Compass className="ico" /> },
+  { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" /> },
   { to: "/guides",    label: "Guides",    icon: <BookOpen className="ico" /> },
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" /> },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" /> },
