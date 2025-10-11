@@ -8,7 +8,6 @@ type UploadCenterState = {
   close: () => void;
   activeTab: TabKey;
   setTab: (t: TabKey) => void;
-  // Rollen-/Gatekeeping
   canUse: boolean;
 };
 
@@ -21,13 +20,19 @@ type Props = {
 
 export function UploadCenterProvider({ children, role }: Props) {
   const [isOpen, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("json");
+  // CSV ist jetzt Standard
+  const [activeTab, setActiveTab] = useState<TabKey>("csv");
 
   const canUse = !!role && (role === "admin" || role === "uploader" || role === "dev");
 
   const open = useCallback((opts?: { tab?: TabKey }) => {
     if (!canUse) return;
-    if (opts?.tab) setActiveTab(opts.tab);
+    if (opts?.tab) {
+      setActiveTab(opts.tab);
+    } else {
+      // Fallback weiterhin CSV
+      setActiveTab("csv");
+    }
     setOpen(true);
   }, [canUse]);
 

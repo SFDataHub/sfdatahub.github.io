@@ -1,132 +1,156 @@
 // src/context/ToplistsDataContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { fetchToplists, ToplistItem, ToplistResponse } from "../lib/api/toplists";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-// WICHTIG: Deine Apps-Script Web-App URL (ohne Query)
-const APPS_SCRIPT_BASE_URL =
-  "https://script.google.com/macros/s/AKfycbwZJqFk8bZqTKe6Qk66HY3xblBSlSqf5U8dMh5gux-8FMpZsbUd7WQSIGLFZl0-U-_e/exec";
+type TimeRange = "all" | "3d" | "7d" | "14d" | "30d" | "60d" | "90d";
+type SortField = "Level" | "Base" | "Constitution" | "Sum Base Stats" | "Last Scan" | "Name";
+type SortDir = "asc" | "desc";
 
-type Status = "idle" | "loading" | "success" | "error";
-
-export type ToplistsState = {
-  status: Status;
-  error: string | null;
-  items: ToplistItem[];
-  total: number;
-  generatedAt: string | null;
-  // Paging
-  pageSize: number;
-  pageIndex: number;
-  setPageIndex: (i: number) => void;
-  // Steuerung
-  reload: () => void;
-};
-
-const ToplistsDataContext = createContext<ToplistsState | null>(null);
-
-type ProviderProps = {
-  children: React.ReactNode;
-  // Filter/Steuerdaten kommen von deinem bestehenden UI/Context:
+export type Filters = {
   servers: string[];
   classes: string[];
-  search: string | null;
-  range: "3d" | "7d" | "14d" | "30d" | "60d" | "90d" | "all";
-  sort: "sum" | "main" | "constitution" | "level" | "delta" | "last_activity" | "rank";
-  order: "asc" | "desc";
-  pageSize?: number; // Default 120
+  timeRange: TimeRange;
 };
 
-export function ToplistsDataProvider({
-  children,
-  servers,
-  classes,
-  search,
-  range,
-  sort,
-  order,
-  pageSize = 120
-}: ProviderProps) {
-  const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<ToplistItem[]>([]);
-  const [total, setTotal] = useState<number>(0);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [pageIndex, setPageIndex] = useState(0);
+export type SortSpec = { field: SortField; dir: SortDir };
 
-  // Bei Filterwechsel auf Seite 0 zurück
-  useEffect(() => {
-    setPageIndex(0);
-  }, [servers.join(","), classes.join(","), search || "", range, sort, order]);
+export type Row = Record<string, any>;
 
-  const abortRef = useRef<AbortController | null>(null);
+type DataState = {
+  loading: boolean;
+  error: string | null;
+  data: Row[];
+  lastUpdated: number | null;
+};
 
-  const load = async () => {
-    if (abortRef.current) abortRef.current.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+type Ctx = {
+  state: DataState;
+  filters: Filters;
+  sort: SortSpec;
+  setFilters: (next: Partial<Filters> | ((prev: Filters) => Filters)) => void;
+  setSort: (next: SortSpec | ((prev: SortSpec) => SortSpec)) => void;
+};
 
-    setStatus("loading");
-    setError(null);
+const ToplistsCtx = createContext<Ctx | null>(null);
 
-    try {
-      const resp = await fetchToplists({
-        baseUrl: APPS_SCRIPT_BASE_URL,
-        servers,
-        classes,
-        search,
-        range,
-        sort,
-        order,
-        limit: pageSize,
-        offset: pageIndex * pageSize,
-        signal: ctrl.signal
-      });
+// ---- helpers ---------------------------------------------------------------
 
-      if (!resp.ok) {
-        const msg = (resp as Extract<ToplistResponse, { ok: false }>).error || "Unknown error";
-        throw new Error(msg);
-      }
+const arrEq = (a: any[], b: any[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
 
-      const ok = resp as Extract<ToplistResponse, { ok: true }>;
-      setItems(ok.items);
-      setTotal(ok.count);
-      setGeneratedAt(ok.meta.generatedAt || null);
-      setStatus("success");
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
-      setStatus("error");
-      setError(String(err?.message || err));
-      setItems([]);
-      setTotal(0);
-      setGeneratedAt(null);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [servers.join(","), classes.join(","), search || "", range, sort, order, pageIndex, pageSize]);
-
-  const value = useMemo<ToplistsState>(
-    () => ({
-      status,
-      error,
-      items,
-      total,
-      generatedAt,
-      pageSize,
-      pageIndex,
-      setPageIndex,
-      reload: load
-    }),
-    [status, error, items, total, generatedAt, pageSize, pageIndex]
+function filtersEqual(a: Filters, b: Filters) {
+  return (
+    a.timeRange === b.timeRange &&
+    arrEq(a.servers, b.servers) &&
+    arrEq(a.classes, b.classes)
   );
-
-  return <ToplistsDataContext.Provider value={value}>{children}</ToplistsDataContext.Provider>;
 }
 
-export function useToplistsData() {
-  const ctx = useContext(ToplistsDataContext);
-  if (!ctx) throw new Error("useToplistsData must be used within ToplistsDataProvider");
+function sortEqual(a: SortSpec, b: SortSpec) {
+  return a.field === b.field && a.dir === b.dir;
+}
+
+// ---- provider --------------------------------------------------------------
+
+export function ToplistsProvider({ children }: { children: React.ReactNode }) {
+  const [filters, setFiltersState] = useState<Filters>({
+    servers: [],
+    classes: [],
+    timeRange: "all",
+  });
+
+  const [sort, setSortState] = useState<SortSpec>({
+    field: "Level",
+    dir: "desc",
+  });
+
+  const [state, setState] = useState<DataState>({
+    loading: false,
+    error: null,
+    data: [],
+    lastUpdated: null,
+  });
+
+  // Setter nur updaten, wenn sich wirklich etwas ändert
+  const setFilters = useCallback(
+    (next: Partial<Filters> | ((prev: Filters) => Filters)) => {
+      setFiltersState((prev) => {
+        const merged =
+          typeof next === "function" ? (next as any)(prev) : { ...prev, ...next };
+        return filtersEqual(prev, merged) ? prev : merged;
+      });
+    },
+    []
+  );
+
+  const setSort = useCallback((next: SortSpec | ((prev: SortSpec) => SortSpec)) => {
+    setSortState((prev) => {
+      const nextVal = typeof next === "function" ? (next as any)(prev) : next;
+      return sortEqual(prev, nextVal) ? prev : nextVal;
+    });
+  }, []);
+
+  // Stabiles Query-Key; nur primitive Dependencies
+  const queryKey = useMemo(
+    () =>
+      JSON.stringify({
+        s: sort.field + ":" + sort.dir,
+        t: filters.timeRange,
+        srv: filters.servers.join(","),
+        cls: filters.classes.join(","),
+      }),
+    [filters.timeRange, filters.servers, filters.classes, sort.field, sort.dir]
+  );
+
+  // Daten laden (Platzhalter) – hier NICHTS fetchen, um Reads zu verhindern
+  useEffect(() => {
+    let cancelled = false;
+
+    // Wenn du später Firestore reaktivierst: erst hier setState(loading: true)
+    // und nach erfolgreichem Fetch wieder auf false. Aber bitte *nur einmal*
+    // je Änderung von queryKey.
+
+    // Platzhalter – zeigt "Ready • 0 rows", ohne irgendwas zu fetchen.
+    if (!cancelled) {
+      setState((prev) =>
+        prev.loading || prev.error || prev.data.length
+          ? { ...prev, loading: false, error: null }
+          : prev
+      );
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryKey]);
+
+  // Context-Value MEMOISIEREN, sonst re-rendert alles unnötig
+  const value = useMemo<Ctx>(
+    () => ({
+      state,
+      filters,
+      sort,
+      setFilters,
+      setSort,
+    }),
+    [state, filters, sort, setFilters, setSort]
+  );
+
+  return <ToplistsCtx.Provider value={value}>{children}</ToplistsCtx.Provider>;
+}
+
+// ---- hook ------------------------------------------------------------------
+
+export function useToplistsData(): Ctx {
+  const ctx = useContext(ToplistsCtx);
+  if (!ctx) {
+    throw new Error("useToplistsData() must be used inside <ToplistsProvider>.");
+  }
   return ctx;
 }

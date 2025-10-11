@@ -1,130 +1,113 @@
-// src/lib/import/upsert.ts
-import { getDB } from "../db";
-import type { PlayersPayloadT, GuildsPayloadT, ScanPayloadT } from "./schemas";
+// /src/lib/importer/upsert.ts
+import {
+  collection, doc, getDoc, writeBatch, setDoc, Firestore,
+} from "firebase/firestore";
+import type {
+  CsvRow, ImportReport, Kind, Mapping, MetaAppConfig,
+} from "./types";
+import { getTimestamp, makeKeyFromTemplate, nowServerTimestamp } from "./db";
+import { bestId, headerValue, normalizeServer } from "./preprocess";
 
-function hashString(s: string) {
-  // simpler Hash (für Dedupe). Für Produktion besser: xxhash/sha-256.
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i) | 0;
-  return String(h >>> 0);
-}
+const MAX_OPS = 450; // Firestore limit < 500
 
-export async function upsertPlayers(payload: PlayersPayloadT) {
-  const db = await getDB();
-  const tx = (await db).transaction(["players"], "readwrite");
-  const store = tx.objectStore("players");
+export async function upsertRows(
+  db: Firestore,
+  kind: Kind,
+  rows: CsvRow[],
+  mapping: Mapping,
+  meta: MetaAppConfig,
+  onProgress?: (p: number) => void,
+): Promise<ImportReport> {
+  const cols = kind === "players"
+    ? { latest: meta.playersLatestCollection, scans: meta.playersScansCollection }
+    : { latest: meta.guildsLatestCollection,  scans: meta.guildsScansCollection };
 
-  const now = Date.now();
-  let count = 0;
-  const rows: any[] = [];
+  let writtenLatest = 0;
+  let writtenScans  = 0;
+  let skippedDuplicate = 0;
+  let skippedMissingRequired = 0;
+  let errors = 0;
 
-  // 🔑 Wichtig: KEINE Filterung nach "own". Jede Zeile mit ID wird gezählt.
-  // Außerdem de-dupen wir über server+id, falls dieselbe ID mehrfach im File steht.
-  const seen = new Set<string>();
+  let batch = writeBatch(db);
+  let ops = 0;
+  let processed = 0;
 
-  for (const p of payload.players ?? []) {
-    if (!p) continue;
-    // SFTools nutzt "identifier" → der Parser mappt bereits auf p.id
-    const rawId = (p as any).id ?? (p as any).identifier;
-    if (rawId == null || String(rawId).trim() === "") continue;
+  const normCfg = meta.csvMapping.serverNormalize;
 
-    const id = `${String(payload.server).toLowerCase()}:${String(rawId)}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
+  const flush = async () => {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    ops = 0;
+  };
 
-    const row = {
-      id,
-      server: String(payload.server),
-      name: (p as any).name ?? "",
-      className:
-        (p as any).className ??
-        (typeof (p as any).class === "number" ? String((p as any).class) : (p as any).class ?? ""),
-      level: (p as any).level ?? undefined,
-      scrapbookPct: (p as any).scrapbookPct ?? undefined,
-      guildId: (p as any).guildId ?? "",
-      updatedAt: now,
+  for (const row of rows) {
+    processed++;
+
+    // Basics
+    const svRaw = headerValue(row, mapping.serverHeader);
+    const sv = normalizeServer(svRaw, normCfg);
+    const ts = getTimestamp(row, mapping.timestampHeader);
+    if (!sv || !ts) {
+      skippedMissingRequired++;
+      continue;
+    }
+    const pidOrIdentifier = bestId(mapping, row);
+    if (!pidOrIdentifier) {
+      skippedMissingRequired++;
+      continue;
+    }
+
+    // Build doc keys
+    const baseKey = makeKeyFromTemplate(mapping.keyTemplate || "{sv}#{pidOrIdentifier}#{ts}", {
+      sv, pidOrIdentifier, ts,
+    });
+    const latestKey = makeKeyFromTemplate("{sv}#{pidOrIdentifier}", { sv, pidOrIdentifier });
+    const scansRef  = doc(collection(db, cols.scans),  baseKey);
+    const latestRef = doc(collection(db, cols.latest), latestKey);
+
+    // Prepare data
+    const common = {
+      sv,
+      ts,
+      id: pidOrIdentifier,
+      name: headerValue(row, mapping.nameHeader),
+      ...nowServerTimestamp(meta),
+      src: "csv",
     };
 
-    await store.put(row);
-    rows.push(row);
-    count++;
+    // upsert into scans (all rows)
+    batch.set(scansRef, { ...row, ...common }, { merge: true });
+    ops++; writtenScans++;
+
+    // upsert into latest: only if ts is newer
+    try {
+      const latestSnap = await getDoc(latestRef);
+      const prevTs = latestSnap.exists() ? Number(latestSnap.get("ts") || 0) : 0;
+      if (ts > prevTs) {
+        batch.set(latestRef, { ...row, ...common }, { merge: true });
+        ops++; writtenLatest++;
+      } else {
+        skippedDuplicate++; // older or equal snapshot
+      }
+    } catch (e) {
+      errors++;
+      console.error("latest getDoc error", e);
+    }
+
+    if (ops >= MAX_OPS) await flush();
+    if (onProgress) onProgress(Math.floor((processed / rows.length) * 100));
   }
 
-  await tx.done;
-  return { count, rows };
-}
-export async function upsertGuilds(payload: GuildsPayloadT) {
-  const db = await getDB();
-  const tx = db.transaction(["guilds"], "readwrite");
-  const store = tx.objectStore("guilds");
-  let count = 0;
-  const now = Date.now();
+  await flush();
 
-  for (const g of payload.guilds) {
-    const id = `${payload.server.toLowerCase()}:g-${g.id}`;
-    const prev = await store.get(id);
-    const rec = {
-      id,
-      name: g.name,
-      server: payload.server,
-      memberCount: g.memberCount,
-      updatedAt: now,
-    };
-    await store.put(prev ? { ...prev, ...rec, updatedAt: now } : rec);
-    count++;
-  }
-  await tx.done;
-  return count;
-}
-
-export async function upsertScan(payload: ScanPayloadT) {
-  const db = await getDB();
-  const now = Date.now();
-  const hash = hashString(JSON.stringify(payload.raw ?? payload));
-
-  // Dedupe über Hash
-  {
-    const txCheck = db.transaction(["scans"], "readonly");
-    const idx = txCheck.objectStore("scans").index("by_hash");
-    const existing = await idx.get(hash);
-    await txCheck.done;
-    if (existing) return { scans: 0, players: 0, guilds: 0, deduped: true };
-  }
-
-  let pCount = 0, gCount = 0;
-
-  // optional player upsert
-  if (payload.player) {
-    pCount += await upsertPlayers({
-      type: "players",
-      server: payload.server,
-      players: [payload.player],
-    });
-  }
-
-  // optional guild upsert
-  if (payload.guild) {
-    gCount += await upsertGuilds({
-      type: "guilds",
-      server: payload.server,
-      guilds: [payload.guild],
-    });
-  }
-
-  // scan speichern
-  {
-    const tx = db.transaction(["scans"], "readwrite");
-    const id = `${payload.server.toLowerCase()}:scan:${Date.now()}:${Math.random().toString(36).slice(2,8)}`;
-    await tx.objectStore("scans").put({
-      id,
-      server: payload.server,
-      playerId: payload.player ? `${payload.server.toLowerCase()}:${payload.player.id}` : undefined,
-      guildId: payload.guild ? `${payload.server.toLowerCase()}:g-${payload.guild.id}` : undefined,
-      payloadHash: hash,
-      createdAt: now,
-    });
-    await tx.done;
-  }
-
-  return { scans: 1, players: pCount, guilds: gCount, deduped: false };
+  return {
+    kind,
+    total: rows.length,
+    writtenLatest,
+    writtenScans,
+    skippedDuplicate,
+    skippedMissingRequired,
+    errors,
+  };
 }

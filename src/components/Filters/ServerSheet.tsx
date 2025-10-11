@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 
 /** Layout-Modus */
 type Mode = "sheet" | "modal";
@@ -22,7 +24,7 @@ type Props = {
   onToggle: (server: string) => void;
 
   /** Alle Server einer Region selektieren */
-  onSelectAllInRegion: (region: RegionKey) => void;
+  onSelectAllInRegion?: (region: RegionKey) => void;
 
   /** Alles abwählen */
   onClearAll: () => void;
@@ -52,6 +54,10 @@ export default function ServerSheet({
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
 
+  // --- NEU: optional geladene Liste aus Firestore, wenn props leer sind ---
+  const [loadedByRegion, setLoadedByRegion] = useState<Record<RegionKey, string[]> | null>(null);
+  const [loading, setLoading] = useState(false);
+
   // ESC schließt
   useEffect(() => {
     if (!open) return;
@@ -70,7 +76,53 @@ export default function ServerSheet({
     }
   }, [open]);
 
-  const regions = useMemo(() => Object.keys(serversByRegion) as RegionKey[], [serversByRegion]);
+  // Prüfen, ob props leer sind
+  const propsAreEmpty = useMemo(() => {
+    const keys: RegionKey[] = ["EU", "US", "INT", "Fusion"];
+    return keys.every((k) => !serversByRegion?.[k]?.length);
+  }, [serversByRegion]);
+
+  // Falls props leer -> beim Öffnen Firestore holen
+  useEffect(() => {
+    if (!open) return;
+    if (!propsAreEmpty) return; // wir haben Daten via Props – nichts tun
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const snap = await getDoc(doc(db, "stats_public", "toplists_bundle_v1"));
+        if (!alive) return;
+        const data: any = snap.data() || {};
+        // servers kann Array oder JSON-String sein
+        const raw: string[] = Array.isArray(data.servers) ? data.servers : JSON.parse(data.servers || "[]");
+        setLoadedByRegion(groupByRegion(raw));
+      } catch {
+        setLoadedByRegion(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [open, propsAreEmpty]);
+
+  // Effektiv genutzte Liste (Props haben Vorrang)
+  const effectiveByRegion: Record<RegionKey, string[]> = useMemo(() => {
+    if (!propsAreEmpty) return serversByRegion;
+    return (
+      loadedByRegion ?? {
+        EU: [],
+        US: [],
+        INT: [],
+        Fusion: [],
+      }
+    );
+  }, [propsAreEmpty, serversByRegion, loadedByRegion]);
+
+  const regions = useMemo(() => Object.keys(effectiveByRegion) as RegionKey[], [effectiveByRegion]);
 
   const filterMatches = (name: string) => {
     const q = query.trim().toLowerCase();
@@ -105,7 +157,7 @@ export default function ServerSheet({
           </div>
         </div>
 
-        {/* Suche (mit id/name + Labelbindung) */}
+        {/* Suche */}
         <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
           <label htmlFor="sheet-serversearch" className="sr-only">Search servers</label>
           <input
@@ -124,16 +176,26 @@ export default function ServerSheet({
         {/* Listen nach Regionen */}
         <div style={{ display: "grid", gap: 16, maxHeight: "60vh", overflow: "auto" }}>
           {regions.map((region) => {
-            const list = (serversByRegion[region] || []).filter(filterMatches);
+            const list = (effectiveByRegion[region] || []).filter(filterMatches);
             return (
               <section key={region} aria-labelledby={`region-${region}`}>
                 <div style={regionHeader}>
-                  <h3 id={`region-${region}`} style={h3Style}>{region}</h3>
+                  <h3 id={`region-${region}`} style={h3Style}>
+                    {region} {loading && propsAreEmpty ? <span style={{ marginLeft: 6, fontSize: 12, color: PALETTE.text2 }}>(loading…)</span> : null}
+                  </h3>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       style={ghostBtn}
-                      onClick={() => onSelectAllInRegion(region)}
+                      onClick={() => {
+                        if (onSelectAllInRegion) {
+                          onSelectAllInRegion(region);
+                        } else {
+                          // Fallback: alles in Region aktivieren
+                          const toAdd = list.filter((s) => !selected.includes(s));
+                          toAdd.forEach(onToggle);
+                        }
+                      }}
                     >
                       Select all
                     </button>
@@ -157,7 +219,7 @@ export default function ServerSheet({
                   })}
                   {list.length === 0 && (
                     <div style={{ color: PALETTE.text2, fontSize: 13, padding: "4px 2px" }}>
-                      No servers found
+                      {loading && propsAreEmpty ? "Loading…" : "No servers found"}
                     </div>
                   )}
                 </div>
@@ -170,7 +232,29 @@ export default function ServerSheet({
   );
 }
 
-/* ---------- Styles (inline, keine Experimente) ---------- */
+/** Gruppiert eine flache Serverliste nach Regionen */
+function groupByRegion(all: string[]): Record<RegionKey, string[]> {
+  const out: Record<RegionKey, string[]> = { EU: [], US: [], INT: [], Fusion: [] };
+
+  for (const s of all) {
+    const up = s.toUpperCase();
+    if (up.startsWith("EU")) out.EU.push(s);
+    else if (up.startsWith("US") || up.startsWith("NA") || up.startsWith("AM")) out.US.push(s);
+    else if (up.startsWith("F")) out.Fusion.push(s);
+    else out.INT.push(s);
+  }
+
+  // stabile Sortierung
+  (Object.keys(out) as RegionKey[]).forEach((k) => out[k].sort(naturalCompare));
+  return out;
+}
+
+/** EU2, EU10 natürlich sortieren */
+function naturalCompare(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/* ---------- Styles (inline, 1:1 aus deiner Datei) ---------- */
 const backdropStyle: React.CSSProperties = {
   position: "fixed", inset: 0, background: PALETTE.backdrop, zIndex: 50,
   display: "grid", placeItems: "center", padding: 16,
@@ -203,6 +287,10 @@ const h3Style: React.CSSProperties = { fontSize: 14, margin: 0, color: PALETTE.t
 const searchInput: React.CSSProperties = {
   width: "100%", background: PALETTE.input, color: PALETTE.text,
   border: `1px solid ${PALETTE.line}`, borderRadius: 12, padding: "10px 12px",
+};
+
+const regionHeader: React.CSSProperties = {
+  display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
 };
 
 const chipRow: React.CSSProperties = {
