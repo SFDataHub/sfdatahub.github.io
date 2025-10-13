@@ -1,15 +1,53 @@
 import React from "react";
-import { Bell, Star, Search, Upload, Globe } from "lucide-react";
+import { Bell, Star, Upload, Globe } from "lucide-react";
 import styles from "./Topbar.module.css";
 
-/** NEU: Upload-Center-Context einbinden */
+/** Upload-Center */
 import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
 
+/** Neue Suche */
+import UniversalSearch from "../search/UniversalSearch";
+
+/** Klassen-Icons / Mapping */
+import * as Classes from "../../data/classes";
+
+function getClassIcon(className?: string | null): string | undefined {
+  if (!className) return undefined;
+  const raw = String(className);
+  const keyA = raw;
+  const keyB = raw.toLowerCase();
+  const keyC = raw.replace(/\s+/g, "");
+  const keyD = keyB.replace(/\s+/g, "");
+
+  // häufige Export-Varianten abdecken
+  const pools: any[] = [
+    (Classes as any).CLASS_ICON_BY_NAME,
+    (Classes as any).CLASS_ICONS,
+    (Classes as any).Icons,
+    (Classes as any).icons,
+    Classes as any,
+  ];
+
+  for (const p of pools) {
+    if (!p) continue;
+    const hit =
+      p[keyA] ?? p[keyB] ?? p[keyC] ?? p[keyD];
+    if (typeof hit === "string") return hit;
+  }
+
+  if (typeof (Classes as any).getClassIcon === "function") {
+    try {
+      const v = (Classes as any).getClassIcon(raw);
+      if (typeof v === "string") return v;
+    } catch {}
+  }
+  return undefined;
+}
+
 export default function Topbar({ user }: { user?: { name: string; role?: string } }) {
-  const { open, canUse } = useUploadCenter(); // <- liefert open()
+  const { open, canUse } = useUploadCenter();
 
   const onUploadClick = () => {
-    // optional: direkt mit Tab "json" starten
     open({ tab: "json" });
   };
 
@@ -25,13 +63,12 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
         </button>
       </div>
 
-      {/* MITTE: Suche */}
+      {/* MITTE: PlayerSearch mit Klassen-Icon */}
       <div className={styles.searchWrap}>
-        <Search className={`${styles.ico} ${styles.searchIco}`} aria-hidden />
-        <input
-          className={styles.search}
-          placeholder="Suchen (Spieler, Gilde, Server)…"
-          aria-label="Suchen"
+        <UniversalSearch
+          placeholder="Suchen (Spieler)…"
+          getClassIcon={getClassIcon}
+          maxResults={10}
         />
       </div>
 
@@ -47,12 +84,11 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
           www.sfgame.net
         </a>
 
-        {/* Upload öffnet das Upload Center */}
         <button
           className={styles.upload}
           aria-label="Scan hochladen"
           onClick={onUploadClick}
-          disabled={!canUse} /* falls Rolle keinen Zugriff hat */
+          disabled={!canUse}
           title={!canUse ? "Kein Zugriff (Rolle benötigt)" : "Scan hochladen"}
         >
           <Upload className={styles.ico} />

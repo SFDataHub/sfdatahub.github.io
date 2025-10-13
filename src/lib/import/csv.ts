@@ -54,6 +54,36 @@ const norm = (s: any) => String(s ?? "").trim();
 const up = (s: any) => norm(s).toUpperCase();
 const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
 
+// diakritikfrei + lowercase (für Folds/Token/Ngram)
+const toFold = (s: any) =>
+  String(s ?? "")
+    .normalize("NFD")
+    // @ts-ignore
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+// Tokenizer: Wort-Tokens (>=2 Zeichen), dedupliziert
+const nameToTokens = (s: any): string[] => {
+  const f = toFold(s);
+  if (!f) return [];
+  const parts = f.split(/[^a-z0-9]+/g).filter((t) => t && t.length >= 2);
+  return Array.from(new Set(parts));
+};
+
+// Edge-Ngrams aus Tokens
+const tokensToNgrams = (tokens: string[]): string[] => {
+  const out = new Set<string>();
+  for (const t of tokens) for (let i = 1; i <= t.length; i++) out.add(t.slice(0, i));
+  return Array.from(out);
+};
+
+// Zahl locker parsen
+const toNumberLoose = (v: any): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(String(v).replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
+
 const COL = {
   PLAYERS: {
     IDENTIFIER: CANON("Identifier"),
@@ -62,6 +92,9 @@ const COL = {
     SERVER: CANON("Server"),
     NAME: CANON("Name"),
     TIMESTAMP: CANON("Timestamp"),
+    LEVEL: CANON("Level"),
+    CLASS: CANON("Class"),
+    GUILD: CANON("Guild"),
   },
   GUILDS: {
     GUILD_IDENTIFIER: CANON("Guild Identifier"),
@@ -69,6 +102,10 @@ const COL = {
     NAME: CANON("Name"),
     MEMBER_COUNT: CANON("Guild Member Count"),
     TIMESTAMP: CANON("Timestamp"),
+    HOF: CANON("Hall of Fame Rank"),
+    HOF_ALT: CANON("HoF"),
+    RANK: CANON("Rank"),
+    GUILD_RANK: CANON("Guild Rank"),
   },
 } as const;
 
@@ -91,14 +128,15 @@ const pickByCanon = (row: Row, canonKey: string): any => {
   return undefined;
 };
 
+const pickAnyByCanon = (row: Row, keys: string[]): any =>
+  keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
+
 function toSecFlexible(v: any): number | null {
   if (v == null) return null;
   const s = String(v).trim();
   if (/^\d{13}$/.test(s)) return Math.floor(Number(s) / 1000);
   if (/^\d{10}$/.test(s)) return Number(s);
-  const m = s.match(
-    /^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-  );
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (m) {
     const dd = Number(m[1]);
     const MM = Number(m[2]) - 1;
@@ -128,9 +166,8 @@ function weekIdFromSec(sec: number): string {
 
 function weekBoundsFromSec(sec: number): { start: number; end: number } {
   const d = new Date(sec * 1000);
-  // Montag 00:00
   const date = new Date(d);
-  const day = (date.getDay() + 6) % 7; // Mo=0 .. So=6
+  const day = (date.getDay() + 6) % 7; // Mo=0..So=6
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() - day);
   const start = Math.floor(date.getTime() / 1000);
@@ -238,14 +275,8 @@ async function commitBatched(
   onProgress?.({ phase: "done", current: 1, total: 1, pass: passName });
 }
 
-/** ---- Aggregation nach Vorgabe ----
- *  - Für Attribute + Equipment: Maximum
- *  - Sonst: letzter (jüngster) Wert (nicht leer bevorzugt)
- */
-function aggregateValues(
-  rowsSortedAsc: RowMeta[],
-  allHeaders: string[]
-): Record<string, any> {
+/** ---- Aggregation ---- */
+function aggregateValues(rowsSortedAsc: RowMeta[], allHeaders: string[]): Record<string, any> {
   const out: Record<string, any> = {};
   for (const h of allHeaders) {
     const canon = CANON(h);
@@ -266,7 +297,6 @@ function aggregateValues(
       }
       out[h] = bestRaw ?? "";
     } else {
-      // letzter nicht-leerer Wert
       let chosen: any = "";
       for (let i = rowsSortedAsc.length - 1; i >= 0; i--) {
         const v = rowsSortedAsc[i].row[h];
@@ -315,7 +345,7 @@ export async function importCsvToDB(
   else if (opts.raw && typeof opts.raw === "string") rows = parseCsvCompat(opts.raw).rows;
   else throw new Error("Es wurden weder 'rows' noch 'raw' übergeben.");
 
-  // Alle Header sammeln (über alle Zeilen), damit wir komplette Felder in latest & history haben
+  // Alle Header sammeln (über alle Zeilen)
   const allHeadersSet = new Set<string>();
   for (const r of rows) Object.keys(r).forEach((k) => allHeadersSet.add(k));
   const ALL_HEADERS = Array.from(allHeadersSet);
@@ -326,7 +356,7 @@ export async function importCsvToDB(
     const putLatest: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
     const putHistory: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
 
-    // Gruppen: pid -> RowMeta[]
+    // pid -> rows
     const byPid = new Map<string, RowMeta[]>();
 
     for (const r of rows) {
@@ -350,7 +380,7 @@ export async function importCsvToDB(
         continue;
       }
 
-      // scans (volle Zeile)
+      // scans
       putScans.push((batch) => {
         const ref = doc(db, `players/${pid}/scans/${tsSec}`);
         batch.set(
@@ -361,7 +391,7 @@ export async function importCsvToDB(
             timestamp: tsSec,
             timestampRaw: pickByCanon(r, COL.PLAYERS.TIMESTAMP),
             name: pickByCanon(r, COL.PLAYERS.NAME) || null,
-            values: r, // komplette Zeile hier
+            values: r,
             createdAt: serverTimestamp(),
           },
           { merge: true }
@@ -373,14 +403,20 @@ export async function importCsvToDB(
       byPid.get(pid)!.push({ row: r, ts: tsSec });
     }
 
-    // Für jede pid: latest & history aggregieren
     for (const [pid, metas] of byPid) {
       metas.sort((a, b) => a.ts - b.ts);
       const last = metas[metas.length - 1];
       const server = up(pickByCanon(last.row, COL.PLAYERS.SERVER) || "");
       const name = pickByCanon(last.row, COL.PLAYERS.NAME) || null;
 
-      // latest (volle Zeile = letzte Zeile)
+      const levelVal = pickByCanon(last.row, COL.PLAYERS.LEVEL);
+      const classVal = pickByCanon(last.row, COL.PLAYERS.CLASS);
+      const guildVal = pickByCanon(last.row, COL.PLAYERS.GUILD);
+
+      const nameForSearch = pickByCanon(last.row, COL.PLAYERS.NAME) ?? name ?? "";
+      const tokens = nameToTokens(nameForSearch);
+      const ngrams = tokensToNgrams(tokens);
+
       putLatest.push((batch) => {
         const ref = doc(db, `players/${pid}/latest/latest`);
         batch.set(
@@ -391,17 +427,27 @@ export async function importCsvToDB(
             timestamp: last.ts,
             timestampRaw: pickByCanon(last.row, COL.PLAYERS.TIMESTAMP),
             name,
-            values: last.row, // alle Header
+            values: last.row,
             updatedAt: serverTimestamp(),
+
+            // Suchfelder
+            nameFold: toFold(nameForSearch),
+            nameTokens: tokens,
+            nameNgrams: ngrams,
+
+            // Dropdown-Felder
+            level: toNumberLoose(levelVal),
+            className: classVal != null && String(classVal).trim() !== "" ? String(classVal) : null,
+            guildName: guildVal != null && String(guildVal).trim() !== "" ? String(guildVal) : null,
+            guildNameFold: guildVal ? toFold(guildVal) : null,
           },
           { merge: true }
         );
       });
       counts.writtenLatestPlayers!++;
 
-      // weekly buckets
+      // buckets
       const weekly = new Map<string, RowMeta[]>();
-      // monthly buckets
       const monthly = new Map<string, RowMeta[]>();
 
       for (const m of metas) {
@@ -413,7 +459,6 @@ export async function importCsvToDB(
         monthly.get(ym)!.push(m);
       }
 
-      // write weekly
       for (const [wid, list] of weekly) {
         list.sort((a, b) => a.ts - b.ts);
         const aggr = aggregateValues(list, ALL_HEADERS);
@@ -433,7 +478,7 @@ export async function importCsvToDB(
               lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
               server: up(pickByCanon(lastM.row, COL.PLAYERS.SERVER) || ""),
               name: pickByCanon(lastM.row, COL.PLAYERS.NAME) || null,
-              values: aggr, // alle Header aggregiert
+              values: aggr,
               updatedAt: serverTimestamp(),
             },
             { merge: true }
@@ -442,7 +487,6 @@ export async function importCsvToDB(
         counts.writtenWeeklyPlayers!++;
       }
 
-      // write monthly
       for (const [ym, list] of monthly) {
         list.sort((a, b) => a.ts - b.ts);
         const aggr = aggregateValues(list, ALL_HEADERS);
@@ -462,7 +506,7 @@ export async function importCsvToDB(
               lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
               server: up(pickByCanon(lastM.row, COL.PLAYERS.SERVER) || ""),
               name: pickByCanon(lastM.row, COL.PLAYERS.NAME) || null,
-              values: aggr, // alle Header aggregiert
+              values: aggr,
               updatedAt: serverTimestamp(),
             },
             { merge: true }
@@ -516,7 +560,7 @@ export async function importCsvToDB(
             timestamp: tsSec,
             timestampRaw: pickByCanon(r, COL.GUILDS.TIMESTAMP),
             name: pickByCanon(r, COL.GUILDS.NAME) || null,
-            values: r, // volle Felder
+            values: r,
             createdAt: serverTimestamp(),
           },
           { merge: true }
@@ -532,6 +576,18 @@ export async function importCsvToDB(
       metas.sort((a, b) => a.ts - b.ts);
       const last = metas[metas.length - 1];
 
+      const nameForSearch = pickByCanon(last.row, COL.GUILDS.NAME) ?? "";
+      const tokens = nameToTokens(nameForSearch);
+      const ngrams = tokensToNgrams(tokens);
+
+      const memberCount = toNumberLoose(
+        pickByCanon(last.row, COL.GUILDS.MEMBER_COUNT)
+      );
+
+      const hofRank = toNumberLoose(
+        pickAnyByCanon(last.row, [COL.GUILDS.HOF, COL.GUILDS.HOF_ALT, COL.GUILDS.RANK, COL.GUILDS.GUILD_RANK])
+      );
+
       // latest
       putLatest.push((batch) => {
         const ref = doc(db, `guilds/${gid}/latest/latest`);
@@ -543,8 +599,17 @@ export async function importCsvToDB(
             timestamp: last.ts,
             timestampRaw: pickByCanon(last.row, COL.GUILDS.TIMESTAMP),
             name: pickByCanon(last.row, COL.GUILDS.NAME) || null,
-            values: last.row, // alle Felder
+            values: last.row,
             updatedAt: serverTimestamp(),
+
+            // Suchfelder
+            nameFold: toFold(nameForSearch),
+            nameTokens: tokens,
+            nameNgrams: ngrams,
+
+            // Dropdown-Felder
+            memberCount,
+            hofRank,
           },
           { merge: true }
         );
@@ -563,7 +628,6 @@ export async function importCsvToDB(
         monthly.get(ym)!.push(m);
       }
 
-      // weekly
       for (const [wid, list] of weekly) {
         list.sort((a, b) => a.ts - b.ts);
         const aggr = aggregateValues(list, ALL_HEADERS);
@@ -583,7 +647,7 @@ export async function importCsvToDB(
               lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
               server: up(pickByCanon(lastM.row, COL.GUILDS.SERVER) || ""),
               name: pickByCanon(lastM.row, COL.GUILDS.NAME) || null,
-              values: aggr, // alle Felder aggregiert
+              values: aggr,
               updatedAt: serverTimestamp(),
             },
             { merge: true }
@@ -592,7 +656,6 @@ export async function importCsvToDB(
         counts.writtenWeeklyGuilds!++;
       }
 
-      // monthly
       for (const [ym, list] of monthly) {
         list.sort((a, b) => a.ts - b.ts);
         const aggr = aggregateValues(list, ALL_HEADERS);
@@ -612,7 +675,7 @@ export async function importCsvToDB(
               lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
               server: up(pickByCanon(lastM.row, COL.GUILDS.SERVER) || ""),
               name: pickByCanon(lastM.row, COL.GUILDS.NAME) || null,
-              values: aggr, // alle Felder aggregiert
+              values: aggr,
               updatedAt: serverTimestamp(),
             },
             { merge: true }

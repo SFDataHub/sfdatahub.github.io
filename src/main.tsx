@@ -132,10 +132,7 @@ import TablePerformanceLabPage from "./pages/Playground/Performance/TablePerform
 import MobileBottomSheetFiltersPage from "./pages/Playground/Mobile/MobileBottomSheetFiltersPage";
 import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 
-/** ⬇️ Upload Center: Provider + Modal am Root einhängen
- *  ACHTUNG: Pfad hier auf `./ui/...` gestellt, passend zu deinen Dateien.
- *  (Wenn deine Dateien unter ./components/UploadCenter liegen, ändere den Pfad zurück.)
- */
+/** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 
@@ -148,7 +145,6 @@ const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht me
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {/* Rolle vorerst fix – später aus Auth/Store lesen */}
     <UploadCenterProvider role="admin">
       <HashRouter>
         <Routes>
@@ -174,6 +170,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/players/stats" element={<PlayersStats />} />
             <Route path="/players/profile" element={<PlayerProfile />} />
             <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
+            {/* NEU: kurze Route für die Topbar-Suche */}
+            <Route path="/player/:playerId" element={<PlayerProfile />} />
 
             {/* Guilds */}
             <Route path="/guilds" element={<GuildsIndex />} />
@@ -312,7 +310,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Routes>
       </HashRouter>
 
-      {/* Modal am Root – muss außerhalb der Routes liegen */}
+      {/* Modal am Root */}
       <UploadCenterModal />
     </UploadCenterProvider>
   </React.StrictMode>
