@@ -32,11 +32,13 @@ import PlayerProfile from "./pages/players/PlayerProfile";
 import GuildsIndex from "./pages/guilds/Index";
 import GuildsRankings from "./pages/guilds/Rankings";
 import GuildsStats from "./pages/guilds/Stats";
+import GuildProfile from "./pages/guilds/Profile"; // ✨ NEU
 
 // Entity Hubs – Servers
 import ServersIndex from "./pages/servers/Index";
 import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
+import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
 // Guides
 import GuidesIndex from "./pages/Guides/Index";
@@ -170,18 +172,26 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/players/stats" element={<PlayersStats />} />
             <Route path="/players/profile" element={<PlayerProfile />} />
             <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
-            {/* NEU: kurze Route für die Topbar-Suche */}
+            {/* kurze Route für Suche */}
             <Route path="/player/:playerId" element={<PlayerProfile />} />
 
             {/* Guilds */}
             <Route path="/guilds" element={<GuildsIndex />} />
             <Route path="/guilds/rankings" element={<GuildsRankings />} />
             <Route path="/guilds/stats" element={<GuildsStats />} />
+            {/* ✨ Gildenprofil */}
+            <Route path="/guilds/profile" element={<GuildProfile />} />
+            <Route path="/guilds/profile/:guildId" element={<GuildProfile />} />
+            {/* kurze Route für Suche */}
+            <Route path="/guild/:guildId" element={<GuildProfile />} />
 
             {/* Servers */}
             <Route path="/servers" element={<ServersIndex />} />
             <Route path="/servers/rankings" element={<ServersRankings />} />
             <Route path="/servers/stats" element={<ServersStats />} />
+            <Route path="/servers/profile" element={<ServerProfilePage />} />               {/* ✨ */}
+            <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />     {/* ✨ */}
+            <Route path="/server/:serverId" element={<ServerProfilePage />} />              {/* ✨ Kurzlink */}
 
             {/* Guides */}
             <Route path="/guides" element={<GuidesIndex />} />

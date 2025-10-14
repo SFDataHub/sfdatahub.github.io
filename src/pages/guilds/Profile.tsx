@@ -1,12 +1,10 @@
-// src/pages/players/PlayerProfile.tsx
+// src/pages/guilds/Profile.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import ContentShell from "../../components/ContentShell";
-
-import { CLASSES } from "../../data/classes";
-import { toDriveThumbProxy } from "../../lib/urls";
+import { guildIconUrlByName } from "../../data/guilds";
 
 const PALETTE = {
   tileAlt: "var(--tile, #14273E)",
@@ -16,76 +14,22 @@ const PALETTE = {
   active: "var(--active, #2D4E78)",
 };
 
-type Character = {
+type Guild = {
   id: string;
   name: string;
-  className: string | null;
-  level: number | null;
-  guild: string | null;
   server: string | null;
-  scrapbookPct?: number | null;
-  totalStats?: number | null;
-  lastScanDays?: number | null;
+  memberCount: number | null;
+  hofRank: number | null;
+  lastScanDays: number | null;
 };
 
 function Container({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px", ...style }}>{children}</div>;
 }
 
-/** Initialen-Fallback (nur falls das Klassenicon nicht lädt) */
-function AvatarCircle({ label, size = 36 }: { label: string; size?: number }) {
-  const initials = (label || "?")
-    .split(" ")
-    .filter(Boolean)
-    .map((s) => s[0]!.toUpperCase())
-    .slice(0, 2)
-    .join("");
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: `linear-gradient(135deg, ${PALETTE.tileAlt}, ${PALETTE.active})`,
-        color: PALETTE.title,
-        fontSize: Math.round(size * 0.36),
-        fontWeight: 800,
-        border: `1px solid ${PALETTE.line}`,
-      }}
-      aria-hidden
-    >
-      {initials || "?"}
-    </div>
-  );
-}
-
-/** Klassen-Icon ohne sichtbaren Hintergrund – nur Bild + Drop-Shadow */
-function ClassAvatar({
-  className,
-  label,
-  size = 36,
-}: {
-  className?: string | null;
-  label: string;
-  size?: number;
-}) {
-  const strip = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const target = strip(className || "");
-  let meta =
-    CLASSES.find((c) => strip(c.label) === target) ||
-    CLASSES.find((c) => strip(c.label).startsWith(target) || target.startsWith(strip(c.label)));
-
-  const iconUrl = meta ? toDriveThumbProxy(meta.iconUrl, size * 2) : undefined;
-  const [error, setError] = useState(false);
-
-  if (!iconUrl || error) {
-    return <AvatarCircle label={label} size={size} />;
-  }
-
-  // Container ist transparent; wir halten nur die Fläche frei.
+/** Transparentes Gilden-Icon (Drive) mit Drop-Shadow – analog zu Spieler-Icons */
+function GuildIcon({ name, size = 36 }: { name: string | null | undefined; size?: number }) {
+  const url = guildIconUrlByName(name, size * 2);
   return (
     <div
       style={{
@@ -94,23 +38,40 @@ function ClassAvatar({
         display: "grid",
         placeItems: "center",
         background: "transparent",
+        borderRadius: 8,
+        overflow: "visible",
       }}
+      aria-hidden
     >
-      <img
-        src={iconUrl}
-        alt=""
-        draggable={false}
-        onError={() => setError(true)}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain" as const,
-          // dezente 3D-Wirkung
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
-          // kein sichtbarer Kreis/Hintergrund
-          background: "transparent",
-        }}
-      />
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            background: "transparent",
+            filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
+          }}
+          onError={(ev) => {
+            // Fallback: Emoji, falls Bild nicht geladen werden kann
+            const parent = ev.currentTarget.parentElement;
+            if (parent) parent.innerHTML = `<div style="font-size:${Math.round(
+              size * 0.7
+            )}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))">🏰</div>`;
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            fontSize: Math.round(size * 0.72),
+            filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
+          }}
+        >
+          🏰
+        </div>
+      )}
     </div>
   );
 }
@@ -150,6 +111,7 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+// helpers
 const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
@@ -162,19 +124,18 @@ const daysSince = (tsSec?: number | null) => {
   return Math.floor(diff / 86400);
 };
 
-const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
+const TABS = ["Übersicht", "Rankings", "Historie"] as const;
 type TabKey = (typeof TABS)[number];
 
-export default function PlayerProfile() {
+export default function GuildProfile() {
   const params = useParams<Record<string, string>>();
-  const playerId =
-    params.id || params.pid || params.playerId || params.player || "";
+  const guildId = params.id || params.gid || params.guildId || params.guild || "";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [char, setChar] = useState<Character | null>(null);
-  const [tab, setTab] = useState<TabKey>("Statistiken");
+  const [guild, setGuild] = useState<Guild | null>(null);
+  const [tab, setTab] = useState<TabKey>("Übersicht");
 
   useEffect(() => {
     let cancelled = false;
@@ -183,44 +144,37 @@ export default function PlayerProfile() {
       setLoading(true);
       setErr(null);
       try {
-        const id = (playerId || "").trim();
+        const id = guildId.trim();
         if (!id) {
-          setErr("Kein Spieler gewählt.");
+          setErr("Keine Gilde gewählt.");
           setLoading(false);
           return;
         }
-        const ref = doc(db, `players/${id}/latest/latest`);
+        const ref = doc(db, `guilds/${id}/latest/latest`);
         const snap = await getDoc(ref);
         if (!snap.exists()) {
-          setErr("Spieler nicht gefunden.");
+          setErr("Gilde nicht gefunden.");
           setLoading(false);
           return;
         }
         const d = snap.data() as any;
 
-        const level = toNum(d.level ?? d.values?.Level) ?? null;
-        const className = (d.className ?? d.values?.Class ?? null) || null;
-        const guildName = (d.guildName ?? d.values?.Guild ?? null) || null;
         const name = d.name ?? d.values?.Name ?? id;
         const server = d.server ?? d.values?.Server ?? null;
-
-        const totalStats = toNum(d.totalStats ?? d.values?.["Total Stats"]) ?? null;
-        const scrapbookPct = toNum(d.values?.["Album"] ?? d.values?.["Album %"] ?? d.values?.AlbumPct) ?? null;
+        const memberCount =
+          toNum(d.memberCount ?? d.values?.["Guild Member Count"] ?? d.values?.GuildMemberCount) ?? null;
+        const hofRank =
+          toNum(
+            d.hofRank ??
+              d.values?.["Hall of Fame Rank"] ??
+              d.values?.HoF ??
+              d.values?.Rank ??
+              d.values?.["Guild Rank"]
+          ) ?? null;
         const lastScanDays = daysSince(toNum(d.timestamp));
 
-        const c: Character = {
-          id,
-          name,
-          className,
-          level,
-          guild: guildName,
-          server,
-          scrapbookPct,
-          totalStats,
-          lastScanDays,
-        };
-
-        if (!cancelled) setChar(c);
+        const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
+        if (!cancelled) setGuild(g);
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
       } finally {
@@ -232,7 +186,7 @@ export default function PlayerProfile() {
     return () => {
       cancelled = true;
     };
-  }, [playerId]);
+  }, [guildId]);
 
   const NotFound = useMemo(
     () => (
@@ -258,7 +212,7 @@ export default function PlayerProfile() {
     [err, navigate]
   );
 
-  const Skeleton = <div style={{ padding: 16, color: PALETTE.textSoft }}>Lade Spielerprofil…</div>;
+  const Skeleton = <div style={{ padding: 16, color: PALETTE.textSoft }}>Lade Gildenprofil…</div>;
 
   const TabsBar = (
     <div
@@ -270,7 +224,7 @@ export default function PlayerProfile() {
         marginTop: 16,
       }}
       role="tablist"
-      aria-label="Spielerprofil Tabs"
+      aria-label="Gildenprofil Tabs"
     >
       {TABS.map((t) => {
         const active = t === tab;
@@ -298,31 +252,17 @@ export default function PlayerProfile() {
 
   const TabContent = (
     <div style={{ marginTop: 12 }}>
-      {tab === "Statistiken" && (
+      {tab === "Übersicht" && (
         <SectionCard>
           <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Statistiken</b> – bleibt bis wir Live-Daten verdrahten.
+            Platzhalter <b>Übersicht</b> – später: Mitgliederliste, Aktivität, Gildenbeschreibung.
           </div>
         </SectionCard>
       )}
-      {tab === "Charts" && (
+      {tab === "Rankings" && (
         <SectionCard>
           <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Charts</b> – (Level/Attribute etc.).
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Fortschritt" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Fortschritt</b> – (Scrapbook, Quests, Dungeons …).
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Vergleich" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Vergleich</b> – Vergleich mit anderen Spielern.
+            Platzhalter <b>Rankings</b> – Server-/Global-Ränge, Entwicklung.
           </div>
         </SectionCard>
       )}
@@ -339,7 +279,7 @@ export default function PlayerProfile() {
   const content =
     loading ? (
       Skeleton
-    ) : !char ? (
+    ) : !guild ? (
       NotFound
     ) : (
       <>
@@ -354,12 +294,14 @@ export default function PlayerProfile() {
           }}
         >
           <Container style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Nur das Klassen-Icon, transparenter Hintergrund, mit Drop-Shadow */}
-            <ClassAvatar className={char.className ?? undefined} label={char.name} size={36} />
+            {/* Transparentes Gilden-Icon mit Shadow (Drive) */}
+            <GuildIcon name={guild.name} size={36} />
             <div>
-              <div style={{ fontSize: 18, color: PALETTE.title, fontWeight: 700 }}>{char.name}</div>
+              <div style={{ fontSize: 18, color: PALETTE.title, fontWeight: 700 }}>{guild.name}</div>
               <div style={{ fontSize: 12, color: PALETTE.textSoft }}>
-                {(char.className ?? "Klasse ?")} • {(char.guild ?? "—")} • {(char.server ?? "—")}
+                {guild.server ?? "Server ?"} •{" "}
+                {guild.memberCount != null ? `${guild.memberCount} Mitglieder` : "Mitglieder ?"}{" "}
+                {guild.hofRank != null ? `• HoF #${guild.hofRank}` : ""}
               </div>
             </div>
           </Container>
@@ -380,11 +322,16 @@ export default function PlayerProfile() {
             }}
           >
             <div>
-              <h2 style={{ margin: 0, color: PALETTE.title, fontSize: 24, fontWeight: 800 }}>{char.name}</h2>
+              <h2 style={{ margin: 0, color: PALETTE.title, fontSize: 24, fontWeight: 800 }}>{guild.name}</h2>
+              <div style={{ marginTop: 6, color: PALETTE.textSoft, fontSize: 13 }}>
+                {guild.server ?? "Server ?"} •{" "}
+                {guild.memberCount != null ? `${guild.memberCount} Mitglieder` : "Mitglieder ?"}{" "}
+                {guild.hofRank != null ? `• HoF #${guild.hofRank}` : ""}
+              </div>
             </div>
             <div style={{ textAlign: "right", fontSize: 13 }}>
               <span style={{ color: PALETTE.textSoft }}>
-                Zuletzt aktualisiert: {char.lastScanDays ?? 0} Tag(e) her
+                Zuletzt aktualisiert: {guild.lastScanDays ?? 0} Tag(e) her
               </span>
               <span
                 style={{
@@ -400,14 +347,12 @@ export default function PlayerProfile() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16, marginTop: 16 }}>
-            <StatTile label="Level" value={char.level ?? "?"} />
-            <StatTile
-              label="Total Stats"
-              value={char.totalStats != null ? char.totalStats.toLocaleString() : "?"}
-            />
-            <StatTile label="Gilde" value={char.guild ?? "—"} hint={char.server ?? "—"} />
+            <StatTile label="Mitglieder" value={guild.memberCount ?? "?"} />
+            <StatTile label="HoF-Rang" value={guild.hofRank != null ? `#${guild.hofRank}` : "?"} />
+            <StatTile label="Server" value={guild.server ?? "—"} />
           </div>
 
+          {/* Tabs & Panels */}
           {TabsBar}
           {TabContent}
         </Container>
@@ -415,7 +360,7 @@ export default function PlayerProfile() {
     );
 
   return (
-    <ContentShell title="Spielerprofil" subtitle="Charakter, KPIs & Verlauf" centerFramed={false} padded>
+    <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed={false} padded>
       {content}
     </ContentShell>
   );
