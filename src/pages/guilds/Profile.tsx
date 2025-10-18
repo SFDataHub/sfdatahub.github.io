@@ -2,16 +2,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
 import ContentShell from "../../components/ContentShell";
+import { db } from "../../lib/firebase";
 import { guildIconUrlByName } from "../../data/guilds";
 
-const PALETTE = {
-  tileAlt: "var(--tile, #14273E)",
-  line: "var(--line, #2C4A73)",
-  title: "var(--title, #F5F9FF)",
-  textSoft: "var(--text-soft, #B0C4D9)",
-  active: "var(--active, #2D4E78)",
+// Mitglieder-Browser (unverändert verwenden)
+import { GuildMemberBrowser } from "../../components/guild-members";
+
+/* Farben wie auf deinen Screens */
+const C = {
+  tile: "#152A42",
+  tileAlt: "#14273E",
+  line: "#2B4C73",
+  title: "#F5F9FF",
+  soft: "#B0C4D9",
+  header: "#1E3657",
+  icon: "#5C8BC6",
 };
 
 type Guild = {
@@ -23,95 +29,47 @@ type Guild = {
   lastScanDays: number | null;
 };
 
-function Container({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px", ...style }}>{children}</div>;
-}
+type MemberSummary = {
+  id: string;
+  name: string | null;
+  class: string | null;       // Rohwert
+  role: string | null;        // Rohwert
+  level: number | null;
+  treasury: number | null;
+  mine: number | null;
+  baseMain: number | null;
+  conBase: number | null;
+  sumBaseTotal: number | null;
+  attrTotal: number | null;
+  conTotal: number | null;
+  totalStats: number | null;
+  lastScan: string | null;      // Roh-String
+  lastActivity: string | null;  // Roh-String
+  lastScanMs: number | null;    // intern
+  lastActivityMs: number | null;// intern
+};
 
-/** Transparentes Gilden-Icon (Drive) mit Drop-Shadow – analog zu Spieler-Icons */
-function GuildIcon({ name, size = 36 }: { name: string | null | undefined; size?: number }) {
-  const url = guildIconUrlByName(name, size * 2);
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        display: "grid",
-        placeItems: "center",
-        background: "transparent",
-        borderRadius: 8,
-        overflow: "visible",
-      }}
-      aria-hidden
-    >
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            background: "transparent",
-            filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
-          }}
-          onError={(ev) => {
-            // Fallback: Emoji, falls Bild nicht geladen werden kann
-            const parent = ev.currentTarget.parentElement;
-            if (parent) parent.innerHTML = `<div style="font-size:${Math.round(
-              size * 0.7
-            )}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))">🏰</div>`;
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            fontSize: Math.round(size * 0.72),
-            filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
-          }}
-        >
-          🏰
-        </div>
-      )}
-    </div>
-  );
-}
+type MembersSnapshot = {
+  guildId: string;
+  updatedAt: string;     // Roh-String, Anzeige
+  updatedAtMs: number;   // intern
+  count: number;
+  hash: string;
+  // Averages (Root)
+  avgLevel?: number | null;
+  avgTreasury?: number | null;
+  avgMine?: number | null;
+  avgBaseMain?: number | null;
+  avgConBase?: number | null;
+  avgSumBaseTotal?: number | null;
+  avgAttrTotal?: number | null;
+  avgConTotal?: number | null;
+  avgTotalStats?: number | null;
+  // Liste
+  members: MemberSummary[];
+};
 
-type StatTileProps = { label: string; value: string | number; hint?: string };
-function StatTile({ label, value, hint }: StatTileProps) {
-  return (
-    <div
-      style={{
-        background: PALETTE.tileAlt,
-        border: `1px solid ${PALETTE.line}`,
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-      }}
-    >
-      <div style={{ fontSize: 12, color: PALETTE.textSoft, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, color: PALETTE.title, fontWeight: 700 }}>{value}</div>
-      {hint ? <div style={{ fontSize: 12, color: PALETTE.textSoft, marginTop: 4 }}>{hint}</div> : null}
-    </div>
-  );
-}
-
-function SectionCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        background: PALETTE.tileAlt,
-        padding: 15,
-        borderRadius: 12,
-        border: `1px solid ${PALETTE.line}`,
-        boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// helpers
+/* kleine Utils */
 const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
@@ -119,13 +77,148 @@ const toNum = (v: any): number | null => {
 };
 const daysSince = (tsSec?: number | null) => {
   if (!tsSec) return null;
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - tsSec);
+  const diff = Math.max(0, Date.now() / 1000 - tsSec);
   return Math.floor(diff / 86400);
 };
 
-const TABS = ["Übersicht", "Rankings", "Historie"] as const;
-type TabKey = (typeof TABS)[number];
+/* Mini-Bausteine */
+function Section({
+  title,
+  right,
+  children,
+}: {
+  title?: string;
+  right?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-2xl shadow-lg"
+      style={{ background: C.tile, border: `1px solid ${C.line}` }}
+    >
+      {(title || right) && (
+        <div
+          className="flex items-center justify-between px-4 py-2 border-b"
+          style={{ borderColor: C.line }}
+        >
+          <div className="text-sm tracking-wide uppercase" style={{ color: C.soft }}>
+            {title}
+          </div>
+          {right}
+        </div>
+      )}
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function StatRow({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between text-sm py-1">
+      <span className="opacity-80">{k}</span>
+      <span className="font-semibold" style={{ color: C.title }}>
+        {v}
+      </span>
+    </div>
+  );
+}
+
+function BarChart({ data }: { data: { label: string; value: number }[] }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="h-64 w-full">
+      <div className="flex items-end gap-4 h-full w-full">
+        {data.map((d) => (
+          <div
+            key={d.label}
+            className="flex flex-col items-center gap-2"
+            style={{ width: `${100 / data.length}%` }}
+          >
+            <div className="w-full rounded-t-md" style={{ height: `${(d.value / max) * 90}%`, background: C.icon }} />
+            <div className="text-[11px] text-center leading-tight opacity-80 select-none rotate-45 origin-top-left" style={{ transform: "rotate(45deg)" }}>
+              {d.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Left Rail */
+function LeftRail({ guild }: { guild: Guild }) {
+  const emblemUrl = guildIconUrlByName(guild.name, 800);
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border p-3" style={{ borderColor: C.line, background: C.tile }}>
+        <div
+          className="w-full"
+          style={{
+            aspectRatio: "3 / 4",
+            borderRadius: 14,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: C.tileAlt,
+            border: `1px solid ${C.line}`,
+            overflow: "hidden",
+          }}
+        >
+          {emblemUrl ? (
+            <img
+              src={emblemUrl}
+              alt=""
+              className="max-h-full max-w-full"
+              style={{
+                objectFit: "contain",
+                filter:
+                  "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 8px 16px rgba(0,0,0,.35))",
+              }}
+              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+            />
+          ) : (
+            <div className="text-6xl">🏰</div>
+          )}
+        </div>
+      </div>
+
+      <Section title="GILDEN INFO">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <StatRow k="Mitglieder" v={guild.memberCount ?? "—"} />
+          <StatRow k="HoF-Rang" v={guild.hofRank != null ? `#${guild.hofRank}` : "—"} />
+          <StatRow k="Server" v={guild.server ?? "—"} />
+          <StatRow k="Inaktiv" v="0" />
+          <StatRow k="Aktivität" v="100%" />
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+/* Right Rail */
+function RightRail() {
+  const CLASS_BARS = [
+    { label: "Bard", value: 5 },
+    { label: "Demon Hunter", value: 8 },
+    { label: "Battle Mage", value: 3 },
+    { label: "Berserker", value: 16 },
+    { label: "Warrior", value: 4 },
+    { label: "Scout", value: 8 },
+    { label: "Mage", value: 2 },
+    { label: "Druid", value: 3 },
+    { label: "Paladin", value: 1 },
+  ];
+  return (
+    <div className="space-y-4">
+      <Section right={<div className="text-xs opacity-70">Class Distribution</div>}>
+        <BarChart data={CLASS_BARS} />
+      </Section>
+      <Section>
+        <div className="text-center text-sm opacity-80">ø</div>
+      </Section>
+    </div>
+  );
+}
 
 export default function GuildProfile() {
   const params = useParams<Record<string, string>>();
@@ -135,11 +228,12 @@ export default function GuildProfile() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [guild, setGuild] = useState<Guild | null>(null);
-  const [tab, setTab] = useState<TabKey>("Übersicht");
+
+  // NEU: Snapshot-State
+  const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       setLoading(true);
       setErr(null);
@@ -150,15 +244,16 @@ export default function GuildProfile() {
           setLoading(false);
           return;
         }
-        const ref = doc(db, `guilds/${id}/latest/latest`);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
+
+        // 1) Guild-Latest (bestehend) für Header/Kacheln
+        const refLatest = doc(db, `guilds/${id}/latest/latest`);
+        const snapLatest = await getDoc(refLatest);
+        if (!snapLatest.exists()) {
           setErr("Gilde nicht gefunden.");
           setLoading(false);
           return;
         }
-        const d = snap.data() as any;
-
+        const d = snapLatest.data() as any;
         const name = d.name ?? d.values?.Name ?? id;
         const server = d.server ?? d.values?.Server ?? null;
         const memberCount =
@@ -172,196 +267,332 @@ export default function GuildProfile() {
               d.values?.["Guild Rank"]
           ) ?? null;
         const lastScanDays = daysSince(toNum(d.timestamp));
-
         const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
         if (!cancelled) setGuild(g);
+
+        // 2) NEU: Snapshot laden (1 Read) – Mitgliederliste & Averages
+        const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
+        const snap = await getDoc(refSnap);
+        if (snap.exists() && !cancelled) {
+          const sdata = snap.data() as any;
+          const s: MembersSnapshot = {
+            guildId: String(sdata.guildId ?? id),
+            updatedAt: String(sdata.updatedAt ?? d.values?.Timestamp ?? ""),
+            updatedAtMs: Number(sdata.updatedAtMs ?? d.timestamp * 1000 ?? 0),
+            count: Number(sdata.count ?? 0),
+            hash: String(sdata.hash ?? ""),
+
+            avgLevel: sdata.avgLevel ?? null,
+            avgTreasury: sdata.avgTreasury ?? null,
+            avgMine: sdata.avgMine ?? null,
+            avgBaseMain: sdata.avgBaseMain ?? null,
+            avgConBase: sdata.avgConBase ?? null,
+            avgSumBaseTotal: sdata.avgSumBaseTotal ?? null,
+            avgAttrTotal: sdata.avgAttrTotal ?? null,
+            avgConTotal: sdata.avgConTotal ?? null,
+            avgTotalStats: sdata.avgTotalStats ?? null,
+
+            members: Array.isArray(sdata.members) ? (sdata.members as MemberSummary[]) : [],
+          };
+          setSnapshot(s);
+        }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
     };
   }, [guildId]);
 
-  const NotFound = useMemo(
-    () => (
-      <div style={{ padding: 24, color: PALETTE.textSoft }}>
-        {err ?? "Unbekannter Fehler."}
-        <div style={{ marginTop: 12 }}>
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              padding: "8px 12px",
-              background: PALETTE.active,
-              border: "none",
-              color: "#fff",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-          >
-            Zur Startseite
-          </button>
+  const membersForList = useMemo<MemberSummary[]>(
+    () => snapshot?.members ?? [],
+    [snapshot]
+  );
+
+  if (loading) {
+    return (
+      <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed>
+        <div className="text-sm" style={{ color: C.soft }}>Lade Gildenprofil…</div>
+      </ContentShell>
+    );
+  }
+
+  if (!guild) {
+    return (
+      <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed>
+        <div className="text-sm" style={{ color: C.soft }}>
+          {err ?? "Unbekannter Fehler."}
+          <div className="mt-3">
+            <button
+              onClick={() => navigate("/")}
+              className="rounded-xl px-3 py-2 text-white"
+              style={{ background: "#2D4E78" }}
+            >
+              Zur Startseite
+            </button>
+          </div>
         </div>
-      </div>
-    ),
-    [err, navigate]
-  );
+      </ContentShell>
+    );
+  }
 
-  const Skeleton = <div style={{ padding: 16, color: PALETTE.textSoft }}>Lade Gildenprofil…</div>;
-
-  const TabsBar = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        borderBottom: `1px solid ${PALETTE.line}`,
-        marginTop: 16,
-      }}
-      role="tablist"
-      aria-label="Gildenprofil Tabs"
-    >
-      {TABS.map((t) => {
-        const active = t === tab;
-        return (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={active}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: `1px solid ${active ? PALETTE.active : "transparent"}`,
-              background: active ? "rgba(45,78,120,0.35)" : "transparent",
-              color: PALETTE.title,
-              cursor: "pointer",
-            }}
-          >
-            {t}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const TabContent = (
-    <div style={{ marginTop: 12 }}>
-      {tab === "Übersicht" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Übersicht</b> – später: Mitgliederliste, Aktivität, Gildenbeschreibung.
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Rankings" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Rankings</b> – Server-/Global-Ränge, Entwicklung.
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Historie" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Historie</b> – wöchentliche / monatliche Aggregationen.
-          </div>
-        </SectionCard>
-      )}
-    </div>
-  );
-
-  const content =
-    loading ? (
-      Skeleton
-    ) : !guild ? (
-      NotFound
-    ) : (
-      <>
-        {/* Sticky Header */}
+  /* ============ ZWEITER HEADER (Server • Name zentriert • Zuletzt aktualisiert) ============ */
+  const SecondHeader = (
+    <div className="mt-2">
+      <div className="px-6">
         <div
+          className="flex items-center justify-between gap-3"
           style={{
-            position: "sticky",
-            top: 0,
+            paddingTop: 10,
+            paddingBottom: 10,
+            borderTop: `1px solid ${C.line}`,
+            position: "relative",
             zIndex: 2,
-            background: "transparent",
-            borderBottom: `1px solid ${PALETTE.line}`,
           }}
         >
-          <Container style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Transparentes Gilden-Icon mit Shadow (Drive) */}
-            <GuildIcon name={guild.name} size={36} />
-            <div>
-              <div style={{ fontSize: 18, color: PALETTE.title, fontWeight: 700 }}>{guild.name}</div>
-              <div style={{ fontSize: 12, color: PALETTE.textSoft }}>
-                {guild.server ?? "Server ?"} •{" "}
-                {guild.memberCount != null ? `${guild.memberCount} Mitglieder` : "Mitglieder ?"}{" "}
-                {guild.hofRank != null ? `• HoF #${guild.hofRank}` : ""}
-              </div>
+          {/* LINKS: Server */}
+          <div className="min-w-[120px]">
+            <span
+              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: C.tile, border: `1px solid ${C.line}`, color: C.title }}
+            >
+              {guild.server ?? "S?.EU"}
+            </span>
+          </div>
+
+          {/* MITTE: Name */}
+          <div className="flex-1 text-center">
+            <div className="font-extrabold" style={{ color: C.title, fontSize: 26, lineHeight: 1.15 }}>
+              {guild.name}
             </div>
-          </Container>
+          </div>
+
+          {/* RECHTS: Zuletzt aktualisiert – Roh-String aus Snapshot */}
+          <div className="min-w-[220px] text-right text-xs" style={{ color: C.soft }}>
+            Zuletzt aktualisiert:&nbsp;
+            {snapshot?.updatedAt ? snapshot.updatedAt : "—"}{" "}
+            <span className="inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#4CAF50" }} />
+          </div>
         </div>
 
-        {/* Kopf + KPIs */}
-        <Container style={{ paddingTop: 12, paddingBottom: 24 }}>
-          <div
-            style={{
-              background: PALETTE.tileAlt,
-              padding: 15,
-              borderRadius: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              border: `1px solid ${PALETTE.line}`,
-              boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-            }}
-          >
-            <div>
-              <h2 style={{ margin: 0, color: PALETTE.title, fontSize: 24, fontWeight: 800 }}>{guild.name}</h2>
-              <div style={{ marginTop: 6, color: PALETTE.textSoft, fontSize: 13 }}>
-                {guild.server ?? "Server ?"} •{" "}
-                {guild.memberCount != null ? `${guild.memberCount} Mitglieder` : "Mitglieder ?"}{" "}
-                {guild.hofRank != null ? `• HoF #${guild.hofRank}` : ""}
-              </div>
-            </div>
-            <div style={{ textAlign: "right", fontSize: 13 }}>
-              <span style={{ color: PALETTE.textSoft }}>
-                Zuletzt aktualisiert: {guild.lastScanDays ?? 0} Tag(e) her
-              </span>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  background: "#4CAF50",
-                  marginLeft: 8,
-                }}
-              />
-            </div>
-          </div>
+        {/* Divider-Linie unten */}
+        <div
+          style={{
+            height: 1,
+            background: C.line,
+            opacity: 0.9,
+            marginTop: 4,
+            marginBottom: 20,
+            position: "relative",
+            zIndex: 2,
+          }}
+        />
+      </div>
+    </div>
+  );
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16, marginTop: 16 }}>
-            <StatTile label="Mitglieder" value={guild.memberCount ?? "?"} />
-            <StatTile label="HoF-Rang" value={guild.hofRank != null ? `#${guild.hofRank}` : "?"} />
-            <StatTile label="Server" value={guild.server ?? "—"} />
-          </div>
-
-          {/* Tabs & Panels */}
-          {TabsBar}
-          {TabContent}
-        </Container>
-      </>
-    );
-
+  /* ====================== PAGE CONTENT ====================== */
   return (
-    <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed={false} padded>
-      {content}
+    <ContentShell
+      title="Gildenprofil"
+      subtitle="Gilde, KPIs & Verlauf"
+      centerFramed={false}
+    >
+      {SecondHeader}
+
+      <div className="px-6 pb-8">
+        <div className="grid grid-cols-12 gap-4">
+          {/* Left 3/12 */}
+          <div className="col-span-12 md:col-span-3">
+            <LeftRail guild={guild} />
+          </div>
+
+          {/* Center 6/12 */}
+          <div className="col-span-12 md:col-span-6 space-y-4">
+            {/* KPI-Zeile – nutzt Averages aus Snapshot, wenn vorhanden */}
+            <Section>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 text-sm">
+                <StatRow k="ø Treasury" v={snapshot?.avgTreasury ?? "—"} />
+                <StatRow k="# on Server" v={1} />
+                <StatRow k="ø Mine" v={snapshot?.avgMine ?? "—"} />
+                <StatRow k="# in Europe" v={6} />
+                <StatRow k="ø level" v={snapshot?.avgLevel ?? "—"} />
+              </div>
+            </Section>
+
+            {/* Base Stats */}
+            <Section title="BASE STATS">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* links */}
+                <div>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ background: C.tileAlt, border: `1px solid ${C.line}` }}
+                  >
+                    <StatRow k="player in Top 100 on Server" v={41} />
+                    <StatRow k="player in Top 100 each class" v={42} />
+                    <StatRow k="player in Top 1000" v={45} />
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      className="px-4 py-2 rounded-xl text-sm text-white"
+                      style={{ background: C.header, border: `1px solid ${C.line}` }}
+                    >
+                      highest in ..
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <div className="opacity-80 mb-1">Main</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgBaseMain ?? "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="opacity-80 mb-1">Con</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgConBase ?? "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="opacity-80 mb-1">Sum Base Stats</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgSumBaseTotal ?? "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* rechts */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <div className="opacity-80">Top Player</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        {/* Platzhalter – später aus Snapshot ableiten */}
+                        —
+                      </div>
+                    </div>
+                    <div>
+                      <div className="opacity-80">2nd</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        —
+                      </div>
+                    </div>
+                    <div>
+                      <div className="opacity-80">3rd</div>
+                      <div className="font-semibold" style={{ color: C.title }}>
+                        —
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ background: C.tileAlt, border: `1px solid ${C.line}` }}
+                  >
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="opacity-80">⌀</div>
+                      <div className="text-right opacity-80">—</div>
+                      <div>Main</div>
+                      <div className="text-right font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgAttrTotal ?? "—"}
+                      </div>
+                      <div>Con</div>
+                      <div className="text-right font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgConTotal ?? "—"}
+                      </div>
+                      <div>Total Stats</div>
+                      <div className="text-right font-semibold" style={{ color: C.title }}>
+                        {snapshot?.avgTotalStats ?? "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            {/* Players joined/left – ÜBER den Tabs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Section title="PLAYER JOINED">
+                <div className="text-sm opacity-70">—</div>
+              </Section>
+              <Section title="PLAYER LEFT">
+                <div className="text-sm opacity-70">—</div>
+              </Section>
+            </div>
+
+            {/* Tabs */}
+            <Tabs members={membersForList} updatedAtMs={snapshot?.updatedAtMs ?? null} />
+          </div>
+
+          {/* Right 3/12 */}
+          <div className="col-span-12 md:col-span-3">
+            <RightRail />
+          </div>
+        </div>
+      </div>
     </ContentShell>
+  );
+}
+
+/* Tabs */
+function Tabs({
+  members,
+  updatedAtMs,
+}: {
+  members: MemberSummary[];
+  updatedAtMs: number | null;
+}) {
+  const [tab, setTab] = useState<"Übersicht" | "Rankings" | "Historie">("Übersicht");
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: C.line }} role="tablist">
+        {(["Übersicht", "Rankings", "Historie"] as const).map((t) => {
+          const active = t === tab;
+          return (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t)}
+              className="rounded-xl px-3 py-2 text-sm"
+              style={{
+                border: `1px solid ${active ? C.header : "transparent"}`,
+                background: active ? "rgba(45,78,120,0.35)" : "transparent",
+                color: C.title,
+              }}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+
+      <Section>
+        {tab === "Übersicht" ? (
+          // WICHTIG: Mitgliederliste bekommt jetzt die Snapshot-Members (1 Read) statt mock data
+          <GuildMemberBrowser
+            members={members}
+            defaultView="list"
+            defaultSort={{ key: "level", dir: "desc" }}
+            // Hinweis für Schritt C · Teil 2:
+            // Beim Klick werden wir docId = floor(updatedAtMs/1000) verwenden,
+            // um players/{playerId}/scans/{docId} zu lesen (nur wenn nötig).
+            // Anzeige von lastScan/lastActivity bleibt Roh-String.
+          />
+        ) : (
+          <div className="text-sm" style={{ color: C.soft }}>
+            Platzhalter <b>{tab}</b> – später: Mitgliederliste, Aktivität, Gildenbeschreibung / Ränge / Historie.
+          </div>
+        )}
+      </Section>
+    </div>
   );
 }

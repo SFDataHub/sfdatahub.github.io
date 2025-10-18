@@ -1,6 +1,7 @@
 // src/components/ImportCsv/ImportCsv.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { importCsvToDB, type ImportCsvKind, type ImportCsvOptions, type ImportReport } from "../../lib/import/csv";
+import { writeGuildSnapshotsFromRows } from "../../lib/import/importer";
 
 type Row = Record<string, any>;
 const norm = (s: any) => String(s ?? "").trim();
@@ -118,7 +119,7 @@ function toSec(v: any): number | null {
   if (/^\d{13}$/.test(s)) return Math.floor(Number(s)/1000);
   if (/^\d{10}$/.test(s)) return Number(s);
   const t = Date.parse(s);
-  return Number.isFinite(t) ? Math.floor(t/1000) : null;
+  return Number.isFinite(t) ? Math.floor(t / 1000) : null;
 }
 
 type PlayerSlim = {
@@ -365,6 +366,9 @@ export default function ImportCsv() {
         onProgress: p => setProgress(p),
       } as ImportCsvOptions);
       console.info("[Import Report] players", repPlayers);
+
+      // Snapshots NACH den beiden Imports schreiben (1 Doc pro Gilde)
+      await writeGuildSnapshotsFromRows(playersRows, guildsRows);
 
       setProgress({ phase:"done", current:1, total:1 });
       setReports([repGuilds, repPlayers]);
