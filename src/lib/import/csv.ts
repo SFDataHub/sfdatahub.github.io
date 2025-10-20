@@ -1,5 +1,5 @@
 // src/lib/import/csv.ts
-import { writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { writeBatch, doc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 /** ---- Public types ---- */
@@ -131,6 +131,7 @@ const pickByCanon = (row: Row, canonKey: string): any => {
 const pickAnyByCanon = (row: Row, keys: string[]): any =>
   keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
 
+// WICHTIG: identisch zu deiner Implementierung
 function toSecFlexible(v: any): number | null {
   if (v == null) return null;
   const s = String(v).trim();
@@ -311,6 +312,36 @@ function aggregateValues(rowsSortedAsc: RowMeta[], allHeaders: string[]): Record
   return out;
 }
 
+/** ---- Helper: vorhandenen latest-Zeitpunkt robust lesen (Sekunden) ---- */
+async function readPrevLatestSec(latestRef: ReturnType<typeof doc>): Promise<number> {
+  const snap = await getDoc(latestRef);
+  if (!snap.exists()) return 0;
+  const d: any = snap.data();
+
+  // bevorzugt: CSV-String in values.Timestamp
+  if (d?.values?.Timestamp != null) {
+    const s = toSecFlexible(d.values.Timestamp);
+    if (s != null) return s;
+  }
+
+  // optional: timestampRaw (falls vorhanden)
+  if (d?.timestampRaw != null) {
+    const s = toSecFlexible(d.timestampRaw);
+    if (s != null) return s;
+  }
+
+  // Fallbacks: ts / timestamp
+  if (typeof d?.ts === "number") return d.ts;
+
+  const v = d?.timestamp;
+  if (typeof v === "number") return v > 9_999_999_999 ? Math.floor(v / 1000) : v;
+  if (typeof v === "string") {
+    const p = Date.parse(v);
+    return Number.isFinite(p) ? Math.floor(p / 1000) : 0;
+  }
+  return 0;
+}
+
 /** ---- Hauptimport ---- */
 export async function importCsvToDB(
   _rawOrNull: string | null,
@@ -417,34 +448,38 @@ export async function importCsvToDB(
       const tokens = nameToTokens(nameForSearch);
       const ngrams = tokensToNgrams(tokens);
 
-      putLatest.push((batch) => {
-        const ref = doc(db, `players/${pid}/latest/latest`);
-        batch.set(
-          ref,
-          {
-            playerId: pid,
-            server,
-            timestamp: last.ts,
-            timestampRaw: pickByCanon(last.row, COL.PLAYERS.TIMESTAMP),
-            name,
-            values: last.row,
-            updatedAt: serverTimestamp(),
+      // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
+      const latestRef = doc(db, `players/${pid}/latest/latest`);
+      const prevSec = await readPrevLatestSec(latestRef);
+      if (last.ts > prevSec) {
+        putLatest.push((batch) => {
+          batch.set(
+            latestRef,
+            {
+              playerId: pid,
+              server,
+              timestamp: last.ts,
+              timestampRaw: pickByCanon(last.row, COL.PLAYERS.TIMESTAMP),
+              name,
+              values: last.row,
+              updatedAt: serverTimestamp(),
 
-            // Suchfelder
-            nameFold: toFold(nameForSearch),
-            nameTokens: tokens,
-            nameNgrams: ngrams,
+              // Suchfelder
+              nameFold: toFold(nameForSearch),
+              nameTokens: tokens,
+              nameNgrams: ngrams,
 
-            // Dropdown-Felder
-            level: toNumberLoose(levelVal),
-            className: classVal != null && String(classVal).trim() !== "" ? String(classVal) : null,
-            guildName: guildVal != null && String(guildVal).trim() !== "" ? String(guildVal) : null,
-            guildNameFold: guildVal ? toFold(guildVal) : null,
-          },
-          { merge: true }
-        );
-      });
-      counts.writtenLatestPlayers!++;
+              // Dropdown-Felder
+              level: toNumberLoose(levelVal),
+              className: classVal != null && String(classVal).trim() !== "" ? String(classVal) : null,
+              guildName: guildVal != null && String(guildVal).trim() !== "" ? String(guildVal) : null,
+              guildNameFold: guildVal ? toFold(guildVal) : null,
+            },
+            { merge: true }
+          );
+        });
+        counts.writtenLatestPlayers!++;
+      }
 
       // buckets
       const weekly = new Map<string, RowMeta[]>();
@@ -518,7 +553,7 @@ export async function importCsvToDB(
 
     await commitBatched(putScans,  BATCH_SCANS,  "scans",  opts.onProgress);
     await commitBatched(putLatest, BATCH_LATEST, "latest", opts.onProgress);
-    await commitBatched(putHistory,BATCH_HISTORY,"history",opts.onProgress);
+    await commitBatched(putHistory, BATCH_HISTORY, "history", opts.onProgress);
   }
 
   // ---------- GUILDS ----------
@@ -588,33 +623,36 @@ export async function importCsvToDB(
         pickAnyByCanon(last.row, [COL.GUILDS.HOF, COL.GUILDS.HOF_ALT, COL.GUILDS.RANK, COL.GUILDS.GUILD_RANK])
       );
 
-      // latest
-      putLatest.push((batch) => {
-        const ref = doc(db, `guilds/${gid}/latest/latest`);
-        batch.set(
-          ref,
-          {
-            guildIdentifier: gid,
-            server: up(pickByCanon(last.row, COL.GUILDS.SERVER) || ""),
-            timestamp: last.ts,
-            timestampRaw: pickByCanon(last.row, COL.GUILDS.TIMESTAMP),
-            name: pickByCanon(last.row, COL.GUILDS.NAME) || null,
-            values: last.row,
-            updatedAt: serverTimestamp(),
+      // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
+      const latestRef = doc(db, `guilds/${gid}/latest/latest`);
+      const prevSec = await readPrevLatestSec(latestRef);
+      if (last.ts > prevSec) {
+        putLatest.push((batch) => {
+          batch.set(
+            latestRef,
+            {
+              guildIdentifier: gid,
+              server: up(pickByCanon(last.row, COL.GUILDS.SERVER) || ""),
+              timestamp: last.ts,
+              timestampRaw: pickByCanon(last.row, COL.GUILDS.TIMESTAMP),
+              name: pickByCanon(last.row, COL.GUILDS.NAME) || null,
+              values: last.row,
+              updatedAt: serverTimestamp(),
 
-            // Suchfelder
-            nameFold: toFold(nameForSearch),
-            nameTokens: tokens,
-            nameNgrams: ngrams,
+              // Suchfelder
+              nameFold: toFold(nameForSearch),
+              nameTokens: tokens,
+              nameNgrams: ngrams,
 
-            // Dropdown-Felder
-            memberCount,
-            hofRank,
-          },
-          { merge: true }
-        );
-      });
-      counts.writtenLatestGuilds!++;
+              // Dropdown-Felder
+              memberCount,
+              hofRank,
+            },
+            { merge: true }
+          );
+        });
+        counts.writtenLatestGuilds!++;
+      }
 
       // buckets
       const weekly = new Map<string, RowMeta[]>();
@@ -687,7 +725,7 @@ export async function importCsvToDB(
 
     await commitBatched(putScans,  BATCH_SCANS,  "scans",  opts.onProgress);
     await commitBatched(putLatest, BATCH_LATEST, "latest", opts.onProgress);
-    await commitBatched(putHistory,BATCH_HISTORY,"history",opts.onProgress);
+    await commitBatched(putHistory, BATCH_HISTORY, "history", opts.onProgress);
   }
 
   const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();

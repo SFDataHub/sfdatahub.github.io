@@ -10,6 +10,24 @@ import { bestId, headerValue, normalizeServer } from "./preprocess";
 
 const MAX_OPS = 450; // Firestore limit < 500
 
+// CSV/ISO/ms → Sekunden (nur für Vergleich; wir schreiben nichts Neues)
+function toSecFlexible(v: any): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (/^\d{13}$/.test(s)) return Math.floor(Number(s) / 1000);
+  if (/^\d{10}$/.test(s)) return Number(s);
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) {
+    const dd = Number(m[1]), MM = Number(m[2]) - 1, yyyy = Number(m[3]);
+    const hh = Number(m[4]), mm = Number(m[5]), ss = m[6] ? Number(m[6]) : 0;
+    const d = new Date(yyyy, MM, dd, hh, mm, ss);
+    if (!Number.isNaN(d.getTime())) return Math.floor(d.getTime() / 1000);
+  }
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) return Math.floor(t / 1000);
+  return null;
+}
+
 export async function upsertRows(
   db: Firestore,
   kind: Kind,
@@ -66,7 +84,7 @@ export async function upsertRows(
     const scansRef  = doc(collection(db, cols.scans),  baseKey);
     const latestRef = doc(collection(db, cols.latest), latestKey);
 
-    // Prepare data
+    // Prepare data (unverändert)
     const common = {
       sv,
       ts,
@@ -83,7 +101,31 @@ export async function upsertRows(
     // upsert into latest: only if ts is newer
     try {
       const latestSnap = await getDoc(latestRef);
-      const prevTs = latestSnap.exists() ? Number(latestSnap.get("ts") || 0) : 0;
+
+      // *** EINZIGE ERGÄNZUNG ggü. deiner alten Datei: robustes prevTs ***
+      // 1) bevorzugt d.values.Timestamp (CSV-String im latest)
+      // 2) sonst d.ts (Sekunden)
+      // 3) sonst d.timestamp (Sek./ms/String)
+      let prevTs = 0;
+      if (latestSnap.exists()) {
+        const d: any = latestSnap.data();
+
+        if (d?.values?.Timestamp != null) {
+          const s = toSecFlexible(d.values.Timestamp);
+          prevTs = s != null ? s : 0;
+        } else if (typeof d?.ts === "number") {
+          prevTs = d.ts;
+        } else if (d?.timestamp != null) {
+          const v = d.timestamp;
+          if (typeof v === "number") {
+            prevTs = v > 9_999_999_999 ? Math.floor(v / 1000) : v;
+          } else if (typeof v === "string") {
+            const p = Date.parse(v);
+            prevTs = Number.isFinite(p) ? Math.floor(p / 1000) : 0;
+          }
+        }
+      }
+
       if (ts > prevTs) {
         batch.set(latestRef, { ...row, ...common }, { merge: true });
         ops++; writtenLatest++;

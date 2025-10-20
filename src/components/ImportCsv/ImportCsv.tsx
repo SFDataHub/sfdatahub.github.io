@@ -3,6 +3,16 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { importCsvToDB, type ImportCsvKind, type ImportCsvOptions, type ImportReport } from "../../lib/import/csv";
 import { writeGuildSnapshotsFromRows } from "../../lib/import/importer";
 
+// NEU: echte Monthly-Berechnung & Writes
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import {
+  monthKeyFromMs,
+  ensureFirstOfMonth,
+  computeProgressDoc,
+  writeMonthlyDoc,
+} from "../../lib/guilds/monthly";
+
 type Row = Record<string, any>;
 const norm = (s: any) => String(s ?? "").trim();
 const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
@@ -369,6 +379,38 @@ export default function ImportCsv() {
 
       // Snapshots NACH den beiden Imports schreiben (1 Doc pro Gilde)
       await writeGuildSnapshotsFromRows(playersRows, guildsRows);
+
+      // === MONTHLY: Baseline sichern + Progress schreiben ===
+
+      // betroffene Gilden-IDs aus beiden CSVs sammeln
+      const gidSet = new Set<string>();
+      for (const r of guildsRows)  { const v = pickByCanon(r, CANON("Guild Identifier")); if (v) gidSet.add(String(v)); }
+      for (const r of playersRows) { const v = pickByCanon(r, CANON("Guild Identifier")); if (v) gidSet.add(String(v)); }
+
+      // pro Gilde: latest lesen, Baseline sicherstellen, Progress berechnen und Monats-Dok schreiben
+      for (const guildId of gidSet) {
+        const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
+        const latestSnap = await getDoc(latestRef);
+        if (!latestSnap.exists()) continue;
+
+        const latest = latestSnap.data() as any;
+        const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
+        const monthKey = monthKeyFromMs(latestTsMs);
+
+        const { first, firstTsMs } = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
+
+        const progress = computeProgressDoc({
+          guildId,
+          monthKey,
+          server: latest.server ?? null,
+          first,
+          firstTsMs,
+          latest,
+          latestTsMs,
+        });
+
+        await writeMonthlyDoc(guildId, monthKey, progress);
+      }
 
       setProgress({ phase:"done", current:1, total:1 });
       setReports([repGuilds, repPlayers]);

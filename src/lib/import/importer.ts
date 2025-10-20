@@ -3,7 +3,7 @@
 //   guilds/{gid}/snapshots/members_summary
 // Kein Eingriff in players/guilds Importpfade.
 
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export type CSVRow = Record<string, any>;
@@ -61,15 +61,23 @@ const P = {
   LEVEL: CANON("Level"),
   CLASS: CANON("Class"),
   GUILD: CANON("Guild"),
-  GUILD_ROLE: CANON("Guild Role"),
+
+  // Role kann als "Role" oder "Guild Role" kommen
+  GUILD_ROLE: [CANON("Role"), CANON("Guild Role")],
 
   TREASURY: [CANON("Treasury"), CANON("Fortress Treasury"), CANON("Treasury Level"), CANON("Festungsschatzkammer")],
-  MINE:     [CANON("Mine"), CANON("Fortress Mine"), CANON("Mine Level"), CANON("Festungsmine")],
+  MINE:     [CANON("Mine"), CANON("Gem Mine"), CANON("Mine Level"), CANON("Festungsmine")],
   BASE_MAIN:[CANON("Base"), CANON("Base Attribute"), CANON("BaseMain"), CANON("Basis Attribut")],
-  CON_BASE: [CANON("Con Base"), CANON("Constitution Base"), CANON("Basis Konstitution"), CANON("conbase")],
+
+  // Base Constitution explizit unterstützen
+  CON_BASE: [CANON("Con Base"), CANON("Constitution Base"), CANON("Base Constitution"), CANON("Basis Konstitution"), CANON("conbase")],
+
   ATTR_TOT: [CANON("Attribute"), CANON("Attr Total"), CANON("Attribut"), CANON("Attribut Gesamt")],
   CON_TOT:  [CANON("Constitution"), CANON("Constitution Total"), CANON("Konstitution"), CANON("Konstitution Gesamt")],
   LAST_ACTIVE: [CANON("Last Active"), CANON("LastActivity"), CANON("Letzte Aktivität")],
+
+  // optional: Guild Joined (wie in deinem Screenshot)
+  GUILD_JOINED: [CANON("Guild Joined"), CANON("Joined Guild"), CANON("Gildenbeitritt")],
 } as const;
 
 const G = {
@@ -87,16 +95,24 @@ type MemberSummary = {
   level: number | null;
   treasury: number | null;
   mine: number | null;
-  baseMain: number | null;
-  conBase: number | null;
-  sumBaseTotal: number | null;
+
+  baseMain: number | null;       // CSV "Base"
+  conBase: number | null;        // CSV "Base Constitution"
+  sumBaseTotal: number | null;   // exakt: baseMain + conBase | null
+
   attrTotal: number | null;
   conTotal: number | null;
   totalStats: number | null;
-  lastScan: string | null;      // Rohanzeige
-  lastActivity: string | null;  // Rohanzeige
+
+  // Zeitfelder
+  lastScan: string | null;       // Rohanzeige
+  lastActivity: string | null;   // Rohanzeige
   lastScanMs: number | null;
   lastActivityMs: number | null;
+
+  // optional: Gildenbeitritt (für UI)
+  guildJoined: string | null;
+  guildJoinedMs: number | null;
 };
 
 // ---------- Helpers ----------
@@ -127,16 +143,23 @@ function buildGuildNameMap(guildRows: CSVRow[]): Map<string, string> {
 function toMemberSummary(row: CSVRow): MemberSummary {
   const tsRaw = pickByCanon(row, P.TIMESTAMP);
   const tsSec = toSecFlexible(tsRaw);
+
   const lastActiveRaw = pickAnyByCanon(row, P.LAST_ACTIVE);
   const lastActiveSec = toSecFlexible(lastActiveRaw);
+
+  // optional: Guild Joined
+  const joinedRaw = pickAnyByCanon(row, P.GUILD_JOINED);
+  const joinedSec = toSecFlexible(joinedRaw);
 
   const level    = toNumberLoose(pickByCanon(row, P.LEVEL));
   const classStr = ((): string | null => {
     const v = pickByCanon(row, P.CLASS);
     return v != null && String(v).trim() !== "" ? String(v) : null;
   })();
+
+  // Role aus "Role" ODER "Guild Role"
   const roleStr  = ((): string | null => {
-    const v = pickByCanon(row, P.GUILD_ROLE);
+    const v = pickAnyByCanon(row, P.GUILD_ROLE);
     return v != null && String(v).trim() !== "" ? String(v) : null;
   })();
 
@@ -147,6 +170,7 @@ function toMemberSummary(row: CSVRow): MemberSummary {
   const attrTot  = toNumberLoose(pickAnyByCanon(row, P.ATTR_TOT));
   const conTot   = toNumberLoose(pickAnyByCanon(row, P.CON_TOT));
 
+  // Regeln:
   const sumBaseTotal = baseMain != null && conBase != null ? baseMain + conBase : null;
   const totalStats   = attrTot  != null && conTot  != null ? attrTot  + conTot  : null;
 
@@ -169,10 +193,14 @@ function toMemberSummary(row: CSVRow): MemberSummary {
     attrTotal: attrTot,
     conTotal: conTot,
     totalStats,
+
     lastScan: tsRaw != null ? String(tsRaw) : null,
     lastActivity: lastActiveRaw != null ? String(lastActiveRaw) : null,
     lastScanMs: tsSec != null ? tsSec * 1000 : null,
     lastActivityMs: lastActiveSec != null ? lastActiveSec * 1000 : null,
+
+    guildJoined: joinedRaw != null ? String(joinedRaw) : null,
+    guildJoinedMs: joinedSec != null ? joinedSec * 1000 : null,
   };
 }
 function avgOf(m: MemberSummary[], key: keyof MemberSummary): number | null {
@@ -181,27 +209,56 @@ function avgOf(m: MemberSummary[], key: keyof MemberSummary): number | null {
   return xs.reduce((a,b)=>a+b,0) / xs.length;
 }
 
+// ---- NEU (nur für dein gewünschtes Verhalten): helper zum Lesen ----
+async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|null, raw: string|null}> {
+  const ref = doc(db, `guilds/${gid}/latest/latest`);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { sec: null, raw: null };
+  const d: any = snap.data() || {};
+  const raw: string | null = d.timestampRaw ?? d.values?.Timestamp ?? null;
+
+  let sec: number | null = null;
+  if (typeof d.timestamp === "number") {
+    sec = d.timestamp > 9_999_999_999 ? Math.floor(d.timestamp / 1000) : d.timestamp;
+  } else if (raw) {
+    sec = toSecFlexible(raw);
+  }
+  return { sec, raw };
+}
+
+async function readPrevSnapshotSec(gid: string): Promise<number> {
+  const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return 0;
+  const d: any = snap.data() || {};
+  if (typeof d.updatedAtMs === "number") return Math.floor(d.updatedAtMs / 1000);
+  if (typeof d.updatedAt === "string") {
+    const s = toSecFlexible(d.updatedAt);
+    if (s != null) return s;
+  }
+  return 0;
+}
+
 // ---------- Hauptfunktion ----------
 /**
  * Schreibt pro Gilde genau EIN Dokument:
  *   guilds/{gid}/snapshots/members_summary
- * Basis: Players-CSV-Zeilen (gruppiert nach gid; jüngster Timestamp).
+ * Basis: Spieler-CSV-Zeilen mit exakt dem Timestamp aus guilds/{gid}/latest/latest.
+ * Überschreibt nur, wenn dieser Timestamp neuer ist als der bestehende Snapshot.
  * Fallback gid via (Server+Guild-Name) anhand Guilds-CSV.
  */
 export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsRows: CSVRow[]) {
   const guildNameMap = buildGuildNameMap(guildsRows || []);
 
-  // Buckets (gid, tsSec)
-  type Bucket = { gid: string; tsSec: number; rows: CSVRow[] };
-  const byGuildTs = new Map<string, Bucket>();
-
+  // Gildenmenge bestimmen (aus guildsRows + playersRows)
+  const allGids = new Set<string>();
+  for (const r of guildsRows || []) {
+    const gid = String(pickByCanon(r, G.GUILD_IDENTIFIER) ?? "").trim();
+    if (gid) allGids.add(gid);
+  }
   for (const r of playersRows || []) {
-    const tsSec = toSecFlexible(pickByCanon(r, P.TIMESTAMP));
-    if (tsSec == null) continue;
-
     const server = pickByCanon(r, P.SERVER);
     let gid = String(pickByCanon(r, P.GUILD_IDENTIFIER) ?? "").trim();
-
     if (!gid) {
       const guildName = pickByCanon(r, P.GUILD) ?? (r as any)["Guild"];
       if (guildName && server) {
@@ -210,41 +267,56 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
         if (mapped) gid = mapped;
       }
     }
-    if (!gid) continue;
-
-    const k = `${gid}__${tsSec}`;
-    let b = byGuildTs.get(k);
-    if (!b) { b = { gid, tsSec, rows: [] }; byGuildTs.set(k, b); }
-    b.rows.push(r);
+    if (gid) allGids.add(gid);
   }
 
-  // pro Gilde jüngsten Bucket wählen
-  const byGuildLatest = new Map<string, Bucket>();
-  for (const b of byGuildTs.values()) {
-    const cur = byGuildLatest.get(b.gid);
-    if (!cur || b.tsSec > cur.tsSec) byGuildLatest.set(b.gid, b);
-  }
+  let snapshotsWritten = 0;
 
-  for (const { gid, tsSec, rows } of byGuildLatest.values()) {
-    // pid -> row bei diesem ts
+  for (const gid of allGids) {
+    // maßgeblichen Timestamp der Gilde aus latest holen
+    const { sec: guildTsSec, raw: guildTsRaw } = await readGuildLatestTimeSecAndRaw(gid);
+    if (guildTsSec == null) continue;
+
+    // nur schreiben, wenn neuer als vorhandener Snapshot
+    const prevSec = await readPrevSnapshotSec(gid);
+    if (guildTsSec <= prevSec) continue;
+
+    // Spielerzeilen mit exakt diesem Timestamp und passender Gilde einsammeln
     const byPid = new Map<string, CSVRow>();
-    for (const r of rows) {
+    for (const r of playersRows || []) {
+      const server = pickByCanon(r, P.SERVER);
+      let rowGid = String(pickByCanon(r, P.GUILD_IDENTIFIER) ?? "").trim();
+      if (!rowGid) {
+        const guildName = pickByCanon(r, P.GUILD) ?? (r as any)["Guild"];
+        if (guildName && server) {
+          const key = `${up(server)}__${toFold(String(guildName))}`;
+          const mapped = guildNameMap.get(key);
+          if (mapped) rowGid = mapped;
+        }
+      }
+      if (rowGid !== gid) continue;
+
+      const tsSec = toSecFlexible(pickByCanon(r, P.TIMESTAMP));
+      if (tsSec == null || tsSec !== guildTsSec) continue;
+
       const pid = String((r as any)?.["ID"] ?? (r as any)?.["Identifier"] ?? "").trim();
       if (!pid) continue;
-      byPid.set(pid, r);
+
+      if (!byPid.has(pid)) byPid.set(pid, r);
     }
 
-    const members: MemberSummary[] = [];
-    for (const r of byPid.values()) members.push(toMemberSummary(r));
+    const rows = Array.from(byPid.values());
 
-    // sort: role -> name
+    // MemberSummary + Averages berechnen
+    const members: MemberSummary[] = [];
+    for (const r of rows) members.push(toMemberSummary(r));
+
     members.sort((a,b) => {
       const ra = roleRank(a.role), rb = roleRank(b.role);
       if (ra !== rb) return ra - rb;
       return (a.name ?? "").toLowerCase().localeCompare((b.name ?? "").toLowerCase());
     });
 
-    // averages
     const avgLevel        = avgOf(members, "level");
     const avgTreasury     = avgOf(members, "treasury");
     const avgMine         = avgOf(members, "mine");
@@ -255,16 +327,15 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     const avgConTotal     = avgOf(members, "conTotal");
     const avgTotalStats   = avgOf(members, "totalStats");
 
-    const any = rows[rows.length - 1] || rows[0];
-    const updatedAtRaw = any ? String(pickByCanon(any, P.TIMESTAMP) ?? tsSec) : String(tsSec);
-
     const hashBasis = JSON.stringify({
-      gid, tsSec,
+      gid,
+      tsSec: guildTsSec,
       members: members.map(m => ({
         id: m.id, name: m.name ?? "", class: m.class ?? "", role: m.role ?? "",
         level: m.level ?? null, treasury: m.treasury ?? null, mine: m.mine ?? null,
         baseMain: m.baseMain ?? null, conBase: m.conBase ?? null, sumBaseTotal: m.sumBaseTotal ?? null,
         attrTotal: m.attrTotal ?? null, conTotal: m.conTotal ?? null, totalStats: m.totalStats ?? null,
+        guildJoinedMs: m.guildJoinedMs ?? null,
       })),
     });
     const hash = djb2HashString(hashBasis);
@@ -273,8 +344,8 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     await setDoc(ref, {
       guildId: gid,
       count: members.length,
-      updatedAt: updatedAtRaw,    // roh wie in CSV angezeigt
-      updatedAtMs: tsSec * 1000,  // intern für Vergleiche
+      updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
+      updatedAtMs: guildTsSec * 1000,              // intern als ms
       hash,
 
       avgLevel,
@@ -290,7 +361,9 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
       members,
       updatedAtServer: serverTimestamp(),
     }, { merge: true });
+
+    snapshotsWritten++;
   }
 
-  return { guildsProcessed: byGuildLatest.size, snapshotsWritten: byGuildLatest.size };
+  return { guildsProcessed: allGids.size, snapshotsWritten };
 }

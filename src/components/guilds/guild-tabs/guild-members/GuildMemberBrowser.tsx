@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Member, ViewMode, SortKey, SortDir } from "./types";
-import { THEME, mergeTheme, timeAgo, sumBaseStats } from "./utils";
+import { THEME, mergeTheme, timeAgo, sumBaseStats, strictSumBase } from "./utils";
 import MemberDetailTop from "./MemberDetailTop";
 import MemberListView from "./MemberListView";
 import MemberCardGrid from "./MemberCardGrid";
@@ -53,21 +53,25 @@ export default function GuildMemberBrowser({
     );
   }, [members, query]);
 
-  // Sort inkl. sumBaseStats / totalStats
+  // Sort: "sumBaseStats" nutzt jetzt strictSumBase(m) (gleich wie Top-Details)
   const sorted = useMemo(() => {
     const mul = sortDir === "asc" ? 1 : -1;
     const val = (m: Member): any => {
       switch (sortKey) {
-        case "sumBaseStats": return sumBaseStats(m.baseStats);
-        case "totalStats":   return m.totalStats ?? sumBaseStats(m.baseStats);
-        default:             return (m as any)[sortKey];
+        case "sumBaseStats": {
+          const sb = strictSumBase(m);
+          return sb == null ? -Infinity : sb; // fehlende Werte ganz nach unten
+        }
+        case "totalStats": {
+          // Fallback auf baseStats, falls totalStats fehlt
+          return (m.totalStats ?? sumBaseStats(m.baseStats)) ?? -Infinity;
+        }
+        default:
+          return (m as any)[sortKey];
       }
     };
     return [...filtered].sort((a, b) => {
       const A = val(a), B = val(b);
-      if (A == null && B == null) return 0;
-      if (A == null) return -1 * mul;
-      if (B == null) return  1 * mul;
       if (A === B) return 0;
       return A > B ? mul : -mul;
     });
@@ -102,7 +106,6 @@ export default function GuildMemberBrowser({
                     className="w-full rounded-xl border px-3 py-2 bg-transparent"
                     style={{ borderColor: theme.border }}>
               <option className="bg-slate-800" value="level">Level</option>
-              <option className="bg-slate-800" value="power">Power</option>
               <option className="bg-slate-800" value="scrapbook">Scrapbook</option>
               <option className="bg-slate-800" value="name">Name</option>
               <option className="bg-slate-800" value="role">Role</option>
@@ -141,8 +144,6 @@ export default function GuildMemberBrowser({
           rightCols={(m) => (
             <>
               <div className="text-right text-sm">{m.level ?? "—"}</div>
-              {/* Rohwert ohne .toLocaleString() */}
-              <div className="text-right text-sm">{m.power ?? "—"}</div>
               <div className="text-right text-xs" style={{ color: theme.sub }}>{timeAgo(m.lastOnline)}</div>
             </>
           )}

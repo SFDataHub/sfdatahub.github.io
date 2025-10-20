@@ -6,10 +6,28 @@ import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
 import { guildIconUrlByName } from "../../data/guilds";
 
-// Mitglieder-Browser (unverändert verwenden)
-import { GuildMemberBrowser } from "../../components/guild-members";
+// Mitglieder-Browser
+import { GuildMemberBrowser } from "../../components/guilds/guild-tabs/guild-members";
 
-/* Farben wie auf deinen Screens */
+// Broadcast-Tile
+import GuildBaseStatsBroadcastTile from "../../components/guilds/GuildBaseStatsBroadcastTile";
+
+// Neuer Container-Tab (Firebase-verdrahtet)
+import GuildMonthlyProgressTabContainer from "../../components/guilds/guild-tabs/GuildMonthlyProgressTab/GuildMonthlyProgressTabContainer";
+
+// Mittel-Block (ausgelagert)
+import GuildProfileInfo from "../../components/guilds/GuildProfileInfo/GuildProfileInfo";
+import type {
+  MembersSnapshotLike,
+  GuildLike,
+  MemberSummaryLike,
+} from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
+
+// Klassen-Übersicht (ausgelagert)
+import GuildClassOverview from "../../components/guilds/GuildClassOverview";
+// Stammdaten für Klassen (key/label + Icons)
+import { CLASSES } from "../../data/classes";
+
 const C = {
   tile: "#152A42",
   tileAlt: "#14273E",
@@ -20,56 +38,10 @@ const C = {
   icon: "#5C8BC6",
 };
 
-type Guild = {
-  id: string;
-  name: string;
-  server: string | null;
-  memberCount: number | null;
-  hofRank: number | null;
-  lastScanDays: number | null;
-};
+type Guild = GuildLike;
+type MemberSummary = MemberSummaryLike;
+type MembersSnapshot = MembersSnapshotLike;
 
-type MemberSummary = {
-  id: string;
-  name: string | null;
-  class: string | null;       // Rohwert
-  role: string | null;        // Rohwert
-  level: number | null;
-  treasury: number | null;
-  mine: number | null;
-  baseMain: number | null;
-  conBase: number | null;
-  sumBaseTotal: number | null;
-  attrTotal: number | null;
-  conTotal: number | null;
-  totalStats: number | null;
-  lastScan: string | null;      // Roh-String
-  lastActivity: string | null;  // Roh-String
-  lastScanMs: number | null;    // intern
-  lastActivityMs: number | null;// intern
-};
-
-type MembersSnapshot = {
-  guildId: string;
-  updatedAt: string;     // Roh-String, Anzeige
-  updatedAtMs: number;   // intern
-  count: number;
-  hash: string;
-  // Averages (Root)
-  avgLevel?: number | null;
-  avgTreasury?: number | null;
-  avgMine?: number | null;
-  avgBaseMain?: number | null;
-  avgConBase?: number | null;
-  avgSumBaseTotal?: number | null;
-  avgAttrTotal?: number | null;
-  avgConTotal?: number | null;
-  avgTotalStats?: number | null;
-  // Liste
-  members: MemberSummary[];
-};
-
-/* kleine Utils */
 const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
@@ -81,7 +53,6 @@ const daysSince = (tsSec?: number | null) => {
   return Math.floor(diff / 86400);
 };
 
-/* Mini-Bausteine */
 function Section({
   title,
   right,
@@ -123,29 +94,6 @@ function StatRow({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function BarChart({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div className="h-64 w-full">
-      <div className="flex items-end gap-4 h-full w-full">
-        {data.map((d) => (
-          <div
-            key={d.label}
-            className="flex flex-col items-center gap-2"
-            style={{ width: `${100 / data.length}%` }}
-          >
-            <div className="w-full rounded-t-md" style={{ height: `${(d.value / max) * 90}%`, background: C.icon }} />
-            <div className="text-[11px] text-center leading-tight opacity-80 select-none rotate-45 origin-top-left" style={{ transform: "rotate(45deg)" }}>
-              {d.label}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* Left Rail */
 function LeftRail({ guild }: { guild: Guild }) {
   const emblemUrl = guildIconUrlByName(guild.name, 800);
   return (
@@ -195,31 +143,6 @@ function LeftRail({ guild }: { guild: Guild }) {
   );
 }
 
-/* Right Rail */
-function RightRail() {
-  const CLASS_BARS = [
-    { label: "Bard", value: 5 },
-    { label: "Demon Hunter", value: 8 },
-    { label: "Battle Mage", value: 3 },
-    { label: "Berserker", value: 16 },
-    { label: "Warrior", value: 4 },
-    { label: "Scout", value: 8 },
-    { label: "Mage", value: 2 },
-    { label: "Druid", value: 3 },
-    { label: "Paladin", value: 1 },
-  ];
-  return (
-    <div className="space-y-4">
-      <Section right={<div className="text-xs opacity-70">Class Distribution</div>}>
-        <BarChart data={CLASS_BARS} />
-      </Section>
-      <Section>
-        <div className="text-center text-sm opacity-80">ø</div>
-      </Section>
-    </div>
-  );
-}
-
 export default function GuildProfile() {
   const params = useParams<Record<string, string>>();
   const guildId = params.id || params.gid || params.guildId || params.guild || "";
@@ -228,8 +151,6 @@ export default function GuildProfile() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [guild, setGuild] = useState<Guild | null>(null);
-
-  // NEU: Snapshot-State
   const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
 
   useEffect(() => {
@@ -245,7 +166,7 @@ export default function GuildProfile() {
           return;
         }
 
-        // 1) Guild-Latest (bestehend) für Header/Kacheln
+        // Latest-Gildeninfo
         const refLatest = doc(db, `guilds/${id}/latest/latest`);
         const snapLatest = await getDoc(refLatest);
         if (!snapLatest.exists()) {
@@ -270,7 +191,7 @@ export default function GuildProfile() {
         const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
         if (!cancelled) setGuild(g);
 
-        // 2) NEU: Snapshot laden (1 Read) – Mitgliederliste & Averages
+        // Members-Snapshot (falls vorhanden)
         const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
         const snap = await getDoc(refSnap);
         if (snap.exists() && !cancelled) {
@@ -281,7 +202,6 @@ export default function GuildProfile() {
             updatedAtMs: Number(sdata.updatedAtMs ?? d.timestamp * 1000 ?? 0),
             count: Number(sdata.count ?? 0),
             hash: String(sdata.hash ?? ""),
-
             avgLevel: sdata.avgLevel ?? null,
             avgTreasury: sdata.avgTreasury ?? null,
             avgMine: sdata.avgMine ?? null,
@@ -291,7 +211,6 @@ export default function GuildProfile() {
             avgAttrTotal: sdata.avgAttrTotal ?? null,
             avgConTotal: sdata.avgConTotal ?? null,
             avgTotalStats: sdata.avgTotalStats ?? null,
-
             members: Array.isArray(sdata.members) ? (sdata.members as MemberSummary[]) : [],
           };
           setSnapshot(s);
@@ -340,7 +259,6 @@ export default function GuildProfile() {
     );
   }
 
-  /* ============ ZWEITER HEADER (Server • Name zentriert • Zuletzt aktualisiert) ============ */
   const SecondHeader = (
     <div className="mt-2">
       <div className="px-6">
@@ -354,7 +272,6 @@ export default function GuildProfile() {
             zIndex: 2,
           }}
         >
-          {/* LINKS: Server */}
           <div className="min-w-[120px]">
             <span
               className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
@@ -363,23 +280,17 @@ export default function GuildProfile() {
               {guild.server ?? "S?.EU"}
             </span>
           </div>
-
-          {/* MITTE: Name */}
           <div className="flex-1 text-center">
             <div className="font-extrabold" style={{ color: C.title, fontSize: 26, lineHeight: 1.15 }}>
               {guild.name}
             </div>
           </div>
-
-          {/* RECHTS: Zuletzt aktualisiert – Roh-String aus Snapshot */}
           <div className="min-w-[220px] text-right text-xs" style={{ color: C.soft }}>
             Zuletzt aktualisiert:&nbsp;
             {snapshot?.updatedAt ? snapshot.updatedAt : "—"}{" "}
             <span className="inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#4CAF50" }} />
           </div>
         </div>
-
-        {/* Divider-Linie unten */}
         <div
           style={{
             height: 1,
@@ -395,146 +306,66 @@ export default function GuildProfile() {
     </div>
   );
 
-  /* ====================== PAGE CONTENT ====================== */
   return (
-    <ContentShell
-      title="Gildenprofil"
-      subtitle="Gilde, KPIs & Verlauf"
-      centerFramed={false}
-    >
+    <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed={false}>
       {SecondHeader}
 
       <div className="px-6 pb-8">
         <div className="grid grid-cols-12 gap-4">
-          {/* Left 3/12 */}
           <div className="col-span-12 md:col-span-3">
             <LeftRail guild={guild} />
           </div>
 
-          {/* Center 6/12 */}
           <div className="col-span-12 md:col-span-6 space-y-4">
-            {/* KPI-Zeile – nutzt Averages aus Snapshot, wenn vorhanden */}
-            <Section>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 text-sm">
-                <StatRow k="ø Treasury" v={snapshot?.avgTreasury ?? "—"} />
-                <StatRow k="# on Server" v={1} />
-                <StatRow k="ø Mine" v={snapshot?.avgMine ?? "—"} />
-                <StatRow k="# in Europe" v={6} />
-                <StatRow k="ø level" v={snapshot?.avgLevel ?? "—"} />
+            {/* Mittel-Block */}
+            <GuildProfileInfo
+              guild={guild}
+              snapshot={snapshot}
+              emblemUrl={guildIconUrlByName(guild.name, 512) || undefined}
+              colors={C}
+            />
+
+            {/* Broadcast-Kachel */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-[980px]">
+                <GuildBaseStatsBroadcastTile
+                  guildName={guild.name}
+                  server={guild.server ?? "—"}
+                  emblemUrl={guildIconUrlByName(guild.name, 512) || undefined}
+                  lastScanISO={snapshot?.updatedAtMs ? new Date(snapshot.updatedAtMs).toISOString() : undefined}
+                  members={guild.memberCount ?? 0}
+                  avgLevel={snapshot?.avgLevel ?? 0}
+                  totalPower={snapshot?.avgTotalStats ?? undefined}
+                  tickerItems={
+                    snapshot?.updatedAt
+                      ? [`Updated ${snapshot.updatedAt}`, `Members ${guild.memberCount ?? 0}`]
+                      : undefined
+                  }
+                />
               </div>
-            </Section>
-
-            {/* Base Stats */}
-            <Section title="BASE STATS">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* links */}
-                <div>
-                  <div
-                    className="rounded-xl p-4"
-                    style={{ background: C.tileAlt, border: `1px solid ${C.line}` }}
-                  >
-                    <StatRow k="player in Top 100 on Server" v={41} />
-                    <StatRow k="player in Top 100 each class" v={42} />
-                    <StatRow k="player in Top 1000" v={45} />
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-3">
-                    <button
-                      className="px-4 py-2 rounded-xl text-sm text-white"
-                      style={{ background: C.header, border: `1px solid ${C.line}` }}
-                    >
-                      highest in ..
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <div className="opacity-80 mb-1">Main</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgBaseMain ?? "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="opacity-80 mb-1">Con</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgConBase ?? "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="opacity-80 mb-1">Sum Base Stats</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgSumBaseTotal ?? "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* rechts */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <div className="opacity-80">Top Player</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        {/* Platzhalter – später aus Snapshot ableiten */}
-                        —
-                      </div>
-                    </div>
-                    <div>
-                      <div className="opacity-80">2nd</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        —
-                      </div>
-                    </div>
-                    <div>
-                      <div className="opacity-80">3rd</div>
-                      <div className="font-semibold" style={{ color: C.title }}>
-                        —
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-xl p-4"
-                    style={{ background: C.tileAlt, border: `1px solid ${C.line}` }}
-                  >
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="opacity-80">⌀</div>
-                      <div className="text-right opacity-80">—</div>
-                      <div>Main</div>
-                      <div className="text-right font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgAttrTotal ?? "—"}
-                      </div>
-                      <div>Con</div>
-                      <div className="text-right font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgConTotal ?? "—"}
-                      </div>
-                      <div>Total Stats</div>
-                      <div className="text-right font-semibold" style={{ color: C.title }}>
-                        {snapshot?.avgTotalStats ?? "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Section>
-
-            {/* Players joined/left – ÜBER den Tabs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Section title="PLAYER JOINED">
-                <div className="text-sm opacity-70">—</div>
-              </Section>
-              <Section title="PLAYER LEFT">
-                <div className="text-sm opacity-70">—</div>
-              </Section>
             </div>
 
             {/* Tabs */}
-            <Tabs members={membersForList} updatedAtMs={snapshot?.updatedAtMs ?? null} />
+            <Tabs
+              members={snapshot?.members ?? []}
+              guildId={guild.id}
+              guildName={guild.name}
+              guildServer={guild.server}
+            />
           </div>
 
-          {/* Right 3/12 */}
           <div className="col-span-12 md:col-span-3">
-            <RightRail />
+            {/* Nur die ausgelagerte Klassen-Übersicht – keine eigene Berechnung hier */}
+            <GuildClassOverview
+              data={snapshot?.members ?? []}
+              classMeta={CLASSES}
+              onPickClass={(id) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set("tab", "Übersicht");
+                url.searchParams.set("class", id);
+                window.location.href = url.toString();
+              }}
+            />
           </div>
         </div>
       </div>
@@ -542,19 +373,22 @@ export default function GuildProfile() {
   );
 }
 
-/* Tabs */
 function Tabs({
   members,
-  updatedAtMs,
+  guildId,
+  guildName,
+  guildServer,
 }: {
   members: MemberSummary[];
-  updatedAtMs: number | null;
+  guildId: string;
+  guildName: string;
+  guildServer: string | null;
 }) {
-  const [tab, setTab] = useState<"Übersicht" | "Rankings" | "Historie">("Übersicht");
+  const [tab, setTab] = useState<"Übersicht" | "Rankings" | "Monthly Progress" | "Historie">("Übersicht");
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 border-b" style={{ borderColor: C.line }} role="tablist">
-        {(["Übersicht", "Rankings", "Historie"] as const).map((t) => {
+        {(["Übersicht", "Rankings", "Monthly Progress", "Historie"] as const).map((t) => {
           const active = t === tab;
           return (
             <button
@@ -576,20 +410,31 @@ function Tabs({
       </div>
 
       <Section>
-        {tab === "Übersicht" ? (
-          // WICHTIG: Mitgliederliste bekommt jetzt die Snapshot-Members (1 Read) statt mock data
+        {tab === "Übersicht" && (
           <GuildMemberBrowser
             members={members}
             defaultView="list"
             defaultSort={{ key: "level", dir: "desc" }}
-            // Hinweis für Schritt C · Teil 2:
-            // Beim Klick werden wir docId = floor(updatedAtMs/1000) verwenden,
-            // um players/{playerId}/scans/{docId} zu lesen (nur wenn nötig).
-            // Anzeige von lastScan/lastActivity bleibt Roh-String.
           />
-        ) : (
+        )}
+
+        {tab === "Rankings" && (
           <div className="text-sm" style={{ color: C.soft }}>
-            Platzhalter <b>{tab}</b> – später: Mitgliederliste, Aktivität, Gildenbeschreibung / Ränge / Historie.
+            Platzhalter <b>Rankings</b> – Inhalt folgt.
+          </div>
+        )}
+
+        {tab === "Monthly Progress" && (
+          <GuildMonthlyProgressTabContainer
+            guildId={guildId}
+            guildName={guildName}
+            guildServer={guildServer}
+          />
+        )}
+
+        {tab === "Historie" && (
+          <div className="text-sm" style={{ color: C.soft }}>
+            Platzhalter <b>Historie</b> – Inhalt folgt.
           </div>
         )}
       </Section>
