@@ -1,100 +1,53 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import ContentShell from "../../components/ContentShell";
+import CommunityHubDashboard from "../../components/community/CommunityHubDashboard";
+import styles from "./styles.module.css";
+
+import communityLogo from "../../assets/logo_communityhub.png";  {/* Der korrekte Logo-Pfad */}
+
+import CommunityCreators from "./Creators";  
+import CommunityScans from "./Scans";
+import CommunityPredictions from "./Predictions";
+import CommunityNews from "./News";
+import CommunityFeedback from "./Feedback";
+
+/** Tab-Key -> Component Mapping für Community */
+const TAB_MAP: Record<string, React.ComponentType> = {
+  creators: CommunityCreators,
+  scans: CommunityScans,
+  predictions: CommunityPredictions,
+  news: CommunityNews,
+  feedback: CommunityFeedback,
+};
 
 export default function CommunityIndex() {
+  const [params] = useSearchParams();
+  const tab = params.get("tab") || "";
+
+  const ActivePage = TAB_MAP[tab];
+
   return (
-    <section style={{ padding: 16 }}>
-      <h1>Community</h1>
-
-      {/* kleine Kacheln als Einstieg */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 12,
-          marginTop: 12,
-        }}
-      >
-        <Link
-          to="/community/scans"
-          style={{
-            display: "block",
-            padding: "14px 16px",
-            background: "var(--tile)",
-            border: "1px solid var(--line)",
-            borderRadius: 12,
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--title)" }}>Scans</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Community-Uploads</div>
-        </Link>
-
-        <Link
-          to="/community/predictions"
-          style={{
-            display: "block",
-            padding: "14px 16px",
-            background: "var(--tile)",
-            border: "1px solid var(--line)",
-            borderRadius: 12,
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--title)" }}>Predictions</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Tipps, Votes & Prognosen</div>
-        </Link>
-
-        <Link
-          to="/community/creators"
-          style={{
-            display: "block",
-            padding: "14px 16px",
-            background: "var(--tile)",
-            border: "1px solid var(--line)",
-            borderRadius: 12,
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--title)" }}>Creators</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Streams, Videos, Guides</div>
-        </Link>
-
-        <Link
-          to="/community/news"
-          style={{
-            display: "block",
-            padding: "14px 16px",
-            background: "var(--tile)",
-            border: "1px solid var(--line)",
-            borderRadius: 12,
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--title)" }}>News</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Updates & Ankündigungen</div>
-        </Link>
-
-        <Link
-          to="/community/feedback"
-          style={{
-            display: "block",
-            padding: "14px 16px",
-            background: "var(--tile)",
-            border: "1px solid var(--line)",
-            borderRadius: 12,
-            textDecoration: "none",
-            color: "var(--text)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--title)" }}>Feedback</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Feature-Wünsche & Bugreports</div>
-        </Link>
+    <ContentShell>
+      <div className={styles.topWrap}>
+        <CommunityHubDashboard
+          logoSrc={communityLogo}
+          titleI18nKey="community.index.title"
+        />
       </div>
-    </section>
+      <div className={styles.divider} />
+      <div className={styles.contentArea}>
+        {ActivePage ? (
+          <ActivePage />
+        ) : (
+          <div className={styles.placeholder}>
+            <h2 className={styles.placeholderTitle}>Community</h2>
+            <p className={styles.placeholderText}>
+              Wähle oben eine Kategorie, um die Inhalte hier anzuzeigen.
+            </p>
+          </div>
+        )}
+      </div>
+    </ContentShell>
   );
 }

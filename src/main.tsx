@@ -19,6 +19,9 @@ import DashboardProgression from "./pages/Dashboard/Progression";
 // Discover
 import Discover from "./pages/Discover/Index";
 
+// Flipbook SFM
+import SFMagazineIndex from "./pages/SFMagazine";
+
 // Toplists
 import ToplistsIndex from "./pages/Toplists/index";
 
@@ -40,17 +43,17 @@ import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
 import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
-// Guides
-import GuidesIndex from "./pages/Guides/Index";
-import GuideFortress from "./pages/Guides/Fortress";
-import GuideUnderworld from "./pages/Guides/Underworld";
-import GuideArenaAM from "./pages/Guides/ArenaAM";
-import GuideDungeons from "./pages/Guides/Dungeons";
-import GuideHellevator from "./pages/Guides/Hellevator";
-import GuideLegendaryDungeon from "./pages/Guides/LegendaryDungeon";
-import GuideEvents from "./pages/Guides/Events";
-import GuideCalculators from "./pages/Guides/Calculators";
-import GuideInfographics from "./pages/Guides/Infographics";
+// Guide Hub
+import GuidesIndex from "./pages/GuideHub/Index";
+import GuideFortress from "./pages/GuideHub/Fortress";
+import GuideUnderworld from "./pages/GuideHub/Underworld";
+import GuideArenaAM from "./pages/GuideHub/ArenaAM";
+import GuideDungeons from "./pages/GuideHub/Dungeons";
+import GuideHellevator from "./pages/GuideHub/Hellevator";
+import GuideLegendaryDungeon from "./pages/GuideHub/LegendaryDungeon";
+import GuideEvents from "./pages/GuideHub/Events";
+import GuideCalculators from "./pages/GuideHub/Calculators";
+import GuideInfographics from "./pages/GuideHub/Infographics";
 
 // Community
 import CommunityIndex from "./pages/Community/Index";
@@ -165,7 +168,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* Toplists */}
             <Route path="/toplists" element={<ToplistsIndex />} />
-
+	    {/* Players */}
+            <Route path="/sfmagazine" element={<SFMagazineIndex />} />
             {/* Players */}
             <Route path="/players" element={<PlayersIndex />} />
             <Route path="/players/rankings" element={<PlayersRankings />} />
@@ -194,16 +198,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/server/:serverId" element={<ServerProfilePage />} />              {/* ✨ Kurzlink */}
 
             {/* Guides */}
-            <Route path="/guides" element={<GuidesIndex />} />
-            <Route path="/guides/fortress" element={<GuideFortress />} />
-            <Route path="/guides/underworld" element={<GuideUnderworld />} />
-            <Route path="/guides/arena-am" element={<GuideArenaAM />} />
-            <Route path="/guides/dungeons" element={<GuideDungeons />} />
-            <Route path="/guides/hellevator" element={<GuideHellevator />} />
-            <Route path="/guides/legendary-dungeon" element={<GuideLegendaryDungeon />} />
-            <Route path="/guides/events" element={<GuideEvents />} />
-            <Route path="/guides/calculators" element={<GuideCalculators />} />
-            <Route path="/guides/infographics" element={<GuideInfographics />} />
+            <Route path="/guidehub" element={<GuidesIndex />} />
+            <Route path="/guidehub/fortress" element={<GuideFortress />} />
+            <Route path="/guidehub/underworld" element={<GuideUnderworld />} />
+            <Route path="/guidehub/arena-am" element={<GuideArenaAM />} />
+            <Route path="/guidehub/dungeons" element={<GuideDungeons />} />
+            <Route path="/guidehub/hellevator" element={<GuideHellevator />} />
+            <Route path="/guidehub/legendary-dungeon" element={<GuideLegendaryDungeon />} />
+            <Route path="/guidehub/events" element={<GuideEvents />} />
+            <Route path="/guidehub/calculators" element={<GuideCalculators />} />
+            <Route path="/guidehub/infographics" element={<GuideInfographics />} />
 
             {/* Community */}
             <Route path="/community" element={<CommunityIndex />} />

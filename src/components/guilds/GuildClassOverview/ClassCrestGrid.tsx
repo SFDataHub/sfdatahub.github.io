@@ -11,8 +11,17 @@ const Ring: React.FC<{ valuePct: number }> = ({ valuePct }) => {
   return (
     <svg className={styles.ring} viewBox="0 0 60 60" aria-hidden="true">
       <circle cx="30" cy="30" r={r} stroke="rgba(255,255,255,.08)" strokeWidth="4" fill="none" />
-      <circle cx="30" cy="30" r={r} stroke="rgba(92,139,198,.9)" strokeWidth="4" fill="none"
-              strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round" />
+      <circle
+        cx="30"
+        cy="30"
+        r={r}
+        stroke="rgba(92,139,198,.9)"
+        strokeWidth="4"
+        fill="none"
+        strokeDasharray={c}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+      />
     </svg>
   );
 };
@@ -30,7 +39,7 @@ const ClassCrestGrid: React.FC<GuildClassOverviewProps> = ({ data, classMeta, on
 
   return (
     <section className={styles.wrapper}>
-      <div className={styles.sectionTitle}>Klassenübersicht</div>
+      {/* Header wurde entfernt, um doppelten Titel im Right Rail zu vermeiden */}
 
       {/* immer 1 Spalte */}
       <div className={styles.grid} style={{ gridTemplateColumns: "1fr" }}>
@@ -51,7 +60,9 @@ const ClassCrestGrid: React.FC<GuildClassOverviewProps> = ({ data, classMeta, on
               title={
                 disabled
                   ? `${cm.name}: kein Mitglied`
-                  : `${cm.name} • ${formatCount(count)} • ${formatPct(share)}${avgLvl ? ` • Ø ${avgLvl.toFixed(1)}` : ""}`
+                  : `${cm.name} • ${formatCount(count)} • ${formatPct(share)}${
+                      avgLvl ? ` • Ø ${avgLvl.toFixed(1)}` : ""
+                    }`
               }
             >
               <div className={styles.crestWrap}>
@@ -65,7 +76,12 @@ const ClassCrestGrid: React.FC<GuildClassOverviewProps> = ({ data, classMeta, on
                 ) : (
                   <div
                     className={styles.crest}
-                    style={{ background: "rgba(255,255,255,.06)", display: "grid", placeItems: "center", fontSize: 18 }}
+                    style={{
+                      background: "rgba(255,255,255,.06)",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 18,
+                    }}
                   >
                     {cm.fallback ?? "🎯"}
                   </div>

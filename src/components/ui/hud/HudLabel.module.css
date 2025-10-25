@@ -1,0 +1,16 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0;            /* kein runder Button */
+  user-select: none;
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.25);
+  text-transform: none;
+}
+.default { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.08)); }
+.accent  { background: linear-gradient(180deg, rgba(120,170,255,.16), rgba(0,0,0,.08)); }

@@ -23,10 +23,16 @@ import type {
   MemberSummaryLike,
 } from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
 
-// Klassen-Übersicht (ausgelagert)
-import GuildClassOverview from "../../components/guilds/GuildClassOverview";
-// Stammdaten für Klassen (key/label + Icons)
+// Right-Rail: einzelne Views (nicht verändern)
+import ClassCrestGrid from "../../components/guilds/GuildClassOverview/ClassCrestGrid";
+import ClassDonut from "../../components/guilds/GuildClassOverview/ClassDonut";
+
+// Utils exakt wie im Container genutzt
+import { adaptClassMeta } from "../../components/guilds/GuildClassOverview/utils";
 import { CLASSES } from "../../data/classes";
+
+// Globale HUD-Tabs (nur Seitencode)
+import HudLabel from "../../components/ui/hud/HudLabel";
 
 const C = {
   tile: "#152A42",
@@ -98,17 +104,20 @@ function LeftRail({ guild }: { guild: Guild }) {
   const emblemUrl = guildIconUrlByName(guild.name, 800);
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border p-3" style={{ borderColor: C.line, background: C.tile }}>
+      <div
+        className="rounded-2xl border p-3"
+        style={{ borderColor: "transparent", background: "transparent" }}
+      >
         <div
-          className="w-full"
+          className="w-full mx-auto max-w-[480px]"
           style={{
             aspectRatio: "3 / 4",
             borderRadius: 14,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: C.tileAlt,
-            border: `1px solid ${C.line}`,
+            background: "transparent",
+            border: "1px solid transparent",
             overflow: "hidden",
           }}
         >
@@ -118,6 +127,8 @@ function LeftRail({ guild }: { guild: Guild }) {
               alt=""
               className="max-h-full max-w-full"
               style={{
+                maxHeight: "115%",
+                maxWidth: "115%",
                 objectFit: "contain",
                 filter:
                   "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 8px 16px rgba(0,0,0,.35))",
@@ -152,6 +163,18 @@ export default function GuildProfile() {
   const [err, setErr] = useState<string | null>(null);
   const [guild, setGuild] = useState<Guild | null>(null);
   const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
+
+  // Right-Rail Umschalter (Tabs)
+  const [rightView, setRightView] = useState<"grid" | "donut">("grid");
+
+  // WICHTIG: classMeta wie im Container erstellen
+  const safeMeta = useMemo(
+    () =>
+      (Array.isArray(CLASSES) ? (CLASSES as any[]) : [])
+        .map(adaptClassMeta)
+        .filter(Boolean),
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -312,12 +335,13 @@ export default function GuildProfile() {
 
       <div className="px-6 pb-8">
         <div className="grid grid-cols-12 gap-4">
+          {/* LEFT RAIL */}
           <div className="col-span-12 md:col-span-3">
             <LeftRail guild={guild} />
           </div>
 
+          {/* MITTELSPALTE */}
           <div className="col-span-12 md:col-span-6 space-y-4">
-            {/* Mittel-Block */}
             <GuildProfileInfo
               guild={guild}
               snapshot={snapshot}
@@ -325,7 +349,6 @@ export default function GuildProfile() {
               colors={C}
             />
 
-            {/* Broadcast-Kachel */}
             <div className="flex justify-center">
               <div className="w-full max-w-[980px]">
                 <GuildBaseStatsBroadcastTile
@@ -345,7 +368,6 @@ export default function GuildProfile() {
               </div>
             </div>
 
-            {/* Tabs */}
             <Tabs
               members={snapshot?.members ?? []}
               guildId={guild.id}
@@ -354,19 +376,35 @@ export default function GuildProfile() {
             />
           </div>
 
+          {/* RIGHT RAIL */}
           <div className="col-span-12 md:col-span-3">
-            {/* Nur die ausgelagerte Klassen-Übersicht – keine eigene Berechnung hier */}
-            <GuildClassOverview
-              data={snapshot?.members ?? []}
-              classMeta={CLASSES}
-              onPickClass={(id) => {
-                const url = new URL(window.location.href);
-                url.searchParams.set("tab", "Übersicht");
-                url.searchParams.set("class", id);
-                window.location.href = url.toString();
-              }}
-            />
+            {/* Tabs (nur Buttons über der ersten Komponente) */}
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => setRightView("grid")} aria-label="Klassenübersicht">
+                <HudLabel text="Klassenübersicht" tone={rightView === "grid" ? "accent" : "default"} />
+              </button>
+              <button onClick={() => setRightView("donut")} aria-label="Klassenverteilung">
+                <HudLabel text="Klassenverteilung" tone={rightView === "donut" ? "accent" : "default"} />
+              </button>
+            </div>
+
+            {/* Umschalten zwischen den zwei vorhandenen Komponenten – ohne Extra-Container */}
+            {rightView === "grid" ? (
+              <ClassCrestGrid
+                data={snapshot?.members ?? []}
+                classMeta={safeMeta as any}
+                onPickClass={(id) => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("tab", "Übersicht");
+                  url.searchParams.set("class", id);
+                  window.location.href = url.toString();
+                }}
+              />
+            ) : (
+              <ClassDonut data={snapshot?.members ?? []} classMeta={safeMeta as any} />
+            )}
           </div>
+          {/* /RIGHT RAIL */}
         </div>
       </div>
     </ContentShell>

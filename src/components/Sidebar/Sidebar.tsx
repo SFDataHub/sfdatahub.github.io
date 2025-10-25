@@ -30,7 +30,7 @@ const main: Item[] = [
 const categories: Item[] = [
   { to: "/discover",  label: "Discover",  icon: <Compass className="ico" /> },
   { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" /> },
-  { to: "/guides",    label: "Guides",    icon: <BookOpen className="ico" /> },
+  { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" /> },
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" /> },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" /> },
   { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" /> },
@@ -39,7 +39,7 @@ const categories: Item[] = [
  const SUBTABS: Record<string, SubItem[]> = {
   "/discover": [
     { to: "/players",            label: "Players" },
-    { to: "/players/profile",    label: "Player Profile" },
+    { to: "/SFMagazine",         label: "SFMagazine" },
     { to: "/guilds",             label: "Guilds" },
     { to: "/servers",            label: "Servers" },
     { to: "/scans",              label: "Scans" },
