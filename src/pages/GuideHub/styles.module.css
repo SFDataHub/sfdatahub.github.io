@@ -2,11 +2,11 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  /* Mehr Luft unter dem Radial-Hub, damit die Linie nicht kollidiert */
+  /* Luft unter dem Radial-Hub, damit die Linie nicht kollidiert */
   padding-bottom: 72px;
 }
 
-/* Trennlinie im Stil des Gildenprofils: dünne Linie + weicher blauer Glow */
+/* Trennlinie wie im Gildenprofil: dünn + weicher blauer Glow */
 .divider {
   position: relative;
   width: 100%;
@@ -27,6 +27,7 @@
 .contentArea {
   width: 100%;
   padding: 8px 0 24px;
+  display: block;
 }
 
 .placeholder {

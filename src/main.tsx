@@ -45,15 +45,6 @@ import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
 // Guide Hub
 import GuidesIndex from "./pages/GuideHub/Index";
-import GuideFortress from "./pages/GuideHub/Fortress";
-import GuideUnderworld from "./pages/GuideHub/Underworld";
-import GuideArenaAM from "./pages/GuideHub/ArenaAM";
-import GuideDungeons from "./pages/GuideHub/Dungeons";
-import GuideHellevator from "./pages/GuideHub/Hellevator";
-import GuideLegendaryDungeon from "./pages/GuideHub/LegendaryDungeon";
-import GuideEvents from "./pages/GuideHub/Events";
-import GuideCalculators from "./pages/GuideHub/Calculators";
-import GuideInfographics from "./pages/GuideHub/Infographics";
 
 // Community
 import CommunityIndex from "./pages/Community/Index";
@@ -168,7 +159,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* Toplists */}
             <Route path="/toplists" element={<ToplistsIndex />} />
-	    {/* Players */}
+            {/* Players */}
             <Route path="/sfmagazine" element={<SFMagazineIndex />} />
             {/* Players */}
             <Route path="/players" element={<PlayersIndex />} />
@@ -198,16 +189,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/server/:serverId" element={<ServerProfilePage />} />              {/* ✨ Kurzlink */}
 
             {/* Guides */}
-            <Route path="/guidehub" element={<GuidesIndex />} />
-            <Route path="/guidehub/fortress" element={<GuideFortress />} />
-            <Route path="/guidehub/underworld" element={<GuideUnderworld />} />
-            <Route path="/guidehub/arena-am" element={<GuideArenaAM />} />
-            <Route path="/guidehub/dungeons" element={<GuideDungeons />} />
-            <Route path="/guidehub/hellevator" element={<GuideHellevator />} />
-            <Route path="/guidehub/legendary-dungeon" element={<GuideLegendaryDungeon />} />
-            <Route path="/guidehub/events" element={<GuideEvents />} />
-            <Route path="/guidehub/calculators" element={<GuideCalculators />} />
-            <Route path="/guidehub/infographics" element={<GuideInfographics />} />
+            <Route path="/guidehub/*" element={<GuidesIndex />} />
 
             {/* Community */}
             <Route path="/community" element={<CommunityIndex />} />

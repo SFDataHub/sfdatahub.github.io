@@ -2,33 +2,41 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import styles from "./styles.module.css";
 
+type Variant = "main" | "sub" | "sub2";
+
 type Props = {
   to: string;
   label: string;
   icon?: string;
-  /** 'main' (Hauptkategorie) | 'sub' (Unterkategorie) */
-  variant?: "main" | "sub";
+  variant?: Variant;
 };
 
 const CategoryIcon: React.FC<Props> = ({ to, label, icon, variant = "main" }) => {
   const { search } = useLocation();
 
-  // Aktiv: MAIN -> tab==tab, SUB -> tab==tab && sub==sub
+  // Aktiv-Erkennung:
+  // main  -> tab==tab
+  // sub   -> tab==tab && sub==sub
+  // sub2  -> tab==tab && sub==sub && sub2==sub2
   let isActive = false;
   try {
     const current = new URLSearchParams(search);
-    const currentTab = current.get("tab");
-    const currentSub = current.get("sub");
+    const curTab  = current.get("tab");
+    const curSub  = current.get("sub");
+    const curSub2 = current.get("sub2");
 
-    const targetUrl = new URL(to, window.location.origin);
-    const target = targetUrl.searchParams;
-    const targetTab = target.get("tab");
-    const targetSub = target.get("sub");
+    const target = new URL(to, window.location.origin).searchParams;
+    const tTab  = target.get("tab");
+    const tSub  = target.get("sub");
+    const tSub2 = target.get("sub2");
 
-    isActive =
-      variant === "sub"
-        ? currentTab === targetTab && !!targetSub && currentSub === targetSub
-        : currentTab === targetTab;
+    if (variant === "main") {
+      isActive = curTab === tTab;
+    } else if (variant === "sub") {
+      isActive = curTab === tTab && !!tSub && curSub === tSub;
+    } else {
+      isActive = curTab === tTab && !!tSub && curSub === tSub && !!tSub2 && curSub2 === tSub2;
+    }
   } catch {
     isActive = false;
   }
@@ -39,7 +47,6 @@ const CategoryIcon: React.FC<Props> = ({ to, label, icon, variant = "main" }) =>
       aria-label={label}
       className={[
         styles.iconBtn,
-        variant === "sub" ? styles.muted : "",
         isActive ? styles.active : "",
       ].join(" ")}
       title={label}

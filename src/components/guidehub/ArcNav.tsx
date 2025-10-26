@@ -6,25 +6,29 @@ type Item = { key: string; label: string; to: string; icon?: string };
 
 type Props = {
   items: Item[];
-  side: "left" | "right" | "sub" | "full";
-  anchorSide?: "left" | "right";        // für sub
+  side: "left" | "right" | "sub" | "sub2" | "full";
+  anchorSide?: "left" | "right"; // erforderlich für sub/sub2
   compact?: boolean;
-  variant?: "main" | "sub";
-  /** Dynamischer Versatz vom Logo-Rand zu den Haupt-Icons */
-  arcOffset?: number;                   // für left/right
-  /** Versatz für Sub-Bogen außen */
-  outerOffset?: number;                 // für sub
+  variant?: "main" | "sub" | "sub2";
+  arcOffset?: number;     // left/right
+  outerOffset?: number;   // sub
+  superOffset?: number;   // sub2
 };
 
 const ArcNav: React.FC<Props> = ({
   items,
   side,
-  anchorSide = "right",
+  anchorSide,
   compact = false,
   variant = "main",
   arcOffset = 220,
   outerOffset = 440,
+  superOffset = 660,
 }) => {
+  // Wenn wir einen Sub/Sub2-Bogen ohne bekannte Seite rendern würden,
+  // gäbe es genau den beschriebenen "Rechts-Sprung". Verhindern:
+  if ((side === "sub" || side === "sub2") && !anchorSide) return null;
+
   const positions = useMemo(() => {
     const count = items.length;
     if (count === 0) return [];
@@ -32,7 +36,7 @@ const ArcNav: React.FC<Props> = ({
     let startDeg = -90, endDeg = 90; // rechter Halbkreis
     if (side === "left") {
       startDeg = 90; endDeg = 270;
-    } else if (side === "sub") {
+    } else if (side === "sub" || side === "sub2") {
       if (anchorSide === "left") { startDeg = 90; endDeg = 270; }
       else { startDeg = -90; endDeg = 90; }
     } else if (side === "full") {
@@ -48,7 +52,7 @@ const ArcNav: React.FC<Props> = ({
     });
   }, [items, side, anchorSide, compact]);
 
-  // Container-Position dynamisch anhand Logo-Breite
+  // Container-Position stabil & ohne Fallbacks
   const containerStyle: React.CSSProperties = (() => {
     const style: React.CSSProperties = {
       position: "absolute",
@@ -64,6 +68,10 @@ const ArcNav: React.FC<Props> = ({
       style.left = anchorSide === "left"
         ? `calc(50% - ${outerOffset}px)`
         : `calc(50% + ${outerOffset}px)`;
+    } else if (side === "sub2") {
+      style.left = anchorSide === "left"
+        ? `calc(50% - ${superOffset}px)`
+        : `calc(50% + ${superOffset}px)`;
     }
     return style;
   })();
@@ -75,6 +83,7 @@ const ArcNav: React.FC<Props> = ({
         side === "left" ? styles.left : "",
         side === "right" ? styles.right : "",
         side === "sub" ? styles.sub : "",
+        side === "sub2" ? styles.sub2 : "",
         side === "full" ? styles.full : "",
       ].join(" ")}
       style={containerStyle}
@@ -85,7 +94,7 @@ const ArcNav: React.FC<Props> = ({
           className={styles.arcItem}
           style={{ transform: `translate(${x}px, ${y}px)` }}
         >
-          <CategoryIcon to={it.to} label={it.label} icon={it.icon} variant={variant} />
+          <CategoryIcon to={it.to} label={it.label} icon={it.icon} variant={side === "left" || side === "right" ? "main" : side} />
         </div>
       ))}
     </div>

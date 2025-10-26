@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import styles from "./styles.module.css";
 import ArcNav from "./ArcNav";
-import { Category, subcategories } from "./config";
+import { Category, SubCategory } from "./config";
 
 type Props = {
   logoSrc: string;
@@ -12,69 +12,129 @@ type Props = {
 
 const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
   const [params] = useSearchParams();
-  const activeTab = params.get("tab") || null;
+  const tab  = params.get("tab")  || null;
+  const sub  = params.get("sub")  || null;
+  const sub2 = params.get("sub2") || null;
 
-  const leftCats  = useMemo(() => categories.filter(c => c.side === "left"),  [categories]);
-  const rightCats = useMemo(() => categories.filter(c => c.side === "right"), [categories]);
+  // Aktive Knoten bestimmen
+  const activeCat   = useMemo(() => categories.find(c => c.key === tab) || null, [categories, tab]);
+  const subList     = activeCat?.sub || [];
+  const activeSub   = useMemo<SubCategory | null>(() => subList.find(s => s.key === sub) || null, [subList, sub]);
+  const sub2List    = activeSub?.sub2 || [];
+  const anchorSide  = activeCat?.side; // absichtlich KEIN Fallback auf "right"
 
-  const activeSub  = activeTab ? subcategories[activeTab] ?? [] : [];
-  const anchorSide = categories.find(c => c.key === activeTab)?.side ?? "right";
-
-  // === exakte Zentrierung: Versatz aus realer Logo-Breite berechnen ===
+  // === Offsets stabil & vor dem ersten Paint messen ===
   const logoRef = useRef<HTMLImageElement | null>(null);
-  const [arcOffset, setArcOffset] = useState<number>(220);   // Fallback
+  const [ready, setReady] = useState(false);
+  const [arcOffset, setArcOffset]     = useState<number>(220);
   const [outerOffset, setOuterOffset] = useState<number>(440);
+  const [superOffset, setSuperOffset] = useState<number>(660);
 
-  useEffect(() => {
-    const calc = () => {
-      const w = logoRef.current?.offsetWidth ?? 380;          // geschätzte Breite
+  // initiales Messen vor dem ersten sichtbaren Paint
+  useLayoutEffect(() => {
+    const measure = () => {
+      const w = logoRef.current?.getBoundingClientRect().width ?? 380;
       const half = w / 2;
-      const gap  = 60;                                        // Abstand zwischen Logo & Haupticons
-      const mainOffset = Math.round(half + gap);
-      const subOffset  = Math.round(mainOffset + 220);        // Sub außerhalb der Main-Bögen
-      setArcOffset(mainOffset);
-      setOuterOffset(subOffset);
+      const gap  = 60;
+      const main = Math.round(half + gap);
+      const out  = Math.round(main + 220);
+      const sup  = Math.round(out + 220);
+      setArcOffset(main);
+      setOuterOffset(out);
+      setSuperOffset(sup);
+      setReady(true);
     };
-    calc();
-    window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
+    measure();
   }, []);
+
+  // Resize entprellen & nur updaten, wenn es sich lohnt (Δ > 1 px)
+  useEffect(() => {
+    let raf = 0;
+    let t: number | null = null;
+    let last = { main: arcOffset, out: outerOffset, sup: superOffset };
+
+    const onResize = () => {
+      if (t != null) window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        raf = requestAnimationFrame(() => {
+          const w = logoRef.current?.getBoundingClientRect().width ?? 380;
+          const half = w / 2;
+          const gap  = 60;
+          const main = Math.round(half + gap);
+          const out  = Math.round(main + 220);
+          const sup  = Math.round(out + 220);
+
+          const dMain = Math.abs(main - last.main);
+          const dOut  = Math.abs(out  - last.out);
+          const dSup  = Math.abs(sup  - last.sup);
+
+          if (dMain > 1) setArcOffset(main);
+          if (dOut  > 1) setOuterOffset(out);
+          if (dSup  > 1) setSuperOffset(sup);
+
+          last = { main, out, sup };
+        });
+      }, 120);
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (t != null) window.clearTimeout(t);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [arcOffset, outerOffset, superOffset]);
 
   return (
     <div className={styles.wrap}>
-      {/* Zentrum: Logo (mit Link zurück zum Default-Index /guidehub) */}
+      {/* Logo -> zurück auf Default (/guidehub ohne Query) */}
       <div className={styles.centerLogoWrap}>
         <Link to="/guidehub" className={styles.centerLogoLink} aria-label="Guide Hub Home">
           <img ref={logoRef} src={logoSrc} alt="Guide Hub" className={styles.centerLogo} />
         </Link>
       </div>
 
-      {/* Linker Halbkreis (Hauptkategorien) */}
-      <ArcNav
-        items={leftCats.map(c => ({ key: c.key, to: c.to, label: c.label, icon: c.icon }))}
-        side="left"
-        variant="main"
-        arcOffset={arcOffset}
-      />
+      {/* Bis Offsets gemessen sind, NICHT rendern → verhindert Erstframe-Sprung */}
+      {ready && (
+        <>
+          {/* Haupt-Halbkreise */}
+          <ArcNav
+            items={(categories.filter(c => c.side === "left")).map(c => ({ key: c.key, to: c.to, label: c.label, icon: c.icon }))}
+            side="left"
+            variant="main"
+            arcOffset={arcOffset}
+          />
+          <ArcNav
+            items={(categories.filter(c => c.side === "right")).map(c => ({ key: c.key, to: c.to, label: c.label, icon: c.icon }))}
+            side="right"
+            variant="main"
+            arcOffset={arcOffset}
+          />
 
-      {/* Rechter Halbkreis (Hauptkategorien) */}
-      <ArcNav
-        items={rightCats.map(c => ({ key: c.key, to: c.to, label: c.label, icon: c.icon }))}
-        side="right"
-        variant="main"
-        arcOffset={arcOffset}
-      />
+          {/* Sub-Halbkreis NUR rendern, wenn anchorSide sicher bekannt */}
+          {anchorSide && subList.length > 0 && (
+            <ArcNav
+              items={subList.map(s => ({ key: s.key, to: s.to, label: s.label, icon: s.icon }))}
+              side="sub"
+              anchorSide={anchorSide}
+              variant="sub"
+              outerOffset={outerOffset}
+              compact
+            />
+          )}
 
-      {/* Unterkategorien – außen andocken, bleiben offen wenn tab aktiv */}
-      {activeSub.length > 0 && (
-        <ArcNav
-          items={activeSub.map(s => ({ key: s.key, to: s.to, label: s.label, icon: s.icon }))}
-          side="sub"
-          anchorSide={anchorSide}
-          compact
-          variant="sub"
-          outerOffset={outerOffset}
-        />
+          {/* Sub-Sub-Halbkreis NUR rendern, wenn anchorSide sicher bekannt */}
+          {anchorSide && sub2List.length > 0 && (
+            <ArcNav
+              items={sub2List.map(s2 => ({ key: s2.key, to: s2.to, label: s2.label, icon: s2.icon }))}
+              side="sub2"
+              anchorSide={anchorSide}
+              variant="sub2"
+              superOffset={superOffset}
+              compact
+            />
+          )}
+        </>
       )}
     </div>
   );

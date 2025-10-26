@@ -1,108 +1,56 @@
-.wrap {
+.topWrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Mehr Luft unter dem Radial-Hub, damit die Linie nicht kollidiert */
+  padding-bottom: 72px;
+}
+
+/* Trennlinie im Stil des Gildenprofils: dünne Linie + weicher blauer Glow */
+.divider {
   position: relative;
   width: 100%;
-  min-height: 520px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0 0;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    rgba(44, 74, 115, 0) 0%,
+    rgba(92, 139, 198, 0.55) 50%,
+    rgba(44, 74, 115, 0) 100%
+  );
+  box-shadow:
+    0 0 10px rgba(92,139,198,0.35),
+    0 0 20px rgba(92,139,198,0.22),
+    inset 0 0 10px rgba(92,139,198,0.18);
+  margin: 24px 0 20px;
 }
 
-.centerLogoWrap {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-.centerLogoLink { pointer-events: auto; display: inline-flex; border-radius: 16px; text-decoration: none; }
-.centerLogo {
-  max-width: 380px;
-  width: 26vw;
-  height: auto;
-  filter: drop-shadow(0 6px 24px rgba(92,139,198,0.35));
+.contentArea {
+  width: 100%;
+  padding: 8px 0 24px;
 }
 
-/* Trennlinie */
-.divider {
-  width: 80%;
-  height: 3px;
-  background: linear-gradient(90deg, #2C4A73, #1A2F4A);
-  margin: 40px auto;
-}
-
-/* Bögen – Positionierung kommt jetzt DYNAMISCH per inline style (ArcNav) */
-.arc { position: absolute; width: 0; height: 0; transform-origin: center; }
-.left {}
-.right {}
-.sub {}
-.full  { left: 50%; top: 50%; transform: translate(-50%, -50%); }
-.arcItem { position: absolute; }
-
-/* Icon-Button */
-.iconBtn {
-  --sz: 72px;
-  width: var(--sz);
-  height: var(--sz);
-  border-radius: 50%;
-  background: var(--tile, #1A2F4A);
+.placeholder {
+  padding: 16px 12px 24px;
+  background: var(--tableBg, #14273E);
   border: 1px solid var(--line, #2C4A73);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  color: var(--text, #fff);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-  position: relative;
-  box-shadow: 0 0 0 0 rgba(92,139,198,0);
+  border-radius: 12px;
 }
 
-/* Hover/Focus – für Main & Sub identisch */
-.iconBtn:hover,
-.iconBtn:focus {
-  transform: scale(1.08);
-  box-shadow: 0 0 24px 2px rgba(92,139,198,0.45);
-  border-color: #5C8BC6;
-  outline: none;
+.placeholderTitle {
+  margin: 0 0 6px 0;
+  color: var(--title, #F5F9FF);
+  font-size: 18px;
+  font-weight: 700;
 }
 
-/* Active-State – permanenter Glow */
-.active {
-  box-shadow: 0 0 24px 2px rgba(92,139,198,0.55);
-  border-color: #5C8BC6;
-}
-
-.iconImg { width: 60%; height: 60%; object-fit: contain; }
-
-.placeholderIcon {
-  width: 60%;
-  height: 60%;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(180deg, #1E3657, #14273E);
-  border: 1px solid var(--line, #2C4A73);
-}
-.placeholderText { font-weight: 800; letter-spacing: 0.5px; color: var(--title, #F5F9FF); font-size: 14px; }
-
-.iconLabel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 12px;
+.placeholderText {
+  margin: 0;
   color: var(--sub, #B0C4D9);
-  pointer-events: none;
+  font-size: 14px;
 }
 
-/* Mobile (optional Vollkreis später) */
-@media (max-width: 768px) {
-  .wrap { min-height: 640px; }
-  .left, .right { display: none; }
-  .full { display: block; }
+@media (min-width: 1600px) {
+  .topWrap { padding-bottom: 88px; }
+  .divider { margin: 28px 0 22px; }
+  .contentArea { padding-bottom: 32px; }
 }
-
-/* Große Screens */
-@media (min-width: 1600px) { .centerLogo { width: 22vw; max-width: 520px; } }
