@@ -1,0 +1,119 @@
+:root {
+  --bg: #0C1C2E;
+  --tile: #1A2F4A;
+  --tile-hover: #25456B;
+  --border: #2B4C73;
+  --text: #FFFFFF;
+  --sub: #B0C4D9;
+  --title: #F5F9FF;
+  --icon: #5C8BC6;
+  --header: #1E3657;
+  --glow: rgba(92,139,198,0.45);
+  --line: #2C4A73;
+  --tableBg: #14273E;
+}
+
+.wrap { display: grid; gap: 16px; }
+
+.header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 900px) {
+  .header { grid-template-columns: 1fr; align-items: start; }
+}
+
+.titles { display: grid; gap: 6px; }
+.h1 { margin: 0; color: var(--title); font-size: 22px; font-weight: 800; letter-spacing: .2px; }
+.lead { margin: 0; color: var(--sub); }
+
+.ctaRow { display: flex; gap: 8px; }
+.cta {
+  background: var(--header);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.cta:hover { box-shadow: 0 0 0 1px var(--icon) inset, 0 0 16px var(--glow); }
+
+.section { background: var(--tile); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+.sectionGrid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 1024px) { .sectionGrid { grid-template-columns: 1fr; } }
+
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+
+.h2 { margin: 0 0 6px; color: var(--title); font-size: 18px; font-weight: 700; }
+.h3 { margin: 0 0 6px; color: var(--title); font-size: 16px; font-weight: 700; }
+.p  { margin: 0; color: var(--text); }
+
+.ul, .ol { margin: 8px 0 0; color: var(--text); padding-left: 18px; }
+.ul li + li, .ol li + li { margin-top: 6px; }
+
+.figure {
+  display: grid; gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+/* === HIER STELLST DU DIE ANZEIGEBREITE EIN ===
+   -> Wert anpassen (z. B. 720px / 960px / 1200px).
+   -> Klasse entfernen, wenn das Bild volle Breite haben soll. */
+.figureNarrow {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.img { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); }
+.fallbackImg {
+  width: 100%; min-height: 160px; display: grid; place-items: center;
+  color: var(--sub); background: var(--tableBg); border: 1px dashed var(--line); border-radius: 8px;
+}
+.figCaption { color: var(--sub); font-size: 12px; }
+
+.tableWrap {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text);
+  font-size: 14px;
+}
+.table thead th {
+  background: var(--header);
+  color: var(--title);
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.table tbody tr:nth-child(2n) td {
+  background: var(--tableBg);
+}
+
+.footer { display: flex; justify-content: flex-end; }
+.tools { display: flex; gap: 8px; }
+.toolBtn {
+  background: var(--tile);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.toolBtn:hover { box-shadow: 0 0 0 1px var(--icon) inset, 0 0 16px var(--glow); }

@@ -1,0 +1,112 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Header wie bei "Dungeon Pause" ---------- */
+.headerBar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #F5F9FF; /* Titeltext laut Theme */
+}
+
+.meta {
+  opacity: 0.85;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.description {
+  margin-top: 2px;
+  color: #B0C4D9; /* Sekundärtext laut Theme */
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+
+/* ---------- Header wie bei "Dungeon Pause" ---------- */
+.search {
+  background: #1A2F4A; /* Gleicher Hintergrund wie bei der Universalsuche */
+  color: #F5F9FF; /* Weißer Text, wie in der Universalsuche */
+  border: 1px solid #2B4C73; /* Border entsprechend deiner Topbar-Search */
+  border-radius: 18px; /* Etwas abgerundeter als Standard */
+  padding: 10px 16px; /* Padding ähnlich der Universalsuche */
+  width: 100%;
+  max-width: 300px; /* Maximale Breite, wenn gewünscht */
+  font-size: 14px; /* Gleiche Schriftgröße */
+  outline: none;
+}
+
+.search::placeholder {
+  color: #B0C4D9; /* Platzhalter in der Sekundärfarbe, wie bei der Universalsuche */
+}
+
+.search:focus {
+  border-color: #5C8BC6; /* Fokusrand in der Highlight-Farbe */
+  background: #152A42; /* Dunklerer Hintergrund beim Fokus */
+}
+
+
+/* ---------- Tabelle ---------- */
+.tableWrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.th {
+  text-align: left;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.tierCell {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.amountCell {
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.note {
+  font-style: italic;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 480px) {
+  .table {
+    font-size: 13px;
+  }
+  .title {
+    font-size: 18px;
+  }
+}

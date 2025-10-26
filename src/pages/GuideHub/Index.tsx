@@ -73,6 +73,9 @@ import MidCalendarSkip from "./Progression/Mid/CalendarSkip";
 /* Progression — Late */
 import ProgLateIndex from "./Progression/Late/Index";
 
+/** 🔹 NEU: TOC (Variante 4) */
+import GuideHubTOC from "../../components/guidehub/GuideHubTOC/GuideHubTOC";
+
 /** Typalias für Mapping */
 type Cmp = React.ComponentType;
 
@@ -158,7 +161,7 @@ const SUB2_MAP: Record<string, Record<string, Record<string, Cmp>>> = {
 };
 
 export default function GuidesIndex() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "";
   const sub = params.get("sub") || "";
   const sub2 = params.get("sub2") || "";
@@ -167,7 +170,7 @@ export default function GuidesIndex() {
   let Content: Cmp | null = null;
 
   if (!tab) {
-    Content = null; // default placeholder weiter unten
+    Content = null; // default: TOC unten anzeigen
   } else if (tab && !sub) {
     Content = MAIN_MAP[tab] || null;
   } else if (tab && sub && !sub2) {
@@ -179,6 +182,15 @@ export default function GuidesIndex() {
         SUB2_MAP[tab][sub][sub2]) ||
       null;
   }
+
+  /** 🔹 Navigation aus TOC/Spotlight → setzt URL-Params */
+  const handleNavigate = (p: { tab: string; sub?: string; sub2?: string }) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", p.tab);
+    if (p.sub) next.set("sub", p.sub); else next.delete("sub");
+    if (p.sub2) next.set("sub2", p.sub2); else next.delete("sub2");
+    setParams(next, { replace: false });
+  };
 
   return (
     <ContentShell>
@@ -199,12 +211,22 @@ export default function GuidesIndex() {
         {Content ? (
           <Content />
         ) : (
-          <div className={styles.placeholder}>
-            <h2 className={styles.placeholderTitle}>Guides</h2>
-            <p className={styles.placeholderText}>
-              Wähle oben eine Kategorie, um die Inhalte hier anzuzeigen.
-            </p>
-          </div>
+          <>
+            {/* Hinweis/Header erhalten */}
+            <div className={styles.placeholder}>
+              <h2 className={styles.placeholderTitle}>Guides</h2>
+              <p className={styles.placeholderText}>
+                Wähle links eine Kategorie oder nutze Suche/Spotlight (Ctrl/Cmd+K), um Inhalte zu öffnen.
+              </p>
+            </div>
+
+            {/* 🔹 NEU: Variante 4 – Sidebar + Detail + Suche + Spotlight */}
+            <GuideHubTOC
+              categories={categories as any}
+              onNavigate={handleNavigate}
+              autoFocusSearch={false}
+            />
+          </>
         )}
       </div>
     </ContentShell>

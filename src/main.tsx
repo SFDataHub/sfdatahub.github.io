@@ -76,6 +76,7 @@ import Settings from "./pages/Settings";
 
 // Playground
 import PlaygroundIndex from "./pages/Playground/index";
+import AMRuneBonusesDemos from "./pages/Playground/AMRuneBonusesDemos";
 import HUDIndex from "./pages/Playground/HUD/index";
 import GameButtonsPlayground from "./pages/Playground/HUD/GameButtonsPlayground";
 import ThemeMaker from "./pages/Playground/ThemeMaker";
@@ -227,6 +228,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="upload-sim" element={<UploadSim />} />
               <Route path="theme-maker" element={<ThemeMaker />} />
               <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
+              <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
+
               {/* HUD */}
               <Route path="hud" element={<HUDIndex />} />
               <Route path="hud/game-buttons" element={<GameButtonsPlayground />} />

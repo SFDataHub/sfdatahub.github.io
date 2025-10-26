@@ -21,7 +21,11 @@ const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
   const subList     = activeCat?.sub || [];
   const activeSub   = useMemo<SubCategory | null>(() => subList.find(s => s.key === sub) || null, [subList, sub]);
   const sub2List    = activeSub?.sub2 || [];
-  const anchorSide  = activeCat?.side; // absichtlich KEIN Fallback auf "right"
+
+  // *** einzige Änderung: defensiver Fallback, falls side fehlt/leer ist ***
+  const safeAnchorSide: "left" | "right" | null = (activeCat?.side === "left" || activeCat?.side === "right")
+    ? activeCat.side
+    : "right";
 
   // === Offsets stabil & vor dem ersten Paint messen ===
   const logoRef = useRef<HTMLImageElement | null>(null);
@@ -30,7 +34,6 @@ const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
   const [outerOffset, setOuterOffset] = useState<number>(440);
   const [superOffset, setSuperOffset] = useState<number>(660);
 
-  // initiales Messen vor dem ersten sichtbaren Paint
   useLayoutEffect(() => {
     const measure = () => {
       const w = logoRef.current?.getBoundingClientRect().width ?? 380;
@@ -47,7 +50,6 @@ const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
     measure();
   }, []);
 
-  // Resize entprellen & nur updaten, wenn es sich lohnt (Δ > 1 px)
   useEffect(() => {
     let raf = 0;
     let t: number | null = null;
@@ -111,24 +113,24 @@ const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
             arcOffset={arcOffset}
           />
 
-          {/* Sub-Halbkreis NUR rendern, wenn anchorSide sicher bekannt */}
-          {anchorSide && subList.length > 0 && (
+          {/* Sub-Halbkreis */}
+          {safeAnchorSide && subList.length > 0 && (
             <ArcNav
               items={subList.map(s => ({ key: s.key, to: s.to, label: s.label, icon: s.icon }))}
               side="sub"
-              anchorSide={anchorSide}
+              anchorSide={safeAnchorSide}
               variant="sub"
               outerOffset={outerOffset}
               compact
             />
           )}
 
-          {/* Sub-Sub-Halbkreis NUR rendern, wenn anchorSide sicher bekannt */}
-          {anchorSide && sub2List.length > 0 && (
+          {/* Sub-Sub-Halbkreis */}
+          {safeAnchorSide && sub2List.length > 0 && (
             <ArcNav
               items={sub2List.map(s2 => ({ key: s2.key, to: s2.to, label: s2.label, icon: s2.icon }))}
               side="sub2"
-              anchorSide={anchorSide}
+              anchorSide={safeAnchorSide}
               variant="sub2"
               superOffset={superOffset}
               compact

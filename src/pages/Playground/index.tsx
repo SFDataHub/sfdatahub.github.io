@@ -21,6 +21,7 @@ const sx: Record<string, React.CSSProperties> = {
   },
   active: { outline: "2px solid #1F3B5D" },
   note: { color: "#B0C4D9", fontSize: 12 },
+  groupLabel: { margin: "16px 0 8px", color: "#B0C4D9", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6 },
 };
 
 export default function PlaygroundIndex() {
@@ -32,27 +33,56 @@ export default function PlaygroundIndex() {
           <p style={sx.note}>Kleine Spielwiese für UI/Flows. Links wählen, rechts live ansehen.</p>
 
           <nav>
-            <NavLink to="list-views" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
+            <div style={sx.groupLabel}>Allgemein</div>
+            <NavLink
+              to="list-views"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
               List-View Switcher
             </NavLink>
 
-            <NavLink to="rescan-widget" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
+            <NavLink
+              to="rescan-widget"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
               Rescan Widget (auto)
             </NavLink>
 
-            <NavLink to="upload-sim" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
+            <NavLink
+              to="upload-sim"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
               Upload Simulator
             </NavLink>
 
-            <NavLink to="hud/game-buttons" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
+            <NavLink
+              to="hud/game-buttons"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
               HUD · Game Buttons
             </NavLink>
-<NavLink to="theme-maker" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
-  Theme / Template Maker
-</NavLink>
-<NavLink to="theme-maker-pro" style={({isActive}) => ({...sx.link, ...(isActive ? sx.active : {})})}>
-  Theme / Template Maker · Pro
-</NavLink>
+
+            <NavLink
+              to="theme-maker"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Theme / Template Maker
+            </NavLink>
+
+            <NavLink
+              to="theme-maker-pro"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Theme / Template Maker · Pro
+            </NavLink>
+
+            <div style={sx.groupLabel}>Guide Hub Demos</div>
+            <NavLink
+              to="am-rune-bonuses-demos"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              AM Rune Bonuses – Demos (A–E)
+            </NavLink>
           </nav>
         </aside>
 
