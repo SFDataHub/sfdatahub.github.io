@@ -1,0 +1,37 @@
+/* src/components/home/HomeSystemStrip.module.css */
+:root { --bg:#152A42; --border:#2B4C73; }
+
+.strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 16px;
+}
+
+.cluster { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill, .btn, .lineShort, .lineTiny {
+  background: linear-gradient(90deg, rgba(43,76,115,.25), rgba(92,139,198,.25), rgba(43,76,115,.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 999px;
+}
+
+.pill { height: 26px; width: 160px; border: 1px solid var(--border); }
+.actions { display: flex; gap: 8px; margin-left: auto; }
+.btn { height: 30px; width: 160px; border: 1px solid var(--border); }
+
+.note { display: grid; gap: 6px; }
+.lineShort { height: 12px; width: 280px; border-radius: 8px; }
+.lineTiny { height: 10px; width: 220px; border-radius: 8px; }
+
+@media (min-width: 1024px) {
+  .strip {
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+  }
+}
+
+@keyframes shimmer { 0%{background-position:0 0;} 100%{background-position:-200% 0;} }

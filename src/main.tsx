@@ -21,6 +21,9 @@ import Discover from "./pages/Discover/Index";
 
 // Flipbook SFM
 import SFMagazineIndex from "./pages/SFMagazine";
+// SF Magazin
+import HistoryBookPage from "./pages/SFMagazine/HistoryBook";
+
 
 // Toplists
 import ToplistsIndex from "./pages/Toplists/index";
@@ -45,7 +48,7 @@ import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
 // Guide Hub
 import GuidesIndex from "./pages/GuideHub/Index";
-
+// SF Magazin
 // Community
 import CommunityIndex from "./pages/Community/Index";
 import CommunityScans from "./pages/Community/Scans";
@@ -160,8 +163,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* Toplists */}
             <Route path="/toplists" element={<ToplistsIndex />} />
-            {/* Players */}
+
+            {/* SF Magazine */}
             <Route path="/sfmagazine" element={<SFMagazineIndex />} />
+            <Route path="/sfmagazine/historybook" element={<HistoryBookPage />} />
+
+
             {/* Players */}
             <Route path="/players" element={<PlayersIndex />} />
             <Route path="/players/rankings" element={<PlayersRankings />} />

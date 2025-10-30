@@ -45,10 +45,25 @@ export default function SubmenuPortal({
 
   if (typeof document === "undefined") return null;
 
+  /* DEBUG: zeigt in der Browser-Konsole, welche Labels im Submenu ankommen
+     Erwarte hier u. a.: "History Book"
+  */
+  if (open && items?.length) {
+    // eslint-disable-next-line no-console
+    console.log("submenu items:", items.map((i) => i.label));
+  }
+
   return ReactDOM.createPortal(
     <div
       className={`${styles.panel} ${open ? styles.open : ""}`}
-      style={{ left: pos.left, top: pos.top }}
+      style={{
+        left: pos.left,
+        top: pos.top,
+        // TEMP: Overflow-Fix, damit nichts abgeschnitten wird
+        maxHeight: "70vh",
+        overflow: "auto",
+        zIndex: 3000,
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       role="menu"

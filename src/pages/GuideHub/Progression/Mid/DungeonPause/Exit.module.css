@@ -1,0 +1,64 @@
+/* src/pages/GuideHub/Exit.module.css */
+.wrap {
+  padding: 20px;
+  background-color: #0c1c2e;
+  color: white;
+}
+
+.headerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #152a42;
+  padding: 10px 20px;
+  border-radius: 8px;
+}
+
+.title {
+  font-size: 2rem;
+  color: #f5f9ff;
+  margin: 0;
+}
+
+.meta {
+  font-size: 0.9rem;
+  color: #b0c4d9;
+}
+
+.description {
+  margin-top: 20px;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #b0c4d9;
+}
+
+.section {
+  margin-top: 30px;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  color: #f5f9ff;
+}
+
+.steps {
+  margin-top: 15px;
+  padding-left: 20px;
+}
+
+.steps li {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #b0c4d9;
+}
+
+.extraTip {
+  margin-top: 15px;
+  padding-left: 20px;
+}
+
+.extraTip p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #b0c4d9;
+}

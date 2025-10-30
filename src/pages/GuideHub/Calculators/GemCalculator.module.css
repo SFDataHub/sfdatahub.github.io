@@ -1,0 +1,27 @@
+.wrap { display: flex; flex-direction: column; gap: 12px; }
+
+/* Header wie in AMRuneBonuses */
+.headerBar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #F5F9FF; /* Titeltext laut Theme */
+}
+
+.meta { opacity: 0.85; font-size: 12px; white-space: nowrap; }
+
+.description {
+  margin-top: 8px;
+  color: #B0C4D9; /* Sekundärtext laut Theme */
+  font-size: 13.5px;
+  line-height: 1.4;
+}

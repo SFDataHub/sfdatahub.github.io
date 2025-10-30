@@ -39,7 +39,8 @@ const categories: Item[] = [
  const SUBTABS: Record<string, SubItem[]> = {
   "/discover": [
     { to: "/players",            label: "Players" },
-    { to: "/SFMagazine",         label: "SFMagazine" },
+    { to: "/sfmagazine",         label: "SFMagazine" },
+    { to: "/sfmagazine/historybook",         label: "History Book" },
     { to: "/guilds",             label: "Guilds" },
     { to: "/servers",            label: "Servers" },
     { to: "/scans",              label: "Scans" },

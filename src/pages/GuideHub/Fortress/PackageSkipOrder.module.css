@@ -1,0 +1,82 @@
+/* src/pages/GuideHub/PackageSkipOrder.module.css */
+.wrap {
+  padding: 20px;
+  background-color: #0c1c2e;
+  color: white;
+}
+
+.headerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #152a42;
+  padding: 10px 20px;
+  border-radius: 8px;
+}
+
+.title {
+  font-size: 2rem;
+  color: #f5f9ff;
+  margin: 0;
+}
+
+.meta {
+  font-size: 0.9rem;
+  color: #b0c4d9;
+}
+
+.description {
+  margin-top: 20px;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #b0c4d9;
+}
+
+.contentWrapper {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+.tableSection {
+  width: 70%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th, .table td {
+  padding: 8px 12px;
+  border: 1px solid #2c4a73;
+  text-align: left;
+}
+
+.table th {
+  background-color: #1e3657;
+  color: #d6e4f7;
+}
+
+.table td {
+  background-color: #14273e;
+  color: #b0c4d9;
+}
+
+.infoBox {
+  width: 25%;
+  background-color: #152a42;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  color: #f5f9ff;
+}
+
+p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #b0c4d9;
+}

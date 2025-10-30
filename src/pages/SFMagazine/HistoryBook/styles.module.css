@@ -1,0 +1,35 @@
+/* src/pages/SFMagazine/HistoryBook/styles.module.css */
+
+/* Gesamter Seitencontainer innerhalb deiner ContentShell */
+.pageWrap {
+  padding: 16px;
+}
+
+/* Hinweis-/Infotext unter dem Header */
+.infoLine {
+  margin-bottom: 12px;
+  color: #B0C4D9;
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.95;
+}
+
+/* Container für den Viewer selbst (Höhe responsiv) */
+.viewerHost {
+  height: 78vh;
+  min-height: 520px;
+  border: 1px solid #2B4C73;
+  border-radius: 14px;
+  background: #152A42;
+  box-shadow: 0 0 0 1px rgba(44,74,115,0.25) inset;
+  padding: 8px;
+}
+
+/* Ab Tablet etwas höher, ab Desktop noch höher,
+   damit die Topbar/Sidebar Platz hat, aber der Viewer bequem ist. */
+@media (min-width: 768px) {
+  .viewerHost { height: 80vh; }
+}
+@media (min-width: 1280px) {
+  .viewerHost { height: 82vh; }
+}
