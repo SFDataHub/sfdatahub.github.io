@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# pdf
+public/flipbooks/**/*.pdf
+public/flipbooks/**/*.PDF
+# oder robuster:
+public/flipbooks/**/*.[Pp][Dd][Ff]
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

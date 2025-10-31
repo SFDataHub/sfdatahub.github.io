@@ -1,10 +1,12 @@
+/* src/pages/GuideHub/ArenaAM/AMRuneBonuses.module.css */
+
 .wrap {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* ---------- Header wie bei "Dungeon Pause" ---------- */
+/* ---------- Header ---------- */
 .headerBar {
   display: flex;
   align-items: baseline;
@@ -18,7 +20,7 @@
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
-  color: #F5F9FF; /* Titeltext laut Theme */
+  color: #F5F9FF;
 }
 
 .meta {
@@ -29,34 +31,30 @@
 
 .description {
   margin-top: 2px;
-  color: #B0C4D9; /* Sekundärtext laut Theme */
+  color: #B0C4D9;
   font-size: 13.5px;
   line-height: 1.4;
 }
 
+/* ---------- Suche ---------- */
+.controls { display: flex; gap: 10px; }
 
-/* ---------- Header wie bei "Dungeon Pause" ---------- */
 .search {
-  background: #1A2F4A; /* Gleicher Hintergrund wie bei der Universalsuche */
-  color: #F5F9FF; /* Weißer Text, wie in der Universalsuche */
-  border: 1px solid #2B4C73; /* Border entsprechend deiner Topbar-Search */
-  border-radius: 18px; /* Etwas abgerundeter als Standard */
-  padding: 10px 16px; /* Padding ähnlich der Universalsuche */
+  background: #1A2F4A;
+  color: #F5F9FF;
+  border: 1px solid #2B4C73;
+  border-radius: 18px;
+  padding: 10px 16px;
   width: 100%;
-  max-width: 300px; /* Maximale Breite, wenn gewünscht */
-  font-size: 14px; /* Gleiche Schriftgröße */
+  max-width: 300px;
+  font-size: 14px;
   outline: none;
 }
-
-.search::placeholder {
-  color: #B0C4D9; /* Platzhalter in der Sekundärfarbe, wie bei der Universalsuche */
-}
-
+.search::placeholder { color: #B0C4D9; }
 .search:focus {
-  border-color: #5C8BC6; /* Fokusrand in der Highlight-Farbe */
-  background: #152A42; /* Dunklerer Hintergrund beim Fokus */
+  border-color: #5C8BC6;
+  background: #152A42;
 }
-
 
 /* ---------- Tabelle ---------- */
 .tableWrap {
@@ -70,6 +68,8 @@
   border-collapse: collapse;
   font-size: 14px;
 }
+
+.thead { background: rgba(255,255,255,0.02); }
 
 .th {
   text-align: left;
@@ -87,26 +87,74 @@
   vertical-align: top;
 }
 
-.tierCell {
+.tierCell { white-space: nowrap; font-weight: 600; }
+.amountCell { white-space: nowrap; opacity: 0.9; }
+.bonusCell { white-space: nowrap; }
+.tags { white-space: nowrap; }
+
+/* Tier-Box (linke große Zelle) */
+.tierBox { display: flex; align-items: center; gap: 10px; }
+.tierIcon {
+  width: 26px; height: 26px; border-radius: 6px;
+  background: #1A2F4A; border: 1px solid #2B4C73;
+  display: grid; place-items: center; font-weight: 800; color: #fff;
+}
+.tierTexts { display: grid; gap: 4px; }
+.tierName { color: #F5F9FF; font-weight: 700; }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-right: 4px;
+  border: 1px solid #2B4C73;
+  background: #1E2F47;
+  color: #FFFFFF;
+}
+.badgeMax  { background: #2A4C72; }
+.badgeAchiev { background: #25456B; }
+.badgeX2  { background: #20385C; }
+.badgeX12 { background: #1F3B5D; }
+.badgeX60 { background: #2D4E78; }
+
+/* Header-Icons */
+.iconHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
-  font-weight: 600;
 }
 
-.amountCell {
-  white-space: nowrap;
-  opacity: 0.9;
+/* Achievements */
+.achiev { display: inline-flex; align-items: center; gap: 6px; color: #B0C4D9; }
+.achievImg {
+  width: 16px; height: 16px; border-radius: 3px;
+  background: #1A2F4A; border: 1px solid #2C4A73;
 }
 
-.note {
-  font-style: italic;
-}
-
-/* ---------- responsive ---------- */
+/* ---------- Responsive ---------- */
 @media (max-width: 480px) {
-  .table {
-    font-size: 13px;
-  }
-  .title {
-    font-size: 18px;
-  }
+  .table { font-size: 13px; }
+  .title { font-size: 18px; }
+}
+
+/* ---------- Hover-Verhalten ---------- */
+
+/* Zeilenhover – ohne Rahmen */
+.dataRow {
+  transition: background-color .12s ease;
+}
+.dataRow:hover,
+.dataRow:focus-within {
+  background: #20385C;     /* nur Farbe, kein box-shadow */
+  box-shadow: none;         /* <— NEU: Rahmen aus */
+}
+
+/* Tier-Zelle beim Gruppenhover – ebenfalls ohne Rahmen */
+.tierCellHover {
+  background: #20385C;
+  box-shadow: none;         /* <— NEU: Rahmen aus */
+  transition: background-color .12s ease;
 }
