@@ -11,7 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+# Build-Output
+dist
+dist-ssr
 
+# Flipbook-PDFs überall ignorieren (egal ob in public/docs/…)
+**/flipbooks/**/*.pdf
+**/flipbooks/**/*.[Pp][Dd][Ff]
 # pdf
 public/flipbooks/**/*.pdf
 public/flipbooks/**/*.PDF
