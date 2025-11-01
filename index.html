@@ -16,6 +16,15 @@
 
     <!-- (Optional) maskable icon hint for some platforms -->
     <link rel="icon" sizes="512x512" href="/icons/icon-512-maskable.png" />
+
+    <!-- Guard: erzwinge Root-SW und verhindere relative Registrierungen -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        const orig = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+        navigator.serviceWorker.register = (_url, opts = {}) =>
+          orig('/service-worker.js', { ...opts, scope: '/' });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -23,12 +32,13 @@
     <!-- Deine App -->
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- PWA: Service Worker Registrierung -->
+    <!-- PWA: Service Worker Registrierung (nur PROD, Root-Scope) -->
     <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
+      if (import.meta?.env?.PROD && 'serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
           navigator.serviceWorker
-            .register("/service-worker.js")
+            .register('/service-worker.js', { scope: '/' })
+            .then(r => console.log('[SW] registered @', r.scope))
             .catch(console.error);
         });
       }
