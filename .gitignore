@@ -7,24 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies / Build
 node_modules
 dist
 dist-ssr
 *.local
-# Build-Output
-dist
-dist-ssr
 
-# Flipbook-PDFs überall ignorieren (egal ob in public/docs/…)
-**/flipbooks/**/*.pdf
-**/flipbooks/**/*.[Pp][Dd][Ff]
-# pdf
-public/flipbooks/**/*.pdf
-public/flipbooks/**/*.PDF
-# oder robuster:
-public/flipbooks/**/*.[Pp][Dd][Ff]
-
-# Editor directories and files
+# Editor/OS
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -35,11 +24,21 @@ public/flipbooks/**/*.[Pp][Dd][Ff]
 *.sln
 *.sw?
 
-# Env-Dateien (Next/Vite/Node)
+# Env-Dateien
 .env
 .env.*
-!.env.example        # Beispiel-Datei darf im Repo bleiben
+!.env.example
 *.local
 *.env.local
 .env.development.local
 .env.production.local
+
+# Flipbook PDFs überall ignorieren (egal wo sie liegen)
+**/flipbooks/**/*.pdf
+**/flipbooks/**/*.[Pp][Dd][Ff]
+
+# (Optional) andere große Binärdateien
+*.zip
+*.7z
+*.rar
+*.iso
