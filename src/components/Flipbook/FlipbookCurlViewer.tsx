@@ -17,21 +17,36 @@ type FlipbookManifest = {
 
 type Props = {
   slug: string;
-  initialPage?: number;               // 1-basiert
+  initialPage?: number;                    // 1-basiert
   onReady?: () => void;
-  onPageChange?: (page: number) => void; // 1-basiert
+  onPageChange?: (page: number) => void;   // 1-basiert
   noSound?: boolean;
 };
 
+// --- Base-URL Helper ---------------------------------------------------------
+// Vite setzt import.meta.env.BASE_URL passend ("/" lokal, "/test/" auf Pages).
+const baseURL =
+  (typeof import !== "undefined" &&
+    (import.meta as any)?.env &&
+    (import.meta as any).env.BASE_URL) ||
+  "/";
+
+// Präfixt relative Pfade mit baseURL, lässt absolute URLs/Root-absolute Pfade unverändert
+const withBase = (p: string) => {
+  if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
+  return baseURL.replace(/\/$/, "") + "/" + p.replace(/^\.?\//, "");
+};
+
 const fetchManifest = async (slug: string): Promise<FlipbookManifest> => {
-  const res = await fetch(`/flipbooks/${slug}/manifest.json`, { cache: "no-cache" });
+  const url = withBase(`flipbooks/${slug}/manifest.json`);
+  const res = await fetch(url, { cache: "no-cache" });
   if (!res.ok) throw new Error(`Manifest not found for slug "${slug}"`);
   return res.json();
 };
 
 const supportsFullscreen = () => {
   const el = document.documentElement as any;
-  return !!(el.requestFullscreen || el.webkitRequestFullscreen || (el.msRequestFullscreen));
+  return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen);
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -51,16 +66,19 @@ const FlipbookCurlViewer: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [fsSupported, setFsSupported] = useState(false);
 
-  const basePath = useMemo(() => `/flipbooks/${slug}`, [slug]);
+  const basePath = useMemo(() => withBase(`flipbooks/${slug}`), [slug]);
 
-  const pickBestSrc = useCallback((p: PageEntry): string => {
-    if (p.srcset?.length) {
-      const sorted = [...p.srcset].sort((a, b) => a.width - b.width);
-      const target = sorted.find(s => s.width >= 1600) ?? sorted[sorted.length - 1];
-      return target.src.startsWith("/") ? target.src : `${basePath}/${target.src}`;
-    }
-    return p.src.startsWith("/") ? p.src : `${basePath}/${p.src}`;
-  }, [basePath]);
+  const pickBestSrc = useCallback(
+    (p: PageEntry): string => {
+      if (p.srcset?.length) {
+        const sorted = [...p.srcset].sort((a, b) => a.width - b.width);
+        const target = sorted.find((s) => s.width >= 1600) ?? sorted[sorted.length - 1];
+        return target.src.startsWith("/") ? target.src : `${basePath}/${target.src}`;
+      }
+      return p.src.startsWith("/") ? p.src : `${basePath}/${p.src}`;
+    },
+    [basePath]
+  );
 
   // Manifest laden
   useEffect(() => {
@@ -68,9 +86,17 @@ const FlipbookCurlViewer: React.FC<Props> = ({
     setManifest(null);
     setError(null);
     fetchManifest(slug)
-      .then((m) => { if (live) { setManifest(m); setFsSupported(supportsFullscreen()); } })
-      .catch((e) => { if (live) setError(e.message || "Failed to load flipbook manifest."); });
-    return () => { live = false; };
+      .then((m) => {
+        if (!live) return;
+        setManifest(m);
+        setFsSupported(supportsFullscreen());
+      })
+      .catch((e) => {
+        if (live) setError(e.message || "Failed to load flipbook manifest.");
+      });
+    return () => {
+      live = false;
+    };
   }, [slug]);
 
   // PageFlip initialisieren
@@ -81,14 +107,18 @@ const FlipbookCurlViewer: React.FC<Props> = ({
 
     // Vorherige Instanz entsorgen
     if (pfRef.current) {
-      try { pfRef.current.destroy(); } catch {}
+      try {
+        pfRef.current.destroy();
+      } catch {
+        /* noop */
+      }
       pfRef.current = null;
     }
 
     const opts = {
       width: manifest.pageWidth,
       height: manifest.pageHeight,
-      size: "stretch" as SizeType,  // passt sich dem Container an
+      size: "stretch" as SizeType, // passt sich dem Container an
       maxShadowOpacity: 0.25,
       showCover: false,
       mobileScrollSupport: true,
@@ -121,14 +151,24 @@ const FlipbookCurlViewer: React.FC<Props> = ({
 
     // Resize-Handling
     const ro = new ResizeObserver(() => {
-      try { pf.update(); } catch {}
+      try {
+        pf.update();
+      } catch {
+        /* noop */
+      }
     });
     ro.observe(wrap);
 
     // Key-Handler
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "ArrowLeft")  { ev.preventDefault(); pf.flipPrev(); }
-      if (ev.key === "ArrowRight") { ev.preventDefault(); pf.flipNext(); }
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        pf.flipPrev();
+      }
+      if (ev.key === "ArrowRight") {
+        ev.preventDefault();
+        pf.flipNext();
+      }
     };
     window.addEventListener("keydown", onKey, { passive: false });
 
@@ -136,7 +176,11 @@ const FlipbookCurlViewer: React.FC<Props> = ({
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
       pf.off("init", onInit as any);
-      try { pf.destroy(); } catch {}
+      try {
+        pf.destroy();
+      } catch {
+        /* noop */
+      }
       pfRef.current = null;
     };
   }, [manifest, initialPage, onReady, onPageChange, pickBestSrc]);
@@ -148,7 +192,9 @@ const FlipbookCurlViewer: React.FC<Props> = ({
     const wrap = wrapRef.current;
     if (!wrap) return;
     const anyEl: any = wrap;
-    (anyEl.requestFullscreen || anyEl.webkitRequestFullscreen || anyEl.msRequestFullscreen)?.call(anyEl);
+    (anyEl.requestFullscreen ||
+      anyEl.webkitRequestFullscreen ||
+      anyEl.msRequestFullscreen)?.call(anyEl);
   };
 
   if (error) return <div className={styles.errorBox}>Flipbook konnte nicht geladen werden: {error}</div>;
@@ -159,12 +205,14 @@ const FlipbookCurlViewer: React.FC<Props> = ({
       <div className={styles.stage}>
         <div className={styles.host} ref={hostRef} />
         {/* Klick-Zonen wie bei Heyzine */}
-        <button className={`${styles.edge} ${styles.left}`}  onClick={flipPrev} aria-label="Vorherige Seite" />
+        <button className={`${styles.edge} ${styles.left}`} onClick={flipPrev} aria-label="Vorherige Seite" />
         <button className={`${styles.edge} ${styles.right}`} onClick={flipNext} aria-label="Nächste Seite" />
       </div>
 
       <div className={styles.hud}>
-        <button className={styles.hBtn} onClick={flipPrev} aria-label="Zurück">‹</button>
+        <button className={styles.hBtn} onClick={flipPrev} aria-label="Zurück">
+          ‹
+        </button>
         <div className={styles.hText}>
           <span className={styles.title}>{manifest.title}</span>
           <span className={styles.sep}>·</span>
@@ -172,9 +220,13 @@ const FlipbookCurlViewer: React.FC<Props> = ({
         </div>
         <div className={styles.spacer} />
         {fsSupported && (
-          <button className={styles.hBtn} onClick={enterFullscreen} aria-label="Fullscreen">⤢</button>
+          <button className={styles.hBtn} onClick={enterFullscreen} aria-label="Fullscreen">
+            ⤢
+          </button>
         )}
-        <button className={styles.hBtn} onClick={flipNext} aria-label="Weiter">›</button>
+        <button className={styles.hBtn} onClick={flipNext} aria-label="Weiter">
+          ›
+        </button>
       </div>
     </div>
   );

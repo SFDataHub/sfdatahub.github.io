@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:test": "vite build --mode test",
     "preview": "vite preview",
     "deploy:preview": "rimraf ../preview && vite build && cpy \"dist/**\" ../preview --parents"
   },
