@@ -33,16 +33,25 @@
 
     <!-- Deine App -->
 
-    <!-- PWA: Service Worker Registrierung (nur PROD, Root-Scope) -->
+    <!-- PWA: Service Worker Registrierung (nur PROD, Root-Scope, mit Existenz-Check) -->
     <script>
-      if (import.meta?.env?.PROD && 'serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/service-worker.js', { scope: '/' })
-            .then(r => console.log('[SW] registered @', r.scope))
-            .catch(console.error);
-        });
-      }
+      (async () => {
+        if (!import.meta?.env?.PROD || !('serviceWorker' in navigator)) return;
+
+        try {
+          // Safety: erst registrieren, wenn die Datei wirklich 200 liefert
+          const res = await fetch('/service-worker.js', { cache: 'no-store' });
+          if (!res.ok) {
+            console.warn('[SW] /service-worker.js nicht erreichbar:', res.status, res.statusText);
+            return; // verhindert die TypeError-Konsole bei 404
+          }
+
+          const reg = await navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+          console.log('[SW] registered @', reg.scope);
+        } catch (err) {
+          console.error('[SW] register failed:', err);
+        }
+      })();
     </script>
   </body>
 </html>
