@@ -14,22 +14,106 @@
   opacity: 0.95;
 }
 
-/* Container für den Viewer selbst (Höhe responsiv) */
+/* ============================================================================
+   Viewer-Container (HistoryBook Bühne)
+   - feste Bühne mit aspect-ratio (Doppelseite) statt fixer Viewport-Höhe
+   - contain → isoliert Reflows/Paints → weniger Flicker bei Zoom/Resize
+   ========================================================================== */
 .viewerHost {
-  height: 78vh;
-  min-height: 520px;
+  /* Optik wie gehabt */
   border: 1px solid #2B4C73;
   border-radius: 14px;
   background: #152A42;
   box-shadow: 0 0 0 1px rgba(44,74,115,0.25) inset;
   padding: 8px;
+
+  /* Neu: stabile Bühne */
+  position: relative;     /* wichtig: Overlay ausrichten */
+  margin: 0 auto;
+  width: 100%;
+  max-width: min(1280px, 100%);  /* bei Bedarf 1200/1400 anpassen */
+  aspect-ratio: 4800 / 3395;     /* Doppelseite: 2*2400 x 3395 */
+  contain: layout paint size;
+  overflow: hidden;
+  image-rendering: auto;
 }
 
-/* Ab Tablet etwas höher, ab Desktop noch höher,
-   damit die Topbar/Sidebar Platz hat, aber der Viewer bequem ist. */
-@media (min-width: 768px) {
-  .viewerHost { height: 80vh; }
+/* Der React-Host-Slot fürs Flipbook vollflächig */
+.viewerHost > div:first-child {
+  position: absolute;
+  inset: 0;
+  display: grid;
 }
-@media (min-width: 1280px) {
-  .viewerHost { height: 82vh; }
+
+/* kleine Layer-Hilfen gegen Zittern bei Zoom */
+.viewerHost,
+.overlay,
+.dragZoneLeft,
+.dragZoneRight,
+.inbookLink {
+  backface-visibility: hidden;
 }
+
+/* ===== Overlay + Hotspots (HistoryBook-spezifisch) ======================== */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;             /* über Flip-Canvas, unter evtl. HUD */
+  pointer-events: none;    /* zentraler Fix: blockiert nichts */
+}
+
+/* Hotspots: die EINZIGEN klickbaren Flächen im Overlay (neben Randzonen) */
+.inbookLink {
+  position: absolute;
+  top: var(--t);
+  left: var(--l);
+  width: var(--w);
+  height: var(--h);
+  background: transparent;
+  border: none;
+  border-radius: 2%;
+  cursor: pointer;
+  pointer-events: auto;     /* macht nur die Fläche klickbar */
+  z-index: 32;              /* Hotspots über Randzonen */
+  outline: none;
+}
+
+.inbookLink:focus-visible {
+  box-shadow: 0 0 0 .2rem rgba(92,139,198,.6);
+  border-radius: 4px;
+}
+
+.inbookLink::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+/* ===== Rand-Klickzonen =====================================================
+   Ziel:
+   - 8% Gutter direkt am Rand → Drag entlang der ganzen Kante möglich.
+   - Klickzonen starten erst nach dem Gutter, volle Höhe.
+   - Hotspots haben Vorrang (höherer z-index).
+*/
+.dragZoneLeft,
+.dragZoneRight {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: auto;   /* fängt Klicks trotz .overlay ein */
+  z-index: 31;            /* unter Hotspots, über Canvas */
+  /* debug: background: rgba(255,0,0,0.08); */
+}
+
+.dragZoneLeft {
+  left: 8%;
+  width: 22%;
+}
+
+.dragZoneRight {
+  right: 8%;
+  width: 22%;
+}
+
+/* (Ehemalige height/min-height-Logik entfällt durch aspect-ratio Bühne) */

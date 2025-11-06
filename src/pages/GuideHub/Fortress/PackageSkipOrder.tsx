@@ -1,17 +1,18 @@
-// src/pages/GuideHub/PackageSkipOrder.tsx
+// FILE: src/pages/GuideHub/Fortress/PackageSkipOrder.tsx
 import React from "react";
-import styles from "./PackageSkipOrder.module.css"; // Die CSS-Datei für die Seite
+import styles from "./PackageSkipOrder.module.css";
 
 export default function PackageSkipOrder() {
   return (
     <div className={styles.wrap}>
-      {/* Header */}
+      {/* Header (wie AMRuneBonuses: Titelzeile mit unterer Trennlinie) */}
       <div className={styles.headerBar}>
         <h2 className={styles.title}>Fortress Package skip order</h2>
         <span className={styles.meta}>Last updated: 21.02.2025</span>
       </div>
+
       <p className={styles.description}>
-        This guide outlines the optimal order to upgrade your Fortress and associated buildings in Shakes & Fidget. Follow the suggested order to minimize resource use and maximize efficiency.
+        This guide outlines the optimal order to upgrade your Fortress and associated buildings in Shakes &amp; Fidget. Follow the suggested order to minimize resource use and maximize efficiency.
       </p>
 
       {/* Main content: Table and Info Box */}
@@ -31,184 +32,55 @@ export default function PackageSkipOrder() {
               </tr>
             </thead>
             <tbody>
-              {/* Fortress and Laborer's Quarter entries */}
-              <tr>
-                <td>Fortress</td>
-                <td>Level 10</td>
-                <td>2</td>
-                <td>0</td>
-                <td>0</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 5</td>
-                <td>2</td>
-                <td>35</td>
-                <td>50</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 20</td>
-                <td>4</td>
-                <td>150</td>
-                <td>50</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 10</td>
-                <td>3</td>
-                <td>138</td>
-                <td>46</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 30</td>
-                <td>6</td>
-                <td>440</td>
-                <td>140</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 15</td>
-                <td>6</td>
-                <td>406</td>
-                <td>129</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 40</td>
-                <td>12</td>
-                <td>1,100</td>
-                <td>333</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 20</td>
-                <td>12</td>
-                <td>1,015</td>
-                <td>308</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 50</td>
-                <td>24</td>
-                <td>2,500</td>
-                <td>800</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 25</td>
-                <td>24</td>
-                <td>2,308</td>
-                <td>738</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 60</td>
-                <td>36</td>
-                <td>6,000</td>
-                <td>2,000</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Laborer's Quarter</td>
-                <td>Level 30</td>
-                <td>36</td>
-                <td>5,538</td>
-                <td>1,849</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 70</td>
-                <td>48</td>
-                <td>13,417</td>
-                <td>4,433</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Fortress</td>
-                <td>Level 80</td>
-                <td>78</td>
-                <td>27,200</td>
-                <td>9,280</td>
-                <td>-</td>
-              </tr>
-              {/* Hall of Knight entries */}
-              <tr>
-                <td>Hall of Knight</td>
-                <td>-</td>
-                <td>-</td>
-                <td>720</td>
-                <td>240</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Hall of Knight</td>
-                <td>-</td>
-                <td>-</td>
-                <td>1,408</td>
-                <td>448</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Hall of Knight</td>
-                <td>-</td>
-                <td>-</td>
-                <td>2,640</td>
-                <td>800</td>
-                <td>-</td>
-              </tr>
-              {/* Gem Mine and other buildings */}
-              <tr>
-                <td>Gem Mine</td>
-                <td>Level 1</td>
-                <td>2</td>
-                <td>50</td>
-                <td>17</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Treasury</td>
-                <td>Level 1</td>
-                <td>2</td>
-                <td>40</td>
-                <td>13</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Woodcutter</td>
-                <td>Level 1</td>
-                <td>2</td>
-                <td>0</td>
-                <td>20</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>Woodcutter</td>
-                <td>Level 2</td>
-                <td>3</td>
-                <td>30</td>
-                <td>20</td>
-                <td>-</td>
-              </tr>
-              {/* Add more rows as needed */}
+              <tr><td>Fortress</td><td>1</td><td>10</td><td>2</td><td>0</td><td>0</td></tr>
+              <tr><td>Laborer's Quarter</td><td>1</td><td>5</td><td>2</td><td>35</td><td>12</td></tr>
+              <tr><td>Fortress</td><td>2</td><td>20</td><td>4</td><td>150</td><td>50</td></tr>
+              <tr><td>Laborer's Quarter</td><td>2</td><td>10</td><td>3</td><td>138</td><td>46</td></tr>
+              <tr><td>Fortress</td><td>3</td><td>30</td><td>6</td><td>440</td><td>140</td></tr>
+              <tr><td>Laborer's Quarter</td><td>3</td><td>15</td><td>6</td><td>406</td><td>129</td></tr>
+              <tr><td>Fortress</td><td>4</td><td>40</td><td>12</td><td>1,100</td><td>333</td></tr>
+              <tr><td>Laborer's Quarter</td><td>4</td><td>20</td><td>12</td><td>1,015</td><td>308</td></tr>
+              <tr><td>Fortress</td><td>5</td><td>50</td><td>24</td><td>2,500</td><td>800</td></tr>
+              <tr><td>Laborer's Quarter</td><td>5</td><td>25</td><td>24</td><td>2,308</td><td>738</td></tr>
+              <tr><td>Fortress</td><td>6</td><td>60</td><td>36</td><td>6,000</td><td>2,000</td></tr>
+              <tr><td>Laborer's Quarter</td><td>6</td><td>30</td><td>36</td><td>5,538</td><td>1,849</td></tr>
+              <tr><td>Fortress</td><td>7</td><td>70</td><td>48</td><td>13,417</td><td>4,433</td></tr>
+              <tr><td>Fortress</td><td>8</td><td>80</td><td>78</td><td>27,200</td><td>9,280</td></tr>
+              <tr><td>Hall of Knight</td><td>1</td><td>0</td><td>0</td><td>720</td><td>240</td></tr>
+              <tr><td>Hall of Knight</td><td>2</td><td>0</td><td>0</td><td>1,408</td><td>448</td></tr>
+              <tr><td>Hall of Knight</td><td>3</td><td>0</td><td>0</td><td>2,640</td><td>800</td></tr>
+              <tr><td>Gem Mine</td><td>1</td><td>15</td><td>2</td><td>50</td><td>17</td></tr>
+              <tr><td>Treasury</td><td>1</td><td>25</td><td>2</td><td>40</td><td>13</td></tr>
+              <tr><td>Woodcutter</td><td>1</td><td>2</td><td>2</td><td>0</td><td>20</td></tr>
+              <tr><td>Woodcutter</td><td>2</td><td>4</td><td>3</td><td>30</td><td>20</td></tr>
+              <tr><td>Woodcutter</td><td>3</td><td>6</td><td>5</td><td>92</td><td>74</td></tr>
+              <tr><td>Woodcutter</td><td>4</td><td>8</td><td>10</td><td>248</td><td>200</td></tr>
+              <tr><td>Woodcutter</td><td>5</td><td>10</td><td>21</td><td>500</td><td>320</td></tr>
+              <tr><td>Quarry</td><td>1</td><td>3</td><td>2</td><td>22</td><td>0</td></tr>
+              <tr><td>Quarry</td><td>2</td><td>6</td><td>3</td><td>90</td><td>16</td></tr>
+              <tr><td>Quarry</td><td>3</td><td>9</td><td>5</td><td>264</td><td>45</td></tr>
+              <tr><td>Quarry</td><td>4</td><td>12</td><td>10</td><td>660</td><td>107</td></tr>
+              <tr><td>Barracks</td><td>1</td><td>4</td><td>2</td><td>20</td><td>14</td></tr>
+              <tr><td>Barracks</td><td>2</td><td>8</td><td>3</td><td>82</td><td>55</td></tr>
+              <tr><td>Total cost</td><td>-</td><td>577</td><td>363</td><td>99,881</td><td>33,218</td></tr>
+              <tr><td>Fortress Pack ressources</td><td>-</td><td>-</td><td>300</td><td>100,000</td><td>50,000</td></tr>
+              <tr><td>Left over</td><td>-</td><td>-577</td><td>-63</td><td>119</td><td>16,782</td></tr>
             </tbody>
           </table>
         </section>
 
         {/* Info Box */}
         <section className={styles.infoBox}>
+          <h3 className={styles.sectionTitle}>Important</h3>
+          <p>Completely ignore building the following buildings until you have built everything else to MAX:</p>
+          <ul>
+            <li>Archery Guild</li>
+            <li>Mage&apos;s Tower</li>
+            <li>Fortifications</li>
+          </ul>
+
+          <div className={styles.divider} />
+
           <h3 className={styles.sectionTitle}>Total Costs</h3>
           <p>
             <strong>Total Gold:</strong> 577 <br />

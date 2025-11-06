@@ -1,0 +1,65 @@
+/* FILE: src/pages/GuideHub/ArenaAM/AMBuildOrder.module.css */
+/* keine Funktionsänderung – Hinweis:
+   Der Drive-Thumbnail-Endpoint liefert jetzt Breite 1024px bei korrektem Seitenverhältnis.
+   Die Regeln unten sorgen weiterhin dafür, dass das Bild ohne zusätzliche Abstände rendert. */
+
+.wrap { background: transparent; }
+
+.headerBar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.title { font-size: 22px; font-weight: 700; line-height: 1.2; color: #F5F9FF; margin: 0; }
+.meta  { font-size: 12px; color: #B0C4D9; }
+
+.centerCol {
+  display: grid;
+  grid-auto-rows: max-content;
+  justify-items: center;
+  row-gap: 4px;
+  margin-top: 12px;
+}
+
+.centerCol > .text,
+.centerCol > .imageBox,
+.centerCol > .imageFallback,
+.centerCol > .credit { margin: 0 !important; padding: 0 !important; }
+
+.text { width: 100%; max-width: 1024px; }
+.text p { margin: 0; line-height: 1.55; color: #B0C4D9; font-size: 14px; }
+.text p + p { margin-top: 4px; }
+
+.imageBox {
+  display: inline-block;
+  line-height: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.imageBox img {
+  display: block;
+  width: 1024px;    /* feste Zielbreite */
+  max-width: 100%;  /* responsive nach unten */
+  height: auto;     /* Seitenverhältnis bleibt erhalten */
+  margin: 0;
+  padding: 0;
+  vertical-align: top;
+}
+
+.credit {
+  width: 100%;
+  max-width: 1024px;
+  text-align: center;
+  color: #8AA5C4;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.imageFallback { font-size: 24px; color: #B0C4D9; text-align: center; }

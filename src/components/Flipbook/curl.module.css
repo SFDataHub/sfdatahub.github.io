@@ -1,3 +1,5 @@
+/* src/components/Flipbook/curl.module.css */
+
 .viewerRoot {
   position: relative;
   width: 100%;
@@ -91,10 +93,60 @@
   color: #F5F9FF;
 }
 
-/* Responsive Höhe – gleiche Logik wie deine HistoryBook-Seite */
+/* Responsive Mindesthöhe – kann bleiben, Bühne via aspect-ratio kommt aus Page-CSS */
 @media (min-width: 768px) {
   .stage { min-height: 560px; }
 }
 @media (min-width: 1280px) {
   .stage { min-height: 620px; }
+}
+
+/* --- HistoryBook overrides: Edge-Buttons nicht in den Gutter ragen ---
+   (Die echten Randklicks kommen aus dem HistoryBook-Overlay)
+*/
+.edge {
+  pointer-events: none;   /* neutralisiert die Viewer-Edge-Buttons */
+  opacity: 0;             /* unsichtbar */
+}
+
+/* ===== Performance-Hilfen (append only) ===== */
+
+:global(.page-flip),
+:global(.stf__wrapper),
+:global(.stf__block) {
+  contain: layout paint style size;
+  overflow: hidden;
+}
+
+:global(.stf__page),
+:global(.stf__item),
+:global(.page-flip__page),
+:global(.page),
+:global(canvas.page-canvas) {
+  backface-visibility: hidden;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+:global(.stf__page img),
+:global(.page-flip__page img),
+:global(.stf__page canvas),
+:global(.page-flip__page canvas) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+:global(.stf__page.is-flipping),
+:global(.page-flip__page.is-flipping) {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+:global(.page-flip),
+:global(.stf__wrapper) {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y pinch-zoom;
 }

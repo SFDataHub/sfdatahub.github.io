@@ -1,3 +1,4 @@
+
 /* --- Tailwind aktivieren (muss vor eigenen Regeln stehen) --- */
 @tailwind base;
 @tailwind components;
@@ -7,6 +8,8 @@
 :root{
   /* Fallback: Wenn RootLayout die Var noch nicht setzt, nimm Basisbreite */
   --sidebar-total-w: var(--sidebar-w);
+  /* Globaler Zusatzabstand unten für alle Seiten (klein, auch ohne Footer) */
+  --content-bottom-pad: 24px; /* Desktop-Default */
 }
 
 /* Logo-Dock über Topbar, transparent, nur Positionierung */
@@ -16,17 +19,17 @@
   width: var(--logo-dock-w);
   height: var(--logo-dock-h);
   background: transparent;
-  z-index: 60;              /* über der Topbar */
-  pointer-events: none;     /* Inputs in Topbar klickbar */
+  z-index: 60;
+  pointer-events: none;
 }
 .logo-dock .logo-img{
   position: absolute;
   left: 50%;
-  top: calc(var(--topbar-h) / 2); /* vertikal zur Topbar zentriert */
+  top: calc(var(--topbar-h) / 2);
   transform: translate(-50%, -50%);
   max-height: calc(var(--logo-dock-h) - 16px);
   width: auto;
-  pointer-events: auto; /* falls später klickbar */
+  pointer-events: auto;
 }
 
 /* Topbar als durchgehende Leiste */
@@ -35,7 +38,7 @@
   inset: 0 0 auto 0;
   height: var(--topbar-h);
   background: var(--nav);
-  z-index: 50; /* unter Logo-Dock */
+  z-index: 50;
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px 0 calc(var(--logo-dock-w) + 16px);
 }
@@ -43,17 +46,17 @@
 /* Sidebar/Content starten ab Topbar-Unterkante */
 .logo-fill{
   position: fixed; left: 0; top: var(--topbar-h); bottom: 0;
-  /* WICHTIG: Gesamtbreite inkl. Padding */
   width: var(--sidebar-total-w);
   background: var(--nav);
   z-index: 0;
   transition: width .25s ease;
 }
 
+/* Content (global) */
 .content{
-  /* WICHTIG: Content weicht exakt der Gesamtbreite aus */
   margin-left: var(--sidebar-total-w);
-  padding: var(--topbar-h) 16px 24px 16px; /* top padding = topbar-h */
+  /* top padding = topbar-h; unten kleine Luft + safe-area */
+  padding: var(--topbar-h) 16px calc(var(--content-bottom-pad) + 24px + env(safe-area-inset-bottom)) 16px;
   min-height: 100vh;
   transition: margin-left .25s ease;
 }
@@ -62,7 +65,7 @@
 .content-inner{ min-height: calc(100vh - var(--topbar-h)); display:flex; flex-direction:column; }
 .content-body{ flex:1; }
 
-/* Footer-Grundlayout (ohne Farben/Schatten der Sidebar) */
+/* Footer-Grundlayout (später nutzbar) */
 .site-footer{
   display:flex; align-items:center; justify-content:space-between;
   gap:12px; padding:14px 16px; margin-top:16px;
@@ -74,10 +77,9 @@
   background: var(--tile); border: 1px solid var(--line);
   border-radius: 999px; padding: 6px 10px;
 }
+
 /* Shell-Default */
 #app-shell { --left: var(--sidebar-w); }
-
-/* Topbar hast du bereits – bleibt unverändert */
 
 /* Hintergrund links in Sidebar-Farbe – nutzt jetzt --left */
 #app-shell .logo-fill{
@@ -85,32 +87,45 @@
   left: 0;
   top: var(--topbar-h);
   bottom: 0;
-  width: var(--left);                 /* <— zentrale Breite */
+  width: var(--left);
   background: var(--nav);
-  z-index: 10;                        /* unter Sidebar, über Seite */
+  z-index: 10;
 }
 
 /* Content räumt exakt so viel Platz wie --left frei */
 #app-shell .content{
-  margin-left: var(--left);           /* <— zentrale Breite */
-  padding: var(--topbar-h) 16px 24px 16px;
+  margin-left: var(--left);
+  padding: var(--topbar-h) 16px calc(var(--content-bottom-pad) + 24px + env(safe-area-inset-bottom)) 16px;
   min-height: 100vh;
   position: relative;
-  z-index: 1;                         /* unter Sidebar bleiben */
+  z-index: 1;
   transition: margin-left .2s ease;
 }
 
 /* Optional, aber hilfreich: Content-Inner-Struktur */
 #app-shell .content-inner{ min-height: calc(100vh - var(--topbar-h)); display:flex; flex-direction:column; }
-#app-shell .content-body{ flex:1; }
-/* Seite selbst scrollt NICHT */
-html, body { height: 100%; overflow: hidden; }
+
+/* >>> SCROLL-FIX: Seite darf scrollen; Scroll findet in content-body statt */
+html, body { height: 100%; overflow: auto; }
 #app-shell, #app-shell .content, #app-shell .content-inner, #app-shell .content-body {
   height: 100%;
-  overflow: hidden;
+}
+#app-shell .content-body { overflow: auto !important; }
+
+/* === Scrollbar UNSICHTBAR (transparent) – global für Body & Content === */
+/* Firefox */
+#app-shell .content-body, body {
+  scrollbar-width: none;              /* keine sichtbare Leiste */
+}
+/* WebKit/Blink */
+#app-shell .content-body::-webkit-scrollbar,
+body::-webkit-scrollbar{
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
-/* Unsichtbarer Scrollbar */
+/* Unsichtbarer Scrollbar – Klasse weiterhin verfügbar bei Bedarf */
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -118,4 +133,15 @@ html, body { height: 100%; overflow: hidden; }
 .no-scrollbar::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
 
 /* Höhe der globalen Topbar (für die Shell-Höhe) */
-#app-shell { --app-topbar-h: 72px; } /* ggf. anpassen */
+#app-shell { --app-topbar-h: 72px; }
+
+/* Responsive: noch etwas kompakter unten auf kleinen Screens */
+@media (max-width: 768px){
+  :root{ --content-bottom-pad: 16px; }
+  .content{
+    padding: var(--topbar-h) 12px calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom)) 12px;
+  }
+  #app-shell .content{
+    padding: var(--topbar-h) 12px calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom)) 12px;
+  }
+}

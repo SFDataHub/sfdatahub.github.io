@@ -72,6 +72,7 @@ const DRIVE_BY_KEY: Record<string, string> = {
 
   // ===== ARENA / AM =====
   amicon: "1a_gPOH3j87wcsuI4sitTgwVA9lvlLJku",
+  ambuildorder: "17euou3ng62FCr7HVeesQm-kZGcV7Ij7l",
 
   // ===== HELLEVATOR =====
   hellevatorbanner: "DRIVE_FILE_ID_HIER",

@@ -1,11 +1,11 @@
+// FILE: src/pages/GuideHub/Calculators/GemCalculator.tsx
 import React from "react";
-import ContentShell from "../../../components/ContentShell";
 import { GemCalculator as GemCalculatorComponent } from "../../../components/calculators/Gem";
 import styles from "./GemCalculator.module.css";
 
 const GemCalculatorPage: React.FC = () => {
   return (
-    <ContentShell title="Gem Calculator">
+    <>
       <div className={styles.headerBar}>
         <h2 className={styles.title}>Gem Calculator</h2>
         <span className={styles.meta}>last updated: 08.11.2024</span>
@@ -16,7 +16,7 @@ const GemCalculatorPage: React.FC = () => {
       </p>
 
       <GemCalculatorComponent />
-    </ContentShell>
+    </>
   );
 };
 

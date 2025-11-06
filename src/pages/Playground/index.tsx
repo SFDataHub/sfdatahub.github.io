@@ -1,3 +1,4 @@
+// FILE: src/pages/Playground/Index.tsx
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -82,6 +83,15 @@ export default function PlaygroundIndex() {
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >
               AM Rune Bonuses – Demos (A–E)
+            </NavLink>
+
+            {/* NEU: PortraitMaker Playground */}
+            <div style={sx.groupLabel}>Graphics / Portraits</div>
+            <NavLink
+              to="portrait-maker"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              PortraitMaker Demo
             </NavLink>
           </nav>
         </aside>

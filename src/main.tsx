@@ -87,6 +87,7 @@ import ThemeMakerPro from "./pages/Playground/ThemeMakerPro";
 import ListViews from "./pages/Playground/ListViews";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
+import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
 
 import HARImportPage from "./pages/Playground/Import/HARImportPage";
 import JSONCSVImportPage from "./pages/Playground/Import/JSONCSVImportPage";
@@ -236,6 +237,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="theme-maker" element={<ThemeMaker />} />
               <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
               <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
+	      <Route path="portrait-maker" element={<PortraitMakerDemoPage />} />
 
               {/* HUD */}
               <Route path="hud" element={<HUDIndex />} />
