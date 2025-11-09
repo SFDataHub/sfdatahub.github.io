@@ -1,18 +1,18 @@
-/* Root-Scope nur für Fortress */
-.foCalc {}
+/* Root-Scope nur für Underworld */
+.uwCalc {}
 
-/* Container & Grid — identisch zu Underworld, volle Breite */
-.foCalc :global(.container) {
+/* Container & Grid — erzwungen volle Breite (neutralisiert geerbte max-width) */
+.uwCalc :global(.container) {
   padding: clamp(12px, 2vw, 20px);
   width: 100% !important;
   max-width: none !important;
 }
-.foCalc :global(.content) {
+.uwCalc :global(.content) {
   min-width: 0;
   width: 100% !important;
   max-width: none !important;
 }
-.foCalc :global(.grid) {
+.uwCalc :global(.grid) {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
@@ -20,29 +20,29 @@
   max-width: none !important;
 }
 
-/* Ab 1024px gleiches 2-Spalten-Grid */
+/* Ab 1024px: links GIF fix bis 480px, rechts Panel flexibel (min 640px) */
 @media (min-width: 1024px) {
-  .foCalc :global(.grid) {
+  .uwCalc :global(.grid) {
     grid-template-columns: minmax(280px, 480px) minmax(640px, 1fr);
     align-items: start;
   }
 }
 
-/* Building-Dropdown */
-.foCalc :global(.tabs) {
+/* Building-Dropdown (SFDataHub-Look) */
+.uwCalc :global(.tabs) {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
-.foCalc :global(.tabSelectLabel) {
+.uwCalc :global(.tabSelectLabel) {
   font-size: 0.95rem;
   color: #B0C4D9;
   opacity: 0.95;
 }
-.foCalc :global(select.tabSelect),
-.foCalc :global(.tabs .tabSelect) {
+.uwCalc :global(select.tabSelect),
+.uwCalc :global(.tabs .tabSelect) {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -60,16 +60,16 @@
   background-size: 14px 14px;
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.foCalc :global(select.tabSelect:hover),
-.foCalc :global(.tabs .tabSelect:hover) { background-color: #2A4C72; }
-.foCalc :global(select.tabSelect:focus-visible),
-.foCalc :global(.tabs .tabSelect:focus-visible) {
+.uwCalc :global(select.tabSelect:hover),
+.uwCalc :global(.tabs .tabSelect:hover) { background-color: #2A4C72; }
+.uwCalc :global(select.tabSelect:focus-visible),
+.uwCalc :global(.tabs .tabSelect:focus-visible) {
   outline: none;
   box-shadow: 0 0 0 2px #5C8BC6;
 }
 
 /* Zeile: GIF links | Panel rechts */
-.foCalc :global(.mediaRow) {
+.uwCalc :global(.mediaRow) {
   display: grid;
   grid-template-columns: minmax(280px, 480px) minmax(640px, 1fr);
   column-gap: 16px;
@@ -77,16 +77,16 @@
   width: 100%;
 }
 @media (max-width: 1024px) {
-  .foCalc :global(.mediaRow) {
-    grid-template-columns: 1fr;
+  .uwCalc :global(.mediaRow) {
+    grid-template-columns: 1fr; /* Stack mobil */
     row-gap: 12px;
   }
 }
 
 /* GIF */
-.foCalc :global(.media) { max-width: 480px; width: 100%; }
-.foCalc :global(.media img),
-.foCalc :global(.media video) {
+.uwCalc :global(.media) { max-width: 480px; width: 100%; }
+.uwCalc :global(.media img),
+.uwCalc :global(.media video) {
   display: block;
   width: 100%;
   height: auto;
@@ -94,15 +94,15 @@
   box-shadow: none;
 }
 
-/* Rechte Spalte (Panel) */
-.foCalc :global(.tabPanel) {
+/* Rechte Spalte (Panel) — ohne max-width-Deckel */
+.uwCalc :global(.tabPanel) {
   margin-top: 0;
   min-width: 0;
   width: 100% !important;
   max-width: none !important;
 }
 
-/* Panel-Styles, Controls & Table (identisch) */
+/* Panel-Styles, Controls & Table */
 .panel {
   background: #152A42;
   border: 1px solid #2B4C73;
@@ -122,6 +122,7 @@
 .controls { display: flex; align-items: center; gap: 8px; }
 .ctrlLabel { font-size: 12px; color: #B0C4D9; }
 
+/* L2-Select separat */
 .ctrlSelect {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -143,6 +144,7 @@
 .ctrlSelect:hover { background-color: #2A4C72; }
 .ctrlSelect:focus-visible { outline: none; box-shadow: 0 0 0 2px #5C8BC6; }
 
+/* Tabelle */
 .tableWrap { overflow: auto; }
 .table {
   width: 100%;
@@ -167,6 +169,7 @@
 .row:hover { background: #20385C; }
 .note { color: #B0C4D9; font-size: 12px; margin-top: 8px; }
 
+/* Mobile */
 @media (max-width: 480px) {
   .panelHead { flex-direction: column; align-items: stretch; gap: 8px; }
   .controls { justify-content: space-between; }

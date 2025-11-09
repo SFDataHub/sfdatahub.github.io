@@ -5,7 +5,7 @@ import styles from "./AMRuneBonuses.module.css";
 // === Manifest-Import (mit integrierten Fallbacks) ===
 import {
   guideAssetByKey, // gibt { id, url, thumb, fallback } zurück
-} from "../../../data/guidehub/assets";
+} from "../../../../data/guidehub/assets";
 
 /**
  * Tabelle wie im Screenshot:

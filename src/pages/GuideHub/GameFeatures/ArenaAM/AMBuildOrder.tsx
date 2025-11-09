@@ -1,7 +1,7 @@
 // FILE: src/pages/GuideHub/ArenaAM/AMBuildOrder.tsx
 import React, { useMemo } from "react";
 import styles from "./AMBuildOrder.module.css";
-import { guideAssetByKey } from "../../../data/guidehub/assets";
+import { guideAssetByKey } from "../../../../data/guidehub/assets";
 
 export default function AMBuildOrder() {
   const info = guideAssetByKey("ambuildorder"); // enthält id, url, thumb, fallback

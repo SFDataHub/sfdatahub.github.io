@@ -18,7 +18,7 @@
 .colSystem {}
 .colFeedback {}
 
-/* ≥ 1024px Layout nach unserem Wireframe */
+/* >= 1024px layout */
 @media (min-width: 1024px) {
   .row {
     gap: 20px;
@@ -45,7 +45,7 @@
   .colFeedback { grid-column: span 4; }
 }
 
-/* ≥ 1440px etwas mehr Luft */
+/* >= 1440px a bit more space */
 @media (min-width: 1440px) {
   .row { gap: 24px; margin-bottom: 24px; }
 }
@@ -60,3 +60,97 @@
   .row { gap: 14px; margin-bottom: 14px; }
   .colRightstack { gap: 14px; }
 }
+
+/* ---------- Shared Cards / Sections ---------- */
+.card {
+  background: #1A2F4A;
+  border: 1px solid #2B4C73;
+  border-radius: 16px;
+  padding: 12px;
+  color: #E7F1FF;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.title { font-weight: 600; font-size: 14px; color: #F5F9FF; }
+.subtitle { font-size: 12px; color: #B0C4D9; margin-left: 8px; }
+.empty { color: #B0C4D9; font-size: 13px; padding: 6px 0; }
+.errorNote { color: #ffb4b4; font-size: 12px; margin-top: 6px; }
+.linkBtn, .primaryBtn, .navBtn, .closeBtn { cursor: pointer; }
+.primaryBtn {
+  background: #2B8AE0;
+  color: white;
+  border: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+.actionsRight { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+/* ---------- Tile Grid ---------- */
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+@media (min-width: 768px){ .tileGrid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (min-width: 1024px){ .tileGrid { grid-template-columns: repeat(5, minmax(0,1fr)); } }
+.tile {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 10px; border-radius: 12px; text-decoration: none;
+  background: #152A42; border: 1px solid #2B4C73; color: #E7F1FF;
+}
+.tile:focus { outline: 2px solid #2B8AE0; outline-offset: 2px; }
+.tileIcon { width: 36px; height: 36px; object-fit: cover; border-radius: 8px; }
+.tileIconFallback { width: 36px; height: 36px; display: grid; place-items: center; background: #254364; border-radius: 8px; font-weight: 700; }
+.tileLabel { font-size: 13px; color: #F5F9FF; text-align: center; }
+
+/* ---------- News List ---------- */
+.newsList { display: grid; gap: 8px; }
+.newsItem { padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
+.newsMeta { display: flex; gap: 8px; font-size: 12px; color: #B0C4D9; margin-bottom: 4px; }
+.newsAuthor { color: #E7F1FF; }
+.newsTime { opacity: 0.8; }
+.newsText { font-size: 13px; color: #E7F1FF; }
+.newsImage { margin-top: 6px; max-height: 160px; width: 100%; object-fit: cover; border-radius: 8px; }
+.linkBtn { margin-top: 8px; display: inline-block; color: #9ad1ff; }
+
+/* ---------- Carousel (YouTube & Live ctrls) ---------- */
+.carouselCtrls { display: flex; gap: 6px; align-items: center; }
+.navBtn { background: #254364; color: #E7F1FF; border: 1px solid #2B4C73; padding: 4px 8px; border-radius: 6px; }
+.navBtn:hover { background: #2B4C73; }
+.carousel { position: relative; height: 220px; overflow: hidden; border-radius: 12px; background: #152A42; border: 1px solid #2B4C73; display: grid; }
+.slide { grid-area: 1 / 1; display: grid; grid-template-rows: 1fr auto; text-decoration: none; color: inherit; }
+.slideActive { opacity: 1; transition: opacity 300ms; }
+.slideInactive { opacity: 0; pointer-events: none; }
+.slideThumb { width: 100%; height: 160px; object-fit: cover; }
+.slideFallback { width: 100%; height: 160px; display: grid; place-items: center; background: #254364; font-weight: 700; font-size: 24px; }
+.slideCaption { font-size: 13px; padding: 6px 8px; color: #E7F1FF; }
+
+/* ---------- Live Now ---------- */
+.liveCard { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
+.liveAvatar { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+.liveAvatarFallback { width: 48px; height: 48px; border-radius: 10px; background: #254364; display: grid; place-items: center; font-weight: 700; }
+.liveInfo {}
+.liveName { font-weight: 600; color: #F5F9FF; }
+.liveMeta { display: flex; gap: 8px; font-size: 12px; color: #B0C4D9; }
+.liveBadge { background: #e02b2b; color: white; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; }
+.liveViewers { color: #B0C4D9; }
+
+/* ---------- Modal (Schedule) ---------- */
+.modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; z-index: 1000; }
+.modal { width: min(100vw - 32px, 980px); max-height: 80vh; overflow: auto; background: #1A2F4A; border: 1px solid #2B4C73; border-radius: 16px; }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #2B4C73; }
+.modalTitle { font-weight: 600; color: #F5F9FF; }
+.closeBtn { background: #254364; color: #E7F1FF; border: 1px solid #2B4C73; border-radius: 8px; padding: 6px 10px; }
+.modalFilters { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+.formRow { display: grid; gap: 4px; color: #E7F1FF; font-size: 12px; }
+.formRowCheckbox { display: flex; gap: 8px; align-items: center; color: #E7F1FF; font-size: 12px; }
+.select, .input { background: #152A42; color: #E7F1FF; border: 1px solid #2B4C73; border-radius: 8px; padding: 6px 8px; }
+.tableWrap { padding: 10px 12px 16px; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { border-bottom: 1px solid #2B4C73; padding: 8px; text-align: left; font-size: 12px; color: #E7F1FF; }
+.table th { color: #B0C4D9; font-weight: 500; }
+

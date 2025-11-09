@@ -74,6 +74,11 @@ import GuildHubEvents from "./pages/GuildHub/Events";
 import GuildHubRoles from "./pages/GuildHub/Roles";
 import GuildHubSettings from "./pages/GuildHub/Settings";
 
+// Admin
+import AdminIndex from "./pages/Admin/Index";
+import AdminErrorLog from "./pages/Admin/ErrorLog";
+import AdminScansUploaded from "./pages/Admin/ScansUploaded";
+
 // Settings
 import Settings from "./pages/Settings";
 
@@ -224,6 +229,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/guild-hub/events" element={<GuildHubEvents />} />
             <Route path="/guild-hub/roles" element={<GuildHubRoles />} />
             <Route path="/guild-hub/settings" element={<GuildHubSettings />} />
+
+            {/* Admin */}
+            <Route path="/admin" element={<AdminIndex />} />
+            <Route path="/admin/errors" element={<AdminErrorLog />} />
+            <Route path="/admin/scans-uploaded" element={<AdminScansUploaded />} />
 
             {/* Settings */}
             <Route path="/settings" element={<Settings />} />

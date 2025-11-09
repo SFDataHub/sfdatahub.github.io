@@ -1,33 +1,13 @@
+// FILE: src/pages/GuideHub/Calculators/GemCalculator.tsx
 import React, { useMemo, useState } from "react";
 import styles from "./styles.module.css";
 import { calcNormalGem, calcBlackGem, calcLegendaryGem } from "../../../lib/calculators/gem/math";
 
-// Manifest EINBINDEN (wie von dir gewünscht).
-// Wir greifen defensiv zu, damit es auch ohne konkrete Keys kompiliert.
-// Wenn deine Icons (noch) nicht drin sind, werden Fallback-Shapes angezeigt.
-import * as GuideHubAssets from "../../../Data/guidehub/assets";
+// Manifest-Helper exakt aus deinem Manifest verwenden (feste Keys).
+// WICHTIG: Pfad gemäß deiner Angabe: src/data/guidehub/assets.ts
+import { guideAssetUrlByKey } from "../../../data/guidehub/assets";
 
 const MAXS = { char: 1000, mine: 100, hok: 1000 };
-
-// Utility: dot-path aus beliebigem Manifest lesen (z. B. "gems.normal")
-function getPath(obj: any, path: string): any {
-  return path.split(".").reduce((o, k) => (o && k in o ? o[k] : undefined), obj);
-}
-// Kandidaten je Typ (passe bei Bedarf an deine tatsächlichen Keys an)
-const CANDIDATES = {
-  normal: ["gems.normal", "gem.normal", "icons.gems.normal", "GEMS.NORMAL", "GEM_NORMAL", "assets.gems.normal"],
-  black: ["gems.black", "gem.black", "icons.gems.black", "GEMS.BLACK", "GEM_BLACK", "assets.gems.black"],
-  legendary: ["gems.legendary", "gem.legendary", "icons.gems.legendary", "GEMS.LEGENDARY", "GEM_LEGENDARY", "assets.gems.legendary"],
-};
-
-function resolveAsset(kind: keyof typeof CANDIDATES): string | undefined {
-  const manifest: any = (GuideHubAssets as any).default ?? GuideHubAssets;
-  for (const key of CANDIDATES[kind]) {
-    const hit = getPath(manifest, key);
-    if (typeof hit === "string" && hit.length > 0) return hit;
-  }
-  return undefined; // Fallback greift dann im UI
-}
 
 const GemCalculator: React.FC = () => {
   const [charLevel, setCharLevel] = useState<number | "">("");
@@ -46,10 +26,10 @@ const GemCalculator: React.FC = () => {
   const black = useMemo(() => (normal == null ? null : calcBlackGem(normal)), [normal]);
   const legendary = useMemo(() => (normal == null ? null : calcLegendaryGem(normal)), [normal]);
 
-  // Asset-URLs (wenn im Manifest vorhanden)
-  const normalSrc = resolveAsset("normal");
-  const blackSrc = resolveAsset("black");
-  const legendarySrc = resolveAsset("legendary");
+  // Asset-URLs: feste Keys aus deinem Manifest
+  const normalSrc = guideAssetUrlByKey("luckbig");       // Normal
+  const blackSrc = guideAssetUrlByKey("blackbig");       // Black
+  const legendarySrc = guideAssetUrlByKey("legendarybig"); // Legendary
 
   return (
     <div className={styles.wrap}>

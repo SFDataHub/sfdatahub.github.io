@@ -18,29 +18,32 @@ export type Category = {
 /** 11 Hauptkategorien (inkl. Dungeons) */
 export const categories: Category[] = [
   // LEFT
-  {
-    key: "fortress",
-    label: "Fortress",
-    to: "/guidehub?tab=fortress",
+{
+    key: "events",
+    label: "Events",
+    to: "/guidehub?tab=events",
     side: "left",
     sub: [
-      { key: "fortress-calculator", label: "Fortress Calculator", to: "/guidehub?tab=fortress&sub=fortress-calculator" },
-      { key: "fortress-package-skip-order", label: "Fortress Package skip order", to: "/guidehub?tab=fortress&sub=fortress-package-skip-order" },
-      { key: "gem-calculator", label: "Gem Calculator", to: "/guidehub?tab=fortress&sub=gem-calculator" },
-      { key: "fortress-attack-duplication", label: "Fortress attack duplication guide", to: "/guidehub?tab=fortress&sub=fortress-attack-duplication" },
+      { key: "event-list", label: "Event List", to: "/guidehub?tab=events&sub=event-list" },
+      { key: "event-cycle", label: "Event Cycle", to: "/guidehub?tab=events&sub=event-cycle" },
+      { key: "hellevator",
+      label: "Hellevator", 
+      to: "/guidehub?tab=hellevator",
+      sub2: [
+      { key: "hellevator-guide", label: "Hellevator Guide", to: "/guidehub?tab=hellevator&sub=hellevator-guide" },
     ],
   },
-  {
-    key: "underworld",
-    label: "Underworld",
-    to: "/guidehub?tab=underworld",
-    side: "left",
-    sub: [
-      { key: "underworld-calculator", label: "Underworld Calculator", to: "/guidehub?tab=underworld&sub=underworld-calculator" },
-      { key: "underworld-pro-package-skip-order", label: "Underworld Pro Package skip order", to: "/guidehub?tab=underworld&sub=underworld-pro-package-skip-order" },
+      { key: "legendary-dungeon", 
+      label: "Legendary Dungeon", 
+      to: "/guidehub?tab=legendary-dungeon",
+      sub2: [
+      { key: "legendary-dungeon-guide-epics-legendaries", label: "Legendary Dungeon Guide, Epics & Legendaries", to: "/guidehub?tab=legendary-dungeon&sub=legendary-dungeon-guide-epics-legendaries" },
     ],
   },
-  {
+    ],
+  },    
+
+{
     key: "progression",
     label: "Progression",
     to: "/guidehub?tab=progression",
@@ -81,45 +84,52 @@ export const categories: Category[] = [
     ],
   },
   {
-    key: "arenaam",
-    label: "Arena/AM",
-    to: "/guidehub?tab=arenaam",
+    key: "gamefeatures",
+    label: "Game Features",
+    to: "/guidehub?tab=gamefeatures",
     side: "left",
     sub: [
-      { key: "am-rune-bonuses", label: "AM Rune bonuses", to: "/guidehub?tab=arenaam&sub=am-rune-bonuses" },
-      { key: "am-build-order", label: "AM Build order", to: "/guidehub?tab=arenaam&sub=am-build-order" },
+      { key: "fortress", 
+	label: "Fortress", 
+	to: "/guidehub?tab=gamefeatures&sub=fortress",
+	sub2: [
+        { key: "fortress-calculator", label: "Fortress Calculator", to: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-calculator" },
+        { key: "fortress-package-skip-order", label: "Fortress Package skip order", to: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-package-skip-order" },
+        { key: "fortress-attack-duplication", label: "Fortress attack duplication guide", to: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-attack-duplication" },
     ],
   },
-
+        {key: "dungeons",
+        label: "Dungeons",
+    	to: "/guidehub?tab=dungeons",
+    	side: "left",
+    	sub2: [], // Inhalte später
+  },
+	{ key: "underworld", 
+	label: "Underworld", 
+	to: "/guidehub?tab=gamefeatures&sub=underworld",
+	sub2: [
+        { key: "underworld-calculator", label: "Underworld Calculator", to: "/guidehub?tab=gamefeatures&sub=underworld&sub2=underworld-calculator" },
+        { key: "underworld-pro-package-skip-order", label: "Underworld Pro Package skip order", to: "/guidehub?tab=gamefeatures&sub=underworld&sub2=underworld-pro-package-skip-order" },
+    ],
+ },
+      { key: "arenaam", 
+        label: "Arena Manager", 
+        to: "/guidehub?tab=gamefeatures&sub=arenaam",
+        sub2: [
+        { key: "am-rune-bonuses", label: "AM Rune bonuses", to: "/guidehub?tab=gamefeatures&sub=arenaam&sub2=am-rune-bonuses" },
+        { key: "am-build-order", label: "AM Build order", to: "/guidehub?tab=gamefeatures&sub=arenaam&sub2=am-build-order" },
+    ],
+ },
+    ],
+  },
+  
+  
+  
+    
   // RIGHT
-  {
-    key: "hellevator",
-    label: "Hellevator",
-    to: "/guidehub?tab=hellevator",
-    side: "right",
-    sub: [
-      { key: "hellevator-guide", label: "Hellevator Guide", to: "/guidehub?tab=hellevator&sub=hellevator-guide" },
-    ],
-  },
-  {
-    key: "legendary-dungeon",
-    label: "Legendary Dungeon",
-    to: "/guidehub?tab=legendary-dungeon",
-    side: "right",
-    sub: [
-      { key: "legendary-dungeon-guide-epics-legendaries", label: "Legendary Dungeon Guide, Epics & Legendaries", to: "/guidehub?tab=legendary-dungeon&sub=legendary-dungeon-guide-epics-legendaries" },
-    ],
-  },
-  {
-    key: "events",
-    label: "Events",
-    to: "/guidehub?tab=events",
-    side: "right",
-    sub: [
-      { key: "event-list", label: "Event List", to: "/guidehub?tab=events&sub=event-list" },
-      { key: "event-cycle", label: "Event Cycle", to: "/guidehub?tab=events&sub=event-cycle" },
-    ],
-  },
+ 
+
+  
   {
     key: "calculators",
     label: "Calculators",
@@ -149,11 +159,5 @@ export const categories: Category[] = [
   },
 
   // DUNGEONS als eigene Hauptkategorie (dein Wunsch)
-  {
-    key: "dungeons",
-    label: "Dungeons",
-    to: "/guidehub?tab=dungeons",
-    side: "left",
-    sub: [], // Inhalte später
-  },
+  
 ];

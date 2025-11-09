@@ -9,10 +9,10 @@ import styles from "./styles.module.css";
 import guideHubLogo from "../../assets/logo_guidehub.png";
 
 /** ========== IMPORTS: HAUPTSEITEN (= tab) ========== */
-import FortressIndex from "./Fortress/Index";
-import UnderworldIndex from "./Underworld/Index";
+import GameFeaturesIndex from "./GameFeatures/Index";
+
+
 import ProgressionIndex from "./Progression/Index";
-import ArenaAMIndex from "./ArenaAM/Index";
 import HellevatorIndex from "./Hellevator/Index";
 import LegendaryDungeonIndex from "./LegendaryDungeon/Index";
 import EventsIndex from "./Events/Index";
@@ -21,20 +21,23 @@ import InfographicsIndex from "./Infographics/Index";
 import ClassBookIndex from "./ClassBook/Index";
 import DungeonsIndex from "./Dungeons/Index";
 
+
 /** ========== IMPORTS: SUB-SEITEN (= sub) ========== */
 /* Fortress */
-import FortressCalculator from "./Fortress/FortressCalculator";
-import FortressPackageSkipOrder from "./Fortress/PackageSkipOrder";
-import FortressGemCalculator from "./Fortress/GemCalculator";
-import FortressAttackDuplication from "./Fortress/AttackDuplicationGuide";
+import FortressIndex from "./GameFeatures/Fortress/Index";
+import FortressCalculator from "./GameFeatures/Fortress/FortressCalculator";
+import FortressPackageSkipOrder from "./GameFeatures/Fortress/PackageSkipOrder";
+import FortressAttackDuplication from "./GameFeatures/Fortress/AttackDuplicationGuide";
 
 /* Underworld */
-import UnderworldCalculator from "./Underworld/UnderworldCalculator";
-import UnderworldProPackageSkipOrder from "./Underworld/ProPackageSkipOrder";
+import UnderworldIndex from "./GameFeatures/Underworld/Index";
+import UnderworldCalculator from "./GameFeatures/Underworld/UnderworldCalculator";
+import UnderworldProPackageSkipOrder from "./GameFeatures/Underworld/ProPackageSkipOrder";
 
 /* Arena/AM */
-import AMRuneBonuses from "./ArenaAM/AMRuneBonuses";
-import AMBuildOrder from "./ArenaAM/AMBuildOrder";
+import ArenaAMIndex from "./GameFeatures/ArenaAM/Index";
+import AMRuneBonuses from "./GameFeatures/ArenaAM/AMRuneBonuses";
+import AMBuildOrder from "./GameFeatures/ArenaAM/AMBuildOrder";
 
 /* Hellevator */
 import HellevatorGuide from "./Hellevator/HellevatorGuide";
@@ -83,10 +86,8 @@ type Cmp = React.ComponentType;
 
 /** 1) HAUPT: tab -> Komponente */
 const MAIN_MAP: Record<string, Cmp> = {
-  fortress: FortressIndex,
-  underworld: UnderworldIndex,
+  gamefeatures: GameFeaturesIndex,
   progression: ProgressionIndex,
-  arenaam: ArenaAMIndex,
   hellevator: HellevatorIndex,
   "legendary-dungeon": LegendaryDungeonIndex,
   events: EventsIndex,
@@ -98,19 +99,10 @@ const MAIN_MAP: Record<string, Cmp> = {
 
 /** 2) SUB: (tab, sub) -> Komponente */
 const SUB_MAP: Record<string, Record<string, Cmp>> = {
-  fortress: {
-    "fortress-calculator": FortressCalculator,
-    "fortress-package-skip-order": FortressPackageSkipOrder,
-    "gem-calculator": FortressGemCalculator,
-    "fortress-attack-duplication": FortressAttackDuplication,
-  },
-  underworld: {
-    "underworld-calculator": UnderworldCalculator,
-    "underworld-pro-package-skip-order": UnderworldProPackageSkipOrder,
-  },
-  arenaam: {
-    "am-rune-bonuses": AMRuneBonuses,
-    "am-build-order": AMBuildOrder,
+  gamefeatures: {
+    fortress: FortressIndex,
+    underworld: UnderworldIndex,
+    arenaam: ArenaAMIndex,
   },
   hellevator: {
     "hellevator-guide": HellevatorGuide,
@@ -140,7 +132,24 @@ const SUB_MAP: Record<string, Record<string, Cmp>> = {
 
 /** 3) SUB-SUB: (tab, sub, sub2) -> Komponente */
 const SUB2_MAP: Record<string, Record<string, Record<string, Cmp>>> = {
-  progression: {
+gamefeatures: {
+    arenaam: {
+      "am-rune-bonuses": AMRuneBonuses,
+      "am-build-order": AMBuildOrder,
+  },
+    underworld: {
+      "underworld-calculator": UnderworldCalculator,
+      "underworld-pro-package-skip-order": UnderworldProPackageSkipOrder,
+  },
+    fortress: {
+      "fortress-calculator": FortressCalculator,
+      "fortress-package-skip-order": FortressPackageSkipOrder,
+      "fortress-attack-duplication": FortressAttackDuplication,
+    },
+    // late: aktuell ohne Sub-Sub
+  },  
+
+progression: {
     early: {
       "first-weekend-guide": EarlyFirstWeekendGuide,
       "max-item-stats-calculator": EarlyMaxItemStatsCalculator,

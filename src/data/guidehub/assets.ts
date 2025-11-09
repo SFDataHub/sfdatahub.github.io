@@ -60,7 +60,21 @@ const DRIVE_BY_KEY: Record<string, string> = {
   // fortress banner
   // URL: https://drive.google.com/file/d/DRIVE_FILE_ID_HIER/view?usp=sharing
   fortressbanner: "DRIVE_FILE_ID_HIER",
-  // fortress gem-calculator icon
+
+  // fortress calculator
+  woodcuttergif: "1wss7GO8uQd4EDNOqlxi6XnPTJN9a3_XX",
+  treasurygif: "1vcW_dKiJrmM2QswU9eRdPuqBXMAWD3rw",
+  smithygif: "1vFNzcf6ozg1zfAjM4hCZ5uXDLrrxlb5i",
+  quarrygif: "1lULek5WgJIWP71jleIEmzcdOOMOXG1tP",
+  magetowergif: "19kufIsNJbdqQ6W4Le2pcBo5LIUTyPf1r",
+  laborerquagif: "1CBT0dRrA3ls2AWcs6xcQf3j_saW_w06d",
+  gemminegif: "1CBT0dRrA3ls2AWcs6xcQf3j_saW_w06d",
+  fortressgif: "1d1EuQpuyUACK3QSmqt3LS1E_VXAnMnv2",
+  fortificationgif: "1r9eE-dtW_tnwG0O_TcqbV0IfExrKWpHQ",
+  barracksgif: "19gHfiOcOSg3hFkkqalPWUbRAhSUrqjcE",
+  archerygif: "19gHfiOcOSg3hFkkqalPWUbRAhSUrqjcE",
+  academygif: "1ecNA5rlJhtZBwgDZeiw3SJFNl2jM51z9",
+
   fortressgemcalculatoricon: "DRIVE_FILE_ID_HIER",
   // fortress diagramme (mehrere Bilder → durchnummerieren)
   fortressdiagram1: "DRIVE_FILE_ID_HIER",
@@ -69,6 +83,19 @@ const DRIVE_BY_KEY: Record<string, string> = {
   // ===== UNDERWORLD =====
   underworldbanner: "DRIVE_FILE_ID_HIER",
   underworldcalculatoricon: "DRIVE_FILE_ID_HIER",
+
+  // Underworld calculator
+  uwgategif: "1FzKBmJcqXCOAUfdG7esFW6nOPkB8iJA3",
+  trollblockgif: "1xAP6-k2BfSe26Wfd9pumtikAc2GYMzXa",
+  torturechambergif: "1HVdmYILGq8B2GeJMhGAvxtgO_FPjWqK1",
+  soulextractorgif: "1rLtoEG-c_Q3bTzmEBrd4GydtEby2wVaI",
+  keepergif: "1qlcjFM6zaxNIbHjOCYndomdXS5MXiO1o",
+  hearthofdarkngif: "1mQR7OPGssgCLgiH8nEh8H2B_Dnp44Zei",
+  goldpitgif: "1PiL2fXnWyC8L7B6cep2ia282aB83KOqL",
+  goblinpitgif: "1sxzs5jx7oRxEqkxLwtfvM8CfkHzJJyKh",
+  gladiatorgif: "1KBe0WW5vytsOHob7i525db47XZTj-lfi",
+  adventuromaticgif: "1HzPBVJm_Oj5uxIjooHQ1jAG21_eS2Knh",
+
 
   // ===== ARENA / AM =====
   amicon: "1a_gPOH3j87wcsuI4sitTgwVA9lvlLJku",
@@ -91,7 +118,7 @@ const DRIVE_BY_KEY: Record<string, string> = {
   calculatorsbanner: "DRIVE_FILE_ID_HIER",
   calculatorsmaxitemstatsicon: "DRIVE_FILE_ID_HIER",
   calculatorsdungeonpauseopenxpicon: "DRIVE_FILE_ID_HIER",
-
+  
   // ===== PROGRESSION =====
   progressionbanner: "DRIVE_FILE_ID_HIER",
   progressionearlygemcalculatordiagram1: "DRIVE_FILE_ID_HIER",
@@ -120,7 +147,10 @@ const DRIVE_BY_KEY: Record<string, string> = {
   epicrune: "1J-kvaKzyxj_HU31rPUVk8g1wF32DjG-S",
   singlerune: "1FowkAzWip7QNI2k6CUAjDWBdAMJU1pFV",
   doublerune: "16ZL63Rh9SW76iSZLSYxFkFNyBMY57Lr8",
-
+  //Gems
+  luckbig: "1iYlE4rDU6rg3MHKG0vvwwb9wskdmu8-1",
+  blackbig: "14bA3CU46YkT4um1tHmFoOGLp8RZE_v0s",
+  legendarybig: "1soGwIo5IBQBhyX75KhD3-3jodoMoe450",
   // ===== hier beliebig erweitern =====
   // progressionlatebanner: "DRIVE_FILE_ID_HIER",
   // underworldppsodiagram1: "DRIVE_FILE_ID_HIER",

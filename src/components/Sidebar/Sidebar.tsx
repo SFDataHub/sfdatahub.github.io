@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture, Trophy
+  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
@@ -23,6 +23,7 @@ const main: Item[] = [
   { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true },
   { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" /> },
   { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" /> },
+  { to: "/admin",      label: "Admin",     icon: <ShieldCheck className="ico" /> },
   { to: "/playground", label: "Playground", icon: <Aperture className="ico" /> }, // <- ohne "/"
 ];
 
@@ -36,7 +37,7 @@ const categories: Item[] = [
   { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" /> },
 ];
 
- const SUBTABS: Record<string, SubItem[]> = {
+const SUBTABS: Record<string, SubItem[]> = {
   "/discover": [
     { to: "/players",            label: "Players" },
     { to: "/sfmagazine",         label: "SFMagazine" },
@@ -45,6 +46,12 @@ const categories: Item[] = [
     { to: "/servers",            label: "Servers" },
     { to: "/scans",              label: "Scans" },
     { to: "/discover/favorites", label: "Favorites" },
+  ],
+  "/admin": [
+    { to: "/admin",        label: "Overview" },
+    { to: "/admin/errors", label: "Error log" },
+    { to: "/admin/feedback", label: "Feedback" },
+
   ],
   "/settings": [
     { to: "/settings/profile",    label: "Profile" },
