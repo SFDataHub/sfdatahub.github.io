@@ -34,7 +34,7 @@ const HistoryBookPage: React.FC = () => {
   const flipNext = useCallback(() => pfRef.current?.flipNext(), []);
 
   return (
-    <ContentShell title="SF History Book" description="Echter Page-Curl Flipbook-Viewer (ohne Sound)." lastUpdated={undefined}>
+    <ContentShell title="SF History Book">
       <div className={styles.pageWrap}>
         <div className={styles.infoLine}>
           Blättern: Ecke ziehen, Ränder klicken, oder ← / →. Kein Sound.

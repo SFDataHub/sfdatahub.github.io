@@ -90,9 +90,11 @@ function getRootAndId(docSnap: any): { root?: string; id?: string } {
 export default function UniversalSearch({
   placeholder = "Suchen … (Spieler, Gilden, Server)",
   maxPerSection = 8,
+  getClassIcon,
 }: {
   placeholder?: string;
   maxPerSection?: number;
+  getClassIcon?: (className?: string | null, size?: number) => string | undefined;
 }) {
   const navigate = useNavigate();
   const [q, setQ] = React.useState("");
@@ -328,7 +330,7 @@ export default function UniversalSearch({
                   <div style={sx.sectionHdr}>Spieler</div>
                   {players.map((h, idx) => {
                     const active = idx === activeIndex;
-                    const iconUrl = iconUrlByLabel(h.className, 64);
+                    const iconUrl = getClassIcon?.(h.className, 64) ?? iconUrlByLabel(h.className, 64);
                     return (
                       <button
                         key={`p-${h.id}-${idx}`}

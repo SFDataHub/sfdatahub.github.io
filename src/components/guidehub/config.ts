@@ -98,12 +98,12 @@ export const categories: Category[] = [
         { key: "fortress-attack-duplication", label: "Fortress attack duplication guide", to: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-attack-duplication" },
     ],
   },
-        {key: "dungeons",
-        label: "Dungeons",
-    	to: "/guidehub?tab=dungeons",
-    	side: "left",
-    	sub2: [], // Inhalte später
-  },
+        {
+          key: "dungeons",
+          label: "Dungeons",
+          to: "/guidehub?tab=dungeons",
+          sub2: [], // Inhalte später
+        },
 	{ key: "underworld", 
 	label: "Underworld", 
 	to: "/guidehub?tab=gamefeatures&sub=underworld",

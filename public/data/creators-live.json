@@ -1,0 +1,754 @@
+{
+  "generatedAt": "2025-11-10T16:38:45.477Z",
+  "data": [
+    {
+      "id": "sheet-dorzer",
+      "name": "DORZER",
+      "avatar": "/avatars/dorzer.png",
+      "description": "Creator code: Dorzer • Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 558,
+      "totalViews": 68642,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-09T14:51:15Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@DORZER"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/dorzer"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.gg/EWEgrCq"
+        }
+      ]
+    },
+    {
+      "id": "sheet-sergio-kurai",
+      "name": "Sergio Kurai",
+      "avatar": "/avatars/sergio-kurai.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 517,
+      "totalViews": 83231,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-04-30T22:00:00.000Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@SergioKurai"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/sergiokuraiyt"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/BsuxhMWQYa"
+        }
+      ]
+    },
+    {
+      "id": "sheet-lootenant",
+      "name": "Lootenant",
+      "avatar": "/avatars/lootenant.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 411,
+      "totalViews": 62559,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-10T13:01:11Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Lootenant"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/lootenantsf"
+        }
+      ]
+    },
+    {
+      "id": "sheet-belleghar",
+      "name": "Belleghar",
+      "avatar": "/avatars/belleghar.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 1920,
+      "totalViews": 666024,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-10T13:30:27Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Bellegahr/videos"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/bellegahr"
+        }
+      ]
+    },
+    {
+      "id": "sheet-halo",
+      "name": "halo",
+      "avatar": "/avatars/halo.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 1200,
+      "totalViews": 115676,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-10T05:45:19Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@GPS71xCyn"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/haloxmd"
+        }
+      ]
+    },
+    {
+      "id": "sheet-gorgoss",
+      "name": "Gorgoss",
+      "avatar": "/avatars/gorgoss.png",
+      "description": "Creator code: Gorgoss • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 860,
+      "totalViews": 240345,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T15:44:58Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Gorgoss8000"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/gorgoss9000"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/J3gXmaRpbM"
+        }
+      ]
+    },
+    {
+      "id": "sheet-tuny",
+      "name": "TUNY",
+      "avatar": "/avatars/tuny.png",
+      "description": "Creator code: Tuny • Drops access: Drops • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 1800,
+      "totalViews": 182147,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-09T19:44:46Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@tuny-yt"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/tunyghost"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/tunysschuppen"
+        }
+      ]
+    },
+    {
+      "id": "sheet-alphatv",
+      "name": "AlphaTV",
+      "avatar": "/avatars/alphatv.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 1080,
+      "totalViews": 228889,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-07-08T19:22:01Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@AlphaTV01"
+        }
+      ]
+    },
+    {
+      "id": "sheet-salz-live",
+      "name": "Salz_Live",
+      "avatar": "/avatars/salz-live.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 1660,
+      "totalViews": 577354,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T21:43:52Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Salz_Live"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/salz_live"
+        }
+      ]
+    },
+    {
+      "id": "sheet-kepsoo",
+      "name": "Kepsoo",
+      "avatar": "/avatars/kepsoo.png",
+      "description": "Creator code: Kepsoo • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 860,
+      "totalViews": 240345,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-08T12:32:59Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@kepsoo"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.gg/FreedomSF"
+        }
+      ]
+    },
+    {
+      "id": "sheet-kysuel",
+      "name": "Kysuel",
+      "avatar": "/avatars/kysuel.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 233,
+      "totalViews": 55932,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-10T11:01:17Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Kysuel"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/kysuel"
+        }
+      ]
+    },
+    {
+      "id": "sheet-niisa",
+      "name": "Niisa",
+      "avatar": "/avatars/niisa.png",
+      "description": "Creator code: Niisa • Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 265,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-09-21T22:00:00.000Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UCMSTL1cRbnfii2rbQIPJMAA"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/kysuel"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/niisa"
+        }
+      ]
+    },
+    {
+      "id": "sheet-bandit",
+      "name": "BanditSF",
+      "avatar": "/avatars/bandit.png",
+      "description": "Creator code: Bandit • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T08:20:38Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/banditsf"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/QSUBnB3MDW"
+        }
+      ]
+    },
+    {
+      "id": "sheet-mozone",
+      "name": "MoZone",
+      "avatar": "/avatars/mozone.png",
+      "description": "Creator code: moZone • Drops access: Drops • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T11:07:37Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/mozone"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/mozonetv"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/cbhT3ZZqkG"
+        }
+      ]
+    },
+    {
+      "id": "sheet-chaze",
+      "name": "CHAZE",
+      "avatar": "/avatars/chaze.png",
+      "description": "Creator code: CHAZE • Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T10:57:36Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.twitch.tv/chaze"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/chaze"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/kCXvXVceaE"
+        }
+      ]
+    },
+    {
+      "id": "sheet-moxtales",
+      "name": "MoxTales",
+      "avatar": "/avatars/moxtales.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 267,
+      "totalViews": 29374,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T08:02:06Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@MoxTales"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/moxtales"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/rHuzrwbhcV"
+        }
+      ]
+    },
+    {
+      "id": "sheet-feena1986",
+      "name": "feena1986",
+      "avatar": "/avatars/feena1986.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T11:47:18Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/feena1986"
+        }
+      ]
+    },
+    {
+      "id": "sheet-blackhammerplay",
+      "name": "Blackhammerplay",
+      "avatar": "/avatars/blackhammerplay.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 2290,
+      "totalViews": 113497,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-10-29T17:18:28Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UCSbUYoE8AhJR0gVLK96USlQ"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/blackhammerplay"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/u3mX7sfVHN"
+        }
+      ]
+    },
+    {
+      "id": "sheet-crappa",
+      "name": "Crappa",
+      "avatar": "/avatars/crappa.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 3220,
+      "totalViews": 828776,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T15:01:39Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@Crappa"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/crappa"
+        }
+      ]
+    },
+    {
+      "id": "sheet-der-cyberpunk",
+      "name": "der_cyberpunk",
+      "avatar": "/avatars/der-cyberpunk.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 5200,
+      "totalViews": 995223,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-09T19:28:41Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/c/dercyberpunk"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/der_cyberpunk"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/GKV38UWCja"
+        }
+      ]
+    },
+    {
+      "id": "sheet-terste",
+      "name": "Terste",
+      "avatar": "/avatars/terste.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 11400,
+      "totalViews": 4053013,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T15:01:46Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UCq8Z8IO_3SG5Q-55fnb2gLA"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/terste"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/4XzTYgt"
+        }
+      ]
+    },
+    {
+      "id": "sheet-uwereinholzen",
+      "name": "UweReinholzen",
+      "avatar": "/avatars/uwereinholzen.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 238,
+      "totalViews": 121862,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-07T19:17:54Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UC-fk4horLbcxpKqwY-XEwAg"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/uwereinholzen"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/Qya8yBbfrg"
+        }
+      ]
+    },
+    {
+      "id": "sheet-mrmoregame",
+      "name": "MrMoregame",
+      "avatar": "/avatars/mrmoregame.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 393000,
+      "totalViews": 91858916,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-09T13:06:54Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/user/MrMoregame"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/mrmoregame"
+        }
+      ]
+    },
+    {
+      "id": "sheet-chromiede",
+      "name": "ChromieDE",
+      "avatar": "/avatars/chromiede.png",
+      "description": "Drops access: Droplets • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 17400,
+      "totalViews": 4920980,
+      "weeklyViews": 0,
+      "weeklyPosts": 3,
+      "lastActive": "2025-11-10T14:03:29Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UChts6QeisFXtH1B8YrJBB-A"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/chromiede"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/tHrHt56"
+        }
+      ]
+    },
+    {
+      "id": "sheet-egoleipzig",
+      "name": "eGoLeipzig",
+      "avatar": "/avatars/egoleipzig.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T14:28:04Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/egoleipzig"
+        }
+      ]
+    },
+    {
+      "id": "sheet-aurikos-zonestos",
+      "name": "Aurikos_Zonestos",
+      "avatar": "/avatars/aurikos-zonestos.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 18,
+      "totalViews": 588,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-10-25T19:51:59Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/channel/UCumWgXIj3ca-oEGOv40-QJg"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/aurikos_zonestos"
+        }
+      ]
+    },
+    {
+      "id": "sheet-xmaexel",
+      "name": "xmaexel",
+      "avatar": "/avatars/xmaexel.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T21:04:58Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/xmaexel"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/maexel"
+        }
+      ]
+    },
+    {
+      "id": "sheet-hunrizzle",
+      "name": "Hunrizzle",
+      "avatar": "/avatars/hunrizzle.png",
+      "description": "Creator code: Hunrizzle • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 246,
+      "totalViews": 4676,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-08-31T22:00:00.000Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/@HunrizzleTV"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/V8ukg7GAyQ"
+        }
+      ]
+    },
+    {
+      "id": "sheet-spielestyler",
+      "name": "Spielestyler",
+      "avatar": "/avatars/spielestyler.png",
+      "description": "Creator code: Spielestyler • Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T19:44:31Z",
+      "platforms": [
+        {
+          "type": "YouTube",
+          "url": "https://www.youtube.com/Spielestyler"
+        },
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/spielestyler"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/aAzzvgs"
+        }
+      ]
+    },
+    {
+      "id": "sheet-plotz",
+      "name": "Plotz",
+      "avatar": "/avatars/plotz.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-09-29T17:28:07Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/plotz"
+        }
+      ]
+    },
+    {
+      "id": "sheet-chriddel",
+      "name": "Chriddel",
+      "avatar": "/avatars/chriddel.png",
+      "description": "Imported from the SFDataHub community sheet.",
+      "language": "de",
+      "subscribers": 0,
+      "totalViews": 0,
+      "weeklyViews": 0,
+      "weeklyPosts": 1,
+      "lastActive": "2025-11-09T19:00:57Z",
+      "platforms": [
+        {
+          "type": "Twitch",
+          "url": "https://www.twitch.tv/chriddel"
+        },
+        {
+          "type": "Discord",
+          "url": "https://discord.com/invite/ZQNDTD6"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "creator": "MoZone",
+      "scope": "youtube",
+      "level": "warning",
+      "message": "Could not resolve channel",
+      "source": "https://www.youtube.com/mozone"
+    },
+    {
+      "creator": "CHAZE",
+      "scope": "youtube",
+      "level": "warning",
+      "message": "Could not resolve channel",
+      "source": "https://www.twitch.tv/chaze"
+    },
+    {
+      "creator": "Spielestyler",
+      "scope": "youtube",
+      "level": "warning",
+      "message": "Could not resolve channel",
+      "source": "https://www.youtube.com/Spielestyler"
+    }
+  ],
+  "stats": {
+    "youtubeLookups": 25,
+    "twitchLookups": 28
+  }
+}

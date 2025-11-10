@@ -96,3 +96,6 @@ export interface ImportOptions {
   rows: CsvRow[];
   onProgress?: (p: number) => void;
 }
+
+// Minimal detected payload type for parsers
+export type DetectedPayload<T = any> = { type: "players" | "guilds" | "scan"; raw: T };

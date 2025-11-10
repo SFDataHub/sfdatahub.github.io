@@ -68,7 +68,7 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
         <UniversalSearch
           placeholder="Suchen (Spieler)…"
           getClassIcon={getClassIcon}
-          maxResults={10}
+          maxPerSection={10}
         />
       </div>
 

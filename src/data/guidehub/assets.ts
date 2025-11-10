@@ -183,8 +183,8 @@ export function guideAssetByKey(
       fallback: "📘",
     };
   }
-  const direct = gdrive(id);
-  const thumb = toDriveThumbProxy(direct, size);
+  const direct = gdrive(id) ?? null;
+  const thumb = direct ? toDriveThumbProxy(direct, size) ?? null : null;
   return {
     id,
     url: direct,

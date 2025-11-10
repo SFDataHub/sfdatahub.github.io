@@ -13,7 +13,7 @@ export type BuildingKey =
   | "trollblock";
 
 export type LevelCost = {
-  level: number;
+  level: number | string;
   soul: number | null;
   gold: number | null;
   /** Raw Build Time (Hidden) in seconds — direkt aus Spalte H umgerechnet */

@@ -184,6 +184,13 @@ function LeftRail() {
           >
             Error log
           </Link>
+          <Link
+            to="/admin/creators-api"
+            className="rounded-xl border px-3 py-2 text-xs no-underline"
+            style={{ borderColor: "#2B4C73", background: "#1A2F4A", color: "#F5F9FF" }}
+          >
+            Creator APIs
+          </Link>
         </div>
       </div>
       <div>

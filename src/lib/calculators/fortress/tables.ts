@@ -77,8 +77,8 @@ export const BUILDINGS: Record<BuildingKey, BuildingTable> = {
     ],
   },
 
-  laborers_quarters: {
-    key: "laborers_quarters",
+  laborersquarter: {
+    key: "laborersquarter",
     title: "Laborer's Quarter",
     costs: [
       { level: 1, wood: 35, stone: 12, gold: 5, timeSec: TIME_1_15[0] },
@@ -149,8 +149,8 @@ export const BUILDINGS: Record<BuildingKey, BuildingTable> = {
     ],
   },
 
-  gem_mine: {
-    key: "gem_mine",
+  gemmine: {
+    key: "gemmine",
     title: "Gem Mine",
     costs: [
       { level: 1, wood: 50, stone: 17, gold: 15, timeSec: TIME_1_15[0] },
@@ -324,9 +324,9 @@ export const BUILDINGS: Record<BuildingKey, BuildingTable> = {
     ],
   },
 
-  fortification: {
-    key: "fortification",
-    title: "Fortification",
+  fortifications: {
+    key: "fortifications",
+    title: "fortifications",
     costs: [
       { level: 1, wood: 30, stone: 13, gold: 15, timeSec: TIME_1_15[0] },
       { level: 2, wood: 120, stone: 53, gold: 30, timeSec: TIME_1_15[1] },

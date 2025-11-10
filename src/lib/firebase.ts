@@ -17,5 +17,4 @@ if (!cfg.projectId) {
 const app = getApps().length ? getApp() : initializeApp(cfg);
 export const db = getFirestore(app);
 
-// Debug (einmalig ok)
-console.log("[FB] projectId =", cfg.projectId);
+// Hinweis: keine sensiblen Werte loggen

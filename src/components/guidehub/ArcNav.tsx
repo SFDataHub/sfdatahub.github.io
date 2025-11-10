@@ -76,6 +76,9 @@ const ArcNav: React.FC<Props> = ({
     return style;
   })();
 
+  const resolvedVariant: NonNullable<Props["variant"]> =
+    side === "sub" ? "sub" : side === "sub2" ? "sub2" : "main";
+
   return (
     <div
       className={[
@@ -94,7 +97,7 @@ const ArcNav: React.FC<Props> = ({
           className={styles.arcItem}
           style={{ transform: `translate(${x}px, ${y}px)` }}
         >
-          <CategoryIcon to={it.to} label={it.label} icon={it.icon} variant={side === "left" || side === "right" ? "main" : side} />
+          <CategoryIcon to={it.to} label={it.label} icon={it.icon} variant={resolvedVariant} />
         </div>
       ))}
     </div>

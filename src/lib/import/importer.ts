@@ -23,7 +23,7 @@ function pickByCanon(row: CSVRow, canonKey: string): any {
   for (const k of Object.keys(row)) if (CANON(k) === canonKey) return row[k];
   return undefined;
 }
-function pickAnyByCanon(row: CSVRow, keys: string[]): any {
+function pickAnyByCanon(row: CSVRow, keys: readonly string[]): any {
   for (const kk of keys) {
     const v = pickByCanon(row, kk);
     if (v != null && String(v) !== "") return v;

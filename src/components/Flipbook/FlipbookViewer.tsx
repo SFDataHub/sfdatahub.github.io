@@ -194,7 +194,7 @@ const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
               {leftPage ? (
                 <img
                   alt={`Page ${leftIndex !== null ? leftIndex + 1 : page}`}
-                  loading="eager" decoding="async" fetchpriority="high"
+                  loading="eager" decoding="async" fetchPriority="high"
                   {...getImgProps(leftPage)}
                 />
               ) : null}

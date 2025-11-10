@@ -1,19 +1,22 @@
-// /src/lib/importer/schemas.ts
-import type { Mapping, MetaAppConfig } from "./types";
-import { splitHeadersList, verifyHeaders } from "./preprocess";
+import { z } from "zod";
 
-export function extractMapping(kind: "players" | "guilds", meta: MetaAppConfig): Mapping {
-  const m = (meta.csvMapping as any)[kind] as Mapping;
-  // Normalize lists (strings -> arrays)
-  (m as any).allowedHeaders  = splitHeadersList((m as any).allowedHeaders);
-  (m as any).requiredHeaders = splitHeadersList((m as any).requiredHeaders);
-  return m;
-}
+export const PlayersPayload = z.object({
+  type: z.literal("players"),
+  server: z.string(),
+  players: z.array(z.record(z.string(), z.any())),
+});
+export type PlayersPayloadT = z.infer<typeof PlayersPayload>;
 
-export function ensureHeaders(kind: "players" | "guilds", rows: Record<string,string>[], mapping: Mapping, meta: MetaAppConfig) {
-  const strict = !!meta.requireAllHeaders || !!meta.rejectOnMissingHeaders;
-  const v = verifyHeaders(rows, (mapping as any).allowedHeaders, (mapping as any).requiredHeaders, strict);
-  if (!v.ok) {
-    throw new Error(`Missing required headers for ${kind}: ${v.missing.join(", ")}`);
-  }
-}
+export const GuildsPayload = z.object({
+  type: z.literal("guilds"),
+  server: z.string(),
+  guilds: z.array(z.record(z.string(), z.any())),
+});
+export type GuildsPayloadT = z.infer<typeof GuildsPayload>;
+
+export const ScanPayload = z.object({
+  type: z.literal("scan"),
+  server: z.string(),
+  data: z.record(z.string(), z.any()).optional(),
+});
+export type ScanPayloadT = z.infer<typeof ScanPayload>;

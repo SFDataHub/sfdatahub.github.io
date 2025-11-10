@@ -25,7 +25,7 @@ export default function GuildBaseStatsBroadcastTile({
   members, avgLevel, totalPower, activity7d,
   topClasses, tickerItems, href, onClick, className,
 }: GuildBaseStatsBroadcastTileProps) {
-  const prefersReduced = useReducedMotion();
+  const prefersReduced = !!useReducedMotion();
 
   // Freshness
   const freshness = useMemo(() => {

@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../../../firebase"; // <- bestehende DB nutzen
+import { db } from "../../firebase"; // <- bestehende DB nutzen
 import type { MonthKey } from "./types";
 
 // kleine Utils

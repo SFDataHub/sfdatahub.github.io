@@ -1,108 +1,97 @@
 .wrapper {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.8fr;
-  gap: 12px;
+  gap: 18px;
 }
 
 .panel {
-  background: #152A42;
-  border: 1px solid #2B4C73;
-  border-radius: 14px;
-  padding: 12px;
-  color: #FFFFFF;
+  background: rgba(10, 18, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
-.title { font-size: 18px; font-weight: 700; color: #F5F9FF; }
-
-.table { width: 100%; border-collapse: collapse; font-size: 14px; }
-
-.table th {
-  background: #1E3657;
-  color: #D6E4F7;
-  text-align: left;
-  padding: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--title, #f5f9ff);
 }
-
-.table td { border-top: 1px solid #2C4A73; padding: 6px 8px; }
-.row:hover { background: #20385C; }
-
-.name { width: 48%; }
-.selectCell { width: 90px; }
-.sumCell { text-align: right; white-space: nowrap; }
-
-.footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #2C4A73; display: flex; flex-direction: column; gap: 6px; }
-.footerLine { display: flex; justify-content: space-between; font-weight: 600; }
 
 .resetBtn {
-  background: #1E2F47; color: #FFFFFF; border: 1px solid #2B4C73;
-  padding: 6px 10px; border-radius: 10px; cursor: pointer;
-}
-.resetBtn:hover { background: #2A4C72; }
-
-.note { font-size: 12px; color: #B0C4D9; }
-
-@media (max-width: 1200px) { .wrapper { grid-template-columns: 1fr; } }
-
-/* === ONLY dropdown/number look in .selectCell (no layout changes) === */
-.selectCell select,
-.selectCell input[type="number"] {
-  font: inherit;                 /* übernimmt deine Schrift */
-  color: #FFFFFF;                /* Text */
-  background: #1A2F4A;          /* Kachel normal */
-  border: 1px solid #2B4C73;    /* Rahmen */
-  border-radius: 8px;
-  height: 28px;
-  line-height: 28px;
-  padding: 0 28px 0 8px;
-  box-shadow: none;
-  transition: background-color .15s, border-color .15s, box-shadow .15s;
-  /* KEIN width, KEIN display -> Breite bleibt durch .selectCell (90px) gesteuert */
-  /* KEIN appearance reset, damit nichts am Layout „springt“ */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--title, #f5f9ff);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-/* Nur das Chevron für <select> hinzufügen */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: 8px;
+  color: var(--text-soft, #b0c4d9);
+}
+
+.row:nth-child(2n) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.row td {
+  padding: 6px 4px;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--title, #f5f9ff);
+}
+
 .selectCell select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5' stroke='%235C8BC6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 14px 14px;
+  width: 100%;
+  background: #101f33;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--title, #f5f9ff);
+  border-radius: 8px;
+  padding: 4px 8px;
 }
 
-/* Hover/Focus */
-.selectCell select:hover,
-.selectCell input[type="number"]:hover {
-  background: #25456B;          /* Kachel-Hover */
-  border-color: #5C8BC6;        /* Accent */
-}
-.selectCell select:focus,
-.selectCell input[type="number"]:focus {
-  outline: none;
-  border-color: #5C8BC6;
-  box-shadow: 0 0 0 3px rgba(92,139,198,.35);
+.sumCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--title, #f5f9ff);
 }
 
-/* Dropdown-Optionen (nur Look) */
-.selectCell option {
-  color: #FFFFFF;
-  background: #14273E;
+.footer {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-soft, #b0c4d9);
 }
 
-/* WebKit-Spinner etwas abdunkeln (rein optisch) */
-.selectCell input[type="number"]::-webkit-outer-spin-button,
-.selectCell input[type="number"]::-webkit-inner-spin-button {
-  filter: invert(80%);
+.footerLine {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
 }
 
+.note {
+  font-size: 12px;
+  color: var(--text-soft, #b0c4d9);
+}

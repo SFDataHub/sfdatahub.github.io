@@ -78,6 +78,7 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 import AdminIndex from "./pages/Admin/Index";
 import AdminErrorLog from "./pages/Admin/ErrorLog";
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
+import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 
 // Settings
 import Settings from "./pages/Settings";
@@ -234,6 +235,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/admin" element={<AdminIndex />} />
             <Route path="/admin/errors" element={<AdminErrorLog />} />
             <Route path="/admin/scans-uploaded" element={<AdminScansUploaded />} />
+        <Route path="/admin/creators-api" element={<AdminCreatorsAPI />} />
 
             {/* Settings */}
             <Route path="/settings" element={<Settings />} />

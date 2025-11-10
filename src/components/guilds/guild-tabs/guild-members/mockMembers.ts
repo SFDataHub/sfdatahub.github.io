@@ -19,8 +19,23 @@ export const mockMembers: Member[] = Array.from({ length: 16 }).map((_, i) => {
   const sumBase = Object.values(baseStats).reduce((a,b)=>a+b,0);
   const totalStats = sumBase + Math.floor(r()*500);
 
-  return { id: `${server}__${i+1}`, name, class: cls, role, level, power, scrapbook,
-           server, activity, online, baseStats, totalStats,
-           joinedAt: new Date(Date.now() - (10 + Math.floor(r()*365))*86400000),
-           lastOnline: new Date(Date.now() - Math.floor(r()*5*86400000) ) };
+  const joinedAt = Date.now() - (10 + Math.floor(r() * 365)) * 86400000;
+  const lastOnline = Date.now() - Math.floor(r() * 5 * 86400000);
+
+  return {
+    id: `${server}__${i + 1}`,
+    name,
+    class: cls,
+    role,
+    level,
+    power,
+    scrapbook,
+    server,
+    activity,
+    online,
+    baseStats,
+    totalStats,
+    joinedAt,
+    lastOnline,
+  };
 });

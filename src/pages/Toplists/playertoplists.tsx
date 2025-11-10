@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 
 import ContentShell from "../../components/ContentShell";
-import { useFilters, SERVERS } from "../../components/Filters/FilterContext";
+import { useFilters, SERVERS, type DaysFilter } from "../../components/Filters/FilterContext";
 import HudFilters from "../../components/Filters/HudFilters";
 import ServerSheet from "../../components/Filters/ServerSheet";
 import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
@@ -94,7 +94,7 @@ function TableDataView({
 }: {
   servers: string[];
   classes: string[];
-  range: "all" | "3d" | "7d" | "14d" | "30d" | "60d" | "90d";
+  range: DaysFilter;
   sortKey: string;
 }) {
   const { state, setFilters, setSort } = useToplistsData();
@@ -102,10 +102,12 @@ function TableDataView({
 
   // HUD-Filter -> Provider
   useEffect(() => {
+    const providerRange =
+      range === "all" ? "all" : range === 60 ? "30d" : `${range}d`;
     setFilters({
       servers,
       classes,
-      timeRange: (range === "60d" ? "30d" : (range as any)),
+      timeRange: providerRange as any,
     });
   }, [servers, classes, range, setFilters]);
 

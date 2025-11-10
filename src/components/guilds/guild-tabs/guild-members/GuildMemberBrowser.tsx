@@ -5,6 +5,16 @@ import MemberDetailTop from "./MemberDetailTop";
 import MemberListView from "./MemberListView";
 import MemberCardGrid from "./MemberCardGrid";
 
+const normalizeBaseStats = (stats?: Member["baseStats"]): Record<string, number> | undefined => {
+  if (!stats) return undefined;
+  const normalized: Record<string, number> = {};
+  (["main", "con", "sumBaseTotal"] as const).forEach((key) => {
+    const value = stats[key];
+    if (typeof value === "number") normalized[key] = value;
+  });
+  return Object.keys(normalized).length ? normalized : undefined;
+};
+
 export default function GuildMemberBrowser({
   members,
   defaultView = "list",
@@ -64,7 +74,7 @@ export default function GuildMemberBrowser({
         }
         case "totalStats": {
           // Fallback auf baseStats, falls totalStats fehlt
-          return (m.totalStats ?? sumBaseStats(m.baseStats)) ?? -Infinity;
+          return (m.totalStats ?? sumBaseStats(normalizeBaseStats(m.baseStats))) ?? -Infinity;
         }
         default:
           return (m as any)[sortKey];

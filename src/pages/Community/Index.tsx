@@ -32,7 +32,6 @@ export default function CommunityIndex() {
       <div className={styles.topWrap}>
         <CommunityHubDashboard
           logoSrc={communityLogo}
-          titleI18nKey="community.index.title"
         />
       </div>
       <div className={styles.divider} />

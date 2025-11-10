@@ -1,9 +1,18 @@
 // src/components/Filters/HudFilters.tsx
 import React from "react";
-import { useFilters } from "./FilterContext";
+import { useFilters, type DaysFilter } from "./FilterContext";
 import { CLASSES } from "../../data/classes";
 import styles from "./filters.module.css";
 import { ClassIconButton } from "./atoms";
+
+const RANGE_OPTIONS: { label: string; value: DaysFilter }[] = [
+  { label: "3d", value: 3 },
+  { label: "7d", value: 7 },
+  { label: "14d", value: 14 },
+  { label: "30d", value: 30 },
+  { label: "90d", value: 90 },
+  { label: "all", value: "all" },
+];
 
 export default function HudFilters() {
   const {
@@ -73,9 +82,14 @@ export default function HudFilters() {
 
       {/* Range */}
       <div className={styles.segmented} role="group" aria-label="Range">
-        {(["3d", "7d", "14d", "30d", "90d", "all"] as const).map((k) => (
-          <button type="button" key={k} aria-pressed={range === k} onClick={() => setRange(k)}>
-            {k}
+        {RANGE_OPTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.label}
+            aria-pressed={range === option.value}
+            onClick={() => setRange(option.value)}
+          >
+            {option.label}
           </button>
         ))}
       </div>

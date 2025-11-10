@@ -68,8 +68,8 @@ export function guildIconByName(
       fallback: "🏰",
     };
   }
-  const direct = gdrive(id);
-  const thumb = toDriveThumbProxy(direct, size); // gleiches Verhalten wie bei Klassen-Icons
+  const direct = gdrive(id) ?? null;
+  const thumb = direct ? toDriveThumbProxy(direct, size) ?? null : null; // gleiches Verhalten wie bei Klassen-Icons
   return {
     id,
     url: direct,

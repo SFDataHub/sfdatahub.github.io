@@ -3,8 +3,21 @@ import { Link, useSearchParams } from "react-router-dom";
 import styles from "./styles.module.css";
 import ArcNav from "./ArcNav";
 
+const CATEGORY_KEYS = ["creators", "scans", "predictions", "news", "feedback"] as const;
+type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
+type HubCategory = {
+  key: CategoryKey;
+  label: string;
+  to: string;
+  side: "left" | "right";
+  icon?: string;
+};
+
+type SubCategory = { key: string; label: string; to: string; icon?: string };
+
 // Lokale Kategorien und Subkategorien
-const categories = [
+const categories: HubCategory[] = [
   { key: "creators", label: "Creators", to: "/community?tab=creators", side: "left" },
   { key: "scans", label: "Scans", to: "/community?tab=scans", side: "left" },
   { key: "predictions", label: "Predictions", to: "/community?tab=predictions", side: "left" },
@@ -12,7 +25,7 @@ const categories = [
   { key: "feedback", label: "Feedback", to: "/community?tab=feedback", side: "right" },
 ];
 
-const subcategories = {
+const subcategories: Record<CategoryKey, SubCategory[]> = {
   creators: [
     { key: "streamers", label: "Streamers", to: "/community?tab=creators&sub=streamers" },
     { key: "youtubers", label: "YouTubers", to: "/community?tab=creators&sub=youtubers" },
@@ -35,6 +48,15 @@ const subcategories = {
   ],
 };
 
+const categoryKeySet = new Set<string>(CATEGORY_KEYS);
+const categoryMap = categories.reduce<Record<CategoryKey, HubCategory>>((acc, cat) => {
+  acc[cat.key] = cat;
+  return acc;
+}, {} as Record<CategoryKey, HubCategory>);
+
+const isCategoryKey = (value: string | null): value is CategoryKey =>
+  typeof value === "string" && categoryKeySet.has(value);
+
 type Props = {
   logoSrc: string;
 };
@@ -43,11 +65,12 @@ const CommunityHubDashboard: React.FC<Props> = ({ logoSrc }) => {
   const [params] = useSearchParams();
   const activeTab = params.get("tab") || null;
 
-  const leftCats = useMemo(() => categories.filter(c => c.side === "left"), [categories]);
-  const rightCats = useMemo(() => categories.filter(c => c.side === "right"), [categories]);
+  const leftCats = useMemo(() => categories.filter((c) => c.side === "left"), []);
+  const rightCats = useMemo(() => categories.filter((c) => c.side === "right"), []);
 
-  const activeSub = activeTab ? subcategories[activeTab] ?? [] : [];
-  const anchorSide = categories.find(c => c.key === activeTab)?.side ?? "right";
+  const activeKey = isCategoryKey(activeTab) ? activeTab : null;
+  const activeSub = activeKey ? subcategories[activeKey] : [];
+  const anchorSide = activeKey ? categoryMap[activeKey].side : "right";
 
   // === exakte Zentrierung: Versatz aus realer Logo-Breite berechnen ===
   const logoRef = useRef<HTMLImageElement | null>(null);
@@ -97,7 +120,7 @@ const CommunityHubDashboard: React.FC<Props> = ({ logoSrc }) => {
       {/* Unterkategorien – außen andocken, bleiben offen wenn tab aktiv */}
       {activeSub.length > 0 && (
         <ArcNav
-          items={activeSub.map(s => ({ key: s.key, to: s.to, label: s.label, icon: s.icon }))}
+          items={activeSub.map((s) => ({ key: s.key, to: s.to, label: s.label, icon: s.icon }))}
           side="sub"
           anchorSide={anchorSide}
           compact

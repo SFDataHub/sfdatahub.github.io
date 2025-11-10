@@ -1,6 +1,6 @@
 // src/layout/ContentLayout.tsx
 import React from "react";
-import { ContentShell } from "../components/ContentShell";
+import ContentShell from "../components/ContentShell";
 
 type Props = {
   title?: string;

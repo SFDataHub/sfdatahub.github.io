@@ -1,6 +1,6 @@
 // FILE: src/components/Flipbook/FlipbookCurlViewer.tsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { PageFlip, SizeType } from "page-flip";
+import { PageFlip } from "page-flip";
 import styles from "./curl.module.css";
 
 // ---- Typen -------------------------------------------------------------------
@@ -17,7 +17,7 @@ type FlipbookManifest = {
 type Props = {
   slug: string;
   initialPage?: number;                         // 1-basiert
-  onReady?: (pf: PageFlip) => void;             // PageFlip-Instanz herausgeben
+  onReady?: (pf: any) => void;             // PageFlip-Instanz herausgeben
   onPageChange?: (page0: number) => void;       // 0-basiert (Parent macht +1)
   noSound?: boolean;
 };
@@ -197,7 +197,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     const opts = {
       width: manifest.pageWidth,
       height: manifest.pageHeight,
-      size: "stretch" as SizeType,
+      size: "stretch" as any,
       maxShadowOpacity: 0.25,
       showCover: false,
       mobileScrollSupport: true,

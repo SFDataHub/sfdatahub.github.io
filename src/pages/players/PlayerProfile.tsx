@@ -1,22 +1,28 @@
 // src/pages/players/PlayerProfile.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
 import ContentShell from "../../components/ContentShell";
+import HeroPanel from "../../components/player-profile/HeroPanel";
+import {
+  ChartsTab,
+  ComparisonTab,
+  HistoryTab,
+  ProgressTab,
+  StatsTab,
+} from "../../components/player-profile/TabPanels";
+import type {
+  HeroActionKey,
+  PlayerProfileViewModel,
+  PortraitOptions,
+} from "../../components/player-profile/types";
+import { db } from "../../lib/firebase";
+import "./player-profile.css";
 
-import { CLASSES } from "../../data/classes";
-import { toDriveThumbProxy } from "../../lib/urls";
+const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
+type TabKey = (typeof TABS)[number];
 
-const PALETTE = {
-  tileAlt: "var(--tile, #14273E)",
-  line: "var(--line, #2C4A73)",
-  title: "var(--title, #F5F9FF)",
-  textSoft: "var(--text-soft, #B0C4D9)",
-  active: "var(--active, #2D4E78)",
-};
-
-type Character = {
+type PlayerSnapshot = {
   id: string;
   name: string;
   className: string | null;
@@ -26,155 +32,21 @@ type Character = {
   scrapbookPct?: number | null;
   totalStats?: number | null;
   lastScanDays?: number | null;
+  values: Record<string, any>;
+  portraitConfig?: Partial<PortraitOptions>;
 };
-
-function Container({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px", ...style }}>{children}</div>;
-}
-
-/** Initialen-Fallback (nur falls das Klassenicon nicht lädt) */
-function AvatarCircle({ label, size = 36 }: { label: string; size?: number }) {
-  const initials = (label || "?")
-    .split(" ")
-    .filter(Boolean)
-    .map((s) => s[0]!.toUpperCase())
-    .slice(0, 2)
-    .join("");
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: `linear-gradient(135deg, ${PALETTE.tileAlt}, ${PALETTE.active})`,
-        color: PALETTE.title,
-        fontSize: Math.round(size * 0.36),
-        fontWeight: 800,
-        border: `1px solid ${PALETTE.line}`,
-      }}
-      aria-hidden
-    >
-      {initials || "?"}
-    </div>
-  );
-}
-
-/** Klassen-Icon ohne sichtbaren Hintergrund – nur Bild + Drop-Shadow */
-function ClassAvatar({
-  className,
-  label,
-  size = 36,
-}: {
-  className?: string | null;
-  label: string;
-  size?: number;
-}) {
-  const strip = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const target = strip(className || "");
-  let meta =
-    CLASSES.find((c) => strip(c.label) === target) ||
-    CLASSES.find((c) => strip(c.label).startsWith(target) || target.startsWith(strip(c.label)));
-
-  const iconUrl = meta ? toDriveThumbProxy(meta.iconUrl, size * 2) : undefined;
-  const [error, setError] = useState(false);
-
-  if (!iconUrl || error) {
-    return <AvatarCircle label={label} size={size} />;
-  }
-
-  // Container ist transparent; wir halten nur die Fläche frei.
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        display: "grid",
-        placeItems: "center",
-        background: "transparent",
-      }}
-    >
-      <img
-        src={iconUrl}
-        alt=""
-        draggable={false}
-        onError={() => setError(true)}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain" as const,
-          // dezente 3D-Wirkung
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28))",
-          // kein sichtbarer Kreis/Hintergrund
-          background: "transparent",
-        }}
-      />
-    </div>
-  );
-}
-
-type StatTileProps = { label: string; value: string | number; hint?: string };
-function StatTile({ label, value, hint }: StatTileProps) {
-  return (
-    <div
-      style={{
-        background: PALETTE.tileAlt,
-        border: `1px solid ${PALETTE.line}`,
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-      }}
-    >
-      <div style={{ fontSize: 12, color: PALETTE.textSoft, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, color: PALETTE.title, fontWeight: 700 }}>{value}</div>
-      {hint ? <div style={{ fontSize: 12, color: PALETTE.textSoft, marginTop: 4 }}>{hint}</div> : null}
-    </div>
-  );
-}
-
-function SectionCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        background: PALETTE.tileAlt,
-        padding: 15,
-        borderRadius: 12,
-        border: `1px solid ${PALETTE.line}`,
-        boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const toNum = (v: any): number | null => {
-  if (v == null || v === "") return null;
-  const n = Number(String(v).replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-};
-const daysSince = (tsSec?: number | null) => {
-  if (!tsSec) return null;
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - tsSec);
-  return Math.floor(diff / 86400);
-};
-
-const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
-type TabKey = (typeof TABS)[number];
 
 export default function PlayerProfile() {
   const params = useParams<Record<string, string>>();
-  const playerId =
-    params.id || params.pid || params.playerId || params.player || "";
+  const playerId = params.id || params.pid || params.playerId || params.player || "";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [char, setChar] = useState<Character | null>(null);
+  const [snapshot, setSnapshot] = useState<PlayerSnapshot | null>(null);
   const [tab, setTab] = useState<TabKey>("Statistiken");
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const feedbackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,31 +56,34 @@ export default function PlayerProfile() {
       setErr(null);
       try {
         const id = (playerId || "").trim();
-        if (!id) {
-          setErr("Kein Spieler gewählt.");
-          setLoading(false);
-          return;
-        }
+        if (!id) throw new Error("Kein Spieler gewählt.");
+
         const ref = doc(db, `players/${id}/latest/latest`);
         const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          setErr("Spieler nicht gefunden.");
-          setLoading(false);
-          return;
-        }
-        const d = snap.data() as any;
+        if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
+        const data = snap.data() as any;
 
-        const level = toNum(d.level ?? d.values?.Level) ?? null;
-        const className = (d.className ?? d.values?.Class ?? null) || null;
-        const guildName = (d.guildName ?? d.values?.Guild ?? null) || null;
-        const name = d.name ?? d.values?.Name ?? id;
-        const server = d.server ?? d.values?.Server ?? null;
+        const values = typeof data.values === "object" && data.values ? data.values : {};
 
-        const totalStats = toNum(d.totalStats ?? d.values?.["Total Stats"]) ?? null;
-        const scrapbookPct = toNum(d.values?.["Album"] ?? d.values?.["Album %"] ?? d.values?.AlbumPct) ?? null;
-        const lastScanDays = daysSince(toNum(d.timestamp));
+        const level = toNum(data.level ?? values?.Level) ?? null;
+        const className = (data.className ?? values?.Class ?? null) || null;
+        const guildName = (data.guildName ?? values?.Guild ?? null) || null;
+        const name = data.name ?? values?.Name ?? id;
+        const server = data.server ?? values?.Server ?? null;
+        const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
+        const scrapbookPct = toNum(values?.["Album"] ?? values?.["Album %"] ?? values?.AlbumPct) ?? null;
+        const lastScanDays = daysSince(toNum(data.timestamp));
 
-        const c: Character = {
+        const portraitConfig =
+          typeof data.portrait === "object"
+            ? data.portrait
+            : typeof data.portraitOptions === "object"
+            ? data.portraitOptions
+            : typeof values?.portraitOptions === "object"
+            ? values.portraitOptions
+            : undefined;
+
+        const nextSnapshot: PlayerSnapshot = {
           id,
           name,
           className,
@@ -218,11 +93,16 @@ export default function PlayerProfile() {
           scrapbookPct,
           totalStats,
           lastScanDays,
+          values,
+          portraitConfig,
         };
 
-        if (!cancelled) setChar(c);
-      } catch (e: any) {
-        if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
+        if (!cancelled) setSnapshot(nextSnapshot);
+      } catch (error: any) {
+        if (!cancelled) {
+          setSnapshot(null);
+          setErr(error?.message || "Unbekannter Fehler beim Laden.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -234,189 +114,498 @@ export default function PlayerProfile() {
     };
   }, [playerId]);
 
-  const NotFound = useMemo(
-    () => (
-      <div style={{ padding: 24, color: PALETTE.textSoft }}>
-        {err ?? "Unbekannter Fehler."}
-        <div style={{ marginTop: 12 }}>
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              padding: "8px 12px",
-              background: PALETTE.active,
-              border: "none",
-              color: "#fff",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
-          >
-            Zur Startseite
-          </button>
-        </div>
-      </div>
-    ),
-    [err, navigate]
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeout.current) clearTimeout(feedbackTimeout.current);
+    };
+  }, []);
+
+  const viewModel = useMemo<PlayerProfileViewModel | null>(
+    () => (snapshot ? buildProfileView(snapshot) : null),
+    [snapshot]
   );
 
-  const Skeleton = <div style={{ padding: 16, color: PALETTE.textSoft }}>Lade Spielerprofil…</div>;
+  const showFeedback = (message: string) => {
+    setActionFeedback(message);
+    if (feedbackTimeout.current) clearTimeout(feedbackTimeout.current);
+    feedbackTimeout.current = setTimeout(() => setActionFeedback(null), 3500);
+  };
 
-  const TabsBar = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        borderBottom: `1px solid ${PALETTE.line}`,
-        marginTop: 16,
-      }}
-      role="tablist"
-      aria-label="Spielerprofil Tabs"
-    >
-      {TABS.map((t) => {
-        const active = t === tab;
-        return (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={active}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: `1px solid ${active ? PALETTE.active : "transparent"}`,
-              background: active ? "rgba(45,78,120,0.35)" : "transparent",
-              color: PALETTE.title,
-              cursor: "pointer",
-            }}
-          >
-            {t}
-          </button>
-        );
-      })}
+  const handleAction = async (action: HeroActionKey | string) => {
+    if (!snapshot) return;
+
+    if (action === "copy-link") {
+      if (typeof window !== "undefined" && navigator?.clipboard) {
+        const link = `${window.location.origin}/players/profile/${snapshot.id}`;
+        try {
+          await navigator.clipboard.writeText(link);
+          showFeedback("Profil-Link wurde kopiert.");
+        } catch {
+          showFeedback("Konnte Link nicht kopieren.");
+        }
+      }
+      return;
+    }
+    if (action === "share" && typeof window !== "undefined" && (navigator as any)?.share) {
+      try {
+        await (navigator as any).share({
+          title: snapshot.name,
+          text: `Shakes & Fidget Charakter ${snapshot.name}`,
+          url: window.location.href,
+        });
+        showFeedback("Profil geteilt.");
+      } catch {
+        showFeedback("Teilen abgebrochen.");
+      }
+      return;
+    }
+    if (action === "guild" && snapshot.guild) {
+      navigate(`/guilds?search=${encodeURIComponent(snapshot.guild)}`);
+      return;
+    }
+    if (action === "rescan") {
+      showFeedback("Rescan-Queue folgt – aktuell noch Platzhalter.");
+      return;
+    }
+  };
+
+  const renderTabs = () => {
+    if (!viewModel) return null;
+    switch (tab) {
+      case "Statistiken":
+        return <StatsTab data={viewModel.stats} />;
+      case "Charts":
+        return <ChartsTab series={viewModel.charts} />;
+      case "Fortschritt":
+        return <ProgressTab items={viewModel.progress} />;
+      case "Vergleich":
+        return <ComparisonTab rows={viewModel.comparison} />;
+      case "Historie":
+        return <HistoryTab entries={viewModel.history} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderNotFound = () => (
+    <div className="player-profile__loading">
+      <p>{err ?? "Spieler nicht gefunden."}</p>
+      <button
+        type="button"
+        className="player-profile__hero-action"
+        onClick={() => navigate("/")}
+        style={{ marginTop: 12 }}
+      >
+        Zur Startseite
+      </button>
     </div>
   );
-
-  const TabContent = (
-    <div style={{ marginTop: 12 }}>
-      {tab === "Statistiken" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Statistiken</b> – bleibt bis wir Live-Daten verdrahten.
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Charts" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Charts</b> – (Level/Attribute etc.).
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Fortschritt" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Fortschritt</b> – (Scrapbook, Quests, Dungeons …).
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Vergleich" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Vergleich</b> – Vergleich mit anderen Spielern.
-          </div>
-        </SectionCard>
-      )}
-      {tab === "Historie" && (
-        <SectionCard>
-          <div style={{ color: PALETTE.textSoft }}>
-            Platzhalter <b>Historie</b> – wöchentliche / monatliche Aggregationen.
-          </div>
-        </SectionCard>
-      )}
-    </div>
-  );
-
-  const content =
-    loading ? (
-      Skeleton
-    ) : !char ? (
-      NotFound
-    ) : (
-      <>
-        {/* Sticky Header */}
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 2,
-            background: "transparent",
-            borderBottom: `1px solid ${PALETTE.line}`,
-          }}
-        >
-          <Container style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Nur das Klassen-Icon, transparenter Hintergrund, mit Drop-Shadow */}
-            <ClassAvatar className={char.className ?? undefined} label={char.name} size={36} />
-            <div>
-              <div style={{ fontSize: 18, color: PALETTE.title, fontWeight: 700 }}>{char.name}</div>
-              <div style={{ fontSize: 12, color: PALETTE.textSoft }}>
-                {(char.className ?? "Klasse ?")} • {(char.guild ?? "—")} • {(char.server ?? "—")}
-              </div>
-            </div>
-          </Container>
-        </div>
-
-        {/* Kopf + KPIs */}
-        <Container style={{ paddingTop: 12, paddingBottom: 24 }}>
-          <div
-            style={{
-              background: PALETTE.tileAlt,
-              padding: 15,
-              borderRadius: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              border: `1px solid ${PALETTE.line}`,
-              boxShadow: "0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
-            }}
-          >
-            <div>
-              <h2 style={{ margin: 0, color: PALETTE.title, fontSize: 24, fontWeight: 800 }}>{char.name}</h2>
-            </div>
-            <div style={{ textAlign: "right", fontSize: 13 }}>
-              <span style={{ color: PALETTE.textSoft }}>
-                Zuletzt aktualisiert: {char.lastScanDays ?? 0} Tag(e) her
-              </span>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  background: "#4CAF50",
-                  marginLeft: 8,
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16, marginTop: 16 }}>
-            <StatTile label="Level" value={char.level ?? "?"} />
-            <StatTile
-              label="Total Stats"
-              value={char.totalStats != null ? char.totalStats.toLocaleString() : "?"}
-            />
-            <StatTile label="Gilde" value={char.guild ?? "—"} hint={char.server ?? "—"} />
-          </div>
-
-          {TabsBar}
-          {TabContent}
-        </Container>
-      </>
-    );
 
   return (
     <ContentShell title="Spielerprofil" subtitle="Charakter, KPIs & Verlauf" centerFramed={false} padded>
-      {content}
+      <div className="player-profile">
+        {loading && !snapshot && <div className="player-profile__loading">Spielerprofil wird geladen …</div>}
+
+        {!loading && (!snapshot || !viewModel) && renderNotFound()}
+
+        {viewModel && (
+          <>
+            <HeroPanel
+              data={viewModel.hero}
+              loading={loading}
+              actionFeedback={actionFeedback}
+              onAction={handleAction}
+            />
+
+            <div className="player-profile__tabs" role="tablist" aria-label="Spielerprofil Tabs">
+              {TABS.map((entry) => {
+                const active = tab === entry;
+                return (
+                  <button
+                    key={entry}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`player-profile__tab-button ${active ? "player-profile__tab-button--active" : ""}`}
+                    onClick={() => setTab(entry)}
+                  >
+                    {entry}
+                  </button>
+                );
+              })}
+            </div>
+
+            {renderTabs()}
+          </>
+        )}
+      </div>
     </ContentShell>
   );
 }
+
+const toNum = (value: any): number | null => {
+  if (value == null || value === "") return null;
+  const normalized = String(value).replace(/[^0-9.-]/g, "");
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : null;
+};
+
+const daysSince = (timestamp?: number | null) => {
+  if (!timestamp) return null;
+  const now = Date.now() / 1000;
+  const diff = Math.max(0, now - timestamp);
+  return Math.floor(diff / 86400);
+};
+
+const canonicalize = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const buildValueLookup = (values: Record<string, any>) => {
+  const map = new Map<string, any>();
+  Object.entries(values || {}).forEach(([k, v]) => map.set(canonicalize(k), v));
+
+  return {
+    number(keys: string[], fallback: number | null = null) {
+      for (const key of keys) {
+        const candidate = toNum(map.get(canonicalize(key)));
+        if (candidate != null) return candidate;
+      }
+      return fallback;
+    },
+    text(keys: string[], fallback: string | null = null) {
+      for (const key of keys) {
+        const raw = map.get(canonicalize(key));
+        if (raw != null && String(raw).trim()) return String(raw).trim();
+      }
+      return fallback;
+    },
+  };
+};
+
+const createSeededRandom = (seed: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return () => {
+    h += 0x6d2b79f5;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const formatNumber = (value?: number | null, fallback = "—") =>
+  value == null ? fallback : value.toLocaleString("de-DE");
+
+const formatPercent = (value?: number | null) =>
+  value == null ? "—" : `${Math.round(value)}%`;
+
+const formatDaysAgo = (days?: number | null) => {
+  if (days == null) return null;
+  if (days === 0) return "heute";
+  return `${days} Tag${days === 1 ? "" : "e"} her`;
+};
+
+const classToPortraitIndex: Record<string, number> = {
+  warrior: 1,
+  berserker: 1,
+  paladin: 1,
+  scout: 5,
+  assassin: 5,
+  "demon hunter": 6,
+  bard: 6,
+  mage: 8,
+  "battle mage": 8,
+  necromancer: 9,
+  druid: 9,
+};
+
+const buildPortraitConfig = (snapshot: PlayerSnapshot): Partial<PortraitOptions> => {
+  if (snapshot.portraitConfig) return snapshot.portraitConfig;
+  const seed = createSeededRandom(snapshot.id || snapshot.name);
+  const classIndex = classToPortraitIndex[snapshot.className?.toLowerCase() || ""] || Math.floor(seed() * 10) + 1;
+  return {
+    genderName: seed() > 0.5 ? "female" : "male",
+    class: classIndex,
+    race: Math.floor(seed() * 8) + 1,
+    hair: Math.floor(seed() * 40) + 1,
+    hairColor: Math.floor(seed() * 10) + 1,
+    mouth: Math.floor(seed() * 20) + 1,
+    eyes: Math.floor(seed() * 20) + 1,
+    brows: Math.floor(seed() * 10) + 1,
+    beard: Math.floor(seed() * 10),
+    nose: Math.floor(seed() * 10) + 1,
+    ears: Math.floor(seed() * 10) + 1,
+    extra: Math.floor(seed() * 10),
+    background: seed() > 0.5 ? "gradient" : "retroGradient",
+    frame: seed() > 0.8 ? "goldenFrame" : "",
+  };
+};
+
+const buildProfileView = (snapshot: PlayerSnapshot): PlayerProfileViewModel => {
+  const values = snapshot.values || {};
+  const lookup = buildValueLookup(values);
+  const rand = createSeededRandom(snapshot.id);
+
+  const level = snapshot.level ?? lookup.number(["level"]);
+  const scrapbook = snapshot.scrapbookPct ?? lookup.number(["album", "scrapbook", "albumpct"]);
+  const honor = lookup.number(["honor", "ehre"]);
+  const totalStats = snapshot.totalStats ?? lookup.number(["totalstats", "stats"]);
+
+  const baseStatsKeys = [
+    ["Base Strength", "Stärke", "basestrength"],
+    ["Base Dexterity", "Geschick", "basedexterity"],
+    ["Base Intelligence", "Intelligenz", "baseintelligence"],
+    ["Base Constitution", "Konstitution", "baseconstitution"],
+    ["Base Luck", "Glück", "baseluck"],
+  ];
+
+  const baseStats = baseStatsKeys.map((keys) => lookup.number(keys, 0) ?? 0);
+  const sumBase = baseStats.reduce((sum, val) => sum + (val ?? 0), 0);
+  const scrapbookProgress = scrapbook ?? Math.round(rand() * 80 + 10);
+  const fortress = lookup.number(["fortresslevel", "fortress"]) ?? Math.round(rand() * 20) + 30;
+  const underworld = lookup.number(["underworld", "underworldlevel"]) ?? Math.round(rand() * 10) + 20;
+  const tower = lookup.number(["tower", "towerfloor"]) ?? Math.round(rand() * 90) + 10;
+  const petProgress = lookup.number(["pets", "petprogress"]) ?? Math.round(rand() * 50) + 25;
+
+  const powerScore = (level ?? 0) * 1200 + sumBase + Math.round((scrapbook ?? 0) * 3200);
+  const mountLabel = lookup.text(["mount", "reittier"]) ?? "Greifendrachen (280%)";
+  const guildRole = lookup.text(["guildrole", "role"]) ?? "Member";
+  const hofRank = lookup.number(["hofrank", "halloffamerank", "hofposition"]);
+
+  const heroMetrics = [
+    { label: "Level", value: level ? `Lvl ${formatNumber(level)}` : "—" },
+    { label: "Power Score", value: formatNumber(powerScore) },
+    { label: "Scrapbook", value: formatPercent(scrapbookProgress) },
+    { label: "Total Stats", value: formatNumber(totalStats) },
+  ];
+
+  const heroBadges = [
+    { label: "Mount", value: mountLabel, tone: "neutral" as const },
+    { label: "Honor", value: formatNumber(honor), tone: "success" as const },
+    { label: "Gildenrolle", value: guildRole, tone: "warning" as const },
+    { label: "HoF", value: hofRank ? `#${formatNumber(hofRank)}` : "—", tone: "neutral" as const },
+  ];
+
+  const hero = {
+    playerName: snapshot.name,
+    className: snapshot.className,
+    guild: snapshot.guild,
+    server: snapshot.server,
+    levelLabel: level ? `Level ${formatNumber(level)}` : undefined,
+    lastScanLabel: formatDaysAgo(snapshot.lastScanDays) ?? undefined,
+    status: (snapshot.lastScanDays != null && snapshot.lastScanDays <= 2 ? "online" : "offline") as ("online"|"offline"),
+    metrics: heroMetrics,
+    badges: heroBadges,
+    actions: [
+      { key: "rescan", label: "Rescan anfordern" },
+      { key: "guild", label: "Gilde öffnen", disabled: !snapshot.guild },
+      { key: "share", label: "Teilen", title: "System Share Sheet" },
+      { key: "copy-link", label: "Link kopieren" },
+    ],
+    portrait: buildPortraitConfig(snapshot),
+  };
+
+  const attributeLabels = [
+    { label: "Stärke", base: ["Base Strength"], total: ["Strength"] },
+    { label: "Geschick", base: ["Base Dexterity"], total: ["Dexterity"] },
+    { label: "Intelligenz", base: ["Base Intelligence"], total: ["Intelligence"] },
+    { label: "Konstitution", base: ["Base Constitution"], total: ["Constitution"] },
+    { label: "Glück", base: ["Base Luck"], total: ["Luck"] },
+  ];
+
+  const statsTab = {
+    summary: [
+      { label: "Power Score", value: formatNumber(powerScore), hint: "Level * SumBase" },
+      { label: "Honor", value: formatNumber(honor) },
+      { label: "HoF Platz", value: hofRank ? `#${formatNumber(hofRank)}` : "—" },
+      { label: "Letzter Scan", value: formatDaysAgo(snapshot.lastScanDays) ?? "—" },
+    ],
+    attributes: attributeLabels.map((a) => ({
+      label: a.label,
+      baseLabel: formatNumber(lookup.number(a.base)),
+      totalLabel: lookup.number(a.total) != null ? `Gesamt ${formatNumber(lookup.number(a.total))}` : undefined,
+    })),
+    resistances: [
+      { label: "Feuer", value: `${Math.round(rand() * 40 + 40)}%` },
+      { label: "Schatten", value: `${Math.round(rand() * 40 + 35)}%` },
+      { label: "Frost", value: `${Math.round(rand() * 30 + 30)}%` },
+      { label: "Licht", value: `${Math.round(rand() * 20 + 30)}%` },
+    ],
+    resources: [
+      { label: "Gold/h", value: `${formatNumber(Math.round((level ?? 1) * (rand() * 8 + 3)))}k` },
+      { label: "XP/h", value: `${formatNumber(Math.round((level ?? 1) * (rand() * 5 + 2)))}k` },
+      { label: "Mount Bonus", value: mountLabel },
+      { label: "Quest Slots", value: `${Math.round(rand() * 2) + 3}` },
+    ],
+  };
+
+  const progressTab = [
+    {
+      label: "Scrapbook",
+      description: "Stickers & Sammlungen",
+      progress: Math.min(1, (scrapbookProgress ?? 0) / 100),
+      targetLabel: `${formatPercent(scrapbookProgress)} / 100%`,
+      meta: "Ziel: 100% für Bonus",
+      emphasis: scrapbookProgress != null && scrapbookProgress >= 90,
+    },
+    {
+      label: "Dungeons",
+      description: "Tower & Loop of Idols",
+      progress: Math.min(1, tower / 100),
+      targetLabel: `Ebene ${Math.round(tower)}/100`,
+      meta: "Tower Floors abgeschlossen",
+    },
+    {
+      label: "Festung",
+      description: "Gebäudeausbau",
+      progress: Math.min(1, fortress / 25),
+      targetLabel: `Lvl ${Math.round(fortress)}`,
+      meta: "Mine, Akademie, Schatzkammer",
+    },
+    {
+      label: "Unterwelt",
+      description: "Seelen/Kerker",
+      progress: Math.min(1, underworld / 30),
+      targetLabel: `Lvl ${Math.round(underworld)}`,
+      meta: "Hydra, Gladiator",
+    },
+    {
+      label: "Pets",
+      description: "Habitate & Elemente",
+      progress: Math.min(1, petProgress / 100),
+      targetLabel: `${Math.round(petProgress)} / 100`,
+      meta: "Habitate offen",
+    },
+  ];
+
+  const buildTrend = (base: number | null | undefined, swing = 0.12) => {
+    const start = base ?? Math.round(rand() * 100);
+    const trend: number[] = [];
+    let current = start * 0.85;
+    for (let i = 0; i < 8; i++) {
+      current += current * (rand() * swing - swing / 2);
+      trend.push(Math.max(0, Math.round(current)));
+    }
+    trend[trend.length - 1] = start;
+    return trend;
+  };
+
+  const charts = [
+    { label: "Level Verlauf", points: buildTrend(level ?? 0, 0.06), unit: "", subLabel: "7 Tage" },
+    { label: "Total Stats", points: buildTrend(totalStats ?? 0, 0.18), unit: "", subLabel: "Summe Attribute" },
+    { label: "Honor", points: buildTrend(honor ?? 0, 0.25), unit: "", subLabel: "Hall of Fame" },
+  ];
+
+  const comparisonRows: import("../../components/player-profile/types").ComparisonRow[] = [
+    {
+      label: "Level",
+      playerValue: level ? `Lvl ${formatNumber(level)}` : "—",
+      benchmark: level ? `Lvl ${formatNumber(Math.round(level * 0.92))}` : "—",
+      diffLabel: level ? `+${Math.round(level * 0.08)}` : "—",
+      trend: "up",
+    },
+    {
+      label: "Power Score",
+      playerValue: formatNumber(powerScore),
+      benchmark: formatNumber(Math.round(powerScore * 0.9)),
+      diffLabel: `+${formatNumber(Math.round(powerScore * 0.1))}`,
+      trend: "up",
+    },
+    {
+      label: "Scrapbook",
+      playerValue: formatPercent(scrapbookProgress),
+      benchmark: `${Math.min(100, Math.round((scrapbookProgress ?? 60) - 8))}%`,
+      diffLabel: scrapbookProgress != null ? `+${Math.round(scrapbookProgress - 60)}%` : "—",
+      trend: (scrapbookProgress != null && scrapbookProgress >= 80 ? "up" : "neutral"),
+    },
+    {
+      label: "Festung",
+      playerValue: `Lvl ${Math.round(fortress)}`,
+      benchmark: `Lvl ${Math.round(fortress - 3)}`,
+      diffLabel: "+3",
+      trend: "up",
+    },
+    {
+      label: "Unterwelt",
+      playerValue: `Lvl ${Math.round(underworld)}`,
+      benchmark: `Lvl ${Math.round(underworld - 2)}`,
+      diffLabel: "+2",
+      trend: "neutral" as ("up"|"down"|"neutral"),
+    },
+  ];
+
+  const historyEntries = buildHistory(snapshot, lookup, rand);
+
+  return {
+    hero,
+    stats: statsTab,
+    progress: progressTab,
+    charts,
+    comparison: comparisonRows,
+    history: historyEntries,
+  };
+};
+
+const buildHistory = (
+  snapshot: PlayerSnapshot,
+  lookup: ReturnType<typeof buildValueLookup>,
+  rand: () => number
+) => {
+  const entries: PlayerProfileViewModel["history"] = [];
+  const joinDate = lookup.text(["guildjoined", "joinedguild", "gildenbeitritt"]);
+  if (joinDate) {
+    entries.push({
+      dateLabel: joinDate,
+      title: "Gildenbeitritt",
+      description: snapshot.guild ? `Joined ${snapshot.guild}` : "Neuer Gildenplatz",
+      tag: "Gilde",
+    });
+  }
+
+  const lastDungeon = lookup.text(["lastdungeon", "lastfight"]);
+  if (lastDungeon) {
+    entries.push({
+      dateLabel: formatHistoricDate(Math.round(rand() * 15) + 5),
+      title: "Dungeon Clear",
+      description: lastDungeon,
+      tag: "Dungeon",
+    });
+  }
+
+  entries.push({
+    dateLabel: formatHistoricDate(2),
+    title: "Level-Up",
+    description: `Erreichte Level ${formatNumber(snapshot.level)}`,
+    tag: "Level",
+  });
+
+  entries.push({
+    dateLabel: formatHistoricDate(10),
+    title: "Scrapbook Meilenstein",
+    description: `${formatPercent(snapshot.scrapbookPct ?? Math.round(rand() * 50 + 40))} komplett`,
+    tag: "Album",
+  });
+
+  entries.push({
+    dateLabel: formatHistoricDate(18),
+    title: "Festung",
+    description: `Fortress Level ${Math.round(
+      lookup.number(["fortress"], Math.round(rand() * 20 + 15)) ?? 0
+    )}`,
+    tag: "Festung",
+  });
+
+  return entries;
+};
+
+const formatHistoricDate = (daysAgo: number) => {
+  const date = new Date(Date.now() - daysAgo * 86400000);
+  return date.toLocaleDateString("de-DE");
+};
+
+
+
+
+

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./creators.css";
 
-type Platform = "YouTube" | "Twitch" | "TikTok" | "Discord";
+import creatorSheet from "../../data/creatorSheet";
+import { Creator, Platform, SheetCreatorRow, sheetRowToCreator } from "../../lib/creators/shared";
+import { useCreatorSnapshot } from "../../hooks/useCreatorSnapshot";
 
 type SortKey = "subs" | "views" | "activity" | "language";
 
@@ -9,403 +11,11 @@ type DisplayMode = "cards" | "table" | "json";
 
 type DataMode = "static" | "dynamic";
 
-interface PlatformLink {
-  type: Platform;
-  url: string;
-  verified?: boolean;
-}
-
-interface Creator {
-  id: string;
-  name: string;
-  avatar: string; // URL or path in /public
-  description: string;
-  language: string; // e.g. "de", "en"
-  subscribers: number;
-  totalViews: number;
-  weeklyViews: number;
-  weeklyPosts: number;
-  lastActive: string; // ISO date
-  platforms: PlatformLink[];
-}
-
-interface SheetCreatorRow {
-  name: string;
-  code?: string;
-  latestActivity?: string;
-  youtube?: string;
-  twitch?: string;
-  drops?: string;
-  discord?: string;
-  avatar?: string;
-}
-
-const SHEET_SOURCE_ROWS: SheetCreatorRow[] = [
-  {
-    name: "DORZER",
-    code: "Dorzer",
-    latestActivity: "23.09.2025",
-    youtube: "https://www.youtube.com/@DORZER",
-    twitch: "https://www.twitch.tv/dorzer",
-    drops: "Droplets",
-    discord: "https://discord.gg/EWEgrCq",
-  },
-  {
-    name: "Sergio Kurai",
-    latestActivity: "01.05.2025",
-    youtube: "https://www.youtube.com/@SergioKurai",
-    twitch: "https://www.twitch.tv/sergiokuraiyt",
-    discord: "https://discord.com/invite/BsuxhMWQYa",
-  },
-  {
-    name: "Lootenant",
-    latestActivity: "23.09.2025",
-    youtube: "https://www.youtube.com/@Lootenant",
-    twitch: "https://www.twitch.tv/lootenantsf",
-  },
-  {
-    name: "Belleghar",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/@Bellegahr/videos",
-    twitch: "https://www.twitch.tv/bellegahr",
-  },
-  {
-    name: "halo",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/@GPS71xCyn",
-    twitch: "https://www.twitch.tv/haloxmd",
-  },
-  {
-    name: "Gorgoss",
-    code: "Gorgoss",
-    latestActivity: "15.09.2025",
-    youtube: "https://www.youtube.com/@Gorgoss8000",
-    twitch: "https://www.twitch.tv/gorgoss9000",
-    discord: "https://discord.com/invite/J3gXmaRpbM",
-  },
-  {
-    name: "TUNY",
-    code: "Tuny",
-    latestActivity: "23.09.2025",
-    youtube: "https://www.youtube.com/@tuny-yt",
-    twitch: "https://www.twitch.tv/tunyghost",
-    drops: "Drops",
-    discord: "https://discord.com/invite/tunysschuppen",
-  },
-  {
-    name: "AlphaTV",
-    latestActivity: "08.07.2025",
-    youtube: "https://www.youtube.com/@AlphaTV01",
-  },
-  {
-    name: "Salz_Live",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/@Salz_Live",
-    twitch: "https://www.twitch.tv/salz_live",
-  },
-  {
-    name: "Kepsoo",
-    code: "Kepsoo",
-    latestActivity: "22.09.2025",
-    youtube: "https://www.youtube.com/@kepsoo",
-    discord: "https://discord.gg/FreedomSF",
-  },
-  {
-    name: "Kysuel",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/@Kysuel",
-    twitch: "https://www.twitch.tv/kysuel",
-  },
-  {
-    name: "Niisa",
-    code: "Niisa",
-    latestActivity: "22.09.2025",
-    youtube: "https://www.youtube.com/channel/UCMSTL1cRbnfii2rbQIPJMAA",
-    twitch: "https://www.twitch.tv/kysuel",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/niisa",
-  },
-  {
-    name: "BanditSF",
-    code: "Bandit",
-    latestActivity: "24.09.2025",
-    twitch: "https://www.twitch.tv/banditsf",
-    discord: "https://discord.com/invite/QSUBnB3MDW",
-  },
-  {
-    name: "MoZone",
-    code: "moZone",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/mozone",
-    twitch: "https://www.twitch.tv/mozonetv",
-    drops: "Drops",
-    discord: "https://discord.com/invite/cbhT3ZZqkG",
-  },
-  {
-    name: "CHAZE",
-    code: "CHAZE",
-    latestActivity: "22.09.2025",
-    youtube: "https://www.twitch.tv/chaze",
-    twitch: "https://www.twitch.tv/chaze",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/kCXvXVceaE",
-  },
-  {
-    name: "MoxTales",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/@MoxTales",
-    twitch: "https://www.twitch.tv/moxtales",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/rHuzrwbhcV",
-  },
-  {
-    name: "feena1986",
-    latestActivity: "22.09.2025",
-    twitch: "https://www.twitch.tv/feena1986",
-    drops: "Droplets",
-  },
-  {
-    name: "Blackhammerplay",
-    latestActivity: "01.08.2025",
-    youtube: "https://www.youtube.com/channel/UCSbUYoE8AhJR0gVLK96USlQ",
-    twitch: "https://www.twitch.tv/blackhammerplay",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/u3mX7sfVHN",
-  },
-  {
-    name: "Crappa",
-    latestActivity: "23.09.2025",
-    youtube: "https://www.youtube.com/@Crappa",
-    twitch: "https://www.twitch.tv/crappa",
-    drops: "Droplets",
-  },
-  {
-    name: "der_cyberpunk",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/c/dercyberpunk",
-    twitch: "https://www.twitch.tv/der_cyberpunk",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/GKV38UWCja",
-  },
-  {
-    name: "Terste",
-    latestActivity: "19.09.2025",
-    youtube: "https://www.youtube.com/channel/UCq8Z8IO_3SG5Q-55fnb2gLA",
-    twitch: "https://www.twitch.tv/terste",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/4XzTYgt",
-  },
-  {
-    name: "UweReinholzen",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/channel/UC-fk4horLbcxpKqwY-XEwAg",
-    twitch: "https://www.twitch.tv/uwereinholzen",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/Qya8yBbfrg",
-  },
-  {
-    name: "MrMoregame",
-    latestActivity: "19.09.2025",
-    youtube: "https://www.youtube.com/user/MrMoregame",
-    twitch: "https://www.twitch.tv/mrmoregame",
-    drops: "Droplets",
-  },
-  {
-    name: "ChromieDE",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/channel/UChts6QeisFXtH1B8YrJBB-A",
-    twitch: "https://www.twitch.tv/chromiede",
-    drops: "Droplets",
-    discord: "https://discord.com/invite/tHrHt56",
-  },
-  {
-    name: "eGoLeipzig",
-    latestActivity: "24.09.2025",
-    twitch: "https://www.twitch.tv/egoleipzig",
-  },
-  {
-    name: "Aurikos_Zonestos",
-    latestActivity: "23.09.2025",
-    youtube: "https://www.youtube.com/channel/UCumWgXIj3ca-oEGOv40-QJg",
-    twitch: "https://www.twitch.tv/aurikos_zonestos",
-  },
-  {
-    name: "xmaexel",
-    latestActivity: "24.09.2025",
-    twitch: "https://www.twitch.tv/xmaexel",
-    discord: "https://discord.com/invite/maexel",
-  },
-  {
-    name: "Hunrizzle",
-    code: "Hunrizzle",
-    latestActivity: "01.09.2025",
-    youtube: "https://www.youtube.com/@HunrizzleTV",
-    discord: "https://discord.com/invite/V8ukg7GAyQ",
-  },
-  {
-    name: "Spielestyler",
-    code: "Spielestyler",
-    latestActivity: "24.09.2025",
-    youtube: "https://www.youtube.com/Spielestyler",
-    twitch: "https://www.twitch.tv/spielestyler",
-    discord: "https://discord.com/invite/aAzzvgs",
-  },
-  {
-    name: "Plotz",
-    latestActivity: "24.09.2025",
-    twitch: "https://www.twitch.tv/plotz",
-  },
-  {
-    name: "Chriddel",
-    latestActivity: "24.09.2025",
-    twitch: "https://www.twitch.tv/chriddel",
-    discord: "https://discord.com/invite/ZQNDTD6",
-  },
-];
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .replace(/-{2,}/g, "-")
-    .trim();
-}
-
-function parseSheetDate(value?: string): string {
-  if (!value) return new Date().toISOString();
-  const parts = value.split(".");
-  if (parts.length === 3) {
-    const [day, month, year] = parts.map((p) => parseInt(p, 10));
-    if (!Number.isNaN(day) && !Number.isNaN(month) && !Number.isNaN(year)) {
-      return new Date(year, month - 1, day).toISOString();
-    }
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
-}
-
-function ensureUrl(raw?: string): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (!trimmed.length) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("discord.gg")) return `https://${trimmed}`;
-  if (trimmed.startsWith("discord.com")) return `https://${trimmed}`;
-  if (trimmed.startsWith("www")) return `https://${trimmed}`;
-  return trimmed.includes(".") ? `https://${trimmed}` : null;
-}
-
-function buildDescription(row: SheetCreatorRow): string {
-  const bits: string[] = [];
-  if (row.code) bits.push(`Creator code: ${row.code}`);
-  if (row.drops) bits.push(`Drops access: ${row.drops}`);
-  bits.push("Imported from the SFDataHub community sheet.");
-  return bits.join(" • ");
-}
-
-function defaultAvatarFor(row: SheetCreatorRow): string {
-  if (row.avatar) return row.avatar;
-  const slug = slugify(row.code || row.name || "creator");
-  return `/avatars/${slug}.png`;
-}
-
-function sheetRowToCreator(row: SheetCreatorRow): Creator {
-  const slug = slugify(row.code || row.name || "creator");
-  const platforms: PlatformLink[] = [];
-  const youtube = ensureUrl(row.youtube);
-  if (youtube) platforms.push({ type: "YouTube", url: youtube });
-  const twitch = ensureUrl(row.twitch);
-  if (twitch) platforms.push({ type: "Twitch", url: twitch });
-  const discord = ensureUrl(row.discord);
-  if (discord) platforms.push({ type: "Discord", url: discord });
-
-  return {
-    id: `sheet-${slug}`,
-    name: row.name,
-    avatar: defaultAvatarFor(row),
-    description: buildDescription(row),
-    language: "de",
-    subscribers: 0,
-    totalViews: 0,
-    weeklyViews: 0,
-    weeklyPosts: row.drops ? 3 : 1,
-    lastActive: parseSheetDate(row.latestActivity),
-    platforms,
-  };
-}
+const SHEET_SOURCE_ROWS: SheetCreatorRow[] = creatorSheet;
 
 const SHEET_CREATORS: Creator[] = SHEET_SOURCE_ROWS.map(sheetRowToCreator);
 
-const SAMPLE_CREATORS: Creator[] = [
-  {
-    id: "c1",
-    name: "PixelPaul",
-    avatar: "/avatars/pixelpaul.png",
-    description: "Indie Dev, Datenvisualisierung und Vite-Live-Streams.",
-    language: "de",
-    subscribers: 54000,
-    totalViews: 4200000,
-    weeklyViews: 58000,
-    weeklyPosts: 4,
-    lastActive: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-    platforms: [
-      { type: "YouTube", url: "https://youtube.com/@pixelpaul", verified: true },
-      { type: "Twitch", url: "https://twitch.tv/pixelpaul" },
-      { type: "Discord", url: "https://discord.gg/example" },
-    ],
-  },
-  {
-    id: "c2",
-    name: "DataDoro",
-    avatar: "/avatars/datadoro.jpg",
-    description: "Kurzclips zu SQL und Datenpipelines, humorvoll erklärt.",
-    language: "de",
-    subscribers: 120000,
-    totalViews: 11800000,
-    weeklyViews: 210000,
-    weeklyPosts: 9,
-    lastActive: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString(),
-    platforms: [
-      { type: "TikTok", url: "https://tiktok.com/@datadoro", verified: true },
-      { type: "YouTube", url: "https://youtube.com/@datadoro" },
-    ],
-  },
-  {
-    id: "c3",
-    name: "StreamStats",
-    avatar: "/avatars/streamstats.png",
-    description: "Livestreams zu Analytics, ML Ops und Observability.",
-    language: "en",
-    subscribers: 30500,
-    totalViews: 2800000,
-    weeklyViews: 32000,
-    weeklyPosts: 2,
-    lastActive: new Date(Date.now() - 12 * 24 * 3600 * 1000).toISOString(),
-    platforms: [
-      { type: "Twitch", url: "https://twitch.tv/streamstats", verified: true },
-      { type: "YouTube", url: "https://youtube.com/@streamstats" },
-      { type: "Discord", url: "https://discord.gg/example2" },
-    ],
-  },
-  {
-    id: "c4",
-    name: "KiraCodes",
-    avatar: "/avatars/kiracodes.jpg",
-    description: "Full‑stack Tutorials und Live‑Debugging.",
-    language: "de",
-    subscribers: 8800,
-    totalViews: 640000,
-    weeklyViews: 16000,
-    weeklyPosts: 3,
-    lastActive: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
-    platforms: [
-      { type: "YouTube", url: "https://youtube.com/@kiracodes", verified: true },
-      { type: "Discord", url: "https://discord.gg/example3" },
-    ],
-  },
-  ...SHEET_CREATORS,
-];
+const SAMPLE_CREATORS: Creator[] = [...SHEET_CREATORS];
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -578,7 +188,7 @@ export default function CommunityCreators() {
   const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [platformFilter, setPlatformFilter] = useState<"all" | Platform>("all");
   const [minSubs, setMinSubs] = useState<number>(0);
-  const [activeWithin, setActiveWithin] = useState<number>(30);
+  const [activeWithin, setActiveWithin] = useState<number>(365);
 
   // Spotlight
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
@@ -589,7 +199,12 @@ export default function CommunityCreators() {
   const [apiError, setApiError] = useState<string>("");
   const [apiData, setApiData] = useState<Creator[] | null>(null);
 
-  const baseData = dataMode === "static" ? SAMPLE_CREATORS : apiData ?? [];
+  const { snapshot, error: snapshotError } = useCreatorSnapshot();
+
+  const managedData = snapshot?.data?.length ? snapshot.data : null;
+  const staticFallback = managedData ?? SAMPLE_CREATORS;
+
+  const baseData = dataMode === "static" ? staticFallback : apiData ?? managedData ?? [];
 
   const languages = useMemo(() => {
     const set = new Set(baseData.map((c) => c.language));
@@ -639,11 +254,20 @@ export default function CommunityCreators() {
     }
   }
 
+  const noResults = filtered.length === 0;
+
   return (
     <section className="cc-wrap">
       <div className="cc-heading">
         <h1>Content Creator Hub</h1>
         <p className="cc-sub">Profiles, stats and links to community creators.</p>
+        {snapshot && (
+          <p className="cc-sync">
+            <span>Live stats synced {new Date(snapshot.generatedAt).toLocaleString()}</span>
+            <span>{snapshot.data.length} profiles</span>
+          </p>
+        )}
+        {snapshotError && <p className="cc-sync-error">{snapshotError}</p>}
       </div>
 
       <div className="cc-toolbar">
@@ -770,14 +394,20 @@ export default function CommunityCreators() {
 
       <div className="cc-main">
         <div className="cc-main-left">
-          {displayMode === "cards" && (
+          {noResults && (
+            <div className="cc-empty">
+              <h3>No creators match the filters</h3>
+              <p>Adjust activity range or other filters to see results.</p>
+            </div>
+          )}
+          {!noResults && displayMode === "cards" && (
             <div className="cc-grid">
               {filtered.map((c) => (
                 <CreatorCard key={c.id} c={c} />
               ))}
             </div>
           )}
-          {displayMode === "table" && <TableView data={filtered} />}
+          {!noResults && displayMode === "table" && <TableView data={filtered} />}
           {displayMode === "json" && (
             <pre className="cc-json" aria-label="JSON">
               {JSON.stringify(filtered, null, 2)}

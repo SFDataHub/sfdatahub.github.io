@@ -5,11 +5,14 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 export { SERVERS } from "../../data/servers";
 
 /** Zeitfenster */
-export type DaysFilter = 3 | 7 | 14 | 30 | 90 | "all";
+export type DaysFilter = 3 | 7 | 14 | 30 | 60 | 90 | "all";
 
 /** UI-Zustände für die Toplists-Ansicht */
 export type FilterMode = "hud" | "sheet";
 export type ListView = "cards" | "buttons" | "table";
+
+type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
+type BooleanUpdater = boolean | ((prev: boolean) => boolean);
 
 /** Persistenter Filter-State */
 type FiltersState = {
@@ -20,6 +23,9 @@ type FiltersState = {
   sortBy: string;          // "level" | "main" | "constitution" | "sum" | "lastScan" | "name" ...
   favoritesOnly: boolean;
   activeOnly: boolean;
+  searchText: string;
+  quickFav: boolean;
+  quickActive: boolean;
 
   // UI-Filter (was deine Seite benötigt)
   filterMode: FilterMode;          // "hud" | "sheet"
@@ -39,6 +45,9 @@ type FiltersContextValue = {
   sortBy: string;
   favoritesOnly: boolean;
   activeOnly: boolean;
+  searchText: string;
+  quickFav: boolean;
+  quickActive: boolean;
 
   // UI-Filter (lesen)
   filterMode: FilterMode;
@@ -47,12 +56,12 @@ type FiltersContextValue = {
   serverSheetOpen: boolean;
 
   // Mutationen (Server)
-  setServers: (list: string[]) => void;
+  setServers: (next: StringArrayUpdater) => void;
   toggleServer: (sv: string) => void;
   clearServers: () => void;
 
   // Mutationen (Klassen)
-  setClasses: (list: string[]) => void;
+  setClasses: (next: StringArrayUpdater) => void;
   toggleClass: (cls: string) => void;
   clearClasses: () => void;
 
@@ -63,6 +72,9 @@ type FiltersContextValue = {
   setSortBy: (s: string) => void;
   setFavoritesOnly: (b: boolean) => void;
   setActiveOnly: (b: boolean) => void;
+  setSearchText: (text: string) => void;
+  setQuickFav: (next: BooleanUpdater) => void;
+  setQuickActive: (next: BooleanUpdater) => void;
 
   // Mutationen (UI)
   setFilterMode: (m: FilterMode) => void;
@@ -72,6 +84,7 @@ type FiltersContextValue = {
 
   // Reset
   resetFilters: () => void;
+  resetAll: () => void;
 };
 
 const LS_KEY = "TL_FILTERS_V2";
@@ -84,6 +97,9 @@ const DEFAULT_STATE: FiltersState = {
   sortBy: "level",
   favoritesOnly: false,
   activeOnly: false,
+  searchText: "",
+  quickFav: false,
+  quickActive: false,
 
   filterMode: "hud",
   listView: "table",
@@ -98,7 +114,7 @@ function loadFromStorage(): FiltersState {
     const parsed = JSON.parse(raw) ?? {};
 
     const normDays: DaysFilter =
-      (["all", 3, 7, 14, 30, 90] as any[]).includes(parsed.days) ? parsed.days : DEFAULT_STATE.days;
+      (["all", 3, 7, 14, 30, 60, 90] as any[]).includes(parsed.days) ? parsed.days : DEFAULT_STATE.days;
 
     const normListView: ListView =
       (["cards", "buttons", "table"] as const).includes(parsed.listView)
@@ -110,19 +126,31 @@ function loadFromStorage(): FiltersState {
         ? parsed.filterMode
         : DEFAULT_STATE.filterMode;
 
+    const parsedQuickFav =
+      typeof parsed.quickFav === "boolean"
+        ? parsed.quickFav
+        : !!parsed.favoritesOnly;
+    const parsedQuickActive =
+      typeof parsed.quickActive === "boolean"
+        ? parsed.quickActive
+        : !!parsed.activeOnly;
+
     return {
       ...DEFAULT_STATE,
       ...parsed,
       servers: Array.isArray(parsed.servers) ? parsed.servers : [],
       classes: Array.isArray(parsed.classes) ? parsed.classes : [],
-      favoritesOnly: !!parsed.favoritesOnly,
-      activeOnly: !!parsed.activeOnly,
+      favoritesOnly: typeof parsed.favoritesOnly === "boolean" ? parsed.favoritesOnly : parsedQuickFav,
+      activeOnly: typeof parsed.activeOnly === "boolean" ? parsed.activeOnly : parsedQuickActive,
+      quickFav: parsedQuickFav,
+      quickActive: parsedQuickActive,
       days: normDays,
       listView: normListView,
       filterMode: normFilterMode,
       bottomFilterOpen: !!parsed.bottomFilterOpen,
       serverSheetOpen: !!parsed.serverSheetOpen,
       sortBy: typeof parsed.sortBy === "string" ? parsed.sortBy : DEFAULT_STATE.sortBy,
+      searchText: typeof parsed.searchText === "string" ? parsed.searchText : DEFAULT_STATE.searchText,
     };
   } catch {
     return DEFAULT_STATE;
@@ -139,6 +167,11 @@ function saveToStorage(state: FiltersState) {
 
 const Ctx = createContext<FiltersContextValue | null>(null);
 
+const uniqueList = (list: string[]) => Array.from(new Set(list));
+function resolveNext<T>(next: T | ((prev: T) => T), prev: T): T {
+  return typeof next === "function" ? (next as (prevValue: T) => T)(prev) : next;
+}
+
 export function FilterProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<FiltersState>(() => loadFromStorage());
 
@@ -147,8 +180,11 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
   }, [state]);
 
   // --------- Server ----------
-  const setServers = (list: string[]) =>
-    setState((s) => ({ ...s, servers: Array.from(new Set(list)) }));
+  const setServers = (next: StringArrayUpdater) =>
+    setState((s) => ({
+      ...s,
+      servers: uniqueList(resolveNext(next, s.servers)),
+    }));
 
   const toggleServer = (sv: string) =>
     setState((s) => {
@@ -160,8 +196,11 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
   const clearServers = () => setState((s) => ({ ...s, servers: [] }));
 
   // --------- Klassen ----------
-  const setClasses = (list: string[]) =>
-    setState((s) => ({ ...s, classes: Array.from(new Set(list)) }));
+  const setClasses = (next: StringArrayUpdater) =>
+    setState((s) => ({
+      ...s,
+      classes: uniqueList(resolveNext(next, s.classes)),
+    }));
 
   const toggleClass = (cls: string) =>
     setState((s) => {
@@ -180,10 +219,25 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, sortBy: srt || "level" }));
 
   const setFavoritesOnly = (b: boolean) =>
-    setState((s) => ({ ...s, favoritesOnly: !!b }));
+    setState((s) => ({ ...s, favoritesOnly: !!b, quickFav: !!b }));
 
   const setActiveOnly = (b: boolean) =>
-    setState((s) => ({ ...s, activeOnly: !!b }));
+    setState((s) => ({ ...s, activeOnly: !!b, quickActive: !!b }));
+
+  const setSearchText = (text: string) =>
+    setState((s) => ({ ...s, searchText: text }));
+
+  const setQuickFav = (next: BooleanUpdater) =>
+    setState((s) => {
+      const value = resolveNext(next, s.quickFav);
+      return { ...s, quickFav: value, favoritesOnly: value };
+    });
+
+  const setQuickActive = (next: BooleanUpdater) =>
+    setState((s) => {
+      const value = resolveNext(next, s.quickActive);
+      return { ...s, quickActive: value, activeOnly: value };
+    });
 
   // --------- UI ----------
   const setFilterMode = (m: FilterMode) =>
@@ -200,6 +254,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
 
   // --------- Reset ----------
   const resetFilters = () => setState(DEFAULT_STATE);
+  const resetAll = () => resetFilters();
 
   const value = useMemo<FiltersContextValue>(
     () => ({
@@ -211,6 +266,9 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       sortBy: state.sortBy,
       favoritesOnly: state.favoritesOnly,
       activeOnly: state.activeOnly,
+      searchText: state.searchText,
+      quickFav: state.quickFav,
+      quickActive: state.quickActive,
 
       // UI (lesen)
       filterMode: state.filterMode,
@@ -230,6 +288,9 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       setSortBy,
       setFavoritesOnly,
       setActiveOnly,
+      setSearchText,
+      setQuickFav,
+      setQuickActive,
       setFilterMode,
       setListView,
       setBottomFilterOpen,
@@ -237,6 +298,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
 
       // Reset
       resetFilters,
+      resetAll,
     }),
     [state]
   );
@@ -253,6 +315,9 @@ export function useFilters(): FiltersContextValue {
     return {
       ...DEFAULT_STATE,
       range: DEFAULT_STATE.days,
+      searchText: DEFAULT_STATE.searchText,
+      quickFav: DEFAULT_STATE.quickFav,
+      quickActive: DEFAULT_STATE.quickActive,
       setServers: () => {},
       toggleServer: () => {},
       clearServers: () => {},
@@ -264,11 +329,15 @@ export function useFilters(): FiltersContextValue {
       setSortBy: () => {},
       setFavoritesOnly: () => {},
       setActiveOnly: () => {},
+      setSearchText: () => {},
+      setQuickFav: () => {},
+      setQuickActive: () => {},
       setFilterMode: () => {},
       setListView: () => {},
       setBottomFilterOpen: () => {},
       setServerSheetOpen: () => {},
       resetFilters: () => {},
+      resetAll: () => {},
     };
   }
   return v;

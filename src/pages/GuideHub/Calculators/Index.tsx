@@ -32,10 +32,11 @@ export default function CalculatorsIndex() {
             onClick={() => openSub(t.slug)}
             aria-label={t.title}
           >
-            <HudBox title={t.title} padding="md" hover />
+            <HudBox title={t.title} padding="md" hover ><> </></HudBox>
           </button>
         ))}
       </div>
     </div>
   );
 }
+
