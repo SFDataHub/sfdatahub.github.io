@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import styles from "./styles.module.css";
 import ArcNav from "./ArcNav";
 
-const CATEGORY_KEYS = ["creators", "scans", "predictions", "news", "feedback"] as const;
+const CATEGORY_KEYS = ["creators", "scans", "predictions", "news", "records", "feedback"] as const;
 type CategoryKey = (typeof CATEGORY_KEYS)[number];
 
 type HubCategory = {
@@ -22,6 +22,7 @@ const categories: HubCategory[] = [
   { key: "scans", label: "Scans", to: "/community?tab=scans", side: "left" },
   { key: "predictions", label: "Predictions", to: "/community?tab=predictions", side: "left" },
   { key: "news", label: "News", to: "/community?tab=news", side: "right" },
+  { key: "records", label: "Records", to: "/community?tab=records", side: "right" },
   { key: "feedback", label: "Feedback", to: "/community?tab=feedback", side: "right" },
 ];
 
@@ -46,6 +47,7 @@ const subcategories: Record<CategoryKey, SubCategory[]> = {
     { key: "bugreports", label: "Bugreports", to: "/community?tab=feedback&sub=bugreports" },
     { key: "features", label: "Feature Requests", to: "/community?tab=feedback&sub=features" },
   ],
+  records: [],
 };
 
 const categoryKeySet = new Set<string>(CATEGORY_KEYS);

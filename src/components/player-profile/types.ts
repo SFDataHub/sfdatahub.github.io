@@ -34,6 +34,7 @@ export type PortraitOptions = {
     | "worldBossFrameSilver"
     | "worldBossFrameBronze"
     | "polarisFrame";
+  mirrorHorizontal?: boolean;
 };
 
 export type HeroMetric = {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { PortraitOptions } from "./types";
-
-type PortraitMakerCtor = typeof import("https://pm-lib.12hp.de/PortraitMaker-core-1.30.js").default;
+import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.31.js";
+import type { PortraitOptions } from "../player-profile/types";
+import "./PortraitPreview.css";
 
 const DEFAULT_PORTRAIT: PortraitOptions = {
   genderName: "male",
@@ -22,13 +22,14 @@ const DEFAULT_PORTRAIT: PortraitOptions = {
   showBorder: true,
   background: "gradient",
   frame: "",
+  mirrorHorizontal: true,
 };
 
 type PortraitStatus = "idle" | "loading" | "ready" | "error";
 
 const statusLabel: Record<PortraitStatus, string> = {
-  idle: "Porträt lädt …",
-  loading: "PortraitMaker wird initialisiert …",
+  idle: "Portrait l\u00E4dt ...",
+  loading: "PortraitMaker wird initialisiert ...",
   ready: "PortraitMaker bereit",
   error: "PortraitMaker konnte nicht geladen werden",
 };
@@ -56,6 +57,7 @@ const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
     showBorder: merged.showBorder ?? true,
     background: merged.background ?? DEFAULT_PORTRAIT.background,
     frame: merged.frame ?? DEFAULT_PORTRAIT.frame,
+    mirrorHorizontal: merged.mirrorHorizontal ?? DEFAULT_PORTRAIT.mirrorHorizontal,
     genderName: merged.genderName === "female" ? "female" : "male",
   };
 };
@@ -71,34 +73,33 @@ export default function PortraitPreview({
   const instanceRef = useRef<{ dispose?: () => void } | null>(null);
   const [status, setStatus] = useState<PortraitStatus>("idle");
 
-  const normalized = useMemo(() => sanitizeConfig(config), [JSON.stringify(config || {})]);
+  const libraryConfig = useMemo(() => {
+    const normalized = sanitizeConfig(config);
+    return {
+      ...normalized,
+      background: "",
+      frame: "",
+      showBorder: false,
+    };
+  }, [JSON.stringify(config || {})]);
 
   useEffect(() => {
     let disposed = false;
-
-    async function boot() {
-      setStatus("loading");
-      try {
-        const canvas = canvasRef.current;
-        if (!canvas) {
-          setStatus("error");
-          return;
-        }
-        const module = (await import(
-          /* @vite-ignore */ "https://pm-lib.12hp.de/PortraitMaker-core-1.30.js"
-        )) as { default: PortraitMakerCtor };
-        if (disposed) return;
-        const PortraitMaker = module.default;
-        const instance = new PortraitMaker(canvas, normalized);
-        instanceRef.current = instance;
-        setStatus("ready");
-      } catch (error) {
-        console.error("[PortraitMaker] failed to initialize", error);
-        if (!disposed) setStatus("error");
+    setStatus("loading");
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        setStatus("error");
+        return;
       }
+      const instance = new PortraitMaker(canvas, libraryConfig);
+      instanceRef.current = instance;
+      setStatus("ready");
+    } catch (error) {
+      console.error("[PortraitMaker] failed to initialize", error);
+      if (!disposed) setStatus("error");
     }
 
-    boot();
     return () => {
       disposed = true;
       try {
@@ -108,22 +109,23 @@ export default function PortraitPreview({
       }
       instanceRef.current = null;
     };
-  }, [normalized]);
+  }, [libraryConfig]);
+
+  const statusMessage = status !== "ready" ? statusLabel[status] : null;
 
   return (
-    <div className="player-profile__portrait" aria-live="polite">
-      <canvas
-        ref={canvasRef}
-        width={320}
-        height={320}
-        className="player-profile__portrait-canvas"
-        aria-label={`Portrait von ${label}`}
-      />
-      {status !== "ready" && (
-        <div className="player-profile__portrait-overlay">
-          <div className="player-profile__portrait-overlay-text">{statusLabel[status]}</div>
-        </div>
-      )}
+    <div className="avatar-portrait" aria-live="polite">
+      <div className="avatar-portrait__canvas-shell">
+        <canvas
+          ref={canvasRef}
+          id="PortraitCanvasPopOut"
+          width={526}
+          height={526}
+          className="avatar-portrait__canvas avatar-portrait__canvas--popout"
+          aria-label={`Portrait von ${label}`}
+        />
+      </div>
+      {statusMessage && <span className="avatar-portrait__status">{statusMessage}</span>}
     </div>
   );
 }

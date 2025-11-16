@@ -1,7 +1,7 @@
 // FILE: src/pages/Playground/PortraitMakerDemo/Index.tsx
 import React, { useEffect, useRef, useState } from "react";
 import styles from "./styles.module.css";
-import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.30.js";
+import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.31.js";
 
 type PMOptions = {
   genderName: "male" | "female";

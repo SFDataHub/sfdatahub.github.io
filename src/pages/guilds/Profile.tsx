@@ -22,6 +22,7 @@ import type {
   GuildLike,
   MemberSummaryLike,
 } from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
+import type { Member as GuildMember } from "../../components/guilds/guild-tabs/guild-members/types";
 
 // Right-Rail: einzelne Views (nicht verändern)
 import ClassCrestGrid from "../../components/guilds/GuildClassOverview/ClassCrestGrid";
@@ -45,8 +46,33 @@ const C = {
 };
 
 type Guild = GuildLike;
-type MemberSummary = MemberSummaryLike;
+type MemberSummary = GuildMember;
 type MembersSnapshot = MembersSnapshotLike;
+
+const normalizeMember = (entry: MemberSummaryLike): MemberSummary => ({
+  id: entry.id,
+  name: entry.name ?? "Unknown",
+  class: entry.class ?? "Unknown",
+  role: entry.role ?? "Unknown",
+  level: entry.level ?? undefined,
+  scrapbook: undefined,
+  lastOnline: entry.lastActivityMs ?? null,
+  server: null,
+  baseStats: {
+    main: entry.baseMain ?? undefined,
+    con: entry.conBase ?? undefined,
+    sumBaseTotal: entry.sumBaseTotal ?? undefined,
+  },
+  totalStats: entry.totalStats ?? undefined,
+  values: {
+    treasury: entry.treasury ?? undefined,
+    mine: entry.mine ?? undefined,
+    attrTotal: entry.attrTotal ?? undefined,
+    conTotal: entry.conTotal ?? undefined,
+    lastScan: entry.lastScan ?? undefined,
+    lastActivity: entry.lastActivity ?? undefined,
+  },
+});
 
 const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
@@ -234,7 +260,9 @@ export default function GuildProfile() {
             avgAttrTotal: sdata.avgAttrTotal ?? null,
             avgConTotal: sdata.avgConTotal ?? null,
             avgTotalStats: sdata.avgTotalStats ?? null,
-            members: Array.isArray(sdata.members) ? (sdata.members as MemberSummary[]) : [],
+            members: Array.isArray(sdata.members)
+              ? (sdata.members as MemberSummaryLike[])
+              : [],
           };
           setSnapshot(s);
         }
@@ -251,7 +279,7 @@ export default function GuildProfile() {
   }, [guildId]);
 
   const membersForList = useMemo<MemberSummary[]>(
-    () => snapshot?.members ?? [],
+    () => (snapshot?.members ?? []).map((m) => normalizeMember(m)),
     [snapshot]
   );
 
@@ -369,7 +397,7 @@ export default function GuildProfile() {
             </div>
 
             <Tabs
-              members={snapshot?.members ?? []}
+              members={membersForList}
               guildId={guild.id}
               guildName={guild.name}
               guildServer={guild.server}
@@ -391,7 +419,7 @@ export default function GuildProfile() {
             {/* Umschalten zwischen den zwei vorhandenen Komponenten – ohne Extra-Container */}
             {rightView === "grid" ? (
               <ClassCrestGrid
-                data={snapshot?.members ?? []}
+                data={membersForList}
                 classMeta={safeMeta as any}
                 onPickClass={(id) => {
                   const url = new URL(window.location.href);
@@ -401,7 +429,7 @@ export default function GuildProfile() {
                 }}
               />
             ) : (
-              <ClassDonut data={snapshot?.members ?? []} classMeta={safeMeta as any} />
+              <ClassDonut data={membersForList} classMeta={safeMeta as any} />
             )}
           </div>
           {/* /RIGHT RAIL */}
@@ -479,3 +507,5 @@ function Tabs({
     </div>
   );
 }
+
+

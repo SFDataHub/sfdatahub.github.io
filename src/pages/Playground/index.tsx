@@ -77,6 +77,44 @@ export default function PlaygroundIndex() {
               Theme / Template Maker · Pro
             </NavLink>
 
+            <div style={sx.groupLabel}>Templates</div>
+            <NavLink
+              to="templates/content-shell"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              ContentShell Template
+            </NavLink>
+            <NavLink
+              to="templates/blank"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Leere Vorlage
+            </NavLink>
+            <NavLink
+              to="templates/blank-alt"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Leere Vorlage (Neu)
+            </NavLink>
+            <NavLink
+              to="templates/blank-layout-2"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Leere Vorlage · Layout 2
+            </NavLink>
+            <NavLink
+              to="templates/blank-layout-3"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Leere Vorlage · Layout 3
+            </NavLink>
+            <NavLink
+              to="templates/blank-layout-4"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Leere Vorlage · Layout 4
+            </NavLink>
+
             <div style={sx.groupLabel}>Guide Hub Demos</div>
             <NavLink
               to="am-rune-bonuses-demos"

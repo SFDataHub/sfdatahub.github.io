@@ -24,16 +24,12 @@ function useTabSync(defaultTab: TabKey = "players") {
 }
 
 export default function ToplistsIndex() {
-  const [tab, setTab] = useTabSync("players");
+  const [tab] = useTabSync("players");
 
   // Nur anzeigen. Alles andere (Topbar, Tabs, Filter, Shell) machen die Unterseiten.
   return (
     <FilterProvider>
-      {tab === "players" ? (
-        <PlayerToplists tab={tab} setTab={setTab} />
-      ) : (
-        <GuildToplists tab={tab} setTab={setTab} />
-      )}
+      {tab === "players" ? <PlayerToplists /> : <GuildToplists />}
     </FilterProvider>
   );
 }

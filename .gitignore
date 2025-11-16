@@ -13,6 +13,9 @@ dist
 dist-ssr
 *.local
 
+# Gemini CLI project config (local only)
+GEMINI.md
+
 # Editor/OS
 .vscode/*
 !.vscode/extensions.json

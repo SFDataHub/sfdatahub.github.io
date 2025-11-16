@@ -9,7 +9,40 @@ import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 
 import { ToplistsProvider, useToplistsData } from "../../context/ToplistsDataContext";
-import { db } from "../../lib/firebase";
+
+type RegionKey = "EU" | "US" | "INT" | "Fusion";
+
+const SERVERS_BY_REGION: Record<RegionKey, string[]> = (() => {
+  const grouped: Record<RegionKey, string[]> = {
+    EU: [],
+    US: [],
+    INT: [],
+    Fusion: [],
+  };
+
+  const push = (region: RegionKey, value: string) => {
+    if (!grouped[region].includes(value)) {
+      grouped[region].push(value);
+    }
+  };
+
+  SERVERS.forEach((server) => {
+    const id = server.id ?? "";
+    const upper = id.toUpperCase();
+    if (upper.startsWith("EU")) push("EU", id);
+    else if (upper.startsWith("US") || upper.startsWith("NA") || upper.startsWith("AM")) push("US", id);
+    else if (upper.startsWith("F")) push("Fusion", id);
+    else push("INT", id);
+  });
+
+  (Object.keys(grouped) as RegionKey[]).forEach((key) => {
+    grouped[key].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  });
+
+  return grouped;
+})();
 
 // HUD -> Provider Sort mapping
 function mapSort(
@@ -57,7 +90,7 @@ export default function PlayerToplistsPage() {
         <ListSwitcher />
 
         {listView === "table" && (
-          <ToplistsProvider db={db}>
+          <ToplistsProvider>
             <TableDataView
               servers={servers ?? []}
               classes={classes ?? []}
@@ -72,12 +105,12 @@ export default function PlayerToplistsPage() {
         mode="modal"
         open={serverSheetOpen}
         onClose={() => setServerSheetOpen(false)}
-        serversByRegion={SERVERS as any}
+        serversByRegion={SERVERS_BY_REGION}
         selected={servers}
         onToggle={(s: string) =>
           setServers((prev: string[]) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
         }
-        onSelectAllInRegion={(r: keyof typeof SERVERS) => setServers(SERVERS[r])}
+        onSelectAllInRegion={(region: RegionKey) => setServers(SERVERS_BY_REGION[region])}
         onClearAll={() => setServers([])}
       />
 

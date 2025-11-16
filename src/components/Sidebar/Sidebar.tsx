@@ -38,6 +38,14 @@ const categories: Item[] = [
 ];
 
 const SUBTABS: Record<string, SubItem[]> = {
+  "/guild-hub": [
+    { to: "/guild-hub", label: "Overview" },
+    { to: "/guild-hub/planner", label: "Guild Planner" },
+    { to: "/guild-hub/fusion-planner", label: "Fusion Planner" },
+    { to: "/guild-hub/fusion", label: "Fusion" },
+    { to: "/guild-hub/waitlist", label: "Waitlist" },
+    { to: "/guild-hub/settings", label: "Settings" },
+  ],
   "/discover": [
     { to: "/players",            label: "Players" },
     { to: "/sfmagazine",         label: "SFMagazine" },

@@ -11,6 +11,7 @@ import CommunityScans from "./Scans";
 import CommunityPredictions from "./Predictions";
 import CommunityNews from "./News";
 import CommunityFeedback from "./Feedback";
+import CommunityRecords from "./Records";
 
 /** Tab-Key -> Component Mapping für Community */
 const TAB_MAP: Record<string, React.ComponentType> = {
@@ -18,6 +19,7 @@ const TAB_MAP: Record<string, React.ComponentType> = {
   scans: CommunityScans,
   predictions: CommunityPredictions,
   news: CommunityNews,
+  records: CommunityRecords,
   feedback: CommunityFeedback,
 };
 

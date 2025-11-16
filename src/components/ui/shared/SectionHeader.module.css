@@ -1,6 +1,9 @@
-.wrap { display: flex; flex-direction: column; gap: 12px; }
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-/* Header wie in AMRuneBonuses */
 .headerBar {
   display: flex;
   align-items: baseline;
@@ -11,17 +14,22 @@
 }
 
 .title {
+  margin: 0;
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
-  color: #F5F9FF; /* Titeltext laut Theme */
+  color: #f5f9ff;
 }
 
-.meta { opacity: 0.85; font-size: 12px; white-space: nowrap; }
+.meta {
+  opacity: 0.85;
+  font-size: 12px;
+  white-space: nowrap;
+}
 
 .description {
-  margin-top: 8px;
-  color: #B0C4D9; /* Sekundärtext laut Theme */
+  margin: 0;
+  color: #b0c4d9;
   font-size: 13.5px;
   line-height: 1.4;
 }

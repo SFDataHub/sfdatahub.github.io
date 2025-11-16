@@ -1,0 +1,37 @@
+.avatar-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.avatar-portrait__canvas-shell {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  border: 1px solid #2c4a73;
+  border-radius: 8px;
+  background-image: radial-gradient(circle, #3186fb 50%, #051020 100%);
+  width: fit-content;
+}
+
+.avatar-portrait__canvas {
+  height: 240px;
+  aspect-ratio: 1 / 1;
+  width: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+.avatar-portrait__canvas--popout {
+  scale: 1.4;
+  transform-origin: center 220px;
+  clip-path: inset(-100vw -20% 6% -20%);
+}
+
+.avatar-portrait__status {
+  font-size: 12px;
+  color: #b0c4d9;
+  text-align: center;
+}

@@ -1,0 +1,51 @@
+/* FILE: src/pages/Playground/Templates/BlankTemplatePageLayout2.module.css */
+
+.avatarFrameMask,
+.avatarFrameOverlay {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 24px;
+  background: #0c1c2e; /* SFDataHub-Hintergrund */
+  overflow: visible;   /* Avatar darf über den Rahmen hinausgehen */
+}
+
+/* Gemeinsame Avatar-Img-Basis */
+.avatarFrameMask img,
+.avatarFrameOverlay img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Variante 1: Radiale Maske – Bild blendet zu den Rändern transparent aus */
+.avatarFrameMask img {
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 1) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 1) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Variante 2: Overlay-Gradient – Hintergrund verschmilzt an den Rändern */
+.avatarFrameOverlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+
+  /* Mitte transparent, Rand geht in Seitenhintergrund über */
+  background: radial-gradient(
+    circle at center,
+    rgba(12, 28, 46, 0) 55%,
+    rgba(12, 28, 46, 1) 100%
+  );
+}

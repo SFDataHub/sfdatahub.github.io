@@ -1,5 +1,5 @@
 import React from "react";
-import PortraitPreview from "./PortraitPreview";
+import PortraitPreview from "../avatar/PortraitPreview";
 import type { HeroAction, HeroPanelData } from "./types";
 import { CLASSES } from "../../data/classes";
 import { toDriveThumbProxy } from "../../lib/urls";

@@ -56,6 +56,7 @@ import CommunityPredictions from "./pages/Community/Predictions";
 import CommunityCreators from "./pages/Community/Creators";
 import CommunityFeedback from "./pages/Community/Feedback";
 import CommunityNews from "./pages/Community/News";
+import CommunityRecords from "./pages/Community/Records";
 
 // Scans
 import ScansIndex from "./pages/Scans/Index";
@@ -65,6 +66,7 @@ import ScansArchive from "./pages/Scans/Archive";
 // GuildHub
 import GuildHubIndex from "./pages/GuildHub/Index";
 import GuildHubPlanner from "./pages/GuildHub/Planner";
+import GuildHubFusionPlanner from "./pages/GuildHub/FusionPlanner/FusionPlanner";
 import GuildHubFusion from "./pages/GuildHub/Fusion";
 import GuildHubWaitlist from "./pages/GuildHub/Waitlist";
 import GuildHubActivity from "./pages/GuildHub/Activity";
@@ -94,6 +96,12 @@ import ListViews from "./pages/Playground/ListViews";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
+import ContentShellTemplatePage from "./pages/Playground/Templates/ContentShellTemplatePage";
+import BlankTemplatePage from "./pages/Playground/Templates/BlankTemplatePage";
+import BlankTemplatePageAlt from "./pages/Playground/Templates/BlankTemplatePageAlt";
+import BlankTemplatePageLayout2 from "./pages/Playground/Templates/BlankTemplatePageLayout2";
+import BlankTemplatePageLayout3 from "./pages/Playground/Templates/BlankTemplatePageLayout3";
+import BlankTemplatePageLayout4 from "./pages/Playground/Templates/BlankTemplatePageLayout4";
 
 import HARImportPage from "./pages/Playground/Import/HARImportPage";
 import JSONCSVImportPage from "./pages/Playground/Import/JSONCSVImportPage";
@@ -213,6 +221,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/community/creators" element={<CommunityCreators />} />
             <Route path="/community/feedback" element={<CommunityFeedback />} />
             <Route path="/community/news" element={<CommunityNews />} />
+            <Route path="/community/records" element={<CommunityRecords />} />
 
             {/* Scans */}
             <Route path="/scans" element={<ScansIndex />} />
@@ -222,6 +231,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             {/* Guild Hub */}
             <Route path="/guild-hub" element={<GuildHubIndex />} />
             <Route path="/guild-hub/planner" element={<GuildHubPlanner />} />
+            <Route path="/guild-hub/fusion-planner" element={<GuildHubFusionPlanner />} />
             <Route path="/guild-hub/fusion" element={<GuildHubFusion />} />
             <Route path="/guild-hub/waitlist" element={<GuildHubWaitlist />} />
             <Route path="/guild-hub/activity" element={<GuildHubActivity />} />
@@ -249,7 +259,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="theme-maker" element={<ThemeMaker />} />
               <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
               <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
-	      <Route path="portrait-maker" element={<PortraitMakerDemoPage />} />
+              <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
+              <Route path="templates/blank" element={<BlankTemplatePage />} />
+              <Route path="templates/blank-alt" element={<BlankTemplatePageAlt />} />
+              <Route path="templates/blank-layout-2" element={<BlankTemplatePageLayout2 />} />
+              <Route path="templates/blank-layout-3" element={<BlankTemplatePageLayout3 />} />
+              <Route path="templates/blank-layout-4" element={<BlankTemplatePageLayout4 />} />
+              <Route path="portrait-maker" element={<PortraitMakerDemoPage />} />
 
               {/* HUD */}
               <Route path="hud" element={<HUDIndex />} />
