@@ -30,7 +30,7 @@ When deploying this service, configure the frontend `.env` to set `VITE_AUTH_BAS
 ### Discord OAuth Setup
 
 - Create/update your Discord application in the Developer Portal:
-  - Add the redirect URL from `DISCORD_REDIRECT_URI` (e.g., `http://localhost:4000/auth/discord/callback`).
+  - Add the redirect URL from `DISCORD_REDIRECT_URI` (e.g., `https://authapi-57ravjntpa-ew.a.run.app/auth/discord/callback`).
   - Copy the Client ID/Secret into `.env` (`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`).
 - Ensure `FRONTEND_BASE_URL` matches your Vite app (default `http://localhost:5173`).
 - Run `npm run dev` in `auth-api/` and set `VITE_AUTH_BASE_URL=http://localhost:4000` in the frontend to test the complete login flow.

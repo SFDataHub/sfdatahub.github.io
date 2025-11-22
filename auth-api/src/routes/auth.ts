@@ -70,7 +70,7 @@ const buildStateCookie = (state: string) => {
     `sfdatahub_oauth_state=${state}`,
     "HttpOnly",
     "SameSite=Lax",
-    "Path=/auth/discord",
+    "Path=/auth",
     "Max-Age=300",
   ];
   if (isProd) {
@@ -84,7 +84,7 @@ const clearStateCookie = () => {
     "sfdatahub_oauth_state=",
     "HttpOnly",
     "SameSite=Lax",
-    "Path=/auth/discord",
+    "Path=/auth",
     "Max-Age=0",
   ];
   if (isProd) {
@@ -98,7 +98,7 @@ const buildGoogleLinkStateCookie = (state: string) => {
     `sfdatahub_google_link_state=${state}`,
     "HttpOnly",
     "SameSite=Lax",
-    "Path=/auth/google",
+    "Path=/auth",
     "Max-Age=300",
   ];
   if (isProd) {
@@ -112,7 +112,7 @@ const clearGoogleLinkStateCookie = () => {
     "sfdatahub_google_link_state=",
     "HttpOnly",
     "SameSite=Lax",
-    "Path=/auth/google",
+    "Path=/auth",
     "Max-Age=0",
   ];
   if (isProd) {
