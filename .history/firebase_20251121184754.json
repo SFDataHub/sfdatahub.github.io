@@ -6,7 +6,7 @@
   "functions": [
     {
       "source": "auth-api",
-      "codebase": "authapi",
+      "codebase": "authApi",
       "runtime": "nodejs20",
       "predeploy": ["npm --prefix auth-api run build"],
       "ignore": [

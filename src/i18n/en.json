@@ -14,7 +14,7 @@
     "license": "License"
   },
   "topbar": {
-    "search": "Search…  /",
+    "search": "Search�?�  /",
     "settings": "Settings",
     "profile": "Profile",
     "signout": "Sign out",
@@ -26,5 +26,75 @@
     "language": "Language",
     "lang_en": "English",
     "lang_de": "Deutsch"
+  },
+  "profile": {
+    "public": {
+      "title": "Public profile",
+      "subtitle": "Read-only showcase of this SFDataHub identity",
+      "identity": {
+        "profileIdLabel": "Profile ID",
+        "unknownValue": "Unknown",
+        "lastScanLabel": "Last scan",
+        "lastScanToday": "today",
+        "daysAgoSuffix": "days ago",
+        "dateUnknown": "Not available",
+        "mainCharacterLabel": "Main character",
+        "levelShort": "Lv.",
+        "serverLabel": "Server",
+        "guildLabel": "Guild",
+        "portraitPlaceholder": "Portrait placeholder"
+      },
+      "bio": {
+        "title": "About this player",
+        "empty": "This player has not added a bio yet.",
+        "languagesLabel": "Languages",
+        "rolesLabel": "Roles"
+      },
+      "showcase": {
+        "title": "Character showcase",
+        "subtitle": "Curated roster pulled from the last verified scans",
+        "empty": "No characters selected for showcase yet.",
+        "scrapbookLabel": "Scrapbook",
+        "highlightLabel": "Highlight",
+        "tags": {
+          "main": "Main",
+          "alt": "Alt",
+          "archive": "Archive",
+          "event": "Event"
+        }
+      },
+      "stats": {
+        "title": "SFDataHub activity",
+        "totalScans": "Total scans",
+        "uniquePlayers": "Unique players",
+        "uniqueGuilds": "Unique guilds",
+        "last30d": "Scans (30d)",
+        "topServersLabel": "Top servers",
+        "firstScanLabel": "First scan",
+        "empty": "No scan data available yet."
+      },
+      "records": {
+        "title": "Records & milestones",
+        "empty": "No records or milestones have been registered yet.",
+        "type": {
+          "record": "Record",
+          "milestone": "Milestone"
+        }
+      },
+      "achievements": {
+        "title": "Achievements & badges",
+        "highlights": "Featured achievements",
+        "empty": "No achievements have been unlocked yet.",
+        "tiers": {
+          "gold": "Gold",
+          "silver": "Silver",
+          "bronze": "Bronze"
+        }
+      },
+      "roles": {
+        "guildleader": "Guild Leader",
+        "tryhard": "Tryhard"
+      }
+    }
   }
 }

@@ -27,6 +27,7 @@ export default function OverviewTab({
   setupState,
   onChangeScenarioDecision,
   onChangeScenarioTargetGuild,
+  onAddPartnerGuild,
 }: Props) {
   const decisions = scenario?.decisions ?? {};
   const targets = scenario?.targetGuildAssignments ?? {};

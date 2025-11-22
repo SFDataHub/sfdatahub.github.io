@@ -1,6 +1,7 @@
 import React from "react";
 import { Bell, Star, Upload, Globe } from "lucide-react";
 import styles from "./Topbar.module.css";
+import AccountMenu from "./AccountMenu";
 
 /** Upload-Center */
 import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
@@ -95,9 +96,7 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
           <span className={styles.label}>Scan hochladen</span>
         </button>
 
-        <button className={styles.avatarBtn} aria-label={user?.name ?? "Gast"}>
-          <img className={styles.avatar} src="https://i.pravatar.cc/72" alt="" />
-        </button>
+        <AccountMenu fallbackName={user?.name} />
       </div>
     </header>
   );

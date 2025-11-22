@@ -14,7 +14,7 @@
     "license": "Lizenzen"
   },
   "topbar": {
-    "search": "Suchen…  /",
+    "search": "Suchen�?�  /",
     "settings": "Einstellungen",
     "profile": "Profil",
     "signout": "Abmelden",
@@ -26,5 +26,75 @@
     "language": "Sprache",
     "lang_en": "English",
     "lang_de": "Deutsch"
+  },
+  "profile": {
+    "public": {
+      "title": "Öffentliches Profil",
+      "subtitle": "Read-only-Ansicht dieser SFDataHub-Identität",
+      "identity": {
+        "profileIdLabel": "Profil-ID",
+        "unknownValue": "Unbekannt",
+        "lastScanLabel": "Letzter Scan",
+        "lastScanToday": "heute",
+        "daysAgoSuffix": "Tage her",
+        "dateUnknown": "Keine Angabe",
+        "mainCharacterLabel": "Hauptcharakter",
+        "levelShort": "Lv.",
+        "serverLabel": "Server",
+        "guildLabel": "Gilde",
+        "portraitPlaceholder": "Portrait-Platzhalter"
+      },
+      "bio": {
+        "title": "Über diesen Spieler",
+        "empty": "Noch kein Bio-Text hinterlegt.",
+        "languagesLabel": "Sprachen",
+        "rolesLabel": "Rollen"
+      },
+      "showcase": {
+        "title": "Charakter-Showcase",
+        "subtitle": "Kuratiertes Roster aus den letzten Scans",
+        "empty": "Noch keine Charaktere für den Showcase ausgewählt.",
+        "scrapbookLabel": "Scrapbook",
+        "highlightLabel": "Highlight",
+        "tags": {
+          "main": "Main",
+          "alt": "Alt",
+          "archive": "Archiv",
+          "event": "Event"
+        }
+      },
+      "stats": {
+        "title": "SFDataHub-Aktivität",
+        "totalScans": "Scans gesamt",
+        "uniquePlayers": "Einzigartige Spieler",
+        "uniqueGuilds": "Einzigartige Gilden",
+        "last30d": "Scans (30T)",
+        "topServersLabel": "Top-Server",
+        "firstScanLabel": "Erster Scan",
+        "empty": "Noch keine Scan-Daten vorhanden."
+      },
+      "records": {
+        "title": "Records & Meilensteine",
+        "empty": "Noch keine Records oder Meilensteine erfasst.",
+        "type": {
+          "record": "Record",
+          "milestone": "Meilenstein"
+        }
+      },
+      "achievements": {
+        "title": "Erfolge & Badges",
+        "highlights": "Highlight-Erfolge",
+        "empty": "Noch keine Erfolge freigeschaltet.",
+        "tiers": {
+          "gold": "Gold",
+          "silver": "Silber",
+          "bronze": "Bronze"
+        }
+      },
+      "roles": {
+        "guildleader": "Gildenleiter",
+        "tryhard": "Tryhard"
+      }
+    }
   }
 }

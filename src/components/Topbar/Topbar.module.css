@@ -131,6 +131,95 @@
   object-fit: cover;
 }
 
+/* Account menu */
+.accountRoot{
+  position: relative;
+  display: inline-flex;
+}
+.accountDropdown{
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 16px 32px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  color: var(--text);
+  z-index: 120;
+}
+.accountHeader{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.accountName{
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+.accountSub{
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.accountStatusText{
+  font-size: 13px;
+  color: var(--text-soft);
+  margin: 0;
+}
+.accountPrimary{
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: var(--btn);
+  color: var(--text);
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.accountHint{
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 0;
+}
+.accountItem{
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background .12s ease;
+}
+.accountItem:hover{
+  background: var(--tile-hover);
+}
+.accountDivider{
+  border: 0;
+  height: 1px;
+  background: var(--line);
+  margin: 12px 0;
+}
+.accountMiniAvatar{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.accountLogout{
+  color: var(--danger, #ff7a7a);
+}
+
 /* Responsive: Mitte darf flexibel, rechts wird kompakter */
 @media (max-width: 920px){
   .topbar{ grid-template-columns: 1fr minmax(160px, 1fr) 1fr; }

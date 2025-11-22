@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
+import { useAuth } from "../../context/AuthContext";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
-type SubItem = { to: string; label: string };
+type SubItem = { to: string; label: string; minRole?: "mod" | "admin" };
 
 type Item = {
   to: string;
@@ -59,7 +60,7 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/admin",        label: "Overview" },
     { to: "/admin/errors", label: "Error log" },
     { to: "/admin/feedback", label: "Feedback" },
-
+    { to: "/admin/users",  label: "Users", minRole: "mod" },
   ],
   "/settings": [
     { to: "/settings/profile",    label: "Profile" },
@@ -73,6 +74,17 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/playground/hud/game-buttons", label: "HUD · Game Buttons" },
   ],
 };
+
+function hasRequiredRole(roles: string[], minRole?: "mod" | "admin") {
+  if (!minRole) return true;
+  if (minRole === "admin") return roles.includes("admin");
+  return roles.includes("admin") || roles.includes("mod");
+}
+
+function filterSubItems(subItems: SubItem[] | undefined, roles: string[]) {
+  if (!subItems) return [];
+  return subItems.filter((item) => hasRequiredRole(roles, item.minRole));
+}
 
 
 
@@ -138,13 +150,17 @@ function AnimatedLabel({
 
 /* ---------------- Ein Kategorie-Item mit Portal-Submenu ---------------- */
 function CategoryItem({
-  it, collapsed, allowSubmenus,
+  it,
+  collapsed,
+  allowSubmenus,
+  subItems,
 }: {
   it: Item;
   collapsed: boolean;
   allowSubmenus: boolean;
+  subItems: SubItem[];
 }) {
-  const hasSub = (SUBTABS[it.to]?.length ?? 0) > 0;
+  const hasSub = subItems.length > 0;
   const { open, onEnter, onLeave, setOpen } = useDelayedHover();
   const rowRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -180,7 +196,7 @@ function CategoryItem({
         <SubmenuPortal
           anchorEl={rowRef.current}
           open={open}
-          items={SUBTABS[it.to]}
+          items={subItems.map(({ to, label }) => ({ to, label }))}
           renderLink={(s) => (
             <NavLink
               key={s.to}
@@ -200,21 +216,36 @@ function CategoryItem({
 
 /* ---------------- Block ---------------- */
 function Block({
-  title, items, collapsed, allowSubmenus,
+  title,
+  items,
+  collapsed,
+  allowSubmenus,
+  userRoles,
 }: {
   title?: string;
   items: Item[];
   collapsed: boolean;
   allowSubmenus: boolean;
+  userRoles: string[];
 }) {
   return (
     <>
       {title && <div className={`${styles.navTitle} ${styles.segTitle}`}>{title}</div>}
       <div className={styles.navCol}>
-        {items.map((it) =>
-          SUBTABS[it.to] ? (
-            <CategoryItem key={it.to} it={it} collapsed={collapsed} allowSubmenus={allowSubmenus} />
-          ) : (
+        {items.map((it) => {
+          const subItems = filterSubItems(SUBTABS[it.to], userRoles);
+          if (subItems.length) {
+            return (
+              <CategoryItem
+                key={it.to}
+                it={it}
+                collapsed={collapsed}
+                allowSubmenus={allowSubmenus}
+                subItems={subItems}
+              />
+            );
+          }
+          return (
             <NavLink
               key={it.to}
               to={it.to}
@@ -226,8 +257,8 @@ function Block({
               {it.icon}
               <AnimatedLabel text={it.label} isOpen={!collapsed} />
             </NavLink>
-          )
-        )}
+          );
+        })}
       </div>
     </>
   );
@@ -296,6 +327,18 @@ export default function Sidebar({
 
   const collapsed = !expanded;
   const allowSubmenus = pinned || (expanded && submenuArmed);
+  const navigate = useNavigate();
+  const { status, user, logout } = useAuth();
+  const isAuthed = status === "authenticated";
+  const userRoles = user?.roles ?? [];
+
+  const handleFooterClick = () => {
+    if (isAuthed) {
+      logout();
+    } else {
+      navigate("/login");
+    }
+  };
 
   return (
     <aside
@@ -326,26 +369,41 @@ export default function Sidebar({
         <div className={styles.pad}>
           {/* Main */}
           <div className={`${styles.segCard} ${styles.mainNavCard}`}>
-            <Block items={main} collapsed={collapsed} allowSubmenus={allowSubmenus} />
+            <Block
+              items={main}
+              collapsed={collapsed}
+              allowSubmenus={allowSubmenus}
+              userRoles={userRoles}
+            />
           </div>
 
           <div className={styles.segTitle}>Kategorien</div>
 
           {/* Kategorien */}
           <div className={`${styles.segCard} ${styles.mainNavCard}`}>
-            <Block items={categories} collapsed={collapsed} allowSubmenus={allowSubmenus} />
+            <Block
+              items={categories}
+              collapsed={collapsed}
+              allowSubmenus={allowSubmenus}
+              userRoles={userRoles}
+            />
           </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className={`${styles.footer} ${styles.segCard} ${styles.mainNavCard}`}>
-        <button className={styles.login} type="button">
+        <button className={styles.login} type="button" onClick={handleFooterClick}>
           <Shield className="ico" />
-          <AnimatedLabel text="Logout" isOpen={!collapsed} />
+          <AnimatedLabel text={isAuthed ? "Logout" : "Login"} isOpen={!collapsed} />
         </button>
+        {isAuthed && user?.displayName ? (
+          <div className={styles.userMeta} title={user.displayName}>
+            {user.displayName}
+          </div>
+        ) : null}
         <div className={styles.legal}>
-          © 2025 SFDataHub — Alle Marken- und Bildrechte bei den jeweiligen Inhabern.
+          (c) 2025 SFDataHub - Alle Marken- und Bildrechte bei den jeweiligen Inhabern.
         </div>
       </div>
     </aside>

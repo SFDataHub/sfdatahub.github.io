@@ -9,6 +9,7 @@ import { HashRouter, Route, Routes, Navigate } from "react-router-dom";
 import RootLayout from "./layout/RootLayout";
 
 import Home from "./pages/Home";
+import LoginPage from "./pages/auth/LoginPage";
 
 // Dashboard
 import DashboardIndex from "./pages/Dashboard/Index";
@@ -46,6 +47,9 @@ import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
 import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
+// Public Profile
+import PublicProfilePage from "./pages/PublicProfile/PublicProfilePage";
+
 // Guide Hub
 import GuidesIndex from "./pages/GuideHub/Index";
 // SF Magazin
@@ -81,9 +85,11 @@ import AdminIndex from "./pages/Admin/Index";
 import AdminErrorLog from "./pages/Admin/ErrorLog";
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
+import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
 
 // Settings
 import Settings from "./pages/Settings";
+import AccountSettingsPage from "./pages/Settings/AccountSettingsPage";
 
 // Playground
 import PlaygroundIndex from "./pages/Playground/index";
@@ -150,6 +156,7 @@ import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 /** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
+import { AuthProvider } from "./context/AuthContext";
 
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
@@ -160,12 +167,14 @@ const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht me
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <UploadCenterProvider role="admin">
-      <HashRouter>
-        <Routes>
-          <Route element={<RootLayout />}>
+    <AuthProvider>
+      <UploadCenterProvider role="admin">
+        <HashRouter>
+          <Routes>
+            <Route element={<RootLayout />}>
             {/* Home */}
             <Route path="/" element={<Home />} />
+            <Route path="/login" element={<LoginPage />} />
 
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardIndex />} />
@@ -211,6 +220,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />     {/* ✨ */}
             <Route path="/server/:serverId" element={<ServerProfilePage />} />              {/* ✨ Kurzlink */}
 
+            {/* Public Profiles */}
+            <Route path="/u/:profileId" element={<PublicProfilePage />} />
+
             {/* Guides */}
             <Route path="/guidehub/*" element={<GuidesIndex />} />
 
@@ -245,10 +257,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/admin" element={<AdminIndex />} />
             <Route path="/admin/errors" element={<AdminErrorLog />} />
             <Route path="/admin/scans-uploaded" element={<AdminScansUploaded />} />
-        <Route path="/admin/creators-api" element={<AdminCreatorsAPI />} />
+            <Route path="/admin/creators-api" element={<AdminCreatorsAPI />} />
+            <Route path="/admin/users" element={<AdminUsersAdminPage />} />
 
             {/* Settings */}
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/account" element={<AccountSettingsPage />} />
 
             {/* Playground */}
             <Route path="/playground" element={<PlaygroundIndex />}>
@@ -331,7 +345,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/toplists/guilds" element={NotFoundOld()} />
             <Route path="/toplists/servers" element={NotFoundOld()} />
             <Route path="/settings/profile" element={NotFoundOld()} />
-            <Route path="/settings/account" element={NotFoundOld()} />
             <Route path="/settings/appearance" element={NotFoundOld()} />
             <Route path="/players/search" element={NotFoundOld()} />
             <Route path="/players/compare" element={NotFoundOld()} />
@@ -349,5 +362,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       {/* Modal am Root */}
       <UploadCenterModal />
     </UploadCenterProvider>
+    </AuthProvider>
   </React.StrictMode>
 );
