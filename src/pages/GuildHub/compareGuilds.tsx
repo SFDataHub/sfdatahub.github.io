@@ -48,7 +48,7 @@ const SERVER_OPTIONS = ["EU-01", "EU-02", "US-01", "US-02", "ASIA-01"] as const;
 
 const numberFormatter = new Intl.NumberFormat("de-DE");
 
-export default function GuildHubFusion() {
+export default function GuildHubCompareGuilds() {
   const isMdUp = useMediaQuery("(min-width: 768px)");
 
   const [serverFilter, setServerFilter] = React.useState<string>("all");
@@ -141,16 +141,16 @@ export default function GuildHubFusion() {
   const comparisonReady = selectedGuildA && selectedGuildB;
 
   return (
-    <ContentShell title="Guild Hub" subtitle="Fusion" centerFramed={false}>
+    <ContentShell title="Guild Hub" subtitle="Gildenvergleich" centerFramed={false}>
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerStack}>
             <div>
               <p className={styles.kicker}>Guild Hub</p>
-              <h1 className={styles.title}>Fusion vorbereiten</h1>
+              <h1 className={styles.title}>Gilden vergleichen</h1>
               <p className={styles.subtitle}>
-                Waehle zwei Gilden, gleiche Kennzahlen ab und sichere Risiken bevor du eine Fusion
-                bestaetigst.
+                Waehle zwei Gilden, gleiche Kennzahlen ab und sichere Risiken ab, bevor du dich fuer
+                oder gegen einen Zusammenschluss entscheidest.
               </p>
             </div>
             <div className={styles.headerActions}>
@@ -577,7 +577,7 @@ function ChecklistCard() {
 
   return (
     <section className={styles.checklistCard}>
-      <h3>Vor der Fusion pruefen</h3>
+      <h3>Vor dem Vergleich pruefen</h3>
       <ul className={styles.checklist}>
         {items.map((item) => (
           <li key={item}>{item}</li>
@@ -690,7 +690,7 @@ function useGuildSearchResults(term: string, server: string, excludeId?: string 
           setResults(next);
         }
       } catch (error) {
-        console.error("[GuildHub Fusion] guild search failed", error);
+        console.error("[GuildHub CompareGuilds] guild search failed", error);
         if (!cancelled) setResults([]);
       } finally {
         if (!cancelled) setLoading(false);

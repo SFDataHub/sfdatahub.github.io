@@ -71,7 +71,7 @@ import ScansArchive from "./pages/Scans/Archive";
 import GuildHubIndex from "./pages/GuildHub/Index";
 import GuildHubPlanner from "./pages/GuildHub/Planner";
 import GuildHubFusionPlanner from "./pages/GuildHub/FusionPlanner/FusionPlanner";
-import GuildHubFusion from "./pages/GuildHub/Fusion";
+import GuildHubCompareGuilds from "./pages/GuildHub/compareGuilds";
 import GuildHubWaitlist from "./pages/GuildHub/Waitlist";
 import GuildHubActivity from "./pages/GuildHub/Activity";
 import GuildHubImports from "./pages/GuildHub/Imports";
@@ -244,7 +244,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/guild-hub" element={<GuildHubIndex />} />
             <Route path="/guild-hub/planner" element={<GuildHubPlanner />} />
             <Route path="/guild-hub/fusion-planner" element={<GuildHubFusionPlanner />} />
-            <Route path="/guild-hub/fusion" element={<GuildHubFusion />} />
+            <Route path="/guild-hub/compare-guilds" element={<GuildHubCompareGuilds />} />
             <Route path="/guild-hub/waitlist" element={<GuildHubWaitlist />} />
             <Route path="/guild-hub/activity" element={<GuildHubActivity />} />
             <Route path="/guild-hub/imports" element={<GuildHubImports />} />

@@ -61,7 +61,7 @@ export default function GuildHubIndex() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Tile to="/guild-hub/planner" title="Planner" desc="Raids, Events, Aufgaben" />
           <Tile to="/guild-hub/fusion-planner" title="Fusion Planner" desc="Setups & Szenarien" />
-          <Tile to="/guild-hub/fusion" title="Fusion" desc="Gildenfusionen planen" />
+          <Tile to="/guild-hub/compare-guilds" title="Gildenvergleich" desc="Kennzahlen nebeneinander legen" />
           <Tile to="/guild-hub/waitlist" title="Waitlist" desc="Bewerber & Slots" />
         </div>
       </div>
@@ -74,7 +74,7 @@ function LeftRail() {
     <nav className="space-y-2 text-sm">
       <RailLink to="/guild-hub/planner">Planner</RailLink>
       <RailLink to="/guild-hub/fusion-planner">Fusion Planner</RailLink>
-      <RailLink to="/guild-hub/fusion">Fusion</RailLink>
+      <RailLink to="/guild-hub/compare-guilds">Gildenvergleich</RailLink>
       <RailLink to="/guild-hub/waitlist">Waitlist</RailLink>
       <RailLink to="/guild-hub/settings">Einstellungen</RailLink>
     </nav>

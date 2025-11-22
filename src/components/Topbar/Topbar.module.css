@@ -130,6 +130,35 @@
   display: block;
   object-fit: cover;
 }
+.avatarSpinnerShell{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--tile);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatarSpinner{
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: var(--text);
+  animation: topbarSpinner 0.7s linear infinite;
+}
+.srOnly{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Account menu */
 .accountRoot{
@@ -230,4 +259,9 @@
 /* Bevorzugt reduzierte Bewegung */
 @media (prefers-reduced-motion: reduce){
   .btnIco{ transition: none; }
+}
+
+@keyframes topbarSpinner{
+  0%{ transform: rotate(0deg); }
+  100%{ transform: rotate(360deg); }
 }

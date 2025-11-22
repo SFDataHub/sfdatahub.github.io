@@ -11,7 +11,7 @@ interface AccountMenuProps {
 }
 
 const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
-  const { user, status, logout } = useAuth();
+  const { user, status, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -34,6 +34,12 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (isLoading) {
+      setIsOpen(false);
+    }
+  }, [isLoading]);
 
   const closeMenu = useCallback(() => setIsOpen(false), []);
 
@@ -61,7 +67,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   }, [closeMenu, logout, navigate]);
 
   const renderDropdownContent = () => {
-    if (status === "loading" || status === "idle") {
+    if (isLoading) {
       return <p className={styles.accountStatusText}>Checking session...</p>;
     }
 
@@ -108,18 +114,30 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
 
   return (
     <div className={styles.accountRoot} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.avatarBtn}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-label={displayName}
-        onClick={handleToggle}
-      >
-        <img className={styles.avatar} src={avatarUrl} alt={displayName} />
-      </button>
+      {isLoading ? (
+        <div
+          className={styles.avatarSpinnerShell}
+          role="status"
+          aria-live="polite"
+          aria-label="Checking login status"
+        >
+          <span className={styles.avatarSpinner} aria-hidden="true" />
+          <span className={styles.srOnly}>Checking login status</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.avatarBtn}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          aria-label={displayName}
+          onClick={handleToggle}
+        >
+          <img className={styles.avatar} src={avatarUrl} alt={displayName} />
+        </button>
+      )}
 
-      {isOpen && (
+      {!isLoading && isOpen && (
         <div className={styles.accountDropdown} role="menu">
           {renderDropdownContent()}
         </div>

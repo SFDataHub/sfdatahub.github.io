@@ -1,37 +1,14 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  startAfter,
-  updateDoc,
-  where,
-  type DocumentData,
-  type DocumentSnapshot,
-  type QueryConstraint,
-  type QueryDocumentSnapshot,
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
-import type {
-  AdminUser,
-  AdminUserRole,
-  AdminUserStatus,
-} from "../types/adminUser";
-import { logAdminAuditEvent } from "./adminAuditLog";
-import type { AdminAuditAction, AdminAuditChangeSet } from "../types/adminAudit";
+import { Timestamp } from "firebase/firestore";
 
-const USERS_COLLECTION = "users";
+import { AUTH_BASE_URL } from "../lib/auth/config";
+import type { AdminUser, AdminUserRole, AdminUserStatus, ProviderDetails } from "../types/adminUser";
+
+const ADMIN_USERS_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/admin/users` : "";
 const DEFAULT_PAGE_SIZE = 25;
-const MAX_FETCH_BATCHES = 4;
-const AUDIT_CONTEXT = "control-panel/users";
-const ROLE_ORDER: AdminUserRole[] = ["admin", "mod", "creator", "user"];
 
 export type ListAdminUsersOptions = {
   pageSize?: number;
-  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+  cursor?: string | null;
   role?: AdminUserRole;
   status?: AdminUserStatus;
   provider?: "discord" | "google";
@@ -40,111 +17,8 @@ export type ListAdminUsersOptions = {
 
 export type ListAdminUsersResult = {
   users: AdminUser[];
-  nextPageCursor: QueryDocumentSnapshot<DocumentData> | null;
+  nextPageCursor: string | null;
 };
-
-export async function listAdminUsers(
-  options: ListAdminUsersOptions = {},
-): Promise<ListAdminUsersResult> {
-  const {
-    pageSize = DEFAULT_PAGE_SIZE,
-    cursor = null,
-    role,
-    status,
-    provider,
-    search,
-  } = options;
-
-  const normalizedPageSize = Math.max(1, Math.min(pageSize, 100));
-  const colRef = collection(db, USERS_COLLECTION);
-
-  const constraints: QueryConstraint[] = [
-    orderBy("createdAt", "desc"),
-    orderBy("userId", "desc"),
-  ];
-
-  if (role) {
-    constraints.unshift(where("roles", "array-contains", role));
-  }
-
-  let statusNeedsClientFilter = false;
-  if (status && status !== "active") {
-    constraints.unshift(where("status", "==", status));
-  } else if (status === "active") {
-    statusNeedsClientFilter = true;
-  }
-
-  const needsClientFilters = Boolean(provider || search || statusNeedsClientFilter);
-  const batchSize = Math.min(
-    normalizedPageSize * (needsClientFilters ? 3 : 1),
-    75,
-  );
-
-  const trimmedSearch = search?.trim().toLowerCase() ?? "";
-  const effectiveStatusFilter = statusNeedsClientFilter ? "active" : undefined;
-
-  const matchesFilters = (user: AdminUser): boolean => {
-    if (provider && !matchesProvider(user, provider)) {
-      return false;
-    }
-    if (trimmedSearch && !matchesSearch(user, trimmedSearch)) {
-      return false;
-    }
-    if (effectiveStatusFilter && normalizeStatus(user.status) !== effectiveStatusFilter) {
-      return false;
-    }
-    return true;
-  };
-
-  const users: AdminUser[] = [];
-  let anchor: QueryDocumentSnapshot<DocumentData> | null = cursor;
-  let nextCursor: QueryDocumentSnapshot<DocumentData> | null = null;
-  let reachedEnd = false;
-
-  for (let i = 0; i < MAX_FETCH_BATCHES && users.length < normalizedPageSize; i += 1) {
-    const pageConstraints = [...constraints];
-    if (anchor) {
-      pageConstraints.push(startAfter(anchor));
-    }
-    pageConstraints.push(limit(batchSize));
-
-    const snapshot = await getDocs(query(colRef, ...pageConstraints));
-    if (snapshot.empty) {
-      reachedEnd = true;
-      nextCursor = null;
-      break;
-    }
-
-    snapshot.docs.forEach((docSnap) => {
-      const user = toAdminUser(docSnap);
-      if (!needsClientFilters || matchesFilters(user)) {
-        users.push(user);
-      }
-    });
-
-    anchor = snapshot.docs[snapshot.docs.length - 1];
-    nextCursor = anchor;
-
-    if (snapshot.size < batchSize) {
-      reachedEnd = true;
-      break;
-    }
-  }
-
-  return {
-    users: users.slice(0, normalizedPageSize),
-    nextPageCursor: reachedEnd ? null : nextCursor,
-  };
-}
-
-export async function getAdminUserById(userId: string): Promise<AdminUser> {
-  const ref = doc(db, USERS_COLLECTION, userId);
-  const snapshot = await getDoc(ref);
-  if (!snapshot.exists()) {
-    throw new Error("User not found");
-  }
-  return toAdminUser(snapshot);
-}
 
 export type UpdateAdminUserInput = {
   roles?: AdminUserRole[];
@@ -152,175 +26,147 @@ export type UpdateAdminUserInput = {
   notes?: string | null;
 };
 
-export type UpdateAdminUserContext = {
-  actorUserId: string;
-  actorDisplayName?: string | null;
+type AdminUserApiPayload = {
+  id: string;
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  primaryProvider: string | null;
+  roles: AdminUserRole[];
+  providers?: {
+    discord?: ProviderDetails;
+    google?: ProviderDetails;
+  };
+  profile?: AdminUser["profile"];
+  createdAt: number | null;
+  lastLoginAt: number | null;
+  status: AdminUserStatus;
+  notes: string | null;
 };
+
+type ListAdminUsersApiResponse = {
+  users: AdminUserApiPayload[];
+  nextPageCursor: string | null;
+};
+
+type SingleAdminUserApiResponse = {
+  user: AdminUserApiPayload;
+};
+
+const ensureAdminEndpoint = () => {
+  if (!ADMIN_USERS_ENDPOINT) {
+    throw new Error("Admin API base URL missing (set VITE_AUTH_BASE_URL).");
+  }
+};
+
+const toTimestamp = (value?: number | null): Timestamp | null => {
+  if (typeof value !== "number") return null;
+  return Timestamp.fromMillis(value);
+};
+
+const mapAdminUser = (payload: AdminUserApiPayload): AdminUser => ({
+  id: payload.id,
+  userId: payload.userId,
+  displayName: payload.displayName,
+  avatarUrl: payload.avatarUrl,
+  primaryProvider: payload.primaryProvider ?? "discord",
+  roles: payload.roles,
+  providers: payload.providers,
+  profile: payload.profile,
+  createdAt: toTimestamp(payload.createdAt),
+  lastLoginAt: toTimestamp(payload.lastLoginAt),
+  status: payload.status,
+  notes: payload.notes,
+});
+
+const buildListQuery = (options: ListAdminUsersOptions): string => {
+  const params = new URLSearchParams();
+  params.set("pageSize", String(options.pageSize ?? DEFAULT_PAGE_SIZE));
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+  if (options.role) {
+    params.set("role", options.role);
+  }
+  if (options.status) {
+    params.set("status", options.status);
+  }
+  if (options.provider) {
+    params.set("provider", options.provider);
+  }
+  if (options.search) {
+    params.set("search", options.search);
+  }
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
+};
+
+const parseError = async (response: Response): Promise<Error> => {
+  let message = `Request failed (${response.status})`;
+  try {
+    const payload = await response.json();
+    if (payload?.error) {
+      message = payload.error;
+    }
+  } catch {
+    // ignore JSON parse failures
+  }
+  return new Error(message);
+};
+
+export async function listAdminUsers(
+  options: ListAdminUsersOptions = {},
+): Promise<ListAdminUsersResult> {
+  ensureAdminEndpoint();
+  const query = buildListQuery(options);
+  const url = `${ADMIN_USERS_ENDPOINT}${query}`;
+
+  try {
+    const response = await fetch(url, {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw await parseError(response);
+    }
+    const payload = (await response.json()) as ListAdminUsersApiResponse;
+    return {
+      users: payload.users.map(mapAdminUser),
+      nextPageCursor: payload.nextPageCursor ?? null,
+    };
+  } catch (error) {
+    console.error("[AdminUsers] listAdminUsers failed", error);
+    throw error instanceof Error ? error : new Error("Failed to load admin users");
+  }
+}
+
+export async function getAdminUserById(userId: string): Promise<AdminUser> {
+  ensureAdminEndpoint();
+  const response = await fetch(`${ADMIN_USERS_ENDPOINT}/${encodeURIComponent(userId)}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  const payload = (await response.json()) as SingleAdminUserApiResponse;
+  return mapAdminUser(payload.user);
+}
 
 export async function updateAdminUser(
   userId: string,
   updates: UpdateAdminUserInput,
-  context: UpdateAdminUserContext,
 ): Promise<AdminUser> {
-  const ref = doc(db, USERS_COLLECTION, userId);
-  const beforeSnapshot = await getDoc(ref);
-  if (!beforeSnapshot.exists()) {
-    throw new Error("User not found");
-  }
-
-  const beforeUser = toAdminUser(beforeSnapshot);
-  const payload: Record<string, unknown> = {};
-
-  if (updates.roles) {
-    payload.roles = normalizeRoles(updates.roles);
-  }
-
-  if (typeof updates.status !== "undefined") {
-    payload.status = updates.status;
-  }
-
-  if ("notes" in updates) {
-    payload.notes = updates.notes ?? null;
-  }
-
-  if (!Object.keys(payload).length) {
-    return beforeUser;
-  }
-
-  await updateDoc(ref, payload);
-
-  const afterSnapshot = await getDoc(ref);
-  const updatedUser = toAdminUser(afterSnapshot);
-
-  const changes = computeChangeSet(beforeUser, updatedUser, payload);
-  if (Object.keys(changes).length && context.actorUserId) {
-    const action = resolveAuditAction(changes);
-    const summary = formatAuditSummary(changes);
-    await logAdminAuditEvent({
-      actorUserId: context.actorUserId,
-      actorDisplayName: context.actorDisplayName,
-      targetUserId: updatedUser.userId,
-      action,
-      summary,
-      changes,
-      context: AUDIT_CONTEXT,
-    });
-  }
-
-  return updatedUser;
-}
-
-function toAdminUser(
-  snapshot: QueryDocumentSnapshot<DocumentData> | DocumentSnapshot<DocumentData>,
-): AdminUser {
-  const raw = snapshot.data();
-  if (!raw) {
-    throw new Error("User payload missing");
-  }
-  const data = raw as Omit<AdminUser, "id">;
-  const rawRoles = Array.isArray(data.roles) ? (data.roles as AdminUserRole[]) : ["user"];
-  return {
-    id: snapshot.id,
-    roles: normalizeRoles(rawRoles),
-    displayName: data.displayName ?? null,
-    avatarUrl: data.avatarUrl ?? null,
-    userId: data.userId ?? snapshot.id,
-    primaryProvider: data.primaryProvider ?? "discord",
-    providers: data.providers,
-    profile: data.profile,
-    createdAt: data.createdAt,
-    lastLoginAt: data.lastLoginAt ?? null,
-    status: data.status,
-    notes: data.notes ?? null,
-  };
-}
-
-function matchesProvider(user: AdminUser, provider: "discord" | "google") {
-  if (user.primaryProvider === provider) {
-    return true;
-  }
-  return Boolean(user.providers?.[provider]);
-}
-
-function matchesSearch(user: AdminUser, term: string) {
-  const haystack = [
-    user.userId,
-    user.displayName ?? undefined,
-    user.profile?.displayName ?? undefined,
-    user.providers?.discord?.displayName,
-    user.providers?.google?.displayName,
-  ]
-    .filter((value): value is string => Boolean(value))
-    .map((value) => value.toLowerCase());
-
-  return haystack.some((value) => value.includes(term));
-}
-
-function normalizeRoles(input: AdminUserRole[]): AdminUserRole[] {
-  const set = new Set<AdminUserRole>(["user"]);
-  input.forEach((role) => {
-    if (ROLE_ORDER.includes(role)) {
-      set.add(role);
-    }
+  ensureAdminEndpoint();
+  const response = await fetch(`${ADMIN_USERS_ENDPOINT}/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
   });
-  return [...set].sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-}
-
-function normalizeStatus(status?: AdminUserStatus): AdminUserStatus {
-  return status ?? "active";
-}
-
-function computeChangeSet(
-  before: AdminUser,
-  after: AdminUser,
-  payload: Record<string, unknown>,
-): AdminAuditChangeSet {
-  const changes: AdminAuditChangeSet = {};
-
-  if ("roles" in payload && !arrayEquals(before.roles, after.roles)) {
-    changes.roles = { before: before.roles, after: after.roles };
+  if (!response.ok) {
+    throw await parseError(response);
   }
-
-  if ("status" in payload) {
-    const prev = normalizeStatus(before.status);
-    const next = normalizeStatus(after.status);
-    if (prev !== next) {
-      changes.status = { before: prev, after: next };
-    }
-  }
-
-  if ("notes" in payload) {
-    const prev = before.notes ?? "";
-    const next = after.notes ?? "";
-    if (prev !== next) {
-      changes.notes = { before: before.notes ?? null, after: after.notes ?? null };
-    }
-  }
-
-  return changes;
-}
-
-function resolveAuditAction(changes: AdminAuditChangeSet): AdminAuditAction {
-  if (changes.roles) return "user.role.update";
-  if (changes.status) return "user.status.update";
-  return "user.notes.update";
-}
-
-function formatAuditSummary(changes: AdminAuditChangeSet): string {
-  const parts: string[] = [];
-  if (changes.roles) {
-    parts.push(`roles: ${JSON.stringify(changes.roles.before)} -> ${JSON.stringify(changes.roles.after)}`);
-  }
-  if (changes.status) {
-    parts.push(`status: "${changes.status.before}" -> "${changes.status.after}"`);
-  }
-  if (changes.notes) {
-    parts.push("notes updated");
-  }
-  return parts.join(" | ");
-}
-
-function arrayEquals(a: AdminUserRole[], b: AdminUserRole[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((value, index) => value === b[index]);
+  const payload = (await response.json()) as SingleAdminUserApiResponse;
+  return mapAdminUser(payload.user);
 }

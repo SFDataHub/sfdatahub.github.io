@@ -18,14 +18,14 @@ export interface AdminUser {
   userId: string;
   displayName: string | null;
   avatarUrl: string | null;
-  primaryProvider: string;
+  primaryProvider: string | null;
   roles: AdminUserRole[];
   providers?: {
     discord?: ProviderDetails;
     google?: ProviderDetails;
   };
   profile?: AdminUserProfile;
-  createdAt: Timestamp;
+  createdAt?: Timestamp | null;
   lastLoginAt?: Timestamp | null;
   status?: AdminUserStatus;
   notes?: string | null;

@@ -27,6 +27,9 @@ This service relies on **Application Default Credentials (ADC)** for `firebase-a
 
 When deploying this service, configure the frontend `.env` to set `VITE_AUTH_BASE_URL` (consumed as `AUTH_BASE_URL`) to the public URL of this backend so the `AuthContext` can reach `/auth/session`, `/auth/logout`, etc.
 
+- Session cookies automatically switch to `SameSite=None; Secure` when this backend runs on Cloud Run / staging so cross-site `fetch(..., { credentials: "include" })` calls from `sfdatahub.github.io` keep the login alive.
+- In local development (when `FRONTEND_BASE_URL` points at `localhost`), the cookie falls back to `SameSite=Lax` without `Secure` so `http://localhost` testing still works.
+
 ### Discord OAuth Setup
 
 - Create/update your Discord application in the Developer Portal:

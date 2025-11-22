@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken";
 
-import { AUTH_JWT_SECRET } from "./config";
+import { AUTH_JWT_SECRET, FRONTEND_BASE_URL } from "./config";
 import type { UserDoc } from "./users";
 
 export const SESSION_COOKIE_NAME = "sfdatahub_session";
 const SESSION_TTL_SECONDS = 15 * 60;
-const isProd = process.env.NODE_ENV === "production";
+const isLocalSessionEnv =
+  FRONTEND_BASE_URL.includes("localhost") || process.env.NODE_ENV !== "production";
 
 interface SessionPayload {
   sub: string;
@@ -43,14 +44,15 @@ export function verifySessionToken(
 }
 
 const buildCookieParts = (name: string, value: string, extra: string[] = []) => {
+  const sameSite = isLocalSessionEnv ? "Lax" : "None";
   const parts = [
     `${name}=${value}`,
     "HttpOnly",
-    "SameSite=Lax",
+    `SameSite=${sameSite}`,
     "Path=/",
     ...extra,
   ];
-  if (isProd) {
+  if (!isLocalSessionEnv) {
     parts.push("Secure");
   }
   return parts.join("; ");

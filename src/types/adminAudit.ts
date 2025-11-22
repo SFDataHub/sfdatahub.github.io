@@ -15,7 +15,7 @@ export type AdminAuditChangeSet = Record<
 
 export interface AdminAuditEvent {
   id: string;
-  createdAt: Timestamp;
+  createdAt?: Timestamp | null;
   actorUserId: string;
   actorDisplayName?: string | null;
   targetUserId: string;

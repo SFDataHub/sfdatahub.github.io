@@ -13,6 +13,7 @@ import type { AuthStatus, AuthUser } from "../lib/auth/types";
 type AuthContextValue = {
   user: AuthUser | null;
   status: AuthStatus;
+  isLoading: boolean;
   loginWithDiscord: () => void;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
@@ -110,16 +111,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await fetchSession();
   }, [fetchSession]);
 
+  const loading = status === "idle" || status === "loading";
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       status,
+      isLoading: loading,
       loginWithDiscord,
       loginWithGoogle,
       logout,
       refreshSession,
     }),
-    [user, status, loginWithDiscord, loginWithGoogle, logout, refreshSession],
+    [user, status, loading, loginWithDiscord, loginWithGoogle, logout, refreshSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

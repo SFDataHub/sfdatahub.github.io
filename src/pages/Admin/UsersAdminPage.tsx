@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import type { DocumentData, QueryDocumentSnapshot, Timestamp } from "firebase/firestore";
+import type { Timestamp } from "firebase/firestore";
 import {
   AlertCircle,
   Ban,
@@ -107,11 +107,7 @@ export default function UsersAdminPage() {
       subheader={<TabSwitcher activeTab={activeTab} onChange={setActiveTab} />}
     >
       {activeTab === "users" ? (
-        <UsersTab
-          isAdmin={isAdmin}
-          currentUserId={user?.id ?? ""}
-          currentUserName={user?.displayName}
-        />
+        <UsersTab isAdmin={isAdmin} />
       ) : (
         <AuditTab
           isAdmin={isAdmin}
@@ -162,15 +158,7 @@ function TabSwitcher({
   );
 }
 
-function UsersTab({
-  isAdmin,
-  currentUserId,
-  currentUserName,
-}: {
-  isAdmin: boolean;
-  currentUserId: string;
-  currentUserName?: string;
-}) {
+function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   const [filters, setFilters] = useState<{
     role: RoleFilterValue;
     status: StatusFilterValue;
@@ -192,7 +180,7 @@ function UsersTab({
 
   const [listState, setListState] = useState<{
     items: AdminUser[];
-    cursor: QueryDocumentSnapshot<DocumentData> | null;
+    cursor: string | null;
     loading: boolean;
     loadingMore: boolean;
     error: string | null;
@@ -388,10 +376,7 @@ function UsersTab({
       setActionPending(true);
       setActionError(null);
       try {
-        const updated = await updateAdminUser(selectedUser.id, patch, {
-          actorUserId: currentUserId,
-          actorDisplayName: currentUserName,
-        });
+        const updated = await updateAdminUser(selectedUser.id, patch);
         setSelectedUser(updated);
         updateListEntry(updated);
         if ("notes" in patch) {
@@ -405,7 +390,7 @@ function UsersTab({
         setActionPending(false);
       }
     },
-    [selectedUser, currentUserId, currentUserName, refreshAudit, updateListEntry],
+    [selectedUser, refreshAudit, updateListEntry],
   );
 
   const handleRoleToggle = (role: AdminUserRole) => {
@@ -691,7 +676,7 @@ function AuditTab({
 
   const [state, setState] = useState<{
     items: AdminAuditEvent[];
-    cursor: QueryDocumentSnapshot<DocumentData> | null;
+    cursor: string | null;
     loading: boolean;
     loadingMore: boolean;
     error: string | null;

@@ -43,7 +43,7 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/guild-hub", label: "Overview" },
     { to: "/guild-hub/planner", label: "Guild Planner" },
     { to: "/guild-hub/fusion-planner", label: "Fusion Planner" },
-    { to: "/guild-hub/fusion", label: "Fusion" },
+    { to: "/guild-hub/compare-guilds", label: "Gildenvergleich" },
     { to: "/guild-hub/waitlist", label: "Waitlist" },
     { to: "/guild-hub/settings", label: "Settings" },
   ],
