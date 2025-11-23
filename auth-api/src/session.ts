@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-import { AUTH_JWT_SECRET, FRONTEND_BASE_URL } from "./config";
+import { AUTH_JWT_SECRET, FRONTEND_BASE_URL, SESSION_COOKIE_DOMAIN } from "./config";
 import type { UserDoc } from "./users";
 
 export const SESSION_COOKIE_NAME = "sfdatahub_session";
@@ -54,6 +54,9 @@ const buildCookieParts = (name: string, value: string, extra: string[] = []) => 
     "Path=/",
     ...extra,
   ];
+  if (!isLocalSessionEnv && SESSION_COOKIE_DOMAIN) {
+    parts.push(`Domain=${SESSION_COOKIE_DOMAIN}`);
+  }
   if (!isLocalSessionEnv) {
     parts.push("Secure");
   }

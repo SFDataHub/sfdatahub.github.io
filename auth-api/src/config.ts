@@ -22,6 +22,7 @@ const strings = {
   DISCORD_CLIENT_ID: defineString("DISCORD_CLIENT_ID"),
   DISCORD_REDIRECT_URI: defineString("DISCORD_REDIRECT_URI"),
   FRONTEND_BASE_URL: defineString("FRONTEND_BASE_URL"),
+  SESSION_COOKIE_DOMAIN: defineString("SESSION_COOKIE_DOMAIN"),
   GOOGLE_CLIENT_ID: defineString("GOOGLE_CLIENT_ID"),
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
 } as const;
@@ -61,6 +62,23 @@ export const DISCORD_CLIENT_SECRET = readRuntimeValue("DISCORD_CLIENT_SECRET", s
 export const DISCORD_REDIRECT_URI = readRuntimeValue("DISCORD_REDIRECT_URI", strings.DISCORD_REDIRECT_URI);
 export const FRONTEND_BASE_URL =
   readRuntimeValue("FRONTEND_BASE_URL", strings.FRONTEND_BASE_URL) ?? "http://localhost:5173";
+
+// Optionale Cookie-Domain: explizit oder aus FRONTEND_BASE_URL abgeleitet (kein Domain-Flag für localhost/127.*)
+const resolveCookieDomain = () => {
+  const explicit = readRuntimeValue("SESSION_COOKIE_DOMAIN", strings.SESSION_COOKIE_DOMAIN);
+  if (explicit) return explicit;
+  try {
+    const host = new URL(FRONTEND_BASE_URL).hostname;
+    if (host === "localhost" || host.startsWith("127.")) {
+      return undefined;
+    }
+    return `.${host}`;
+  } catch {
+    return undefined;
+  }
+};
+
+export const SESSION_COOKIE_DOMAIN = resolveCookieDomain();
 export const GOOGLE_CLIENT_ID = readRuntimeValue("GOOGLE_CLIENT_ID", strings.GOOGLE_CLIENT_ID);
 export const GOOGLE_CLIENT_SECRET = readRuntimeValue("GOOGLE_CLIENT_SECRET", secrets.GOOGLE_CLIENT_SECRET);
 export const GOOGLE_LINK_REDIRECT_URI = readRuntimeValue(

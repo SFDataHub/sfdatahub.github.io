@@ -30,6 +30,14 @@ type StatePayload = {
   redirect?: string;
 };
 
+const frontendHost = (() => {
+  try {
+    return new URL(FRONTEND_BASE_URL).hostname;
+  } catch {
+    return "localhost";
+  }
+})();
+
 const getSafeRedirect = (raw?: string): string | undefined => {
   if (!raw) return undefined;
   let url: URL;
@@ -39,7 +47,14 @@ const getSafeRedirect = (raw?: string): string | undefined => {
     return undefined;
   }
 
-  const allowedHosts = ["sfdatahub.github.io", "control-panel.sfdatahub.com", "localhost"];
+  const allowedHosts = Array.from(
+    new Set([
+      frontendHost,
+      `control-panel.${frontendHost}`,
+      "sfdatahub.github.io",
+      "localhost",
+    ]),
+  );
   if (!allowedHosts.includes(url.hostname)) {
     return undefined;
   }
