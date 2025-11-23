@@ -155,6 +155,12 @@ const applyListQueryFilters = (
   return { query: queryRef, statusNeedsClientFilter };
 };
 
+const extractIndexUrl = (details?: string, fallbackMessage?: string): string | null => {
+  const haystack = details ?? fallbackMessage ?? "";
+  const match = haystack.match(/https:\/\/console\.firebase\.google\.com[^\s"]+/);
+  return match ? match[0] : null;
+};
+
 adminRouter.use(requireModerator);
 
 adminRouter.get("/users", async (req: Request, res: Response) => {
@@ -265,7 +271,20 @@ adminRouter.get("/users", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("[admin] Failed to list users", error);
-    res.status(500).json({ error: "Failed to load admin users" });
+    const err = error as { code?: string | number; details?: string; message?: string };
+    const indexUrl = extractIndexUrl(err.details, err.message);
+
+    if (err.code === "failed-precondition" || err.code === 9 || indexUrl) {
+      return res.status(500).json({
+        error: "missing_index",
+        details: indexUrl ?? "Firestore index required for this query.",
+      });
+    }
+
+    return res.status(500).json({
+      error: "internal_error",
+      details: err.message ?? "Failed to load admin users",
+    });
   }
 });
 

@@ -25,6 +25,48 @@ const authRouter = Router();
 
 const isProd = process.env.NODE_ENV === "production";
 
+type StatePayload = {
+  id: string;
+  redirect?: string;
+};
+
+const getSafeRedirect = (raw?: string): string | undefined => {
+  if (!raw) return undefined;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return undefined;
+  }
+
+  const allowedHosts = ["sfdatahub.github.io", "control-panel.sfdatahub.com", "localhost"];
+  if (!allowedHosts.includes(url.hostname)) {
+    return undefined;
+  }
+
+  if (url.hostname !== "localhost" && url.protocol !== "https:") {
+    return undefined;
+  }
+
+  return url.toString();
+};
+
+const encodeState = (payload: StatePayload): string =>
+  Buffer.from(JSON.stringify(payload)).toString("base64url");
+
+const decodeState = (raw: string): StatePayload | null => {
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      id: typeof parsed.id === "string" ? parsed.id : "",
+      redirect: typeof parsed.redirect === "string" ? parsed.redirect : undefined,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const buildAccountRedirectUrl = (params: Record<string, string>) => {
   const url = new URL("/settings/account", FRONTEND_BASE_URL);
   Object.entries(params).forEach(([key, value]) => {
@@ -161,7 +203,9 @@ authRouter.get("/discord/login", (req, res) => {
     return res.status(500).json({ error: "Discord OAuth not configured" });
   }
 
-  const state = randomUUID();
+  const safeRedirect = getSafeRedirect(typeof req.query.redirect === "string" ? req.query.redirect : undefined);
+  const statePayload: StatePayload = { id: randomUUID(), redirect: safeRedirect };
+  const state = encodeState(statePayload);
   const authorizeUrl = new URL("https://discord.com/oauth2/authorize");
   authorizeUrl.searchParams.set("client_id", DISCORD_CLIENT_ID);
   authorizeUrl.searchParams.set("redirect_uri", DISCORD_REDIRECT_URI);
@@ -192,6 +236,8 @@ authRouter.get("/discord/callback", async (req, res) => {
   if (!stateCookie || stateCookie !== state) {
     return res.status(400).json({ error: "Invalid OAuth state" });
   }
+
+  const decodedState = decodeState(state);
 
   try {
     const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
@@ -250,7 +296,9 @@ authRouter.get("/discord/callback", async (req, res) => {
     const cookies = [buildSessionCookie(sessionToken), clearStateCookie()];
 
     res.setHeader("Set-Cookie", cookies);
-    return res.redirect(FRONTEND_BASE_URL);
+    const redirectUrl =
+      getSafeRedirect(decodedState?.redirect) ?? FRONTEND_BASE_URL ?? "https://sfdatahub.github.io/";
+    return res.redirect(redirectUrl);
   } catch (error) {
     console.error("[auth] Discord callback failed", error);
     return res.status(500).json({ error: "Discord OAuth callback failed" });

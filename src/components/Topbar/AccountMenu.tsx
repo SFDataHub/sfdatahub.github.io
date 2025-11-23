@@ -87,6 +87,8 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
     }
 
     if (status === "authenticated") {
+      const isAdmin = !!user?.roles?.includes("admin");
+
       return (
         <>
           <div className={styles.accountHeader}>
@@ -101,6 +103,16 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
           <button type="button" className={styles.accountItem} onClick={handleAccountClick}>
             Account &amp; Profile
           </button>
+          {isAdmin ? (
+            <a
+              className={styles.accountItem}
+              href="https://control-panel.sfdatahub.com/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Console Panel
+            </a>
+          ) : null}
           <hr className={styles.accountDivider} />
           <button type="button" className={`${styles.accountItem} ${styles.accountLogout}`} onClick={handleLogout}>
             Logout
