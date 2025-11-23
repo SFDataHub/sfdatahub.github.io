@@ -34,6 +34,7 @@ import PlayersIndex from "./pages/players/Index";
 import PlayersRankings from "./pages/players/Rankings";
 import PlayersStats from "./pages/players/Stats";
 import PlayerProfile from "./pages/players/PlayerProfile";
+import PlayersCompare from "./pages/players/comparePlayer";
 
 // Entity Hubs – Guilds
 import GuildsIndex from "./pages/guilds/Index";
@@ -199,6 +200,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/players/stats" element={<PlayersStats />} />
             <Route path="/players/profile" element={<PlayerProfile />} />
             <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
+            <Route path="/players/compare" element={<PlayersCompare />} />
             {/* kurze Route für Suche */}
             <Route path="/player/:playerId" element={<PlayerProfile />} />
 
@@ -347,7 +349,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/settings/profile" element={NotFoundOld()} />
             <Route path="/settings/appearance" element={NotFoundOld()} />
             <Route path="/players/search" element={NotFoundOld()} />
-            <Route path="/players/compare" element={NotFoundOld()} />
             <Route path="/servers/list" element={NotFoundOld()} />
             <Route path="/servers/trend" element={NotFoundOld()} />
             <Route path="/scans/upload" element={NotFoundOld()} />
