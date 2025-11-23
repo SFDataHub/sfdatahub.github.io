@@ -158,6 +158,7 @@ const applyListQueryFilters = (
 adminRouter.use(requireModerator);
 
 adminRouter.get("/users", async (req: Request, res: Response) => {
+  console.log("[authApi] GET /admin/users hit", { time: new Date().toISOString() });
   try {
     const rawPageSize = Number.parseInt(String(req.query.pageSize ?? ""), 10);
     const normalizedPageSize = clamp(

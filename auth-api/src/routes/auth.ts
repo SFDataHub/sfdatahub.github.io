@@ -138,6 +138,19 @@ authRouter.get("/session", async (req, res) => {
   }
 });
 
+authRouter.get("/me", async (req, res) => {
+  try {
+    const user = await getSessionUser(req.cookies?.[SESSION_COOKIE_NAME]);
+    if (!user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    return res.json(formatAuthUser(user));
+  } catch (error) {
+    console.error("[auth] Failed to fetch me", error);
+    return res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
 authRouter.post("/logout", (req, res) => {
   res.setHeader("Set-Cookie", buildClearSessionCookie());
   return res.json({ ok: true });

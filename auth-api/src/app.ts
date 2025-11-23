@@ -20,7 +20,8 @@ app.use("/auth", authRouter);
 app.use("/admin", adminRouter);
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, timestamp: new Date().toISOString() });
+  // Lightweight readiness probe for Cloud Run/Functions
+  res.json({ ok: true });
 });
 
 export default app;

@@ -6,7 +6,9 @@ import type { UserDoc } from "./users";
 export const SESSION_COOKIE_NAME = "sfdatahub_session";
 const SESSION_TTL_SECONDS = 15 * 60;
 const isLocalSessionEnv =
-  FRONTEND_BASE_URL.includes("localhost") || process.env.NODE_ENV !== "production";
+  FRONTEND_BASE_URL.includes("localhost") ||
+  process.env.NODE_ENV === "development" ||
+  process.env.FUNCTIONS_EMULATOR === "true";
 
 interface SessionPayload {
   sub: string;

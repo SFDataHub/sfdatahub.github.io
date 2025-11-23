@@ -20,6 +20,7 @@ export default function Discover() {
         <Tile to="/scans" title="Scans" desc="Neueste & Archiv" />
         <Tile to="/guides" title="Guides" desc="Fortress, Underworld, Dungeons…" />
         <Tile to="/community" title="Community" desc="News, Scans, Predictions, Creators" />
+        <Tile to="/players/compare" title="Compare Players" desc="Direkter Spieler-Vergleich" />
       </div>
     </section>
   );
