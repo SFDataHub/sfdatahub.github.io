@@ -1,0 +1,107 @@
+/* src/components/Flipbook/styles.module.css */
+
+.viewerRoot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 60vh;
+  display: grid;
+  grid-template-rows: 1fr auto; /* Canvas/Pages + HUD */
+  gap: 12px;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  touch-action: pan-y;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1600px; /* für Curl/3D */
+}
+
+.book {
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(44,74,115,0.4);
+  border-radius: 16px;
+  background: #0C1C2E;
+}
+
+.pageWrap {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  justify-items: stretch;
+  overflow: hidden;
+}
+
+/* Einzelne Page-Flächen (linke & rechte Seite) */
+.page {
+  position: relative;
+  overflow: hidden;
+  background: #0C1C2E;
+}
+
+.page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+/* Optik: Buchrücken-Schatten in der Mitte */
+.gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.35),
+    rgba(0,0,0,0.0),
+    rgba(0,0,0,0.35)
+  );
+  pointer-events: none;
+}
+
+/* Fallback: Crossfade beim Seitenwechsel */
+.crossfadeEnter { opacity: 0; }
+.crossfadeEnterActive { opacity: 1; transition: opacity 220ms ease-out; }
+.crossfadeExit { opacity: 1; }
+.crossfadeExitActive { opacity: 0; transition: opacity 180ms ease-in; }
+
+/* HUD-Leiste */
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hudLeft, .hudRight { display: flex; gap: 8px; align-items: center; }
+.hudCenter { font-size: 14px; color: #D6E4F7; opacity: 0.9; }
+
+/* Buttons im SFDataHub-Dark-Style */
+.btn {
+  background: #1E2F47; color: #FFFFFF;
+  border: 1px solid #2B4C73; border-radius: 12px;
+  padding: 8px 12px; cursor: pointer;
+  transition: background 120ms ease, transform 60ms ease;
+}
+.btn:hover { background: #2A4C72; }
+.btn:active { transform: translateY(1px); }
+
+.iconBtn { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; }
+.zoomInfo { min-width: 60px; text-align: center; color: #B0C4D9; }
+
+.errorBox {
+  border: 1px dashed #2B4C73; background: #152A42; color: #D6E4F7;
+  padding: 16px; border-radius: 12px;
+}

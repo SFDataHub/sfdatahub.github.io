@@ -1,0 +1,59 @@
+/* Fallbacks nutzen, wenn du (noch) keine globalen Tokens hast */
+:root {
+  --tile: #0f2030;
+  --tile-hover: #13293f;
+  --line: #2b4c73;
+  --text: #ffffff;
+  --text-soft: #b0c4d9;
+}
+
+/* Grundkarte – angelehnt an SFDataHub Sidebar-Segmente */
+.card {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--tile);
+  border-radius: 12px;
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.35),
+    0 2px 6px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  color: var(--text);
+  overflow: visible;
+  transition: transform .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+
+/* Hover-Anhebung (dezent) */
+.hoverLift:hover {
+  transform: translateY(-1px);
+  background: var(--tile-hover);
+}
+
+/* Titel (klein, uppercase) */
+.title {
+  color: var(--text-soft);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 4px 6px 8px;
+}
+
+/* Innenbereiche (Padding-Varianten) */
+.pad-sm { padding: 8px; }
+.pad-md { padding: 10px; }
+.pad-lg { padding: 14px; }
+
+.body {
+  /* zusätzlicher Innenabstand vom Titel getrennt */
+}
+
+/* Optional: Standard-Icon-Stack wie in deinem Screenshot */
+.body .iconStack {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+}
+.body .iconStack > * {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.6));
+}

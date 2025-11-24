@@ -7,12 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies / Build
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Gemini CLI project config (local only)
+GEMINI.md
+
+# Editor/OS
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +26,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env-Dateien
+.env
+.env.*
+!.env.example
+*.local
+*.env.local
+.env.development.local
+.env.production.local
+
+# Flipbook PDFs überall ignorieren (egal wo sie liegen)
+**/flipbooks/**/*.pdf
+**/flipbooks/**/*.[Pp][Dd][Ff]
+
+# (Optional) andere große Binärdateien
+*.zip
+*.7z
+*.rar
+*.iso

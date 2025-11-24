@@ -1,0 +1,310 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.banner {
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.bannerSuccess {
+  border-color: rgba(127, 255, 182, 0.4);
+  background: rgba(127, 255, 182, 0.12);
+  color: #7fffb6;
+}
+
+.bannerError {
+  border-color: rgba(255, 134, 134, 0.4);
+  background: rgba(255, 134, 134, 0.12);
+  color: #ff8686;
+}
+
+.card {
+  border: 1px solid var(--line);
+  background: var(--tile);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cardSubtitle {
+  margin: 4px 0 18px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.identityHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.identityAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.identityName {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.identityProvider {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.identityForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.nameInputWrap {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nameLabel {
+  font-size: 12px;
+  color: var(--text-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nameInput {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 15px;
+}
+
+.nameSaveButton {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  background: var(--btn);
+  color: var(--text);
+  font-weight: 600;
+  min-width: 120px;
+  cursor: pointer;
+}
+
+.nameSaveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nameHint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.feedbackError {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #ff8686;
+}
+
+.feedbackSuccess {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #7fffb6;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.metaItem {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.metaLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+
+.metaValue {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.serviceList {
+  display: flex;
+  flex-direction: column;
+}
+
+.serviceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.serviceRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.serviceName {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.serviceStatus {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.serviceAction {
+  border-radius: 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  background: var(--tile-hover);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.serviceAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.securityText {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.securityNote {
+  margin: 0 0 20px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.logoutButton {
+  width: 100%;
+  border-radius: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 122, 122, 0.5);
+  background: rgba(255, 122, 122, 0.12);
+  color: var(--danger, #ff8686);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logoutButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loadingState,
+.emptyState {
+  border: 1px solid var(--line);
+  background: var(--tile);
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+  color: var(--text);
+}
+
+.emptyStateTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.emptyStateText {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.primaryButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--btn);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 18px;
+  }
+
+  .identityHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .identityForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nameSaveButton {
+    width: 100%;
+  }
+
+  .serviceRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .serviceAction {
+    width: 100%;
+  }
+}

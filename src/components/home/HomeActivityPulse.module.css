@@ -1,0 +1,27 @@
+/* src/components/home/HomeActivityPulse.module.css */
+:root { --bg:#152A42; --border:#2B4C73; --title:#F5F9FF; --muted:#B0C4D9; --line:#2C4A73; }
+
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+.header { margin-bottom: 10px; }
+.title { color: var(--title); font-weight: 600; font-size: 15px; }
+
+.chart {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end;
+  height: 160px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(90deg, rgba(43,76,115,0.25), rgba(92,139,198,0.25), rgba(43,76,115,0.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.footer { margin-top: 8px; }
+.note { color: var(--muted); font-size: 12px; }
+
+@keyframes shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: -200% 0; }
+}

@@ -1,0 +1,117 @@
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  color: var(--sidebar-fg, #ffffff);
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+}
+
+.item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  /* leichte Tiefe für „HUD“-Feeling */
+  filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.6));
+}
+
+/* Text-Container hält die Breite stabil, damit das Layout nicht springt */
+.text {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+/* Screenreader-Variante des Labels (sichtbar ausblenden) */
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Einzelne Buchstaben */
+.char {
+  display: inline-block;
+  opacity: 0;
+  transform: translate3d(0, 6px, 0) scale(0.98);
+  filter: blur(0.8px);
+  animation-fill-mode: forwards;
+  /* default: geschlossen = raus-animiert (oder unsichtbar) */
+}
+
+/* Offen: vorwärts (rein) animieren mit Stagger */
+.item[data-open="true"] .char {
+  animation-name: charIn;
+  animation-duration: var(--duration, 500ms);
+  animation-timing-function: cubic-bezier(.2,.8,.2,1);
+  animation-delay: calc(var(--i) * var(--step, 18ms));
+}
+
+/* Zu: rückwärts (raus) animieren – reverse Stagger */
+.item[data-open="false"] .char {
+  animation-name: charOut;
+  animation-duration: var(--duration, 500ms);
+  animation-timing-function: cubic-bezier(.2,.8,.2,1);
+  /* Umgekehrte Reihenfolge: (count - 1 - i)  */
+  animation-delay: calc((var(--count) - 1 - var(--i)) * var(--step, 18ms));
+}
+
+/* Keyframes: leichtes Hochgleiten + Schärfen */
+@keyframes charIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.98);
+    filter: blur(0.8px);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes charOut {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.98);
+    filter: blur(0.6px);
+  }
+}
+
+/* Barrierefreiheit: Animationen respektieren */
+@media (prefers-reduced-motion: reduce) {
+  .char {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

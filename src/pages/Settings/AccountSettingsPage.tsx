@@ -1,0 +1,356 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import ContentShell from "../../components/ContentShell";
+import { useAuth } from "../../context/AuthContext";
+import { AUTH_BASE_URL } from "../../lib/auth/config";
+import styles from "./AccountSettingsPage.module.css";
+
+const PLACEHOLDER_AVATAR = "https://i.pravatar.cc/72";
+const PROFILE_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/account/profile` : "";
+const GOOGLE_LINK_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/google/link/start` : "";
+const MIN_NAME_LENGTH = 3;
+const MAX_NAME_LENGTH = 32;
+
+const formatTimestamp = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+};
+
+const AccountSettingsPage: React.FC = () => {
+  const { status, user, logout, refreshSession } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const linkFeedback = useMemo<{ type: "success" | "error"; message: string } | null>(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("linked") === "google") {
+      return { type: "success", message: "Google successfully connected." };
+    }
+    if (params.get("error") === "google_already_linked") {
+      return {
+        type: "error",
+        message: "This Google account is already linked to another SFDataHub account.",
+      };
+    }
+    return null;
+  }, [location.search]);
+
+  const isLoading = status === "loading" || status === "idle";
+  const isAuthed = status === "authenticated" && !!user;
+
+  const handleGoToSignIn = () => {
+    navigate("/login");
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+  };
+
+  const handleGoogleConnect = () => {
+    if (!GOOGLE_LINK_ENDPOINT) {
+      window.alert("Auth service is not configured for Google linking.");
+      return;
+    }
+    window.location.href = GOOGLE_LINK_ENDPOINT;
+  };
+
+  const renderLoading = () => (
+    <div className={styles.loadingState}>Checking session...</div>
+  );
+
+  const renderUnauthed = () => (
+    <div className={styles.emptyState}>
+      <p className={styles.emptyStateTitle}>You are not signed in.</p>
+      <p className={styles.emptyStateText}>
+        Use the sign-in page to connect your Discord or Google account and unlock settings.
+      </p>
+      <button type="button" className={styles.primaryButton} onClick={handleGoToSignIn}>
+        Go to sign-in
+      </button>
+    </div>
+  );
+
+  const renderLinkFeedback = () => {
+    if (!linkFeedback) return null;
+    const className =
+      linkFeedback.type === "success"
+        ? `${styles.banner} ${styles.bannerSuccess}`
+        : `${styles.banner} ${styles.bannerError}`;
+    return <div className={className}>{linkFeedback.message}</div>;
+  };
+
+  const renderServicesCard = () => {
+    if (!user) return null;
+    const discordProvider = user.providers?.discord;
+    const googleProvider = user.providers?.google;
+    const discordConnected = Boolean(discordProvider);
+    const googleConnected = Boolean(googleProvider);
+    const canLinkGoogle = Boolean(GOOGLE_LINK_ENDPOINT);
+    const googleStatus = !canLinkGoogle
+      ? "Auth service not configured"
+      : googleConnected
+        ? googleProvider?.displayName
+          ? `Connected as ${googleProvider.displayName}`
+          : "Connected"
+        : "Not connected";
+    const serviceRows = [
+      {
+        key: "discord",
+        name: "Discord",
+        status: discordConnected
+          ? `Connected as ${discordProvider?.displayName ?? user.displayName}`
+          : "Not connected",
+        actionLabel: discordConnected ? "Connected" : "Connect",
+        disabled: true,
+      },
+      {
+        key: "google",
+        name: "Google",
+        status: googleStatus,
+        actionLabel: googleConnected ? "Connected" : "Connect",
+        disabled: googleConnected || !canLinkGoogle,
+        onClick: googleConnected || !canLinkGoogle ? undefined : handleGoogleConnect,
+      },
+      {
+        key: "twitch",
+        name: "Twitch",
+        status: "Planned",
+        actionLabel: "Soon",
+        disabled: true,
+      },
+      {
+        key: "youtube",
+        name: "YouTube",
+        status: "Planned",
+        actionLabel: "Soon",
+        disabled: true,
+      },
+    ];
+
+    return (
+      <section className={styles.card}>
+        <h2 className={styles.cardTitle}>Connected services</h2>
+        <p className={styles.cardSubtitle}>
+          Manage which social logins are linked to your SFDataHub identity.
+        </p>
+        <div className={styles.serviceList}>
+          {serviceRows.map((service) => (
+            <div key={service.key} className={styles.serviceRow}>
+              <div>
+                <p className={styles.serviceName}>{service.name}</p>
+                <p className={styles.serviceStatus}>{service.status}</p>
+              </div>
+              <button
+                type="button"
+                className={styles.serviceAction}
+                disabled={service.disabled}
+                onClick={service.onClick}
+              >
+                {service.actionLabel}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+
+  const renderSecurityCard = () => (
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>Security &amp; session</h2>
+      <p className={styles.securityText}>
+        We only store your SFDataHub user ID, display name, avatar URL and provider identifiers
+        (like your Discord ID). We never see or store your Discord or Google password.
+      </p>
+      <p className={styles.securityNote}>
+        Logging out here only clears your SFDataHub session cookie. Your Discord or Google account
+        stays signed in separately.
+      </p>
+      <button type="button" className={styles.logoutButton} onClick={handleLogout}>
+        Log out from this device
+      </button>
+      <p className={styles.securityNote}>
+        To fully revoke access, remove SFDataHub Auth from your Discord applications page.
+      </p>
+    </section>
+  );
+
+  const renderContent = () => {
+    if (isLoading) return renderLoading();
+    if (!isAuthed) return renderUnauthed();
+
+    return (
+      <>
+        <IdentityCard
+          user={user}
+          refreshSession={refreshSession}
+        />
+        {renderServicesCard()}
+        {renderSecurityCard()}
+      </>
+    );
+  };
+
+  return (
+    <ContentShell
+      title="Account & Profile"
+      subtitle="Manage your SFDataHub identity and connected services."
+      centerFramed
+    >
+      <div className={styles.page}>
+        {renderLinkFeedback()}
+        {renderContent()}
+      </div>
+    </ContentShell>
+  );
+};
+
+export default AccountSettingsPage;
+
+type IdentityCardProps = {
+  user: ReturnType<typeof useAuth>["user"];
+  refreshSession: () => Promise<void>;
+};
+
+function IdentityCard({ user, refreshSession }: IdentityCardProps) {
+  const [nameDraft, setNameDraft] = useState(() => user?.displayName ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const avatarUrl = user?.avatarUrl || PLACEHOLDER_AVATAR;
+  const providerLabel = user?.provider === "google" ? "Google" : "Discord";
+  const currentDisplayName = user?.displayName ?? "";
+  const trimmedName = nameDraft.trim();
+  const nameLengthValid =
+    trimmedName.length === 0 ||
+    (trimmedName.length >= MIN_NAME_LENGTH && trimmedName.length <= MAX_NAME_LENGTH);
+  const nameChanged = Boolean(user) && trimmedName.length > 0 && trimmedName !== currentDisplayName;
+  const canSave = Boolean(PROFILE_ENDPOINT && nameLengthValid && nameChanged && !saving);
+  const validationMessage =
+    trimmedName.length > 0 && !nameLengthValid
+      ? `Name must be between ${MIN_NAME_LENGTH} and ${MAX_NAME_LENGTH} characters.`
+      : null;
+
+  useEffect(() => {
+    setNameDraft(user?.displayName ?? "");
+    setSuccess(false);
+    setError(null);
+  }, [user?.id, user?.displayName]);
+
+  const metaItems = useMemo(() => {
+    if (!user) return [];
+    return [
+      { label: "SFDataHub ID", value: user.id },
+      user.roles?.length ? { label: "Roles", value: user.roles.join(", ") } : null,
+      user.createdAt ? { label: "Created at", value: formatTimestamp(user.createdAt) } : null,
+      user.lastLoginAt ? { label: "Last login", value: formatTimestamp(user.lastLoginAt) } : null,
+    ].filter((entry): entry is { label: string; value: string } => Boolean(entry?.value));
+  }, [user]);
+
+  const handleNameSave = async () => {
+    if (!canSave || !PROFILE_ENDPOINT) {
+      if (!PROFILE_ENDPOINT) {
+        setError("Auth service is not configured.");
+      }
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccess(false);
+
+      const response = await fetch(PROFILE_ENDPOINT, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ displayName: trimmedName }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Failed to update name.");
+      }
+
+      await refreshSession();
+      setSuccess(true);
+      setNameDraft(trimmedName);
+    } catch (updateError: any) {
+      const message = updateError?.message ?? "Failed to update name.";
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (canSave) {
+        handleNameSave();
+      }
+    }
+  };
+
+  const handleNameBlur = () => {
+    if (canSave) {
+      handleNameSave();
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <section className={styles.card}>
+      <div className={styles.identityHeader}>
+        <img src={avatarUrl} alt="" className={styles.identityAvatar} />
+        <div>
+          <p className={styles.identityName}>{user.displayName || "Unbenannter Nutzer"}</p>
+          <p className={styles.identityProvider}>{providerLabel} sign-in</p>
+        </div>
+        <span className={styles.statusBadge}>Verified</span>
+      </div>
+      <div className={styles.identityForm}>
+        <div className={styles.nameInputWrap}>
+          <label className={styles.nameLabel}>Display name</label>
+          <input
+            type="text"
+            className={styles.nameInput}
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            onKeyDown={handleNameKeyDown}
+            onBlur={handleNameBlur}
+            placeholder="Enter your display name"
+          />
+        </div>
+        <button
+          type="button"
+          className={styles.nameSaveButton}
+          disabled={!canSave}
+          onClick={handleNameSave}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+      {validationMessage && <p className={styles.feedbackError}>{validationMessage}</p>}
+      {error && <p className={styles.feedbackError}>{error}</p>}
+      {success && <p className={styles.feedbackSuccess}>Name updated.</p>}
+      {metaItems.length > 0 && (
+        <div className={styles.metaGrid}>
+          {metaItems.map((meta) => (
+            <div key={meta.label} className={styles.metaItem}>
+              <span className={styles.metaLabel}>{meta.label}</span>
+              <span className={styles.metaValue}>{meta.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}

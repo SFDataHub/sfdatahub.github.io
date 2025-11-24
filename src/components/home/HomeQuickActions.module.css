@@ -1,0 +1,32 @@
+/* src/components/home/HomeQuickActions.module.css */
+:root { --bg:#152A42; --border:#2B4C73; --card:#1A2F4A; }
+
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+.header { margin-bottom: 12px; }
+.title { color: #F5F9FF; font-weight: 600; font-size: 15px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+}
+
+.icon, .line {
+  background: linear-gradient(90deg, rgba(43,76,115,.25), rgba(92,139,198,.25), rgba(43,76,115,.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 8px;
+}
+.icon { width: 40px; height: 40px; border-radius: 10px; }
+.line { height: 14px; width: 70%; }
+
+@media (min-width: 1024px) {
+  .grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+
+@keyframes shimmer { 0%{background-position:0 0;} 100%{background-position:-200% 0;} }

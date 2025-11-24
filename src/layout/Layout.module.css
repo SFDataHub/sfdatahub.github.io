@@ -1,0 +1,14 @@
+.main {
+  margin-left: var(--sidebar-w);
+  transition: margin-left .2s ease;
+}
+.mainExpanded {
+  margin-left: var(--sidebar-w-expanded);
+  transition: margin-left .2s ease;
+}
+.inner {
+  padding: 16px;
+}
+.body {
+  min-height: calc(100vh - var(--topbar-h));
+}

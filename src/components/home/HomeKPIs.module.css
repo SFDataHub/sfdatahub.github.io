@@ -1,0 +1,43 @@
+/* src/components/home/HomeKPIs.module.css */
+/* Import entfernt – Pfadfehler verursachte Vite/PostCSS-ENOENT */
+
+.card {
+  background: var(--bg, #152A42);
+  border: 1px solid var(--border, #2B4C73);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.header { margin-bottom: 10px; }
+.title { color: var(--title, #F5F9FF); font-weight: 600; font-size: 15px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+}
+
+.kpi {
+  background: #1A2F4A;
+  border: 1px solid #2B4C73;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.kpiLabel, .kpiValue {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(43,76,115,0.25), rgba(92,139,198,0.25), rgba(43,76,115,0.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.kpiValue { height: 18px; margin-top: 8px; }
+
+.footer { margin-top: 8px; }
+.note { color: #B0C4D9; font-size: 12px; }
+
+@keyframes shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: -200% 0; }
+}

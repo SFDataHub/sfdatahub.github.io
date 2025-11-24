@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----- Public reads -----
+    match /metadata/{doc}         { allow read: if true; }
+    match /servers/{doc}          { allow read: if true; }
+    match /stats_public/{doc=**}  { allow read: if true; }
+
+    // Übergangs-Gate (bis Auth/AppCheck)
+    function isImporter() { return true; }
+
+    // ---------- Players ----------
+    match /players/{pid} {
+      allow read: if true;
+      allow create, update: if isImporter();
+      allow delete: if false;
+
+      match /scans/{ts} {
+        allow read: if true;
+        allow create: if isImporter();
+        allow update, delete: if false;
+      }
+      match /latest/{docId} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+      match /history_weekly/{wid} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+      match /history_monthly/{ym} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+    }
+
+    // ---------- Guilds ----------
+    match /guilds/{gid} {
+      allow read: if true;
+      allow create, update: if isImporter();
+      allow delete: if false;
+
+      match /scans/{ts} {
+        allow read: if true;
+        allow create: if isImporter();
+        allow update, delete: if false;
+      }
+      match /latest/{docId} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+      match /history_weekly/{wid} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+      match /history_monthly/{ym} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
+      }
+    }
+
+    // ---------- Links ----------
+    match /links_players/{externalKey} {
+      allow read: if isImporter();
+      allow create, update: if isImporter();
+      allow delete: if false;
+    }
+    match /links_guilds/{externalKey} {
+      allow read: if isImporter();
+      allow create, update: if isImporter();
+      allow delete: if false;
+    }
+
+    // ---------- Zusatz nur für collectionGroup("latest") ----------
+    // Ermöglicht READ auf *allen* Subcollections namens "latest"
+    // (z. B. players/*/latest/*, guilds/*/latest/*) – keine Writes.
+    match /{path=**}/latest/{docId} {
+      allow read: if true;
+    }
+
+    // Rest dicht
+    match /{document=**} { allow read, write: if false; }
+  }
+}

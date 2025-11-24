@@ -1,0 +1,110 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  width: min(720px, 100%);
+  background: rgba(8, 16, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 24px;
+  color: var(--title, #f5f9ff);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft, #b0c4d9);
+}
+
+.input {
+  background: #0d1c2f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: inherit;
+}
+
+.gemsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.gemBox {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+
+.disabled {
+  opacity: 0.4;
+}
+
+.gemImg {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.gemFallback {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto;
+  opacity: 0.4;
+}
+
+.normalGem {
+  background: linear-gradient(135deg, #6dd6ff, #1e90ff);
+}
+
+.blackGem {
+  background: linear-gradient(135deg, #3a3a3a, #000);
+}
+
+.legendaryGem {
+  background: linear-gradient(135deg, #ffd36d, #ff8c00);
+}
+
+.gemLabel {
+  font-size: 14px;
+  color: var(--text-soft, #b0c4d9);
+}
+
+.gemValue {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-soft, #b0c4d9);
+}

@@ -1,0 +1,129 @@
+/* Transparente Card – kein eigener Hintergrund */
+.card {
+  position: relative;
+  background: transparent;
+  padding: 0;
+
+  /* linke Spaltenbreite + Spaltmaß */
+  --left: clamp(150px, 19vw, 200px);
+  --gap:  clamp(8px, 1.6vw, 14px);
+
+  /* Divider-Bias: <1 => Divider (und gefühlt rechte Spalte) rückt weiter nach links */
+  --divider-bias: 0.85;
+}
+
+/* Wrapper + Divider (eine durchgehende Linie) */
+.wrap {
+  position: relative;
+  border-radius: 10px;
+  overflow: visible;
+  padding: 4px 2px;
+}
+
+.divider {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  /* entscheidend: wir multiplizieren die linke Spaltenbreite */
+  left: calc(var(--left) * var(--divider-bias) + var(--gap) / 2);
+  width: 1px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, rgba(92,139,198,0) 0%, rgba(92,139,198,0.55) 50%, rgba(92,139,198,0) 100%);
+  box-shadow: 0 0 6px rgba(92,139,198,0.45);
+  filter: blur(.1px);
+  opacity: .75;
+  pointer-events: none;
+}
+
+/* Zeilenlayout */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(120px, var(--left)) 1fr;
+  column-gap: var(--gap);
+  align-items: center;
+  padding: 10px 6px;
+  border-radius: 10px;
+}
+
+/* Linker Block */
+.left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label  { font-size: clamp(14px, 1.5vw, 16px); opacity: .95; }
+.avgHead{ opacity: .82; font-size: 12px; }
+.avgNum { font-size: clamp(16px, 1.8vw, 18px); margin-top: 1px; font-weight: 600; }
+
+/* Rechte Top-3 */
+.top3 { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;                 /* kompakter */
+  border-radius: 999px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--line, #2C4A73);
+  box-shadow: 0 0 0 2px var(--line, #2C4A73) inset, 0 0 14px rgba(92,139,198,0.28);
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(12px, 1.2vw, 14px);
+}
+.badge { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--line,#2C4A73) inset, 0 0 12px rgba(0,0,0,.35); flex-shrink: 0; overflow: hidden; }
+.badge img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Namen sicher sichtbar */
+.name  { opacity: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
+.score { margin-left: auto; font-weight: 700; white-space: nowrap; }
+
+/* kleiner Abstand unter dem HudLabel */
+.headerSpacer { height: 8px; }
+
+/* ========================= */
+/*   RESPONSIVE VERHALTEN    */
+/* ========================= */
+
+/* 1920 → 1450: enger zusammen */
+@media (max-width: 1920px) {
+  .card { --left: clamp(140px, 18vw, 185px); --gap: 12px; --divider-bias: 0.84; }
+}
+
+/* 1440: rechter Block deutlich näher nach links, Chips kompakter */
+@media (max-width: 1440px) {
+  .card { --left: clamp(115px, 13.5vw, 140px); --gap: 8px; --divider-bias: 0.82; }
+  .top3 { gap: 6px; }
+  .chip { gap: 8px; padding: 5px 8px; font-size: 12px; }
+  .badge { width: 16px; height: 16px; }
+  .score { font-size: 12px; }
+}
+
+/* 1280: weiter nach links */
+@media (max-width: 1280px) {
+  .card { --left: clamp(110px, 13vw, 130px); --gap: 8px; --divider-bias: 0.80; }
+}
+
+/* 1120: Vorbereitung auf 1024 */
+@media (max-width: 1120px) {
+  .card { --left: clamp(106px, 12.8vw, 126px); --gap: 8px; --divider-bias: 0.80; }
+}
+
+/* 1024: kompakt, aber 2-spaltig möglich */
+@media (max-width: 1024px) {
+  .card { --left: clamp(100px, 12.5vw, 120px); --gap: 8px; --divider-bias: 0.78; }
+  .top3 { gap: 6px; }
+  .chip { gap: 8px; padding: 5px 8px; font-size: 12px; }
+  .badge { width: 16px; height: 16px; }
+  .score { font-size: 12px; }
+}
+
+/* ≤ 920 (Tablet & kleiner): Stack, Divider aus */
+@media (max-width: 920px) {
+  .divider { display: none; }
+  .row { grid-template-columns: 1fr; row-gap: 8px; padding: 12px 0; }
+  .top3 { margin-left: 0; }
+  .chip { width: 100%; }
+}

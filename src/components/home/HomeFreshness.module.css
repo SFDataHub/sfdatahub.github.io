@@ -1,0 +1,67 @@
+/* src/components/home/HomeFreshness.module.css */
+:root {
+  --bg: #152A42;
+  --bg-hover: #1E3A5C;
+  --border: #2B4C73;
+  --text: #FFFFFF;
+  --muted: #B0C4D9;
+  --title: #F5F9FF;
+  --line: #2C4A73;
+}
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.header {
+  margin-bottom: 10px;
+}
+
+.title {
+  color: var(--title);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.body { display: grid; gap: 10px; }
+
+.row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.skeletonLine {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(43,76,115,0.25), rgba(92,139,198,0.25), rgba(43,76,115,0.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.countdown { margin-top: 6px; }
+.skeletonPill {
+  height: 28px;
+  width: 180px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(43,76,115,0.25), rgba(92,139,198,0.25), rgba(43,76,115,0.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.footer { margin-top: 8px; }
+.note { color: var(--muted); font-size: 12px; }
+
+@keyframes shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: -200% 0; }
+}

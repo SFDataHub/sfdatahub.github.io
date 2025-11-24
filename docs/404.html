@@ -1,14 +1,56 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>SF Data Hub</title>
-    <script type="module" crossorigin src="/assets/index-fIk1s7t2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-8Gq6k7S5.css">
+
+    <!-- PWA: Manifest + Farben -->
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0C1C2E" />
+
+    <!-- Favicon & Apple Touch Icon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Guard: erzwinge Root-SW und verhindere relative Registrierungen -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        const orig = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+        navigator.serviceWorker.register = (_url, opts = {}) =>
+          orig('/service-worker.js', { ...opts, scope: '/' });
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-2OvKioXi.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Bqelsq-U.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+
+    <!-- Deine App -->
+
+    <!-- PWA: Service Worker Registrierung (nur PROD, Root-Scope, mit Existenz-Check) -->
+    <script>
+      (async () => {
+        if (!import.meta?.env?.PROD || !('serviceWorker' in navigator)) return;
+
+        try {
+          // Safety: erst registrieren, wenn die Datei wirklich 200 liefert
+          const res = await fetch('/service-worker.js', { cache: 'no-store' });
+          if (!res.ok) {
+            console.warn('[SW] /service-worker.js nicht erreichbar:', res.status, res.statusText);
+            return; // verhindert die TypeError-Konsole bei 404
+          }
+
+          const reg = await navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+          console.log('[SW] registered @', reg.scope);
+        } catch (err) {
+          console.error('[SW] register failed:', err);
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -1,0 +1,78 @@
+name: toplists-daily
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # GitHub Actions cron läuft in UTC.
+    # 22:05 UTC ~ 00:05 Berlin (Winterzeit), 23:05 UTC ~ 01:05 Berlin (Sommerzeit).
+    - cron: "5 22 * * *"
+    - cron: "5 23 * * *"
+
+permissions:
+  id-token: write    # für OIDC/WIF
+  contents: read
+
+concurrency:
+  group: toplists-daily
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_CLOUD_PROJECT: "sfdatahub-staging"
+      TZ: "Europe/Berlin"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      # OIDC/WIF: Kein JSON-Key, reine Föderation
+      - name: Auth to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/614140423653/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "toplists-bot@sfdatahub-staging.iam.gserviceaccount.com>"
+
+      - name: Guard: run only at 00:05 Berlin (for scheduled runs)
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            now=$(TZ=Europe/Berlin date +'%H:%M')
+            echo "Local time (Europe/Berlin): $now"
+            if [[ "$now" != "00:05" ]]; then
+              echo "Not 00:05 Berlin -> exit (scheduled run)."
+              exit 0
+            fi
+          else
+            echo "workflow_dispatch detected -> proceed regardless of time."
+          fi
+
+
+      - name: Install deps
+        run: |
+          npm ci
+
+      # 1) Player Derived aktualisieren (liest collectionGroup 'latest' seit lastComputedAt)
+      - name: Update player_derived cache
+        run: |
+          npx tsx tools/update-player-derived.mts
+
+      # 2) Kompakte Indizes für heute schreiben
+      - name: Build compact indices (players/guilds)
+        run: |
+          npx tsx tools/index-compact-daily.mts
+
+      # kurze Pause (Firestore Index-Build/Latenz abfedern)
+      - name: Wait a moment
+        run: sleep 15
+
+      # 3) Pages p1 für alle Gruppen/Server/Ranges schreiben
+      - name: Build toplists pages
+        run: |
+          npx tsx tools/build-toplists.mts

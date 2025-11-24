@@ -1,0 +1,21 @@
+:root{
+  --page:#0C1C2E; --tile:#1A2F4A; --hover:#25456B;
+  --border:#2B4C73; --icon:#5C8BC6; --text:#F5F9FF; --text2:#B0C4D9;
+}
+.hudWrap{ position:sticky; top:.5rem; z-index:20; display:flex; flex-wrap:wrap; gap:.5rem; padding:.75rem; border-radius:1rem; background:var(--tile); border:1px solid var(--border); backdrop-filter: blur(6px); }
+.hudBtn{ background:var(--tile); border:1px solid var(--border); padding:.5rem .75rem; border-radius:.75rem; transition:transform .12s ease; color:var(--text); }
+.hudBtn:hover{ transform: translateY(-1px); box-shadow:0 0 0 2px rgba(92,139,198,.15), 0 6px 18px rgba(0,0,0,.25); }
+.hudSubBtn{ background:transparent; border:1px solid var(--border); padding:.4rem .65rem; border-radius:.65rem; color:var(--text); opacity:.9; }
+.hudSubBtn:hover{ background:var(--hover); }
+.iconRow{ display:flex; align-items:center; gap:.5rem; overflow:auto; padding-right:.25rem; }
+.segmented{ display:inline-flex; gap:4px; background:#14273E; border:1px solid var(--border); padding:4px; border-radius:12px; }
+.segmented > button{ padding:.4rem .6rem; border-radius:10px; border:1px solid transparent; color:var(--text); }
+.segmented > button[aria-pressed="true"]{ background: var(--hover); border-color: var(--icon); }
+.sortLabel{ display:inline-flex; align-items:center; gap:.5rem; color:var(--text2); }
+.sortSelect{ background:#14273E; color:var(--text); border:1px solid var(--border); padding:.4rem .6rem; border-radius:.5rem; }
+.chip{ background:#14273E; color:var(--text); border:1px solid var(--border); padding:.35rem .6rem; border-radius:999px; display:inline-flex; align-items:center; gap:.25rem; }
+.isActive{ outline:2px solid var(--icon); box-shadow: inset 0 0 16px rgba(92,139,198,.25); }
+.classBtn{ position:relative; width:42px; height:42px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:1px solid var(--border); }
+.classBtn:hover{ background: rgba(255,255,255,.04); }
+.classBtn[aria-pressed="true"]{ outline:2px solid var(--icon); box-shadow: inset 0 0 18px rgba(92,139,198,.25); }
+.classImg{ width:28px; height:28px; object-fit:contain; filter: drop-shadow(0 0 8px rgba(92,139,198,.25)); }

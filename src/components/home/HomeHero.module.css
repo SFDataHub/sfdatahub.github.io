@@ -1,0 +1,26 @@
+/* src/components/home/HomeHero.module.css */
+.hero {
+  background: radial-gradient(120% 120% at 0% 0%, rgba(92,139,198,0.12), rgba(21,42,66,0.6)),
+              #152A42;
+  border: 1px solid #2B4C73;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.titleLine, .subLine, .ctaPill {
+  background: linear-gradient(90deg, rgba(43,76,115,0.25), rgba(92,139,198,0.25), rgba(43,76,115,0.25));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 10px;
+}
+
+.titleLine { height: 28px; width: 60%; margin-bottom: 10px; }
+.subLine { height: 16px; width: 80%; margin-bottom: 16px; opacity: 0.9; }
+
+.ctaRow { display: flex; gap: 12px; }
+.ctaPill { height: 34px; width: 160px; border-radius: 999px; }
+
+@keyframes shimmer {
+  0% { background-position: 0 0; }
+  100% { background-position: -200% 0; }
+}

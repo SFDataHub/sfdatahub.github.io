@@ -1,0 +1,226 @@
+.scenariosTab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scenariosHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #2b4c73;
+  background: #0f1c2f;
+}
+
+.scenariosTitle {
+  margin: 4px 0 6px;
+  color: #f5f9ff;
+}
+
+.scenariosText {
+  margin: 0;
+  color: #b0c4d9;
+  line-height: 1.4;
+}
+
+.scenarioInfo {
+  margin: 0;
+  padding: 0 2px;
+  color: #9cb5d5;
+  font-size: 13px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.createButton {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid #2b6de0;
+  background: linear-gradient(135deg, rgba(43, 109, 224, 0.2), rgba(43, 109, 224, 0.08));
+  color: #f5f9ff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.createButton:hover {
+  background: linear-gradient(135deg, rgba(43, 109, 224, 0.3), rgba(43, 109, 224, 0.12));
+  border-color: #3f7ff0;
+}
+
+.scenarioList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.scenarioCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #2b4c73;
+  background: #0f1c2f;
+}
+
+.scenarioCardActive {
+  border-color: #2b6de0;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.scenarioCardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardKicker {
+  margin: 0;
+  color: #7da5d8;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.cardTitle {
+  margin: 2px 0;
+  color: #f5f9ff;
+  font-size: 18px;
+}
+
+.cardText {
+  margin: 0;
+  color: #b0c4d9;
+  line-height: 1.4;
+}
+
+.scenarioActiveBadge {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(43, 109, 224, 0.12);
+  color: #9cc4ff;
+  border: 1px solid #2b6de0;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.scenarioMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.scenarioMetaLabel {
+  display: block;
+  color: #87a7cd;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scenarioMetaValue {
+  color: #f5f9ff;
+  font-weight: 700;
+}
+
+.scenarioStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.scenarioStatItem {
+  border: 1px solid #2b4c73;
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(17, 32, 54, 0.7);
+}
+
+.scenarioStatLabel {
+  display: block;
+  color: #87a7cd;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scenarioStatValue {
+  color: #f5f9ff;
+  font-size: 18px;
+}
+
+.scenarioActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scenarioActionButton {
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #2b4c73;
+  background: rgba(17, 32, 54, 0.7);
+  color: #f5f9ff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.scenarioActionButton:hover {
+  border-color: #3f7ff0;
+  background: #132a45;
+}
+
+.scenarioActionActive {
+  border-color: #2b6de0;
+  background: linear-gradient(135deg, rgba(43, 109, 224, 0.25), rgba(43, 109, 224, 0.1));
+}
+
+.scenarioActionGroup {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.secondaryActionButton,
+.deleteActionButton {
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #2b4c73;
+  background: rgba(17, 32, 54, 0.7);
+  color: #f5f9ff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.secondaryActionButton:hover {
+  border-color: #3f7ff0;
+  background: #132a45;
+}
+
+.deleteActionButton {
+  border-color: #af3d4e;
+  color: #ffc8d2;
+  background: rgba(175, 61, 78, 0.14);
+}
+
+.deleteActionButton:hover {
+  border-color: #ff5c76;
+  background: rgba(175, 61, 78, 0.22);
+}
+
+.deleteActionDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}

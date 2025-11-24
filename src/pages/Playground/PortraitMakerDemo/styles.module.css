@@ -1,0 +1,72 @@
+/* FILE: src/pages/Playground/PortraitMakerDemo/styles.module.css */
+.wrap {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.left {
+  min-width: 0;
+}
+
+.right {
+  min-width: 0;
+}
+
+.canvasCard {
+  background: #152A42;           /* SFDataHub Kachel-HG */
+  border: 1px solid #2B4C73;     /* Kachel-Rahmen */
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 0 0 1px rgba(43, 76, 115, 0.25) inset;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.portraitCanvasWrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Optionales Scaling über CSS: passt sich an Containerbreite an */
+.portrait-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.hint {
+  color: #B0C4D9;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.panel {
+  background: #152A42;
+  border: 1px solid #2B4C73;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.panelTitle {
+  margin: 0 0 8px 0;
+  color: #F5F9FF;
+  font-size: 18px;
+}
+
+.panelBody {
+  color: #FFFFFF;
+  opacity: 0.95;
+  font-size: 14px;
+}
+
+/* Responsive: unter 980px auf einspaltig */
+@media (max-width: 980px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+}
