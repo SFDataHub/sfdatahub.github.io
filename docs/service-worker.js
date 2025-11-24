@@ -6,10 +6,13 @@ const CACHE = `sfdatahub-cache-${VERSION}`;
 // Nur tatsächlich vorhandene Root-Assets precachen – KEIN '/'!
 const ASSETS = [
   '/offline.html',
-  '/manifest.webmanifest',
-  '/icons/icon-48.png','/icons/icon-72.png','/icons/icon-96.png','/icons/icon-128.png','/icons/icon-144.png',
-  '/icons/icon-152.png','/icons/icon-180.png','/icons/icon-192.png','/icons/icon-256.png','/icons/icon-384.png',
-  '/icons/icon-512.png','/icons/icon-512-maskable.png',
+  '/site.webmanifest',
+  '/favicon.ico',
+  '/favicon.svg',
+  '/favicon-96x96.png',
+  '/apple-touch-icon.png',
+  '/web-app-manifest-192x192.png',
+  '/web-app-manifest-512x512.png',
 ];
 
 self.addEventListener('install', (event) => {
