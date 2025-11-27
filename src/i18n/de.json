@@ -14,6 +14,18 @@
     "license": "Lizenzen",
     "tools": "Tools"
   },
+  "tools": {
+    "banner": {
+      "guestTitle": "Zusatzfunktionen mit Account freischalten",
+      "guestDescription": "Du kannst alle Tools ohne Account nutzen. Mit einem Login schaltest du zusaetzlich cloud-synchronisierte Sets, Set-Analysen und Integrationen mit deinem SFDataHub-Profil frei.",
+      "guestLoginCta": "Einloggen und freischalten",
+      "accountTitle": "Erweiterte Tool-Funktionen",
+      "accountComingSoon": "Diese Funktionen sind in Entwicklung und werden nach und nach freigeschaltet.",
+      "featureSetComparison": "Vergleiche deine Sets, um die besten Setups zu finden.",
+      "featureIntegration": "Verknuepfe deine Sets mit Spielerprofilen, Gilden und weiteren Modulen.",
+      "featureCloudSync": "Nutze deine Sets auf mehreren Geraeten mit deinem SFDataHub-Account."
+    }
+  },
   "topbar": {
     "search": "Suchen�?�  /",
     "settings": "Einstellungen",

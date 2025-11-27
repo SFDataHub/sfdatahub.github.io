@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ContentShell from "../../components/ContentShell";
+import { useAuth } from "../../context/AuthContext";
 
 type SetSlot = {
   id: string;
@@ -26,6 +28,10 @@ const TOOLS: Tool[] = [
 ];
 
 export default function ToolsPage() {
+  const { t } = useTranslation();
+  const { user, status, loginWithDiscord } = useAuth();
+  const isLoggedIn = status === "authenticated" && !!user;
+
   const [sets, setSets] = useState<SetSlot[]>(INITIAL_SETS);
   const [activeSetId, setActiveSetId] = useState<string>(INITIAL_SETS[0]?.id ?? "");
   const [activeToolId, setActiveToolId] = useState<string>(TOOLS[0]?.id ?? "");
@@ -44,6 +50,10 @@ export default function ToolsPage() {
     };
     setSets((prev) => [...prev, newSet]);
     setActiveSetId(newSet.id);
+  };
+
+  const handleLoginClick = () => {
+    loginWithDiscord();
   };
 
   return (
@@ -123,12 +133,69 @@ export default function ToolsPage() {
                       : "border-slate-700/70 bg-slate-800/70 text-slate-200 hover:border-emerald-400/60 hover:text-emerald-100",
                   ].join(" ")}
                 >
-                  <span className="text-base">🛠️</span>
+                  <span className="text-base" aria-hidden>*</span>
                   <span>{tool.name}</span>
                 </button>
               );
             })}
           </div>
+        </section>
+
+        {/* Gast vs Account Info-Bereich */}
+        <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 md:p-5">
+          {isLoggedIn ? (
+            <div className="grid gap-4 md:grid-cols-[1.2fr_1fr] md:items-center">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
+                  {t("tools.banner.accountComingSoon")}
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-50">
+                  {t("tools.banner.accountTitle")}
+                </h3>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[t("tools.banner.featureSetComparison"), t("tools.banner.featureIntegration"), t("tools.banner.featureCloudSync")].map((copy) => (
+                  <div
+                    key={copy}
+                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3 text-sm text-emerald-50 shadow-[0_12px_45px_-30px_rgba(16,185,129,0.8)]"
+                  >
+                    <div className="text-xs uppercase tracking-wide text-emerald-200/90">
+                      {t("tools.banner.accountComingSoon")}
+                    </div>
+                    <div className="mt-1 leading-snug text-emerald-50/90">{copy}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-slate-50">
+                  {t("tools.banner.guestTitle")}
+                </h3>
+                <p className="text-sm text-slate-400">
+                  {t("tools.banner.guestDescription")}
+                </p>
+                <ul className="text-sm text-slate-300">
+                  {[t("tools.banner.featureSetComparison"), t("tools.banner.featureIntegration"), t("tools.banner.featureCloudSync")].map((copy) => (
+                    <li key={copy} className="flex items-start gap-2">
+                      <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+                      <span>{copy}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex gap-3 md:flex-col md:items-end">
+                <button
+                  type="button"
+                  onClick={handleLoginClick}
+                  className="rounded-xl border border-emerald-400/60 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:border-emerald-300 hover:bg-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-400/70"
+                >
+                  {t("tools.banner.guestLoginCta")}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Slider-/Diashow-Container */}
