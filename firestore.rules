@@ -7,8 +7,24 @@ service cloud.firestore {
     match /servers/{doc}          { allow read: if true; }
     match /stats_public/{doc=**}  { allow read: if true; }
 
-    // Übergangs-Gate (bis Auth/AppCheck)
+    // Uebergangs-Gate (bis Auth/AppCheck)
     function isImporter() { return true; }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.roles != null && request.auth.token.roles.hasAny(['admin', 'owner']);
+    }
+
+    // Access control configuration (used by Control Panel / Access & Features)
+    match /feature_access/{featureId} {
+      // Jeder eingeloggte User darf die Konfiguration lesen; Mutationen laufen ueber auth-api/Service Account.
+      allow get, list: if request.auth != null;
+      allow create, update, delete: if false;
+    }
+
+    match /access_groups/{groupId} {
+      allow get, list: if request.auth != null;
+      allow create, update, delete: if false;
+    }
 
     // ---------- Players ----------
     match /players/{pid} {
@@ -78,9 +94,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ---------- Zusatz nur für collectionGroup("latest") ----------
-    // Ermöglicht READ auf *allen* Subcollections namens "latest"
-    // (z. B. players/*/latest/*, guilds/*/latest/*) – keine Writes.
+    // ---------- Zusatz nur fuer collectionGroup("latest") ----------
+    // Ermoeglicht READ auf *allen* Subcollections namens "latest"
+    // (z. B. players/*/latest/*, guilds/*/latest/*) - keine Writes.
     match /{path=**}/latest/{docId} {
       allow read: if true;
     }
