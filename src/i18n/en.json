@@ -14,6 +14,18 @@
     "license": "License",
     "tools": "Tools"
   },
+  "tools": {
+    "banner": {
+      "guestTitle": "Unlock extra features with an account",
+      "guestDescription": "You can use all tools without an account. Sign in to enable cloud-synced sets, cross-set insights, and integrations with your SFDataHub profile.",
+      "guestLoginCta": "Sign in to unlock",
+      "accountTitle": "Extended tools features",
+      "accountComingSoon": "These features are in development and will roll out gradually.",
+      "featureSetComparison": "Compare your sets to find the best setups.",
+      "featureIntegration": "Link your sets with player profiles, guilds, and other modules.",
+      "featureCloudSync": "Sync your sets across devices with your SFDataHub account."
+    }
+  },
   "topbar": {
     "search": "Search�?�  /",
     "settings": "Settings",
