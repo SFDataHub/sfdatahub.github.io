@@ -18,6 +18,8 @@ const ROLE_ORDER = ["admin", "mod", "creator", "user"] as const;
 type AdminUserRole = (typeof ROLE_ORDER)[number];
 type AdminUserStatus = "active" | "suspended" | "banned";
 
+const ROLE_SET = new Set<AdminUserRole>(ROLE_ORDER);
+
 type AdminUserRecord = UserDoc & {
   status?: AdminUserStatus;
   notes?: string | null;
@@ -309,6 +311,19 @@ const sanitizeRoles = (input: unknown[]): AdminUserRole[] => {
   return roles.length ? normalizeRoles(roles) : ["user"];
 };
 
+const parseRolesPayload = (value: unknown): AdminUserRole[] | null => {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const roles = value.map((role) => String(role) as AdminUserRole);
+  if (roles.some((role) => !ROLE_SET.has(role))) {
+    return null;
+  }
+
+  return normalizeRoles(roles);
+};
+
 const sanitizeStatus = (input: unknown): AdminUserStatus | null => {
   if (input === "active" || input === "suspended" || input === "banned") {
     return input;
@@ -411,6 +426,55 @@ const logAuditEvent = async (
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 };
+
+adminRouter.patch(
+  "/users/:userId/roles",
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+
+    if (!Object.prototype.hasOwnProperty.call(body, "roles")) {
+      return res.status(400).json({ error: "roles is required" });
+    }
+
+    const roles = parseRolesPayload(body.roles);
+    if (!roles) {
+      return res.status(400).json({ error: "roles must be an array of valid roles" });
+    }
+
+    if (req.sessionUser?.userId === req.params.userId && !roles.includes("admin")) {
+      return res.status(400).json({ error: "You cannot remove your own admin role" });
+    }
+
+    try {
+      const ref = db.collection(USERS_COLLECTION).doc(req.params.userId);
+      const beforeSnapshot = await ref.get();
+      if (!beforeSnapshot.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const beforeUser = mapAdminUserDoc(beforeSnapshot as QueryDocumentSnapshot);
+      await ref.set({ roles }, { merge: true });
+
+      const afterSnapshot = await ref.get();
+      const updatedUser = mapAdminUserDoc(afterSnapshot as QueryDocumentSnapshot);
+
+      const changes = computeChangeSet(beforeUser, updatedUser, { roles });
+      if (Object.keys(changes).length) {
+        const actorUserId = req.sessionUser?.userId ?? "";
+        const actorDisplayName = await fetchUserDisplayName(actorUserId);
+        const action = resolveAuditAction(changes);
+        const summary = formatAuditSummary(changes);
+        await logAuditEvent(actorUserId, actorDisplayName, updatedUser.userId, action, summary, changes);
+      }
+
+      return res.json({ user: updatedUser });
+    } catch (error) {
+      console.error("[admin] Failed to update user roles", error);
+      return res.status(500).json({ error: "Failed to update user roles" });
+    }
+  },
+);
 
 adminRouter.patch(
   "/users/:userId",
