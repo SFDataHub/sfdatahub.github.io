@@ -154,6 +154,9 @@ import TablePerformanceLabPage from "./pages/Playground/Performance/TablePerform
 import MobileBottomSheetFiltersPage from "./pages/Playground/Mobile/MobileBottomSheetFiltersPage";
 import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 
+// Tools
+import ToolsPage from "./pages/tools/ToolsPage";
+
 /** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
@@ -230,6 +233,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* Guides */}
             <Route path="/guidehub/*" element={<GuidesIndex />} />
+
+            {/* Tools */}
+            <Route path="/tools" element={<ToolsPage />} />
 
             {/* Community */}
             <Route path="/community" element={<CommunityIndex />} />

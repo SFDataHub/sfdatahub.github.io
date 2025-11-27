@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck
+  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
@@ -15,6 +15,7 @@ import {
   getAppRoleFromUserRoles,
   useFeatureAccessStore,
 } from "../../lib/featureAccessConfig";
+import { useTranslation } from "react-i18next";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -25,6 +26,7 @@ type Item = {
   label: string;
   icon: React.ReactNode;
   end?: boolean;
+  i18nKey?: string;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 const main: Item[] = [
@@ -40,6 +42,7 @@ const categories: Item[] = [
   { to: "/discover",  label: "Discover",  icon: <Compass className="ico" /> },
   { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" /> },
   { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" /> },
+  { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools" },
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" /> },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" /> },
   { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" /> },
@@ -158,11 +161,13 @@ function AnimatedLabel({
 /* ---------------- Ein Kategorie-Item mit Portal-Submenu ---------------- */
 function CategoryItem({
   it,
+  label,
   collapsed,
   allowSubmenus,
   subItems,
 }: {
   it: Item;
+  label: string;
   collapsed: boolean;
   allowSubmenus: boolean;
   subItems: SubItem[];
@@ -191,7 +196,7 @@ function CategoryItem({
         }
       >
         {it.icon}
-        <AnimatedLabel text={it.label} isOpen={!collapsed} />
+        <AnimatedLabel text={label} isOpen={!collapsed} />
         {hasSub && !collapsed && (
           <span className={styles.trailing} aria-hidden="true">
             <ChevronRight className="ico" />
@@ -231,6 +236,7 @@ function Block({
   appRole,
   isAdminOverride,
   storeRules,
+  translate,
 }: {
   title?: string;
   items: Item[];
@@ -240,6 +246,7 @@ function Block({
   appRole: AppRole | null;
   isAdminOverride: boolean;
   storeRules: Record<string, FeatureAccessRule>;
+  translate: (key: string) => string;
 }) {
   return (
     <>
@@ -255,11 +262,13 @@ function Block({
           }
 
           const subItems = filterSubItems(SUBTABS[it.to], userRoles);
+          const label = it.i18nKey ? translate(it.i18nKey) : it.label;
           if (subItems.length) {
             return (
               <CategoryItem
                 key={it.to}
                 it={it}
+                label={label}
                 collapsed={collapsed}
                 allowSubmenus={allowSubmenus}
                 subItems={subItems}
@@ -276,7 +285,7 @@ function Block({
               }
             >
               {it.icon}
-              <AnimatedLabel text={it.label} isOpen={!collapsed} />
+              <AnimatedLabel text={label} isOpen={!collapsed} />
             </NavLink>
           );
         })}
@@ -349,6 +358,7 @@ export default function Sidebar({
   const collapsed = !expanded;
   const allowSubmenus = pinned || (expanded && submenuArmed);
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
@@ -401,6 +411,7 @@ export default function Sidebar({
               appRole={appRole}
               isAdminOverride={isAdminOverride}
               storeRules={rulesByRoute}
+              translate={t}
             />
           </div>
 
@@ -416,6 +427,7 @@ export default function Sidebar({
               appRole={appRole}
               isAdminOverride={isAdminOverride}
               storeRules={rulesByRoute}
+              translate={t}
             />
           </div>
         </div>
