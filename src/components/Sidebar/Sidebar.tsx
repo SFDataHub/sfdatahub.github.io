@@ -8,6 +8,13 @@ import {
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
 import { useAuth } from "../../context/AuthContext";
+import {
+  AppRole,
+  FeatureAccessRule,
+  canAccessRoute,
+  getAppRoleFromUserRoles,
+  useFeatureAccessStore,
+} from "../../lib/featureAccessConfig";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -221,18 +228,32 @@ function Block({
   collapsed,
   allowSubmenus,
   userRoles,
+  appRole,
+  isAdminOverride,
+  storeRules,
 }: {
   title?: string;
   items: Item[];
   collapsed: boolean;
   allowSubmenus: boolean;
   userRoles: string[];
+  appRole: AppRole | null;
+  isAdminOverride: boolean;
+  storeRules: Record<string, FeatureAccessRule>;
 }) {
   return (
     <>
       {title && <div className={`${styles.navTitle} ${styles.segTitle}`}>{title}</div>}
       <div className={styles.navCol}>
         {items.map((it) => {
+          const isGuardedRoute = it.to === "/admin" || it.to === "/playground";
+          if (
+            isGuardedRoute &&
+            !canAccessRoute({ route: it.to, userRole: appRole, isAdminOverride, storeRules })
+          ) {
+            return null;
+          }
+
           const subItems = filterSubItems(SUBTABS[it.to], userRoles);
           if (subItems.length) {
             return (
@@ -331,6 +352,9 @@ export default function Sidebar({
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
+  const appRole = getAppRoleFromUserRoles(userRoles);
+  const isAdminOverride = userRoles.includes("admin");
+  const { rulesByRoute } = useFeatureAccessStore();
 
   const handleFooterClick = () => {
     if (isAuthed) {
@@ -374,6 +398,9 @@ export default function Sidebar({
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
+              appRole={appRole}
+              isAdminOverride={isAdminOverride}
+              storeRules={rulesByRoute}
             />
           </div>
 
@@ -386,6 +413,9 @@ export default function Sidebar({
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
+              appRole={appRole}
+              isAdminOverride={isAdminOverride}
+              storeRules={rulesByRoute}
             />
           </div>
         </div>

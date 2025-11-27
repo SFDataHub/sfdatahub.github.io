@@ -158,6 +158,8 @@ import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { AuthProvider } from "./context/AuthContext";
+import FeatureGate from "./components/FeatureGate";
+import { FeatureAccessProvider } from "./lib/featureAccessConfig";
 
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
@@ -169,10 +171,11 @@ const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht me
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
-      <UploadCenterProvider role="admin">
-        <HashRouter>
-          <Routes>
-            <Route element={<RootLayout />}>
+      <FeatureAccessProvider>
+        <UploadCenterProvider role="admin">
+          <HashRouter>
+            <Routes>
+              <Route element={<RootLayout />}>
             {/* Home */}
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<LoginPage />} />
@@ -267,7 +270,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/settings/account" element={<AccountSettingsPage />} />
 
             {/* Playground */}
-            <Route path="/playground" element={<PlaygroundIndex />}>
+            <Route
+              path="/playground"
+              element={(
+                <FeatureGate route="/playground" fallback={<Navigate to="/" replace />}>
+                  <PlaygroundIndex />
+                </FeatureGate>
+              )}
+            >
               <Route index element={<div style={{ color: "#B0C4D9" }}>Choose an item on the left.</div>} />
               <Route path="list-views" element={<ListViews />} />
               <Route path="rescan-widget" element={<RescanWidget />} />
@@ -354,15 +364,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/scans/upload" element={NotFoundOld()} />
             <Route path="/scans/history" element={NotFoundOld()} />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </HashRouter>
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </HashRouter>
 
-      {/* Modal am Root */}
-      <UploadCenterModal />
-    </UploadCenterProvider>
+        {/* Modal am Root */}
+        <UploadCenterModal />
+      </UploadCenterProvider>
+    </FeatureAccessProvider>
     </AuthProvider>
   </React.StrictMode>
 );
