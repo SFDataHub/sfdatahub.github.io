@@ -283,10 +283,13 @@ const DEFAULT_STATE: FeatureAccessState = {
 
 function mergeRuleValues(base: FeatureAccessRule | undefined, override: FeatureAccessRule): FeatureAccessRule {
   const merged: FeatureAccessRule = { ...(base ?? {}) } as FeatureAccessRule;
-  (Object.keys(override) as (keyof FeatureAccessRule)[]).forEach((key) => {
-    const value = override[key];
+  const entries = Object.entries(override) as Array<
+    [keyof FeatureAccessRule, FeatureAccessRule[keyof FeatureAccessRule]]
+  >;
+  entries.forEach(([key, value]) => {
     if (value !== undefined) {
-      merged[key] = value as FeatureAccessRule[keyof FeatureAccessRule];
+      const typedKey = key as keyof FeatureAccessRule;
+      (merged as any)[typedKey] = value;
     }
   });
   return merged;
@@ -488,7 +491,7 @@ export function useFeatureAccess(): {
     console.warn("[FeatureAccess] useFeatureAccess used outside AuthProvider; continuing with user-level access.");
   }
 
-  const { rulesById, rulesByRoute, loading, error } = useFeatureAccessStore();
+  const { byId: rulesById, byRoute: rulesByRoute, loading, error } = useFeatureAccessStore();
 
   const storeRules = React.useMemo<FeatureAccessRuleMap>(
     () => ({
