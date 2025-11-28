@@ -1,13 +1,27 @@
-import en from './en.json';
-import de from './de.json';
+import i18next from "i18next";
+import { initReactI18next } from "react-i18next";
+import en from "./en.json";
+import de from "./de.json";
 
-export type Lang = 'en' | 'de';
-type Dict = typeof en;
-const dicts: Record<Lang, Dict> = { en, de };
+export type Lang = "en" | "de";
 
-export function t(key: string, lang: Lang = 'en'){
-  const parts = key.split('.');
-  let cur: any = dicts[lang] as any;
-  for(const p of parts){ cur = cur?.[p]; if(cur == null) return key; }
-  return String(cur);
+const resources = {
+  en: { translation: en },
+  de: { translation: de },
+};
+
+i18next
+  .use(initReactI18next)
+  .init({
+    resources,
+    fallbackLng: "en",
+    lng: "en",
+    interpolation: { escapeValue: false },
+    react: { useSuspense: false },
+  });
+
+export default i18next;
+
+export function t(key: string, lang: Lang = "en") {
+  return i18next.t(key, { lng: lang });
 }
