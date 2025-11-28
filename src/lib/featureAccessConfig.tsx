@@ -1,4 +1,5 @@
 import React from "react";
+import type { FirebaseError } from "firebase/app";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 import { useAuth } from "../context/AuthContext";
@@ -319,8 +320,8 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
     let active = true;
 
     const fetchRules = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, "feature_access"));
+    try {
+      const snapshot = await getDocs(collection(db, "feature_access"));
         const dynamicRules: FeatureAccessRule[] = [];
 
         snapshot.forEach((doc) => {
@@ -339,15 +340,28 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
       } catch (error) {
-        console.error("[FeatureAccess] Failed to load rules from Firestore.", error);
-        if (active) {
-          setState((prev) => ({
-            ...prev,
-            loading: false,
-            error: error instanceof Error ? error.message : "Failed to load feature access rules",
-          }));
-        }
+      const err = error as FirebaseError;
+      const code = err?.code;
+      const isPermissionIssue =
+        code === "permission-denied" || code === "failed-precondition";
+      const shouldWarn =
+        typeof window !== "undefined" && window.location.hostname === "localhost";
+      if (shouldWarn) {
+        console.warn(
+          `[FeatureAccess] Firestore feature_access ${
+            isPermissionIssue ? "not readable" : "load failed"
+          }. Falling back to defaults.`,
+          error,
+        );
       }
+      if (active) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : "Failed to load feature access rules",
+        }));
+      }
+    }
     };
 
     fetchRules();
