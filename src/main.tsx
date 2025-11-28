@@ -171,215 +171,332 @@ const P = (t: string) => () => (
 );
 const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht mehr.");
 
+const withFeatureGate = (
+  featureId: string,
+  route: string,
+  element: React.ReactNode,
+  fallback: React.ReactNode = <Navigate to="/" replace />,
+) => (
+  <FeatureGate featureId={featureId} route={route} fallback={fallback}>
+    {element}
+  </FeatureGate>
+);
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
       <FeatureAccessProvider>
         <UploadCenterProvider role="admin">
           <HashRouter>
-            <Routes>
+                        <Routes>
               <Route element={<RootLayout />}>
-            {/* Home */}
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<LoginPage />} />
+                {/* Home */}
+                <Route
+                  path="/"
+                  element={withFeatureGate("main.home", "/", <Home />, <Navigate to="/login" replace />)}
+                />
+                <Route path="/login" element={<LoginPage />} />
 
-            {/* Dashboard */}
-            <Route path="/dashboard" element={<DashboardIndex />} />
-            <Route path="/dashboard/kpis" element={<DashboardKPIs />} />
-            <Route path="/dashboard/activity" element={<DashboardActivity />} />
-            <Route path="/dashboard/progression" element={<DashboardProgression />} />
+                {/* Dashboard */}
+                <Route
+                  path="/dashboard"
+                  element={withFeatureGate("main.dashboard", "/dashboard", <DashboardIndex />)}
+                />
+                <Route
+                  path="/dashboard/kpis"
+                  element={withFeatureGate("main.dashboard", "/dashboard", <DashboardKPIs />)}
+                />
+                <Route
+                  path="/dashboard/activity"
+                  element={withFeatureGate("main.dashboard", "/dashboard", <DashboardActivity />)}
+                />
+                <Route
+                  path="/dashboard/progression"
+                  element={withFeatureGate("main.dashboard", "/dashboard", <DashboardProgression />)}
+                />
 
-            {/* Discover */}
-            <Route path="/discover" element={<Discover />} />
+                {/* Discover */}
+                <Route
+                  path="/discover"
+                  element={withFeatureGate("main.discover", "/discover", <Discover />)}
+                />
 
-            {/* Toplists */}
-            <Route path="/toplists" element={<ToplistsIndex />} />
+                {/* Toplists */}
+                <Route
+                  path="/toplists"
+                  element={withFeatureGate("main.toplists", "/toplists", <ToplistsIndex />)}
+                />
 
-            {/* SF Magazine */}
-            <Route path="/sfmagazine" element={<SFMagazineIndex />} />
-            <Route path="/sfmagazine/historybook" element={<HistoryBookPage />} />
+                {/* SF Magazine */}
+                <Route path="/sfmagazine" element={<SFMagazineIndex />} />
+                <Route path="/sfmagazine/historybook" element={<HistoryBookPage />} />
 
+                {/* Players */}
+                <Route path="/players" element={<PlayersIndex />} />
+                <Route path="/players/rankings" element={<PlayersRankings />} />
+                <Route path="/players/stats" element={<PlayersStats />} />
+                <Route path="/players/profile" element={<PlayerProfile />} />
+                <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
+                <Route path="/players/compare" element={<PlayersCompare />} />
+                {/* kurze Route f?r Suche */}
+                <Route path="/player/:playerId" element={<PlayerProfile />} />
 
-            {/* Players */}
-            <Route path="/players" element={<PlayersIndex />} />
-            <Route path="/players/rankings" element={<PlayersRankings />} />
-            <Route path="/players/stats" element={<PlayersStats />} />
-            <Route path="/players/profile" element={<PlayerProfile />} />
-            <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
-            <Route path="/players/compare" element={<PlayersCompare />} />
-            {/* kurze Route für Suche */}
-            <Route path="/player/:playerId" element={<PlayerProfile />} />
+                {/* Guilds */}
+                <Route path="/guilds" element={<GuildsIndex />} />
+                <Route path="/guilds/rankings" element={<GuildsRankings />} />
+                <Route path="/guilds/stats" element={<GuildsStats />} />
+                {/* ?o? Gildenprofil */}
+                <Route path="/guilds/profile" element={<GuildProfile />} />
+                <Route path="/guilds/profile/:guildId" element={<GuildProfile />} />
+                {/* kurze Route f?r Suche */}
+                <Route path="/guild/:guildId" element={<GuildProfile />} />
 
-            {/* Guilds */}
-            <Route path="/guilds" element={<GuildsIndex />} />
-            <Route path="/guilds/rankings" element={<GuildsRankings />} />
-            <Route path="/guilds/stats" element={<GuildsStats />} />
-            {/* ✨ Gildenprofil */}
-            <Route path="/guilds/profile" element={<GuildProfile />} />
-            <Route path="/guilds/profile/:guildId" element={<GuildProfile />} />
-            {/* kurze Route für Suche */}
-            <Route path="/guild/:guildId" element={<GuildProfile />} />
+                {/* Servers */}
+                <Route path="/servers" element={<ServersIndex />} />
+                <Route path="/servers/rankings" element={<ServersRankings />} />
+                <Route path="/servers/stats" element={<ServersStats />} />
+                <Route path="/servers/profile" element={<ServerProfilePage />} />
+                <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />
+                <Route path="/server/:serverId" element={<ServerProfilePage />} />
 
-            {/* Servers */}
-            <Route path="/servers" element={<ServersIndex />} />
-            <Route path="/servers/rankings" element={<ServersRankings />} />
-            <Route path="/servers/stats" element={<ServersStats />} />
-            <Route path="/servers/profile" element={<ServerProfilePage />} />               {/* ✨ */}
-            <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />     {/* ✨ */}
-            <Route path="/server/:serverId" element={<ServerProfilePage />} />              {/* ✨ Kurzlink */}
+                {/* Public Profiles */}
+                <Route path="/u/:profileId" element={<PublicProfilePage />} />
 
-            {/* Public Profiles */}
-            <Route path="/u/:profileId" element={<PublicProfilePage />} />
+                {/* Guides */}
+                <Route
+                  path="/guidehub/*"
+                  element={withFeatureGate("main.guidehub", "/guidehub", <GuidesIndex />)}
+                />
 
-            {/* Guides */}
-            <Route path="/guidehub/*" element={<GuidesIndex />} />
+                {/* Tools */}
+                <Route
+                  path="/tools"
+                  element={withFeatureGate("main.tools", "/tools", <ToolsPage />)}
+                />
 
-            {/* Tools */}
-            <Route path="/tools" element={<ToolsPage />} />
+                {/* Community */}
+                <Route
+                  path="/community"
+                  element={withFeatureGate("main.community", "/community", <CommunityIndex />)}
+                />
+                <Route
+                  path="/community/scans"
+                  element={withFeatureGate("main.community", "/community", <CommunityScans />)}
+                />
+                <Route
+                  path="/community/predictions"
+                  element={withFeatureGate("main.community", "/community", <CommunityPredictions />)}
+                />
+                <Route
+                  path="/community/creators"
+                  element={withFeatureGate("main.community", "/community", <CommunityCreators />)}
+                />
+                <Route
+                  path="/community/feedback"
+                  element={withFeatureGate("main.community", "/community", <CommunityFeedback />)}
+                />
+                <Route
+                  path="/community/news"
+                  element={withFeatureGate("main.community", "/community", <CommunityNews />)}
+                />
+                <Route
+                  path="/community/records"
+                  element={withFeatureGate("main.community", "/community", <CommunityRecords />)}
+                />
 
-            {/* Community */}
-            <Route path="/community" element={<CommunityIndex />} />
-            <Route path="/community/scans" element={<CommunityScans />} />
-            <Route path="/community/predictions" element={<CommunityPredictions />} />
-            <Route path="/community/creators" element={<CommunityCreators />} />
-            <Route path="/community/feedback" element={<CommunityFeedback />} />
-            <Route path="/community/news" element={<CommunityNews />} />
-            <Route path="/community/records" element={<CommunityRecords />} />
+                {/* Scans */}
+                <Route
+                  path="/scans"
+                  element={withFeatureGate("main.scans", "/scans", <ScansIndex />)}
+                />
+                <Route
+                  path="/scans/latest"
+                  element={withFeatureGate("main.scans", "/scans", <ScansLatest />)}
+                />
+                <Route
+                  path="/scans/archive"
+                  element={withFeatureGate("main.scans", "/scans", <ScansArchive />)}
+                />
 
-            {/* Scans */}
-            <Route path="/scans" element={<ScansIndex />} />
-            <Route path="/scans/latest" element={<ScansLatest />} />
-            <Route path="/scans/archive" element={<ScansArchive />} />
+                {/* Guild Hub */}
+                <Route
+                  path="/guild-hub"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubIndex />)}
+                />
+                <Route
+                  path="/guild-hub/planner"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubPlanner />)}
+                />
+                <Route
+                  path="/guild-hub/fusion-planner"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFusionPlanner />)}
+                />
+                <Route
+                  path="/guild-hub/compare-guilds"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubCompareGuilds />)}
+                />
+                <Route
+                  path="/guild-hub/waitlist"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubWaitlist />)}
+                />
+                <Route
+                  path="/guild-hub/activity"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubActivity />)}
+                />
+                <Route
+                  path="/guild-hub/imports"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubImports />)}
+                />
+                <Route
+                  path="/guild-hub/announcements"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubAnnouncements />)}
+                />
+                <Route
+                  path="/guild-hub/events"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubEvents />)}
+                />
+                <Route
+                  path="/guild-hub/roles"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubRoles />)}
+                />
+                <Route
+                  path="/guild-hub/settings"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubSettings />)}
+                />
 
-            {/* Guild Hub */}
-            <Route path="/guild-hub" element={<GuildHubIndex />} />
-            <Route path="/guild-hub/planner" element={<GuildHubPlanner />} />
-            <Route path="/guild-hub/fusion-planner" element={<GuildHubFusionPlanner />} />
-            <Route path="/guild-hub/compare-guilds" element={<GuildHubCompareGuilds />} />
-            <Route path="/guild-hub/waitlist" element={<GuildHubWaitlist />} />
-            <Route path="/guild-hub/activity" element={<GuildHubActivity />} />
-            <Route path="/guild-hub/imports" element={<GuildHubImports />} />
-            <Route path="/guild-hub/announcements" element={<GuildHubAnnouncements />} />
-            <Route path="/guild-hub/events" element={<GuildHubEvents />} />
-            <Route path="/guild-hub/roles" element={<GuildHubRoles />} />
-            <Route path="/guild-hub/settings" element={<GuildHubSettings />} />
+                {/* Admin */}
+                <Route
+                  path="/admin"
+                  element={withFeatureGate("main.admin", "/admin", <AdminIndex />)}
+                />
+                <Route
+                  path="/admin/errors"
+                  element={withFeatureGate("main.admin", "/admin", <AdminErrorLog />)}
+                />
+                <Route
+                  path="/admin/scans-uploaded"
+                  element={withFeatureGate("main.admin", "/admin", <AdminScansUploaded />)}
+                />
+                <Route
+                  path="/admin/creators-api"
+                  element={withFeatureGate("main.admin", "/admin", <AdminCreatorsAPI />)}
+                />
+                <Route
+                  path="/admin/users"
+                  element={withFeatureGate("main.admin", "/admin", <AdminUsersAdminPage />)}
+                />
 
-            {/* Admin */}
-            <Route path="/admin" element={<AdminIndex />} />
-            <Route path="/admin/errors" element={<AdminErrorLog />} />
-            <Route path="/admin/scans-uploaded" element={<AdminScansUploaded />} />
-            <Route path="/admin/creators-api" element={<AdminCreatorsAPI />} />
-            <Route path="/admin/users" element={<AdminUsersAdminPage />} />
+                {/* Settings */}
+                <Route
+                  path="/settings"
+                  element={withFeatureGate("main.settings", "/settings", <Settings />)}
+                />
+                <Route
+                  path="/settings/account"
+                  element={withFeatureGate("main.settings", "/settings", <AccountSettingsPage />)}
+                />
 
-            {/* Settings */}
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/account" element={<AccountSettingsPage />} />
+                {/* Playground */}
+                <Route
+                  path="/playground"
+                  element={withFeatureGate("main.playground", "/playground", <PlaygroundIndex />)}
+                >
+                  <Route index element={<div style={{ color: "#B0C4D9" }}>Choose an item on the left.</div>} />
+                  <Route path="list-views" element={<ListViews />} />
+                  <Route path="rescan-widget" element={<RescanWidget />} />
+                  <Route path="upload-sim" element={<UploadSim />} />
+                  <Route path="theme-maker" element={<ThemeMaker />} />
+                  <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
+                  <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
+                  <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
+                  <Route path="templates/blank" element={<BlankTemplatePage />} />
+                  <Route path="templates/blank-alt" element={<BlankTemplatePageAlt />} />
+                  <Route path="templates/blank-layout-2" element={<BlankTemplatePageLayout2 />} />
+                  <Route path="templates/blank-layout-3" element={<BlankTemplatePageLayout3 />} />
+                  <Route path="templates/blank-layout-4" element={<BlankTemplatePageLayout4 />} />
+                  <Route path="portrait-maker" element={<PortraitMakerDemoPage />} />
 
-            {/* Playground */}
-            <Route
-              path="/playground"
-              element={(
-                <FeatureGate route="/playground" fallback={<Navigate to="/" replace />}>
-                  <PlaygroundIndex />
-                </FeatureGate>
-              )}
-            >
-              <Route index element={<div style={{ color: "#B0C4D9" }}>Choose an item on the left.</div>} />
-              <Route path="list-views" element={<ListViews />} />
-              <Route path="rescan-widget" element={<RescanWidget />} />
-              <Route path="upload-sim" element={<UploadSim />} />
-              <Route path="theme-maker" element={<ThemeMaker />} />
-              <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
-              <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
-              <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
-              <Route path="templates/blank" element={<BlankTemplatePage />} />
-              <Route path="templates/blank-alt" element={<BlankTemplatePageAlt />} />
-              <Route path="templates/blank-layout-2" element={<BlankTemplatePageLayout2 />} />
-              <Route path="templates/blank-layout-3" element={<BlankTemplatePageLayout3 />} />
-              <Route path="templates/blank-layout-4" element={<BlankTemplatePageLayout4 />} />
-              <Route path="portrait-maker" element={<PortraitMakerDemoPage />} />
+                  {/* HUD */}
+                  <Route path="hud" element={<HUDIndex />} />
+                  <Route path="hud/game-buttons" element={<GameButtonsPlayground />} />
+                  {/* Core UI ??" Alternativpfade */}
+                  <Route path="core-ui/theme-maker" element={<ThemeMaker />} />
+                  <Route path="core-ui/theme-maker-pro" element={<ThemeMakerPro />} />
+                  <Route path="core-ui/list-views" element={<ListViews />} />
+                  {/* Sync & Upload */}
+                  <Route path="sync/rescan" element={<RescanWidget />} />
+                  <Route path="upload/sim" element={<UploadSim />} />
+                  {/* Data Import & Schema */}
+                  <Route path="import/har" element={<HARImportPage />} />
+                  <Route path="import/json-csv" element={<JSONCSVImportPage />} />
+                  <Route path="import/schema" element={<IndexSchemaViewerPage />} />
+                  {/* Hubs & Profile */}
+                  <Route path="hubs/player-contained" element={<PlayerProfileContainedPage />} />
+                  <Route path="hubs/guilds" element={<GuildHubPage />} />
+                  <Route path="hubs/servers" element={<ServerHubPage />} />
+                  {/* Rankings & KPIs */}
+                  <Route path="rankings/views" element={<RankingsViewsPage />} />
+                  <Route path="analytics/kpi" element={<KPIDashboardPage />} />
+                  <Route path="analytics/progression" element={<ProgressionTrackerPage />} />
+                  <Route path="analytics/legendary-pets" element={<LegendaryPetsPage />} />
+                  {/* Community & Feedback */}
+                  <Route path="community/scans" element={<CommunityScansPage />} />
+                  <Route path="community/creators" element={<CreatorHubPage />} />
+                  <Route path="feedback/form" element={<FeedbackFormPage />} />
+                  <Route path="feedback/admin" element={<FeedbackAdminPage />} />
+                  {/* Help, Settings & Legal */}
+                  <Route path="help/tutorials" element={<TutorialsPage />} />
+                  <Route path="help/wiki" element={<WikiFAQPage />} />
+                  <Route path="legal/tos" element={<ToSPrivacyPage />} />
+                  <Route path="legal/transparency" element={<TransparencyViewerPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  {/* PWA, Connect & Export */}
+                  <Route path="pwa/update" element={<PWAUpdateFlowPage />} />
+                  <Route path="pwa/install" element={<PWAInstallPromptPage />} />
+                  <Route path="connect/manual" element={<ConnectManualPage />} />
+                  <Route path="connect/userscript" element={<ConnectUserscriptPage />} />
+                  <Route path="interop/exports" element={<ExportsPage />} />
+                  <Route path="interop/deeplinks" element={<DeeplinksDemoPage />} />
+                  {/* Admin, Performance & Mobile */}
+                  <Route path="admin/servers" element={<ServersEditorPage />} />
+                  <Route path="admin/jobs" element={<JobsQueuesPage />} />
+                  <Route path="admin/flags" element={<FeatureFlagsPage />} />
+                  <Route path="perf/table-lab" element={<TablePerformanceLabPage />} />
+                  <Route path="mobile/filters" element={<MobileBottomSheetFiltersPage />} />
+                  <Route path="qa/a11y" element={<A11yPassPage />} />
+                </Route>
 
-              {/* HUD */}
-              <Route path="hud" element={<HUDIndex />} />
-              <Route path="hud/game-buttons" element={<GameButtonsPlayground />} />
-              {/* Core UI – Alternativpfade */}
-              <Route path="core-ui/theme-maker" element={<ThemeMaker />} />
-              <Route path="core-ui/theme-maker-pro" element={<ThemeMakerPro />} />
-              <Route path="core-ui/list-views" element={<ListViews />} />
-              {/* Sync & Upload */}
-              <Route path="sync/rescan" element={<RescanWidget />} />
-              <Route path="upload/sim" element={<UploadSim />} />
-              {/* Data Import & Schema */}
-              <Route path="import/har" element={<HARImportPage />} />
-              <Route path="import/json-csv" element={<JSONCSVImportPage />} />
-              <Route path="import/schema" element={<IndexSchemaViewerPage />} />
-              {/* Hubs & Profile */}
-              <Route path="hubs/player-contained" element={<PlayerProfileContainedPage />} />
-              <Route path="hubs/guilds" element={<GuildHubPage />} />
-              <Route path="hubs/servers" element={<ServerHubPage />} />
-              {/* Rankings & KPIs */}
-              <Route path="rankings/views" element={<RankingsViewsPage />} />
-              <Route path="analytics/kpi" element={<KPIDashboardPage />} />
-              <Route path="analytics/progression" element={<ProgressionTrackerPage />} />
-              <Route path="analytics/legendary-pets" element={<LegendaryPetsPage />} />
-              {/* Community & Feedback */}
-              <Route path="community/scans" element={<CommunityScansPage />} />
-              <Route path="community/creators" element={<CreatorHubPage />} />
-              <Route path="feedback/form" element={<FeedbackFormPage />} />
-              <Route path="feedback/admin" element={<FeedbackAdminPage />} />
-              {/* Help, Settings & Legal */}
-              <Route path="help/tutorials" element={<TutorialsPage />} />
-              <Route path="help/wiki" element={<WikiFAQPage />} />
-              <Route path="legal/tos" element={<ToSPrivacyPage />} />
-              <Route path="legal/transparency" element={<TransparencyViewerPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              {/* PWA, Connect & Export */}
-              <Route path="pwa/update" element={<PWAUpdateFlowPage />} />
-              <Route path="pwa/install" element={<PWAInstallPromptPage />} />
-              <Route path="connect/manual" element={<ConnectManualPage />} />
-              <Route path="connect/userscript" element={<ConnectUserscriptPage />} />
-              <Route path="interop/exports" element={<ExportsPage />} />
-              <Route path="interop/deeplinks" element={<DeeplinksDemoPage />} />
-              {/* Admin, Performance & Mobile */}
-              <Route path="admin/servers" element={<ServersEditorPage />} />
-              <Route path="admin/jobs" element={<JobsQueuesPage />} />
-              <Route path="admin/flags" element={<FeatureFlagsPage />} />
-              <Route path="perf/table-lab" element={<TablePerformanceLabPage />} />
-              <Route path="mobile/filters" element={<MobileBottomSheetFiltersPage />} />
-              <Route path="qa/a11y" element={<A11yPassPage />} />
-            </Route>
+                {/* Redirects alte Routen */}
+                <Route path="/latest-scan" element={<Navigate to="/scans/latest" replace />} />
+                <Route path="/old-scans" element={<Navigate to="/scans/archive" replace />} />
 
-            {/* Redirects alte Routen */}
-            <Route path="/latest-scan" element={<Navigate to="/scans/latest" replace />} />
-            <Route path="/old-scans" element={<Navigate to="/scans/archive" replace />} />
+                {/* Alte, nicht mehr existierende Deep-Links ??? Hinweis */}
+                <Route path="/favorites" element={NotFoundOld()} />
+                <Route path="/notifications" element={NotFoundOld()} />
+                <Route path="/guilds/planner" element={NotFoundOld()} />
+                <Route path="/guilds/fusion" element={NotFoundOld()} />
+                <Route path="/guilds/academy" element={NotFoundOld()} />
+                <Route path="/toplists/players" element={NotFoundOld()} />
+                <Route path="/toplists/guilds" element={NotFoundOld()} />
+                <Route path="/toplists/servers" element={NotFoundOld()} />
+                <Route path="/settings/profile" element={NotFoundOld()} />
+                <Route path="/settings/appearance" element={NotFoundOld()} />
+                <Route path="/players/search" element={NotFoundOld()} />
+                <Route path="/servers/list" element={NotFoundOld()} />
+                <Route path="/servers/trend" element={NotFoundOld()} />
+                <Route path="/scans/upload" element={NotFoundOld()} />
+                <Route path="/scans/history" element={NotFoundOld()} />
 
-            {/* Alte, nicht mehr existierende Deep-Links → Hinweis */}
-            <Route path="/favorites" element={NotFoundOld()} />
-            <Route path="/notifications" element={NotFoundOld()} />
-            <Route path="/guilds/planner" element={NotFoundOld()} />
-            <Route path="/guilds/fusion" element={NotFoundOld()} />
-            <Route path="/guilds/academy" element={NotFoundOld()} />
-            <Route path="/toplists/players" element={NotFoundOld()} />
-            <Route path="/toplists/guilds" element={NotFoundOld()} />
-            <Route path="/toplists/servers" element={NotFoundOld()} />
-            <Route path="/settings/profile" element={NotFoundOld()} />
-            <Route path="/settings/appearance" element={NotFoundOld()} />
-            <Route path="/players/search" element={NotFoundOld()} />
-            <Route path="/servers/list" element={NotFoundOld()} />
-            <Route path="/servers/trend" element={NotFoundOld()} />
-            <Route path="/scans/upload" element={NotFoundOld()} />
-            <Route path="/scans/history" element={NotFoundOld()} />
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </HashRouter>
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </HashRouter>
-
-        {/* Modal am Root */}
-        <UploadCenterModal />
-      </UploadCenterProvider>
-    </FeatureAccessProvider>
+          {/* Modal am Root */}
+          <UploadCenterModal />
+        </UploadCenterProvider>
+      </FeatureAccessProvider>
     </AuthProvider>
   </React.StrictMode>
 );

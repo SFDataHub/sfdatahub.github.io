@@ -1,46 +1,33 @@
 import React from "react";
-import {
-  canAccessWithRule,
-  getAppRoleFromUserRoles,
-  resolveFeatureRule,
-  useFeatureAccessStore,
-} from "../lib/featureAccessConfig";
-import { useAuth } from "../context/AuthContext";
+import { useFeatureAccess } from "../lib/featureAccessConfig";
 
 interface FeatureGateProps {
-  route: string;
+  route?: string;
+  featureId?: string;
   fallback?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function FeatureGate({ route, fallback = null, children }: FeatureGateProps) {
-  const { user } = useAuth();
-  const { rulesByRoute, loading } = useFeatureAccessStore();
-  const userRole = React.useMemo(
-    () => getAppRoleFromUserRoles(user?.roles),
-    [user?.roles],
-  );
-  const isAdminOverride = React.useMemo(
-    () => !!user?.roles?.includes("admin"),
-    [user?.roles],
-  );
+export function FeatureGate({ route, featureId, fallback = null, children }: FeatureGateProps) {
+  const { resolveRule, canAccessFeature, canAccessRule } = useFeatureAccess();
+  const target = featureId ?? route ?? "/";
 
   const rule = React.useMemo(
-    () => resolveFeatureRule(route, rulesByRoute),
-    [route, rulesByRoute],
+    () => resolveRule(target),
+    [resolveRule, target],
   );
 
   React.useEffect(() => {
-    if (!loading && !rule) {
-      console.debug(`[FeatureGate] No rule found for route "${route}", allowing by default.`);
+    if (!rule) {
+      console.debug(`[FeatureGate] No rule found for target "${target}", allowing by default.`);
     }
-  }, [loading, rule, route]);
+  }, [rule, target]);
 
   const allowed = React.useMemo(() => {
-    if (loading) return true;
-    if (!rule) return true;
-    return canAccessWithRule(rule, userRole, isAdminOverride);
-  }, [loading, rule, userRole, isAdminOverride]);
+    if (!featureId && !route) return true;
+    if (rule) return canAccessRule(rule);
+    return canAccessFeature(target);
+  }, [canAccessFeature, canAccessRule, featureId, route, rule, target]);
 
   if (!allowed) return <>{fallback}</>;
   return <>{children}</>;

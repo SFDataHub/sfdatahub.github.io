@@ -95,7 +95,19 @@
   color: var(--text);
   text-decoration: none;
 }
+.pillActive{
+  background: var(--tile-hover);
+  border-color: var(--line);
+}
 .onlyExpanded{} /* neutral */
+.topbarNav{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbarLink{
+  font-weight: 600;
+}
 
 /* Upload-Button */
 .upload{

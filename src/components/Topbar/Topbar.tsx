@@ -1,4 +1,5 @@
 import React from "react";
+import { NavLink } from "react-router-dom";
 import { Bell, Star, Upload, Globe } from "lucide-react";
 import styles from "./Topbar.module.css";
 import AccountMenu from "./AccountMenu";
@@ -11,6 +12,15 @@ import UniversalSearch from "../search/UniversalSearch";
 
 /** Klassen-Icons / Mapping */
 import * as Classes from "../../data/classes";
+import { useFeatureAccess } from "../../lib/featureAccessConfig";
+
+const TOPBAR_ITEMS = [
+  { to: "/", label: "Home", featureId: "main.home" },
+  { to: "/dashboard", label: "Dashboard", featureId: "main.dashboard" },
+  { to: "/guild-hub", label: "Guild Hub", featureId: "main.guildHub" },
+  { to: "/community", label: "Community", featureId: "main.community" },
+  { to: "/tools", label: "Tools", featureId: "main.tools" },
+];
 
 function getClassIcon(className?: string | null): string | undefined {
   if (!className) return undefined;
@@ -47,6 +57,11 @@ function getClassIcon(className?: string | null): string | undefined {
 
 export default function Topbar({ user }: { user?: { name: string; role?: string } }) {
   const { open, canUse } = useUploadCenter();
+  const { isVisibleInTopbar } = useFeatureAccess();
+  const navItems = React.useMemo(
+    () => TOPBAR_ITEMS.filter((item) => !item.featureId || isVisibleInTopbar(item.featureId)),
+    [isVisibleInTopbar],
+  );
 
   const onUploadClick = () => {
     open({ tab: "json" });
@@ -62,6 +77,21 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
         <button className={styles.btnIco} aria-label="Favoriten">
           <Star className={styles.ico} />
         </button>
+        {navItems.length > 0 ? (
+          <nav className={styles.topbarNav} aria-label="Schnellzugriff">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `${styles.pill} ${styles.topbarLink} ${isActive ? styles.pillActive : ""}`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        ) : null}
       </div>
 
       {/* MITTE: PlayerSearch mit Klassen-Icon */}

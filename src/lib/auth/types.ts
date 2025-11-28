@@ -15,6 +15,7 @@ export interface AuthUser {
   provider: AuthProvider;
   providers?: Partial<Record<AuthProvider, AuthUserProviderInfo>>;
   roles: string[];
+  accessGroups?: string[];
   createdAt?: string;
   lastLoginAt?: string;
 }
