@@ -274,6 +274,11 @@ function buildRuleMaps(rules: FeatureAccessRule[]): FeatureAccessRuleMap {
 }
 
 const DEFAULT_RULE_MAPS = buildRuleMaps(FEATURE_ACCESS_CONFIG);
+const DEFAULT_STATE: FeatureAccessState = {
+  ...DEFAULT_RULE_MAPS,
+  loading: false,
+  error: null,
+};
 
 function mergeRuleValues(base: FeatureAccessRule | undefined, override: FeatureAccessRule): FeatureAccessRule {
   const merged: FeatureAccessRule = { ...(base ?? {}) } as FeatureAccessRule;
@@ -301,7 +306,7 @@ function mergeRuleMaps(dynamicRules: FeatureAccessRule[]): FeatureAccessRuleMap 
   return { byId: mergedById, byRoute: mergedByRoute };
 }
 
-const FeatureAccessContext = React.createContext<FeatureAccessState | undefined>(undefined);
+const FeatureAccessContext = React.createContext<FeatureAccessState>(DEFAULT_STATE);
 
 export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = React.useState<FeatureAccessState>({
@@ -359,20 +364,19 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export function useFeatureAccessStore(): FeatureAccessState {
   const ctx = React.useContext(FeatureAccessContext);
-  if (!ctx) {
-    throw new Error("useFeatureAccessStore must be used within a FeatureAccessProvider");
-  }
   return ctx;
 }
 
 export function resolveFeatureRule(
   identifier: string,
-  storeRules: FeatureAccessRuleMap,
+  storeRules?: FeatureAccessRuleMap,
 ): FeatureAccessRule | undefined {
+  if (!identifier) return undefined;
+  const rules = storeRules ?? DEFAULT_RULE_MAPS;
   const normalizedRoute = normalizeRoute(identifier);
   return (
-    storeRules.byId[identifier] ??
-    storeRules.byRoute[normalizedRoute] ??
+    rules.byId[identifier] ??
+    rules.byRoute[normalizedRoute] ??
     DEFAULT_RULE_MAPS.byId[identifier] ??
     DEFAULT_RULE_MAPS.byRoute[normalizedRoute]
   );
@@ -463,24 +467,33 @@ export function useFeatureAccess(): {
   isVisibleInSidebar: (identifier: string) => boolean;
   isVisibleInTopbar: (identifier: string) => boolean;
 } {
-  const { user } = useAuth();
+  let authUser: ReturnType<typeof useAuth>["user"] | null = null;
+  try {
+    authUser = useAuth().user;
+  } catch (error) {
+    console.warn("[FeatureAccess] useFeatureAccess used outside AuthProvider; continuing with guest context.");
+  }
+
   const { rulesById, rulesByRoute, loading, error } = useFeatureAccessStore();
 
   const storeRules = React.useMemo<FeatureAccessRuleMap>(
-    () => ({ byId: rulesById, byRoute: rulesByRoute }),
+    () => ({
+      byId: rulesById ?? DEFAULT_RULE_MAPS.byId,
+      byRoute: rulesByRoute ?? DEFAULT_RULE_MAPS.byRoute,
+    }),
     [rulesById, rulesByRoute],
   );
 
   const userRole = React.useMemo(
-    () => getAppRoleFromUserRoles(user?.roles),
-    [user?.roles],
+    () => getAppRoleFromUserRoles(authUser?.roles),
+    [authUser?.roles],
   );
   const isAdminOverride = React.useMemo(
-    () => !!user?.roles?.includes("admin"),
-    [user?.roles],
+    () => !!authUser?.roles?.includes("admin"),
+    [authUser?.roles],
   );
-  const userGroups = React.useMemo(() => user?.accessGroups ?? [], [user?.accessGroups]);
-  const userId = user?.id ?? null;
+  const userGroups = React.useMemo(() => authUser?.accessGroups ?? [], [authUser?.accessGroups]);
+  const userId = authUser?.id ?? null;
 
   const resolveRule = React.useCallback(
     (identifier: string) => resolveFeatureRule(identifier, storeRules),
