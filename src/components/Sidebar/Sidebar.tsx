@@ -8,13 +8,7 @@ import {
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
 import { useAuth } from "../../context/AuthContext";
-import {
-  AppRole,
-  FeatureAccessRule,
-  canAccessRoute,
-  getAppRoleFromUserRoles,
-  useFeatureAccessStore,
-} from "../../lib/featureAccessConfig";
+import { useFeatureAccess } from "../../lib/featureAccessConfig";
 import { useTranslation } from "react-i18next";
 
 /* ---------------- Daten ---------------- */
@@ -27,25 +21,26 @@ type Item = {
   icon: React.ReactNode;
   end?: boolean;
   i18nKey?: string;
+  featureId?: string;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 const main: Item[] = [
-  { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true },
-  { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" /> },
-  { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" /> },
-  { to: "/admin",      label: "Admin",     icon: <ShieldCheck className="ico" /> },
-  { to: "/playground", label: "Playground", icon: <Aperture className="ico" /> }, // <- ohne "/"
+  { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
+  { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
+  { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" />, featureId: "main.guildHub" },
+  { to: "/admin",      label: "Admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
+  { to: "/playground", label: "Playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
 ];
 
 
 const categories: Item[] = [
-  { to: "/discover",  label: "Discover",  icon: <Compass className="ico" /> },
-  { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" /> },
-  { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" /> },
-  { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools" },
-  { to: "/community", label: "Community", icon: <MessagesSquare className="ico" /> },
-  { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" /> },
-  { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" /> },
+  { to: "/discover",  label: "Discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
+  { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
+  { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
+  { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools", featureId: "main.tools" },
+  { to: "/community", label: "Community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
+  { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
+  { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
 ];
 
 const SUBTABS: Record<string, SubItem[]> = {
@@ -233,33 +228,23 @@ function Block({
   collapsed,
   allowSubmenus,
   userRoles,
-  appRole,
-  isAdminOverride,
-  storeRules,
   translate,
+  isItemVisible,
 }: {
   title?: string;
   items: Item[];
   collapsed: boolean;
   allowSubmenus: boolean;
   userRoles: string[];
-  appRole: AppRole | null;
-  isAdminOverride: boolean;
-  storeRules: Record<string, FeatureAccessRule>;
   translate: (key: string) => string;
+  isItemVisible: (item: Item) => boolean;
 }) {
   return (
     <>
       {title && <div className={`${styles.navTitle} ${styles.segTitle}`}>{title}</div>}
       <div className={styles.navCol}>
         {items.map((it) => {
-          const isGuardedRoute = it.to === "/admin" || it.to === "/playground";
-          if (
-            isGuardedRoute &&
-            !canAccessRoute({ route: it.to, userRole: appRole, isAdminOverride, storeRules })
-          ) {
-            return null;
-          }
+          if (!isItemVisible(it)) return null;
 
           const subItems = filterSubItems(SUBTABS[it.to], userRoles);
           const label = it.i18nKey ? translate(it.i18nKey) : it.label;
@@ -362,9 +347,7 @@ export default function Sidebar({
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
-  const appRole = getAppRoleFromUserRoles(userRoles);
-  const isAdminOverride = userRoles.includes("admin");
-  const { rulesByRoute } = useFeatureAccessStore();
+  const { isVisibleInSidebar } = useFeatureAccess();
 
   const handleFooterClick = () => {
     if (isAuthed) {
@@ -408,10 +391,8 @@ export default function Sidebar({
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
-              appRole={appRole}
-              isAdminOverride={isAdminOverride}
-              storeRules={rulesByRoute}
               translate={t}
+              isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
             />
           </div>
 
@@ -424,10 +405,8 @@ export default function Sidebar({
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
-              appRole={appRole}
-              isAdminOverride={isAdminOverride}
-              storeRules={rulesByRoute}
               translate={t}
+              isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
             />
           </div>
         </div>
