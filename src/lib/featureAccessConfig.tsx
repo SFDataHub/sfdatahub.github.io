@@ -400,7 +400,7 @@ export function resolveFeatureRule(
 }
 
 export function getAppRoleFromUserRoles(roles?: string[] | null): AppRole | null {
-  if (!roles || roles.length === 0) return "user";
+  if (!roles || roles.length === 0) return "guest";
   if (roles.includes("admin")) return "admin";
   if (roles.includes("dev") || roles.includes("developer")) return "developer";
   if (roles.includes("mod") || roles.includes("moderator")) return "moderator";
