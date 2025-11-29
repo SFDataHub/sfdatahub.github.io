@@ -9,7 +9,16 @@ const FEATURE_COLLECTION = "feature_access";
 const GROUP_COLLECTION = "access_groups";
 
 const FEATURE_STATUSES = new Set(["dev_only", "beta", "logged_in", "public", "hidden"]);
-const ROLES = new Set(["admin", "owner", "mod", "moderator", "creator", "user", "developer"]);
+const ROLES = new Set([
+  "admin",
+  "owner",
+  "mod",
+  "moderator",
+  "creator",
+  "developer",
+  "user",
+  "guest",
+]);
 
 type FeatureDoc = {
   route?: string;
