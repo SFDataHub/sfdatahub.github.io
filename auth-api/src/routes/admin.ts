@@ -3,17 +3,22 @@ import { Router } from "express";
 import type { Query, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 
-import { admin, db } from "../firebase";
+import { db } from "../firebase";
 import { mapAdminAuditToLogEntry } from "../lib/mapAdminAuditToLogEntry";
+import {
+  ADMIN_AUDIT_COLLECTION,
+  ADMIN_AUDIT_CONTEXT_USERS,
+  AdminAuditChangeSet,
+  fetchAdminUserDisplayName,
+  writeAdminAuditLog,
+} from "../lib/adminAuditLog";
 import { requireAdmin, requireModerator } from "../middleware/auth";
 import type { ProviderDocEntry, UserDoc } from "../users";
 
 const USERS_COLLECTION = "users";
-const AUDIT_COLLECTION = "admin_audit_log";
 const DEFAULT_USERS_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const MAX_FETCH_BATCHES = 4;
-const AUDIT_CONTEXT = "control-panel/users";
 const DEFAULT_LOG_LIMIT = 100;
 const MAX_LOG_LIMIT = 500;
 const ROLE_ORDER = ["admin", "mod", "creator", "user"] as const;
@@ -42,14 +47,6 @@ type AdminUserResponse = {
   status: AdminUserStatus;
   notes: string | null;
 };
-
-type AdminAuditChangeSet = Record<
-  string,
-  {
-    before: unknown;
-    after: unknown;
-  }
->;
 
 type AdminAuditEventResponse = {
   id: string;
@@ -398,38 +395,6 @@ const formatAuditSummary = (changes: AdminAuditChangeSet): string => {
   return parts.join(" | ");
 };
 
-const fetchUserDisplayName = async (userId: string): Promise<string | null> => {
-  if (!userId) return null;
-  try {
-    const snapshot = await db.collection(USERS_COLLECTION).doc(userId).get();
-    if (!snapshot.exists) return null;
-    const data = snapshot.data() as AdminUserRecord;
-    return data.profile?.displayName ?? data.displayName ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const logAuditEvent = async (
-  actorUserId: string,
-  actorDisplayName: string | null,
-  targetUserId: string,
-  action: string,
-  summary: string,
-  changes: AdminAuditChangeSet,
-) => {
-  await db.collection(AUDIT_COLLECTION).add({
-    actorUserId,
-    actorDisplayName,
-    targetUserId,
-    action,
-    summary,
-    changes,
-    context: AUDIT_CONTEXT,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-};
-
 adminRouter.patch(
   "/users/:userId/roles",
   requireAdmin,
@@ -465,10 +430,18 @@ adminRouter.patch(
       const changes = computeChangeSet(beforeUser, updatedUser, { roles });
       if (Object.keys(changes).length) {
         const actorUserId = req.sessionUser?.userId ?? "";
-        const actorDisplayName = await fetchUserDisplayName(actorUserId);
+        const actorDisplayName = await fetchAdminUserDisplayName(actorUserId);
         const action = resolveAuditAction(changes);
         const summary = formatAuditSummary(changes);
-        await logAuditEvent(actorUserId, actorDisplayName, updatedUser.userId, action, summary, changes);
+        await writeAdminAuditLog({
+          action,
+          context: ADMIN_AUDIT_CONTEXT_USERS,
+          actorUserId,
+          actorDisplayName,
+          targetUserId: updatedUser.userId,
+          summary,
+          changes,
+        });
       }
 
       return res.json({ user: updatedUser });
@@ -529,10 +502,18 @@ adminRouter.patch(
       const changes = computeChangeSet(beforeUser, updatedUser, payload);
       if (Object.keys(changes).length) {
         const actorUserId = req.sessionUser?.userId ?? "";
-        const actorDisplayName = await fetchUserDisplayName(actorUserId);
+        const actorDisplayName = await fetchAdminUserDisplayName(actorUserId);
         const action = resolveAuditAction(changes);
         const summary = formatAuditSummary(changes);
-        await logAuditEvent(actorUserId, actorDisplayName, updatedUser.userId, action, summary, changes);
+        await writeAdminAuditLog({
+          action,
+          context: ADMIN_AUDIT_CONTEXT_USERS,
+          actorUserId,
+          actorDisplayName,
+          targetUserId: updatedUser.userId,
+          summary,
+          changes,
+        });
       }
 
       return res.json({ user: updatedUser });
@@ -560,13 +541,13 @@ adminRouter.get(
           : undefined;
 
       let queryRef = db
-        .collection(AUDIT_COLLECTION)
+        .collection(ADMIN_AUDIT_COLLECTION)
         .orderBy("createdAt", "desc")
         .limit(normalizedLimit);
 
       if (cursorId) {
         const cursorSnapshot = await db
-          .collection(AUDIT_COLLECTION)
+          .collection(ADMIN_AUDIT_COLLECTION)
           .doc(cursorId)
           .get();
         if (cursorSnapshot.exists) {
@@ -610,7 +591,7 @@ adminRouter.get("/audit-events", async (req: Request, res: Response) => {
         : undefined;
 
     let queryRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection(
-      AUDIT_COLLECTION,
+      ADMIN_AUDIT_COLLECTION,
     );
     if (actorUserId) {
       queryRef = queryRef.where("actorUserId", "==", actorUserId);
@@ -624,7 +605,10 @@ adminRouter.get("/audit-events", async (req: Request, res: Response) => {
     queryRef = queryRef.orderBy("createdAt", "desc");
 
     if (cursorId) {
-      const cursorSnapshot = await db.collection(AUDIT_COLLECTION).doc(cursorId).get();
+      const cursorSnapshot = await db
+        .collection(ADMIN_AUDIT_COLLECTION)
+        .doc(cursorId)
+        .get();
       if (cursorSnapshot.exists) {
         queryRef = queryRef.startAfter(cursorSnapshot);
       }

@@ -3,6 +3,12 @@ import { Router } from "express";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 
 import { admin, db } from "../firebase";
+import {
+  ADMIN_AUDIT_CONTEXT_ACCESS,
+  AdminAuditChangeSet,
+  fetchAdminUserDisplayName,
+  writeAdminAuditLog,
+} from "../lib/adminAuditLog";
 import { requireAdmin, requireModerator } from "../middleware/auth";
 
 const FEATURE_COLLECTION = "feature_access";
@@ -126,6 +132,141 @@ const mapGroupDoc = (snapshot: QueryDocumentSnapshot): Record<string, unknown> =
   };
 };
 
+const asStringField = (value: unknown): string | null =>
+  typeof value === "string" ? value : null;
+
+const asBooleanField = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const asNumberField = (value: unknown): number | null =>
+  typeof value === "number" ? value : null;
+
+const asStringArrayField = (value: unknown): string[] | null => {
+  if (!Array.isArray(value)) return null;
+  return value.map((entry) => (typeof entry === "string" ? entry : String(entry)));
+};
+
+const arraysEqual = (a: string[] | null, b: string[] | null): boolean => {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+};
+
+const computeFeatureChanges = (
+  before: FeatureDoc,
+  after: FeatureDoc,
+): AdminAuditChangeSet => {
+  const changes: AdminAuditChangeSet = {};
+
+  const addChange = <T>(
+    key: string,
+    prev: T,
+    next: T,
+    equals: (a: T, b: T) => boolean = (a, b) => a === b,
+  ) => {
+    if (!equals(prev, next)) {
+      changes[key] = {
+        before: prev,
+        after: next,
+      };
+    }
+  };
+
+  addChange("status", asStringField(before.status), asStringField(after.status));
+  addChange("minRole", asStringField(before.minRole), asStringField(after.minRole));
+  addChange(
+    "allowedRoles",
+    asStringArrayField(before.allowedRoles),
+    asStringArrayField(after.allowedRoles),
+    arraysEqual,
+  );
+  addChange(
+    "allowedGroups",
+    asStringArrayField(before.allowedGroups),
+    asStringArrayField(after.allowedGroups),
+    arraysEqual,
+  );
+  addChange(
+    "allowedUserIds",
+    asStringArrayField(before.allowedUserIds),
+    asStringArrayField(after.allowedUserIds),
+    arraysEqual,
+  );
+  addChange(
+    "showInSidebar",
+    asBooleanField(before.showInSidebar),
+    asBooleanField(after.showInSidebar),
+  );
+  addChange(
+    "showInTopbar",
+    asBooleanField(before.showInTopbar),
+    asBooleanField(after.showInTopbar),
+  );
+  addChange(
+    "navOrder",
+    asNumberField(before.navOrder),
+    asNumberField(after.navOrder),
+  );
+
+  return changes;
+};
+
+const formatSummaryValue = (value: unknown): string => {
+  if (value === null || typeof value === "undefined") {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+};
+
+const summarizeFeatureChanges = (
+  label: string,
+  changes: AdminAuditChangeSet,
+): string => {
+  const parts: string[] = [];
+  const append = (name: string, entry: { before: unknown; after: unknown }) => {
+    parts.push(`${name} ${formatSummaryValue(entry.before)} -> ${formatSummaryValue(entry.after)}`);
+  };
+
+  if (changes.status) {
+    append("status", changes.status);
+  }
+  if (changes.minRole) {
+    append("minRole", changes.minRole);
+  }
+  if (changes.allowedRoles) {
+    append("allowedRoles", changes.allowedRoles);
+  }
+  if (changes.allowedGroups) {
+    append("allowedGroups", changes.allowedGroups);
+  }
+  if (changes.allowedUserIds) {
+    append("allowedUserIds", changes.allowedUserIds);
+  }
+  if (changes.showInSidebar) {
+    append("showInSidebar", changes.showInSidebar);
+  }
+  if (changes.showInTopbar) {
+    append("showInTopbar", changes.showInTopbar);
+  }
+  if (changes.navOrder) {
+    append("navOrder", changes.navOrder);
+  }
+
+  if (!parts.length) {
+    return `feature ${label}: updated`;
+  }
+
+  return `feature ${label}: ${parts.join("; ")}`;
+};
+
 const adminAccessControlRouter = Router();
 
 adminAccessControlRouter.use(requireModerator);
@@ -216,17 +357,42 @@ adminAccessControlRouter.patch("/features/:id", async (req: Request, res: Respon
       return res.status(404).json({ ok: false, error: "not_found" });
     }
 
+    const beforeDoc = snapshot.data() as FeatureDoc;
+
     updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
     await ref.update(updates);
     const updatedSnap = (await ref.get()) as QueryDocumentSnapshot;
+    const updatedDoc = updatedSnap.data() as FeatureDoc;
     console.log("[admin-access] feature updated", {
       actor: req.sessionUser?.userId,
       featureId,
       fields: Object.keys(updates),
     });
 
-    return res.json({ ok: true, feature: mapFeatureDoc(updatedSnap) });
+    const updatedFeature = mapFeatureDoc(updatedSnap);
+    const changes = computeFeatureChanges(beforeDoc, updatedDoc);
+    if (Object.keys(changes).length) {
+      const actorUserId = req.sessionUser?.userId ?? "";
+      const actorDisplayName = await fetchAdminUserDisplayName(actorUserId);
+      const featureLabel = updatedFeature.id ?? featureId;
+      const safeLabel =
+        typeof featureLabel === "string" && featureLabel.trim().length > 0
+          ? featureLabel
+          : "feature";
+      const summary = summarizeFeatureChanges(safeLabel, changes);
+      await writeAdminAuditLog({
+        action: "feature.access.update",
+        context: ADMIN_AUDIT_CONTEXT_ACCESS,
+        actorUserId,
+        actorDisplayName,
+        targetFeatureId: featureId,
+        summary,
+        changes,
+      });
+    }
+
+    return res.json({ ok: true, feature: updatedFeature });
   } catch (error) {
     console.error("[admin-access] Failed to update feature", error);
     return res.status(500).json({ ok: false, error: "internal_error" });
