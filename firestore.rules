@@ -16,14 +16,14 @@ service cloud.firestore {
 
     // Access control configuration (used by Control Panel / Access & Features)
     match /feature_access/{featureId} {
-      // Jeder eingeloggte User darf die Konfiguration lesen; Mutationen laufen ueber auth-api/Service Account.
-      allow get, list: if request.auth != null;
-      allow create, update, delete: if false;
+      // Jeder Client darf die Konfiguration lesen; Mutationen laufen ueber auth-api/Service Account.
+      allow read: if true;
+      allow write: if false;
     }
 
     match /access_groups/{groupId} {
-      allow get, list: if request.auth != null;
-      allow create, update, delete: if false;
+      allow read: if true;
+      allow write: if false;
     }
 
     // ---------- Players ----------

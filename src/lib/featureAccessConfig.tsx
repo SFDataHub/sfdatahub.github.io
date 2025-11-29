@@ -416,6 +416,11 @@ export function canAccessWithRule(
 ): boolean {
   if (isAdminOverride) return true;
 
+  const isAuthenticated = !!userId;
+  if (rule.status === "logged_in" && !isAuthenticated) {
+    return false;
+  }
+
   const effectiveRole = userRole ?? "user";
 
   if (rule.status === "hidden") {
