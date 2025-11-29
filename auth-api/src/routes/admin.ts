@@ -4,6 +4,7 @@ import type { Query, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 
 import { admin, db } from "../firebase";
+import { mapAdminAuditToLogEntry } from "../lib/mapAdminAuditToLogEntry";
 import { requireAdmin, requireModerator } from "../middleware/auth";
 import type { ProviderDocEntry, UserDoc } from "../users";
 
@@ -13,6 +14,8 @@ const DEFAULT_USERS_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const MAX_FETCH_BATCHES = 4;
 const AUDIT_CONTEXT = "control-panel/users";
+const DEFAULT_LOG_LIMIT = 100;
+const MAX_LOG_LIMIT = 500;
 const ROLE_ORDER = ["admin", "mod", "creator", "user"] as const;
 
 type AdminUserRole = (typeof ROLE_ORDER)[number];
@@ -536,6 +539,55 @@ adminRouter.patch(
     } catch (error) {
       console.error("[admin] Failed to update user", error);
       return res.status(500).json({ error: "Failed to update user" });
+    }
+  },
+);
+
+adminRouter.get(
+  "/logs",
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const limitParam = Number.parseInt(String(req.query.limit ?? ""), 10);
+      const normalizedLimit = clamp(
+        Number.isNaN(limitParam) ? DEFAULT_LOG_LIMIT : limitParam,
+        1,
+        MAX_LOG_LIMIT,
+      );
+      const cursorId =
+        typeof req.query.cursor === "string" && req.query.cursor.length
+          ? req.query.cursor
+          : undefined;
+
+      let queryRef = db
+        .collection(AUDIT_COLLECTION)
+        .orderBy("createdAt", "desc")
+        .limit(normalizedLimit);
+
+      if (cursorId) {
+        const cursorSnapshot = await db
+          .collection(AUDIT_COLLECTION)
+          .doc(cursorId)
+          .get();
+        if (cursorSnapshot.exists) {
+          queryRef = queryRef.startAfter(cursorSnapshot);
+        }
+      }
+
+      const snapshot = await queryRef.get();
+      const items = snapshot.docs.map((docSnap) =>
+        mapAdminAuditToLogEntry(docSnap.id, docSnap.data()),
+      );
+
+      const nextCursor =
+        snapshot.size < normalizedLimit
+          ? null
+          : snapshot.docs[snapshot.docs.length - 1]?.id ?? null;
+
+      return res.json({ ok: true, items, nextCursor });
+    } catch (error) {
+      console.error("[admin] Failed to load admin logs", error);
+      return res.status(500).json({ ok: false, error: "failed_to_load_logs" });
     }
   },
 );

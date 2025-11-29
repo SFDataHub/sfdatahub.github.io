@@ -8,7 +8,16 @@ import { requireAdmin, requireModerator } from "../middleware/auth";
 const FEATURE_COLLECTION = "feature_access";
 const GROUP_COLLECTION = "access_groups";
 
-const FEATURE_STATUSES = new Set(["dev_only", "beta", "logged_in", "public", "hidden"]);
+type FeatureStatus = "hidden" | "dev_only" | "beta" | "logged_in" | "public" | "active";
+
+const FEATURE_STATUSES = new Set<FeatureStatus>([
+  "dev_only",
+  "beta",
+  "logged_in",
+  "public",
+  "hidden",
+  "active",
+]);
 const ROLES = new Set([
   "admin",
   "owner",
@@ -72,9 +81,9 @@ const sanitizeRoles = (value: unknown): string[] | null => {
   return normalized.length ? normalized : [];
 };
 
-const sanitizeStatus = (value: unknown): string | null => {
+const sanitizeStatus = (value: unknown): FeatureStatus | null => {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase();
+  const normalized = value.trim().toLowerCase() as FeatureStatus;
   return FEATURE_STATUSES.has(normalized) ? normalized : null;
 };
 
