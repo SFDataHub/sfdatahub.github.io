@@ -1,5 +1,6 @@
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const cfg = {
@@ -16,5 +17,6 @@ if (!cfg.projectId) {
 
 const app = getApps().length ? getApp() : initializeApp(cfg);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 // Hinweis: keine sensiblen Werte loggen

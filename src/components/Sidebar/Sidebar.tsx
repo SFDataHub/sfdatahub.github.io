@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import SubmenuPortal from "./SubmenuPortal";
+import submenuStyles from "./SubmenuPortal.module.css";
 import { useAuth } from "../../context/AuthContext";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,9 @@ type Item = {
 // main
 const main: Item[] = [
   { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
+  { to: "/discover",   label: "Discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
   { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
+  { to: "/settings",   label: "Settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
   { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" />, featureId: "main.guildHub" },
   { to: "/admin",      label: "Admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
   { to: "/playground", label: "Playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
@@ -34,13 +37,11 @@ const main: Item[] = [
 
 
 const categories: Item[] = [
-  { to: "/discover",  label: "Discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
   { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
   { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
   { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools", featureId: "main.tools" },
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
-  { to: "/settings",  label: "Settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
 ];
 
 const SUBTABS: Record<string, SubItem[]> = {
@@ -208,7 +209,10 @@ function CategoryItem({
             <NavLink
               key={s.to}
               to={s.to}
-              className={({ isActive }) => `${"link"} ${isActive ? "linkActive" : ""}`}
+              end
+              className={({ isActive }) =>
+                `${submenuStyles.link} ${isActive ? submenuStyles.linkActive : ""}`
+              }
             >
               {s.label}
             </NavLink>
