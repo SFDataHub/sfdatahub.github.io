@@ -4,11 +4,15 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 import { AUTH_BASE_URL } from "../lib/auth/config";
 import type { AuthStatus, AuthUser } from "../lib/auth/types";
+import { fetchFirebaseToken } from "../lib/auth/client";
+import { auth } from "../lib/firebase";
+import { onAuthStateChanged, signInWithCustomToken, signOut } from "firebase/auth";
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -28,6 +32,7 @@ const LOGOUT_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/logout` : "";
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("idle");
+  const firebaseSyncRef = useRef<{ tried: boolean }>({ tried: false });
 
   const handleSessionResponse = useCallback((payload: any) => {
     if (payload?.authenticated && payload.user) {
@@ -71,6 +76,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchSession();
   }, [fetchSession]);
 
+  useEffect(() => {
+    console.log("[AuthDebug] session user:", user);
+    const firebaseUser = auth.currentUser;
+    console.log("[AuthDebug] firebase currentUser uid:", firebaseUser?.uid);
+    firebaseUser
+      ?.getIdTokenResult()
+      .then((res) => {
+        console.log("[AuthDebug] firebase claims:", res.claims);
+      })
+      .catch((error) => {
+        console.warn("[AuthDebug] failed to fetch token claims", error);
+      });
+  }, [user]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      console.log("[AuthDebug] firebase currentUser uid:", currentUser?.uid);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      firebaseSyncRef.current.tried = false;
+      return;
+    }
+    if (firebaseSyncRef.current.tried) {
+      return;
+    }
+    firebaseSyncRef.current.tried = true;
+
+    (async () => {
+      try {
+        const token = await fetchFirebaseToken();
+        await signInWithCustomToken(auth, token);
+        console.log("[AuthDebug] signed in to Firebase with custom token");
+      } catch (err) {
+        console.error("[AuthDebug] failed to sign in to Firebase", err);
+      }
+    })();
+  }, [user]);
+
   const loginWithProvider = useCallback((provider: "discord" | "google") => {
     if (!AUTH_BASE_URL) {
       console.warn(`[Auth] Cannot initiate ${provider} login without AUTH_BASE_URL.`);
@@ -83,6 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = useCallback(() => loginWithProvider("google"), [loginWithProvider]);
 
   const logout = useCallback(async () => {
+    await signOut(auth).catch(() => undefined);
+
     if (!LOGOUT_ENDPOINT) {
       console.warn("[Auth] AUTH_BASE_URL is not configured. Clearing local session only.");
       setUser(null);

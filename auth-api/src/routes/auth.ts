@@ -11,6 +11,7 @@ import {
   GOOGLE_LINK_REDIRECT_URI,
 } from "../config";
 import { db } from "../firebase";
+import { createFirebaseCustomToken } from "../lib/firebaseAuth";
 import {
   buildClearSessionCookie,
   buildSessionCookie,
@@ -192,6 +193,33 @@ authRouter.get("/session", async (req, res) => {
   } catch (error) {
     console.error("[auth] Failed to fetch session user", error);
     return res.json({ authenticated: false });
+  }
+});
+
+authRouter.get("/firebase-token", async (req, res) => {
+  try {
+    const user = await getSessionUser(req.cookies?.[SESSION_COOKIE_NAME]);
+    if (!user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const firebaseToken = await createFirebaseCustomToken({
+      id: user.userId,
+      roles: user.roles,
+    });
+    if (!isProd) {
+      console.log("[AuthAPI] Issued Firebase token for user", user.userId);
+    }
+
+    return res.json({
+      firebaseToken,
+      tokens: {
+        firebase: firebaseToken,
+      },
+    });
+  } catch (err) {
+    console.error("[AuthAPI] Failed to create Firebase token", err);
+    return res.status(500).json({ error: "Failed to create Firebase token" });
   }
 });
 

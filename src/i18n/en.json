@@ -24,6 +24,45 @@
       "featureSetComparison": "Compare your sets to find the best setups.",
       "featureIntegration": "Link your sets with player profiles, guilds, and other modules.",
       "featureCloudSync": "Sync your sets across devices with your SFDataHub account."
+    },
+    "labels": {
+      "gemSim": "Gem Simulator",
+      "dungeonPause": "Dungeon Pause",
+      "xpDungeon": "XP Dungeon"
+    },
+    "descriptions": {
+      "gemSim": "Placeholder for future gem calculations.",
+      "dungeonPause": "Dummy view for dungeon pause tools.",
+      "xpDungeon": "Slide for XP dungeon planning."
+    },
+    "sets": {
+      "defaultName": "New Set",
+      "exportActive": "Export active set",
+      "import": "Import set",
+      "importErrorInvalid": "This file does not contain a valid tools set.",
+      "importErrorMaxReached": "You already use the maximum of 3 sets. Delete one before importing a new one.",
+      "delete": "Delete set",
+      "deleteConfirmTitle": "Delete this set?",
+      "deleteConfirmText": "This will remove the set from your browser and free up a slot. Export it first if you want a backup.",
+      "deleteLastForbidden": "You need at least one set. Create a new one before deleting this.",
+      "rename": "Rename set",
+      "renameTitle": "Rename set",
+      "renameLabel": "Set name",
+      "renamePlaceholder": "Enter a name for this set",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
+      "renameErrorEmpty": "Please enter a name."
+    },
+    "sync": {
+      "buttonSave": "Save changes to account",
+      "saving": "Saving…",
+      "error": "Could not save your changes. Please try again.",
+      "statusUnsynced": "Unsynced changes",
+      "statusSynced": "All changes synced",
+      "statusNever": "Not synced yet",
+      "lastSyncLabel": "Last sync",
+      "noChanges": "No changes to save",
+      "cooldownLabel": "Next sync in {{time}}"
     }
   },
   "topbar": {

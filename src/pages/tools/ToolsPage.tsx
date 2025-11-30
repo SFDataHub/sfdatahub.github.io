@@ -1,50 +1,232 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import ContentShell from "../../components/ContentShell";
 import { useAuth } from "../../context/AuthContext";
+import { db } from "../../lib/firebase";
 
-type SetSlot = {
-  id: string;
+type ToolId = "gemSim" | "dungeonPause" | "xpDungeon";
+type ToolSetId = string;
+
+interface ToolSet {
+  id: ToolSetId;
   name: string;
   classLabel: string;
   serverLabel: string;
+}
+
+type ToolDef = {
+  id: ToolId;
+  labelKey: string;
+  defaultLabel: string;
+  descriptionKey: string;
+  defaultDescription: string;
 };
 
-type Tool = {
-  id: string;
-  name: string;
-  description: string;
+const MAX_SETS = 3;
+const LOCAL_STORAGE_KEY = "sfdatahub.tools.sets.v1";
+
+interface PersistedToolsState {
+  version: 1;
+  type: "toolSet";
+  sets: ToolSet[];
+  activeSetId: ToolSetId | null;
+  activeToolId: ToolId;
+}
+
+const INITIAL_SETS: ToolSet[] = [
+  {
+    id: "set-main-dh",
+    name: "Main DH",
+    classLabel: "Demon Hunter",
+    serverLabel: "DE-55",
+  },
+  {
+    id: "set-twink-mage",
+    name: "Twink Mage",
+    classLabel: "Mage",
+    serverLabel: "US-12",
+  },
+];
+
+const TOOL_DEFS: ToolDef[] = [
+  {
+    id: "gemSim",
+    labelKey: "tools.labels.gemSim",
+    defaultLabel: "Gem Simulator",
+    descriptionKey: "tools.descriptions.gemSim",
+    defaultDescription: "Placeholder fuer kuenftige Gem-Berechnungen.",
+  },
+  {
+    id: "dungeonPause",
+    labelKey: "tools.labels.dungeonPause",
+    defaultLabel: "Dungeon Pause",
+    descriptionKey: "tools.descriptions.dungeonPause",
+    defaultDescription: "Dummy-Ansicht fuer Dungeon-Pausen-Tools.",
+  },
+  {
+    id: "xpDungeon",
+    labelKey: "tools.labels.xpDungeon",
+    defaultLabel: "XP Dungeon",
+    descriptionKey: "tools.descriptions.xpDungeon",
+    defaultDescription: "Slide fuer XP-Lauf-Planung als Platzhalter.",
+  },
+];
+
+const COOLDOWN_MS = 5 * 60 * 1000;
+
+async function saveToolsStateForUser(
+  userId: string,
+  payload: {
+    sets: ToolSet[];
+    activeSetId: ToolSetId | null;
+    activeToolId: ToolId;
+  },
+): Promise<void> {
+  const docRef = doc(collection(db, "user_tools_state"), userId);
+  console.log("[ToolsSync] userId param:", userId, "doc path:", docRef.path);
+  const data = {
+    version: 1,
+    updatedAt: serverTimestamp(),
+    sets: payload.sets,
+    activeSetId: payload.activeSetId,
+    activeToolId: payload.activeToolId,
+  };
+  await setDoc(docRef, data, { merge: false });
+}
+
+const readPersistedState = (): PersistedToolsState | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.version !== 1 || parsed.type !== "toolSet") {
+      return null;
+    }
+    if (!Array.isArray(parsed.sets)) return null;
+    return parsed as PersistedToolsState;
+  } catch (error) {
+    console.warn("Failed to parse persisted tools state", error);
+    return null;
+  }
 };
-
-const INITIAL_SETS: SetSlot[] = [
-  { id: "main-dh", name: "Main DH", classLabel: "Demon Hunter", serverLabel: "DE-55" },
-  { id: "twink-mage", name: "Twink Mage", classLabel: "Mage", serverLabel: "US-12" },
-];
-
-const TOOLS: Tool[] = [
-  { id: "gem-sim", name: "Gem Simulator", description: "Placeholder fuer kuenftige Gem-Berechnungen." },
-  { id: "dungeon-pause", name: "Dungeon Pause", description: "Dummy-Ansicht fuer Dungeon-Pausen-Tools." },
-  { id: "xp-dungeon", name: "XP Dungeon", description: "Slide fuer XP-Lauf-Planung als Platzhalter." },
-];
 
 export default function ToolsPage() {
   const { t } = useTranslation();
   const { user, status, loginWithDiscord } = useAuth();
   const isLoggedIn = status === "authenticated" && !!user;
 
-  const [sets, setSets] = useState<SetSlot[]>(INITIAL_SETS);
-  const [activeSetId, setActiveSetId] = useState<string>(INITIAL_SETS[0]?.id ?? "");
-  const [activeToolId, setActiveToolId] = useState<string>(TOOLS[0]?.id ?? "");
+  const persistedState = useMemo(() => readPersistedState(), []);
+  const initialSets = useMemo(() => {
+    if (persistedState?.sets?.length) {
+      return persistedState.sets.slice(0, MAX_SETS);
+    }
+    return INITIAL_SETS;
+  }, [persistedState]);
+  const initialActiveSetId = useMemo(() => {
+    const storedId = persistedState?.activeSetId;
+    if (storedId && initialSets.some((set) => set.id === storedId)) {
+      return storedId;
+    }
+    return initialSets[0]?.id ?? INITIAL_SETS[0]?.id ?? "set-main-dh";
+  }, [persistedState, initialSets]);
+  const initialToolId = useMemo(() => {
+    const storedToolId = persistedState?.activeToolId;
+    if (storedToolId && TOOL_DEFS.some((def) => def.id === storedToolId)) {
+      return storedToolId;
+    }
+    return TOOL_DEFS[0]?.id ?? "gemSim";
+  }, [persistedState]);
+
+  const [sets, setSets] = useState<ToolSet[]>(initialSets);
+  const [activeSetId, setActiveSetId] = useState<ToolSetId>(initialActiveSetId);
+  const [activeToolId, setActiveToolId] = useState<ToolId>(initialToolId);
+  const [renameTargetId, setRenameTargetId] = useState<ToolSetId | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownRemainingSec, setCooldownRemainingSec] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const syncInitialRenderRef = useRef(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const payload: PersistedToolsState = {
+        version: 1,
+        type: "toolSet",
+        sets,
+        activeSetId: activeSetId ?? null,
+        activeToolId,
+      };
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn("Failed to persist tools state", error);
+    }
+  }, [sets, activeSetId, activeToolId]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setHasUnsyncedChanges(false);
+      syncInitialRenderRef.current = true;
+      return;
+    }
+
+    if (syncInitialRenderRef.current) {
+      syncInitialRenderRef.current = false;
+      return;
+    }
+
+    setHasUnsyncedChanges(true);
+  }, [isLoggedIn, sets, activeSetId, activeToolId]);
+
+  useEffect(() => {
+    if (cooldownUntil === null) {
+      setCooldownRemainingSec(0);
+      return;
+    }
+
+    const updateRemaining = () => {
+      const remainingMs = cooldownUntil - Date.now();
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      setCooldownRemainingSec(remainingSec);
+      if (remainingSec <= 0) {
+        setCooldownUntil(null);
+      }
+    };
+
+    updateRemaining();
+    const interval = setInterval(() => {
+      const remainingMs = cooldownUntil - Date.now();
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      setCooldownRemainingSec(remainingSec);
+      if (remainingSec <= 0) {
+        setCooldownUntil(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [cooldownUntil]);
 
   const activeSet = useMemo(() => sets.find((s) => s.id === activeSetId) ?? sets[0], [activeSetId, sets]);
-  const activeTool = useMemo(() => TOOLS.find((t) => t.id === activeToolId) ?? TOOLS[0], [activeToolId]);
+  const activeToolDef = useMemo(() => TOOL_DEFS.find((t) => t.id === activeToolId) ?? TOOL_DEFS[0], [activeToolId]);
+
+  const currentCount = sets.length;
+  const isAddDisabled = currentCount >= MAX_SETS;
 
   const handleAddSet = () => {
-    if (sets.length >= 3) return;
-    const nextIndex = sets.length + 1;
-    const newSet: SetSlot = {
-      id: `custom-${nextIndex}`,
-      name: `New Set ${nextIndex}`,
+    if (isAddDisabled) return;
+    const nextIndex = currentCount + 1;
+    const defaultSetName = t("tools.sets.defaultName", "New Set");
+    const newSet: ToolSet = {
+      id: `set-${Date.now()}`,
+      name: `${defaultSetName} ${nextIndex}`,
       classLabel: "Class TBD",
       serverLabel: "Server TBD",
     };
@@ -54,6 +236,194 @@ export default function ToolsPage() {
 
   const handleLoginClick = () => {
     loginWithDiscord();
+  };
+
+  const handleExportActiveSet = () => {
+    if (!activeSet) {
+      console.warn("No active set to export.");
+      return;
+    }
+    const payload = {
+      version: 1,
+      type: "toolSet",
+      set: activeSet,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const fileNameSafe = activeSet.name.toLowerCase().replace(/\s+/g, "-");
+    anchor.href = url;
+    anchor.download = `sfdatahub-set-${fileNameSafe}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleDeleteSet = (setId: ToolSetId) => {
+    if (sets.length <= 1) {
+      alert(t("tools.sets.deleteLastForbidden"));
+      return;
+    }
+    const confirmTitle = t("tools.sets.deleteConfirmTitle");
+    const confirmText = t("tools.sets.deleteConfirmText");
+    if (!window.confirm(`${confirmTitle}\n\n${confirmText}`)) {
+      return;
+    }
+    const remaining = sets.filter((set) => set.id !== setId);
+    const nextActiveId =
+      setId === activeSetId ? remaining[0]?.id ?? null : activeSetId;
+    setSets(remaining);
+    if (nextActiveId) {
+      setActiveSetId(nextActiveId);
+    }
+  };
+
+  const handleStartRename = (setId: ToolSetId) => {
+    const target = sets.find((set) => set.id === setId);
+    if (!target) return;
+    setRenameTargetId(setId);
+    setRenameValue(target.name);
+    setRenameError("");
+  };
+
+  const handleCancelRename = () => {
+    setRenameTargetId(null);
+    setRenameValue("");
+    setRenameError("");
+  };
+
+  const handleConfirmRename = () => {
+    if (!renameTargetId) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameError(t("tools.sets.renameErrorEmpty"));
+      return;
+    }
+    setSets((prev) =>
+      prev.map((set) =>
+        set.id === renameTargetId ? { ...set, name: trimmed } : set
+      )
+    );
+    setRenameTargetId(null);
+    setRenameValue("");
+    setRenameError("");
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+      if (sets.length >= MAX_SETS) {
+        alert(t("tools.sets.importErrorMaxReached"));
+        return;
+      }
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (
+        parsed?.version !== 1 ||
+        parsed?.type !== "toolSet" ||
+        typeof parsed?.set !== "object"
+      ) {
+        throw new Error("invalid payload");
+      }
+      const { set: imported } = parsed as {
+        version: number;
+        type: "toolSet";
+        set: Partial<ToolSet>;
+      };
+      if (
+        typeof imported?.name !== "string" ||
+        typeof imported?.classLabel !== "string" ||
+        typeof imported?.serverLabel !== "string"
+      ) {
+        throw new Error("invalid set");
+      }
+      const newSet: ToolSet = {
+        ...imported,
+        id: `imported-${Date.now()}`,
+        name: imported.name,
+        classLabel: imported.classLabel,
+        serverLabel: imported.serverLabel,
+      };
+      setSets((prev) => [...prev, newSet]);
+      setActiveSetId(newSet.id);
+    } catch (error) {
+      console.error("Failed to import set", error);
+      alert(t("tools.sets.importErrorInvalid"));
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const setCounterLabel = `${currentCount}/${MAX_SETS}`;
+  const activeToolLabel = t(activeToolDef.labelKey, activeToolDef.defaultLabel);
+  const activeToolDescription = t(activeToolDef.descriptionKey, activeToolDef.defaultDescription);
+
+  const now = Date.now();
+  const isInCooldown = cooldownUntil !== null && cooldownUntil > now;
+  const isSyncDisabled = !isLoggedIn || isInCooldown || !hasUnsyncedChanges || isSyncing;
+  const cooldownMinutes = Math.floor(cooldownRemainingSec / 60);
+  const cooldownSeconds = cooldownRemainingSec % 60;
+  const formattedCooldownTime = `${String(cooldownMinutes).padStart(2, "0")}:${String(cooldownSeconds).padStart(2, "0")}`;
+  const syncButtonLabel = isSyncing
+    ? t("tools.sync.saving")
+    : isInCooldown
+      ? t("tools.sync.cooldownLabel", { time: formattedCooldownTime })
+      : t("tools.sync.buttonSave");
+
+  let syncStatusText = t("tools.sync.statusNever");
+  let syncStatusDetail: string | null = null;
+
+  if (hasUnsyncedChanges) {
+    syncStatusText = t("tools.sync.statusUnsynced");
+  } else if (lastSyncedAt) {
+    syncStatusText = t("tools.sync.statusSynced");
+    syncStatusDetail = `${t("tools.sync.lastSyncLabel")}: ${lastSyncedAt.toLocaleTimeString()}`;
+  } else {
+    syncStatusDetail = t("tools.sync.noChanges");
+  }
+
+  const syncButtonClassName = [
+    "rounded-xl border px-4 py-2 text-sm font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-emerald-400/70",
+    isSyncDisabled
+      ? "cursor-not-allowed border-slate-700/70 bg-slate-800/70 text-slate-500"
+      : "border-emerald-400/60 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300 hover:bg-emerald-500/20",
+  ].join(" ");
+
+  const handleSyncToAccount = async () => {
+    if (!isLoggedIn) return;
+    const userId = user?.id;
+    if (!userId) return;
+    if (isSyncing) return;
+    const cooldownActive = cooldownUntil !== null && cooldownUntil > Date.now();
+    if (cooldownActive) return;
+    if (!hasUnsyncedChanges) return;
+
+    setIsSyncing(true);
+    setSyncError(null);
+
+    try {
+      await saveToolsStateForUser(userId, {
+        sets,
+        activeSetId,
+        activeToolId,
+      });
+
+      const syncNow = Date.now();
+      const until = syncNow + COOLDOWN_MS;
+      setHasUnsyncedChanges(false);
+      setLastSyncedAt(new Date(syncNow));
+      setCooldownUntil(until);
+      setCooldownRemainingSec(Math.ceil(COOLDOWN_MS / 1000));
+    } catch (error) {
+      console.error("Failed to sync tools state", error);
+      setSyncError(t("tools.sync.error"));
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -66,39 +436,65 @@ export default function ToolsPage() {
               <h2 className="text-base font-semibold text-slate-50">Sets</h2>
               <p className="text-sm text-slate-400">Waehle dein aktives Char-Set (max. 3 Slots)</p>
             </div>
-            <span className="text-xs text-slate-400">{sets.length}/3</span>
+            <span className="text-xs text-slate-400">{setCounterLabel}</span>
           </div>
 
           <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
             {sets.map((set) => {
               const isActive = set.id === activeSetId;
               return (
-                <button
-                  key={set.id}
-                  type="button"
-                  onClick={() => setActiveSetId(set.id)}
-                  className={[
-                    "flex min-w-[180px] flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-emerald-400/70",
-                    isActive
-                      ? "border-emerald-400/80 bg-emerald-500/10 shadow-[0_10px_40px_-20px_rgba(16,185,129,0.6)]"
-                      : "border-slate-700/70 bg-slate-800/60 hover:border-emerald-400/60 hover:bg-slate-800/80",
-                  ].join(" ")}
-                >
-                  <div className="text-sm font-semibold text-slate-50">{set.name}</div>
-                  <div className="text-xs text-emerald-200/90">{set.classLabel}</div>
-                  <div className="text-xs text-slate-400">{set.serverLabel}</div>
-                  {isActive && <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Aktiv</div>}
-                </button>
+                <div key={set.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSetId(set.id)}
+                    className={[
+                      "flex min-w-[180px] flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-emerald-400/70",
+                      isActive
+                        ? "border-emerald-400/80 bg-emerald-500/10 shadow-[0_10px_40px_-20px_rgba(16,185,129,0.6)]"
+                        : "border-slate-700/70 bg-slate-800/60 hover:border-emerald-400/60 hover:bg-slate-800/80",
+                    ].join(" ")}
+                  >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-50">{set.name}</span>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleStartRename(set.id);
+                      }}
+                      aria-label={t("tools.sets.rename")}
+                      className="rounded-full border border-transparent p-1 text-slate-300 transition hover:border-slate-500 hover:text-white"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
+                    <div className="text-xs text-emerald-200/90">{set.classLabel}</div>
+                    <div className="text-xs text-slate-400">{set.serverLabel}</div>
+                    {isActive && <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Aktiv</div>}
+                  </button>
+                  {sets.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDeleteSet(set.id);
+                      }}
+                      className="absolute right-2 top-2 rounded-full border border-slate-600/60 bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:text-white"
+                    >
+                      {t("tools.sets.delete")}
+                    </button>
+                  )}
+                </div>
               );
             })}
 
             <button
               type="button"
               onClick={handleAddSet}
-              disabled={sets.length >= 3}
+              disabled={isAddDisabled}
               className={[
                 "flex h-full min-w-[140px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm font-semibold transition",
-                sets.length >= 3
+                isAddDisabled
                   ? "cursor-not-allowed border-slate-700/70 bg-slate-800/40 text-slate-500"
                   : "border-emerald-400/60 bg-emerald-500/5 text-emerald-200 hover:border-emerald-400 hover:bg-emerald-500/10",
               ].join(" ")}
@@ -107,6 +503,29 @@ export default function ToolsPage() {
               <span>{sets.length >= 3 ? "Max erreicht" : "Neues Set"}</span>
             </button>
           </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={handleExportActiveSet}
+              className="rounded-xl border border-slate-600/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-400/80 hover:bg-slate-800/60"
+            >
+              {t("tools.sets.exportActive")}
+            </button>
+            <button
+              type="button"
+              onClick={handleImportClick}
+              className="rounded-xl border border-emerald-400/50 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-200 transition hover:border-emerald-300 hover:bg-emerald-500/20"
+            >
+              {t("tools.sets.import")}
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </section>
 
         {/* Tool-Leiste */}
@@ -119,8 +538,9 @@ export default function ToolsPage() {
           </div>
 
           <div className="flex items-center gap-3 overflow-x-auto pb-1">
-            {TOOLS.map((tool) => {
+            {TOOL_DEFS.map((tool) => {
               const isActive = tool.id === activeToolId;
+              const toolLabel = t(tool.labelKey, tool.defaultLabel);
               return (
                 <button
                   key={tool.id}
@@ -134,7 +554,7 @@ export default function ToolsPage() {
                   ].join(" ")}
                 >
                   <span className="text-base" aria-hidden>*</span>
-                  <span>{tool.name}</span>
+                  <span>{toolLabel}</span>
                 </button>
               );
             })}
@@ -144,29 +564,54 @@ export default function ToolsPage() {
         {/* Gast vs Account Info-Bereich */}
         <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 md:p-5">
           {isLoggedIn ? (
-            <div className="grid gap-4 md:grid-cols-[1.2fr_1fr] md:items-center">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
-                  {t("tools.banner.accountComingSoon")}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-50">
-                  {t("tools.banner.accountTitle")}
-                </h3>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[t("tools.banner.featureSetComparison"), t("tools.banner.featureIntegration"), t("tools.banner.featureCloudSync")].map((copy) => (
-                  <div
-                    key={copy}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3 text-sm text-emerald-50 shadow-[0_12px_45px_-30px_rgba(16,185,129,0.8)]"
-                  >
-                    <div className="text-xs uppercase tracking-wide text-emerald-200/90">
-                      {t("tools.banner.accountComingSoon")}
+            <>
+              <div className="grid gap-4 md:grid-cols-[1.2fr_1fr] md:items-center">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
+                    {t("tools.banner.accountComingSoon")}
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-slate-50">
+                    {t("tools.banner.accountTitle")}
+                  </h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[t("tools.banner.featureSetComparison"), t("tools.banner.featureIntegration"), t("tools.banner.featureCloudSync")].map((copy) => (
+                    <div
+                      key={copy}
+                      className="rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3 text-sm text-emerald-50 shadow-[0_12px_45px_-30px_rgba(16,185,129,0.8)]"
+                    >
+                      <div className="text-xs uppercase tracking-wide text-emerald-200/90">
+                        {t("tools.banner.accountComingSoon")}
+                      </div>
+                      <div className="mt-1 leading-snug text-emerald-50/90">{copy}</div>
                     </div>
-                    <div className="mt-1 leading-snug text-emerald-50/90">{copy}</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="mt-4 rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <button
+                    type="button"
+                    disabled={isSyncDisabled}
+                    onClick={handleSyncToAccount}
+                    className={syncButtonClassName}
+                  >
+                    {syncButtonLabel}
+                  </button>
+                  <div className="text-left">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                      {syncStatusText}
+                    </p>
+                    {syncStatusDetail && (
+                      <p className="text-sm text-slate-200">{syncStatusDetail}</p>
+                    )}
+                    {syncError && (
+                      <p className="text-sm text-rose-400">{syncError}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
@@ -203,11 +648,11 @@ export default function ToolsPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Aktives Tool</p>
-              <h3 className="text-xl font-semibold text-slate-50">{activeTool?.name}</h3>
+              <h3 className="text-xl font-semibold text-slate-50">{activeToolLabel}</h3>
               <p className="text-sm text-slate-400">Aktives Set: {activeSet?.name || "kein Set"}</p>
             </div>
             <div className="flex gap-2">
-              {TOOLS.map((tool) => (
+              {TOOL_DEFS.map((tool) => (
                 <div
                   key={tool.id}
                   className={[
@@ -222,10 +667,10 @@ export default function ToolsPage() {
 
           <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
             <div className="rounded-2xl border border-slate-700/70 bg-slate-800/60 p-4">
-              <div className="text-sm text-slate-300">{activeTool?.description}</div>
+              <div className="text-sm text-slate-300">{activeToolDescription}</div>
               <div className="mt-4 rounded-xl border border-dashed border-slate-700/70 bg-slate-900/60 p-4 text-center text-sm text-slate-400">
                 Placeholder fuer kuenftige Tool-Komponente<br />
-                (z. B. {activeTool?.name})
+                (z. B. {activeToolLabel})
               </div>
             </div>
 
@@ -243,6 +688,43 @@ export default function ToolsPage() {
             </div>
           </div>
         </section>
+        {renameTargetId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={handleCancelRename} />
+            <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-900/95 p-6 shadow-2xl">
+              <h3 className="text-lg font-semibold text-slate-50">{t("tools.sets.renameTitle")}</h3>
+              <label className="mt-4 block text-xs uppercase tracking-[0.3em] text-slate-400">
+                {t("tools.sets.renameLabel")}
+              </label>
+              <input
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value)}
+                autoFocus
+                className="mt-2 w-full rounded-xl border border-slate-700/70 bg-slate-900/60 px-4 py-2 text-sm text-slate-50 outline-none transition focus:border-emerald-400"
+                placeholder={t("tools.sets.renamePlaceholder")}
+              />
+              {renameError && (
+                <p className="mt-2 text-xs text-rose-400">{renameError}</p>
+              )}
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancelRename}
+                  className="rounded-xl border border-slate-600/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/60"
+                >
+                  {t("tools.sets.renameCancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRename}
+                  className="rounded-xl border border-emerald-400/60 bg-emerald-500 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-50 transition hover:border-emerald-300 hover:bg-emerald-500/80"
+                >
+                  {t("tools.sets.renameSave")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ContentShell>
   );

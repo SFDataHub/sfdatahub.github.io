@@ -24,6 +24,45 @@
       "featureSetComparison": "Vergleiche deine Sets, um die besten Setups zu finden.",
       "featureIntegration": "Verknuepfe deine Sets mit Spielerprofilen, Gilden und weiteren Modulen.",
       "featureCloudSync": "Nutze deine Sets auf mehreren Geraeten mit deinem SFDataHub-Account."
+    },
+    "labels": {
+      "gemSim": "Gem Simulator",
+      "dungeonPause": "Dungeon Pause",
+      "xpDungeon": "XP Dungeon"
+    },
+    "descriptions": {
+      "gemSim": "Platzhalter fuer kuenftige Gem-Berechnungen.",
+      "dungeonPause": "Dummy-Ansicht fuer Dungeon-Pausen-Tools.",
+      "xpDungeon": "Slide fuer XP-Run-Planung."
+    },
+    "sets": {
+      "defaultName": "Neues Set",
+      "exportActive": "Aktives Set exportieren",
+      "import": "Set importieren",
+      "importErrorInvalid": "Diese Datei enthält kein gültiges Tools-Set.",
+      "importErrorMaxReached": "Du nutzt bereits das Maximum von 3 Sets. Lösche zuerst ein Set, bevor du ein neues importierst.",
+      "delete": "Set l?schen",
+      "deleteConfirmTitle": "Dieses Set l?schen?",
+      "deleteConfirmText": "Damit wird das Set in diesem Browser entfernt und ein Slot freigegeben. Exportiere es zuerst, wenn du ein Backup behalten m?chtest.",
+      "deleteLastForbidden": "Du ben?tigst mindestens ein Set. Erstelle zuerst ein neues, bevor du dieses l?schst.",
+      "rename": "Set umbenennen",
+      "renameTitle": "Set umbenennen",
+      "renameLabel": "Set-Name",
+      "renamePlaceholder": "Name f?r dieses Set eingeben",
+      "renameSave": "Speichern",
+      "renameCancel": "Abbrechen",
+      "renameErrorEmpty": "Bitte einen Namen eingeben."
+    },
+    "sync": {
+      "buttonSave": "Änderungen im Account speichern",
+      "saving": "Speichere …",
+      "error": "Deine Änderungen konnten nicht gespeichert werden. Bitte versuche es erneut.",
+      "statusUnsynced": "Nicht gespeicherte Änderungen",
+      "statusSynced": "Alle Änderungen synchronisiert",
+      "statusNever": "Noch nie synchronisiert",
+      "lastSyncLabel": "Letzte Synchronisierung",
+      "noChanges": "Keine Änderungen zum Speichern",
+      "cooldownLabel": "Nächster Sync in {{time}}"
     }
   },
   "topbar": {
