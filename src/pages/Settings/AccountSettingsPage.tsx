@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
 import { useAuth } from "../../context/AuthContext";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
+import { getUserSettings, updateUserSettings, type UserSettings } from "../../lib/user/settings";
+import { getUserToolsSettings, saveUserToolsSettings, type UserToolsSettings } from "../../lib/user/toolsSettings";
 import styles from "./AccountSettingsPage.module.css";
 
 const PLACEHOLDER_AVATAR = "https://i.pravatar.cc/72";
@@ -11,6 +14,7 @@ const PROFILE_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/account/profile`
 const GOOGLE_LINK_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/google/link/start` : "";
 const MIN_NAME_LENGTH = 3;
 const MAX_NAME_LENGTH = 32;
+type TabKey = "overview" | "settings" | "tools";
 
 const formatTimestamp = (value?: string): string | undefined => {
   if (!value) return undefined;
@@ -22,6 +26,20 @@ const AccountSettingsPage: React.FC = () => {
   const { status, user, logout, refreshSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, i18n } = useTranslation();
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [loadedSettings, setLoadedSettings] = useState<UserSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [toolsSettings, setToolsSettings] = useState<UserToolsSettings | null>(null);
+  const [initialToolsSettings, setInitialToolsSettings] = useState<UserToolsSettings | null>(null);
+  const [isLoadingTools, setIsLoadingTools] = useState(true);
+  const [isSavingTools, setIsSavingTools] = useState(false);
+  const [toolsSaveError, setToolsSaveError] = useState<string | null>(null);
+  const [toolsSaveSuccess, setToolsSaveSuccess] = useState(false);
 
   const linkFeedback = useMemo<{ type: "success" | "error"; message: string } | null>(() => {
     const params = new URLSearchParams(location.search);
@@ -39,6 +57,92 @@ const AccountSettingsPage: React.FC = () => {
 
   const isLoading = status === "loading" || status === "idle";
   const isAuthed = status === "authenticated" && !!user;
+  const uid = user?.id;
+
+  const defaultSettings: UserSettings = useMemo(
+    () => ({
+      language: i18n.language === "de" ? "de" : "en",
+      defaultSection: "home",
+      compactTables: false,
+      showExperimentalFeatures: false,
+    }),
+    [i18n.language],
+  );
+
+  useEffect(() => {
+    if (!uid) {
+      setSettings(null);
+      setLoadedSettings(null);
+      setSettingsError(null);
+      setSettingsLoading(false);
+      setToolsSettings(null);
+      setInitialToolsSettings(null);
+      setIsLoadingTools(false);
+      setIsSavingTools(false);
+      setToolsSaveError(null);
+      setToolsSaveSuccess(false);
+      return;
+    }
+
+    let isMounted = true;
+    const load = async () => {
+      setSettingsLoading(true);
+      setSettingsError(null);
+      setSaveSuccess(false);
+      try {
+        const remote = await getUserSettings(uid);
+        const merged = remote ? { ...defaultSettings, ...remote } : defaultSettings;
+        if (!isMounted) return;
+        setSettings(merged);
+        setLoadedSettings(merged);
+      } catch (error) {
+        if (!isMounted) return;
+        setSettingsError(t("account.settings.error", "Could not load settings."));
+      } finally {
+        if (isMounted) {
+          setSettingsLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [uid, defaultSettings, t]);
+
+  useEffect(() => {
+    if (!uid) return;
+    let isMounted = true;
+    const defaults: UserToolsSettings = {
+      defaultSetId: null,
+      showToolsIntro: true,
+      enableExperimentalTools: false,
+    };
+    const loadTools = async () => {
+      setIsLoadingTools(true);
+      setToolsSaveError(null);
+      setToolsSaveSuccess(false);
+      try {
+        const remote = await getUserToolsSettings(uid);
+        if (!isMounted) return;
+        const merged = remote ? { ...defaults, ...remote } : defaults;
+        setToolsSettings(merged);
+        setInitialToolsSettings(merged);
+      } catch (error) {
+        if (!isMounted) return;
+        setToolsSaveError(t("account.tools.loadError", "Could not load tools settings."));
+      } finally {
+        if (isMounted) {
+          setIsLoadingTools(false);
+        }
+      }
+    };
+    loadTools();
+    return () => {
+      isMounted = false;
+    };
+  }, [uid, t]);
 
   const handleGoToSignIn = () => {
     navigate("/login");
@@ -178,18 +282,306 @@ const AccountSettingsPage: React.FC = () => {
     </section>
   );
 
+  const handleSettingsChange = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+    if (!settings) return;
+    setSettings((prev) => ({ ...(prev ?? defaultSettings), [key]: value }));
+    setSaveSuccess(false);
+  };
+
+  const settingsDirty = Boolean(
+    settings &&
+    loadedSettings &&
+    JSON.stringify(settings) !== JSON.stringify(loadedSettings),
+  );
+
+  const toolsDirty = Boolean(
+    toolsSettings &&
+    initialToolsSettings &&
+    JSON.stringify(toolsSettings) !== JSON.stringify(initialToolsSettings),
+  );
+
+  const handleSettingsSave = async () => {
+    if (!uid || !settings || savingSettings || !settingsDirty) return;
+    try {
+      setSavingSettings(true);
+      setSettingsError(null);
+      await updateUserSettings(uid, settings);
+      setLoadedSettings(settings);
+      setSaveSuccess(true);
+    } catch (error) {
+      setSettingsError(t("account.settings.saveError", "Could not save settings. Please try again."));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleToolsSettingsChange = <K extends keyof UserToolsSettings>(key: K, value: UserToolsSettings[K]) => {
+    if (!toolsSettings) return;
+    setToolsSettings((prev) => ({ ...(prev ?? {}), [key]: value }));
+    setToolsSaveSuccess(false);
+  };
+
+  const handleToolsSave = async () => {
+    if (!uid || !toolsSettings || isSavingTools || !toolsDirty) return;
+    try {
+      setIsSavingTools(true);
+      setToolsSaveError(null);
+      await saveUserToolsSettings(uid, toolsSettings);
+      setInitialToolsSettings(toolsSettings);
+      setToolsSaveSuccess(true);
+    } catch (error) {
+      setToolsSaveError(t("account.tools.save.error", "Could not save settings. Please try again."));
+    } finally {
+      setIsSavingTools(false);
+    }
+  };
+
+  const renderSettingsTab = () => (
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>{t("account.settings.title", "Settings")}</h2>
+      <p className={styles.cardSubtitle}>{t("account.settings.subtitle", "Configure your personal preferences.")}</p>
+
+      {settingsLoading && (
+        <p className={styles.helperText}>{t("account.settings.loading", "Loading settings...")}</p>
+      )}
+
+      {settingsError && (
+        <div className={styles.feedbackError}>
+          <p>{settingsError}</p>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => {
+              if (uid) {
+                setSettingsError(null);
+                setSaveSuccess(false);
+                setSettingsLoading(true);
+                getUserSettings(uid)
+                  .then((remote) => {
+                    const merged = remote ? { ...defaultSettings, ...remote } : defaultSettings;
+                    setSettings(merged);
+                    setLoadedSettings(merged);
+                  })
+                  .catch(() => {
+                    setSettingsError(t("account.settings.error", "Could not load settings."));
+                  })
+                  .finally(() => setSettingsLoading(false));
+              }
+            }}
+          >
+            {t("account.settings.retry", "Retry")}
+          </button>
+        </div>
+      )}
+
+      {settings && !settingsLoading && (
+        <div className={styles.settingsForm}>
+          <div className={styles.formRow}>
+            <label className={styles.nameLabel} htmlFor="settings-language">
+              {t("account.settings.language.label", "Preferred language")}
+            </label>
+            <select
+              id="settings-language"
+              className={styles.selectInput}
+              value={settings.language ?? defaultSettings.language}
+              onChange={(event) => handleSettingsChange("language", event.target.value as UserSettings["language"])}
+            >
+              <option value="en">{t("topbar.lang_en", "English")}</option>
+              <option value="de">{t("topbar.lang_de", "Deutsch")}</option>
+            </select>
+          </div>
+
+          <div className={styles.formRow}>
+            <label className={styles.nameLabel} htmlFor="settings-section">
+              {t("account.settings.defaultSection.label", "Default section")}
+            </label>
+            <select
+              id="settings-section"
+              className={styles.selectInput}
+              value={settings.defaultSection ?? defaultSettings.defaultSection}
+              onChange={(event) =>
+                handleSettingsChange("defaultSection", event.target.value as UserSettings["defaultSection"])
+              }
+            >
+              <option value="home">{t("nav.home", "Home")}</option>
+              <option value="toplists">{t("nav.toplists", "Top Lists")}</option>
+              <option value="guilds">{t("nav.guilds", "Guilds")}</option>
+              <option value="tools">{t("nav.tools", "Tools")}</option>
+              <option value="community">{t("nav.community", "Community")}</option>
+            </select>
+          </div>
+
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              checked={Boolean(settings.compactTables)}
+              onChange={(event) => handleSettingsChange("compactTables", event.target.checked)}
+            />
+            <span>{t("account.settings.compactTables.label", "Use compact table layout")}</span>
+          </label>
+
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              checked={Boolean(settings.showExperimentalFeatures)}
+              onChange={(event) => handleSettingsChange("showExperimentalFeatures", event.target.checked)}
+            />
+            <span>{t("account.settings.experimental.label", "Enable experimental features")}</span>
+          </label>
+        </div>
+      )}
+
+      <div className={styles.settingsFooter}>
+        <div className={styles.inlineStatus}>
+          {saveSuccess ? (
+            <span className={styles.feedbackSuccess}>{t("account.settings.saved", "Settings saved.")}</span>
+          ) : !settingsDirty ? (
+            <span className={styles.helperText}>{t("account.settings.noChanges", "No changes to save.")}</span>
+          ) : null}
+          {savingSettings && (
+            <span className={styles.helperText}>{t("account.settings.saving", "Saving...")}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className={styles.primaryButton}
+          disabled={!settingsDirty || savingSettings || !settings}
+          onClick={handleSettingsSave}
+        >
+          {t("account.settings.save", "Save settings")}
+        </button>
+      </div>
+    </section>
+  );
+
+  const renderTabs = () => {
+    const tabs: { key: TabKey; label: string }[] = [
+      { key: "overview", label: "Overview" },
+      { key: "settings", label: "Settings" },
+      { key: "tools", label: "Tools" },
+    ];
+
+    return (
+      <div className={styles.tabs} role="tablist" aria-label="Account sections">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+              role="tab"
+              aria-selected={isActive}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderTabContent = () => {
+    if (!user) return null;
+
+    switch (activeTab) {
+      case "overview":
+        return (
+          <>
+            <IdentityCard
+              user={user}
+              refreshSession={refreshSession}
+            />
+            {renderServicesCard()}
+            {renderSecurityCard()}
+          </>
+        );
+      case "settings":
+        return renderSettingsTab();
+      case "tools":
+        return (
+          <section className={styles.card}>
+            <h2 className={styles.cardTitle}>{t("account.tools.title", "Tools settings")}</h2>
+            <p className={styles.cardSubtitle}>
+              {t("account.tools.subtitle", "Configure how tools behave for your account.")}
+            </p>
+            {isLoadingTools && (
+              <p className={styles.helperText}>{t("account.tools.loading", "Loading tools settings...")}</p>
+            )}
+            {toolsSaveError && (
+              <p className={styles.feedbackError}>{toolsSaveError}</p>
+            )}
+            {toolsSettings && !isLoadingTools && (
+              <>
+                <div className={styles.settingsForm}>
+                  <div className={styles.formRow}>
+                    <label className={styles.nameLabel} htmlFor="tools-default-set">
+                      {t("account.tools.defaultSet.label", "Default set ID")}
+                    </label>
+                    <input
+                      id="tools-default-set"
+                      type="text"
+                      className={styles.nameInput}
+                      value={toolsSettings.defaultSetId ?? ""}
+                      onChange={(event) => handleToolsSettingsChange("defaultSetId", event.target.value)}
+                      placeholder={t("account.tools.defaultSet.placeholder", "Enter a default set ID")}
+                    />
+                  </div>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(toolsSettings.showToolsIntro)}
+                      onChange={(event) => handleToolsSettingsChange("showToolsIntro", event.target.checked)}
+                    />
+                    <span>{t("account.tools.showIntro.label", "Show tools intro")}</span>
+                  </label>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(toolsSettings.enableExperimentalTools)}
+                      onChange={(event) => handleToolsSettingsChange("enableExperimentalTools", event.target.checked)}
+                    />
+                    <span>{t("account.tools.experimental.label", "Enable experimental tools")}</span>
+                  </label>
+                </div>
+                <div className={styles.settingsFooter}>
+                  <div className={styles.inlineStatus}>
+                    {toolsSaveSuccess ? (
+                      <span className={styles.feedbackSuccess}>{t("account.tools.save.success", "Settings saved.")}</span>
+                    ) : !toolsDirty ? (
+                      <span className={styles.helperText}>{t("account.tools.save.noChanges", "No changes to save.")}</span>
+                    ) : null}
+                    {isSavingTools && (
+                      <span className={styles.helperText}>{t("account.tools.save.saving", "Saving...")}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.primaryButton}
+                    disabled={isLoadingTools || isSavingTools || !toolsDirty || !toolsSettings}
+                    onClick={handleToolsSave}
+                  >
+                    {t("account.tools.save.cta", "Save settings")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
+
   const renderContent = () => {
     if (isLoading) return renderLoading();
     if (!isAuthed) return renderUnauthed();
 
     return (
       <>
-        <IdentityCard
-          user={user}
-          refreshSession={refreshSession}
-        />
-        {renderServicesCard()}
-        {renderSecurityCard()}
+        {renderTabs()}
+        {renderTabContent()}
       </>
     );
   };

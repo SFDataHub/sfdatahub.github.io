@@ -25,6 +25,8 @@ import SFMagazineIndex from "./pages/SFMagazine";
 // SF Magazin
 import HistoryBookPage from "./pages/SFMagazine/HistoryBook";
 
+import HelpPage from "./pages/Help/HelpPage";
+
 
 // Toplists
 import ToplistsIndex from "./pages/Toplists/index";
@@ -230,6 +232,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* SF Magazine */}
                 <Route path="/sfmagazine" element={<SFMagazineIndex />} />
                 <Route path="/sfmagazine/historybook" element={<HistoryBookPage />} />
+
+                {/* Help (public) */}
+                <Route path="/help" element={<HelpPage />} />
 
                 {/* Players */}
                 <Route path="/players" element={<PlayersIndex />} />

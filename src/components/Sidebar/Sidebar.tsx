@@ -427,6 +427,9 @@ export default function Sidebar({
             {user.displayName}
           </div>
         ) : null}
+        <NavLink to="/help" className={styles.footerLink}>
+          {t("nav.help", { defaultValue: "Help" })}
+        </NavLink>
         <div className={styles.legal}>
           (c) 2025 SFDataHub - Alle Marken- und Bildrechte bei den jeweiligen Inhabern.
         </div>
