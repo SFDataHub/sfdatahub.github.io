@@ -156,6 +156,20 @@
   color:var(--text-soft);
   text-align:center;
 }
+.footerLink{
+  display:block;
+  margin-top:8px;
+  text-align:center;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:var(--tile);
+  color:var(--text);
+  text-decoration:none;
+}
+.footerLink:hover{
+  background:var(--tile-hover);
+}
 .legal{ margin-top:8px; font-size:10px; line-height:1.25; color:var(--text-soft); }
 
 /* ====== Sicherheitsnetze ====== */

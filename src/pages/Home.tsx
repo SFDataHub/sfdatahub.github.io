@@ -110,7 +110,7 @@ const TILE_ROUTES: Tile[] = [
   { to: "/community/", label: "Community" },
   { to: "/magazine/historybook/", label: "Historybook" },
   { to: "/creator-hub/", label: "Creator Hub" },
-  { to: "/help/", label: "Help" },
+  { to: "/help", label: "Help" },
   { to: "/settings/", label: "Settings" },
 ];
 

@@ -4,24 +4,47 @@ import styles from "./styles.module.css";
 import { calcNormalGem, calcBlackGem, calcLegendaryGem } from "../../../lib/calculators/gem/math";
 
 // Manifest-Helper exakt aus deinem Manifest verwenden (feste Keys).
-// WICHTIG: Pfad gemäß deiner Angabe: src/data/guidehub/assets.ts
+// WICHTIG: Pfad gem���Y deiner Angabe: src/data/guidehub/assets.ts
 import { guideAssetUrlByKey } from "../../../data/guidehub/assets";
 
 const MAXS = { char: 1000, mine: 100, hok: 1000 };
 
-const GemCalculator: React.FC = () => {
-  const [charLevel, setCharLevel] = useState<number | "">("");
-  const [mineLevel, setMineLevel] = useState<number | "">("");
-  const [guildHoK, setGuildHoK] = useState<number | "">("");
+export interface GemSimState {
+  charLevel: number;
+  mineLevel: number;
+  guildHoKLevel: number;
+}
+
+export interface GemCalculatorProps {
+  initialState?: GemSimState;
+  onStateChange?: (state: GemSimState) => void;
+}
+
+const GemCalculator: React.FC<GemCalculatorProps> = ({ initialState, onStateChange }) => {
+  const [charLevel, setCharLevel] = useState<number | "">(initialState?.charLevel ?? "");
+  const [mineLevel, setMineLevel] = useState<number | "">(initialState?.mineLevel ?? "");
+  const [guildHoKLevel, setGuildHoKLevel] = useState<number | "">(initialState?.guildHoKLevel ?? "");
+
+  const emitStateChange = (nextChar: number | "", nextMine: number | "", nextHoK: number | "") => {
+    if (!onStateChange) return;
+    if (typeof nextChar !== "number" || typeof nextMine !== "number" || typeof nextHoK !== "number") {
+      return;
+    }
+    onStateChange({
+      charLevel: nextChar,
+      mineLevel: nextMine,
+      guildHoKLevel: nextHoK,
+    });
+  };
 
   const normal = useMemo(() => {
-    if (charLevel === "" || mineLevel === "" || guildHoK === "") return null;
+    if (charLevel === "" || mineLevel === "" || guildHoKLevel === "") return null;
     return calcNormalGem({
       charLevel: Number(charLevel),
       mineLevel: Number(mineLevel),
-      guildHoK: Number(guildHoK),
+      guildHoK: Number(guildHoKLevel),
     });
-  }, [charLevel, mineLevel, guildHoK]);
+  }, [charLevel, mineLevel, guildHoKLevel]);
 
   const black = useMemo(() => (normal == null ? null : calcBlackGem(normal)), [normal]);
   const legendary = useMemo(() => (normal == null ? null : calcLegendaryGem(normal)), [normal]);
@@ -48,9 +71,14 @@ const GemCalculator: React.FC = () => {
               value={charLevel}
               onChange={(e) => {
                 const v = e.currentTarget.value;
-                if (v === "") return setCharLevel("");
+                if (v === "") {
+                  setCharLevel("");
+                  return;
+                }
                 const num = Number(v);
-                setCharLevel(Number.isFinite(num) ? num : "");
+                const nextValue = Number.isFinite(num) ? num : "";
+                setCharLevel(nextValue);
+                emitStateChange(nextValue, mineLevel, guildHoKLevel);
               }}
               max={MAXS.char}
             />
@@ -66,9 +94,14 @@ const GemCalculator: React.FC = () => {
               value={mineLevel}
               onChange={(e) => {
                 const v = e.currentTarget.value;
-                if (v === "") return setMineLevel("");
+                if (v === "") {
+                  setMineLevel("");
+                  return;
+                }
                 const num = Number(v);
-                setMineLevel(Number.isFinite(num) ? num : "");
+                const nextValue = Number.isFinite(num) ? num : "";
+                setMineLevel(nextValue);
+                emitStateChange(charLevel, nextValue, guildHoKLevel);
               }}
               max={MAXS.mine}
             />
@@ -81,12 +114,17 @@ const GemCalculator: React.FC = () => {
               inputMode="numeric"
               className={styles.input}
               placeholder="e.g., 840"
-              value={guildHoK}
+              value={guildHoKLevel}
               onChange={(e) => {
                 const v = e.currentTarget.value;
-                if (v === "") return setGuildHoK("");
+                if (v === "") {
+                  setGuildHoKLevel("");
+                  return;
+                }
                 const num = Number(v);
-                setGuildHoK(Number.isFinite(num) ? num : "");
+                const nextValue = Number.isFinite(num) ? num : "";
+                setGuildHoKLevel(nextValue);
+                emitStateChange(charLevel, mineLevel, nextValue);
               }}
               max={MAXS.hok}
             />
@@ -103,7 +141,7 @@ const GemCalculator: React.FC = () => {
               <div className={`${styles.gemFallback} ${styles.normalGem}`} />
             )}
             <div className={styles.gemLabel}>Normal</div>
-            <div className={styles.gemValue}>{normal ?? "—"}</div>
+            <div className={styles.gemValue}>{normal ?? "-"}</div>
           </div>
 
           {/* Black */}
@@ -114,7 +152,7 @@ const GemCalculator: React.FC = () => {
               <div className={`${styles.gemFallback} ${styles.blackGem}`} />
             )}
             <div className={styles.gemLabel}>Black</div>
-            <div className={styles.gemValue}>{black ?? "—"}</div>
+            <div className={styles.gemValue}>{black ?? "-"}</div>
           </div>
 
           {/* Legendary */}
@@ -125,7 +163,7 @@ const GemCalculator: React.FC = () => {
               <div className={`${styles.gemFallback} ${styles.legendaryGem}`} />
             )}
             <div className={styles.gemLabel}>Legendary</div>
-            <div className={styles.gemValue}>{legendary ?? "—"}</div>
+            <div className={styles.gemValue}>{legendary ?? "-"}</div>
           </div>
         </div>
 

@@ -1,9 +1,20 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import styles from "./DungeonPauseOpenXPCalculator.module.css";
 import { dungeonPauseOpenXPData } from "../../../lib/calculators/dungeonPauseOpenXP";
 import { DungeonRow, SpecialRow, buildOptions, sumXp } from "../../../lib/calculators/dungeonPauseOpenXP/types";
 
 type RangeMap = Record<string, { from: number; to: number }>;
+interface DungeonPauseOpenXPState {
+  light: RangeMap;
+  shadow: RangeMap;
+  special: RangeMap;
+}
+
+interface DungeonPauseOpenXPCalculatorProps {
+  initialState?: DungeonPauseOpenXPState;
+  onStateChange?: (state: DungeonPauseOpenXPState) => void;
+}
+
 const numberFmt = (n: number) => n.toLocaleString("en-US");
 
 function useInitialRanges() {
@@ -118,11 +129,63 @@ function Panel({
   );
 }
 
-export default function DungeonPauseOpenXPCalculator() {
-  const initial = useInitialRanges();
-  const [lightRanges, setLightRanges] = useState<RangeMap>(initial.light);
-  const [shadowRanges, setShadowRanges] = useState<RangeMap>(initial.shadow);
-  const [specialRanges, setSpecialRanges] = useState<RangeMap>(initial.special);
+export default function DungeonPauseOpenXPCalculator({
+  initialState,
+  onStateChange,
+}: DungeonPauseOpenXPCalculatorProps) {
+  const initial = useMemo(() => useInitialRanges(), []);
+  const [lightRanges, setLightRanges] = useState<RangeMap>(initialState?.light ?? initial.light);
+  const [shadowRanges, setShadowRanges] = useState<RangeMap>(initialState?.shadow ?? initial.shadow);
+  const [specialRanges, setSpecialRanges] = useState<RangeMap>(initialState?.special ?? initial.special);
+
+  const emitState = (
+    nextLight: RangeMap,
+    nextShadow: RangeMap,
+    nextSpecial: RangeMap
+  ) => {
+    if (!onStateChange) return;
+    onStateChange({
+      light: nextLight,
+      shadow: nextShadow,
+      special: nextSpecial,
+    });
+  };
+
+  const handleLightChange = (key: string, val: { from: number; to: number }) => {
+    setLightRanges((prev) => {
+      const next = { ...prev, [key]: val };
+      emitState(next, shadowRanges, specialRanges);
+      return next;
+    });
+  };
+
+  const handleShadowChange = (key: string, val: { from: number; to: number }) => {
+    setShadowRanges((prev) => {
+      const next = { ...prev, [key]: val };
+      emitState(lightRanges, next, specialRanges);
+      return next;
+    });
+  };
+
+  const handleSpecialChange = (key: string, val: { from: number; to: number }) => {
+    setSpecialRanges((prev) => {
+      const next = { ...prev, [key]: val };
+      emitState(lightRanges, shadowRanges, next);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (initialState) {
+      setLightRanges(initialState.light ?? initial.light);
+      setShadowRanges(initialState.shadow ?? initial.shadow);
+      setSpecialRanges(initialState.special ?? initial.special);
+      return;
+    }
+    setLightRanges(initial.light);
+    setShadowRanges(initial.shadow);
+    setSpecialRanges(initial.special);
+  }, [initialState, initial]);
 
   const lightTotal = useMemo(
     () => dungeonPauseOpenXPData.light.reduce((acc, r) => {
@@ -155,6 +218,7 @@ export default function DungeonPauseOpenXPCalculator() {
     setLightRanges(r.light);
     setShadowRanges(r.shadow);
     setSpecialRanges(r.special);
+    emitState(r.light, r.shadow, r.special);
   };
 
   return (
@@ -163,14 +227,14 @@ export default function DungeonPauseOpenXPCalculator() {
         title="Light World"
         rows={dungeonPauseOpenXPData.light}
         ranges={lightRanges}
-        setRanges={(key, val) => setLightRanges((s) => ({ ...s, [key]: val }))}
+        setRanges={handleLightChange}
       />
 
       <Panel
         title="Shadow World"
         rows={dungeonPauseOpenXPData.shadow}
         ranges={shadowRanges}
-        setRanges={(key, val) => setShadowRanges((s) => ({ ...s, [key]: val }))}
+        setRanges={handleShadowChange}
       />
 
       <div className={styles.panel}>
@@ -194,7 +258,7 @@ export default function DungeonPauseOpenXPCalculator() {
                 key={r.key}
                 row={r}
                 range={specialRanges[r.key] ?? { from: 0, to: 0 }}
-                onChange={(next) => setSpecialRanges((s) => ({ ...s, [r.key]: next }))}
+                onChange={(next) => handleSpecialChange(r.key, next)}
               />
             ))}
           </tbody>

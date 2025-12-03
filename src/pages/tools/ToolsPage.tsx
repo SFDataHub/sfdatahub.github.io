@@ -1,19 +1,43 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
 import ContentShell from "../../components/ContentShell";
+import { GemCalculator } from "../../components/calculators/Gem";
+import DungeonPauseOpenXPCalculator from "../../components/calculators/DungeonPauseOpenXPCalculator";
+import type { GemSimState } from "../../components/calculators/Gem";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../lib/firebase";
+import ToolsSyncBar from "./ToolsSyncBar";
 
-type ToolId = "gemSim" | "dungeonPause" | "xpDungeon";
+type ToolId = "gemSim" | "dungeonPauseOpenXP" | "xpDungeon";
 type ToolSetId = string;
+
+type GemSimToolState = GemSimState & { updatedAt?: Timestamp };
+
+interface DungeonPauseRange {
+  from: number;
+  to: number;
+}
+
+interface DungeonPauseToolState {
+  light: Record<string, DungeonPauseRange>;
+  shadow: Record<string, DungeonPauseRange>;
+  special: Record<string, DungeonPauseRange>;
+  updatedAt?: Timestamp;
+}
+
+type ToolStateMap = {
+  gemSim?: GemSimToolState;
+  dungeonPauseOpenXP?: DungeonPauseToolState;
+};
 
 interface ToolSet {
   id: ToolSetId;
   name: string;
   classLabel: string;
   serverLabel: string;
+  tools?: ToolStateMap;
 }
 
 type ToolDef = {
@@ -59,7 +83,7 @@ const TOOL_DEFS: ToolDef[] = [
     defaultDescription: "Placeholder fuer kuenftige Gem-Berechnungen.",
   },
   {
-    id: "dungeonPause",
+    id: "dungeonPauseOpenXP",
     labelKey: "tools.labels.dungeonPause",
     defaultLabel: "Dungeon Pause",
     descriptionKey: "tools.descriptions.dungeonPause",
@@ -149,7 +173,6 @@ export default function ToolsPage() {
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [cooldownRemainingSec, setCooldownRemainingSec] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -186,36 +209,10 @@ export default function ToolsPage() {
     setHasUnsyncedChanges(true);
   }, [isLoggedIn, sets, activeSetId, activeToolId]);
 
-  useEffect(() => {
-    if (cooldownUntil === null) {
-      setCooldownRemainingSec(0);
-      return;
-    }
-
-    const updateRemaining = () => {
-      const remainingMs = cooldownUntil - Date.now();
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-      setCooldownRemainingSec(remainingSec);
-      if (remainingSec <= 0) {
-        setCooldownUntil(null);
-      }
-    };
-
-    updateRemaining();
-    const interval = setInterval(() => {
-      const remainingMs = cooldownUntil - Date.now();
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-      setCooldownRemainingSec(remainingSec);
-      if (remainingSec <= 0) {
-        setCooldownUntil(null);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [cooldownUntil]);
-
   const activeSet = useMemo(() => sets.find((s) => s.id === activeSetId) ?? sets[0], [activeSetId, sets]);
   const activeToolDef = useMemo(() => TOOL_DEFS.find((t) => t.id === activeToolId) ?? TOOL_DEFS[0], [activeToolId]);
+  const activeGemSimState = activeSet?.tools?.gemSim;
+  const activeDungeonPauseState = activeSet?.tools?.dungeonPauseOpenXP;
 
   const currentCount = sets.length;
   const isAddDisabled = currentCount >= MAX_SETS;
@@ -358,40 +355,39 @@ export default function ToolsPage() {
     }
   };
 
+  const handleGemSimStateChange = (nextState: GemSimState) => {
+    if (!activeSetId) return;
+    setSets((prev) =>
+      prev.map((set) => {
+        if (set.id !== activeSetId) return set;
+        const nextTools: ToolStateMap = {
+          ...(set.tools ?? {}),
+          gemSim: nextState,
+        };
+        return { ...set, tools: nextTools };
+      })
+    );
+    setHasUnsyncedChanges(true);
+  };
+
+  const handleDungeonPauseStateChange = (nextState: DungeonPauseToolState) => {
+    if (!activeSetId) return;
+    setSets((prev) =>
+      prev.map((set) => {
+        if (set.id !== activeSetId) return set;
+        const nextTools: ToolStateMap = {
+          ...(set.tools ?? {}),
+          dungeonPauseOpenXP: nextState,
+        };
+        return { ...set, tools: nextTools };
+      })
+    );
+    setHasUnsyncedChanges(true);
+  };
+
   const setCounterLabel = `${currentCount}/${MAX_SETS}`;
   const activeToolLabel = t(activeToolDef.labelKey, activeToolDef.defaultLabel);
   const activeToolDescription = t(activeToolDef.descriptionKey, activeToolDef.defaultDescription);
-
-  const now = Date.now();
-  const isInCooldown = cooldownUntil !== null && cooldownUntil > now;
-  const isSyncDisabled = !isLoggedIn || isInCooldown || !hasUnsyncedChanges || isSyncing;
-  const cooldownMinutes = Math.floor(cooldownRemainingSec / 60);
-  const cooldownSeconds = cooldownRemainingSec % 60;
-  const formattedCooldownTime = `${String(cooldownMinutes).padStart(2, "0")}:${String(cooldownSeconds).padStart(2, "0")}`;
-  const syncButtonLabel = isSyncing
-    ? t("tools.sync.saving")
-    : isInCooldown
-      ? t("tools.sync.cooldownLabel", { time: formattedCooldownTime })
-      : t("tools.sync.buttonSave");
-
-  let syncStatusText = t("tools.sync.statusNever");
-  let syncStatusDetail: string | null = null;
-
-  if (hasUnsyncedChanges) {
-    syncStatusText = t("tools.sync.statusUnsynced");
-  } else if (lastSyncedAt) {
-    syncStatusText = t("tools.sync.statusSynced");
-    syncStatusDetail = `${t("tools.sync.lastSyncLabel")}: ${lastSyncedAt.toLocaleTimeString()}`;
-  } else {
-    syncStatusDetail = t("tools.sync.noChanges");
-  }
-
-  const syncButtonClassName = [
-    "rounded-xl border px-4 py-2 text-sm font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-emerald-400/70",
-    isSyncDisabled
-      ? "cursor-not-allowed border-slate-700/70 bg-slate-800/70 text-slate-500"
-      : "border-emerald-400/60 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300 hover:bg-emerald-500/20",
-  ].join(" ");
 
   const handleSyncToAccount = async () => {
     if (!isLoggedIn) return;
@@ -417,7 +413,6 @@ export default function ToolsPage() {
       setHasUnsyncedChanges(false);
       setLastSyncedAt(new Date(syncNow));
       setCooldownUntil(until);
-      setCooldownRemainingSec(Math.ceil(COOLDOWN_MS / 1000));
     } catch (error) {
       console.error("Failed to sync tools state", error);
       setSyncError(t("tools.sync.error"));
@@ -454,20 +449,28 @@ export default function ToolsPage() {
                         : "border-slate-700/70 bg-slate-800/60 hover:border-emerald-400/60 hover:bg-slate-800/80",
                     ].join(" ")}
                   >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-50">{set.name}</span>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleStartRename(set.id);
-                      }}
-                      aria-label={t("tools.sets.rename")}
-                      className="rounded-full border border-transparent p-1 text-slate-300 transition hover:border-slate-500 hover:text-white"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                  </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-50">{set.name}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleStartRename(set.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleStartRename(set.id);
+                          }
+                        }}
+                        aria-label={t("tools.sets.rename")}
+                        className="rounded-full border border-transparent p-1 text-slate-300 transition hover:border-slate-500 hover:text-white"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </span>
+                    </div>
                     <div className="text-xs text-emerald-200/90">{set.classLabel}</div>
                     <div className="text-xs text-slate-400">{set.serverLabel}</div>
                     {isActive && <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Aktiv</div>}
@@ -479,7 +482,7 @@ export default function ToolsPage() {
                         event.stopPropagation();
                         handleDeleteSet(set.id);
                       }}
-                      className="absolute right-2 top-2 rounded-full border border-slate-600/60 bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:text-white"
+                      className="absolute bottom-2 right-2 rounded-full border border-slate-600/60 bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:text-white"
                     >
                       {t("tools.sets.delete")}
                     </button>
@@ -588,29 +591,15 @@ export default function ToolsPage() {
                   ))}
                 </div>
               </div>
-              <div className="mt-4 rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                  <button
-                    type="button"
-                    disabled={isSyncDisabled}
-                    onClick={handleSyncToAccount}
-                    className={syncButtonClassName}
-                  >
-                    {syncButtonLabel}
-                  </button>
-                  <div className="text-left">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                      {syncStatusText}
-                    </p>
-                    {syncStatusDetail && (
-                      <p className="text-sm text-slate-200">{syncStatusDetail}</p>
-                    )}
-                    {syncError && (
-                      <p className="text-sm text-rose-400">{syncError}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <ToolsSyncBar
+                isLoggedIn={isLoggedIn}
+                hasUnsyncedChanges={hasUnsyncedChanges}
+                lastSyncedAt={lastSyncedAt}
+                cooldownUntil={cooldownUntil}
+                onSyncClick={handleSyncToAccount}
+                isSaving={isSyncing}
+                syncError={syncError}
+              />
             </>
           ) : (
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -668,9 +657,24 @@ export default function ToolsPage() {
           <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
             <div className="rounded-2xl border border-slate-700/70 bg-slate-800/60 p-4">
               <div className="text-sm text-slate-300">{activeToolDescription}</div>
-              <div className="mt-4 rounded-xl border border-dashed border-slate-700/70 bg-slate-900/60 p-4 text-center text-sm text-slate-400">
-                Placeholder fuer kuenftige Tool-Komponente<br />
-                (z. B. {activeToolLabel})
+              <div className="mt-4">
+                {activeToolId === "gemSim" ? (
+                  <GemCalculator
+                    initialState={activeGemSimState}
+                    onStateChange={handleGemSimStateChange}
+                  />
+                ) : activeToolId === "dungeonPauseOpenXP" ? (
+                  <DungeonPauseOpenXPCalculator
+                    key={activeSetId}
+                    initialState={activeDungeonPauseState}
+                    onStateChange={handleDungeonPauseStateChange}
+                  />
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-900/60 p-4 text-center text-sm text-slate-400">
+                    Placeholder fuer kuenftige Tool-Komponente<br />
+                    (z. B. {activeToolLabel})
+                  </div>
+                )}
               </div>
             </div>
 
@@ -681,7 +685,7 @@ export default function ToolsPage() {
                 <div className="text-sm text-emerald-200/90">{activeSet?.classLabel}</div>
                 <div className="text-xs text-slate-400">{activeSet?.serverLabel}</div>
               </div>
-              <div className="rounded-xl border border-dashed border-emerald-400/40 bg-emerald-500/5 p-3 text-xs text-emerald-100">
+              <div className="rounded-2xl border border-dashed border-emerald-400/40 bg-emerald-500/5 p-3 text-xs text-emerald-100">
                 Lokaler State only - keine Firestore-Anbindung.<br />
                 Slides wechseln, wenn du oben ein Tool auswaehlst.
               </div>

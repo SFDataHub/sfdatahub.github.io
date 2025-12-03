@@ -12,7 +12,58 @@
     "imprint": "Imprint",
     "privacy": "Privacy",
     "license": "License",
-    "tools": "Tools"
+    "help": "Help",
+    "tools": "Tools",
+    "community": "Community"
+  },
+  "account": {
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Configure your personal preferences.",
+      "loading": "Loading settings...",
+      "error": "Could not load settings.",
+      "retry": "Retry",
+      "language": {
+        "label": "Preferred language"
+      },
+      "defaultSection": {
+        "label": "Default section"
+      },
+      "compactTables": {
+        "label": "Use compact table layout"
+      },
+      "experimental": {
+        "label": "Enable experimental features"
+      },
+      "save": "Save settings",
+      "saved": "Settings saved.",
+      "noChanges": "No changes to save.",
+      "saving": "Saving...",
+      "saveError": "Could not save settings. Please try again."
+    },
+    "tools": {
+      "title": "Tools settings",
+      "subtitle": "Configure how tools behave for your account.",
+      "loading": "Loading tools settings...",
+      "loadError": "Could not load tools settings.",
+      "defaultSet": {
+        "label": "Default set ID",
+        "placeholder": "Enter a default set ID"
+      },
+      "showIntro": {
+        "label": "Show tools intro"
+      },
+      "experimental": {
+        "label": "Enable experimental tools"
+      },
+      "save": {
+        "cta": "Save settings",
+        "saving": "Saving...",
+        "success": "Settings saved.",
+        "noChanges": "No changes to save.",
+        "error": "Could not save settings. Please try again."
+      }
+    }
   },
   "tools": {
     "banner": {
@@ -146,6 +197,57 @@
       "roles": {
         "guildleader": "Guild Leader",
         "tryhard": "Tryhard"
+      }
+    }
+  },
+  "help": {
+    "title": "Help & Overview",
+    "subtitle": "Quick guide to SFDataHub",
+    "hero": {
+      "eyebrow": "Start guide",
+      "heading": "Welcome to SFDataHub",
+      "lead": "Learn what you can do, how data freshness works, and where to find settings or legal info.",
+      "freshnessLabel": "Data freshness",
+      "freshnessBody": "Data is refreshed regularly. You will see the exact scan time directly inside top lists and profiles."
+    },
+    "sections": {
+      "intro": {
+        "title": "What is SFDataHub?",
+        "body1": "SFDataHub is a community project around Shakes & Fidget.",
+        "body2": "You can analyse scan data, browse top lists, and open detailed player and guild profiles. The goal: a quick overview of progress, rankings, and development – without any official connection to Playa Games."
+      },
+      "actions": {
+        "title": "What can I do on SFDataHub?",
+        "items": {
+          "toplists": "Browse top lists: compare players and guilds by level or other metrics.",
+          "profiles": "Open profiles: view detailed player and guild profiles with extra information.",
+          "guides": "Read guides: use guides and tips to plan your progress.",
+          "tools": "Use tools & calculators: run interactive tools such as a dungeon XP calculator."
+        }
+      },
+      "freshness": {
+        "title": "How up to date is the data?",
+        "body1": "SFDataHub is based on scans uploaded or linked by the community.",
+        "body2": "Next to many values you’ll find the time of the last scan (for example “Last scan: 2025-12-01”).",
+        "body3": "Top lists and profiles are updated regularly. If an entry hasn’t been scanned for a while, the displayed values might differ from the current state in the game."
+      },
+      "login": {
+        "title": "Login & Settings",
+        "body1": "You can log in with your Discord account to unlock additional features.",
+        "body2": "After logging in you’ll see your profile menu with avatar and name in the header.",
+        "body3": "In the settings you can adjust basic options for your SFDataHub account.",
+        "body4": "Settings are only relevant for logged-in users – without an account there’s nothing to configure."
+      },
+      "legal": {
+        "title": "Help, feedback & legal information",
+        "body1": "If you notice bugs, strange data, or have ideas for new features, we’re happy to hear from you.",
+        "body2": "You can find contact options and more information on the contact or imprint page.",
+        "body3": "For legal details please use the linked pages:",
+        "items": {
+          "tos": "Terms of Service (ToS)",
+          "privacy": "Privacy Policy",
+          "imprint": "Imprint / Contact"
+        }
       }
     }
   }

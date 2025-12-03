@@ -12,7 +12,58 @@
     "imprint": "Impressum",
     "privacy": "Datenschutz",
     "license": "Lizenzen",
-    "tools": "Tools"
+    "help": "Hilfe",
+    "tools": "Tools",
+    "community": "Community"
+  },
+  "account": {
+    "settings": {
+      "title": "Einstellungen",
+      "subtitle": "Passe deine persoenlichen Praeferenzen an.",
+      "loading": "Einstellungen werden geladen...",
+      "error": "Einstellungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "language": {
+        "label": "Bevorzugte Sprache"
+      },
+      "defaultSection": {
+        "label": "Standardbereich"
+      },
+      "compactTables": {
+        "label": "Kompaktes Tabellen-Layout nutzen"
+      },
+      "experimental": {
+        "label": "Experimentelle Features aktivieren"
+      },
+      "save": "Einstellungen speichern",
+      "saved": "Einstellungen gespeichert.",
+      "noChanges": "Keine Aenderungen zum Speichern.",
+      "saving": "Speichern...",
+      "saveError": "Einstellungen konnten nicht gespeichert werden. Bitte erneut versuchen."
+    },
+    "tools": {
+      "title": "Tool-Einstellungen",
+      "subtitle": "Konfiguriere, wie die Tools f\u00fcr deinen Account arbeiten.",
+      "loading": "Tool-Einstellungen werden geladen...",
+      "loadError": "Tool-Einstellungen konnten nicht geladen werden.",
+      "defaultSet": {
+        "label": "Standard-Set-ID",
+        "placeholder": "Standard-Set-ID eingeben"
+      },
+      "showIntro": {
+        "label": "Tools-Intro anzeigen"
+      },
+      "experimental": {
+        "label": "Experimentelle Tools aktivieren"
+      },
+      "save": {
+        "cta": "Einstellungen speichern",
+        "saving": "Speichern...",
+        "success": "Einstellungen gespeichert.",
+        "noChanges": "Keine Aenderungen zum Speichern.",
+        "error": "Einstellungen konnten nicht gespeichert werden. Bitte erneut versuchen."
+      }
+    }
   },
   "tools": {
     "banner": {
@@ -146,6 +197,57 @@
       "roles": {
         "guildleader": "Gildenleiter",
         "tryhard": "Tryhard"
+      }
+    }
+  },
+  "help": {
+    "title": "Hilfe & Übersicht",
+    "subtitle": "Kurzer Einstieg in den SFDataHub",
+    "hero": {
+      "eyebrow": "Start-Guide",
+      "heading": "Willkommen im SFDataHub",
+      "lead": "Erfahre, was du tun kannst, wie aktuell die Daten sind und wo du Einstellungen oder rechtliche Infos findest.",
+      "freshnessLabel": "Datenaktualität",
+      "freshnessBody": "Daten werden regelmäßig aktualisiert. Den genauen Scan-Zeitpunkt siehst du direkt in Toplisten und Profilen."
+    },
+    "sections": {
+      "intro": {
+        "title": "Was ist SFDataHub?",
+        "body1": "SFDataHub ist ein Community-Projekt rund um Shakes & Fidget.",
+        "body2": "Du kannst hier Spielerdaten aus Scans auswerten, Toplisten ansehen und detaillierte Spieler- und Gildenprofile öffnen. Ziel ist ein schneller Überblick über Fortschritt, Rankings und Entwicklungen – ohne offizielle Verbindung zu Playa Games."
+      },
+      "actions": {
+        "title": "Was kann ich auf SFDataHub tun?",
+        "items": {
+          "toplists": "Toplisten ansehen: Vergleiche Spieler und Gilden nach Level oder anderen Werten.",
+          "profiles": "Profile öffnen: Schaue dir detaillierte Spieler- und Gildenprofile mit mehr Informationen an.",
+          "guides": "Guides lesen: Nutze Anleitungen und Tipps, um dein Spiel besser zu planen.",
+          "tools": "Tools & Rechner verwenden: Berechne z. B. Dungeon-XP oder andere Werte mit interaktiven Tools."
+        }
+      },
+      "freshness": {
+        "title": "Wie aktuell sind die Daten?",
+        "body1": "SFDataHub basiert auf Scans, die von der Community hochgeladen oder verbunden werden.",
+        "body2": "Neben vielen Werten findest du einen Hinweis auf den Zeitpunkt des letzten Scans (z. B. „Last scan: 2025-12-01“).",
+        "body3": "Toplisten und Profile werden regelmäßig aktualisiert. Wenn ein Eintrag längere Zeit nicht gescannt wurde, können die angezeigten Werte vom aktuellen Stand im Spiel abweichen."
+      },
+      "login": {
+        "title": "Login & Einstellungen",
+        "body1": "Du kannst dich mit deinem Discord-Account anmelden, um zusätzliche Funktionen nutzen zu können.",
+        "body2": "Nach dem Login siehst du oben dein Profilmenü mit Avatar und Namen.",
+        "body3": "In den Einstellungen kannst du grundlegende Optionen für deinen SFDataHub-Account anpassen.",
+        "body4": "Einstellungen sind nur für eingeloggte Nutzer relevant – ohne Account musst du hier nichts konfigurieren."
+      },
+      "legal": {
+        "title": "Hilfe, Feedback & rechtliche Infos",
+        "body1": "Wenn dir Fehler auffallen, Daten komisch aussehen oder du Ideen für neue Features hast, freuen wir uns über Feedback.",
+        "body2": "Du findest unsere Kontaktmöglichkeiten und weitere Infos auf der Kontakt- oder Impressumsseite.",
+        "body3": "Für rechtliche Details nutze bitte die verlinkten Seiten:",
+        "items": {
+          "tos": "Terms of Service (ToS)",
+          "privacy": "Datenschutz",
+          "imprint": "Impressum / Kontakt"
+        }
       }
     }
   }
