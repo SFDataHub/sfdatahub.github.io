@@ -431,7 +431,7 @@ export default function Sidebar({
           {t("nav.help", { defaultValue: "Help" })}
         </NavLink>
         <div className={styles.legal}>
-          (c) 2025 SFDataHub - Alle Marken- und Bildrechte bei den jeweiligen Inhabern.
+          (c) 2025 {t("footer.shortDisclaimer", { defaultValue: "SFDataHub is an unofficial, non-commercial fan project. All trademarks and images belong to their respective owners." })}
         </div>
       </div>
     </aside>

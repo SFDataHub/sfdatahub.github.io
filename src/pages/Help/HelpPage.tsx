@@ -12,6 +12,7 @@ type Section = {
 
 const HelpPage: React.FC = () => {
   const { t } = useTranslation();
+  const dataFreshnessParagraphs = t("help.dataFreshness.body").split("\n\n");
 
   const sections: Section[] = [
     {
@@ -31,12 +32,8 @@ const HelpPage: React.FC = () => {
     },
     {
       key: "freshness",
-      title: t("help.sections.freshness.title"),
-      paragraphs: [
-        t("help.sections.freshness.body1"),
-        t("help.sections.freshness.body2"),
-        t("help.sections.freshness.body3"),
-      ],
+      title: t("help.dataFreshness.title"),
+      paragraphs: dataFreshnessParagraphs,
     },
     {
       key: "login",

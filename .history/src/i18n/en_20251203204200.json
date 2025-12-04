@@ -210,10 +210,9 @@
       "freshnessLabel": "Data freshness",
       "freshnessBody": "Data is refreshed regularly. You will see the exact scan time directly inside top lists and profiles."
     },
-        "dataFreshness": {
+    "dataFreshness": {
       "title": "How up to date is the data?",
-      "body": "SFDataHub relies on community scans. Some servers (for example many EU servers) are scanned roughly once per month by us and a few helpers – depending on our free time. Other servers (for example fusion servers) are scanned by other community projects and may have longer gaps between scans.\n\nThis means there can be several weeks or even months between two scans. You can always see the exact data age from the \"Last scan: …\" hint in top lists and profiles.\n\nIf you want your own profile to be more up to date, you can link your SFDataHub account and upload your own scans. That way you keep your profile fresh and help the overall database stay more current for the whole community."
-    },
+      "body": "SFDataHub relies on community scans. Some servers (for example many EU servers) are scanned roughly once per month by us and a few helpers – depending on our free time. Other servers (for example fusion servers) are scanned by other community projects and may have longer gaps between scans.\n\nThis means there can be several weeks or even months between two scans. You can always see the exact data age from the \"Last scan: …\" hint in top lists and profiles.\n\nIf you want your own profile to be more up to date, you can link your SFDataHub account and upload your own scans. That way you keep your profile fresh and help the overall database stay more current for the whole community."\n    },
     "sections": {
       "intro": {
         "title": "What is SFDataHub?",

@@ -115,16 +115,17 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
           www.sfgame.net
         </a>
 
-        <button
-          className={styles.upload}
-          aria-label="Scan hochladen"
-          onClick={onUploadClick}
-          disabled={!canUse}
-          title={!canUse ? "Kein Zugriff (Rolle benötigt)" : "Scan hochladen"}
-        >
-          <Upload className={styles.ico} />
-          <span className={styles.label}>Scan hochladen</span>
-        </button>
+        {canUse ? (
+          <button
+            className={styles.upload}
+            aria-label="Scan hochladen"
+            onClick={onUploadClick}
+            title="Scan hochladen"
+          >
+            <Upload className={styles.ico} />
+            <span className={styles.label}>Scan hochladen</span>
+          </button>
+        ) : null}
 
         <AccountMenu fallbackName={user?.name} />
       </div>
