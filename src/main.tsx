@@ -165,6 +165,7 @@ import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { AuthProvider } from "./context/AuthContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
+import UploadCenterPage from "./pages/UploadCenter/Index";
 
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
@@ -188,7 +189,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
       <FeatureAccessProvider>
-        <UploadCenterProvider role="admin">
+        <UploadCenterProvider>
           <HashRouter>
                         <Routes>
               <Route element={<RootLayout />}>
@@ -277,6 +278,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route
                   path="/tools"
                   element={withFeatureGate("main.tools", "/tools", <ToolsPage />)}
+                />
+
+                {/* Upload Center */}
+                <Route
+                  path="/upload-center"
+                  element={withFeatureGate("main.uploadCenter", "/upload-center", <UploadCenterPage />, <Navigate to="/login" replace />)}
                 />
 
                 {/* Community */}

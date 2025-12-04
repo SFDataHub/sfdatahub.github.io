@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { useFeatureAccess } from "../../lib/featureAccessConfig";
 
 type TabKey = "json" | "csv";
 
@@ -15,15 +16,15 @@ const Ctx = createContext<UploadCenterState | null>(null);
 
 type Props = {
   children: React.ReactNode;
-  role?: string | null;
 };
 
-export function UploadCenterProvider({ children, role }: Props) {
+export function UploadCenterProvider({ children }: Props) {
+  const { canAccessFeature } = useFeatureAccess();
   const [isOpen, setOpen] = useState(false);
   // CSV ist jetzt Standard
   const [activeTab, setActiveTab] = useState<TabKey>("csv");
 
-  const canUse = !!role && (role === "admin" || role === "uploader" || role === "dev");
+  const canUse = canAccessFeature("main.uploadCenter");
 
   const open = useCallback((opts?: { tab?: TabKey }) => {
     if (!canUse) return;

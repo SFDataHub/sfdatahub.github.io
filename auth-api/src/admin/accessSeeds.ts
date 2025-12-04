@@ -271,6 +271,24 @@ export const featureAccessSeeds: FeatureAccessSeed[] = [
     createdAt: serverTimestamp,
     updatedAt: serverTimestamp,
   },
+  {
+    id: "main.uploadCenter",
+    route: "/upload-center",
+    area: "main",
+    titleKey: "feature.uploadCenter",
+    status: "logged_in",
+    minRole: "user",
+    allowedRoles: [],
+    allowedGroups: [],
+    allowedUserIds: [],
+    showInTopbar: false,
+    showInSidebar: false,
+    navOrder: 200,
+    isExperimental: false,
+    description: "Upload Center for importing player and guild scans into SFDataHub.",
+    createdAt: serverTimestamp,
+    updatedAt: serverTimestamp,
+  },
 ];
 
 export const accessGroupSeeds: AccessGroupSeed[] = [

@@ -210,6 +210,10 @@
       "freshnessLabel": "Datenaktualität",
       "freshnessBody": "Daten werden regelmäßig aktualisiert. Den genauen Scan-Zeitpunkt siehst du direkt in Toplisten und Profilen."
     },
+    "dataFreshness": {
+      "title": "Wie aktuell sind die Daten?",
+      "body": "SFDataHub lebt von Community-Scans. Ein Teil der Server (z. B. die europäischen Server) wird von uns und ein paar Helfern ungefähr einmal im Monat gescannt – je nachdem, wie wir Zeit haben. Andere Server (z. B. Fusion-Server) werden von anderen Community-Projekten in größeren Abständen gescannt.\n\nDadurch können zwischen zwei Scans auch mehrere Wochen oder sogar Monate liegen. Den genauen Stand siehst du immer am Hinweis „Last scan: …“ in Toplisten und Profilen.\n\nWenn du dein Profil besonders aktuell halten möchtest, kannst du dich mit deinem SFDataHub-Account verbinden und eigene Scans hochladen. So hilfst du gleichzeitig mit, dass die Datenbank aktueller bleibt – für dich selbst und für die Community."
+    },
     "sections": {
       "intro": {
         "title": "Was ist SFDataHub?",
@@ -250,5 +254,15 @@
         }
       }
     }
+  },
+  "footer": {
+    "about": {
+      "title": "Über SFDataHub",
+      "body": "SFDataHub ist ein nicht-kommerzielles Fan- und Community-Projekt rund um Shakes & Fidget. Es besteht keine offizielle Verbindung zu Playa Games GmbH oder den Betreibern von Shakes & Fidget.\n\nAlle genannten Marken, Logos und Grafiken sind Eigentum der jeweiligen Rechteinhaber und werden ausschlie�lich zu identifizierenden Zwecken verwendet."
+    },
+    "shortDisclaimer": "SFDataHub ist ein inoffizielles, nicht-kommerzielles Fanprojekt. Alle Marken und Bilder geh�ren ihren jeweiligen Rechteinhabern.",
+    "copyright": "� 2025 SFDataHub � Community-Projekt rund um Shakes & Fidget."
   }
 }
+
+
