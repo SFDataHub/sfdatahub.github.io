@@ -1,13 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
+import React, { useEffect, useRef, useState } from "react";
+import type { RegionKey, ServerGroupsByRegion } from "./serverGroups";
 
 /** Layout-Modus */
 type Mode = "sheet" | "modal";
-type RegionKey = "EU" | "US" | "INT" | "Fusion";
+const REGION_ORDER: RegionKey[] = ["EU", "US", "INT", "Fusion"];
 
 type Props = {
-  /** Sichtbarkeit wird ausschließlich über Props gesteuert */
+  /** Sichtbarkeit wird ausschliesslich ueber Props gesteuert */
   open: boolean;
   onClose: () => void;
 
@@ -15,9 +14,9 @@ type Props = {
   mode?: Mode;
 
   /** Serverdaten: { EU: [...], US: [...], INT: [...], Fusion: [...] } */
-  serversByRegion: Record<RegionKey, string[]>;
+  serversByRegion: ServerGroupsByRegion;
 
-  /** aktuell ausgewählte Server */
+  /** aktuell ausgewaehlte Server */
   selected: string[];
 
   /** Toggle einzelner Server */
@@ -26,7 +25,7 @@ type Props = {
   /** Alle Server einer Region selektieren */
   onSelectAllInRegion?: (region: RegionKey) => void;
 
-  /** Alles abwählen */
+  /** Alles abwaehlen */
   onClearAll: () => void;
 };
 
@@ -54,11 +53,7 @@ export default function ServerSheet({
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  // --- NEU: optional geladene Liste aus Firestore, wenn props leer sind ---
-  const [loadedByRegion, setLoadedByRegion] = useState<Record<RegionKey, string[]> | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // ESC schließt
+  // ESC schliesst
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -68,7 +63,7 @@ export default function ServerSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Focus-Trap rudimentär
+  // Focus-Trap rudimentaer
   useEffect(() => {
     if (open && rootRef.current) {
       const el = rootRef.current.querySelector<HTMLInputElement>("#sheet-serversearch");
@@ -76,53 +71,7 @@ export default function ServerSheet({
     }
   }, [open]);
 
-  // Prüfen, ob props leer sind
-  const propsAreEmpty = useMemo(() => {
-    const keys: RegionKey[] = ["EU", "US", "INT", "Fusion"];
-    return keys.every((k) => !serversByRegion?.[k]?.length);
-  }, [serversByRegion]);
-
-  // Falls props leer -> beim Öffnen Firestore holen
-  useEffect(() => {
-    if (!open) return;
-    if (!propsAreEmpty) return; // wir haben Daten via Props – nichts tun
-    let alive = true;
-
-    (async () => {
-      try {
-        setLoading(true);
-        const snap = await getDoc(doc(db, "stats_public", "toplists_bundle_v1"));
-        if (!alive) return;
-        const data: any = snap.data() || {};
-        // servers kann Array oder JSON-String sein
-        const raw: string[] = Array.isArray(data.servers) ? data.servers : JSON.parse(data.servers || "[]");
-        setLoadedByRegion(groupByRegion(raw));
-      } catch {
-        setLoadedByRegion(null);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [open, propsAreEmpty]);
-
-  // Effektiv genutzte Liste (Props haben Vorrang)
-  const effectiveByRegion: Record<RegionKey, string[]> = useMemo(() => {
-    if (!propsAreEmpty) return serversByRegion;
-    return (
-      loadedByRegion ?? {
-        EU: [],
-        US: [],
-        INT: [],
-        Fusion: [],
-      }
-    );
-  }, [propsAreEmpty, serversByRegion, loadedByRegion]);
-
-  const regions = useMemo(() => Object.keys(effectiveByRegion) as RegionKey[], [effectiveByRegion]);
+  const regions = REGION_ORDER;
 
   const filterMatches = (name: string) => {
     const q = query.trim().toLowerCase();
@@ -139,7 +88,7 @@ export default function ServerSheet({
       aria-labelledby="server-dialog-title"
       style={backdropStyle}
       onClick={(e) => {
-        // Klick auf Backdrop schließt
+        // Klick auf Backdrop schliesst
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -164,7 +113,7 @@ export default function ServerSheet({
             id="sheet-serversearch"
             name="sheet-serversearch"
             type="text"
-            placeholder="Search servers…"
+            placeholder="Search servers..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Search servers"
@@ -176,13 +125,11 @@ export default function ServerSheet({
         {/* Listen nach Regionen */}
         <div style={{ display: "grid", gap: 16, maxHeight: "60vh", overflow: "auto" }}>
           {regions.map((region) => {
-            const list = (effectiveByRegion[region] || []).filter(filterMatches);
+            const list = (serversByRegion[region] || []).filter(filterMatches);
             return (
               <section key={region} aria-labelledby={`region-${region}`}>
                 <div style={regionHeader}>
-                  <h3 id={`region-${region}`} style={h3Style}>
-                    {region} {loading && propsAreEmpty ? <span style={{ marginLeft: 6, fontSize: 12, color: PALETTE.text2 }}>(loading…)</span> : null}
-                  </h3>
+                  <h3 id={`region-${region}`} style={h3Style}>{region}</h3>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
@@ -219,7 +166,7 @@ export default function ServerSheet({
                   })}
                   {list.length === 0 && (
                     <div style={{ color: PALETTE.text2, fontSize: 13, padding: "4px 2px" }}>
-                      {loading && propsAreEmpty ? "Loading…" : "No servers found"}
+                      No servers found
                     </div>
                   )}
                 </div>
@@ -230,28 +177,6 @@ export default function ServerSheet({
       </div>
     </div>
   );
-}
-
-/** Gruppiert eine flache Serverliste nach Regionen */
-function groupByRegion(all: string[]): Record<RegionKey, string[]> {
-  const out: Record<RegionKey, string[]> = { EU: [], US: [], INT: [], Fusion: [] };
-
-  for (const s of all) {
-    const up = s.toUpperCase();
-    if (up.startsWith("EU")) out.EU.push(s);
-    else if (up.startsWith("US") || up.startsWith("NA") || up.startsWith("AM")) out.US.push(s);
-    else if (up.startsWith("F")) out.Fusion.push(s);
-    else out.INT.push(s);
-  }
-
-  // stabile Sortierung
-  (Object.keys(out) as RegionKey[]).forEach((k) => out[k].sort(naturalCompare));
-  return out;
-}
-
-/** EU2, EU10 natürlich sortieren */
-function naturalCompare(a: string, b: string) {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
 /* ---------- Styles (inline, 1:1 aus deiner Datei) ---------- */

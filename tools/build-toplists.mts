@@ -14,16 +14,19 @@ try { initializeApp({ credential: applicationDefault() }); } catch {}
 const db = getFirestore();
 
 // ---------- Config ----------
+// Hinweis: Diese Toplists werden nur aus den kompakten Indizes + Caches gebaut
+// (players: stats_index_players_daily_compact + stats_cache_player_derived,
+//  guilds:  stats_index_guilds_daily_compact + guild avg cache). Keine players/* Reads.
 const META_DOC_PATH = "stats_public/toplists_meta_v1";
-const PLAYERS_PAGES_COL = "stats_public/toplists_players_v1";
-const GUILDS_PAGES_COL  = "stats_public/toplists_guilds_v1";
+const PLAYERS_PAGES_COL = "stats_public/toplists_players_v1/pages";
+const GUILDS_PAGES_COL  = "stats_public/toplists_guilds_v1/pages";
+const PLAYERS_LISTS_COL = "stats_public/toplists_players_v1/lists";
 
 const PLAYER_DERIVED_COL = "stats_cache_player_derived";
 const GUILD_AVG_CACHE_COL = "stats_cache_guild_avgs";
 const PLAYERS_INDEX_COL = "stats_index_players_daily_compact";
 const GUILDS_INDEX_COL  = "stats_index_guilds_daily_compact";
 
-const PLAYERS_COL = "players";
 const GUILDS_COL  = "guilds";
 const LATEST_DOC_ID = "latest";
 
@@ -65,12 +68,59 @@ type Meta = {
   };
   columnKeysPlayers?: string[];
   columnKeysGuilds?: string[];
+  ttlSec?: number;
+
+  scopeChange?: {
+    [scopeId: string]: {
+      lastRebuildAtMs?: number;           // Zeitstempel des letzten vollständigen Rebuilds (ms)
+      lastChangeAtMs?: number;            // optional: letztes Änderungsdatum (für später)
+      changedSinceLastRebuild?: number;   // Anzahl geänderter Spieler seit Rebuild (für später)
+    };
+  };
+
+  thresholds?: {
+    players?: {
+      minChanges?: number;   // Mindestanzahl Änderungen, bevor ein Scope neu gebaut wird
+      maxAgeDays?: number;   // Spätestens nach X Tagen neu bauen, auch wenn wenig los ist
+    };
+    guilds?: {
+      minChanges?: number;
+      maxAgeDays?: number;
+    };
+  };
 };
 const loadMeta = async (): Promise<Meta> => {
   const snap = await db.doc(META_DOC_PATH).get();
   if (!snap.exists) throw new Error(`Meta missing at ${META_DOC_PATH}`);
   return snap.data() as Meta;
 };
+
+function shouldRebuildPlayersScope(meta: Meta, scope: Scope, nowMs: number): boolean {
+  const thresholds = meta.thresholds?.players || {};
+  const minChanges = typeof thresholds.minChanges === "number" ? thresholds.minChanges : 0;
+  const maxAgeDays = typeof thresholds.maxAgeDays === "number" ? thresholds.maxAgeDays : 0;
+
+  // Keine Thresholds gesetzt => Backwards-kompatibel: immer rebuilden
+  if (!minChanges && !maxAgeDays) return true;
+
+  const scopeInfo = meta.scopeChange?.[scope.scopeId];
+  if (!scopeInfo) return true; // keine Infos zum Scope => rebuild
+
+  const lastRebuildAtMs = typeof scopeInfo.lastRebuildAtMs === "number" ? scopeInfo.lastRebuildAtMs : 0;
+  const changed = scopeInfo.changedSinceLastRebuild;
+
+  let ageDays = 0;
+  if (lastRebuildAtMs > 0) {
+    ageDays = (nowMs - lastRebuildAtMs) / (1000 * 60 * 60 * 24);
+  }
+
+  // Solange der Counter nicht gepflegt wird: unknown => rebuild
+  const hasChangedCount = typeof changed === "number";
+  const enoughChanges = hasChangedCount ? changed >= minChanges : true;
+  const tooOld = maxAgeDays > 0 && ageDays >= maxAgeDays;
+
+  return enoughChanges || tooOld;
+}
 
 // Scope handling
 type Scope = { scopeId: string; group: string; serverKey: string; sort: "sum"|"sumAvg" };
@@ -155,16 +205,26 @@ async function buildPlayersPage(dateKey:number, range:string, scope:Scope, meta:
     if (!dSnap.exists) continue;
     const d = dSnap.data() as any;
 
-    // treasury/mine/lastScan aus players/latest/latest
-    let treasury = 0, mine = 0, lastScan = "";
+    // treasury/mine/lastScan ermitteln (latest bevorzugt fuer lesbares timestampRaw)
+    let treasury = toNumber(d.treasury);
+    let mine = toNumber(d.mine);
+    let lastScan = String(d.timestamp ?? d.updatedAtFromLatest ?? "");
     try {
       const latestRef = db.doc(`${PLAYERS_COL}/${pid}/latest/${LATEST_DOC_ID}`);
       const lSnap = await latestRef.get();
       if (lSnap.exists) {
         const l = lSnap.data() as any;
         treasury = toNumber(l.values?.["Treasury"]);
-        mine     = toNumber(l.values?.["Mine"] ?? l.values?.["Quarry"] ?? 0);
-        lastScan = String(l.timestampRaw || l.timestamp || "");
+        mine     = toNumber(l.values?.["Mine"] ?? l.values?.["Quarry"] ?? mine ?? 0);
+
+        const raw = l.timestampRaw;
+        if (typeof raw === "string" && raw.trim()) {
+          lastScan = raw.trim();
+        } else if (l.timestamp != null) {
+          lastScan = String(l.timestamp);
+        } else {
+          lastScan = "";
+        }
       }
     } catch {}
 
@@ -218,7 +278,29 @@ async function buildPlayersPage(dateKey:number, range:string, scope:Scope, meta:
     updatedAt: new Date().toISOString(),
   };
 
-  await db.collection(PLAYERS_PAGES_COL).doc(pageId).set({ meta: metaOut, rows }, { merge: true });
+  // Kein Write mehr nach PLAYERS_PAGES_COL – Pages fuer Players werden nicht mehr aktualisiert.
+
+  // Zusaetzlich: Snapshot-Dokument fuer das neue lists-Schema schreiben
+  const norm = (v: string) => (v ?? "").toString().trim().toLowerCase();
+  const listGroup = norm(scope.group) || "all";
+  const listRange = norm(range) || "all";
+  const listSort = norm(scope.sort) || "sum";
+  const listId = `${listGroup}__${listRange}__${listSort}`;
+
+  const listDoc = {
+    entity: "players" as const,
+    group: scope.group,
+    server: scope.serverKey || "all",
+    metric: scope.sort,
+    timeRange: range,
+    limit: pageSize,
+    updatedAt: metaOut.updatedAtRaw,
+    nextUpdateAt: 0,
+    ttlSec: meta.ttlSec ?? undefined,
+    rows,
+  };
+
+  await db.collection(PLAYERS_LISTS_COL).doc(listId).set(listDoc, { merge: true });
 }
 
 // ---------- Build Guilds Page ----------
@@ -357,14 +439,23 @@ const dateArg = args.get("date");
   const scopes: Scope[] = [...groupScopes, ...serverScopes];
 
   const d = dateArg ? Number(dateArg) : toYYYYMMDDLocal(new Date());
+  const nowMs = Date.now();
+  const rebuiltPlayerScopes: string[] = [];
 
   // Players
   for (const s of scopes) {
     if (s.sort!=="sum") continue;
+
+    const rebuild = shouldRebuildPlayersScope(meta, s, nowMs);
+    if (!rebuild) {
+      console.log("[build-toplists] Skip players scope", s.scopeId, "no rebuild needed");
+      continue;
+    }
     for (const r of SUPPORTED_RANGES) {
       await buildPlayersPage(d, r, s, meta);
       await new Promise(res=>setTimeout(res, 5));
     }
+    rebuiltPlayerScopes.push(s.scopeId);
   }
   // Guilds
   for (const s of scopes) {
@@ -376,6 +467,14 @@ const dateArg = args.get("date");
   }
 
   // Meta timestamps
+  if (rebuiltPlayerScopes.length > 0) {
+    const updates:any = {};
+    for (const scopeId of rebuiltPlayerScopes) {
+      updates[`scopeChange.${scopeId}.lastRebuildAtMs`] = nowMs;
+      updates[`scopeChange.${scopeId}.changedSinceLastRebuild`] = 0;
+    }
+    await db.doc(META_DOC_PATH).set(updates, { merge: true });
+  }
   await db.doc(META_DOC_PATH).set({
     lastComputedAt: Date.now(),
     nextUpdateAt: 0

@@ -1,17 +1,10 @@
 // src/components/ImportCsv/ImportCsv.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { importCsvToDB, type ImportCsvKind, type ImportCsvOptions, type ImportReport } from "../../lib/import/csv";
-import { writeGuildSnapshotsFromRows } from "../../lib/import/importer";
+import { type ImportCsvKind, type ImportReport } from "../../lib/import/csv";
+import { importSelectionToDb } from "./importCsvToDb";
+import type { CsvParsedResult, ParsedCsvGuild, ParsedCsvPlayer } from "../UploadCenter/uploadCenterCsvMapping";
 
 // NEU: echte Monthly-Berechnung & Writes
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
-import {
-  monthKeyFromMs,
-  ensureFirstOfMonth,
-  computeProgressDoc,
-  writeMonthlyDoc,
-} from "../../lib/guilds/monthly";
 
 type Row = Record<string, any>;
 const norm = (s: any) => String(s ?? "").trim();
@@ -62,6 +55,7 @@ function parseCsv(text: string): { headers: string[]; rows: Row[]; delimiter: st
 const COL = {
   PLAYERS: {
     IDENTIFIER:       CANON("Identifier"),
+    PID:              CANON("ID"),
     GUILD_IDENTIFIER: CANON("Guild Identifier"),
     TIMESTAMP:        CANON("Timestamp"),
     NAME:             CANON("Name"),
@@ -73,6 +67,7 @@ const COL = {
     GUILD_MEMBER_COUNT: CANON("Guild Member Count"),
     NAME:               CANON("Name"),
     TIMESTAMP:          CANON("Timestamp"),
+    SERVER:             CANON("Server"),
   }
 } as const;
 
@@ -275,7 +270,14 @@ type FilePreview = {
   warn?: string;
 };
 
-export default function ImportCsv() {
+export type ImportCsvMode = "db" | "session";
+
+export type ImportCsvProps = {
+  mode?: ImportCsvMode; // default: "db"
+  onBuildUploadSession?: (parsed: CsvParsedResult) => void;
+};
+
+export default function ImportCsv({ mode = "db", onBuildUploadSession }: ImportCsvProps) {
   const [files, setFiles] = useState<FilePreview[]>([]);
   const [summary, setSummary] = useState<QuickSummary | null>(null);
   const [busy, setBusy] = useState(false);
@@ -337,7 +339,111 @@ export default function ImportCsv() {
     await analyzeMany(fl);
   }, [analyzeMany]);
 
-  async function handleImportToDB() {
+  const toUpperOrUndefined = (value: any) => {
+    const s = value != null ? String(value).trim() : "";
+    return s ? s.toUpperCase() : undefined;
+  };
+
+  const buildParsedResultForSession = useCallback((): CsvParsedResult => {
+    let playersRows: Row[] = [];
+    let guildsRows: Row[] = [];
+
+    for (const f of files) {
+      const parsed = parseCsv(f.text);
+      const { kind } = detectCsvKind(f.name, parsed.headers);
+      if (kind === "players") playersRows = playersRows.concat(parsed.rows);
+      else if (kind === "guilds") guildsRows = guildsRows.concat(parsed.rows);
+    }
+
+    const players: ParsedCsvPlayer[] = [];
+    const membersByGuild = new Map<string, ParsedCsvPlayer[]>();
+    const guildServerFromPlayers = new Map<string, string>();
+
+    for (const r of playersRows) {
+      const playerId = pickByCanon(r, COL.PLAYERS.PID) ?? pickByCanon(r, COL.PLAYERS.IDENTIFIER);
+      const server = toUpperOrUndefined(pickByCanon(r, COL.PLAYERS.SERVER));
+      const scanTimestampSec = toSec(pickByCanon(r, COL.PLAYERS.TIMESTAMP));
+      if (!playerId || !server || scanTimestampSec == null) continue;
+      const guildIdRaw = pickByCanon(r, COL.PLAYERS.GUILD_IDENTIFIER);
+      const guildId = guildIdRaw ? String(guildIdRaw) : undefined;
+
+      const player: ParsedCsvPlayer = {
+        playerId: String(playerId),
+        name: pickByCanon(r, COL.PLAYERS.NAME) || "",
+        server,
+        guildId,
+        level: undefined,
+        className: undefined,
+        scanTimestampSec,
+      };
+      players.push(player);
+
+      if (guildId) {
+        if (!membersByGuild.has(guildId)) membersByGuild.set(guildId, []);
+        membersByGuild.get(guildId)!.push(player);
+        if (!guildServerFromPlayers.has(guildId)) guildServerFromPlayers.set(guildId, server);
+      }
+    }
+
+    const guilds: ParsedCsvGuild[] = [];
+
+    for (const r of guildsRows) {
+      const gidRaw = pickByCanon(r, COL.GUILDS.GUILD_IDENTIFIER);
+      const guildId = gidRaw ? String(gidRaw) : "";
+      if (!guildId) continue;
+      const scanTimestampSec = toSec(pickByCanon(r, COL.GUILDS.TIMESTAMP));
+      if (scanTimestampSec == null) continue;
+      const server = toUpperOrUndefined(pickByCanon(r, COL.GUILDS.SERVER)) ?? guildServerFromPlayers.get(guildId);
+      if (!server) continue;
+
+      const memberCountRaw = pickByCanon(r, COL.GUILDS.GUILD_MEMBER_COUNT);
+      const memberCountNum = Number(memberCountRaw);
+      const members = membersByGuild.get(guildId) ?? [];
+
+      guilds.push({
+        guildId,
+        name: pickByCanon(r, COL.GUILDS.NAME) || guildId,
+        server,
+        memberCount: Number.isFinite(memberCountNum) ? memberCountNum : undefined,
+        scanTimestampSec,
+        members: members.map((m) => ({
+          playerId: m.playerId,
+          name: m.name,
+          level: m.level,
+          className: m.className,
+        })),
+      });
+      membersByGuild.delete(guildId);
+    }
+
+    for (const [gid, members] of membersByGuild.entries()) {
+      if (!members.length) continue;
+      const server = guildServerFromPlayers.get(gid);
+      if (!server) continue;
+      const latestTs = members.reduce((max, m) => Math.max(max, m.scanTimestampSec), members[0].scanTimestampSec);
+      guilds.push({
+        guildId: gid,
+        name: gid,
+        server,
+        memberCount: undefined,
+        scanTimestampSec: latestTs,
+        members: members.map((m) => ({
+          playerId: m.playerId,
+          name: m.name,
+          level: m.level,
+          className: m.className,
+        })),
+      });
+    }
+
+    return {
+      filename: files[0]?.name,
+      players,
+      guilds,
+    };
+  }, [files]);
+
+async function handleImportToDB() {
     if (!files.length) return;
     setImportBusy(true); setProgress({phase:"prepare", current:0, total:0});
     setImportMsg(null); setReports([]);
@@ -360,60 +466,16 @@ export default function ImportCsv() {
         guildsRows: guildsRows.length,
       });
 
-      if (!guildsRows.length)  throw new Error("Guilds-CSV mit „Guild Identifier“ + „Guild Member Count“ + „Timestamp“ nicht gefunden.");
-      if (!playersRows.length) throw new Error("Players-CSV mit „Guild Identifier“ nicht gefunden.");
+      if (!guildsRows.length)  throw new Error("Guilds-CSV mit \"Guild Identifier\" + \"Guild Member Count\" + \"Timestamp\" nicht gefunden.");
+      if (!playersRows.length) throw new Error("Players-CSV mit \"Guild Identifier\" nicht gefunden.");
 
-      const repGuilds = await importCsvToDB(null, {
-        kind: "guilds",
-        rows: guildsRows,
-        onProgress: p => setProgress(p),
-      } as ImportCsvOptions);
-      console.info("[Import Report] guilds", repGuilds);
-
-      const repPlayers = await importCsvToDB(null, {
-        kind: "players",
-        rows: playersRows,
-        onProgress: p => setProgress(p),
-      } as ImportCsvOptions);
-      console.info("[Import Report] players", repPlayers);
-
-      // Snapshots NACH den beiden Imports schreiben (1 Doc pro Gilde)
-      await writeGuildSnapshotsFromRows(playersRows, guildsRows);
-
-      // === MONTHLY: Baseline sichern + Progress schreiben ===
-
-      // betroffene Gilden-IDs aus beiden CSVs sammeln
-      const gidSet = new Set<string>();
-      for (const r of guildsRows)  { const v = pickByCanon(r, CANON("Guild Identifier")); if (v) gidSet.add(String(v)); }
-      for (const r of playersRows) { const v = pickByCanon(r, CANON("Guild Identifier")); if (v) gidSet.add(String(v)); }
-
-      // pro Gilde: latest lesen, Baseline sicherstellen, Progress berechnen und Monats-Dok schreiben
-      for (const guildId of gidSet) {
-        const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
-        const latestSnap = await getDoc(latestRef);
-        if (!latestSnap.exists()) continue;
-
-        const latest = latestSnap.data() as any;
-        const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
-        const monthKey = monthKeyFromMs(latestTsMs);
-
-        const { first, firstTsMs } = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
-
-        const progress = computeProgressDoc({
-          guildId,
-          monthKey,
-          server: latest.server ?? null,
-          first,
-          firstTsMs,
-          latest,
-          latestTsMs,
-        });
-
-        await writeMonthlyDoc(guildId, monthKey, progress);
-      }
+      const result = await importSelectionToDb(
+        { playersRows, guildsRows },
+        { onProgress: (p) => setProgress(p) },
+      );
 
       setProgress({ phase:"done", current:1, total:1 });
-      setReports([repGuilds, repPlayers]);
+      setReports(result.reports);
       setImportMsg("Import abgeschlossen.");
     } catch (e:any) {
       console.error("[UploadCenter] Import error:", e);
@@ -423,6 +485,25 @@ export default function ImportCsv() {
       setTimeout(()=>setProgress(null), 1200);
     }
   }
+
+  const handlePrepareSession = useCallback(async () => {
+    if (mode !== "session" || !onBuildUploadSession || !files.length) return;
+    setImportBusy(true);
+    setImportMsg(null);
+    setReports([]);
+    setErr(null);
+    setProgress(null);
+    try {
+      const parsed = buildParsedResultForSession();
+      onBuildUploadSession(parsed);
+      setImportMsg("Session prepared locally.");
+    } catch (e: any) {
+      console.error("[UploadCenter] Session build error:", e);
+      setImportMsg(`Fehler beim Import: ${e?.message ?? e}`);
+    } finally {
+      setImportBusy(false);
+    }
+  }, [mode, onBuildUploadSession, files, buildParsedResultForSession]);
 
   const fileBadges = useMemo(()=> files.map(f=>`${f.name} (${f.rows} rows, “${f.delimiter}”, ${f.kind}${f.warn ? " ⚠️" : ""})`), [files]);
   const totalParsedRows = useMemo(()=> files.reduce((a,b)=>a+b.rows,0), [files]);
@@ -463,7 +544,7 @@ export default function ImportCsv() {
         </div>
 
         <div style={{ marginLeft:"auto", display:"flex", gap:12, alignItems:"center" }}>
-          {progress && (
+          {progress && mode === "db" && (
             <div style={{ minWidth:180, display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ width:120, height:8, background:"#27456E", borderRadius:6, overflow:"hidden" }}>
                 <div style={{ width:`${percent}%`, height:"100%", background:"#2E75F0" }}/>
@@ -472,11 +553,15 @@ export default function ImportCsv() {
             </div>
           )}
           <button
-            onClick={handleImportToDB}
-            disabled={!files.length || !summary || importBusy}
+            onClick={mode === "session" ? handlePrepareSession : handleImportToDB}
+            disabled={!files.length || !summary || importBusy || (mode === "session" && !onBuildUploadSession)}
             className="uc-btn"
           >
-            {importBusy ? "Loading…" : "Load to DB"}
+            {importBusy
+              ? "Loading…"
+              : mode === "session"
+                ? "Add as Upload Session"
+                : "Load to DB"}
           </button>
           {importMsg && (
             <span style={{ color: importMsg.startsWith("Fehler") ? "#ff9e9e" : "#B0E3A1" }}>

@@ -162,6 +162,7 @@ import ToolsPage from "./pages/tools/ToolsPage";
 /** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
+import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCenterSessionsContext";
 import { AuthProvider } from "./context/AuthContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
@@ -190,9 +191,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AuthProvider>
       <FeatureAccessProvider>
         <UploadCenterProvider>
-          <HashRouter>
-                        <Routes>
-              <Route element={<RootLayout />}>
+          <UploadCenterSessionsProvider>
+            <HashRouter>
+              <Routes>
+                <Route element={<RootLayout />}>
                 {/* Home */}
                 <Route
                   path="/"
@@ -285,6 +287,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   path="/upload-center"
                   element={withFeatureGate("main.uploadCenter", "/upload-center", <UploadCenterPage />, <Navigate to="/login" replace />)}
                 />
+                <Route path="/UploadCenter" element={<Navigate to="/upload-center" replace />} />
 
                 {/* Community */}
                 <Route
@@ -507,8 +510,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
           {/* Modal am Root */}
           <UploadCenterModal />
-        </UploadCenterProvider>
-      </FeatureAccessProvider>
+        </UploadCenterSessionsProvider>
+      </UploadCenterProvider>
+    </FeatureAccessProvider>
     </AuthProvider>
   </React.StrictMode>
 );
