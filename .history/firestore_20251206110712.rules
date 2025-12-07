@@ -3,7 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----- Public reads -----
-    match /metadata/{doc}         { allow read: if true; }
+    match /metadata/{doc} {
+      allow read: if true;
+      allow write: if isImporter();
+    }
     match /servers/{doc}          { allow read: if true; }
     match /stats_public/{doc=**}  { allow read: if true; }
 
@@ -99,25 +102,6 @@ service cloud.firestore {
     // (z. B. players/*/latest/*, guilds/*/latest/*) - keine Writes.
     match /{path=**}/latest/{docId} {
       allow read: if true;
-    }
-
-    // ---------- Stats-Cache & Indizes (vom CSV-Importer beschrieben) ----------
-    match /stats_cache_player_derived/{pid} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    match /stats_index_players_daily_compact/{docId} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    match /stats_index_guilds_daily_compact/{docId} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
     }
 
     // ---------- User settings (per-user) ----------

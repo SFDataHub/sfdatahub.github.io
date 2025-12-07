@@ -56,7 +56,7 @@ export default function UploadCenterModal() {
 
         {/* Content */}
         <div className={styles.content}>
-          {activeTab === "csv" ? <ImportCsv /> : <JsonPlaceholder />}
+          {activeTab === "csv" ? <ImportCsv mode="db" /> : <JsonPlaceholder />}
         </div>
       </div>
     </div>

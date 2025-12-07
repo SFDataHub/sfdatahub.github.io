@@ -44,7 +44,25 @@ export default function ScansIndex() {
           }}
         >
           <div style={{ fontWeight: 700, color: "var(--title)" }}>Archiv</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Ältere Scans & Verlauf</div>
+          <div style={{ opacity: 0.75, marginTop: 4 }}>Aeltere Scans & Verlauf</div>
+        </Link>
+
+        <Link
+          to="/upload-center"
+          style={{
+            display: "block",
+            padding: "14px 16px",
+            background: "var(--tile)",
+            border: "1px solid var(--line)",
+            borderRadius: 12,
+            textDecoration: "none",
+            color: "var(--text)",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "var(--title)" }}>Upload Center</div>
+          <div style={{ opacity: 0.75, marginTop: 4 }}>
+            CSV Import & lokale Vorschau (Spieler & Gilden)
+          </div>
         </Link>
       </div>
     </section>

@@ -1,15 +1,25 @@
-// tools/update-player-derived.mts
+﻿// tools/update-player-derived.mts
 // Run: npx tsx tools/update-player-derived.mts
 // Auth: gcloud auth application-default login
 
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp, BulkWriter } from "firebase-admin/firestore";
+import {
+  toNumber,
+  normalizeServer,
+  MAIN_BY_CLASS,
+  pick,
+  computeBaseStats,
+  deriveForPlayer,
+} from "./playerDerivedHelpers.mts";
 
 // ---------- Config ----------
 const META_DOC_PATH = "stats_public/toplists_meta_v1";
 const PLAYER_CACHE_COL = "stats_cache_player_derived";
 const PLAYERS_COL = "players";
 const LATEST_DOC_ID = "latest";
+
+const scopeChangeCounts: Record<string, number> = {};
 
 // ---------- Init ----------
 try {
@@ -18,103 +28,6 @@ try {
 const db = getFirestore();
 
 // ---------- Utils ----------
-const toNumber = (v: any): number => {
-  if (typeof v === "number") return v;
-  if (v == null) return 0;
-  let s = String(v).trim();
-  if (!s || s === "-" || s.toLowerCase() === "nan") return 0;
-  s = s.replace(/\s+/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(/,/g, ".");
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-};
-
-type ServerNorm = { group: "EU" | "US" | "INT" | "FUSION" | "ALL"; serverKey: string };
-const normalizeServer = (raw: any): ServerNorm => {
-  if (!raw) return { group: "ALL", serverKey: "all" };
-  const s = String(raw).toUpperCase();
-
-  let m = s.match(/S?(\d+)[._-]?EU|S(\d+)\.SFGAME\.EU/);
-  if (m) {
-    const num = m[1] || m[2];
-    return { group: "EU", serverKey: `EU${num}` };
-  }
-  if (s.includes("AM1") || s.includes("S1.SFGAME.US")) return { group: "US", serverKey: "AM1" };
-  if (s.includes("MAERWYNN")) return { group: "INT", serverKey: "MAERWYNN" };
-  m = s.match(/F(\d+)/);
-  if (m) return { group: "FUSION", serverKey: `F${m[1]}` };
-  return { group: "ALL", serverKey: "all" };
-};
-
-const MAIN_BY_CLASS: Record<string, "Base Strength" | "Base Dexterity" | "Base Intelligence"> = {
-  Warrior: "Base Strength",
-  Berserker: "Base Strength",
-  Paladin: "Base Strength",
-  Scout: "Base Dexterity",
-  Assassin: "Base Dexterity",
-  "Demon Hunter": "Base Dexterity",
-  Bard: "Base Dexterity",
-  Mage: "Base Intelligence",
-  "Battle Mage": "Base Intelligence",
-  Necromancer: "Base Intelligence",
-  Druid: "Base Intelligence",
-};
-
-const pick = (obj: Record<string, any>, key: string): any =>
-  obj && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined;
-
-const computeBaseStats = (values: Record<string, any>) => {
-  const bs = {
-    str: toNumber(pick(values, "Base Strength")),
-    dex: toNumber(pick(values, "Base Dexterity")),
-    intl: toNumber(pick(values, "Base Intelligence")),
-    con: toNumber(pick(values, "Base Constitution")),
-    luck: toNumber(pick(values, "Base Luck")),
-  };
-  const sum = bs.str + bs.dex + bs.intl + bs.con + bs.luck;
-  return { ...bs, sum };
-};
-
-const deriveForPlayer = (latest: any) => {
-  const {
-    playerId,
-    name,
-    className,
-    level: levelRaw,
-    server: serverRaw,
-    guildIdentifier,
-    guildName,
-    timestamp, // number (deine Felder)
-    updatedAt, // Firestore TS
-    values = {},
-  } = latest || {};
-
-  const level = toNumber(levelRaw);
-  const { group, serverKey } = normalizeServer(serverRaw);
-  const base = computeBaseStats(values);
-
-  const mainKey = MAIN_BY_CLASS[String(className)] ?? "Base Intelligence";
-  const main = toNumber(pick(values, mainKey));
-  const sum = base.sum;
-  const con = base.con;
-  const ratio = level > 0 ? sum / level : 0;
-
-  return {
-    playerId: String(playerId ?? ""),
-    name: String(name ?? ""),
-    class: String(className ?? ""),
-    level,
-    group,
-    serverKey,
-    guildId: guildIdentifier ? String(guildIdentifier) : "",
-    guildName: guildName ? String(guildName) : "",
-    sum,
-    main,
-    con,
-    ratio,
-    timestamp: toNumber(timestamp),
-    updatedAtFromLatest: updatedAt ?? FieldValue.serverTimestamp(),
-  };
-};
 
 // ---------- Main ----------
 const run = async () => {
@@ -138,7 +51,7 @@ const run = async () => {
     if (!path.startsWith(`${PLAYERS_COL}/`) || !path.endsWith(`/latest/${LATEST_DOC_ID}`)) return;
 
     const latest = snap.data();
-    const derived = deriveForPlayer(latest);
+    const derived = deriveForPlayer(latest, () => FieldValue.serverTimestamp());
     // Fallback-ID, falls playerId im Doc fehlt: players/{pid}
     const fallbackId =
       derived.playerId ||
@@ -149,6 +62,17 @@ const run = async () => {
     const destRef = db.collection(PLAYER_CACHE_COL).doc(String(fallbackId));
     writer.set(destRef, derived, { merge: true });
     processed++;
+
+    const group = derived.group || "ALL";
+    const serverKey = derived.serverKey || "all";
+    const scopes: string[] = [];
+    scopes.push("ALL_all_sum");
+    scopes.push(`${group}_all_sum`);
+    if (serverKey !== "all") scopes.push(`${group}_${serverKey}_sum`);
+
+    for (const scopeId of scopes) {
+      scopeChangeCounts[scopeId] = (scopeChangeCounts[scopeId] || 0) + 1;
+    }
   };
 
   const stream = await cg.stream();
@@ -159,13 +83,16 @@ const run = async () => {
   await writer.close();
 
   // lastComputedAt aktualisieren
-  await metaRef.set(
-    {
-      lastComputedAt: Date.now(),
-      nextUpdateAt: 0,
-    },
-    { merge: true }
-  );
+  const nowMs = Date.now();
+  const updates: any = {
+    lastComputedAt: nowMs,
+    nextUpdateAt: 0,
+  };
+  for (const [scopeId, count] of Object.entries(scopeChangeCounts)) {
+    updates[`scopeChange.${scopeId}.lastChangeAtMs`] = nowMs;
+    updates[`scopeChange.${scopeId}.changedSinceLastRebuild`] = FieldValue.increment(count);
+  }
+  await metaRef.set(updates, { merge: true });
 
   console.log(`player_derived updated: ${processed} players.`);
 };
