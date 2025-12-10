@@ -31,6 +31,21 @@ export type UploadCenterSessionsState = {
     selected: boolean
   ) => void;
 
+  selectGuildWithPlayers: (
+    sessionId: UploadSessionId,
+    guildKey: UploadRecordKey,
+    selected: boolean
+  ) => void;
+
+  updateGuildSelectionFromPlayer: (
+    sessionId: UploadSessionId,
+    playerKey: UploadRecordKey,
+    selected: boolean
+  ) => void;
+
+  selectAllPlayersWithGuilds: (sessionId: UploadSessionId, selected: boolean) => void;
+  selectAllGuildsWithPlayers: (sessionId: UploadSessionId, selected: boolean) => void;
+
   // Status updates (for future API responses)
   setRecordStatus: (
     sessionId: UploadSessionId,
@@ -196,6 +211,91 @@ export function UploadCenterSessionsProvider({ children }: ProviderProps) {
     );
   }, []);
 
+  const selectGuildWithPlayers = useCallback((
+    sessionId: UploadSessionId,
+    guildKey: UploadRecordKey,
+    selected: boolean,
+  ) => {
+    setSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== sessionId) return session;
+        const targetGuild = session.guilds.find((g) => g.key === guildKey);
+        if (!targetGuild) return session;
+        const guildId = targetGuild.guildId;
+        const players = session.players.map((player) =>
+          player.guildId === guildId ? { ...player, selected } : player,
+        );
+        const guilds = session.guilds.map((guild) =>
+          guild.key === guildKey ? { ...guild, selected } : guild,
+        );
+        return { ...session, players, guilds };
+      }),
+    );
+  }, []);
+
+  const updateGuildSelectionFromPlayer = useCallback((
+    sessionId: UploadSessionId,
+    playerKey: UploadRecordKey,
+    selected: boolean,
+  ) => {
+    setSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== sessionId) return session;
+        let guildId: string | undefined;
+        const players = session.players.map((player) => {
+          if (player.key !== playerKey) return player;
+          guildId = player.guildId;
+          return { ...player, selected };
+        });
+        if (!guildId) return { ...session, players };
+
+        const guildPlayers = players.filter((p) => p.guildId === guildId);
+        const allSelected = guildPlayers.length > 0 && guildPlayers.every((p) => p.selected);
+
+        const guilds = session.guilds.map((guild) => {
+          if (guild.guildId !== guildId) return guild;
+          if (selected === false) return { ...guild, selected: false };
+          return allSelected ? { ...guild, selected: true } : guild;
+        });
+
+        return { ...session, players, guilds };
+      }),
+    );
+  }, []);
+
+  const selectAllPlayersWithGuilds = useCallback((sessionId: UploadSessionId, selected: boolean) => {
+    setSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== sessionId) return session;
+        const players = session.players.map((p) => ({ ...p, selected }));
+        const guilds = session.guilds.map((g) => {
+          if (!selected) return { ...g, selected: false };
+          const guildPlayers = players.filter((p) => p.guildId === g.guildId);
+          const allSelected = guildPlayers.length > 0 && guildPlayers.every((p) => p.selected);
+          return { ...g, selected: allSelected };
+        });
+        return { ...session, players, guilds };
+      }),
+    );
+  }, []);
+
+  const selectAllGuildsWithPlayers = useCallback((sessionId: UploadSessionId, selected: boolean) => {
+    setSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== sessionId) return session;
+        const guilds = session.guilds.map((g) => ({ ...g, selected }));
+        const players = session.players.map((p) =>
+          selected && p.guildId
+            ? { ...p, selected: true }
+            : !selected && p.guildId
+              ? { ...p, selected: false }
+              : p
+        );
+        return { ...session, guilds, players };
+      }),
+    );
+  }, []);
+
   const setRecordStatus = useCallback((
     sessionId: UploadSessionId,
     kind: UploadRecordKind,
@@ -229,6 +329,10 @@ export function UploadCenterSessionsProvider({ children }: ProviderProps) {
     clearAllSessions,
     toggleRecordSelection,
     selectAllInSession,
+    selectGuildWithPlayers,
+    updateGuildSelectionFromPlayer,
+    selectAllPlayersWithGuilds,
+    selectAllGuildsWithPlayers,
     setRecordStatus,
   }), [
     sessions,
@@ -239,6 +343,10 @@ export function UploadCenterSessionsProvider({ children }: ProviderProps) {
     clearAllSessions,
     toggleRecordSelection,
     selectAllInSession,
+    selectGuildWithPlayers,
+    updateGuildSelectionFromPlayer,
+    selectAllPlayersWithGuilds,
+    selectAllGuildsWithPlayers,
     setRecordStatus,
   ]);
 

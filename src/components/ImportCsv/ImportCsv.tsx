@@ -1,6 +1,11 @@
 // src/components/ImportCsv/ImportCsv.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { type ImportCsvKind, type ImportReport } from "../../lib/import/csv";
+import {
+  type ImportCsvKind,
+  type ImportReport,
+  parseGuildsCsvText,
+  parsePlayersCsvText,
+} from "../../lib/import/csv";
 import { importSelectionToDb } from "./importCsvToDb";
 import type { CsvParsedResult, ParsedCsvGuild, ParsedCsvPlayer } from "../UploadCenter/uploadCenterCsvMapping";
 
@@ -179,6 +184,97 @@ function slimGuilds(rows: Row[], headers: string[]): GuildSlim[] {
   return out;
 }
 
+const toUpperOrUndefined = (value: any) => {
+  const s = value != null ? String(value).trim() : "";
+  return s ? s.toUpperCase() : undefined;
+};
+
+export type CsvTextSource = {
+  name: string;
+  text: string;
+};
+
+export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvParsedResult {
+  let parsedPlayers = [] as ReturnType<typeof parsePlayersCsvText>;
+  let parsedGuilds = [] as ReturnType<typeof parseGuildsCsvText>;
+
+  for (const source of sources) {
+    const parsed = parseCsv(source.text);
+    const { kind } = detectCsvKind(source.name, parsed.headers);
+    if (kind === "players") parsedPlayers = parsedPlayers.concat(parsePlayersCsvText(source.text));
+    else if (kind === "guilds") parsedGuilds = parsedGuilds.concat(parseGuildsCsvText(source.text));
+  }
+
+  const players: ParsedCsvPlayer[] = [];
+  const membersByGuild = new Map<string, ParsedCsvPlayer[]>();
+  const guildServerFromPlayers = new Map<string, string>();
+
+  for (const p of parsedPlayers) {
+    const player: ParsedCsvPlayer = {
+      playerId: p.playerId,
+      name: p.name ?? "",
+      server: p.server,
+      guildId: p.guildIdentifier ?? undefined,
+      level: p.level ?? undefined,
+      className: p.className ?? undefined,
+      scanTimestampSec: p.timestampSec,
+    };
+    players.push(player);
+
+    if (p.guildIdentifier) {
+      if (!membersByGuild.has(p.guildIdentifier)) membersByGuild.set(p.guildIdentifier, []);
+      membersByGuild.get(p.guildIdentifier)!.push(player);
+      if (!guildServerFromPlayers.has(p.guildIdentifier)) guildServerFromPlayers.set(p.guildIdentifier, p.server);
+    }
+  }
+
+  const guilds: ParsedCsvGuild[] = [];
+
+  for (const g of parsedGuilds) {
+    const members = membersByGuild.get(g.guildIdentifier) ?? [];
+    guilds.push({
+      guildId: g.guildIdentifier,
+      name: g.name ?? g.guildIdentifier,
+      server: g.server,
+      memberCount: g.memberCount ?? members.length,
+      scanTimestampSec: g.timestampSec,
+      members: members.map((m) => ({
+        playerId: m.playerId,
+        name: m.name,
+        level: m.level,
+        className: m.className,
+      })),
+    });
+    membersByGuild.delete(g.guildIdentifier);
+  }
+
+  for (const [gid, members] of membersByGuild.entries()) {
+    if (!members.length) continue;
+    const server = guildServerFromPlayers.get(gid);
+    if (!server) continue;
+    const latestTs = members.reduce((max, m) => Math.max(max, m.scanTimestampSec), members[0].scanTimestampSec);
+    guilds.push({
+      guildId: gid,
+      name: gid,
+      server,
+      memberCount: members.length,
+      scanTimestampSec: latestTs,
+      members: members.map((m) => ({
+        playerId: m.playerId,
+        name: m.name,
+        level: m.level,
+        className: m.className,
+      })),
+    });
+  }
+
+  return {
+    filename: sources[0]?.name,
+    players,
+    guilds,
+  };
+}
+
 /** Zusammenfassung */
 type PlayerListItem = { server?: string; id: string; name: string; own: boolean };
 type GuildListItem  = { id: string; name: string; declaredCount: number; playersCount: number; full: boolean };
@@ -339,108 +435,9 @@ export default function ImportCsv({ mode = "db", onBuildUploadSession }: ImportC
     await analyzeMany(fl);
   }, [analyzeMany]);
 
-  const toUpperOrUndefined = (value: any) => {
-    const s = value != null ? String(value).trim() : "";
-    return s ? s.toUpperCase() : undefined;
-  };
-
   const buildParsedResultForSession = useCallback((): CsvParsedResult => {
-    let playersRows: Row[] = [];
-    let guildsRows: Row[] = [];
-
-    for (const f of files) {
-      const parsed = parseCsv(f.text);
-      const { kind } = detectCsvKind(f.name, parsed.headers);
-      if (kind === "players") playersRows = playersRows.concat(parsed.rows);
-      else if (kind === "guilds") guildsRows = guildsRows.concat(parsed.rows);
-    }
-
-    const players: ParsedCsvPlayer[] = [];
-    const membersByGuild = new Map<string, ParsedCsvPlayer[]>();
-    const guildServerFromPlayers = new Map<string, string>();
-
-    for (const r of playersRows) {
-      const playerId = pickByCanon(r, COL.PLAYERS.PID) ?? pickByCanon(r, COL.PLAYERS.IDENTIFIER);
-      const server = toUpperOrUndefined(pickByCanon(r, COL.PLAYERS.SERVER));
-      const scanTimestampSec = toSec(pickByCanon(r, COL.PLAYERS.TIMESTAMP));
-      if (!playerId || !server || scanTimestampSec == null) continue;
-      const guildIdRaw = pickByCanon(r, COL.PLAYERS.GUILD_IDENTIFIER);
-      const guildId = guildIdRaw ? String(guildIdRaw) : undefined;
-
-      const player: ParsedCsvPlayer = {
-        playerId: String(playerId),
-        name: pickByCanon(r, COL.PLAYERS.NAME) || "",
-        server,
-        guildId,
-        level: undefined,
-        className: undefined,
-        scanTimestampSec,
-      };
-      players.push(player);
-
-      if (guildId) {
-        if (!membersByGuild.has(guildId)) membersByGuild.set(guildId, []);
-        membersByGuild.get(guildId)!.push(player);
-        if (!guildServerFromPlayers.has(guildId)) guildServerFromPlayers.set(guildId, server);
-      }
-    }
-
-    const guilds: ParsedCsvGuild[] = [];
-
-    for (const r of guildsRows) {
-      const gidRaw = pickByCanon(r, COL.GUILDS.GUILD_IDENTIFIER);
-      const guildId = gidRaw ? String(gidRaw) : "";
-      if (!guildId) continue;
-      const scanTimestampSec = toSec(pickByCanon(r, COL.GUILDS.TIMESTAMP));
-      if (scanTimestampSec == null) continue;
-      const server = toUpperOrUndefined(pickByCanon(r, COL.GUILDS.SERVER)) ?? guildServerFromPlayers.get(guildId);
-      if (!server) continue;
-
-      const memberCountRaw = pickByCanon(r, COL.GUILDS.GUILD_MEMBER_COUNT);
-      const memberCountNum = Number(memberCountRaw);
-      const members = membersByGuild.get(guildId) ?? [];
-
-      guilds.push({
-        guildId,
-        name: pickByCanon(r, COL.GUILDS.NAME) || guildId,
-        server,
-        memberCount: Number.isFinite(memberCountNum) ? memberCountNum : undefined,
-        scanTimestampSec,
-        members: members.map((m) => ({
-          playerId: m.playerId,
-          name: m.name,
-          level: m.level,
-          className: m.className,
-        })),
-      });
-      membersByGuild.delete(guildId);
-    }
-
-    for (const [gid, members] of membersByGuild.entries()) {
-      if (!members.length) continue;
-      const server = guildServerFromPlayers.get(gid);
-      if (!server) continue;
-      const latestTs = members.reduce((max, m) => Math.max(max, m.scanTimestampSec), members[0].scanTimestampSec);
-      guilds.push({
-        guildId: gid,
-        name: gid,
-        server,
-        memberCount: undefined,
-        scanTimestampSec: latestTs,
-        members: members.map((m) => ({
-          playerId: m.playerId,
-          name: m.name,
-          level: m.level,
-          className: m.className,
-        })),
-      });
-    }
-
-    return {
-      filename: files[0]?.name,
-      players,
-      guilds,
-    };
+    const sources = files.map((f) => ({ name: f.name, text: f.text }));
+    return buildParsedResultFromCsvSources(sources);
   }, [files]);
 
 async function handleImportToDB() {

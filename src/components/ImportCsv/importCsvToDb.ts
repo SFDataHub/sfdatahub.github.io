@@ -85,6 +85,7 @@ export async function importSelectionToDb(
     await writeGuildSnapshotsFromRows(playersRows, guildsRows);
   } catch (error) {
     console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows skipped", error);
+    ok = false;
   }
 
   const gidSet = new Set<string>();

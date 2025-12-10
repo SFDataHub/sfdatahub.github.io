@@ -37,3 +37,40 @@ When deploying this service, configure the frontend `.env` to set `VITE_AUTH_BAS
   - Copy the Client ID/Secret into `.env` (`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`).
 - Ensure `FRONTEND_BASE_URL` matches your Vite app (default `http://localhost:5173`).
 - Run `npm run dev` in `auth-api/` and set `VITE_AUTH_BASE_URL=http://localhost:4000` in the frontend to test the complete login flow.
+
+### Internal Upload Inbox Endpoint
+
+An internal endpoint allows the Discord bot to deposit processed scans:
+
+```
+POST /internal/upload-inbox/add
+Header: x-internal-token: $UPLOAD_INBOX_TOKEN
+```
+
+Example:
+
+```bash
+curl -X POST "https://<auth-api-url>/internal/upload-inbox/add" \
+  -H "Content-Type: application/json" \
+  -H "x-internal-token: $UPLOAD_INBOX_TOKEN" \
+  -d '{
+    "discordUserId": "138679453717889024",
+    "scanId": "test-scan-001",
+    "playersCount": 3,
+    "guildsCount": 1,
+    "playerIds": ["p1","p2","p3"],
+    "guildIds": ["g1"],
+    "server": "eu1",
+    "source": "discord",
+    "playersCsvBase64": "UExBQ0VIT0xERVI7..."
+  }'
+```
+
+Configure `UPLOAD_INBOX_TOKEN` and `UPLOAD_INBOX_BUCKET` in your environment (see `.env.example`).
+
+### User Upload Inbox Endpoints
+
+Authenticated users can fetch their inbox entries and download CSVs:
+
+- `GET /user/upload-inbox` — lists non-expired scans (`ready`/`downloaded`).
+- `GET /user/upload-inbox/:scanId/download` — returns CSV contents plus metadata and marks the entry as downloaded (extends expiry by 7 days from first download).

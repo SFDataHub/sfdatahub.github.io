@@ -21,6 +21,16 @@ export interface ProviderDocEntry {
   avatarUrl?: string;
 }
 
+export interface UploadCenterUsage {
+  date?: string;
+  guilds?: number;
+  players?: number;
+}
+
+export interface UploadCenterState {
+  usage?: UploadCenterUsage;
+}
+
 export interface UserDoc {
   userId: string;
   primaryProvider: AuthProvider;
@@ -33,6 +43,7 @@ export interface UserDoc {
   createdAt: Timestamp;
   lastLoginAt: Timestamp;
   profile?: UserProfile;
+  uploadCenter?: UploadCenterState;
 }
 
 const usersCollection = db.collection("users");

@@ -11,7 +11,7 @@ import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
 import UniversalSearch from "../search/UniversalSearch";
 
 /** Klassen-Icons / Mapping */
-import * as Classes from "../../data/classes";
+import { getClassIconUrl } from "../ui/shared/classIcons";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
 
 const TOPBAR_ITEMS = [
@@ -22,37 +22,8 @@ const TOPBAR_ITEMS = [
   { to: "/tools", label: "Tools", featureId: "main.tools" },
 ];
 
-function getClassIcon(className?: string | null): string | undefined {
-  if (!className) return undefined;
-  const raw = String(className);
-  const keyA = raw;
-  const keyB = raw.toLowerCase();
-  const keyC = raw.replace(/\s+/g, "");
-  const keyD = keyB.replace(/\s+/g, "");
-
-  // häufige Export-Varianten abdecken
-  const pools: any[] = [
-    (Classes as any).CLASS_ICON_BY_NAME,
-    (Classes as any).CLASS_ICONS,
-    (Classes as any).Icons,
-    (Classes as any).icons,
-    Classes as any,
-  ];
-
-  for (const p of pools) {
-    if (!p) continue;
-    const hit =
-      p[keyA] ?? p[keyB] ?? p[keyC] ?? p[keyD];
-    if (typeof hit === "string") return hit;
-  }
-
-  if (typeof (Classes as any).getClassIcon === "function") {
-    try {
-      const v = (Classes as any).getClassIcon(raw);
-      if (typeof v === "string") return v;
-    } catch {}
-  }
-  return undefined;
+function getClassIcon(className?: string | null, size?: number): string | undefined {
+  return getClassIconUrl(className, size);
 }
 
 export default function Topbar({ user }: { user?: { name: string; role?: string } }) {
