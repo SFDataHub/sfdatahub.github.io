@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ContentShell from "../ContentShell";
 import ImportCsv, { buildParsedResultFromCsvSources, type CsvTextSource } from "../ImportCsv/ImportCsv";
 import type { UploadRecordKey, UploadRecordStatus } from "./uploadCenterTypes";
@@ -128,6 +129,7 @@ function UploadCenterContentBody() {
     selectAllGuildsWithPlayers,
     setRecordStatus,
   } = useUploadCenterSessions();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const discordUserId =
     user?.providers?.discord?.id ?? (user?.provider === "discord" ? user.id : null);
@@ -440,6 +442,25 @@ function UploadCenterContentBody() {
     return quotaState.usageDate;
   }, [quotaState.today, quotaState.usageDate]);
 
+  const isPlayerUnlimited = quotaState.config.dailyPlayerLimit === 0;
+  const isGuildUnlimited = quotaState.config.dailyGuildLimit === 0;
+  const playerLimitLabel = isPlayerUnlimited
+    ? t("uploadCenter.quota.unlimited")
+    : quotaState.config.dailyPlayerLimit;
+  const guildLimitLabel = isGuildUnlimited
+    ? t("uploadCenter.quota.unlimited")
+    : quotaState.config.dailyGuildLimit;
+  const playerLimitDisplay = isPlayerUnlimited
+    ? t("uploadCenter.quota.unlimited")
+    : `${playerLimitLabel} limit today`;
+  const guildLimitDisplay = isGuildUnlimited ? t("uploadCenter.quota.unlimited") : `${guildLimitLabel} limit today`;
+  const playerRemainingLabel = isPlayerUnlimited
+    ? t("uploadCenter.quota.unlimited")
+    : quotaState.remainingPlayers;
+  const guildRemainingLabel = isGuildUnlimited
+    ? t("uploadCenter.quota.unlimited")
+    : quotaState.remainingGuilds;
+
   const handleUploadSelectionToDb = async () => {
     if (!activeSession) return;
     const payload = buildPayloadFromActiveSession();
@@ -588,21 +609,21 @@ function UploadCenterContentBody() {
             <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/5 p-3">
               <div className="text-xs uppercase tracking-[0.14em] text-emerald-200/80">Players</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-semibold text-emerald-50">{quotaState.remainingPlayers}</span>
+                <span className="text-2xl font-semibold text-emerald-50">{playerRemainingLabel}</span>
                 <span className="text-sm text-emerald-100/80">remaining</span>
               </div>
               <div className="mt-1 text-xs text-emerald-100/70">
-                {quotaState.usedPlayersToday} used / {quotaState.config.dailyPlayerLimit} limit today
+                {quotaState.usedPlayersToday} used / {playerLimitDisplay}
               </div>
             </div>
             <div className="rounded-xl border border-sky-400/40 bg-sky-500/5 p-3">
               <div className="text-xs uppercase tracking-[0.14em] text-sky-200/80">Guilds</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-semibold text-sky-50">{quotaState.remainingGuilds}</span>
+                <span className="text-2xl font-semibold text-sky-50">{guildRemainingLabel}</span>
                 <span className="text-sm text-sky-100/80">remaining</span>
               </div>
               <div className="mt-1 text-xs text-sky-100/70">
-                {quotaState.usedGuildsToday} used / {quotaState.config.dailyGuildLimit} limit today
+                {quotaState.usedGuildsToday} used / {guildLimitDisplay}
               </div>
             </div>
           </div>

@@ -255,6 +255,11 @@
       }
     }
   },
+  "uploadCenter": {
+    "quota": {
+      "unlimited": "Kein Limit"
+    }
+  },
   "footer": {
     "about": {
       "title": "Über SFDataHub",
