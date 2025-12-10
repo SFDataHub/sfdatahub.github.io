@@ -47,6 +47,7 @@ export type UploadSession = {
   id: UploadSessionId;
   createdAt: string;            // ISO string (local create timestamp)
   sourceFilename?: string;
+  scanUploadId?: string;
   note?: string;
   players: UploadPlayerPreview[];
   guilds: UploadGuildPreview[];

@@ -153,16 +153,16 @@ const classIdFromName = (name: string): number | null => {
 };
 
 const parseClassValue = (value: any): { classId: number | null; className: string | null } => {
-  const raw = value == null ? "" : String(value).trim();
-  if (!raw) return { classId: null, className: null };
-  const asNumber = Number(raw);
-  const isIntegerNumber = Number.isInteger(asNumber) && !Number.isNaN(asNumber);
-  if (isIntegerNumber) {
-    const classId = asNumber;
+  if (value == null) return { classId: null, className: null };
+  const str = norm(value);
+  if (!str) return { classId: null, className: null };
+  const numeric = toNumberLoose(str);
+  if (numeric != null) {
+    const classId = Math.trunc(numeric);
     return { classId, className: PLAYER_CLASS_NAMES[classId] ?? String(classId) };
   }
-  const classId = classIdFromName(raw);
-  return { classId, className: raw };
+  const classId = classIdFromName(str);
+  return { classId, className: str };
 };
 
 const COL = {
@@ -201,12 +201,11 @@ const PLAYER_CLASS_NAMES: Record<number, string> = {
   8: "Bard",
 };
 
-const PLAYER_LEVEL_KEYS = [COL.PLAYERS.LEVEL, CANON("Level"), CANON("Lvl"), CANON("Stufe")];
+const PLAYER_LEVEL_KEYS = [COL.PLAYERS.LEVEL, CANON("Lvl"), CANON("Stufe")];
 const PLAYER_CLASS_KEYS = [
   COL.PLAYERS.CLASS,
-  CANON("Class"),
-  CANON("ClassID"),
   CANON("Class ID"),
+  CANON("ClassID"),
   CANON("CharClass"),
   CANON("Klasse"),
 ];
@@ -389,39 +388,12 @@ type GuildParseStats = {
 type PlayerParseResult = { rows: ParsedPlayerCsvRow[]; stats: PlayerParseStats; headers: string[] };
 type GuildParseResult = { rows: ParsedGuildCsvRow[]; stats: GuildParseStats; headers: string[] };
 
-type PlayerHeaderMap = {
-  levelIndex?: number;
-  classIndex?: number;
-};
-
-function buildPlayerHeaderMap(headers: string[]): PlayerHeaderMap {
-  const map: PlayerHeaderMap = {};
-
-  for (let i = 0; i < headers.length; i++) {
-    const canon = CANON(headers[i]);
-    if (PLAYER_LEVEL_KEYS.includes(canon) && map.levelIndex == null) map.levelIndex = i;
-    if (PLAYER_CLASS_KEYS.includes(canon) && map.classIndex == null) map.classIndex = i;
-  }
-
-  if (map.levelIndex == null) {
-    const idx = headers.findIndex((h) => h.trim() === "Level");
-    if (idx >= 0) map.levelIndex = idx;
-  }
-  if (map.classIndex == null) {
-    const idx = headers.findIndex((h) => h.trim() === "Class");
-    if (idx >= 0) map.classIndex = idx;
-  }
-
-  return map;
-}
-
 function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResult {
   const headersResolved = headers && headers.length ? headers : inferHeadersFromRows(rows);
   const lookup = buildHeaderLookup(headersResolved);
   const stats: PlayerParseStats = { missingIdentifier: 0, badTimestamp: 0, missingServer: 0 };
   const parsed: ParsedPlayerCsvRow[] = [];
 
-  const headerMap = buildPlayerHeaderMap(headersResolved);
   for (const row of rows) {
     const pidRaw = pickWithLookup(row, lookup, COL.PLAYERS.PID) ?? pickWithLookup(row, lookup, COL.PLAYERS.IDENTIFIER);
     const playerId = norm(pidRaw);
@@ -453,14 +425,8 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
     const guildNameVal = pickWithLookup(row, lookup, COL.PLAYERS.GUILD);
     const guildName = guildNameVal != null && norm(guildNameVal) !== "" ? String(guildNameVal) : null;
 
-    const level =
-      headerMap.levelIndex != null
-        ? parseLevelValue(row[headersResolved[headerMap.levelIndex]])
-        : parseLevelValue(pickAnyWithLookup(row, lookup, PLAYER_LEVEL_KEYS));
-    const classInfo =
-      headerMap.classIndex != null
-        ? parseClassValue(row[headersResolved[headerMap.classIndex]])
-        : parseClassValue(pickAnyWithLookup(row, lookup, PLAYER_CLASS_KEYS));
+    const level = parseLevelValue(pickAnyWithLookup(row, lookup, PLAYER_LEVEL_KEYS));
+    const classInfo = parseClassValue(pickAnyWithLookup(row, lookup, PLAYER_CLASS_KEYS));
 
     parsed.push({
       playerId,

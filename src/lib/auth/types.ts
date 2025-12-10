@@ -18,4 +18,11 @@ export interface AuthUser {
   accessGroups?: string[];
   createdAt?: string;
   lastLoginAt?: string;
+  uploadCenter?: {
+    usage?: {
+      date?: string | null;
+      guilds?: number;
+      players?: number;
+    };
+  };
 }

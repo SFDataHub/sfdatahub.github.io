@@ -89,6 +89,7 @@ export function buildUploadSessionFromCsv(
     id: sessionId,
     createdAt: createdAtIso,
     sourceFilename: parsed.filename,
+    scanUploadId: undefined,
     players,
     guilds,
   };

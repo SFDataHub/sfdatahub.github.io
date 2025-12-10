@@ -14,6 +14,8 @@ type Param = {
 const secrets = {
   DISCORD_CLIENT_SECRET: defineSecret("DISCORD_CLIENT_SECRET"),
   GOOGLE_CLIENT_SECRET: defineSecret("GOOGLE_CLIENT_SECRET"),
+  UPLOAD_INBOX_TOKEN: defineSecret("UPLOAD_INBOX_TOKEN"),
+  SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
 } as const;
 
 const strings = {
@@ -25,6 +27,8 @@ const strings = {
   SESSION_COOKIE_DOMAIN: defineString("SESSION_COOKIE_DOMAIN"),
   GOOGLE_CLIENT_ID: defineString("GOOGLE_CLIENT_ID"),
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
+  UPLOAD_INBOX_BUCKET: defineString("UPLOAD_INBOX_BUCKET"),
+  SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
 } as const;
 
 const readRuntimeValue = (key: string, param?: Param): string | undefined => {
@@ -62,6 +66,13 @@ export const DISCORD_CLIENT_SECRET = readRuntimeValue("DISCORD_CLIENT_SECRET", s
 export const DISCORD_REDIRECT_URI = readRuntimeValue("DISCORD_REDIRECT_URI", strings.DISCORD_REDIRECT_URI);
 export const FRONTEND_BASE_URL =
   readRuntimeValue("FRONTEND_BASE_URL", strings.FRONTEND_BASE_URL) ?? "http://localhost:5173";
+export const UPLOAD_INBOX_BUCKET = requireValue("UPLOAD_INBOX_BUCKET", strings.UPLOAD_INBOX_BUCKET);
+export const UPLOAD_INBOX_TOKEN = requireValue("UPLOAD_INBOX_TOKEN", secrets.UPLOAD_INBOX_TOKEN);
+export const SCAN_UPLOAD_CSV_BUCKET = requireValue(
+  "SCAN_UPLOAD_CSV_BUCKET",
+  strings.SCAN_UPLOAD_CSV_BUCKET,
+);
+export const SCAN_UPLOAD_TOKEN = requireValue("SCAN_UPLOAD_TOKEN", secrets.SCAN_UPLOAD_TOKEN);
 
 // Optionale Cookie-Domain: explizit oder aus FRONTEND_BASE_URL abgeleitet (kein Domain-Flag für localhost/127.*)
 const resolveCookieDomain = () => {

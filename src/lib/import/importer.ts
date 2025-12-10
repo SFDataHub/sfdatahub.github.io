@@ -209,6 +209,13 @@ function avgOf(m: MemberSummary[], key: keyof MemberSummary): number | null {
   return xs.reduce((a,b)=>a+b,0) / xs.length;
 }
 
+const isDuplicatePermissionError = (error: unknown): boolean => {
+  const code = (error as any)?.code;
+  if (!code) return false;
+  const c = String(code).toLowerCase();
+  return c === "permission-denied" || c === "already-exists" || c === "failed-precondition";
+};
+
 // ---- NEU (nur für dein gewünschtes Verhalten): helper zum Lesen ----
 async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|null, raw: string|null}> {
   const ref = doc(db, `guilds/${gid}/latest/latest`);
@@ -271,6 +278,7 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
   }
 
   let snapshotsWritten = 0;
+  let fatalError: unknown = null;
 
   for (const gid of allGids) {
     // maßgeblichen Timestamp der Gilde aus latest holen
@@ -341,28 +349,41 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     const hash = djb2HashString(hashBasis);
 
     const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-    await setDoc(ref, {
-      guildId: gid,
-      count: members.length,
-      updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
-      updatedAtMs: guildTsSec * 1000,              // intern als ms
-      hash,
+    try {
+      await setDoc(ref, {
+        guildId: gid,
+        count: members.length,
+        updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
+        updatedAtMs: guildTsSec * 1000,              // intern als ms
+        hash,
 
-      avgLevel,
-      avgTreasury,
-      avgMine,
-      avgBaseMain,
-      avgConBase,
-      avgSumBaseTotal,
-      avgAttrTotal,
-      avgConTotal,
-      avgTotalStats,
+        avgLevel,
+        avgTreasury,
+        avgMine,
+        avgBaseMain,
+        avgConBase,
+        avgSumBaseTotal,
+        avgAttrTotal,
+        avgConTotal,
+        avgTotalStats,
 
-      members,
-      updatedAtServer: serverTimestamp(),
-    }, { merge: true });
+        members,
+        updatedAtServer: serverTimestamp(),
+      }, { merge: true });
 
-    snapshotsWritten++;
+      snapshotsWritten++;
+    } catch (error) {
+      if (isDuplicatePermissionError(error)) {
+        console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
+        continue;
+      }
+      console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
+      fatalError = fatalError || error;
+    }
+  }
+
+  if (fatalError) {
+    throw fatalError;
   }
 
   return { guildsProcessed: allGids.size, snapshotsWritten };

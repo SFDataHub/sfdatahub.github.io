@@ -132,6 +132,22 @@ service cloud.firestore {
         && request.auth.token.userId == userId;
     }
 
+    // ---------- Scan uploads (per-user) ----------
+    match /scan_uploads/{scanId} {
+      function isScanOwner() {
+        return request.auth != null
+          && request.auth.token.userId != null
+          && resource.data.discordUserId != null
+          && request.auth.token.userId == ("discord:" + resource.data.discordUserId);
+      }
+
+      // Lesen: Besitzer oder Admin
+      allow read: if isScanOwner() || isAdmin();
+
+      // Clientseitige Writes nicht erlaubt; Upload läuft über auth-api/Admin SDK
+      allow write: if false;
+    }
+
     // Rest dicht
     match /{document=**} { allow read, write: if false; }
   }
