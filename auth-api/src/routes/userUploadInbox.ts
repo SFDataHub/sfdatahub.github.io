@@ -5,6 +5,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { UPLOAD_INBOX_BUCKET } from "../config";
 import { admin, db } from "../firebase";
 import { requireUser } from "../middleware/auth";
+import type { LinkedPlayer, UserDoc } from "../users";
 
 const userUploadInboxRouter = Router();
 
@@ -27,6 +28,17 @@ const getInboxCollection = (userId: string) =>
 const serializeTimestamp = (value?: Timestamp | null): string | null =>
   value ? value.toDate().toISOString() : null;
 
+const normalizePlayerId = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "number") {
+    return value.toString();
+  }
+  return null;
+};
+
 const readCsvFromStorage = async (path: string | null): Promise<string | null> => {
   if (!path) return null;
   try {
@@ -40,6 +52,68 @@ const readCsvFromStorage = async (path: string | null): Promise<string | null> =
 };
 
 userUploadInboxRouter.use(requireUser);
+
+userUploadInboxRouter.post("/unlink-character", async (req: Request, res: Response) => {
+  const userId = req.sessionUser?.userId;
+  const targetPlayerId = normalizePlayerId(req.body?.playerId);
+  const rawServer = typeof req.body?.server === "string" ? req.body.server.trim() : "";
+  const server = rawServer.length > 0 ? rawServer : null;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  if (!targetPlayerId) {
+    return res.status(400).json({ error: "playerId is required" });
+  }
+
+  try {
+    const userRef = db.collection("users").doc(userId);
+
+    const updatedLinkedPlayers = await db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(userRef);
+      if (!snapshot.exists) {
+        throw new Error("user_not_found");
+      }
+
+      const data = snapshot.data() as UserDoc;
+      const current = Array.isArray(data.linkedPlayers) ? data.linkedPlayers : [];
+
+      const matchesTarget = (player: LinkedPlayer): boolean => {
+        const playerId = normalizePlayerId(player?.playerId);
+        const idsMatch = Boolean(playerId) && playerId === targetPlayerId;
+        const serverMatches = server
+          ? typeof player?.server === "string" && player.server.toLowerCase() === server.toLowerCase()
+          : true;
+        return idsMatch && serverMatches;
+      };
+
+      if (!current.some(matchesTarget)) {
+        throw new Error("linked_player_not_found");
+      }
+
+      const next = current.filter((player) => !matchesTarget(player));
+      tx.update(userRef, { linkedPlayers: next });
+      return next;
+    });
+
+    return res.json({
+      ok: true,
+      linkedPlayers: updatedLinkedPlayers,
+    });
+  } catch (error: any) {
+    const code = error?.message;
+    if (code === "user_not_found") {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (code === "linked_player_not_found") {
+      return res.status(404).json({ error: "Linked character not found" });
+    }
+
+    console.error("[unlinkCharacter] Failed to unlink character", error);
+    return res.status(500).json({ error: "Failed to unlink character" });
+  }
+});
 
 userUploadInboxRouter.get("/upload-inbox", async (req: Request, res: Response) => {
   try {

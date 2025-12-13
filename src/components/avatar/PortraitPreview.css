@@ -31,6 +31,17 @@
   clip-path: inset(-100vw -20% 3% -20%);
 }
 
+.avatar-portrait__fallback {
+  height: 240px;
+  aspect-ratio: 1 / 1;
+  width: auto;
+  display: block;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #0c1b2d;
+  border: 1px solid #2c4a73;
+}
+
 .avatar-portrait__status {
   font-size: 12px;
   color: #b0c4d9;

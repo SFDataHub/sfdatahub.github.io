@@ -30,7 +30,7 @@
 
 .player-profile__hero .avatar-portrait {
   flex-shrink: 0;
-  width: min(350px, 40vw);
+  width: min(420px, 40vw);
   justify-content: center;
   gap: 8px;
   transform: translateY(40px);

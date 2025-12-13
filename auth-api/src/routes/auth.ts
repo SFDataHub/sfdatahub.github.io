@@ -110,6 +110,7 @@ const formatAuthUser = (user: UserDoc) => {
     createdAt: user.createdAt?.toDate().toISOString(),
     lastLoginAt: user.lastLoginAt?.toDate().toISOString(),
     uploadCenter: user.uploadCenter,
+    linkedPlayers: user.linkedPlayers ?? [],
   };
 };
 

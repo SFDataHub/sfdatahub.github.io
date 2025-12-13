@@ -67,12 +67,6 @@ service cloud.firestore {
       allow create, update: if isImporter();
       allow delete: if false;
 
-      // Snapshots der Gildenmitglieder (vom Upload-Center beschrieben)
-      match /snapshots/{docId} {
-        allow read: if true;            // optional: nur eingeloggte Nutzer erlauben
-        allow write: if isImporter();   // aktuell Uebergangs-Gate
-      }
-
       match /scans/{ts} {
         allow read: if true;
         allow create: if isImporter();
@@ -105,23 +99,6 @@ service cloud.firestore {
       allow read: if isImporter();
       allow create, update: if isImporter();
       allow delete: if false;
-    }
-
-    // ---------- Linked player avatars (subcollection under linked_players/avatars/{id}) ----------
-    function linkedAvatarUserId() {
-      // Prefer incoming data (write), otherwise existing doc (read)
-      return request.resource.data.userId != null
-        ? request.resource.data.userId
-        : resource.data.userId;
-    }
-
-    match /linked_players/avatars/{playerServerId} {
-      // Bot/Admin darf schreiben (z. B. Avatar-Snapshots aus connectChar/scanUpload)
-      allow write: if isAdmin();
-
-      // Lesen: Besitzer (per Feld userId) oder Admin
-      allow read: if request.auth != null
-        && (isAdmin() || (linkedAvatarUserId() != null && request.auth.token.userId == linkedAvatarUserId()));
     }
 
     // ---------- Zusatz nur fuer collectionGroup("latest") ----------

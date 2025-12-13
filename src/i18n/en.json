@@ -16,6 +16,17 @@
     "tools": "Tools",
     "community": "Community"
   },
+  "sidebar": {
+    "connectedCharacters": {
+      "title": "Connected characters",
+      "empty": "No characters linked yet. Link a character in your account to see it here.",
+      "loginPrompt": "Sign in to see your linked characters.",
+      "chip": {
+        "server": "Server",
+        "class": "Class"
+      }
+    }
+  },
   "account": {
     "settings": {
       "title": "Settings",

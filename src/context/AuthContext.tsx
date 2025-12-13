@@ -21,13 +21,17 @@ type AuthContextValue = {
   loginWithDiscord: () => void;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
+  refreshSession: (options?: RefreshOptions) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const SESSION_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/session` : "";
 const LOGOUT_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/logout` : "";
+
+type RefreshOptions = {
+  silent?: boolean;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -44,8 +48,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const fetchSession = useCallback(async () => {
-    setStatus("loading");
+  const fetchSession = useCallback(async (options?: RefreshOptions) => {
+    if (!options?.silent) {
+      setStatus("loading");
+    }
 
     if (!SESSION_ENDPOINT) {
       console.warn("[Auth] AUTH_BASE_URL is not configured. Skipping session fetch.");
@@ -156,8 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const refreshSession = useCallback(async () => {
-    await fetchSession();
+  const refreshSession = useCallback(async (options?: RefreshOptions) => {
+    await fetchSession(options);
   }, [fetchSession]);
 
   const loading = status === "idle" || status === "loading";

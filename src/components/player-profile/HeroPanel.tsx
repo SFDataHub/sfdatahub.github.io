@@ -55,9 +55,27 @@ function ClassAvatar({
 }
 
 export default function HeroPanel({ data, loading, actionFeedback, onAction }: HeroPanelProps) {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const classMeta =
+    CLASSES.find((item) => normalize(item.label) === normalize(data.className || "")) ||
+    CLASSES.find(
+      (item) =>
+        normalize(item.label).startsWith(normalize(data.className || "")) ||
+        normalize(data.className || "").startsWith(normalize(item.label)),
+    );
+  const portraitFallbackUrl =
+    data.portraitFallbackUrl || (classMeta ? toDriveThumbProxy(classMeta.iconUrl, 420) : undefined) || "/assets/demo-avatar-special.png";
+  const portraitFallbackLabel = data.portraitFallbackLabel || data.className || data.playerName;
+  const portraitConfig = data.hasPortrait === false ? undefined : data.portrait;
+
   return (
     <section className="player-profile__hero" aria-busy={loading}>
-      <PortraitPreview config={data.portrait} label={data.playerName} />
+      <PortraitPreview
+        config={portraitConfig}
+        label={data.playerName}
+        fallbackImage={portraitFallbackUrl}
+        fallbackLabel={portraitFallbackLabel}
+      />
       <div className="player-profile__hero-body">
         <div className="player-profile__identity">
           <ClassAvatar className={data.className} label={data.playerName} size={48} />

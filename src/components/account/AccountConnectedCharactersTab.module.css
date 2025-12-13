@@ -1,0 +1,198 @@
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerTexts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.tableWrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.table td {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tableRow:last-child td {
+  border-bottom: none;
+}
+
+.dateCell {
+  white-space: nowrap;
+}
+
+.actionsHeader {
+  text-align: right;
+}
+
+.actionCell {
+  text-align: right;
+}
+
+.unlinkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.unlinkButton:hover {
+  background: var(--tile-hover);
+  transform: translateY(-1px);
+}
+
+.unlinkButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.unlinkIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.muted {
+  color: var(--text-soft);
+}
+
+.emptyState {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.emptyTitle {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.emptyDescription {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.confirmBackdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 20;
+}
+
+.confirmDialog {
+  width: 100%;
+  max-width: 440px;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.confirmTitle {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.confirmText {
+  margin: 0 0 12px;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.confirmName {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.confirmMeta {
+  font-size: 13px;
+}
+
+.errorText {
+  margin: 0 0 10px;
+  color: #ff8686;
+  font-size: 13px;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.cancelButton,
+.confirmButton {
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--tile-hover);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.confirmButton {
+  border-color: rgba(255, 122, 122, 0.6);
+  background: rgba(255, 122, 122, 0.14);
+  color: var(--danger, #ff8686);
+}
+
+.cancelButton:disabled,
+.confirmButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

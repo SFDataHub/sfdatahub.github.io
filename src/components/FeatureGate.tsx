@@ -1,4 +1,5 @@
 import React from "react";
+import { useAuth } from "../context/AuthContext";
 import { useFeatureAccess } from "../lib/featureAccessConfig";
 
 interface FeatureGateProps {
@@ -9,7 +10,8 @@ interface FeatureGateProps {
 }
 
 export function FeatureGate({ route, featureId, fallback = null, children }: FeatureGateProps) {
-  const { resolveRule, canAccessFeature, canAccessRule } = useFeatureAccess();
+  const { isLoading: authIsLoading } = useAuth();
+  const { resolveRule, canAccessFeature, canAccessRule, loading: featureAccessLoading } = useFeatureAccess();
   const target = featureId ?? route ?? "/";
 
   const rule = React.useMemo(
@@ -28,6 +30,10 @@ export function FeatureGate({ route, featureId, fallback = null, children }: Fea
     if (rule) return canAccessRule(rule);
     return canAccessFeature(target);
   }, [canAccessFeature, canAccessRule, featureId, route, rule, target]);
+
+  if (authIsLoading || featureAccessLoading) {
+    return null;
+  }
 
   if (!allowed) return <>{fallback}</>;
   return <>{children}</>;

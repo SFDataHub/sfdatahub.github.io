@@ -8,6 +8,17 @@ export interface AuthUserProviderInfo {
   avatarUrl?: string;
 }
 
+export type LinkedPlayer = {
+  server: string;
+  playerId: number | string;
+  verifiedAt?: string;
+  method?: string;
+  name?: string;
+  class?: string;
+  level?: number;
+  guildName?: string;
+};
+
 export interface AuthUser {
   id: string;
   displayName: string;
@@ -16,6 +27,7 @@ export interface AuthUser {
   providers?: Partial<Record<AuthProvider, AuthUserProviderInfo>>;
   roles: string[];
   accessGroups?: string[];
+  linkedPlayers?: LinkedPlayer[];
   createdAt?: string;
   lastLoginAt?: string;
   uploadCenter?: {

@@ -53,13 +53,25 @@ describe("POST /internal/scan-uploads", () => {
   beforeEach(async () => {
     fakeDb.reset();
     fakeBucket.reset();
+    await fakeDb.collection("upload_quota_config").doc("default").set({
+      enabled: true,
+      dailyGuildLimit: 10,
+      dailyPlayerLimit: 50,
+      roles: {
+        admin: { enabled: true, dailyGuildLimit: 0, dailyPlayerLimit: 0 },
+        user: { enabled: true, dailyGuildLimit: 5, dailyPlayerLimit: 6 },
+      },
+    });
     await fakeDb.collection("users").doc(TEST_USER_ID).set({
       userId: TEST_USER_ID,
       roles: ["user"],
-      remainingUploads: 2,
-      totalUploadsToday: 1,
-      lastUploadDate: formatTodayString(),
-      dailyUploadLimit: 3,
+      uploadCenter: {
+        usage: {
+          date: formatTodayString(),
+          players: 0,
+          guilds: 0,
+        },
+      },
     });
   });
 
@@ -135,9 +147,9 @@ describe("POST /internal/scan-uploads", () => {
 
     const userSnap = await fakeDb.collection("users").doc(TEST_USER_ID).get();
     const userData = userSnap.data() as Record<string, any>;
-    expect(userData.remainingUploads).toBe(1);
-    expect(userData.totalUploadsToday).toBe(2);
-    expect(userData.lastUploadDate).toBe(formatTodayString());
+    expect(userData.uploadCenter?.usage?.date).toBe(formatTodayString());
+    expect(userData.uploadCenter?.usage?.players).toBe(3);
+    expect(userData.uploadCenter?.usage?.guilds).toBe(2);
   });
 
   it("marks the Firestore doc as error if storage upload fails", async () => {
@@ -172,8 +184,8 @@ describe("POST /internal/scan-uploads", () => {
 
     const userSnap = await fakeDb.collection("users").doc(TEST_USER_ID).get();
     const userData = userSnap.data() as Record<string, any>;
-    expect(userData.remainingUploads).toBe(2);
-    expect(userData.totalUploadsToday).toBe(1);
+    expect(userData.uploadCenter?.usage?.players).toBe(0);
+    expect(userData.uploadCenter?.usage?.guilds).toBe(0);
   });
 
   it("rejects uploads when the daily quota is exhausted", async () => {
@@ -181,10 +193,13 @@ describe("POST /internal/scan-uploads", () => {
     await fakeDb.collection("users").doc(TEST_USER_ID).set({
       userId: TEST_USER_ID,
       roles: ["user"],
-      remainingUploads: 0,
-      totalUploadsToday: 3,
-      lastUploadDate: formatTodayString(),
-      dailyUploadLimit: 3,
+      uploadCenter: {
+        usage: {
+          date: formatTodayString(),
+          players: 6,
+          guilds: 0,
+        },
+      },
     });
 
     const response = await request(app)
@@ -206,8 +221,7 @@ describe("POST /internal/scan-uploads", () => {
 
     const userSnap = await fakeDb.collection("users").doc(TEST_USER_ID).get();
     const userData = userSnap.data() as Record<string, any>;
-    expect(userData.remainingUploads).toBe(0);
-    expect(userData.totalUploadsToday).toBe(3);
+    expect(userData.uploadCenter?.usage?.players).toBe(6);
   });
 
   it("allows admins to upload without quota limits", async () => {
@@ -215,10 +229,13 @@ describe("POST /internal/scan-uploads", () => {
     await fakeDb.collection("users").doc(TEST_USER_ID).set({
       userId: TEST_USER_ID,
       roles: ["admin"],
-      remainingUploads: 0,
-      totalUploadsToday: 0,
-      lastUploadDate: formatTodayString(),
-      dailyUploadLimit: 0,
+      uploadCenter: {
+        usage: {
+          date: formatTodayString(),
+          players: 0,
+          guilds: 0,
+        },
+      },
     });
 
     const response = await request(app)
@@ -235,7 +252,8 @@ describe("POST /internal/scan-uploads", () => {
 
     const userSnap = await fakeDb.collection("users").doc(TEST_USER_ID).get();
     const userData = userSnap.data() as Record<string, any>;
-    expect(userData.totalUploadsToday).toBe(1);
-    expect(userData.lastUploadDate).toBe(formatTodayString());
+    expect(userData.uploadCenter?.usage?.players).toBe(1);
+    expect(userData.uploadCenter?.usage?.guilds).toBe(0);
+    expect(userData.uploadCenter?.usage?.date).toBe(formatTodayString());
   });
 });
