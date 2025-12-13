@@ -66,6 +66,77 @@
   margin: 4px 6px 8px;
 }
 
+/* ====== Connected Characters ====== */
+.connectedCharactersCard{
+  margin-top: 6px;
+}
+.connectedCharactersTitle{
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .01em;
+  margin-bottom: 10px;
+}
+.connectedCharactersList{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.connectedCharactersList[data-collapsed="true"]{
+  align-items: stretch;
+}
+.characterChip{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--tile-hover);
+  border: 1px solid var(--line);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color .15s ease, border-color .15s ease, transform .12s ease;
+}
+.characterChip:hover{
+  background: var(--active);
+  border-color: var(--line);
+  transform: translateY(-1px);
+}
+.characterChipId{
+  font-weight: 600;
+  font-size: 14px;
+}
+.characterChipMeta{
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.connectedCharactersEmpty{
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--line);
+  background: var(--tile-hover);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.connectedCharactersList[data-collapsed="true"] .characterChip{
+  align-items: center;
+  text-align: center;
+}
+.connectedCharactersList[data-collapsed="true"] .characterChipMeta{
+  width: 100%;
+}
+@media (max-width: 768px){
+  .connectedCharactersCard{
+    width: 100%;
+  }
+  .characterChip{
+    font-size: 14px;
+  }
+}
+
 /* ====== Liste/Navigation ====== */
 .navCol{ display:flex; flex-direction:column; gap:6px; width:100%; }
 .navItemWrap{ position:relative; display:flex; align-items:center; gap:6px; width:100%; overflow:visible; }

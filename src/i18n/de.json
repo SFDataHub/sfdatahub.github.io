@@ -16,6 +16,17 @@
     "tools": "Tools",
     "community": "Community"
   },
+  "sidebar": {
+    "connectedCharacters": {
+      "title": "Verknuepfte Charaktere",
+      "empty": "Noch keine Charaktere verknuepft. Verknuepfe einen Charakter in deinem Account, damit er hier erscheint.",
+      "loginPrompt": "Bitte einloggen, um verknuepfte Charaktere zu sehen.",
+      "chip": {
+        "server": "Server",
+        "class": "Klasse"
+      }
+    }
+  },
   "account": {
     "settings": {
       "title": "Einstellungen",

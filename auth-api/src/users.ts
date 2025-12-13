@@ -31,6 +31,17 @@ export interface UploadCenterState {
   usage?: UploadCenterUsage;
 }
 
+export interface LinkedPlayer {
+  server: string;
+  playerId: number | string;
+  verifiedAt?: string;
+  method?: string;
+  name?: string;
+  class?: string;
+  level?: number;
+  guildName?: string;
+}
+
 export interface UserDoc {
   userId: string;
   primaryProvider: AuthProvider;
@@ -44,6 +55,7 @@ export interface UserDoc {
   lastLoginAt: Timestamp;
   profile?: UserProfile;
   uploadCenter?: UploadCenterState;
+  linkedPlayers?: LinkedPlayer[];
 }
 
 const usersCollection = db.collection("users");

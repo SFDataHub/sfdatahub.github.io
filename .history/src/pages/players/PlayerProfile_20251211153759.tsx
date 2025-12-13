@@ -96,19 +96,12 @@ export default function PlayerProfile() {
         const guildName = (data.guildName ?? values?.Guild ?? null) || null;
         const name = data.name ?? values?.Name ?? id;
         const server = data.server ?? values?.Server ?? null;
-        const serverNormalized =
-          typeof server === "string"
-            ? server
-                .trim()
-                .toLowerCase()
-                .replace(/\./g, "_")
-            : "";
-        const avatarIdentifier =
-          data.avatarIdentifier ??
-          data.identifier ??
-          values?.avatarIdentifier ??
-          values?.identifier ??
-          (serverNormalized ? `${id}__${serverNormalized}` : null);
+        const serverNormalized = normalizeServerId(server);
+        const avatarIdentifier = normalizeAvatarIdentifier(
+          data.avatarIdentifier ?? data.identifier ?? values?.avatarIdentifier ?? values?.identifier ?? null,
+          id,
+          serverNormalized,
+        );
         const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
         const scrapbookPct = toNum(values?.["Album"] ?? values?.["Album %"] ?? values?.AlbumPct) ?? null;
         const lastScanDays = daysSince(toNum(data.timestamp));
@@ -183,8 +176,8 @@ export default function PlayerProfile() {
       try {
         const snap = await fetchAvatarSnapshotByPlayer(
           playerIdNum,
-          snapshot.server ?? "",
-          snapshot.avatarIdentifier ?? undefined,
+          snapshot.server,
+          snapshot.avatarIdentifier || undefined,
         );
         if (!cancelled) setAvatarSnapshot(snap);
       } catch (error: any) {

@@ -171,6 +171,23 @@ function UploadCenterContentBody() {
   );
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
+  const applyQuotaState = useCallback((config: UploadQuotaConfig, usage: UploadCenterUsage) => {
+    const today = formatTodayString();
+    setQuotaState(buildQuotaState(config, usage, today));
+    setQuotaError(null);
+  }, []);
+
+  const refreshQuotaFromRemote = useCallback(async () => {
+    try {
+      const snapshot = await fetchUploadQuotaSnapshot(user ?? null);
+      applyQuotaState(snapshot.config, snapshot.usage);
+      persistUploadQuotaToStorage(snapshot.config, snapshot.usage);
+    } catch (error) {
+      console.error("[UploadCenter] Failed to refresh upload quota", error);
+      setQuotaError("Could not refresh upload quota. Using last known values.");
+    }
+  }, [applyQuotaState, user]);
+
   useEffect(() => {
     let isActive = true;
     const today = formatTodayString();
@@ -178,12 +195,6 @@ function UploadCenterContentBody() {
       date: null,
       guilds: 0,
       players: 0,
-    };
-
-    const applyQuotaState = (config: UploadQuotaConfig, usage: UploadCenterUsage) => {
-      if (!isActive) return;
-      setQuotaState(buildQuotaState(config, usage, today));
-      setQuotaError(null);
     };
 
     applyQuotaState(DEFAULT_UPLOAD_QUOTA, usageFromUser);
@@ -215,6 +226,7 @@ function UploadCenterContentBody() {
     user?.uploadCenter?.usage?.date,
     user?.uploadCenter?.usage?.guilds,
     user?.uploadCenter?.usage?.players,
+    applyQuotaState,
   ]);
 
   const handleBuildSessionFromCsv = useCallback((parsed: CsvParsedResult) => {
@@ -570,6 +582,7 @@ function UploadCenterContentBody() {
             console.error("[UploadCenter] Failed to record upload usage.", error);
           }
         }
+        await refreshQuotaFromRemote();
       }
     } catch (error) {
       console.error("[UploadCenter] Failed to upload selection", error);
@@ -655,10 +668,17 @@ function UploadCenterContentBody() {
                 {sessions.map((session) => {
                   const isActive = session.id === activeSessionId;
                   return (
-                    <button
+                    <div
                       key={session.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setActiveSession(session.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setActiveSession(session.id);
+                        }
+                      }}
                       className={[
                         "w-full rounded-xl border px-4 py-3 text-left transition",
                         isActive
@@ -702,7 +722,7 @@ function UploadCenterContentBody() {
                           Active
                         </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

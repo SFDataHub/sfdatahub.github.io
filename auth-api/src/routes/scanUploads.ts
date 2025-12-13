@@ -20,12 +20,6 @@ const formatTodayString = () => {
 
 type NormalizedRole = "admin" | "moderator" | "user";
 
-const DAILY_SCAN_UPLOAD_LIMIT: Record<NormalizedRole, number> = {
-  admin: Number.POSITIVE_INFINITY,
-  moderator: 20,
-  user: 5,
-};
-
 const normalizeRole = (userData: Record<string, unknown>): NormalizedRole => {
   const rawRole =
     typeof (userData as any).role === "string"
@@ -47,49 +41,99 @@ const normalizeRole = (userData: Record<string, unknown>): NormalizedRole => {
   return "user";
 };
 
-const resolveDailyLimit = (
-  role: NormalizedRole,
-  userData: Record<string, unknown>,
-): number => {
-  const explicit =
-    (userData as any).dailyUploadLimit ?? (userData as any).scanUploadDailyLimit;
-  const parsed = Number(explicit);
-  if (Number.isFinite(parsed) && parsed >= 0) return parsed;
-
-  const fallback = DAILY_SCAN_UPLOAD_LIMIT[role];
-  if (Number.isFinite(fallback)) return fallback;
-  return DAILY_SCAN_UPLOAD_LIMIT.user;
+type UploadQuotaRoleOverride = {
+  enabled?: boolean;
+  dailyGuildLimit?: number;
+  dailyPlayerLimit?: number;
 };
 
-type QuotaSnapshot = {
-  dailyLimit: number;
-  remaining: number;
-  totalToday: number;
-  isToday: boolean;
+type UploadQuotaConfig = {
+  enabled?: boolean;
+  dailyGuildLimit: number;
+  dailyPlayerLimit: number;
+  roles?: Record<string, UploadQuotaRoleOverride | undefined>;
 };
 
-const buildQuotaSnapshot = (
-  userData: Record<string, unknown>,
-  role: NormalizedRole,
-  today: string,
-): QuotaSnapshot => {
-  const dailyLimit = resolveDailyLimit(role, userData);
-  const lastUploadDate =
-    typeof (userData as any).lastUploadDate === "string"
-      ? ((userData as any).lastUploadDate as string)
-      : null;
-  const isToday = lastUploadDate === today;
-  const remainingRaw = Number((userData as any).remainingUploads);
-  const totalRaw = Number((userData as any).totalUploadsToday);
+const DEFAULT_UPLOAD_QUOTA: UploadQuotaConfig = {
+  enabled: true,
+  dailyGuildLimit: 9999,
+  dailyPlayerLimit: 999999,
+};
 
-  const remaining = isToday && Number.isFinite(remainingRaw) ? remainingRaw : dailyLimit;
-  const totalToday = isToday && Number.isFinite(totalRaw) ? totalRaw : 0;
+const parseNonNegativeNumber = (value: unknown): number | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "boolean") return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+};
+
+const loadUploadQuotaConfig = async (): Promise<UploadQuotaConfig> => {
+  try {
+    const snap = await db.collection("upload_quota_config").doc("default").get();
+    if (!snap.exists) {
+      console.warn("[scanUploads] Missing upload_quota_config/default, using defaults");
+      return DEFAULT_UPLOAD_QUOTA;
+    }
+    const data = snap.data() ?? {};
+    const maybeGuildLimit = parseNonNegativeNumber((data as any).dailyGuildLimit);
+    const maybePlayerLimit = parseNonNegativeNumber((data as any).dailyPlayerLimit);
+    const rolesRaw = (data as any).roles;
+    const rolesParsed: UploadQuotaConfig["roles"] = {};
+    if (rolesRaw && typeof rolesRaw === "object") {
+      Object.entries(rolesRaw as Record<string, unknown>).forEach(([role, override]) => {
+        if (!override || typeof override !== "object") return;
+        const ov = override as Record<string, unknown>;
+        const enabled = typeof ov.enabled === "boolean" ? ov.enabled : undefined;
+        const guildLimit = parseNonNegativeNumber(ov.dailyGuildLimit);
+        const playerLimit = parseNonNegativeNumber(ov.dailyPlayerLimit);
+        const clean: UploadQuotaRoleOverride = {};
+        if (enabled !== undefined) clean.enabled = enabled;
+        if (guildLimit !== null) clean.dailyGuildLimit = guildLimit;
+        if (playerLimit !== null) clean.dailyPlayerLimit = playerLimit;
+        if (Object.keys(clean).length > 0) {
+          rolesParsed[role.toLowerCase()] = clean;
+        }
+      });
+    }
+
+    const config: UploadQuotaConfig = {
+      enabled: typeof (data as any).enabled === "boolean" ? (data as any).enabled : DEFAULT_UPLOAD_QUOTA.enabled,
+      dailyGuildLimit: maybeGuildLimit ?? DEFAULT_UPLOAD_QUOTA.dailyGuildLimit,
+      dailyPlayerLimit: maybePlayerLimit ?? DEFAULT_UPLOAD_QUOTA.dailyPlayerLimit,
+    };
+    if (Object.keys(rolesParsed).length > 0) {
+      config.roles = rolesParsed;
+    }
+    return config;
+  } catch (error) {
+    console.error("[scanUploads] Failed to load upload quota config, using defaults", error);
+    return DEFAULT_UPLOAD_QUOTA;
+  }
+};
+
+const resolveQuotaLimitsForUser = (
+  config: UploadQuotaConfig,
+  userRoles: string[],
+): { dailyGuildLimit: number; dailyPlayerLimit: number } => {
+  const normalizedRoles = Array.isArray(userRoles)
+    ? userRoles.filter((role): role is string => typeof role === "string" && role.length > 0).map((r) => r.toLowerCase())
+    : [];
+
+  for (const role of normalizedRoles) {
+    const override = config.roles?.[role];
+    if (!override || override.enabled === false) {
+      continue;
+    }
+    return {
+      dailyGuildLimit: override.dailyGuildLimit ?? config.dailyGuildLimit,
+      dailyPlayerLimit: override.dailyPlayerLimit ?? config.dailyPlayerLimit,
+    };
+  }
 
   return {
-    dailyLimit,
-    remaining,
-    totalToday,
-    isToday,
+    dailyGuildLimit: config.dailyGuildLimit,
+    dailyPlayerLimit: config.dailyPlayerLimit,
   };
 };
 
@@ -101,8 +145,22 @@ type QuotaReservation =
       applied: boolean;
       date: string;
       userRef: FirebaseFirestore.DocumentReference;
-      remainingAfter?: number;
-      totalAfter?: number;
+      usage: {
+        playersUsedToday: number;
+        guildsUsedToday: number;
+      };
+      limits: {
+        dailyGuildLimit: number;
+        dailyPlayerLimit: number;
+      };
+      deltas: {
+        players: number;
+        guilds: number;
+      };
+      unlimited: {
+        players: boolean;
+        guilds: boolean;
+      };
     }
   | {
       ok: false;
@@ -113,10 +171,15 @@ type QuotaReservation =
 
 const reserveUploadQuotaForUser = async (
   discordUserId: string,
+  playersDelta: number,
+  guildsDelta: number,
 ): Promise<QuotaReservation> => {
   const today = formatTodayString();
   const userId = `discord:${discordUserId}`;
   const userRef = db.collection("users").doc(userId);
+  const quotaConfig = await loadUploadQuotaConfig();
+  const safePlayersDelta = Math.max(0, Number(playersDelta) || 0);
+  const safeGuildsDelta = Math.max(0, Number(guildsDelta) || 0);
 
   try {
     const reservation = await db.runTransaction(async (tx) => {
@@ -132,54 +195,53 @@ const reserveUploadQuotaForUser = async (
 
       const userData = (snap.data() ?? {}) as Record<string, unknown>;
       const role = normalizeRole(userData);
-      const quota = buildQuotaSnapshot(userData, role, today);
-
-      if (role === "admin") {
-        const updatePayload: Record<string, unknown> = {
-          lastUploadDate: today,
-          totalUploadsToday: quota.totalToday + 1,
-        };
-        if (typeof (userData as any).role !== "string") {
-          updatePayload.role = role;
-        }
-        tx.update(userRef, updatePayload);
-        return {
-          ok: true,
-          userId,
-          role,
-          applied: false,
-          date: today,
-          userRef,
-        } satisfies QuotaReservation;
+      const userRoles: string[] = Array.isArray((userData as any).roles)
+        ? ((userData as any).roles as string[])
+        : [];
+      if (typeof (userData as any).role === "string") {
+        userRoles.unshift((userData as any).role as string);
       }
 
-      if (!Number.isFinite(quota.dailyLimit)) {
-        return {
-          ok: false,
-          status: 500,
-          code: "invalid_quota",
-          message: "User quota configuration is invalid.",
-        } satisfies QuotaReservation;
-      }
+      const limits = resolveQuotaLimitsForUser(quotaConfig, userRoles);
+      const usage = ((userData as any).uploadCenter as any)?.usage ?? {};
+      const lastDate = typeof usage?.date === "string" ? (usage.date as string) : null;
+      const isToday = lastDate === today;
+      const playersUsedToday = isToday ? Number(usage?.players ?? 0) || 0 : 0;
+      const guildsUsedToday = isToday ? Number(usage?.guilds ?? 0) || 0 : 0;
 
-      if (quota.remaining <= 0) {
+      const isUnlimitedPlayers = !limits.dailyPlayerLimit || limits.dailyPlayerLimit <= 0;
+      const isUnlimitedGuilds = !limits.dailyGuildLimit || limits.dailyGuildLimit <= 0;
+
+      const nextPlayersUsed = playersUsedToday + safePlayersDelta;
+      const nextGuildsUsed = guildsUsedToday + safeGuildsDelta;
+
+      if (!isUnlimitedPlayers && limits.dailyPlayerLimit > 0 && nextPlayersUsed > limits.dailyPlayerLimit) {
         return {
           ok: false,
           status: 429,
           code: "quota_exhausted",
-          message:
-            "Upload limit reached for today. Please try again tomorrow or contact an admin.",
+          message: "Player upload limit reached for today. Please try again tomorrow or contact an admin.",
         } satisfies QuotaReservation;
       }
 
-      const remainingAfter = quota.remaining - 1;
-      const totalAfter = quota.totalToday + 1;
+      if (!isUnlimitedGuilds && limits.dailyGuildLimit > 0 && nextGuildsUsed > limits.dailyGuildLimit) {
+        return {
+          ok: false,
+          status: 429,
+          code: "quota_exhausted",
+          message: "Guild upload limit reached for today. Please try again tomorrow or contact an admin.",
+        } satisfies QuotaReservation;
+      }
 
       tx.update(userRef, {
-        remainingUploads: remainingAfter,
-        totalUploadsToday: totalAfter,
-        lastUploadDate: today,
-        dailyUploadLimit: quota.dailyLimit,
+        uploadCenter: {
+          ...((userData as any).uploadCenter ?? {}),
+          usage: {
+            date: today,
+            players: nextPlayersUsed,
+            guilds: nextGuildsUsed,
+          },
+        },
         role: typeof (userData as any).role === "string" ? (userData as any).role : role,
       });
 
@@ -187,11 +249,25 @@ const reserveUploadQuotaForUser = async (
         ok: true,
         userId,
         role,
-        applied: true,
-        remainingAfter,
-        totalAfter,
         date: today,
         userRef,
+        applied: true,
+        usage: {
+          playersUsedToday: nextPlayersUsed,
+          guildsUsedToday: nextGuildsUsed,
+        },
+        limits: {
+          dailyGuildLimit: limits.dailyGuildLimit,
+          dailyPlayerLimit: limits.dailyPlayerLimit,
+        },
+        deltas: {
+          players: safePlayersDelta,
+          guilds: safeGuildsDelta,
+        },
+        unlimited: {
+          players: isUnlimitedPlayers,
+          guilds: isUnlimitedGuilds,
+        },
       } satisfies QuotaReservation;
     });
 
@@ -216,22 +292,26 @@ const refundQuotaReservation = async (reservation: QuotaReservation) => {
       if (!snap.exists) return;
 
       const data = snap.data() ?? {};
-      const lastUploadDate =
-        typeof (data as any).lastUploadDate === "string"
-          ? ((data as any).lastUploadDate as string)
-          : null;
-      if (lastUploadDate && lastUploadDate !== reservation.date) {
+      const usage = ((data as any).uploadCenter as any)?.usage ?? {};
+      const lastDate = typeof usage?.date === "string" ? (usage.date as string) : null;
+      if (lastDate && lastDate !== reservation.date) {
         return;
       }
 
-      const remainingRaw = Number((data as any).remainingUploads);
-      const totalRaw = Number((data as any).totalUploadsToday);
-      const nextRemaining = Number.isFinite(remainingRaw) ? remainingRaw + 1 : 1;
-      const nextTotal = Number.isFinite(totalRaw) && totalRaw > 0 ? totalRaw - 1 : 0;
+      const playersUsed = Number(usage?.players ?? 0) || 0;
+      const guildsUsed = Number(usage?.guilds ?? 0) || 0;
+      const nextPlayers = Math.max(playersUsed - reservation.deltas.players, 0);
+      const nextGuilds = Math.max(guildsUsed - reservation.deltas.guilds, 0);
 
       tx.update(reservation.userRef, {
-        remainingUploads: nextRemaining,
-        totalUploadsToday: nextTotal,
+        uploadCenter: {
+          ...((data as any).uploadCenter ?? {}),
+          usage: {
+            date: reservation.date,
+            players: nextPlayers,
+            guilds: nextGuilds,
+          },
+        },
       });
     });
   } catch (error) {
@@ -271,6 +351,12 @@ type ScanUploadPayload = z.infer<typeof scanUploadSchema>;
 const scanUploadsRouter = Router();
 
 const toCsvBuffer = (value: string) => Buffer.from(value, "utf8");
+const countCsvRows = (csv?: string): number => {
+  if (!csv) return 0;
+  const lines = csv.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) return 0;
+  return Math.max(lines.length - 1, 0);
+};
 
 scanUploadsRouter.post("/", async (req: Request, res: Response) => {
   const token = req.header(SCAN_UPLOAD_HEADER);
@@ -297,7 +383,14 @@ scanUploadsRouter.post("/", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "missing_user", message: "discordUser.id is required" });
   }
 
-  const quotaReservation = await reserveUploadQuotaForUser(payload.discordUser.id);
+  const playersDelta = countCsvRows(payload.playersCsv);
+  const guildsDelta = countCsvRows(payload.guildsCsv);
+
+  const quotaReservation = await reserveUploadQuotaForUser(
+    payload.discordUser.id,
+    playersDelta,
+    guildsDelta,
+  );
   if (!quotaReservation.ok) {
     return res.status(quotaReservation.status).json({
       error: quotaReservation.code,

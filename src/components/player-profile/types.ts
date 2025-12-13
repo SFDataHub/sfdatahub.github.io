@@ -30,11 +30,35 @@ export type PortraitOptions = {
     | ""
     | "goldenFrame"
     | "twitchFrame"
+    | "zenFrame"
+    | "silverFrame"
     | "worldBossFrameGold"
     | "worldBossFrameSilver"
     | "worldBossFrameBronze"
     | "polarisFrame";
   mirrorHorizontal?: boolean;
+};
+
+export const DEFAULT_PORTRAIT: PortraitOptions = {
+  genderName: "male",
+  class: 2,
+  race: 1,
+  mouth: 1,
+  hair: 3,
+  hairColor: 4,
+  horn: 0,
+  hornColor: 0,
+  brows: 2,
+  eyes: 3,
+  beard: 0,
+  nose: 2,
+  ears: 1,
+  extra: 0,
+  special: 0,
+  showBorder: true,
+  background: "gradient",
+  frame: "",
+  mirrorHorizontal: true,
 };
 
 export type HeroMetric = {
@@ -66,7 +90,10 @@ export type HeroPanelData = {
   metrics: HeroMetric[];
   badges: HeroBadge[];
   actions: HeroAction[];
-  portrait: Partial<PortraitOptions>;
+  portrait?: Partial<PortraitOptions>;
+  hasPortrait?: boolean;
+  portraitFallbackUrl?: string;
+  portraitFallbackLabel?: string;
 };
 
 export type AttributeStat = {

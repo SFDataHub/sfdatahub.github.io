@@ -3,6 +3,8 @@ import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.31.js";
 import type { PortraitOptions } from "../player-profile/types";
 import "./PortraitPreview.css";
 
+const NEUTRAL_PLACEHOLDER = "/assets/demo-avatar-special.png";
+
 const DEFAULT_PORTRAIT: PortraitOptions = {
   genderName: "male",
   class: 2,
@@ -65,26 +67,29 @@ const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
 export default function PortraitPreview({
   config,
   label,
+  fallbackImage,
+  fallbackLabel,
 }: {
   config?: Partial<PortraitOptions>;
   label: string;
+  fallbackImage?: string;
+  fallbackLabel?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const instanceRef = useRef<{ dispose?: () => void } | null>(null);
   const [status, setStatus] = useState<PortraitStatus>("idle");
 
   const libraryConfig = useMemo(() => {
-    const normalized = sanitizeConfig(config);
-    return {
-      ...normalized,
-      background: "",
-      frame: "",
-      showBorder: false,
-    };
+    if (!config || Object.keys(config || {}).length === 0) return null;
+    return sanitizeConfig(config);
   }, [JSON.stringify(config || {})]);
 
   useEffect(() => {
     let disposed = false;
+    if (!libraryConfig) {
+      setStatus("idle");
+      return;
+    }
     setStatus("loading");
     try {
       const canvas = canvasRef.current;
@@ -111,19 +116,34 @@ export default function PortraitPreview({
     };
   }, [libraryConfig]);
 
-  const statusMessage = status !== "ready" ? statusLabel[status] : null;
+  const statusMessage = libraryConfig && status !== "ready" ? statusLabel[status] : null;
+  const placeholderSrc = fallbackImage || NEUTRAL_PLACEHOLDER;
+  const placeholderAlt = fallbackLabel || label;
+  const showFallback = !libraryConfig || status === "error";
 
   return (
     <div className="avatar-portrait" aria-live="polite">
       <div className="avatar-portrait__canvas-shell">
-        <canvas
-          ref={canvasRef}
-          id="PortraitCanvasPopOut"
-          width={526}
-          height={526}
-          className="avatar-portrait__canvas avatar-portrait__canvas--popout"
-          aria-label={`Portrait von ${label}`}
-        />
+        {!showFallback && (
+          <canvas
+            ref={canvasRef}
+            id="PortraitCanvasPopOut"
+            width={526}
+            height={526}
+            className="avatar-portrait__canvas avatar-portrait__canvas--popout"
+            aria-label={`Portrait von ${label}`}
+          />
+        )}
+        {showFallback && (
+          <img
+            src={placeholderSrc}
+            alt={placeholderAlt}
+            className="avatar-portrait__fallback"
+            draggable={false}
+            width={240}
+            height={240}
+          />
+        )}
       </div>
       {statusMessage && <span className="avatar-portrait__status">{statusMessage}</span>}
     </div>

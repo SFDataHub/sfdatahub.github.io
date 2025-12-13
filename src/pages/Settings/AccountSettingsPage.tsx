@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
+import AccountConnectedCharactersTab from "../../components/account/AccountConnectedCharactersTab";
 import { useAuth } from "../../context/AuthContext";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
 import { getUserSettings, updateUserSettings, type UserSettings } from "../../lib/user/settings";
@@ -14,7 +15,7 @@ const PROFILE_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/account/profile`
 const GOOGLE_LINK_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/google/link/start` : "";
 const MIN_NAME_LENGTH = 3;
 const MAX_NAME_LENGTH = 32;
-type TabKey = "overview" | "settings" | "tools";
+type TabKey = "overview" | "settings" | "tools" | "connected-characters";
 
 const formatTimestamp = (value?: string): string | undefined => {
   if (!value) return undefined;
@@ -456,9 +457,10 @@ const AccountSettingsPage: React.FC = () => {
 
   const renderTabs = () => {
     const tabs: { key: TabKey; label: string }[] = [
-      { key: "overview", label: "Overview" },
-      { key: "settings", label: "Settings" },
-      { key: "tools", label: "Tools" },
+      { key: "overview", label: t("account.tabs.overview", "Overview") },
+      { key: "settings", label: t("account.tabs.settings", "Settings") },
+      { key: "tools", label: t("account.tabs.tools", "Tools") },
+      { key: "connected-characters", label: t("account.tabs.connectedCharacters", "Connected characters") },
     ];
 
     return (
@@ -569,6 +571,13 @@ const AccountSettingsPage: React.FC = () => {
             )}
           </section>
         );
+      case "connected-characters":
+        return (
+          <AccountConnectedCharactersTab
+            user={user}
+            refreshSession={refreshSession}
+          />
+        );
       default:
         return null;
     }
@@ -604,7 +613,7 @@ export default AccountSettingsPage;
 
 type IdentityCardProps = {
   user: ReturnType<typeof useAuth>["user"];
-  refreshSession: () => Promise<void>;
+  refreshSession: ReturnType<typeof useAuth>["refreshSession"];
 };
 
 function IdentityCard({ user, refreshSession }: IdentityCardProps) {

@@ -351,6 +351,7 @@ export default function Sidebar({
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
+  const linkedPlayers = React.useMemo(() => user?.linkedPlayers ?? [], [user?.linkedPlayers]);
   const { isVisibleInSidebar } = useFeatureAccess();
 
   const handleFooterClick = () => {
@@ -360,6 +361,20 @@ export default function Sidebar({
       navigate("/login");
     }
   };
+
+  const handleCharacterClick = (playerId: string | number) => {
+    navigate(`/player/${playerId}`);
+  };
+
+  const emptyConnectedText = isAuthed
+    ? t(
+        "sidebar.connectedCharacters.empty",
+        { defaultValue: "No characters linked yet. Link a character in your account to see it here." },
+      )
+    : t(
+        "sidebar.connectedCharacters.loginPrompt",
+        { defaultValue: "Sign in to see your linked characters." },
+      );
 
   return (
     <aside
@@ -412,6 +427,37 @@ export default function Sidebar({
               translate={t}
               isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
             />
+          </div>
+
+          <div className={`${styles.segCard} ${styles.mainNavCard} ${styles.connectedCharactersCard}`}>
+            <div className={styles.connectedCharactersTitle}>
+              {t("sidebar.connectedCharacters.title", { defaultValue: "Connected characters" })}
+            </div>
+            {linkedPlayers.length === 0 ? (
+              <div className={styles.connectedCharactersEmpty}>
+                {emptyConnectedText}
+              </div>
+            ) : (
+              <div className={styles.connectedCharactersList} data-collapsed={collapsed ? "true" : "false"}>
+                {linkedPlayers.map((char) => {
+                  const metaParts = [char.server, char.class].filter(Boolean).join(" | ");
+                  const playerId = char.playerId ?? "-";
+                  const key = `${char.server ?? "server"}-${playerId}`;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={styles.characterChip}
+                      onClick={() => handleCharacterClick(playerId)}
+                    >
+                      <span className={styles.characterChipId}>{playerId}</span>
+                      {metaParts && <span className={styles.characterChipMeta}>{metaParts}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
