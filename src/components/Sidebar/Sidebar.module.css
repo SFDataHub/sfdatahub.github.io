@@ -114,11 +114,41 @@
   font-size: 12px;
 }
 .connectedCharactersEmpty{
-  padding: 10px 12px;
-  border-radius: 10px;
+  width: 100%;
+  text-align: left;
+  appearance: none;
   border: 1px dashed var(--line);
   background: var(--tile-hover);
   color: var(--text-soft);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, transform .12s ease, color .15s ease;
+}
+.connectedCharactersEmpty:hover,
+.connectedCharactersEmpty:focus-visible{
+  background: var(--active);
+  border-color: var(--line);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.connectedCharactersEmpty:focus-visible{
+  outline: 2px solid rgba(255,255,255,0.25);
+  outline-offset: 2px;
+}
+.connectedCharactersEmptyText{
+  display: block;
+}
+.connectedCharactersEmptyCta{
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
 }
 .connectedCharactersList[data-collapsed="true"] .characterChip{

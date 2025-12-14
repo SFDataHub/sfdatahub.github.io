@@ -12,6 +12,7 @@ import {
   StatsTab,
 } from "../../components/player-profile/TabPanels";
 import type {
+  BaseStatValues,
   HeroActionKey,
   PlayerProfileViewModel,
   PortraitOptions,
@@ -25,10 +26,19 @@ import {
 import { toDriveThumbProxy } from "../../lib/urls";
 import { iconForClassName } from "../../data/classes";
 import { db } from "../../lib/firebase";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDoc,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 import "./player-profile.css";
 
 const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
 type TabKey = (typeof TABS)[number];
+
+const PROFILE_CACHE_PREFIX = "player-profile-cache:";
+const PROFILE_CACHE_TTL_MS = 15 * 60 * 1000;
 
 type PlayerSnapshot = {
   id: string;
@@ -61,23 +71,57 @@ export default function PlayerProfile() {
   const [, setAvatarLoading] = useState(false);
   const [, setAvatarError] = useState<Error | null>(null);
   const feedbackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+
+  const getScrollContainer = () => profileRef.current?.parentElement;
 
   useEffect(() => {
     let cancelled = false;
+    const scope: FirestoreTraceScope = beginReadScope("PlayerProfile:load");
 
     async function load() {
       setLoading(true);
       setErr(null);
+      const cacheKey = `${PROFILE_CACHE_PREFIX}${playerId}`;
+
+      const loadFromCache = () => {
+        try {
+          const raw = typeof window !== "undefined" ? window.localStorage.getItem(cacheKey) : null;
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!parsed?.data || typeof parsed.timestamp !== "number") return null;
+          const isFresh = Date.now() - parsed.timestamp < PROFILE_CACHE_TTL_MS;
+          if (!isFresh) return null;
+          return {
+            data: parsed.data as PlayerSnapshot,
+            timestamp: parsed.timestamp as number,
+            version: typeof parsed.version === "number" ? parsed.version : null,
+          };
+        } catch {
+          return null;
+        }
+      };
+
+      const cached = loadFromCache();
+      if (cached) {
+        setSnapshot(cached.data);
+        endReadScope(scope);
+        setLoading(false);
+        return;
+      }
       try {
         const id = (playerId || "").trim();
         if (!id) throw new Error("Kein Spieler gewählt.");
 
         const ref = doc(db, `players/${id}/latest/latest`);
-        const snap = await getDoc(ref);
+        const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
         if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
         const data = snap.data() as any;
 
         const values = typeof data.values === "object" && data.values ? data.values : {};
+        if (data.timestampRaw != null && values.timestampRaw == null) {
+          values.timestampRaw = data.timestampRaw;
+        }
         const saveArray =
           (Array.isArray(data.save) && data.save) ||
           (Array.isArray(values?.save) && values.save) ||
@@ -110,8 +154,23 @@ export default function PlayerProfile() {
           values?.identifier ??
           (serverNormalized ? `${id}__${serverNormalized}` : null);
         const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
-        const scrapbookPct = toNum(values?.["Album"] ?? values?.["Album %"] ?? values?.AlbumPct) ?? null;
-        const lastScanDays = daysSince(toNum(data.timestamp));
+        const scrapbookRaw =
+          data.scrapbookPct ??
+          data.scrapbook ??
+          values?.scrapbookPct ??
+          values?.scrapbook ??
+          values?.["Scrapbook %"] ??
+          values?.["Scrapbook"] ??
+          values?.["Album"] ??
+          values?.["Album %"] ??
+          values?.AlbumPct ??
+          values?.AlbumPercent ??
+          values?.AlbumPercentage ??
+          values?.AlbumCompletion ??
+          values?.AlbumProgress;
+        const scrapbookPct = toNum(scrapbookRaw) ?? null;
+        const timestampSeconds = toNum(data.timestamp) ?? toNum(values?.timestamp);
+        const lastScanDays = daysSince(timestampSeconds);
 
         const portraitConfig =
           typeof data.portrait === "object"
@@ -139,6 +198,21 @@ export default function PlayerProfile() {
           saveString,
         };
 
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                data: nextSnapshot,
+                timestamp: Date.now(),
+                version: timestampSeconds ?? null,
+              }),
+            );
+          } catch {
+            // ignore cache write failures
+          }
+        }
+
         if (!cancelled) setSnapshot(nextSnapshot);
       } catch (error: any) {
         if (!cancelled) {
@@ -146,6 +220,7 @@ export default function PlayerProfile() {
           setErr(error?.message || "Unbekannter Fehler beim Laden.");
         }
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }
@@ -156,6 +231,17 @@ export default function PlayerProfile() {
     };
   }, [playerId]);
 
+  const handleTabChange = (next: TabKey) => {
+    const scroller = getScrollContainer();
+    const currentTop = scroller?.scrollTop ?? null;
+    setTab(next);
+    if (scroller && currentTop != null) {
+      requestAnimationFrame(() => {
+        scroller.scrollTo({ top: currentTop });
+      });
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (feedbackTimeout.current) clearTimeout(feedbackTimeout.current);
@@ -165,10 +251,12 @@ export default function PlayerProfile() {
   useEffect(() => {
     let cancelled = false;
     const loadAvatar = async () => {
+      const avatarScope: FirestoreTraceScope = beginReadScope("PlayerProfile:avatar");
       if (!snapshot?.id) {
         setAvatarSnapshot(null);
         setAvatarLoading(false);
         setAvatarError(null);
+        endReadScope(avatarScope);
         return;
       }
       const playerIdNum = toNum(snapshot.id);
@@ -176,6 +264,7 @@ export default function PlayerProfile() {
         setAvatarSnapshot(null);
         setAvatarLoading(false);
         setAvatarError(null);
+        endReadScope(avatarScope);
         return;
       }
       setAvatarLoading(true);
@@ -185,6 +274,7 @@ export default function PlayerProfile() {
           playerIdNum,
           snapshot.server ?? "",
           snapshot.avatarIdentifier ?? undefined,
+          avatarScope,
         );
         if (!cancelled) setAvatarSnapshot(snap);
       } catch (error: any) {
@@ -193,6 +283,7 @@ export default function PlayerProfile() {
           setAvatarError(error instanceof Error ? error : new Error("AvatarSnapshot failed"));
         }
       } finally {
+        endReadScope(avatarScope);
         if (!cancelled) setAvatarLoading(false);
       }
     };
@@ -287,7 +378,7 @@ export default function PlayerProfile() {
 
   return (
     <ContentShell title="Spielerprofil" subtitle="Charakter, KPIs & Verlauf" centerFramed={false} padded>
-      <div className="player-profile">
+      <div className="player-profile" ref={profileRef}>
         {loading && !snapshot && <div className="player-profile__loading">Spielerprofil wird geladen …</div>}
 
         {!loading && (!snapshot || !viewModel) && renderNotFound()}
@@ -311,7 +402,7 @@ export default function PlayerProfile() {
                     role="tab"
                     aria-selected={active}
                     className={`player-profile__tab-button ${active ? "player-profile__tab-button--active" : ""}`}
-                    onClick={() => setTab(entry)}
+                    onClick={() => handleTabChange(entry)}
                   >
                     {entry}
                   </button>
@@ -329,8 +420,29 @@ export default function PlayerProfile() {
 
 const toNum = (value: any): number | null => {
   if (value == null || value === "") return null;
-  const normalized = String(value).replace(/[^0-9.-]/g, "");
-  const num = Number(normalized);
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const raw = String(value).trim();
+  const sign = raw.startsWith("-") ? -1 : 1;
+  const unsigned = raw.replace(/^[+-]/, "").replace(/[\s%]/g, "");
+  const lastComma = unsigned.lastIndexOf(",");
+  const lastDot = unsigned.lastIndexOf(".");
+  const decimalPos = Math.max(lastComma, lastDot);
+  let normalized = "";
+
+  if (decimalPos > -1) {
+    const fractional = unsigned.slice(decimalPos + 1).replace(/[^0-9]/g, "");
+    const integer = unsigned.slice(0, decimalPos).replace(/[^0-9]/g, "");
+    if (fractional.length > 0 && fractional.length <= 2) {
+      normalized = `${integer}.${fractional}`;
+    } else {
+      normalized = (integer + fractional).replace(/[^0-9]/g, "");
+    }
+  } else {
+    normalized = unsigned.replace(/[^0-9]/g, "");
+  }
+
+  if (!normalized) return null;
+  const num = Number(normalized) * sign;
   return Number.isFinite(num) ? num : null;
 };
 
@@ -382,13 +494,30 @@ const createSeededRandom = (seed: string) => {
 const formatNumber = (value?: number | null, fallback = "—") =>
   value == null ? fallback : value.toLocaleString("de-DE");
 
-const formatPercent = (value?: number | null) =>
-  value == null ? "—" : `${Math.round(value)}%`;
+const formatPercent = (value?: number | null) => {
+  if (value == null) return "—";
+  const truncated = Math.floor(value * 100) / 100;
+  const hasFraction = truncated % 1 !== 0;
+  return `${truncated.toLocaleString("de-DE", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}%`;
+};
 
 const formatDaysAgo = (days?: number | null) => {
   if (days == null) return null;
   if (days === 0) return "heute";
   return `${days} Tag${days === 1 ? "" : "e"} her`;
+};
+
+const formatDateTimeFromSeconds = (timestamp?: number | null) => {
+  if (timestamp == null) return null;
+  const date = new Date(timestamp * 1000);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}`;
 };
 
 const buildPortraitConfig = (
@@ -431,45 +560,121 @@ const buildProfileView = (snapshot: PlayerSnapshot, avatarSnapshot?: AvatarSnaps
   const portraitFallbackUrl = toDriveThumbProxy(classIcon.url, 420) || "/assets/demo-avatar-special.png";
   const portraitFallbackLabel = snapshot.className ? `Klassenbild ${snapshot.className}` : "Portrait-Platzhalter";
 
+  const scrapbookKeys = [
+    "album",
+    "album%",
+    "albumpct",
+    "albumpercent",
+    "albumpercentage",
+    "albumcompletion",
+    "albumprogress",
+    "scrapbook",
+    "scrapbook%",
+    "scrapbookpct",
+    "scrapbookpercent",
+  ];
+  const honorKeys = ["honor", "ehre", "honour", "honorpoints", "ehrepunkte"];
+  const hofKeys = ["hofrank", "halloffamerank", "hofposition", "halloffameposition", "hofplatz", "halloffame", "hof"];
+  const mountKeys = ["mount", "reittier", "mountname"];
+  const mountPercentKeys = ["mountpct", "mountpercent", "mountpercentage", "mountspeed", "mountbonus", "mountvalue"];
+  const guildRoleKeys = ["guildrole", "role", "guildrank", "gildenrolle"];
+
   const level = snapshot.level ?? lookup.number(["level"]);
-  const scrapbook = snapshot.scrapbookPct ?? lookup.number(["album", "scrapbook", "albumpct"]);
-  const honor = lookup.number(["honor", "ehre"]);
+  const scrapbook = snapshot.scrapbookPct ?? lookup.number(scrapbookKeys);
+  const honor = lookup.number(honorKeys);
   const totalStats = snapshot.totalStats ?? lookup.number(["totalstats", "stats"]);
 
-  const baseStatsKeys = [
-    ["Base Strength", "Stärke", "basestrength"],
-    ["Base Dexterity", "Geschick", "basedexterity"],
-    ["Base Intelligence", "Intelligenz", "baseintelligence"],
-    ["Base Constitution", "Konstitution", "baseconstitution"],
-    ["Base Luck", "Glück", "baseluck"],
+  const baseStatConfig: { key: keyof BaseStatValues; label: string; base: string[]; total: string[] }[] = [
+    { key: "str", label: "St??rke", base: ["Base Strength", "St??rke", "basestrength"], total: ["Strength"] },
+    { key: "dex", label: "Geschick", base: ["Base Dexterity", "Geschick", "basedexterity"], total: ["Dexterity"] },
+    {
+      key: "int",
+      label: "Intelligenz",
+      base: ["Base Intelligence", "Intelligenz", "baseintelligence"],
+      total: ["Intelligence"],
+    },
+    {
+      key: "con",
+      label: "Konstitution",
+      base: ["Base Constitution", "Konstitution", "baseconstitution"],
+      total: ["Constitution"],
+    },
+    { key: "lck", label: "Gl??ck", base: ["Base Luck", "Gl??ck", "baseluck"], total: ["Luck"] },
   ];
 
-  const baseStats = baseStatsKeys.map((keys) => lookup.number(keys, 0) ?? 0);
-  const sumBase = baseStats.reduce((sum, val) => sum + (val ?? 0), 0);
-  const scrapbookProgress = scrapbook ?? Math.round(rand() * 80 + 10);
+  const baseStats: BaseStatValues = { str: 0, dex: 0, int: 0, con: 0, lck: 0 };
+  const totalStatsDetail: BaseStatValues = { str: 0, dex: 0, int: 0, con: 0, lck: 0 };
+  let hasBaseStats = false;
+  let hasTotalStats = false;
+  baseStatConfig.forEach((entry) => {
+    const baseValue = lookup.number(entry.base);
+    if (baseValue != null) {
+      baseStats[entry.key] = baseValue;
+      hasBaseStats = true;
+    }
+    const totalValue = lookup.number(entry.total);
+    if (totalValue != null) {
+      totalStatsDetail[entry.key] = totalValue;
+      hasTotalStats = true;
+    }
+  });
+  const totalBaseStats = hasBaseStats ? Object.values(baseStats).reduce((sum, val) => sum + val, 0) : null;
+  const scrapbookProgress = scrapbook ?? null;
   const fortress = lookup.number(["fortresslevel", "fortress"]) ?? Math.round(rand() * 20) + 30;
   const underworld = lookup.number(["underworld", "underworldlevel"]) ?? Math.round(rand() * 10) + 20;
   const tower = lookup.number(["tower", "towerfloor"]) ?? Math.round(rand() * 90) + 10;
   const petProgress = lookup.number(["pets", "petprogress"]) ?? Math.round(rand() * 50) + 25;
 
-  const powerScore = (level ?? 0) * 1200 + sumBase + Math.round((scrapbook ?? 0) * 3200);
-  const mountLabel = lookup.text(["mount", "reittier"]) ?? "Greifendrachen (280%)";
-  const guildRole = lookup.text(["guildrole", "role"]) ?? "Member";
-  const hofRank = lookup.number(["hofrank", "halloffamerank", "hofposition"]);
+  const powerScore = (level ?? 0) * 1200 + (totalBaseStats ?? 0) + Math.round((scrapbook ?? 0) * 3200);
+  const mountNameRaw = lookup.text(mountKeys);
+  const mountName =
+    mountNameRaw && /[a-zA-Z]/.test(mountNameRaw)
+      ? mountNameRaw
+      : mountNameRaw && /%/.test(mountNameRaw)
+      ? mountNameRaw
+      : null;
+  const mountPercentRaw =
+    values?.["Mount %"] ??
+    values?.["mount %"] ??
+    values?.MountPct ??
+    values?.mountPct ??
+    values?.MountBonus ??
+    values?.mountBonus;
+  const mountPercent = toNum(mountPercentRaw) ?? lookup.number(mountPercentKeys);
+  const mountPercentFromName = mountName ? toNum((mountName.match(/(\d+)\s*%/) || [])[1]) : null;
+  const mountPercentResolved = mountPercent ?? mountPercentFromName;
+  let mountLabel = "—";
+  if (mountName) {
+    mountLabel = mountPercentResolved != null && !/%/.test(mountName)
+      ? `${mountName} (${Math.round(mountPercentResolved)}%)`
+      : mountName;
+  } else if (mountPercentResolved != null) {
+    mountLabel = `${Math.round(mountPercentResolved)}%`;
+  }
+  const guildRole = lookup.text(guildRoleKeys);
+  const hofRankDirect = toNum(values?.["Rank"]);
+  const hofRank = hofRankDirect ?? lookup.number(hofKeys);
+  const lastScanRaw = lookup.text(["timestampraw"]);
+  const timestampSeconds = lookup.number(["timestamp"]);
+  const lastScanDisplay =
+    lastScanRaw && /^\s*\d+\s*$/.test(lastScanRaw)
+      ? formatDateTimeFromSeconds(toNum(lastScanRaw)) ?? lastScanRaw
+      : lastScanRaw ?? formatDateTimeFromSeconds(timestampSeconds) ?? "-";
 
   const heroMetrics = [
-    { label: "Level", value: level ? `Lvl ${formatNumber(level)}` : "—" },
-    { label: "Power Score", value: formatNumber(powerScore) },
+    { label: "Last Scan", value: lastScanDisplay },
+    { label: "Level", value: level != null ? `Lvl ${formatNumber(level)}` : "-" },
     { label: "Scrapbook", value: formatPercent(scrapbookProgress) },
-    { label: "Total Stats", value: formatNumber(totalStats) },
+    { label: "Total Base Stats", value: totalBaseStats != null ? formatNumber(totalBaseStats) : "-" },
+  ];
+  const heroBadges = [
+    { label: "Mount", value: mountLabel ?? "—", tone: "neutral" as const },
+    { label: "Honor", value: formatNumber(honor), tone: "success" as const },
+    { label: "Gildenrolle", value: guildRole ?? "—", tone: "warning" as const },
+    { label: "HoF", value: hofRank != null ? `#${formatNumber(hofRank)}` : "—", tone: "neutral" as const },
   ];
 
-  const heroBadges = [
-    { label: "Mount", value: mountLabel, tone: "neutral" as const },
-    { label: "Honor", value: formatNumber(honor), tone: "success" as const },
-    { label: "Gildenrolle", value: guildRole, tone: "warning" as const },
-    { label: "HoF", value: hofRank ? `#${formatNumber(hofRank)}` : "—", tone: "neutral" as const },
-  ];
+  const heroBaseStats = hasBaseStats ? baseStats : undefined;
 
   const hero = {
     playerName: snapshot.name,
@@ -491,15 +696,9 @@ const buildProfileView = (snapshot: PlayerSnapshot, avatarSnapshot?: AvatarSnaps
     hasPortrait: portrait.hasData,
     portraitFallbackUrl,
     portraitFallbackLabel,
+    baseStats: heroBaseStats,
+    totalStats: hasTotalStats ? totalStatsDetail : undefined,
   };
-
-  const attributeLabels = [
-    { label: "Stärke", base: ["Base Strength"], total: ["Strength"] },
-    { label: "Geschick", base: ["Base Dexterity"], total: ["Dexterity"] },
-    { label: "Intelligenz", base: ["Base Intelligence"], total: ["Intelligence"] },
-    { label: "Konstitution", base: ["Base Constitution"], total: ["Constitution"] },
-    { label: "Glück", base: ["Base Luck"], total: ["Luck"] },
-  ];
 
   const statsTab = {
     summary: [
@@ -508,7 +707,7 @@ const buildProfileView = (snapshot: PlayerSnapshot, avatarSnapshot?: AvatarSnaps
       { label: "HoF Platz", value: hofRank ? `#${formatNumber(hofRank)}` : "—" },
       { label: "Letzter Scan", value: formatDaysAgo(snapshot.lastScanDays) ?? "—" },
     ],
-    attributes: attributeLabels.map((a) => ({
+    attributes: baseStatConfig.map((a) => ({
       label: a.label,
       baseLabel: formatNumber(lookup.number(a.base)),
       totalLabel: lookup.number(a.total) != null ? `Gesamt ${formatNumber(lookup.number(a.total))}` : undefined,
@@ -690,8 +889,3 @@ const formatHistoricDate = (daysAgo: number) => {
   const date = new Date(Date.now() - daysAgo * 86400000);
   return date.toLocaleDateString("de-DE");
 };
-
-
-
-
-

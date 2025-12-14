@@ -14,7 +14,7 @@
   border-radius: 8px;
   background-image: radial-gradient(circle, #3186fb 50%, #051020 100%);
   width: fit-content;
-  padding-inline: 29px;
+  padding-inline: 44px;
 }
 
 .avatar-portrait__canvas {
@@ -38,8 +38,8 @@
   display: block;
   border-radius: 6px;
   object-fit: cover;
-  background: #0c1b2d;
-  border: 1px solid #2c4a73;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .avatar-portrait__status {

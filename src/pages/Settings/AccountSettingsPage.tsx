@@ -16,6 +16,7 @@ const GOOGLE_LINK_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/google/link/
 const MIN_NAME_LENGTH = 3;
 const MAX_NAME_LENGTH = 32;
 type TabKey = "overview" | "settings" | "tools" | "connected-characters";
+const TAB_KEYS: TabKey[] = ["overview", "settings", "tools", "connected-characters"];
 
 const formatTimestamp = (value?: string): string | undefined => {
   if (!value) return undefined;
@@ -59,6 +60,9 @@ const AccountSettingsPage: React.FC = () => {
   const isLoading = status === "loading" || status === "idle";
   const isAuthed = status === "authenticated" && !!user;
   const uid = user?.id;
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const tabParam = searchParams.get("tab");
+  const openHelpFromQuery = searchParams.get("openHelp") === "1";
 
   const defaultSettings: UserSettings = useMemo(
     () => ({
@@ -144,6 +148,28 @@ const AccountSettingsPage: React.FC = () => {
       isMounted = false;
     };
   }, [uid, t]);
+
+  useEffect(() => {
+    if (!tabParam) return;
+    if (TAB_KEYS.includes(tabParam as TabKey) && tabParam !== activeTab) {
+      setActiveTab(tabParam as TabKey);
+    }
+  }, [tabParam, activeTab]);
+
+  const syncTabToUrl = (tabKey: TabKey, options?: { openHelp?: boolean }) => {
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.set("tab", tabKey);
+    if (options?.openHelp) {
+      nextParams.set("openHelp", "1");
+    } else {
+      nextParams.delete("openHelp");
+    }
+    const searchString = nextParams.toString();
+    navigate(
+      { pathname: location.pathname, search: searchString ? `?${searchString}` : "" },
+      { replace: true },
+    );
+  };
 
   const handleGoToSignIn = () => {
     navigate("/login");
@@ -472,7 +498,10 @@ const AccountSettingsPage: React.FC = () => {
               key={tab.key}
               type="button"
               className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                setActiveTab(tab.key);
+                syncTabToUrl(tab.key, { openHelp: tab.key === "connected-characters" && openHelpFromQuery });
+              }}
               role="tab"
               aria-selected={isActive}
             >
@@ -576,6 +605,7 @@ const AccountSettingsPage: React.FC = () => {
           <AccountConnectedCharactersTab
             user={user}
             refreshSession={refreshSession}
+            openHelp={openHelpFromQuery}
           />
         );
       default:

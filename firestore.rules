@@ -107,12 +107,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ---------- Linked player avatars (subcollection under linked_players/avatars/{id}) ----------
+    // ---------- Linked player avatars ----------
     function linkedAvatarUserId() {
       // Prefer incoming data (write), otherwise existing doc (read)
       return request.resource.data.userId != null
         ? request.resource.data.userId
         : resource.data.userId;
+    }
+
+    // Publicly readable snapshots stored under linked_players/avatars/avatars/{docId}
+    match /linked_players/avatars/avatars/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /linked_players/avatars/{playerServerId} {

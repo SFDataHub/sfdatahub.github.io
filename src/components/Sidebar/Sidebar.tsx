@@ -366,6 +366,15 @@ export default function Sidebar({
     navigate(`/player/${playerId}`);
   };
 
+  const handleConnectedHintClick = () => {
+    if (linkedPlayers.length > 0) return;
+    if (isAuthed) {
+      navigate("/settings/account?tab=connected-characters&openHelp=1");
+    } else {
+      navigate("/help#linking");
+    }
+  };
+
   const emptyConnectedText = isAuthed
     ? t(
         "sidebar.connectedCharacters.empty",
@@ -375,6 +384,16 @@ export default function Sidebar({
         "sidebar.connectedCharacters.loginPrompt",
         { defaultValue: "Sign in to see your linked characters." },
       );
+
+  const emptyCta = isAuthed
+    ? t(
+      "sidebar.connectedCharacters.ctaAuthed",
+      { defaultValue: "Open linked characters guide" },
+    )
+    : t(
+      "sidebar.connectedCharacters.ctaGuest",
+      { defaultValue: "Open start guide" },
+    );
 
   return (
     <aside
@@ -434,9 +453,14 @@ export default function Sidebar({
               {t("sidebar.connectedCharacters.title", { defaultValue: "Connected characters" })}
             </div>
             {linkedPlayers.length === 0 ? (
-              <div className={styles.connectedCharactersEmpty}>
-                {emptyConnectedText}
-              </div>
+              <button
+                type="button"
+                className={styles.connectedCharactersEmpty}
+                onClick={handleConnectedHintClick}
+              >
+                <span className={styles.connectedCharactersEmptyText}>{emptyConnectedText}</span>
+                <span className={styles.connectedCharactersEmptyCta}>{emptyCta}</span>
+              </button>
             ) : (
               <div className={styles.connectedCharactersList} data-collapsed={collapsed ? "true" : "false"}>
                 {linkedPlayers.map((char) => {
