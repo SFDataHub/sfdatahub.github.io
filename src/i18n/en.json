@@ -21,6 +21,8 @@
       "title": "Connected characters",
       "empty": "No characters linked yet. Link a character in your account to see it here.",
       "loginPrompt": "Sign in to see your linked characters.",
+      "ctaGuest": "Open start guide",
+      "ctaAuthed": "Open linked characters guide",
       "chip": {
         "server": "Server",
         "class": "Class"
@@ -73,6 +75,57 @@
         "success": "Settings saved.",
         "noChanges": "No changes to save.",
         "error": "Could not save settings. Please try again."
+      }
+    },
+    "connectedCharacters": {
+      "title": "Connected characters",
+      "subtitle": "These game characters are linked to your SFDataHub account.",
+      "loading": "Refreshing characters...",
+      "empty": {
+        "title": "No characters linked yet",
+        "description": "Use the \"!connect char\" command in Discord to link your characters, then click \"Refresh\" here.",
+        "cta": "Click to learn how linking works"
+      },
+      "actions": {
+        "refresh": "Refresh",
+        "refreshing": "Refreshing...",
+        "unlink": "Disconnect character"
+      },
+      "confirmation": {
+        "title": "Are you sure you want to unlink this character?",
+        "cancel": "Cancel",
+        "confirm": "Yes, unlink",
+        "confirming": "Unlinking..."
+      },
+      "errors": {
+        "serviceUnavailable": "Auth service is not configured for unlinking.",
+        "unlink": "Could not unlink character."
+      },
+      "columns": {
+        "character": "Character",
+        "server": "Server",
+        "playerId": "Player ID",
+        "class": "Class",
+        "level": "Level",
+        "guild": "Guild",
+        "lastVerified": "Last linked",
+        "source": "Source",
+        "actions": "Actions"
+      },
+      "method": {
+        "discord": "Discord bot"
+      },
+      "help": {
+        "title": "How does linking work?",
+        "show": "Show",
+        "hide": "Hide",
+        "steps": {
+          "link": "Link a character via the Discord bot using the \"!connect char\" command.",
+          "verify": "We match the character to your latest verified scan; keep your game data up to date.",
+          "refresh": "After linking, click Refresh here to sync the latest characters from the auth service.",
+          "unlink": "You can unlink any character in the Actions column; the source column shows how it was linked."
+        },
+        "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
       }
     }
   },
@@ -271,6 +324,22 @@
       "unlimited": "No limit"
     }
   },
+  "search": {
+    "inputLabel": "Search players, guilds and servers",
+    "loading": "Loading…",
+    "recents": "Recent searches",
+    "minCharsHint": "Type at least 3 characters…",
+    "noResults": "No results",
+    "players": "Players",
+    "guilds": "Guilds",
+    "servers": "Servers",
+    "active": "Active",
+    "inactive": "Inactive",
+    "guildMembers": "{{count}} members",
+    "guildMembersUnknown": "Members ?",
+    "moreResults": "More results… press Enter",
+    "recentLabel": "Recent"
+  },
   "footer": {
     "about": {
       "title": "About SFDataHub",
@@ -280,10 +349,6 @@
     "copyright": "© 2025 SFDataHub – community project around Shakes & Fidget."
   }
 }
-
-
-
-
 
 
 

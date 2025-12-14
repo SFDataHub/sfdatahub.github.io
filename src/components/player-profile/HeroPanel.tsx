@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import PortraitPreview from "../avatar/PortraitPreview";
 import type { HeroAction, HeroPanelData } from "./types";
 import { CLASSES } from "../../data/classes";
 import { toDriveThumbProxy } from "../../lib/urls";
+import PlayerAttributeBars from "./AttributeBars/PlayerAttributeBars";
 
 type HeroPanelProps = {
   data: HeroPanelData;
@@ -55,6 +56,7 @@ function ClassAvatar({
 }
 
 export default function HeroPanel({ data, loading, actionFeedback, onAction }: HeroPanelProps) {
+  const [mode, setMode] = useState<"base" | "total">("base");
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const classMeta =
     CLASSES.find((item) => normalize(item.label) === normalize(data.className || "")) ||
@@ -68,16 +70,31 @@ export default function HeroPanel({ data, loading, actionFeedback, onAction }: H
   const portraitFallbackLabel = data.portraitFallbackLabel || data.className || data.playerName;
   const portraitConfig = data.hasPortrait === false ? undefined : data.portrait;
 
+  const formatNumber = (value?: number | null) =>
+    typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("de-DE") : "-";
+
+  const heroMetrics = useMemo(() => {
+    return data.metrics.map((metric) => {
+      if (metric.label === "Total Base Stats" && mode === "total") {
+        const totalStats = data.totalStats;
+        if (totalStats) {
+          const sum =
+            (Number(totalStats.str) || 0) +
+            (Number(totalStats.dex) || 0) +
+            (Number(totalStats.int) || 0) +
+            (Number(totalStats.con) || 0) +
+            (Number(totalStats.lck) || 0);
+          return { ...metric, label: "Total Stats", value: formatNumber(sum) };
+        }
+      }
+      return metric;
+    });
+  }, [data.metrics, data.totalStats, mode]);
+
   return (
     <section className="player-profile__hero" aria-busy={loading}>
-      <PortraitPreview
-        config={portraitConfig}
-        label={data.playerName}
-        fallbackImage={portraitFallbackUrl}
-        fallbackLabel={portraitFallbackLabel}
-      />
-      <div className="player-profile__hero-body">
-        <div className="player-profile__identity">
+      <div className="player-profile__hero-portrait">
+        <div className="player-profile__identity player-profile__identity--overlay">
           <ClassAvatar className={data.className} label={data.playerName} size={48} />
           <div>
             <div className="player-profile__player-name">{data.playerName}</div>
@@ -98,9 +115,17 @@ export default function HeroPanel({ data, loading, actionFeedback, onAction }: H
             )}
           </div>
         </div>
+        <PortraitPreview
+          config={portraitConfig}
+          label={data.playerName}
+          fallbackImage={portraitFallbackUrl}
+          fallbackLabel={portraitFallbackLabel}
+        />
+      </div>
+      <div className="player-profile__hero-body">
 
         <div className="player-profile__hero-metrics">
-          {data.metrics.map((metric) => (
+          {heroMetrics.map((metric) => (
             <div key={metric.label} className="player-profile__hero-metric">
               <div className="player-profile__hero-metric-label">{metric.label}</div>
               <div className="player-profile__hero-metric-value">{metric.value}</div>
@@ -108,6 +133,16 @@ export default function HeroPanel({ data, loading, actionFeedback, onAction }: H
             </div>
           ))}
         </div>
+
+        {data.baseStats && (
+          <PlayerAttributeBars
+            baseStats={data.baseStats}
+            totalStats={data.totalStats}
+            benchmarks={data.baseStatBenchmarks}
+            mode={mode}
+            onModeChange={setMode}
+          />
+        )}
 
         {data.badges.length > 0 && (
           <div className="player-profile__hero-badges">

@@ -79,6 +79,20 @@ export type HeroAction = {
   disabled?: boolean;
 };
 
+export type BaseStatValues = {
+  str: number;
+  dex: number;
+  int: number;
+  con: number;
+  lck: number;
+};
+
+export type BaseStatBenchmarks = {
+  serverAvg?: Partial<BaseStatValues>;
+  guildAvg?: Partial<BaseStatValues>;
+  scaleMax?: Partial<BaseStatValues>;
+};
+
 export type HeroPanelData = {
   playerName: string;
   className?: string | null;
@@ -94,6 +108,9 @@ export type HeroPanelData = {
   hasPortrait?: boolean;
   portraitFallbackUrl?: string;
   portraitFallbackLabel?: string;
+  baseStats?: BaseStatValues;
+  baseStatBenchmarks?: BaseStatBenchmarks;
+  totalStats?: BaseStatValues;
 };
 
 export type AttributeStat = {

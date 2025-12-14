@@ -158,6 +158,7 @@ import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 
 // Tools
 import ToolsPage from "./pages/tools/ToolsPage";
+import SearchResultsPage from "./pages/search/SearchResults";
 
 /** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
@@ -238,6 +239,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Help (public) */}
                 <Route path="/help" element={<HelpPage />} />
+                <Route path="/search" element={<SearchResultsPage />} />
 
                 {/* Players */}
                 <Route path="/players" element={<PlayersIndex />} />

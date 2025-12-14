@@ -82,25 +82,28 @@ const HelpPage: React.FC = () => {
         </section>
 
         <div className={styles.grid}>
-          {sections.map((section) => (
-            <section key={section.key} className={styles.card}>
-              <h2 className={styles.cardTitle}>{section.title}</h2>
-              {section.paragraphs?.map((text, idx) => (
-                <p key={`${section.key}-p-${idx}`} className={styles.paragraph}>
-                  {text}
-                </p>
-              ))}
-              {section.bullets && (
-                <ul className={styles.list}>
-                  {section.bullets.map((item) => (
-                    <li key={`${section.key}-${item}`} className={styles.listItem}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
+          {sections.map((section) => {
+            const sectionId = section.key === "login" ? "linking" : undefined;
+            return (
+              <section key={section.key} id={sectionId} className={styles.card}>
+                <h2 className={styles.cardTitle}>{section.title}</h2>
+                {section.paragraphs?.map((text, idx) => (
+                  <p key={`${section.key}-p-${idx}`} className={styles.paragraph}>
+                    {text}
+                  </p>
+                ))}
+                {section.bullets && (
+                  <ul className={styles.list}>
+                    {section.bullets.map((item) => (
+                      <li key={`${section.key}-${item}`} className={styles.listItem}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
         </div>
       </div>
     </ContentShell>

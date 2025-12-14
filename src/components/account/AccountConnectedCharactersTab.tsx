@@ -9,6 +9,7 @@ import styles from "./AccountConnectedCharactersTab.module.css";
 type AccountConnectedCharactersTabProps = {
   user: AuthUser;
   refreshSession: (options?: { silent?: boolean }) => Promise<void>;
+  openHelp?: boolean;
 };
 
 const formatTimestamp = (value?: string): string => {
@@ -26,18 +27,34 @@ const getCharacterName = (player: LinkedPlayer): string => {
   return "-";
 };
 
-const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps> = ({ user, refreshSession }) => {
+const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps> = ({
+  user,
+  refreshSession,
+  openHelp = false,
+}) => {
   const { t } = useTranslation();
+  const linkedPlayers = useMemo(() => user.linkedPlayers ?? [], [user.linkedPlayers]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
   const [confirmingPlayer, setConfirmingPlayer] = useState<LinkedPlayer | null>(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
-
-  const linkedPlayers = useMemo(() => user.linkedPlayers ?? [], [user.linkedPlayers]);
+  const [isHelpOpen, setIsHelpOpen] = useState<boolean>(() => openHelp || linkedPlayers.length === 0);
   const unlinkEndpoint = useMemo(
     () => (AUTH_BASE_URL ? `${AUTH_BASE_URL}/user/unlink-character` : ""),
     [],
   );
+
+  React.useEffect(() => {
+    if (openHelp) {
+      setIsHelpOpen(true);
+    }
+  }, [openHelp]);
+
+  React.useEffect(() => {
+    if (linkedPlayers.length === 0) {
+      setIsHelpOpen(true);
+    }
+  }, [linkedPlayers.length]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -116,6 +133,65 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
       return t("account.connectedCharacters.method.discord", "Discord bot");
     }
     return method;
+  };
+
+  const helpSteps = useMemo(
+    () => [
+      t(
+        "account.connectedCharacters.help.steps.link",
+        'Link a character via the Discord bot using the "!connect char" command.',
+      ),
+      t(
+        "account.connectedCharacters.help.steps.verify",
+        "We match the character to your latest verified scan; keep your game data up to date.",
+      ),
+      t(
+        "account.connectedCharacters.help.steps.refresh",
+        "After linking, click Refresh here to sync the latest characters from the auth service.",
+      ),
+      t(
+        "account.connectedCharacters.help.steps.unlink",
+        "You can unlink any character in the Actions column; the source column shows how it was linked.",
+      ),
+    ],
+    [t],
+  );
+
+  const renderHelpAccordion = () => {
+    const helpContentId = "connected-characters-help";
+    return (
+      <div className={styles.helpAccordion}>
+        <button
+          type="button"
+          className={`${styles.helpToggle} ${isHelpOpen ? styles.helpToggleOpen : ""}`}
+          aria-expanded={isHelpOpen}
+          aria-controls={helpContentId}
+          onClick={() => setIsHelpOpen((prev) => !prev)}
+        >
+          <span>{t("account.connectedCharacters.help.title", "How does linking work?")}</span>
+          <span className={styles.helpToggleAction}>
+            {isHelpOpen
+              ? t("account.connectedCharacters.help.hide", "Hide")
+              : t("account.connectedCharacters.help.show", "Show")}
+          </span>
+        </button>
+        {isHelpOpen && (
+          <div id={helpContentId} className={styles.helpBody}>
+            <ul className={styles.helpList}>
+              {helpSteps.map((step, index) => (
+                <li key={`help-step-${index}`} className={styles.helpListItem}>{step}</li>
+              ))}
+            </ul>
+            <p className={styles.helpFootnote}>
+              {t(
+                "account.connectedCharacters.help.footnote",
+                "Tip: Click Refresh after linking or unlinking to update this table.",
+              )}
+            </p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderTable = () => (
@@ -256,6 +332,8 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
         </p>
       )}
 
+      {renderHelpAccordion()}
+
       {!isRefreshing && linkedPlayers.length === 0 && (
         <div className={styles.emptyState}>
           <p className={styles.emptyTitle}>
@@ -267,6 +345,13 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
               'Use the "!connect char" command in Discord to link your characters, then click "Refresh" here.',
             )}
           </p>
+          <button
+            type="button"
+            className={styles.emptyCta}
+            onClick={() => setIsHelpOpen(true)}
+          >
+            {t("account.connectedCharacters.empty.cta", "Click to learn how linking works")}
+          </button>
         </div>
       )}
 
@@ -277,4 +362,3 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
 };
 
 export default AccountConnectedCharactersTab;
-

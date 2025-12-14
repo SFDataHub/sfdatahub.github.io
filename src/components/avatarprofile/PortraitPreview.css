@@ -1,0 +1,42 @@
+.avatar-portrait-frame {
+  --avatar-size: 420px;
+  width: calc(var(--avatar-size) + 2px);
+  height: calc(var(--avatar-size) + 2px);
+  display: inline-block;
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid #2c4a73;
+  background: rgba(12, 27, 45, 0.9);
+  box-sizing: border-box;
+}
+
+.avatar-portrait__canvas {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  display: block;
+  border-radius: 6px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.avatar-portrait__canvas--popout {
+  scale: 1;
+  transform-origin: center;
+  clip-path: inset(0);
+}
+
+.avatar-portrait__fallback {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  display: block;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #0c1b2d;
+  border: 1px solid #2c4a73;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}

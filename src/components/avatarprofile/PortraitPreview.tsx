@@ -58,7 +58,7 @@ const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
     special: clampPositive(merged.special, 200),
     showBorder: false,
     background: "",
-    frame: "",
+    frame: merged.frame ?? DEFAULT_PORTRAIT.frame,
     mirrorHorizontal: merged.mirrorHorizontal ?? DEFAULT_PORTRAIT.mirrorHorizontal,
     genderName: merged.genderName === "female" ? "female" : "male",
   };
@@ -116,36 +116,31 @@ export default function PortraitPreview({
     };
   }, [libraryConfig]);
 
-  const statusMessage = libraryConfig && status !== "ready" ? statusLabel[status] : null;
   const placeholderSrc = fallbackImage || NEUTRAL_PLACEHOLDER;
   const placeholderAlt = fallbackLabel || label;
   const showFallback = !libraryConfig || status === "error";
 
   return (
-    <div className="avatar-portrait" aria-live="polite">
-      <div className="avatar-portrait__canvas-shell">
-        {!showFallback && (
-          <canvas
-            ref={canvasRef}
-            id="PortraitCanvasPopOut"
-            width={526}
-            height={526}
-            className="avatar-portrait__canvas avatar-portrait__canvas--popout"
-            aria-label={`Portrait von ${label}`}
-          />
-        )}
-        {showFallback && (
-          <img
-            src={placeholderSrc}
-            alt={placeholderAlt}
-            className="avatar-portrait__fallback"
-            draggable={false}
-            width={240}
-            height={240}
-          />
-        )}
-      </div>
-      {statusMessage && <span className="avatar-portrait__status">{statusMessage}</span>}
+    <div className="avatar-portrait-frame">
+      {showFallback ? (
+        <img
+          src={placeholderSrc}
+          alt={placeholderAlt}
+          className="avatar-portrait__fallback"
+          draggable={false}
+          width={526}
+          height={526}
+        />
+      ) : (
+        <canvas
+          ref={canvasRef}
+          id="PortraitCanvasPopOut"
+          width={526}
+          height={526}
+          className="avatar-portrait__canvas avatar-portrait__canvas--popout"
+          aria-label={`Portrait von ${label}`}
+        />
+      )}
     </div>
   );
 }

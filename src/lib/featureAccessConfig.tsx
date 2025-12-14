@@ -3,6 +3,13 @@ import type { FirebaseError } from "firebase/app";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 import { useAuth } from "../context/AuthContext";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDocs,
+  type FirestoreTraceScope,
+  isFirestoreReadTraceEnabled,
+} from "./debug/firestoreReadTrace";
 
 export type AppRole = "guest" | "user" | "moderator" | "developer" | "admin";
 
@@ -303,6 +310,51 @@ const DEFAULT_STATE: FeatureAccessState = {
   loading: false,
   error: null,
 };
+const FEATURE_ACCESS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type FeatureAccessFetchResult = {
+  rules: FeatureAccessRuleMap;
+  fetchedAt: number;
+};
+
+let featureAccessInflight: Promise<FeatureAccessFetchResult> | null = null;
+let featureAccessCache: FeatureAccessFetchResult | null = null;
+
+const loadFeatureAccessRules = async (scope: FirestoreTraceScope | null): Promise<FeatureAccessFetchResult> => {
+  const now = Date.now();
+  if (featureAccessCache && now - featureAccessCache.fetchedAt < FEATURE_ACCESS_CACHE_TTL_MS) {
+    return featureAccessCache;
+  }
+  if (featureAccessInflight) {
+    return featureAccessInflight;
+  }
+
+  featureAccessInflight = (async () => {
+    const colRef = collection(db, "feature_access");
+    const snapshot = await traceGetDocs(scope, colRef, () => getDocs(colRef), {
+      collectionHint: "feature_access",
+    });
+    const dynamicRules: FeatureAccessRule[] = [];
+
+    snapshot.forEach((doc) => {
+      const rule = mapDocToRule(doc.id, doc.data());
+      if (!rule) return;
+      dynamicRules.push(rule);
+    });
+
+    const merged = mergeRuleMaps(dynamicRules);
+    const payload: FeatureAccessFetchResult = {
+      rules: merged,
+      fetchedAt: Date.now(),
+    };
+    featureAccessCache = payload;
+    return payload;
+  })().finally(() => {
+    featureAccessInflight = null;
+  });
+
+  return featureAccessInflight;
+};
 
 function mergeRuleValues(base: FeatureAccessRule | undefined, override: FeatureAccessRule): FeatureAccessRule {
   const merged: FeatureAccessRule = { ...(base ?? {}) } as FeatureAccessRule;
@@ -346,48 +398,45 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
     let active = true;
 
     const fetchRules = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, "feature_access"));
-        const dynamicRules: FeatureAccessRule[] = [];
-
-        snapshot.forEach((doc) => {
-          const rule = mapDocToRule(doc.id, doc.data());
-          if (!rule) return;
-          dynamicRules.push(rule);
-        });
-
-        const merged = mergeRuleMaps(dynamicRules);
+      const shouldTrace = isFirestoreReadTraceEnabled();
+      const scope: FirestoreTraceScope =
+        shouldTrace && !featureAccessCache && !featureAccessInflight
+          ? beginReadScope("FeatureAccess:load")
+          : null;
+      try {
+        const { rules } = await loadFeatureAccessRules(scope);
 
         if (active) {
           setState({
-            ...merged,
+            ...rules,
             loading: false,
             error: null,
           });
         }
       } catch (error) {
-      const err = error as FirebaseError;
-      const code = err?.code;
-      const isPermissionIssue =
-        code === "permission-denied" || code === "failed-precondition";
-      const shouldWarn =
-        typeof window !== "undefined" && window.location.hostname === "localhost";
-      if (shouldWarn) {
-        console.warn(
-          `[FeatureAccess] Firestore feature_access ${
-            isPermissionIssue ? "not readable" : "load failed"
-          }. Falling back to defaults.`,
-          error,
-        );
+        const err = error as FirebaseError;
+        const code = err?.code;
+        const isPermissionIssue = code === "permission-denied" || code === "failed-precondition";
+        const shouldWarn =
+          typeof window !== "undefined" && window.location.hostname === "localhost";
+        if (shouldWarn) {
+          console.warn(
+            `[FeatureAccess] Firestore feature_access ${
+              isPermissionIssue ? "not readable" : "load failed"
+            }. Falling back to defaults.`,
+            error,
+          );
+        }
+        if (active) {
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: error instanceof Error ? error.message : "Failed to load feature access rules",
+          }));
+        }
+      } finally {
+        endReadScope(scope);
       }
-      if (active) {
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: error instanceof Error ? error.message : "Failed to load feature access rules",
-        }));
-      }
-    }
     };
 
     fetchRules();

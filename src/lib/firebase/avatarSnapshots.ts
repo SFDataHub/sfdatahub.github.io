@@ -1,16 +1,8 @@
-import {
-  collectionGroup,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  query,
-  where,
-  type Timestamp,
-} from "firebase/firestore";
+import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import type { PortraitOptions } from "../../components/player-profile/types";
 import { DEFAULT_PORTRAIT } from "../../components/player-profile/types";
+import { traceGetDoc, type FirestoreTraceScope } from "../debug/firestoreReadTrace";
 
 export type AvatarSnapshotPortrait = {
   genderName: "male" | "female";
@@ -64,17 +56,22 @@ const normalizeServerCandidates = (value: unknown): string[] => {
   return normalized ? [normalized] : [];
 };
 
+const avatarCache = new Map<string, AvatarSnapshot | null>();
+const AVATAR_CACHE_PREFIX = "avatar-cache:";
+const AVATAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export const fetchAvatarSnapshotByPlayer = async (
   playerId: number,
   server: string,
   identifier?: string,
+  traceScope?: FirestoreTraceScope | null,
 ): Promise<AvatarSnapshot | null> => {
   const pidNum = Number(playerId);
   const pidStr = String(playerId ?? "").trim();
-  const serverCandidates = normalizeServerCandidates(server);
-  const primaryServer = serverCandidates[0];
+  const primaryServer = normalizeServerCandidates(server)[0] ?? "";
   const explicitIdentifier = typeof identifier === "string" && identifier.trim() ? identifier.trim() : "";
-  const normalizeIdentifierCandidate = (value: string) => {
+
+  const normalizeIdentifier = (value: string) => {
     if (!value) return "";
     const trimmed = value.trim().toLowerCase();
     if (!trimmed) return "";
@@ -92,123 +89,46 @@ export const fetchAvatarSnapshotByPlayer = async (
       .replace(/__+/g, "_")
       .replace(/^_|_$/g, "");
   };
-  const generatedIdentifier =
-    primaryServer && pidStr ? `${pidStr}__${primaryServer}` : "";
-  const identifierCandidates = [explicitIdentifier, generatedIdentifier]
-    .map(normalizeIdentifierCandidate)
-    .filter(Boolean)
-    .reduce<string[]>((acc, val) => {
-      if (!acc.includes(val)) acc.push(val);
-      return acc;
-    }, []);
-  const cg = collectionGroup(db, "avatars");
 
-  if (identifierCandidates.length) {
-    console.debug("[avatars] identifier candidates", identifierCandidates);
-  } else {
-    console.debug("[avatars] no identifier candidates for", { playerId, server });
-  }
+  const identifierNormalized =
+    normalizeIdentifier(explicitIdentifier) || (pidStr && primaryServer ? `${pidStr}__${primaryServer}` : "");
 
-  for (const ident of identifierCandidates) {
-    const docPath = `linked_players/avatars/avatars/${ident}`;
-    console.debug("[avatars] lookup direct doc", docPath);
-    const directByIdentifier = await getDoc(doc(db, "linked_players", "avatars", "avatars", ident));
-    if (directByIdentifier.exists()) {
-      const data = directByIdentifier.data() as any;
-      const portraitRaw = data?.portrait || {};
-      const hasPortraitData = hasPortraitValues(portraitRaw);
-      return {
-        playerId: toNumber(data?.playerId, pidNum),
-        server: typeof data?.server === "string" ? data.server : server,
-        portrait: {
-          genderName: portraitRaw?.genderName === "female" ? "female" : "male",
-          classId: toNumber(portraitRaw?.classId),
-          raceId: toNumber(portraitRaw?.raceId),
-          mouth: toNumber(portraitRaw?.mouth),
-          hair: toNumber(portraitRaw?.hair),
-          hairColor: toNumber(portraitRaw?.hairColor),
-          horn: toNumber(portraitRaw?.horn),
-          hornColor: toNumber(portraitRaw?.hornColor),
-          brows: toNumber(portraitRaw?.brows),
-          eyes: toNumber(portraitRaw?.eyes),
-          beard: toNumber(portraitRaw?.beard),
-          nose: toNumber(portraitRaw?.nose),
-          ears: toNumber(portraitRaw?.ears),
-          extra: toNumber(portraitRaw?.extra),
-          special: toNumber(portraitRaw?.special),
-          frameId: toNumber(portraitRaw?.frameId),
-          frame: typeof portraitRaw?.frame === "string" ? portraitRaw.frame : undefined,
-          background: typeof portraitRaw?.background === "string" ? portraitRaw.background : undefined,
-          showBorder: typeof portraitRaw?.showBorder === "boolean" ? portraitRaw.showBorder : undefined,
-          mirrorHorizontal:
-            typeof portraitRaw?.mirrorHorizontal === "boolean" ? portraitRaw.mirrorHorizontal : undefined,
-        },
-        updatedAt: (data?.updatedAt as Timestamp | undefined) ?? null,
-        hasPortraitData,
-      };
+  if (!identifierNormalized) return null;
+
+  const loadCached = () => {
+    if (avatarCache.has(identifierNormalized)) {
+      return avatarCache.get(identifierNormalized) ?? null;
     }
-  }
-
-  const tryQuery = async (pid: string | number, srv?: string | null) => {
-    const filters = [where("playerId", "==", pid)];
-    if (srv) filters.push(where("server", "==", srv));
-    const q = query(cg, ...filters, limit(1));
-    const snap = await getDocs(q);
-    return snap.empty ? null : snap.docs[0];
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(`${AVATAR_CACHE_PREFIX}${identifierNormalized}`) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.data || typeof parsed.savedAt !== "number") return null;
+      const isFresh = Date.now() - parsed.savedAt < AVATAR_CACHE_TTL_MS;
+      if (!isFresh) return null;
+      return parsed.data as AvatarSnapshot;
+    } catch {
+      return null;
+    }
   };
 
-  let docSnap: any = null;
-
-  if (Number.isFinite(pidNum)) {
-    for (const srv of serverCandidates) {
-      docSnap = await tryQuery(pidNum, srv);
-      if (docSnap) break;
-    }
+  const cached = loadCached();
+  if (cached) {
+    avatarCache.set(identifierNormalized, cached);
+    return cached;
   }
 
-  if (!docSnap && pidStr) {
-    for (const srv of serverCandidates) {
-      docSnap = await tryQuery(pidStr, srv);
-      if (docSnap) break;
-    }
+  const directDoc = await traceGetDoc(
+    traceScope ?? null,
+    doc(db, "linked_players", "avatars", "avatars", identifierNormalized),
+    () => getDoc(doc(db, "linked_players", "avatars", "avatars", identifierNormalized)),
+  );
+  if (!directDoc.exists()) {
+    avatarCache.set(identifierNormalized, null);
+    return null;
   }
 
-  // Fallback: try without server filter (any server) if still nothing
-  if (!docSnap) {
-    if (Number.isFinite(pidNum)) {
-      console.debug("[avatars] fallback: any server numeric pid", pidNum);
-      docSnap = await tryQuery(pidNum, null);
-    }
-    if (!docSnap && pidStr) {
-      console.debug("[avatars] fallback: any server string pid", pidStr);
-      docSnap = await tryQuery(pidStr, null);
-    }
-  }
-
-  // Fallback: direct doc under linked_players/avatars/{server__playerId} or variants
-  if (!docSnap && pidStr && serverCandidates.length > 0) {
-    for (const srv of serverCandidates) {
-      const compositeIds = [
-        `${pidStr}__${srv}`,
-        `${srv}__${pidStr}`,
-        `${srv}_${pidStr}`,
-        `${pidStr}_${srv}`,
-      ];
-      for (const candidate of compositeIds) {
-        console.debug("[avatars] fallback direct doc", candidate);
-        const direct = await getDoc(doc(db, "linked_players", "avatars", "avatars", candidate));
-        if (direct.exists()) {
-          docSnap = direct as any;
-          break;
-        }
-      }
-      if (docSnap) break;
-    }
-  }
-
-  if (!docSnap) return null;
-
-  const data = docSnap.data() as any;
+  const data = directDoc.data() as any;
   const portraitRaw = data?.portrait || {};
   const hasPortraitData = hasPortraitValues(portraitRaw);
 
@@ -236,13 +156,26 @@ export const fetchAvatarSnapshotByPlayer = async (
       typeof portraitRaw?.mirrorHorizontal === "boolean" ? portraitRaw.mirrorHorizontal : undefined,
   };
 
-  return {
-    playerId: toNumber(data?.playerId, playerId),
+  const snapshot: AvatarSnapshot = {
+    playerId: toNumber(data?.playerId, pidNum),
     server: typeof data?.server === "string" ? data.server : server,
     portrait,
     updatedAt: (data?.updatedAt as Timestamp | undefined) ?? null,
     hasPortraitData,
   };
+
+  avatarCache.set(identifierNormalized, snapshot);
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(
+        `${AVATAR_CACHE_PREFIX}${identifierNormalized}`,
+        JSON.stringify({ data: snapshot, savedAt: Date.now() }),
+      );
+    } catch {
+      // ignore cache write failures
+    }
+  }
+  return snapshot;
 };
 
 const mapFrameIdToName = (frameId: number): PortraitOptions["frame"] => {

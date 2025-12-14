@@ -21,6 +21,8 @@
       "title": "Verknuepfte Charaktere",
       "empty": "Noch keine Charaktere verknuepft. Verknuepfe einen Charakter in deinem Account, damit er hier erscheint.",
       "loginPrompt": "Bitte einloggen, um verknuepfte Charaktere zu sehen.",
+      "ctaGuest": "Start-Guide oeffnen",
+      "ctaAuthed": "Zum Account-Tab wechseln",
       "chip": {
         "server": "Server",
         "class": "Klasse"
@@ -54,7 +56,7 @@
     },
     "tools": {
       "title": "Tool-Einstellungen",
-      "subtitle": "Konfiguriere, wie die Tools f\u00fcr deinen Account arbeiten.",
+      "subtitle": "Konfiguriere, wie die Tools fuer deinen Account arbeiten.",
       "loading": "Tool-Einstellungen werden geladen...",
       "loadError": "Tool-Einstellungen konnten nicht geladen werden.",
       "defaultSet": {
@@ -73,6 +75,57 @@
         "success": "Einstellungen gespeichert.",
         "noChanges": "Keine Aenderungen zum Speichern.",
         "error": "Einstellungen konnten nicht gespeichert werden. Bitte erneut versuchen."
+      }
+    },
+    "connectedCharacters": {
+      "title": "Verknuepfte Charaktere",
+      "subtitle": "Diese Spielcharaktere sind mit deinem SFDataHub-Account verknuepft.",
+      "loading": "Charaktere werden aktualisiert...",
+      "empty": {
+        "title": "Noch keine Charaktere verknuepft",
+        "description": "Nutze den Befehl \"!connect char\" im Discord-Bot, verknuepfe deinen Account und klicke dann hier auf \"Refresh\".",
+        "cta": "Klicke hier, um zu erfahren, wie das Verknuepfen funktioniert"
+      },
+      "actions": {
+        "refresh": "Refresh",
+        "refreshing": "Aktualisiere...",
+        "unlink": "Charakter trennen"
+      },
+      "confirmation": {
+        "title": "Moechtest du diesen Charakter wirklich trennen?",
+        "cancel": "Abbrechen",
+        "confirm": "Ja, trennen",
+        "confirming": "Trenne..."
+      },
+      "errors": {
+        "serviceUnavailable": "Auth-Service ist fuer das Trennen nicht konfiguriert.",
+        "unlink": "Charakter konnte nicht getrennt werden."
+      },
+      "columns": {
+        "character": "Charakter",
+        "server": "Server",
+        "playerId": "Player ID",
+        "class": "Klasse",
+        "level": "Level",
+        "guild": "Gilde",
+        "lastVerified": "Zuletzt verknuepft",
+        "source": "Quelle",
+        "actions": "Aktionen"
+      },
+      "method": {
+        "discord": "Discord-Bot"
+      },
+      "help": {
+        "title": "Wie funktioniert das Verknuepfen?",
+        "show": "Anzeigen",
+        "hide": "Ausblenden",
+        "steps": {
+          "link": "Verknuepfe einen Charakter ueber den Discord-Bot mit dem Befehl \"!connect char\".",
+          "verify": "Wir gleichen den Charakter mit deinem letzten verifizierten Scan ab; halte deine Daten aktuell.",
+          "refresh": "Klicke nach dem Verknuepfen auf Refresh, damit die Liste aktualisiert wird.",
+          "unlink": "Du kannst jeden Charakter ueber die Spalte Aktionen trennen; die Quelle zeigt, wie er verknuepft wurde."
+        },
+        "footnote": "Tipp: Nach dem Verknuepfen oder Trennen immer kurz auf Refresh klicken."
       }
     }
   },
@@ -271,6 +324,23 @@
       "unlimited": "Kein Limit"
     }
   },
+  "search": {
+    "inputLabel": "Spieler, Gilden und Server suchen",
+    "loading": "L\u00e4dt?",
+    "recents": "Letzte Suchen",
+    "minCharsHint": "Mindestens 3 Zeichen eingeben?",
+    "noResults": "Keine Treffer",
+    "players": "Spieler",
+    "guilds": "Gilden",
+    "servers": "Server",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "guildMembers": "{{count}} Mitglieder",
+    "guildMembersUnknown": "Mitglieder ?",
+    "moreResults": "Mehr Ergebnisse? Enter dr\u00fccken",
+    "recentLabel": "Kuerzlich"
+  },
+
   "footer": {
     "about": {
       "title": "Über SFDataHub",
