@@ -1,17 +1,67 @@
-import React, { useState, useMemo } from "react";
-import { Outlet, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Topbar from "../components/Topbar/Topbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import LogoDock from "../components/LogoDock/LogoDock";
+import { useAuth } from "../context/AuthContext";
 
 const SURFACE_STYLE = { borderColor: "#2B4C73", background: "#1A2F4A" };
+const AUTH_NEXT_STORAGE_KEY = "sfh:authNext";
+
+const isSafeNextPath = (value: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("/")) return null;
+  if (trimmed.startsWith("//")) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
+  if (trimmed.toLowerCase().startsWith("/login")) return null;
+  return trimmed;
+};
 
 export default function RootLayout() {
   const [expanded, setExpanded] = useState(false);
   const [pinned, setPinned] = useState(false);
   const isOpen = pinned || expanded;
   const { t } = useTranslation();
+  const { status: authStatus, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !user) return;
+
+    const readStoredNext = () => {
+      if (typeof window === "undefined" || !window.sessionStorage) return null;
+      try {
+        return window.sessionStorage.getItem(AUTH_NEXT_STORAGE_KEY);
+      } catch (error) {
+        console.warn("[AuthNext] Failed to read auth next from sessionStorage", error);
+        return null;
+      }
+    };
+
+    const clearStoredNext = () => {
+      if (typeof window === "undefined" || !window.sessionStorage) return;
+      try {
+        window.sessionStorage.removeItem(AUTH_NEXT_STORAGE_KEY);
+      } catch (error) {
+        console.warn("[AuthNext] Failed to clear auth next from sessionStorage", error);
+      }
+    };
+
+    const nextPath = isSafeNextPath(readStoredNext());
+    if (!nextPath) {
+      clearStoredNext();
+      return;
+    }
+
+    clearStoredNext();
+    const currentPath = `${location.pathname}${location.search || ""}`;
+    if (currentPath === nextPath) return;
+
+    navigate(nextPath, { replace: true });
+  }, [authStatus, user, location.pathname, location.search, navigate]);
 
   // Eine Variable für ALLES links: Sidebar + Hintergrund + Content-Offset
   const leftVar = useMemo(

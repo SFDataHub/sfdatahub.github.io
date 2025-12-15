@@ -122,6 +122,12 @@ export default function PlaygroundIndex() {
             >
               {t("playground.tabs.gamified7", { defaultValue: "Gamified 7" })}
             </NavLink>
+            <NavLink
+              to="gamified-8"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified8", { defaultValue: "Gamified 8" })}
+            </NavLink>
 
             <div style={sx.groupLabel}>Templates</div>
             <NavLink
