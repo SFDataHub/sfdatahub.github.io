@@ -98,8 +98,12 @@ export type HeroPanelData = {
   className?: string | null;
   guild?: string | null;
   server?: string | null;
+  guildIdentifier?: string | null;
+  guildJoined?: string | null;
   levelLabel?: string;
   lastScanLabel?: string;
+  lastScanAtLabel?: string;
+  lastScanDays?: number | null;
   status?: "online" | "offline" | "unknown";
   metrics: HeroMetric[];
   badges: HeroBadge[];

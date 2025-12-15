@@ -16,6 +16,13 @@
     "tools": "Tools",
     "community": "Community"
   },
+  "playground": {
+    "tabs": {
+      "gamified": "Gamifiziert",
+      "gamified2": "Gamified 2",
+      "gamified3": "Gamified 3"
+    }
+  },
   "sidebar": {
     "connectedCharacters": {
       "title": "Verknuepfte Charaktere",
