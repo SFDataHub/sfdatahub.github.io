@@ -5,6 +5,12 @@ import { doc, getDoc } from "firebase/firestore";
 import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
 import { guildIconUrlByName } from "../../data/guilds";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDoc,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 
 // Mitglieder-Browser
 import { GuildMemberBrowser } from "../../components/guilds/guild-tabs/guild-members";
@@ -205,6 +211,7 @@ export default function GuildProfile() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      const scope: FirestoreTraceScope = beginReadScope("GuildProfile:load");
       setLoading(true);
       setErr(null);
       try {
@@ -217,7 +224,7 @@ export default function GuildProfile() {
 
         // Latest-Gildeninfo
         const refLatest = doc(db, `guilds/${id}/latest/latest`);
-        const snapLatest = await getDoc(refLatest);
+        const snapLatest = await traceGetDoc(scope, refLatest, () => getDoc(refLatest));
         if (!snapLatest.exists()) {
           setErr("Gilde nicht gefunden.");
           setLoading(false);
@@ -242,7 +249,7 @@ export default function GuildProfile() {
 
         // Members-Snapshot (falls vorhanden)
         const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
-        const snap = await getDoc(refSnap);
+        const snap = await traceGetDoc(scope, refSnap, () => getDoc(refSnap));
         if (snap.exists() && !cancelled) {
           const sdata = snap.data() as any;
           const s: MembersSnapshot = {
@@ -269,6 +276,7 @@ export default function GuildProfile() {
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }
@@ -507,5 +515,4 @@ function Tabs({
     </div>
   );
 }
-
 

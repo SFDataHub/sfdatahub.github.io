@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { beginReadScope, endReadScope, traceGetDocs } from "../../lib/debug/firestoreReadTrace";
 
 // Klassen-Mapping lokal einbinden (Icon-Auflösung findet hier statt)
 import { CLASSES, CLASS_BY_KEY } from "../../data/classes";
@@ -96,11 +97,13 @@ export default function PlayerSearch({
   React.useEffect(() => {
     let cancelled = false;
     async function run() {
+      const scope = beginReadScope("PlayerSearch:fetch");
       setError(null);
       const term = debounced;
       if (term.length < 1) {
         setHits([]);
         setActiveIndex(-1);
+        endReadScope(scope);
         return;
       }
       setLoading(true);
@@ -120,7 +123,9 @@ export default function PlayerSearch({
           endAt(folded + "\uf8ff"),
           limit(maxResults)
         );
-        const snapPrefix = await getDocs(qPrefix);
+        const snapPrefix = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
+          getDocs(qPrefix),
+        );
 
         // 2) Edge-Ngram Query auf nameNgrams (liefert schon ab 1 Zeichen)
         const qNgram = fsQuery(
@@ -128,7 +133,9 @@ export default function PlayerSearch({
           where("nameNgrams", "array-contains", folded),
           limit(maxResults)
         );
-        const snapNgram = await getDocs(qNgram);
+        const snapNgram = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
+          getDocs(qNgram),
+        );
 
         if (cancelled) return;
 
@@ -167,6 +174,7 @@ export default function PlayerSearch({
         setHits([]);
         setActiveIndex(-1);
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }

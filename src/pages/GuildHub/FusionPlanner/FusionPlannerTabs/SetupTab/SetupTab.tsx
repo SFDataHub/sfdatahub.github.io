@@ -12,6 +12,12 @@ import {
 import { useDebouncedValue } from "../../../../../hooks/useDebouncedValue";
 import { db } from "../../../../../lib/firebase";
 import type { FusionMode, FusionSetupState } from "../../FusionPlanner";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDocs,
+  type FirestoreTraceScope,
+} from "../../../../../lib/debug/firestoreReadTrace";
 import styles from "./SetupTab.module.css";
 
 type GuildForm = {
@@ -343,19 +349,22 @@ function useGuildSearchResults(term: string, server: string) {
 
     let cancelled = false;
     async function run() {
+      const scope: FirestoreTraceScope = beginReadScope("FusionSetup:guildSearch");
       try {
         const cg = collectionGroup(db, "latest");
-        const snapPrefix = await getDocs(
-          fsQuery(
-            cg,
-            orderBy("nameFold"),
-            startAt(q),
-            endAt(q + "\uf8ff"),
-            limit(12),
+        const snapPrefix = await traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
+          getDocs(
+            fsQuery(
+              cg,
+              orderBy("nameFold"),
+              startAt(q),
+              endAt(q + "\uf8ff"),
+              limit(12),
+            ),
           ),
         );
-        const snapNgram = await getDocs(
-          fsQuery(cg, where("nameNgrams", "array-contains", q), limit(12)),
+        const snapNgram = await traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
+          getDocs(fsQuery(cg, where("nameNgrams", "array-contains", q), limit(12))),
         );
 
         const seen = new Set<string>();
@@ -387,6 +396,8 @@ function useGuildSearchResults(term: string, server: string) {
       } catch (err) {
         console.error("[FusionPlanner] guild search failed", err);
         if (!cancelled) setResults([]);
+      } finally {
+        endReadScope(scope);
       }
     }
 

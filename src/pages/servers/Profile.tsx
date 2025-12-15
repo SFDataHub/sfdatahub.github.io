@@ -4,6 +4,13 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import ContentShell from "../../components/ContentShell";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDoc,
+  traceGetDocs,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 
 const PALETTE = {
   tileAlt: "var(--tile, #14273E)",
@@ -97,6 +104,7 @@ export default function ServerProfilePage() {
     let cancelled = false;
 
     async function resolveAndLoad() {
+      const scope: FirestoreTraceScope = beginReadScope("ServerProfile:load");
       setLoading(true);
       setErr(null);
       setDocId(null);
@@ -108,7 +116,7 @@ export default function ServerProfilePage() {
 
         // 1) Direkter Doc-Fetch (/servers/{id})
         const directRef = doc(db, `servers/${id}`);
-        const directSnap = await getDoc(directRef);
+        const directSnap = await traceGetDoc(scope, directRef, () => getDoc(directRef));
         if (directSnap.exists()) {
           if (!cancelled) {
             setDocId(directSnap.id);
@@ -124,9 +132,15 @@ export default function ServerProfilePage() {
         // Baue Queries
         const tries: Promise<any>[] = [];
         for (const v of variants) {
-          tries.push(getDocs(query(col, where("code", "==", v), limit(1))));
-          tries.push(getDocs(query(col, where("displayName", "==", v), limit(1))));
-          tries.push(getDocs(query(col, where("host", "==", v), limit(1))));
+          tries.push(
+            traceGetDocs(scope, col, () => getDocs(query(col, where("code", "==", v), limit(1))))
+          );
+          tries.push(
+            traceGetDocs(scope, col, () => getDocs(query(col, where("displayName", "==", v), limit(1))))
+          );
+          tries.push(
+            traceGetDocs(scope, col, () => getDocs(query(col, where("host", "==", v), limit(1))))
+          );
         }
 
         const results = await Promise.allSettled(tries);
@@ -157,6 +171,7 @@ export default function ServerProfilePage() {
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }

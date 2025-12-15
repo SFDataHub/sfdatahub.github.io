@@ -160,7 +160,7 @@ const persistRecent = (entry: RecentEntry) => {
   }
 };
 
-const removeRecent = (key: string, setState: (next: RecentEntry[]) => void) => {
+const removeRecent = (key: string, setState: React.Dispatch<React.SetStateAction<RecentEntry[]>>) => {
   try {
     const filtered = loadRecents().filter((r) => keyForRecent(r) !== key);
     window.localStorage.setItem(RECENTS_KEY, JSON.stringify(filtered));
@@ -259,6 +259,7 @@ export default function UniversalSearch({
             kind: "guild",
             id: g.guildId,
             name: g.name,
+            nameFold: null,
             server: g.server ?? null,
             memberCount: null,
             hofRank: null,
@@ -289,14 +290,20 @@ export default function UniversalSearch({
           endAt(folded + "\uf8ff"),
           limit(FS_LIMIT),
         );
-        const snapPrefix = await traceGetDocs(scope, prefixQuery, () => getDocs(prefixQuery), {
-          collectionHint: "latest",
-        });
+        const snapPrefix = await traceGetDocs(
+          scope,
+          { path: "latest" },
+          () => getDocs(prefixQuery),
+          { collectionHint: "latest" },
+        );
 
         const ngramQuery = fsQuery(cg, where("nameNgrams", "array-contains", folded), limit(FS_LIMIT));
-        const snapNgram = await traceGetDocs(scope, ngramQuery, () => getDocs(ngramQuery), {
-          collectionHint: "latest",
-        });
+        const snapNgram = await traceGetDocs(
+          scope,
+          { path: "latest" },
+          () => getDocs(ngramQuery),
+          { collectionHint: "latest" },
+        );
 
         const seenP = new Set<string>();
         const seenG = new Set<string>();
@@ -368,7 +375,7 @@ export default function UniversalSearch({
         const serverQueryPromises = [
           traceGetDocs(
             scope,
-            fsQuery(serversCol, orderBy("displayName"), startAt(term), endAt(term + "\uf8ff"), limit(maxPerSection)),
+            { path: "servers" },
             () =>
               getDocs(
                 fsQuery(serversCol, orderBy("displayName"), startAt(term), endAt(term + "\uf8ff"), limit(maxPerSection)),
@@ -377,13 +384,13 @@ export default function UniversalSearch({
           ),
           traceGetDocs(
             scope,
-            fsQuery(serversCol, orderBy("code"), startAt(upper), endAt(upper + "\uf8ff"), limit(maxPerSection)),
+            { path: "servers" },
             () => getDocs(fsQuery(serversCol, orderBy("code"), startAt(upper), endAt(upper + "\uf8ff"), limit(maxPerSection))),
             { collectionHint: "servers" },
           ),
           traceGetDocs(
             scope,
-            fsQuery(serversCol, orderBy("host"), startAt(lower), endAt(lower + "\uf8ff"), limit(maxPerSection)),
+            { path: "servers" },
             () => getDocs(fsQuery(serversCol, orderBy("host"), startAt(lower), endAt(lower + "\uf8ff"), limit(maxPerSection))),
             { collectionHint: "servers" },
           ),
@@ -592,13 +599,27 @@ export default function UniversalSearch({
 
   const renderPlayerRow = (h: PlayerHit, idx: number, isRecent = false, recentKey?: string) => {
     const active = idx === activeIndex;
+    const Wrapper: any = isRecent ? "div" : "button";
+    const wrapperProps = isRecent
+      ? {
+          role: "button",
+          tabIndex: 0,
+          onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigateTo(h);
+            }
+          },
+        }
+      : { type: "button" };
     return (
-      <button
+      <Wrapper
         key={`p-${h.id}-${idx}-${isRecent ? "r" : "s"}`}
         onClick={() => navigateTo(h)}
         style={active ? sx.itemActive : sx.item}
         title={h.name || ""}
         onMouseEnter={() => setActiveIndex(idx)}
+        {...wrapperProps}
       >
         <div style={sx.iconBox}>
           {getClassIcon ? (
@@ -638,19 +659,33 @@ export default function UniversalSearch({
             <span>{h.server ?? "Server ?"}</span>
           </div>
         </div>
-      </button>
+      </Wrapper>
     );
   };
 
   const renderGuildRow = (h: GuildHit, idx: number, isRecent = false, recentKey?: string) => {
     const active = idx === activeIndex;
+    const Wrapper: any = isRecent ? "div" : "button";
+    const wrapperProps = isRecent
+      ? {
+          role: "button",
+          tabIndex: 0,
+          onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigateTo(h);
+            }
+          },
+        }
+      : { type: "button" };
     return (
-      <button
+      <Wrapper
         key={`g-${h.id}-${idx}-${isRecent ? "r" : "s"}`}
         onClick={() => navigateTo(h)}
         style={active ? sx.itemActive : sx.item}
         title={h.name || ""}
         onMouseEnter={() => setActiveIndex(idx)}
+        {...wrapperProps}
       >
         <div style={sx.iconBox}>🏰</div>
         <div style={sx.meta}>
@@ -683,7 +718,7 @@ export default function UniversalSearch({
             </span>
           </div>
         </div>
-      </button>
+      </Wrapper>
     );
   };
 
@@ -721,14 +756,25 @@ export default function UniversalSearch({
                 if (entry.kind === "query") {
                   const key = keyForRecent(entry);
                   return (
-                    <button
+                    <div
                       key={`rq-${idx}`}
                       style={sx.item}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         setQ(entry.value);
                         setDebounced(entry.value);
                         setIsOpen(false);
                         setRecents(loadRecents());
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setQ(entry.value);
+                          setDebounced(entry.value);
+                          setIsOpen(false);
+                          setRecents(loadRecents());
+                        }
                       }}
                     >
                       <div style={sx.meta}>
@@ -749,7 +795,7 @@ export default function UniversalSearch({
                           </button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 }
                 if (entry.kind === "player") {

@@ -14,6 +14,12 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { db } from "../../lib/firebase";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDocs,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 import styles from "../GuildHub/Fusion.module.css";
 import {
   FreshnessCode,
@@ -631,22 +637,25 @@ function usePlayerSearchResults(term: string, server: string, excludeId?: string
     let cancelled = false;
 
     async function run() {
+      const scope: FirestoreTraceScope = beginReadScope("PlayersCompare:search");
       setLoading(true);
       try {
         const folded = q.toLowerCase();
         const cg = collectionGroup(db, "latest");
 
-        const snapPrefix = await getDocs(
-          fsQuery(
-            cg,
-            orderBy("nameFold"),
-            startAt(folded),
-            endAt(folded + "\uf8ff"),
-            limit(15),
+        const snapPrefix = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
+          getDocs(
+            fsQuery(
+              cg,
+              orderBy("nameFold"),
+              startAt(folded),
+              endAt(folded + "\uf8ff"),
+              limit(15),
+            ),
           ),
         );
-        const snapNgram = await getDocs(
-          fsQuery(cg, where("nameNgrams", "array-contains", folded), limit(15)),
+        const snapNgram = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
+          getDocs(fsQuery(cg, where("nameNgrams", "array-contains", folded), limit(15))),
         );
 
         const seen = new Set<string>();
@@ -713,6 +722,7 @@ function usePlayerSearchResults(term: string, server: string, excludeId?: string
         console.error("[Players Compare] player search failed", error);
         if (!cancelled) setResults([]);
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }
