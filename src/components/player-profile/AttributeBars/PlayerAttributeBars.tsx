@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { BaseStatBenchmarks, BaseStatValues } from "../types";
 
 type AttributeKey = "str" | "dex" | "int" | "con" | "lck";
@@ -33,8 +33,34 @@ const toPercent = (value: number, maxValue: number) => {
 const isValidNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-export default function PlayerAttributeBars({ baseStats, totalStats, benchmarks, mode, onModeChange }: Props) {
+export default function PlayerAttributeBars({
+  baseStats,
+  totalStats,
+  benchmarks,
+  mode,
+  onModeChange,
+}: Props) {
   const [internalMode, setInternalMode] = useState<"base" | "total">("base");
+  const [animateReady, setAnimateReady] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  useEffect(() => {
+    let frame1: number | null = null;
+    let frame2: number | null = null;
+    frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => setAnimateReady(true));
+    });
+    return () => {
+      if (frame1 != null) cancelAnimationFrame(frame1);
+      if (frame2 != null) cancelAnimationFrame(frame2);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (animateReady && !hasAnimated) {
+      setHasAnimated(true);
+    }
+  }, [animateReady, hasAnimated]);
 
   const hasTotalStats = ATTRIBUTES.some((attr) => isValidNumber(totalStats?.[attr.key]));
   const effectiveMode = mode ?? internalMode;
@@ -101,7 +127,9 @@ export default function PlayerAttributeBars({ baseStats, totalStats, benchmarks,
           const playerPct = toPercent(playerValue, effectiveMax);
           const serverPct = toPercent(serverVal, effectiveMax);
           const guildPct = toPercent(guildVal, effectiveMax);
-          const playerRatio = Math.min(1, Math.max(0, playerPct / 100));
+          const targetRatio = Math.min(1, Math.max(0, playerPct / 100));
+          const displayRatio = animateReady ? targetRatio : 0;
+          const transitionDuration = !hasAnimated ? "500ms" : undefined;
 
           return (
             <div key={attr.key} className="player-profile__attribute-bar-row">
@@ -113,8 +141,9 @@ export default function PlayerAttributeBars({ baseStats, totalStats, benchmarks,
                 <div
                   className="player-profile__attribute-bar-fill"
                   style={{
-                    transform: `scaleX(${playerRatio})`,
+                    transform: `scaleX(${displayRatio})`,
                     minWidth: playerValue > 0 && playerPct < 100 ? MIN_FILL_PX : undefined,
+                    transitionDuration,
                   }}
                   aria-hidden
                 />

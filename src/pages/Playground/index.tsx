@@ -1,6 +1,7 @@
 // FILE: src/pages/Playground/Index.tsx
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const sx: Record<string, React.CSSProperties> = {
   wrap: { padding: 16, maxWidth: 1200, margin: "0 auto", color: "#FFFFFF" },
@@ -26,6 +27,8 @@ const sx: Record<string, React.CSSProperties> = {
 };
 
 export default function PlaygroundIndex() {
+  const { t } = useTranslation();
+
   return (
     <div style={sx.wrap}>
       <div style={sx.grid}>
@@ -75,6 +78,25 @@ export default function PlaygroundIndex() {
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >
               Theme / Template Maker · Pro
+            </NavLink>
+
+            <NavLink
+              to="gamified"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified", { defaultValue: "Gamified" })}
+            </NavLink>
+            <NavLink
+              to="gamified-2"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified2", { defaultValue: "Gamified 2" })}
+            </NavLink>
+            <NavLink
+              to="gamified-3"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified3", { defaultValue: "Gamified 3" })}
             </NavLink>
 
             <div style={sx.groupLabel}>Templates</div>

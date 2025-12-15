@@ -101,6 +101,9 @@ import HUDIndex from "./pages/Playground/HUD/index";
 import GameButtonsPlayground from "./pages/Playground/HUD/GameButtonsPlayground";
 import ThemeMaker from "./pages/Playground/ThemeMaker";
 import ThemeMakerPro from "./pages/Playground/ThemeMakerPro";
+import GamifiedTab from "./pages/Playground/GamifiedTab";
+import GamifiedTab2 from "./pages/Playground/GamifiedTab2";
+import GamifiedTab3 from "./pages/Playground/GamifiedTab3";
 import ListViews from "./pages/Playground/ListViews";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
@@ -424,6 +427,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="upload-sim" element={<UploadSim />} />
                   <Route path="theme-maker" element={<ThemeMaker />} />
                   <Route path="theme-maker-pro" element={<ThemeMakerPro />} />
+                  <Route path="gamified" element={<GamifiedTab />} />
+                  <Route path="gamified-2" element={<GamifiedTab2 />} />
+                  <Route path="gamified-3" element={<GamifiedTab3 />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />

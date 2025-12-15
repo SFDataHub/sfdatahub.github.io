@@ -16,6 +16,13 @@
     "tools": "Tools",
     "community": "Community"
   },
+  "playground": {
+    "tabs": {
+      "gamified": "Gamified",
+      "gamified2": "Gamified 2",
+      "gamified3": "Gamified 3"
+    }
+  },
   "sidebar": {
     "connectedCharacters": {
       "title": "Connected characters",
@@ -349,9 +356,6 @@
     "copyright": "© 2025 SFDataHub – community project around Shakes & Fidget."
   }
 }
-
-
-
 
 
 

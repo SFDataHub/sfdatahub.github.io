@@ -6,6 +6,7 @@ import type {
   TimelineEntry,
   TrendSeries,
 } from "./types";
+import AnchoredLineCard from "../ui/charts/AnchoredLineCard";
 
 export function StatsTab({ data }: { data: StatsTabModel }) {
   return (
@@ -99,19 +100,12 @@ export function ChartsTab({ series }: { series: TrendSeries[] }) {
   return (
     <div className="player-profile__tab-panel player-profile__grid">
       {series.map((trend) => (
-        <article key={trend.label} className="player-profile__trend-card">
-          <div className="player-profile__trend-head">
-            <div>
-              <div className="player-profile__card-label">{trend.label}</div>
-              {trend.subLabel && <div className="player-profile__card-hint">{trend.subLabel}</div>}
-            </div>
-            <div className="player-profile__card-value">
-              {trend.points[trend.points.length - 1]?.toLocaleString("de-DE")}
-              {trend.unit || ""}
-            </div>
-          </div>
-          <MiniTrend points={trend.points} />
-        </article>
+        <AnchoredLineCard
+          key={trend.label}
+          title={trend.label}
+          subtitle={trend.subLabel ?? "Looks natural even when the values are high (no 0-baseline)."}
+          series={trend}
+        />
       ))}
     </div>
   );
@@ -169,24 +163,6 @@ export function HistoryTab({ entries }: { entries: TimelineEntry[] }) {
 }
 
 function MiniTrend({ points }: { points: number[] }) {
-  if (!points.length) {
-    return <div className="player-profile__trend-chart player-profile__trend-chart--empty" />;
-  }
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = Math.max(1, max - min || 1);
-  const normalized = points.map((value, idx) => {
-    const x = points.length > 1 ? (idx / (points.length - 1)) * 100 : 0;
-    const y = 100 - ((value - min) / span) * 100;
-    return `${idx === 0 ? "M" : "L"}${x},${y}`;
-  });
-  const path = normalized.join(" ");
-
-  return (
-    <div className="player-profile__trend-chart">
-      <svg viewBox="0 0 100 100" role="img" aria-label="Verlauf">
-        <path d={path} />
-      </svg>
-    </div>
-  );
+  // legacy, unused
+  return <div className="player-profile__trend-chart player-profile__trend-chart--empty" />;
 }

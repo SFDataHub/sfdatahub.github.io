@@ -5,10 +5,35 @@ import { CLASSES } from "../../data/classes";
 import { toDriveThumbProxy } from "../../lib/urls";
 import PlayerAttributeBars from "./AttributeBars/PlayerAttributeBars";
 
+type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
+
+const computeFreshness = (
+  lastScanDays?: number | null,
+): { level: FreshnessLevel; label: string; hint: string } => {
+  if (lastScanDays == null || !Number.isFinite(lastScanDays)) {
+    return { level: "unknown", label: "Unknown", hint: "Scan history unavailable" };
+  }
+  const days = Math.max(0, Math.floor(lastScanDays));
+  if (days === 0) return { level: 0, label: "Scanned today", hint: "No rescan needed" };
+  if (days === 1) return { level: 1, label: "Very fresh", hint: "No rescan needed" };
+  if (days <= 3) return { level: 2, label: "Fresh", hint: "No rescan needed" };
+  if (days <= 7) return { level: 3, label: "Recent", hint: "Rescan recommended" };
+  if (days <= 14) return { level: 4, label: "Aging", hint: "Rescan recommended" };
+  if (days <= 30) return { level: 5, label: "Outdated", hint: "Rescan strongly recommended" };
+  return { level: 6, label: "Stale", hint: "Rescan strongly recommended" };
+};
+
+const formatAgeLabel = (lastScanDays?: number | null) => {
+  if (lastScanDays == null || !Number.isFinite(lastScanDays)) return null;
+  const days = Math.max(0, Math.floor(lastScanDays));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+};
+
 type HeroPanelProps = {
   data: HeroPanelData;
   loading?: boolean;
-  actionFeedback?: string | null;
   onAction?: (action: HeroAction["key"]) => void;
 };
 
@@ -55,9 +80,18 @@ function ClassAvatar({
   );
 }
 
-export default function HeroPanel({ data, loading, actionFeedback, onAction }: HeroPanelProps) {
+function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
   const [mode, setMode] = useState<"base" | "total">("base");
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const freshness = useMemo(() => computeFreshness(data.lastScanDays), [data.lastScanDays]);
+  const freshnessTooltip = useMemo(() => {
+    const parts = [];
+    if (data.lastScanAtLabel) parts.push(`Last scan: ${data.lastScanAtLabel}`);
+    const ageLabel = formatAgeLabel(data.lastScanDays);
+    if (ageLabel) parts.push(`Age: ${ageLabel}`);
+    if (freshness.hint) parts.push(freshness.hint);
+    return parts.join(" | ");
+  }, [data.lastScanAtLabel, data.lastScanDays, freshness.hint]);
   const classMeta =
     CLASSES.find((item) => normalize(item.label) === normalize(data.className || "")) ||
     CLASSES.find(
@@ -104,17 +138,20 @@ export default function HeroPanel({ data, loading, actionFeedback, onAction }: H
               {data.server && <span>• {data.server}</span>}
             </div>
             {data.lastScanLabel && (
-              <div className="player-profile__player-meta player-profile__player-meta--soft">
-                Zuletzt gescannt: {data.lastScanLabel}
-              </div>
-            )}
-            {data.status && (
-              <div className={`player-profile__status player-profile__status--${data.status}`}>
-                {data.status === "online" ? "aktiv" : "inaktiv"}
-              </div>
-            )}
-          </div>
+            <div className="player-profile__player-meta player-profile__player-meta--soft">
+              Zuletzt gescannt: {data.lastScanLabel}
+            </div>
+          )}
+            <div className="player-profile__freshness" title={freshnessTooltip || undefined}>
+              <span
+                aria-hidden
+                className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
+              />
+              <span className="player-profile__freshness-label">{freshness.label}</span>
+              <span aria-hidden className="player-profile__freshness-info">ⓘ</span>
+            </div>
         </div>
+      </div>
         <PortraitPreview
           config={portraitConfig}
           label={data.playerName}
@@ -174,10 +211,11 @@ export default function HeroPanel({ data, loading, actionFeedback, onAction }: H
                 {action.label}
               </button>
             ))}
-            {actionFeedback && <p className="player-profile__hero-feedback">{actionFeedback}</p>}
           </div>
         )}
       </div>
     </section>
   );
 }
+
+export default React.memo(HeroPanel);
