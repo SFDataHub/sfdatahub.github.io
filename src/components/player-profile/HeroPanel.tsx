@@ -4,6 +4,7 @@ import type { HeroAction, HeroPanelData } from "./types";
 import { CLASSES } from "../../data/classes";
 import { toDriveThumbProxy } from "../../lib/urls";
 import PlayerAttributeBars from "./AttributeBars/PlayerAttributeBars";
+import Tooltip from "../ui/Tooltip/Tooltip";
 
 type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
 
@@ -138,18 +139,20 @@ function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
               {data.server && <span>• {data.server}</span>}
             </div>
             {data.lastScanLabel && (
-            <div className="player-profile__player-meta player-profile__player-meta--soft">
-              Zuletzt gescannt: {data.lastScanLabel}
-            </div>
-          )}
-            <div className="player-profile__freshness" title={freshnessTooltip || undefined}>
-              <span
-                aria-hidden
-                className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
-              />
-              <span className="player-profile__freshness-label">{freshness.label}</span>
-              <span aria-hidden className="player-profile__freshness-info">ⓘ</span>
-            </div>
+              <div className="player-profile__player-meta player-profile__player-meta--soft">
+                Zuletzt gescannt: {data.lastScanLabel}
+              </div>
+            )}
+            <Tooltip content={freshnessTooltip}>
+              <div className="player-profile__freshness">
+                <span
+                  aria-hidden
+                  className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
+                />
+                <span className="player-profile__freshness-label">{freshness.label}</span>
+                <span aria-hidden className="player-profile__freshness-info">ⓘ</span>
+              </div>
+            </Tooltip>
         </div>
       </div>
         <PortraitPreview

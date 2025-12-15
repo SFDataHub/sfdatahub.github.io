@@ -11,6 +11,12 @@ import ResultTab from "./FusionPlannerTabs/ResultTab/ResultTab";
 import { db } from "../../../lib/firebase";
 import type { MemberSummaryLike } from "../../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
 import type { Member as GuildMember } from "../../../components/guilds/guild-tabs/guild-members/types";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDoc,
+  type FirestoreTraceScope,
+} from "../../../lib/debug/firestoreReadTrace";
 
 type TabKey = "setup" | "members" | "overview" | "scenarios" | "result";
 
@@ -390,6 +396,7 @@ export default function FusionPlanner() {
     let cancelled = false;
 
     async function loadMembers() {
+      const scope: FirestoreTraceScope = beginReadScope("FusionPlanner:loadMembers");
       setMembersLoading(true);
       try {
         const allMembers: FusionMember[] = [];
@@ -399,7 +406,7 @@ export default function FusionPlanner() {
           if (!targetGuildId) continue;
 
           const latestRef = doc(db, `guilds/${targetGuildId}/latest/latest`);
-          const latestSnap = await getDoc(latestRef);
+          const latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
           const latestData = latestSnap.exists() ? (latestSnap.data() as any) : null;
           const guildName =
             guildConfig.name?.trim() ??
@@ -413,7 +420,7 @@ export default function FusionPlanner() {
             null;
 
           const membersRef = doc(db, `guilds/${targetGuildId}/snapshots/members_summary`);
-          const membersSnap = await getDoc(membersRef);
+          const membersSnap = await traceGetDoc(scope, membersRef, () => getDoc(membersRef));
           if (!membersSnap.exists()) continue;
           const rawMembers = membersSnap.data() as any;
           const list = Array.isArray(rawMembers.members) ? (rawMembers.members as MemberSummaryLike[]) : [];
@@ -435,6 +442,7 @@ export default function FusionPlanner() {
         if (!cancelled) {
           setMembersLoading(false);
         }
+        endReadScope(scope);
       }
     }
 
@@ -716,4 +724,3 @@ export default function FusionPlanner() {
     </ContentShell>
   );
 }
-

@@ -98,6 +98,30 @@ export default function PlaygroundIndex() {
             >
               {t("playground.tabs.gamified3", { defaultValue: "Gamified 3" })}
             </NavLink>
+            <NavLink
+              to="gamified-4"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified4", { defaultValue: "Gamified 4" })}
+            </NavLink>
+            <NavLink
+              to="gamified-5"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified5", { defaultValue: "Gamified 5" })}
+            </NavLink>
+            <NavLink
+              to="gamified-6"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified6", { defaultValue: "Gamified 6" })}
+            </NavLink>
+            <NavLink
+              to="gamified-7"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              {t("playground.tabs.gamified7", { defaultValue: "Gamified 7" })}
+            </NavLink>
 
             <div style={sx.groupLabel}>Templates</div>
             <NavLink

@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDoc,
+  traceGetDocs,
+  type FirestoreTraceScope,
+} from "../../../../lib/debug/firestoreReadTrace";
 import GuildMonthlyProgressTab from "./GuildMonthlyProgressTab";
 import type {
   GuildMonthlyProgressData,
@@ -40,11 +47,12 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
     let cancelled = false;
 
     async function loadMonthsAndMaybeProgress() {
+      const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:months");
       setLoading(true);
       try {
         // 1) Monate auflisten: guilds/{id}/history_monthly/*
         const monthCol = collection(db, `guilds/${guildId}/history_monthly`);
-        const monthSnaps = await getDocs(monthCol);
+        const monthSnaps = await traceGetDocs(scope, { path: monthCol.path }, () => getDocs(monthCol));
 
         const opts: MonthOption[] = [];
 
@@ -116,6 +124,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
         setCurrentMonthKey(undefined);
         setUiData(emptyUiData(guildName, guildServer));
       } finally {
+        endReadScope(scope);
         if (!cancelled) setLoading(false);
       }
     }
@@ -132,9 +141,10 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
     // aus Cache oder holen
     let p = progressCache.current[key];
     if (!p) {
+      const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:monthDoc");
       try {
         const ref = doc(db, `guilds/${guildId}/history_monthly/${key}`);
-        const pSnap = await getDoc(ref);
+        const pSnap = await traceGetDoc(scope, ref, () => getDoc(ref));
         if (pSnap.exists()) {
           p = pSnap.data();
           progressCache.current[key] = p;
@@ -144,6 +154,8 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
       } catch (e) {
         console.error(e);
         p = null;
+      } finally {
+        endReadScope(scope);
       }
     }
 

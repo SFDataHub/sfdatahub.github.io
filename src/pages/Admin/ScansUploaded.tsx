@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  Timestamp,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -23,6 +16,12 @@ import {
 } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
+import {
+  beginReadScope,
+  endReadScope,
+  traceGetDocs,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 
 const surfaceStyle: React.CSSProperties = {
   background: "#152A42",
@@ -688,6 +687,7 @@ function useScansUploadedOverview(): OverviewState {
   const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (isRefresh = false) => {
+    const scope: FirestoreTraceScope = beginReadScope("AdminScansUploaded:overview");
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -696,20 +696,21 @@ function useScansUploadedOverview(): OverviewState {
     try {
       const coll = collection(db, "scanUploads");
       const q = query(coll, orderBy("uploadedAt", "desc"), limit(100));
-      const snap = await getDocs(q);
+      const snap = await traceGetDocs(scope, coll, () => getDocs(q));
       const fetched = snap.docs.map((doc) => normaliseRecord(doc.id, doc.data()));
       if (fetched.length > 0) {
         setRecords(fetched);
         setError(null);
       } else {
         setRecords(FALLBACK_RECORDS);
-        setError("No uploads in window – showing fallback snapshot");
+        setError("No uploads in window - showing fallback snapshot");
       }
     } catch (err) {
       console.error("[ScansUploaded] Failed to load Firestore data", err);
-      setError("Live data unavailable – fallback snapshot active");
+      setError("Live data unavailable - fallback snapshot active");
       setRecords(FALLBACK_RECORDS);
     } finally {
+      endReadScope(scope);
       if (isRefresh) {
         setRefreshing(false);
       } else {

@@ -13,6 +13,7 @@ import {
   writeMonthlyDoc,
 } from "../../lib/guilds/monthly";
 import { db } from "../../lib/firebase";
+import { beginReadScope, endReadScope, traceGetDoc, type FirestoreTraceScope } from "../../lib/debug/firestoreReadTrace";
 
 type Row = Record<string, any>;
 
@@ -99,8 +100,14 @@ export async function importSelectionToDb(
   }
 
   for (const guildId of gidSet) {
+    const scope: FirestoreTraceScope = beginReadScope("ImportCsv:guildLatest");
     const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
-    const latestSnap = await getDoc(latestRef);
+    let latestSnap;
+    try {
+      latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
+    } finally {
+      endReadScope(scope);
+    }
     if (!latestSnap.exists()) continue;
 
     const latest = latestSnap.data() as any;
