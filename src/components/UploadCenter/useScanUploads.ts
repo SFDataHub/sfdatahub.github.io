@@ -6,6 +6,7 @@ import {
   query,
   Timestamp,
   where,
+  documentId,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
@@ -116,6 +117,18 @@ const mergeUploads = (existing: ScanUploadDoc[], incoming: ScanUploadDoc[]): Sca
     .slice(0, SCAN_UPLOAD_LIMIT);
 };
 
+const collectIdsForTimestamp = (
+  docs: ScanUploadDoc[],
+  target: SerializedTimestamp | null,
+): string[] => {
+  if (!target) return [];
+  const targetMs = timestampToMillis(target);
+  return docs
+    .filter((doc) => timestampToMillis(doc.uploadedAt) === targetMs)
+    .map((doc) => doc.id)
+    .filter((id): id is string => Boolean(id));
+};
+
 const readCache = (key: string): ScanUploadCache | null => {
   if (typeof window === "undefined") return null;
   try {
@@ -163,8 +176,8 @@ export const useScanUploads = (discordUserId?: string | null): UseScanUploadsRes
     const cacheKey = `${CACHE_KEY_PREFIX}${discordUserId}`;
     const cached = readCache(cacheKey);
     const cachedItems = cached ? cached.items.map(deserializeCachedDoc) : [];
-    const cachedLastUploadedAt =
-      cached?.lastUploadedAt || getLatestUploadedAt(cachedItems);
+    const cachedLastUploadedAt = cached?.lastUploadedAt || getLatestUploadedAt(cachedItems);
+    const seenIdsAtLastTimestamp = collectIdsForTimestamp(cachedItems, cachedLastUploadedAt);
 
     setError(null);
     if (cachedItems.length > 0) {
@@ -213,7 +226,10 @@ export const useScanUploads = (discordUserId?: string | null): UseScanUploadsRes
       }
     };
 
-    const runDelta = async (lastUploadedAt: SerializedTimestamp) => {
+    const runDelta = async (
+      lastUploadedAt: SerializedTimestamp,
+      seenIdsForLastTimestamp: string[],
+    ) => {
       const deltaKey = `${discordUserId}:${lastUploadedAt.seconds}:${lastUploadedAt.nanoseconds}`;
       const existing = inFlightDeltaChecks.get(deltaKey);
       if (existing) {
@@ -225,25 +241,47 @@ export const useScanUploads = (discordUserId?: string | null): UseScanUploadsRes
       const promise = (async () => {
         try {
           const scanUploadsRef = collection(db, "scan_uploads");
+          const lastTimestamp = new Timestamp(lastUploadedAt.seconds, lastUploadedAt.nanoseconds);
           const deltaQuery = query(
             scanUploadsRef,
             where("discordUserId", "==", discordUserId),
             orderBy("uploadedAt", "asc"),
-            where(
-              "uploadedAt",
-              ">=",
-              new Timestamp(lastUploadedAt.seconds, lastUploadedAt.nanoseconds),
-            ),
+            where("uploadedAt", ">", lastTimestamp),
           );
           const snapshot = await traceGetDocs(scope, { path: scanUploadsRef.path }, () => getDocs(deltaQuery));
           if (!active) return;
-          const docs = snapshot.docs.map(
+          let docs = snapshot.docs.map(
             (doc) =>
               ({
                 id: doc.id,
                 ...doc.data(),
               }) as ScanUploadDoc,
           );
+
+          if (docs.length === 0 && seenIdsForLastTimestamp.length > 0) {
+            const unseenIds = seenIdsForLastTimestamp.slice(0, 10);
+            const equalityQuery = query(
+              scanUploadsRef,
+              where("discordUserId", "==", discordUserId),
+              where("uploadedAt", "==", lastTimestamp),
+              where(documentId(), "not-in", unseenIds),
+              orderBy(documentId()),
+            );
+            const equalitySnapshot = await traceGetDocs(
+              scope,
+              { path: scanUploadsRef.path },
+              () => getDocs(equalityQuery),
+            );
+            if (!active) return;
+            docs = equalitySnapshot.docs.map(
+              (doc) =>
+                ({
+                  id: doc.id,
+                  ...doc.data(),
+                }) as ScanUploadDoc,
+            );
+          }
+
           if (docs.length === 0) {
             console.log("[upload-center] No new scan_uploads found; using cached entries");
             return;
@@ -273,7 +311,7 @@ export const useScanUploads = (discordUserId?: string | null): UseScanUploadsRes
     };
 
     if (cachedItems.length > 0 && cachedLastUploadedAt) {
-      void runDelta(cachedLastUploadedAt);
+      void runDelta(cachedLastUploadedAt, seenIdsAtLastTimestamp);
     } else {
       void loadInitial();
     }

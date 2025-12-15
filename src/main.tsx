@@ -108,6 +108,7 @@ import GamifiedTab4 from "./pages/Playground/GamifiedTab4";
 import GamifiedTab5 from "./pages/Playground/GamifiedTab5";
 import GamifiedTab6 from "./pages/Playground/GamifiedTab6";
 import GamifiedTab7 from "./pages/Playground/GamifiedTab7";
+import GamifiedTab8 from "./pages/Playground/GamifiedTab8";
 import ListViews from "./pages/Playground/ListViews";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
@@ -438,6 +439,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="gamified-5" element={<GamifiedTab5 />} />
                   <Route path="gamified-6" element={<GamifiedTab6 />} />
                   <Route path="gamified-7" element={<GamifiedTab7 />} />
+                  <Route path="gamified-8" element={<GamifiedTab8 />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />
