@@ -78,6 +78,33 @@
   background: rgba(15, 32, 48, 0.85);
 }
 
+.errorMessage {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 96, 96, 0.08);
+  border: 1px solid rgba(255, 133, 133, 0.35);
+  color: #ffb3b3;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.diagnostics {
+  margin-top: 12px;
+  text-align: left;
+  color: var(--text-soft, #8ea8c9);
+}
+
+.diagnosticsBody {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
 .disclaimer {
   color: var(--text-soft, #8ea8c9);
   font-size: 0.85rem;
