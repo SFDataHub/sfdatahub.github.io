@@ -172,7 +172,11 @@ const AccountSettingsPage: React.FC = () => {
   };
 
   const handleGoToSignIn = () => {
-    navigate("/login");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sfh:openLoginModal"));
+    } else {
+      navigate("/login");
+    }
   };
 
   const handleLogout = async () => {

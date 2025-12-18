@@ -358,7 +358,11 @@ export default function Sidebar({
     if (isAuthed) {
       logout();
     } else {
-      navigate("/login");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("sfh:openLoginModal"));
+      } else {
+        navigate("/login");
+      }
     }
   };
 

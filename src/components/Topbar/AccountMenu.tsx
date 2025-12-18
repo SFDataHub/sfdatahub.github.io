@@ -48,7 +48,11 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   };
 
   const handleSignIn = () => {
-    navigate("/login");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sfh:openLoginModal"));
+    } else {
+      navigate("/login");
+    }
     closeMenu();
   };
 
