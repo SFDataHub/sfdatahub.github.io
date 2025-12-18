@@ -5,6 +5,7 @@ import Topbar from "../components/Topbar/Topbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import LogoDock from "../components/LogoDock/LogoDock";
 import { useAuth } from "../context/AuthContext";
+import LoginModalHost from "../components/auth/LoginModalHost";
 
 const SURFACE_STYLE = { borderColor: "#2B4C73", background: "#1A2F4A" };
 const AUTH_NEXT_STORAGE_KEY = "sfh:authNext";
@@ -97,6 +98,7 @@ export default function RootLayout() {
         <div className="content-inner">
           <div className="content-body">
             <Outlet />
+            <LoginModalHost />
             <div className="mt-4 px-4 md:px-6">
               <div className="rounded-2xl border px-4 py-4" style={SURFACE_STYLE}>
                 <div className="text-sm font-semibold" style={{ color: "#F5F9FF" }}>
