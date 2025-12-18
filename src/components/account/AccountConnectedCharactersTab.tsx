@@ -8,7 +8,7 @@ import styles from "./AccountConnectedCharactersTab.module.css";
 
 type AccountConnectedCharactersTabProps = {
   user: AuthUser;
-  refreshSession: (options?: { silent?: boolean }) => Promise<void>;
+  refreshSession: (options?: { silent?: boolean }) => Promise<boolean>;
   openHelp?: boolean;
 };
 

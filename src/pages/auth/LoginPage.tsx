@@ -5,6 +5,7 @@ import ContentShell from "../../components/ContentShell";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/logo-sfdatahub.png";
 import styles from "./LoginPage.module.css";
+import { auth } from "../../lib/firebase";
 
 const AUTH_NEXT_STORAGE_KEY = "sfh:authNext";
 
@@ -22,6 +23,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, user, loginWithDiscord, loginWithGoogle, logout } = useAuth();
+  const [authError, setAuthError] = React.useState<{ code?: string; message: string } | null>(null);
 
   const isLoading = status === "loading" || status === "idle";
   const isAuthenticated = status === "authenticated" && !!user;
@@ -58,12 +60,57 @@ const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, navigate, resolvedNext]);
 
-  const handleDiscord = () => {
-    if (!isLoading) loginWithDiscord();
+  const isAuthDebugEnabled = React.useCallback(() => {
+    const fallback = import.meta.env.DEV;
+    if (typeof window === "undefined") return fallback;
+    try {
+      const raw = window.localStorage?.getItem("sfh:debug:auth");
+      if (raw === "1" || raw === "true") return true;
+    } catch (error) {
+      console.warn("[Login] Failed to read auth debug flag", error);
+    }
+    return fallback;
+  }, []);
+
+  const mapAuthError = React.useCallback((code?: string, rawMessage?: string): string => {
+    const host = typeof window !== "undefined" ? window.location.host : "unknown host";
+    switch (code) {
+      case "auth/unauthorized-domain":
+        return `This domain is not authorized for login. Please add "${host}" to your Firebase Auth authorized domains or use the correct environment.`;
+      case "auth/popup-blocked":
+        return "The login popup was blocked. Please allow popups for this site or continue with the redirect flow.";
+      case "auth/popup-closed-by-user":
+        return "The login popup was closed before completing sign-in. Please try again.";
+      default: {
+        const suffix = code ? ` (code: ${code})` : "";
+        const baseMessage = rawMessage || "Login failed. Please try again.";
+        return `${baseMessage}${suffix}`;
+      }
+    }
+  }, []);
+
+  const handleDiscord = async () => {
+    if (isLoading) return;
+    setAuthError(null);
+    try {
+      await loginWithDiscord();
+    } catch (error: any) {
+      const code = typeof error?.code === "string" ? error.code : undefined;
+      const message = typeof error?.message === "string" ? error.message : undefined;
+      setAuthError({ code, message: mapAuthError(code, message) });
+    }
   };
 
-  const handleGoogle = () => {
-    if (!isLoading) loginWithGoogle();
+  const handleGoogle = async () => {
+    if (isLoading) return;
+    setAuthError(null);
+    try {
+      await loginWithGoogle();
+    } catch (error: any) {
+      const code = typeof error?.code === "string" ? error.code : undefined;
+      const message = typeof error?.message === "string" ? error.message : undefined;
+      setAuthError({ code, message: mapAuthError(code, message) });
+    }
   };
 
   const handleLogout = async () => {
@@ -112,6 +159,22 @@ const LoginPage: React.FC = () => {
         >
           Login with Google
         </button>
+        {authError && (
+          <div className={styles.errorMessage}>
+            {authError.message}
+          </div>
+        )}
+        {isAuthDebugEnabled() && (
+          <details className={styles.diagnostics}>
+            <summary>Auth diagnostics</summary>
+            <div className={styles.diagnosticsBody}>
+              <div>Host: {typeof window !== "undefined" ? window.location.host : "N/A"}</div>
+              <div>Origin: {typeof window !== "undefined" ? window.location.origin : "N/A"}</div>
+              <div>Firebase projectId: {auth.app?.options?.projectId ?? "unknown"}</div>
+              <div>Firebase authDomain: {auth.app?.options?.authDomain ?? "unknown"}</div>
+            </div>
+          </details>
+        )}
       </div>
     );
   }

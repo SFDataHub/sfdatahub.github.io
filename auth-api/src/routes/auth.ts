@@ -29,6 +29,8 @@ const isProd = process.env.NODE_ENV === "production";
 type StatePayload = {
   id: string;
   redirect?: string;
+  mode?: "popup";
+  nonce?: string;
 };
 
 const frontendHost = (() => {
@@ -77,6 +79,8 @@ const decodeState = (raw: string): StatePayload | null => {
     return {
       id: typeof parsed.id === "string" ? parsed.id : "",
       redirect: typeof parsed.redirect === "string" ? parsed.redirect : undefined,
+      mode: parsed.mode === "popup" ? "popup" : undefined,
+      nonce: typeof parsed.nonce === "string" ? parsed.nonce : undefined,
     };
   } catch {
     return null;
@@ -249,7 +253,9 @@ authRouter.get("/discord/login", (req, res) => {
   }
 
   const safeRedirect = getSafeRedirect(typeof req.query.redirect === "string" ? req.query.redirect : undefined);
-  const statePayload: StatePayload = { id: randomUUID(), redirect: safeRedirect };
+  const mode = req.query.mode === "popup" ? "popup" : undefined;
+  const nonce = typeof req.query.nonce === "string" ? req.query.nonce : undefined;
+  const statePayload: StatePayload = { id: randomUUID(), redirect: safeRedirect, mode, nonce };
   const state = encodeState(statePayload);
   const authorizeUrl = new URL("https://discord.com/oauth2/authorize");
   authorizeUrl.searchParams.set("client_id", DISCORD_CLIENT_ID);
@@ -337,12 +343,84 @@ authRouter.get("/discord/callback", async (req, res) => {
       avatarUrl,
     });
 
+    const firebaseToken = await createFirebaseCustomToken({
+      id: userDoc.userId,
+      roles: userDoc.roles,
+    });
     const sessionToken = createSessionToken(userDoc);
     const cookies = [buildSessionCookie(sessionToken), clearStateCookie()];
 
     res.setHeader("Set-Cookie", cookies);
     const redirectUrl =
       getSafeRedirect(decodedState?.redirect) ?? FRONTEND_BASE_URL ?? "https://sfdatahub.github.io/";
+
+    if (decodedState?.mode === "popup") {
+      const redirectOrigin = (() => {
+        try {
+          return new URL(redirectUrl).origin;
+        } catch {
+          return null;
+        }
+      })();
+      const frontendOrigin = (() => {
+        try {
+          return FRONTEND_BASE_URL ? new URL(FRONTEND_BASE_URL).origin : null;
+        } catch {
+          return null;
+        }
+      })();
+      const allowedOrigins = Array.from(
+        new Set(
+          [redirectOrigin, frontendOrigin].filter((value): value is string => !!value),
+        ),
+      );
+
+      const safeOriginsJson = JSON.stringify(allowedOrigins);
+      const safeRedirectJson = JSON.stringify(redirectUrl);
+      const safeNonce = JSON.stringify(decodedState?.nonce ?? "");
+      const safeCustomToken = JSON.stringify(firebaseToken);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>SFDataHub Auth</title>
+  </head>
+  <body>
+    <script>
+      (function() {
+        var allowedOrigins = ${safeOriginsJson};
+        var payload = { type: "sfh:discordAuth", nonce: ${safeNonce}, customToken: ${safeCustomToken} };
+        for (var i = 0; i < allowedOrigins.length; i++) {
+          var origin = allowedOrigins[i];
+          try {
+            if (window.opener) {
+              window.opener.postMessage(payload, origin);
+            }
+          } catch (_) {}
+        }
+        setTimeout(function() {
+          for (var i = 0; i < allowedOrigins.length; i++) {
+            var origin = allowedOrigins[i];
+            try {
+              if (window.opener) {
+                window.opener.postMessage(payload, origin);
+              }
+            } catch (_) {}
+          }
+        }, 75);
+        try {
+          setTimeout(function() { window.close(); }, 200);
+        } catch (_) {}
+        setTimeout(function() {
+          window.location.href = ${safeRedirectJson};
+        }, 300);
+      })();
+    </script>
+  </body>
+</html>`);
+    }
+
     return res.redirect(redirectUrl);
   } catch (error) {
     console.error("[auth] Discord callback failed", error);

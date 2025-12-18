@@ -111,7 +111,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [status, setStatus] = useState<AuthStatus>("idle");
   const firebaseSyncRef = useRef<{ tried: boolean }>({ tried: false });
   const discordLoginInFlight = useRef(false);
-  const discordPopupMessageReceived = useRef(false);
   const googleProvider = useMemo<GoogleAuthProvider | null>(() => {
     try {
       return new GoogleAuthProvider();
@@ -233,37 +232,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const closePoll = window.setInterval(() => {
         if (popup.closed) {
-          if (handled || discordPopupMessageReceived.current) {
+          if (handled) {
             cleanup();
             resolve({});
             return;
           }
-
-          logAuthDebug("[Auth] Discord popup closed; starting grace window");
-
-          const graceMs = 2200;
-          const started = Date.now();
-          const gracePoll = window.setInterval(() => {
-            if (handled || discordPopupMessageReceived.current) {
-              window.clearInterval(gracePoll);
-              cleanup();
-              resolve({});
-              return;
-            }
-
-            if (auth.currentUser || (status === "authenticated" && user)) {
-              window.clearInterval(gracePoll);
-              cleanup();
-              resolve({});
-              return;
-            }
-
-            if (Date.now() - started >= graceMs) {
-              window.clearInterval(gracePoll);
-              cleanup();
-              reject(new Error("auth_popup_closed"));
-            }
-          }, 200);
+          cleanup();
+          reject(new Error("auth_popup_closed"));
         }
       }, 500);
 
@@ -279,7 +254,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = event.data;
         if (data?.type !== "sfh:discordAuth") return;
         if (data?.nonce && data.nonce !== expectedNonce) return;
-        discordPopupMessageReceived.current = true;
         handled = true;
         cleanup();
         resolve({
@@ -313,7 +287,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     discordLoginInFlight.current = true;
-    discordPopupMessageReceived.current = false;
     const origin = typeof window !== "undefined" ? window.location.origin : "N/A";
     const host = typeof window !== "undefined" ? window.location.host : "N/A";
     logAuthDebug("[Auth] Starting Discord auth-api popup login", { origin, host });
