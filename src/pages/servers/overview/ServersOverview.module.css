@@ -1,0 +1,126 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.controls {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.controlButton {
+  border: 1px solid var(--line);
+  background: var(--tile);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.controlButton:hover {
+  background: var(--tile-hover);
+}
+
+.entryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.entryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nodeList,
+.nodeChildren {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nodeChildren {
+  margin-top: 10px;
+  padding-left: 16px;
+  border-left: 1px dashed var(--line);
+}
+
+.nodeItem {
+  min-width: 0;
+}
+
+.nodeButton {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nodeCard {
+  text-align: left;
+}
+
+.nodeTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nodeTitle {
+  font-weight: 600;
+  color: var(--title, var(--text));
+}
+
+.nodeToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.nodeMeta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.nodeCode {
+  letter-spacing: 0.02em;
+}
+
+.placeholder {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+@media (max-width: 900px) {
+  .desktopOnly {
+    display: none;
+  }
+}

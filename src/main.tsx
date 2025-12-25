@@ -48,6 +48,7 @@ import GuildProfile from "./pages/guilds/Profile"; // ✨ NEU
 import ServersIndex from "./pages/servers/Index";
 import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
+import ServersOverviewPage from "./pages/servers/overview/Index";
 import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
 // Public Profile
@@ -273,6 +274,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/servers" element={<ServersIndex />} />
                 <Route path="/servers/rankings" element={<ServersRankings />} />
                 <Route path="/servers/stats" element={<ServersStats />} />
+                <Route path="/servers/overview" element={<ServersOverviewPage />} />
                 <Route path="/servers/profile" element={<ServerProfilePage />} />
                 <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />
                 <Route path="/server/:serverId" element={<ServerProfilePage />} />

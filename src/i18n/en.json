@@ -16,6 +16,24 @@
     "tools": "Tools",
     "community": "Community"
   },
+  "home": {
+    "historybook": {
+      "coverAlt": "Historybook cover"
+    }
+  },
+  "servers": {
+    "tiles": {
+      "overview": {
+        "title": "Server Overview",
+        "subtitle": "Fusion tree & active servers"
+      }
+    },
+    "overview": {
+      "pageTitle": "Server Overview",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all"
+    }
+  },
   "playground": {
     "tabs": {
       "gamified": "Gamified",
@@ -188,7 +206,9 @@
     }
   },
   "topbar": {
-    "search": "Searchï¿½?ï¿½  /",
+    "quickAccess": "Quick access",
+    "upload": "Upload scan",
+    "search": "Search /",
     "settings": "Settings",
     "profile": "Profile",
     "signout": "Sign out",
@@ -332,6 +352,7 @@
     }
   },
   "search": {
+    "placeholder": "Search players",
     "inputLabel": "Search players, guilds and servers",
     "loading": "Loading…",
     "recents": "Recent searches",

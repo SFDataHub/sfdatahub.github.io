@@ -271,6 +271,112 @@
 .footerLink:hover{
   background:var(--tile-hover);
 }
+.footerRow{
+  display:flex;
+  gap:8px;
+  margin-top:8px;
+}
+.footerRowCell{
+  flex:1;
+  display:flex;
+}
+.footerRowCell > *{
+  flex:1;
+}
+.footerRowLink{
+  margin-top:0;
+}
+.languageSwitch{
+  position:relative;
+  display:flex;
+  width:100%;
+  --slant: 14px;
+  border:1px solid var(--line);
+  background:var(--tile);
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:
+    0 6px 12px rgba(0,0,0,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.languageSegment{
+  flex:1;
+  padding:8px 10px;
+  background:transparent;
+  border:0;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  color:var(--text);
+  font-size:0.85rem;
+  font-weight:600;
+  letter-spacing:0.05em;
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  cursor:pointer;
+  position:relative;
+  --clip-shape: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  clip-path:var(--clip-shape);
+  transition:box-shadow .2s ease, filter .2s ease, opacity .2s ease;
+}
+.languageSegment::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.2));
+  opacity:0.5;
+  pointer-events:none;
+  transition:opacity .2s ease;
+  clip-path:var(--clip-shape);
+}
+.languageSegment::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  clip-path:var(--clip-shape);
+  pointer-events:none;
+  opacity:0;
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 1px rgba(255,255,255,0.05);
+  transition:opacity .15s ease;
+}
+.languageSegmentEn{
+  --clip-shape: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  z-index:2;
+  background-image:url("/assets/flags/Flag_of_the_United_Kingdom_(3-5).svg.png");
+}
+.languageSegmentDe{
+  --clip-shape: polygon(var(--slant) 0, 100% 0, 100% 100%, 0 100%);
+  margin-left:calc(var(--slant) * -1);
+  z-index:1;
+  background-image:url("/assets/flags/Flag_of_Germany.svg.png");
+}
+.languageSegmentActive{
+  filter:brightness(1.05);
+}
+.languageSegmentActive::before{
+  opacity:0.18;
+}
+.languageSegmentActive::after{
+  opacity:1;
+}
+.languageSegmentInactive{
+  filter:saturate(0.95) brightness(0.97);
+}
+.languageSegmentInactive::before{
+  opacity:0.35;
+}
+.languageSegment:hover{
+  filter:brightness(1.08);
+}
+.languageSegment:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
 .legal{ margin-top:8px; font-size:10px; line-height:1.25; color:var(--text-soft); }
 
 /* ====== Sicherheitsnetze ====== */

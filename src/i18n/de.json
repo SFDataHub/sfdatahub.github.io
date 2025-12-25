@@ -1,4 +1,4 @@
-{
+﻿{
   "nav": {
     "home": "Start",
     "dashboard": "Dashboard",
@@ -15,6 +15,24 @@
     "help": "Hilfe",
     "tools": "Tools",
     "community": "Community"
+  },
+  "home": {
+    "historybook": {
+      "coverAlt": "Historybook Cover"
+    }
+  },
+  "servers": {
+    "tiles": {
+      "overview": {
+        "title": "Server-Uebersicht",
+        "subtitle": "Fusion-Tree & aktive Server"
+      }
+    },
+    "overview": {
+      "pageTitle": "Server-Uebersicht",
+      "expandAll": "Alle aufklappen",
+      "collapseAll": "Alle einklappen"
+    }
   },
   "playground": {
     "tabs": {
@@ -161,8 +179,8 @@
       "defaultName": "Neues Set",
       "exportActive": "Aktives Set exportieren",
       "import": "Set importieren",
-      "importErrorInvalid": "Diese Datei enthält kein gültiges Tools-Set.",
-      "importErrorMaxReached": "Du nutzt bereits das Maximum von 3 Sets. Lösche zuerst ein Set, bevor du ein neues importierst.",
+      "importErrorInvalid": "Diese Datei enthÃ¤lt kein gÃ¼ltiges Tools-Set.",
+      "importErrorMaxReached": "Du nutzt bereits das Maximum von 3 Sets. LÃ¶sche zuerst ein Set, bevor du ein neues importierst.",
       "delete": "Set l?schen",
       "deleteConfirmTitle": "Dieses Set l?schen?",
       "deleteConfirmText": "Damit wird das Set in diesem Browser entfernt und ein Slot freigegeben. Exportiere es zuerst, wenn du ein Backup behalten m?chtest.",
@@ -176,19 +194,21 @@
       "renameErrorEmpty": "Bitte einen Namen eingeben."
     },
     "sync": {
-      "buttonSave": "Änderungen im Account speichern",
-      "saving": "Speichere …",
-      "error": "Deine Änderungen konnten nicht gespeichert werden. Bitte versuche es erneut.",
-      "statusUnsynced": "Nicht gespeicherte Änderungen",
-      "statusSynced": "Alle Änderungen synchronisiert",
+      "buttonSave": "Ã„nderungen im Account speichern",
+      "saving": "Speichere â€¦",
+      "error": "Deine Ã„nderungen konnten nicht gespeichert werden. Bitte versuche es erneut.",
+      "statusUnsynced": "Nicht gespeicherte Ã„nderungen",
+      "statusSynced": "Alle Ã„nderungen synchronisiert",
       "statusNever": "Noch nie synchronisiert",
       "lastSyncLabel": "Letzte Synchronisierung",
-      "noChanges": "Keine Änderungen zum Speichern",
-      "cooldownLabel": "Nächster Sync in {{time}}"
+      "noChanges": "Keine Ã„nderungen zum Speichern",
+      "cooldownLabel": "NÃ¤chster Sync in {{time}}"
     }
   },
   "topbar": {
-    "search": "Suchen�?�  /",
+    "quickAccess": "Schnellzugriff",
+    "upload": "Scan hochladen",
+    "search": "Suchen /",
     "settings": "Einstellungen",
     "profile": "Profil",
     "signout": "Abmelden",
@@ -203,8 +223,8 @@
   },
   "profile": {
     "public": {
-      "title": "Öffentliches Profil",
-      "subtitle": "Read-only-Ansicht dieser SFDataHub-Identität",
+      "title": "Ã–ffentliches Profil",
+      "subtitle": "Read-only-Ansicht dieser SFDataHub-IdentitÃ¤t",
       "identity": {
         "profileIdLabel": "Profil-ID",
         "unknownValue": "Unbekannt",
@@ -219,7 +239,7 @@
         "portraitPlaceholder": "Portrait-Platzhalter"
       },
       "bio": {
-        "title": "Über diesen Spieler",
+        "title": "Ãœber diesen Spieler",
         "empty": "Noch kein Bio-Text hinterlegt.",
         "languagesLabel": "Sprachen",
         "rolesLabel": "Rollen"
@@ -227,7 +247,7 @@
       "showcase": {
         "title": "Charakter-Showcase",
         "subtitle": "Kuratiertes Roster aus den letzten Scans",
-        "empty": "Noch keine Charaktere für den Showcase ausgewählt.",
+        "empty": "Noch keine Charaktere fÃ¼r den Showcase ausgewÃ¤hlt.",
         "scrapbookLabel": "Scrapbook",
         "highlightLabel": "Highlight",
         "tags": {
@@ -238,7 +258,7 @@
         }
       },
       "stats": {
-        "title": "SFDataHub-Aktivität",
+        "title": "SFDataHub-AktivitÃ¤t",
         "totalScans": "Scans gesamt",
         "uniquePlayers": "Einzigartige Spieler",
         "uniqueGuilds": "Einzigartige Gilden",
@@ -272,30 +292,30 @@
     }
   },
   "help": {
-    "title": "Hilfe & Übersicht",
+    "title": "Hilfe & Ãœbersicht",
     "subtitle": "Kurzer Einstieg in den SFDataHub",
     "hero": {
       "eyebrow": "Start-Guide",
       "heading": "Willkommen im SFDataHub",
       "lead": "Erfahre, was du tun kannst, wie aktuell die Daten sind und wo du Einstellungen oder rechtliche Infos findest.",
-      "freshnessLabel": "Datenaktualität",
-      "freshnessBody": "Daten werden regelmäßig aktualisiert. Den genauen Scan-Zeitpunkt siehst du direkt in Toplisten und Profilen."
+      "freshnessLabel": "DatenaktualitÃ¤t",
+      "freshnessBody": "Daten werden regelmÃ¤ÃŸig aktualisiert. Den genauen Scan-Zeitpunkt siehst du direkt in Toplisten und Profilen."
     },
     "dataFreshness": {
       "title": "Wie aktuell sind die Daten?",
-      "body": "SFDataHub lebt von Community-Scans. Ein Teil der Server (z. B. die europäischen Server) wird von uns und ein paar Helfern ungefähr einmal im Monat gescannt – je nachdem, wie wir Zeit haben. Andere Server (z. B. Fusion-Server) werden von anderen Community-Projekten in größeren Abständen gescannt.\n\nDadurch können zwischen zwei Scans auch mehrere Wochen oder sogar Monate liegen. Den genauen Stand siehst du immer am Hinweis „Last scan: …“ in Toplisten und Profilen.\n\nWenn du dein Profil besonders aktuell halten möchtest, kannst du dich mit deinem SFDataHub-Account verbinden und eigene Scans hochladen. So hilfst du gleichzeitig mit, dass die Datenbank aktueller bleibt – für dich selbst und für die Community."
+      "body": "SFDataHub lebt von Community-Scans. Ein Teil der Server (z. B. die europÃ¤ischen Server) wird von uns und ein paar Helfern ungefÃ¤hr einmal im Monat gescannt â€“ je nachdem, wie wir Zeit haben. Andere Server (z. B. Fusion-Server) werden von anderen Community-Projekten in grÃ¶ÃŸeren AbstÃ¤nden gescannt.\n\nDadurch kÃ¶nnen zwischen zwei Scans auch mehrere Wochen oder sogar Monate liegen. Den genauen Stand siehst du immer am Hinweis â€žLast scan: â€¦â€œ in Toplisten und Profilen.\n\nWenn du dein Profil besonders aktuell halten mÃ¶chtest, kannst du dich mit deinem SFDataHub-Account verbinden und eigene Scans hochladen. So hilfst du gleichzeitig mit, dass die Datenbank aktueller bleibt â€“ fÃ¼r dich selbst und fÃ¼r die Community."
     },
     "sections": {
       "intro": {
         "title": "Was ist SFDataHub?",
         "body1": "SFDataHub ist ein Community-Projekt rund um Shakes & Fidget.",
-        "body2": "Du kannst hier Spielerdaten aus Scans auswerten, Toplisten ansehen und detaillierte Spieler- und Gildenprofile öffnen. Ziel ist ein schneller Überblick über Fortschritt, Rankings und Entwicklungen – ohne offizielle Verbindung zu Playa Games."
+        "body2": "Du kannst hier Spielerdaten aus Scans auswerten, Toplisten ansehen und detaillierte Spieler- und Gildenprofile Ã¶ffnen. Ziel ist ein schneller Ãœberblick Ã¼ber Fortschritt, Rankings und Entwicklungen â€“ ohne offizielle Verbindung zu Playa Games."
       },
       "actions": {
         "title": "Was kann ich auf SFDataHub tun?",
         "items": {
           "toplists": "Toplisten ansehen: Vergleiche Spieler und Gilden nach Level oder anderen Werten.",
-          "profiles": "Profile öffnen: Schaue dir detaillierte Spieler- und Gildenprofile mit mehr Informationen an.",
+          "profiles": "Profile Ã¶ffnen: Schaue dir detaillierte Spieler- und Gildenprofile mit mehr Informationen an.",
           "guides": "Guides lesen: Nutze Anleitungen und Tipps, um dein Spiel besser zu planen.",
           "tools": "Tools & Rechner verwenden: Berechne z. B. Dungeon-XP oder andere Werte mit interaktiven Tools."
         }
@@ -303,21 +323,21 @@
       "freshness": {
         "title": "Wie aktuell sind die Daten?",
         "body1": "SFDataHub basiert auf Scans, die von der Community hochgeladen oder verbunden werden.",
-        "body2": "Neben vielen Werten findest du einen Hinweis auf den Zeitpunkt des letzten Scans (z. B. „Last scan: 2025-12-01“).",
-        "body3": "Toplisten und Profile werden regelmäßig aktualisiert. Wenn ein Eintrag längere Zeit nicht gescannt wurde, können die angezeigten Werte vom aktuellen Stand im Spiel abweichen."
+        "body2": "Neben vielen Werten findest du einen Hinweis auf den Zeitpunkt des letzten Scans (z. B. â€žLast scan: 2025-12-01â€œ).",
+        "body3": "Toplisten und Profile werden regelmÃ¤ÃŸig aktualisiert. Wenn ein Eintrag lÃ¤ngere Zeit nicht gescannt wurde, kÃ¶nnen die angezeigten Werte vom aktuellen Stand im Spiel abweichen."
       },
       "login": {
         "title": "Login & Einstellungen",
-        "body1": "Du kannst dich mit deinem Discord-Account anmelden, um zusätzliche Funktionen nutzen zu können.",
-        "body2": "Nach dem Login siehst du oben dein Profilmenü mit Avatar und Namen.",
-        "body3": "In den Einstellungen kannst du grundlegende Optionen für deinen SFDataHub-Account anpassen.",
-        "body4": "Einstellungen sind nur für eingeloggte Nutzer relevant – ohne Account musst du hier nichts konfigurieren."
+        "body1": "Du kannst dich mit deinem Discord-Account anmelden, um zusÃ¤tzliche Funktionen nutzen zu kÃ¶nnen.",
+        "body2": "Nach dem Login siehst du oben dein ProfilmenÃ¼ mit Avatar und Namen.",
+        "body3": "In den Einstellungen kannst du grundlegende Optionen fÃ¼r deinen SFDataHub-Account anpassen.",
+        "body4": "Einstellungen sind nur fÃ¼r eingeloggte Nutzer relevant â€“ ohne Account musst du hier nichts konfigurieren."
       },
       "legal": {
         "title": "Hilfe, Feedback & rechtliche Infos",
-        "body1": "Wenn dir Fehler auffallen, Daten komisch aussehen oder du Ideen für neue Features hast, freuen wir uns über Feedback.",
-        "body2": "Du findest unsere Kontaktmöglichkeiten und weitere Infos auf der Kontakt- oder Impressumsseite.",
-        "body3": "Für rechtliche Details nutze bitte die verlinkten Seiten:",
+        "body1": "Wenn dir Fehler auffallen, Daten komisch aussehen oder du Ideen fÃ¼r neue Features hast, freuen wir uns Ã¼ber Feedback.",
+        "body2": "Du findest unsere KontaktmÃ¶glichkeiten und weitere Infos auf der Kontakt- oder Impressumsseite.",
+        "body3": "FÃ¼r rechtliche Details nutze bitte die verlinkten Seiten:",
         "items": {
           "tos": "Terms of Service (ToS)",
           "privacy": "Datenschutz",
@@ -332,6 +352,7 @@
     }
   },
   "search": {
+    "placeholder": "Suchen (Spieler)",
     "inputLabel": "Spieler, Gilden und Server suchen",
     "loading": "L\u00e4dt?",
     "recents": "Letzte Suchen",
@@ -350,12 +371,13 @@
 
   "footer": {
     "about": {
-      "title": "Über SFDataHub",
-      "body": "SFDataHub ist ein nicht-kommerzielles Fan- und Community-Projekt rund um Shakes & Fidget. Es besteht keine offizielle Verbindung zu Playa Games GmbH oder den Betreibern von Shakes & Fidget.\n\nAlle genannten Marken, Logos und Grafiken sind Eigentum der jeweiligen Rechteinhaber und werden ausschlie�lich zu identifizierenden Zwecken verwendet."
+      "title": "Ãœber SFDataHub",
+      "body": "SFDataHub ist ein nicht-kommerzielles Fan- und Community-Projekt rund um Shakes & Fidget. Es besteht keine offizielle Verbindung zu Playa Games GmbH oder den Betreibern von Shakes & Fidget.\n\nAlle genannten Marken, Logos und Grafiken sind Eigentum der jeweiligen Rechteinhaber und werden ausschließlich zu identifizierenden Zwecken verwendet."
     },
-    "shortDisclaimer": "SFDataHub ist ein inoffizielles, nicht-kommerzielles Fanprojekt. Alle Marken und Bilder geh�ren ihren jeweiligen Rechteinhabern.",
-    "copyright": "� 2025 SFDataHub � Community-Projekt rund um Shakes & Fidget."
+    "shortDisclaimer": "SFDataHub ist ein inoffizielles, nicht-kommerzielles Fanprojekt. Alle Marken und Bilder gehören ihren jeweiligen Rechteinhabern.",
+    "copyright": "© 2025 SFDataHub – Community-Projekt rund um Shakes & Fidget."
   }
 }
+
 
 

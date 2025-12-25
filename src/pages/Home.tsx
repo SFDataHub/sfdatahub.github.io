@@ -4,6 +4,47 @@ import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
 
+// Historybook cover (first page of flipbook)
+const HISTORYBOOK_SLUG = "sf-history-book";
+type ManifestPageEntry = { src?: string; srcset?: { src: string; width?: number }[] };
+type FlipbookManifest = { pages?: ManifestPageEntry[] };
+const BASE_URL = (() => {
+  const b = (import.meta as any)?.env?.BASE_URL || "/";
+  return b.endsWith("/") ? b : `${b}/`;
+})();
+const joinBase = (p: string) => {
+  if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
+  const clean = p.replace(/^\.?\//, "");
+  return `${BASE_URL}${clean}`.replace(/\/{2,}/g, "/");
+};
+const HISTORYBOOK_MANIFEST_URL = joinBase(`flipbooks/${HISTORYBOOK_SLUG}/manifest.json`);
+let historybookCoverCache: string | null = null;
+let historybookCoverPromise: Promise<string | null> | null = null;
+const pickHistorybookCoverFromManifest = (manifest: FlipbookManifest): string | null => {
+  const first = manifest.pages?.[0];
+  if (!first) return null;
+  const src = first.src ?? first.srcset?.[0]?.src;
+  if (!src) return null;
+  const path = /^https?:\/\//i.test(src) || src.startsWith("/")
+    ? src
+    : `flipbooks/${HISTORYBOOK_SLUG}/${src}`;
+  return joinBase(path);
+};
+async function loadHistorybookCover(): Promise<string | null> {
+  if (historybookCoverCache) return historybookCoverCache;
+  if (historybookCoverPromise) return historybookCoverPromise;
+  historybookCoverPromise = fetch(HISTORYBOOK_MANIFEST_URL, { cache: "no-cache" })
+    .then((res) => res.ok ? res.json() as Promise<FlipbookManifest> : null)
+    .then((manifest) => {
+      const picked = manifest ? pickHistorybookCoverFromManifest(manifest) : null;
+      historybookCoverCache = picked;
+      return picked;
+    })
+    .catch(() => null)
+    .finally(() => { historybookCoverPromise = null; });
+  return historybookCoverPromise;
+}
+
 // Datenquellen (client-seitig lesbar)
 const NEWS_FEED_URL = "";            // Discord-News (JSON, gemergt serverseitig)
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
@@ -101,14 +142,14 @@ function extractYouTubeVideoId(url: string): string | null {
 }
 
 // Kachel-Grid
-type Tile = { to: string; label: string; icon?: string };
+type Tile = { to: string; label: string; icon?: string; cover?: boolean };
 const TILE_ROUTES: Tile[] = [
   { to: "/toplists/", label: "Toplists" },
   { to: "/guidehub/?tab=calculators", label: "GuideHub" },
   { to: "/players/", label: "Players" },
   { to: "/guilds/", label: "Guilds" },
   { to: "/community/", label: "Community" },
-  { to: "/magazine/historybook/", label: "Historybook" },
+  { to: "/magazine/historybook/", label: "Historybook", cover: true },
   { to: "/creator-hub/", label: "Creator Hub" },
   { to: "/help", label: "Help" },
   { to: "/settings/", label: "Settings" },
@@ -120,26 +161,49 @@ const ICON_MANIFEST: Record<string, string> = {
 
 // ---------- Subcomponents ----------
 
-const TileGrid: React.FC = () => (
-  <section className={styles.card} data-i18n-scope="home.tiles">
-    <header className={styles.header}>
-      <span className={styles.title} data-i18n="home.title">Home</span>
-      <span className={styles.subtitle} data-i18n="home.subtitle">Welcome back</span>
-    </header>
-    <div className={styles.tileGrid} role="list">
-      {TILE_ROUTES.map((t) => (
-        <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
-          {ICON_MANIFEST[t.to] ? (
-            <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
-          ) : (
-            <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
-          )}
-          <div className={styles.tileLabel} data-i18n={`nav.${t.label.toLowerCase()}`}>{t.label}</div>
-        </Link>
-      ))}
-    </div>
-  </section>
-);
+const TileGrid: React.FC = () => {
+  const [historybookCover, setHistorybookCover] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadHistorybookCover().then((src) => { if (alive && src) setHistorybookCover(src); });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <section className={styles.card} data-i18n-scope="home.tiles">
+      <header className={styles.header}>
+        <span className={styles.title} data-i18n="home.title">Home</span>
+        <span className={styles.subtitle} data-i18n="home.subtitle">Welcome back</span>
+      </header>
+      <div className={styles.tileGrid} role="list">
+        {TILE_ROUTES.map((t) => (
+          <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
+            {t.cover ? (
+              historybookCover ? (
+                <img
+                  src={historybookCover}
+                  alt="Historybook cover"
+                  data-i18n="home.historybook.coverAlt"
+                  className={styles.tileCover}
+                  loading="eager"
+                  decoding="async"
+                />
+              ) : (
+                <div className={`${styles.tileCover} ${styles.tileCoverPlaceholder}`} aria-hidden />
+              )
+            ) : ICON_MANIFEST[t.to] ? (
+              <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
+            ) : (
+              <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
+            )}
+            <div className={styles.tileLabel} data-i18n={`nav.${t.label.toLowerCase()}`}>{t.label}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 type NewsItem = { id?: string; author?: string; text?: string; image?: string; url?: string; timestamp?: number | string };
 const NewsFeed: React.FC = () => {

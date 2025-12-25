@@ -1,7 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export default function ServersIndex() {
+  const { t } = useTranslation();
   return (
     <section style={{ padding: 16 }}>
       <h1>Servers</h1>
@@ -16,6 +18,11 @@ export default function ServersIndex() {
       >
         <Tile to="/servers/rankings" title="Rankings" desc="Server-Ladder und Trends" />
         <Tile to="/servers/stats" title="Stats" desc="Verteilung, Aktivität, Peaks" />
+        <Tile
+          to="/servers/overview"
+          title={t("servers.tiles.overview.title")}
+          desc={t("servers.tiles.overview.subtitle")}
+        />
       </div>
     </section>
   );
