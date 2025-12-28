@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
+import { fetchLatestDiscordNews } from "./Home/newsFeed.client";
+import type { DiscordNewsItem } from "./Home/newsFeed.types";
 
 // Historybook cover (first page of flipbook)
 const HISTORYBOOK_SLUG = "sf-history-book";
@@ -46,7 +48,7 @@ async function loadHistorybookCover(): Promise<string | null> {
 }
 
 // Datenquellen (client-seitig lesbar)
-const NEWS_FEED_URL = "";            // Discord-News (JSON, gemergt serverseitig)
+const NEWS_FEED_URL = (import.meta as any)?.env?.VITE_DISCORD_NEWS_URL || ""; // Discord-News (JSON, gemergt serverseitig)
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
@@ -128,6 +130,13 @@ function formatTimeAgo(isoOrEpoch?: string | number): string {
   } catch { return ""; }
 }
 
+function clampText(text: string, maxChars: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  const slice = trimmed.slice(0, Math.max(0, maxChars - 3)).trimEnd();
+  return `${slice}...`;
+}
+
 function extractYouTubeVideoId(url: string): string | null {
   try {
     const u = new URL(url);
@@ -142,14 +151,13 @@ function extractYouTubeVideoId(url: string): string | null {
 }
 
 // Kachel-Grid
-type Tile = { to: string; label: string; icon?: string; cover?: boolean };
+type Tile = { to: string; label: string; icon?: string };
 const TILE_ROUTES: Tile[] = [
   { to: "/toplists/", label: "Toplists" },
   { to: "/guidehub/?tab=calculators", label: "GuideHub" },
   { to: "/players/", label: "Players" },
   { to: "/guilds/", label: "Guilds" },
   { to: "/community/", label: "Community" },
-  { to: "/magazine/historybook/", label: "Historybook", cover: true },
   { to: "/creator-hub/", label: "Creator Hub" },
   { to: "/help", label: "Help" },
   { to: "/settings/", label: "Settings" },
@@ -162,14 +170,6 @@ const ICON_MANIFEST: Record<string, string> = {
 // ---------- Subcomponents ----------
 
 const TileGrid: React.FC = () => {
-  const [historybookCover, setHistorybookCover] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    loadHistorybookCover().then((src) => { if (alive && src) setHistorybookCover(src); });
-    return () => { alive = false; };
-  }, []);
-
   return (
     <section className={styles.card} data-i18n-scope="home.tiles">
       <header className={styles.header}>
@@ -179,20 +179,7 @@ const TileGrid: React.FC = () => {
       <div className={styles.tileGrid} role="list">
         {TILE_ROUTES.map((t) => (
           <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
-            {t.cover ? (
-              historybookCover ? (
-                <img
-                  src={historybookCover}
-                  alt="Historybook cover"
-                  data-i18n="home.historybook.coverAlt"
-                  className={styles.tileCover}
-                  loading="eager"
-                  decoding="async"
-                />
-              ) : (
-                <div className={`${styles.tileCover} ${styles.tileCoverPlaceholder}`} aria-hidden />
-              )
-            ) : ICON_MANIFEST[t.to] ? (
+            {ICON_MANIFEST[t.to] ? (
               <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
             ) : (
               <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
@@ -205,70 +192,134 @@ const TileGrid: React.FC = () => {
   );
 };
 
-type NewsItem = { id?: string; author?: string; text?: string; image?: string; url?: string; timestamp?: number | string };
+const HistorybookCard: React.FC = () => {
+  const [historybookCover, setHistorybookCover] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadHistorybookCover().then((src) => { if (alive) setHistorybookCover(src); });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <section className={`${styles.card} ${styles.historybookCard}`} data-i18n-scope="home.historybook">
+      <header className={styles.header}>
+        <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
+      </header>
+      <Link
+        to="/magazine/historybook/"
+        className={styles.historybookLink}
+        aria-label="Open Historybook"
+        data-i18n-aria-label="home.historybook.open"
+      >
+        {historybookCover ? (
+          <img
+            src={historybookCover}
+            alt="Historybook cover"
+            data-i18n="home.historybook.coverAlt"
+            className={styles.historybookCover}
+            loading="eager"
+            decoding="async"
+          />
+        ) : (
+          <div className={`${styles.historybookCover} ${styles.historybookPlaceholder}`} aria-hidden />
+        )}
+      </Link>
+    </section>
+  );
+};
+
 const NewsFeed: React.FC = () => {
-  const [items, setItems] = useState<NewsItem[] | null>(null);
+  const [item, setItem] = useState<DiscordNewsItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     async function load(){
-      if(!NEWS_FEED_URL){ setItems([]); return; }
+      if(!NEWS_FEED_URL){
+        if (alive) {
+          setItem(null);
+          setLoading(false);
+        }
+        return;
+      }
       try {
-        const res = await fetch(NEWS_FEED_URL, { cache: "no-store" });
-        const data = await res.json();
-        const flat: NewsItem[] = normalizeNews(data).sort((a,b)=> (new Date(b.timestamp??0).getTime()) - (new Date(a.timestamp??0).getTime()));
-        if(alive) setItems(flat.slice(0,5));
-      } catch(e: any){ if(alive){ setError(String(e?.message||e||"error")); setItems([]);} }
+        setLoading(true);
+        const data = await fetchLatestDiscordNews(NEWS_FEED_URL);
+        if(alive){
+          setItem(data?.item ?? null);
+          setError(null);
+        }
+      } catch(e: any){
+        if(alive){
+          setError(String(e?.message||e||"error"));
+          setItem(null);
+        }
+      } finally {
+        if(alive) setLoading(false);
+      }
     }
     load();
     return ()=>{ alive = false; };
   }, []);
 
-  function normalizeNews(data: any): NewsItem[] {
-    const arr: any[] = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.channels)
-        ? data.channels.flatMap((c: any) => c?.items || c?.messages || [])
-        : Object.values((data && typeof data === 'object' ? data : {})).flatMap((v: any) => Array.isArray(v) ? v : []);
-    return arr.map((it) => ({
-      id: it.id ?? it.message_id ?? undefined,
-      author: it.author ?? it.username ?? it.user ?? undefined,
-      text: it.text ?? it.content ?? "",
-      image: it.image ?? it.image_url ?? it.media?.[0]?.url ?? undefined,
-      url: it.url ?? it.link ?? undefined,
-      timestamp: it.timestamp ?? it.createdAt ?? it.created_at ?? Date.now(),
-    }));
-  }
-
-  const empty = !items || items.length === 0;
+  const timeLabel = item ? formatTimeAgo(item.timestamp) : "";
+  const authorLabel = item?.author || "Discord";
+  const displayText = item?.contentText ? clampText(item.contentText, 240) : "";
+  const cardLabel = item ? `${authorLabel} ${timeLabel}`.trim() : undefined;
+  const empty = !loading && !item;
 
   return (
-    <section className={styles.card} data-i18n-scope="home.news" aria-busy={items==null}>
+    <section className={styles.card} data-i18n-scope="home.news" aria-busy={loading}>
       <header className={styles.header}>
         <span className={styles.title} data-i18n="home.news.title">Community news</span>
       </header>
       <div className={styles.newsList}>
-        {items?.map((n) => (
-          <article key={n.id ?? `${n.author}-${n.timestamp}`} className={styles.newsItem}>
-            <div className={styles.newsMeta}>
-              <span className={styles.newsAuthor}>{n.author || "Discord"}</span>
-              <span className={styles.newsTime}>{formatTimeAgo(n.timestamp)}</span>
+        {loading && (
+          <div className={styles.newsSkeleton} aria-hidden />
+        )}
+        {item && (
+          <article
+            className={[styles.newsCard, item.imageUrl ? styles.newsCardWithImage : ""].join(" ")}
+            tabIndex={0}
+          >
+            <div className={styles.newsBody}>
+              <div className={styles.newsMeta}>
+                <span className={styles.newsAuthor}>{authorLabel}</span>
+                <span className={styles.newsTime}>{timeLabel}</span>
+              </div>
+              {displayText && <p className={styles.newsText}>{displayText}</p>}
+              <div className={styles.newsActions}>
+                <a
+                  href={item.jumpUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.linkBtn}
+                  aria-label={cardLabel}
+                  data-i18n="home.news.openOnDiscord"
+                >
+                  Open on Discord
+                </a>
+              </div>
             </div>
-            <p className={styles.newsText}>{n.text}</p>
-            {n.image && <img src={n.image} alt="" className={styles.newsImage} />}
-            {n.url && (
-              <a href={n.url} target="_blank" rel="noreferrer" className={styles.linkBtn} data-i18n="home.news.open_on_discord">Auf Discord öffnen</a>
+            {item.imageUrl && (
+              <img
+                src={item.imageUrl}
+                alt=""
+                className={styles.newsImage}
+                loading="lazy"
+                decoding="async"
+              />
             )}
           </article>
-        ))}
-        {empty && <div className={styles.empty} data-i18n="home.news.empty">No news yet</div>}
+        )}
+        {empty && <div className={styles.empty} data-i18n="home.news.empty">No news yet.</div>}
       </div>
       {error && <div className={styles.errorNote} aria-live="polite">{error}</div>}
     </section>
   );
 };
-
 const YouTubeCarousel: React.FC = () => {
   const [items, setItems] = useState<{ title: string; url: string; thumb?: string }[]>([]);
   const [index, setIndex] = useState(0);
@@ -561,8 +612,9 @@ const Home: React.FC = () => {
     <ContentShell title="home.title" subtitle="home.subtitle">
       {/* Row 0 – Kachel-Grid */}
       <div className={styles.row}>
-        <div className={styles.colFull}>
+        <div className={`${styles.colFull} ${styles.heroGrid}`}>
           <TileGrid />
+          <HistorybookCard />
         </div>
       </div>
       {/* Row 1 – News & YouTube */}
