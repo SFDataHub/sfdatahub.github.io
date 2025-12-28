@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsByChannel } from "./Home/newsFeed.client";
-import type { DiscordNewsByChannelEntry, DiscordNewsItem } from "./Home/newsFeed.types";
+import type { DiscordByChannelResponse, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
 
 // Historybook cover (first page of flipbook)
 const HISTORYBOOK_SLUG = "sf-history-book";
@@ -48,8 +48,10 @@ async function loadHistorybookCover(): Promise<string | null> {
 }
 
 // Datenquellen (client-seitig lesbar)
+const AUTH_BASE_URL = (import.meta as any)?.env?.VITE_AUTH_BASE_URL || "";
 const NEWS_BY_CHANNEL_URL =
-  (import.meta as any)?.env?.VITE_DISCORD_NEWS_BY_CHANNEL_URL || ""; // Discord-News pro Channel
+  (import.meta as any)?.env?.VITE_DISCORD_NEWS_BY_CHANNEL_URL
+  || (AUTH_BASE_URL ? `${AUTH_BASE_URL.replace(/\/+$/, "")}/public/news/discord/latest-by-channel` : "");
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
@@ -231,19 +233,35 @@ const HistorybookCard: React.FC = () => {
 };
 
 const NewsFeed: React.FC = () => {
-  const [channels, setChannels] = useState<DiscordNewsByChannelEntry[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [item, setItem] = useState<DiscordNewsItem | null>(null);
+  const [index, setIndex] = useState<number>(0);
+  const [data, setData] = useState<DiscordByChannelResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const userSelectedRef = useRef(false);
+  const autoSelectedOnceRef = useRef(false);
+
+  const pickLatestIndex = (items: DiscordNewsByChannelEntry[]): number => {
+    let pickedIndex = -1;
+    let pickedTime = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < items.length; i++) {
+      const ts = items[i]?.item?.timestamp;
+      if (!ts) continue;
+      const t = Date.parse(ts);
+      if (Number.isNaN(t)) continue;
+      if (t > pickedTime) {
+        pickedTime = t;
+        pickedIndex = i;
+      }
+    }
+    return pickedIndex === -1 ? 0 : pickedIndex;
+  };
 
   useEffect(() => {
     let alive = true;
     async function load(){
       if(!NEWS_BY_CHANNEL_URL){
         if (alive) {
-          setChannels([]);
-          setItem(null);
+          setData(null);
           setLoading(false);
         }
         return;
@@ -252,17 +270,13 @@ const NewsFeed: React.FC = () => {
         setLoading(true);
         const data = await fetchDiscordNewsByChannel(NEWS_BY_CHANNEL_URL);
         if(alive){
-          const entries = data?.items ?? [];
-          setChannels(entries);
-          setActiveIndex(0);
-          setItem(entries[0]?.item ?? null);
+          setData(data ?? null);
           setError(null);
         }
       } catch(e: any){
         if(alive){
           setError(String(e?.message||e||"error"));
-          setChannels([]);
-          setItem(null);
+          setData(null);
         }
       } finally {
         if(alive) setLoading(false);
@@ -273,17 +287,25 @@ const NewsFeed: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (channels.length === 0) return;
-    const clamped = Math.min(activeIndex, channels.length - 1);
-    setActiveIndex(clamped);
-    setItem(channels[clamped]?.item ?? null);
-  }, [channels, activeIndex]);
+    const items = data?.items ?? [];
+    if (items.length === 0) {
+      setIndex(0);
+      return;
+    }
+    if (!userSelectedRef.current && !autoSelectedOnceRef.current) {
+      setIndex(pickLatestIndex(items));
+      autoSelectedOnceRef.current = true;
+      return;
+    }
+    setIndex((prev) => Math.min(prev, items.length - 1));
+  }, [data]);
 
-  const totalChannels = channels.length;
-  const activeEntry = totalChannels > 0 ? channels[activeIndex] : null;
+  const totalChannels = data?.items.length ?? 0;
+  const activeEntry = totalChannels > 0 ? data!.items[index] : null;
   const activeLabel = activeEntry?.label || activeEntry?.channelId || "";
   const channelEmpty = !loading && activeEntry && !activeEntry.item;
 
+  const item = activeEntry?.item ?? null;
   const timeLabel = item ? formatTimeAgo(item.timestamp) : "";
   const authorLabel = item?.author || "Discord";
   const displayText = item?.contentText ? clampText(item.contentText, 240) : "";
@@ -292,11 +314,13 @@ const NewsFeed: React.FC = () => {
 
   const goPrev = () => {
     if (totalChannels <= 1) return;
-    setActiveIndex((i) => (i - 1 + totalChannels) % totalChannels);
+    userSelectedRef.current = true;
+    setIndex((i) => (i - 1 + totalChannels) % totalChannels);
   };
   const goNext = () => {
     if (totalChannels <= 1) return;
-    setActiveIndex((i) => (i + 1) % totalChannels);
+    userSelectedRef.current = true;
+    setIndex((i) => (i + 1) % totalChannels);
   };
 
   return (
