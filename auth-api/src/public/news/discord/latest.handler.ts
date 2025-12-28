@@ -4,13 +4,14 @@ import {
   DISCORD_NEWS_BOT_TOKEN,
   DISCORD_NEWS_CACHE_TTL_SEC,
   DISCORD_NEWS_CHANNEL_IDS,
-  DISCORD_NEWS_CORS_ORIGINS,
+  DISCORD_NEWS_CORS_ORIGINS_LIST,
 } from "../../../config";
 import { getCachedValue, setCachedValue } from "./cache.memory";
 import {
   DISCORD_NEWS_DEBUG_KEY,
   DISCORD_NEWS_DEFAULT_TTL_SEC,
 } from "./config";
+import { applyDiscordNewsCors } from "./cors";
 import {
   fetchLatestDiscordMessage,
   fetchLatestDiscordMessageWithDiagnostics,
@@ -21,17 +22,6 @@ import type {
   DiscordNewsResponse,
 } from "./types";
 
-const parseJsonArray = (value?: string): string[] | null => {
-  if (!value) return null;
-  try {
-    const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return null;
-    return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
-  } catch {
-    return null;
-  }
-};
-
 const parseTtlSeconds = (
   value?: string,
   fallback = DISCORD_NEWS_DEFAULT_TTL_SEC,
@@ -39,20 +29,6 @@ const parseTtlSeconds = (
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.floor(parsed);
-};
-
-const applyCors = (req: Request, res: Response, allowedOrigins: string[]): boolean => {
-  const origin = req.headers.origin;
-  if (!origin) return true;
-  if (!allowedOrigins.includes(origin)) {
-    res.removeHeader("Access-Control-Allow-Origin");
-    res.removeHeader("Access-Control-Allow-Credentials");
-    return false;
-  }
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Vary", "Origin");
-  return true;
 };
 
 const selectLatestItem = (items: Array<DiscordNewsItem | null>): DiscordNewsItem | null => {
@@ -64,28 +40,42 @@ const selectLatestItem = (items: Array<DiscordNewsItem | null>): DiscordNewsItem
 };
 
 export const latestDiscordNewsHandler = async (req: Request, res: Response) => {
+  const { allowed } = applyDiscordNewsCors(req, res, DISCORD_NEWS_CORS_ORIGINS_LIST);
+  if (req.method === "OPTIONS") {
+    if (!allowed) {
+      return res.status(403).send();
+    }
+    return res.status(204).send();
+  }
+  if (!allowed) {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    return res.status(403).json({ error: "cors_not_allowed" });
+  }
   if (req.method !== "GET") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const allowedOrigins = parseJsonArray(DISCORD_NEWS_CORS_ORIGINS);
-  if (!allowedOrigins || allowedOrigins.length === 0) {
-    console.error("[discord-news] Missing DISCORD_NEWS_CORS_ORIGINS configuration");
-    return res.status(500).json({ error: "missing_config" });
-  }
-  if (!applyCors(req, res, allowedOrigins)) {
-    return res.status(403).json({ error: "cors_not_allowed" });
-  }
-
-  const channelIds = parseJsonArray(DISCORD_NEWS_CHANNEL_IDS);
+  const channelIds = (() => {
+    if (!DISCORD_NEWS_CHANNEL_IDS) return null;
+    try {
+      const parsed = JSON.parse(DISCORD_NEWS_CHANNEL_IDS);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
+    } catch {
+      return null;
+    }
+  })();
   if (!channelIds || channelIds.length === 0) {
     console.error("[discord-news] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(500).json({ error: "missing_config" });
   }
 
   const token = DISCORD_NEWS_BOT_TOKEN;
   if (!token) {
     console.error("[discord-news] Missing DISCORD_NEWS_BOT_TOKEN configuration");
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(500).json({ error: "missing_config" });
   }
 
@@ -94,6 +84,7 @@ export const latestDiscordNewsHandler = async (req: Request, res: Response) => {
     DISCORD_NEWS_DEFAULT_TTL_SEC,
   );
   res.setHeader("Cache-Control", `public, max-age=${ttlSeconds}`);
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
 
   const noCache = req.query.noCache === "1";
   const debugRequested = req.query.debug === "1";

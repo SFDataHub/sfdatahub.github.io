@@ -3,8 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
-import { fetchLatestDiscordNews } from "./Home/newsFeed.client";
-import type { DiscordNewsItem } from "./Home/newsFeed.types";
+import { fetchDiscordNewsByChannel } from "./Home/newsFeed.client";
+import type { DiscordNewsByChannelEntry, DiscordNewsItem } from "./Home/newsFeed.types";
 
 // Historybook cover (first page of flipbook)
 const HISTORYBOOK_SLUG = "sf-history-book";
@@ -48,7 +48,8 @@ async function loadHistorybookCover(): Promise<string | null> {
 }
 
 // Datenquellen (client-seitig lesbar)
-const NEWS_FEED_URL = (import.meta as any)?.env?.VITE_DISCORD_NEWS_URL || ""; // Discord-News (JSON, gemergt serverseitig)
+const NEWS_BY_CHANNEL_URL =
+  (import.meta as any)?.env?.VITE_DISCORD_NEWS_BY_CHANNEL_URL || ""; // Discord-News pro Channel
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
@@ -230,6 +231,8 @@ const HistorybookCard: React.FC = () => {
 };
 
 const NewsFeed: React.FC = () => {
+  const [channels, setChannels] = useState<DiscordNewsByChannelEntry[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [item, setItem] = useState<DiscordNewsItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,8 +240,9 @@ const NewsFeed: React.FC = () => {
   useEffect(() => {
     let alive = true;
     async function load(){
-      if(!NEWS_FEED_URL){
+      if(!NEWS_BY_CHANNEL_URL){
         if (alive) {
+          setChannels([]);
           setItem(null);
           setLoading(false);
         }
@@ -246,14 +250,18 @@ const NewsFeed: React.FC = () => {
       }
       try {
         setLoading(true);
-        const data = await fetchLatestDiscordNews(NEWS_FEED_URL);
+        const data = await fetchDiscordNewsByChannel(NEWS_BY_CHANNEL_URL);
         if(alive){
-          setItem(data?.item ?? null);
+          const entries = data?.items ?? [];
+          setChannels(entries);
+          setActiveIndex(0);
+          setItem(entries[0]?.item ?? null);
           setError(null);
         }
       } catch(e: any){
         if(alive){
           setError(String(e?.message||e||"error"));
+          setChannels([]);
           setItem(null);
         }
       } finally {
@@ -264,16 +272,64 @@ const NewsFeed: React.FC = () => {
     return ()=>{ alive = false; };
   }, []);
 
+  useEffect(() => {
+    if (channels.length === 0) return;
+    const clamped = Math.min(activeIndex, channels.length - 1);
+    setActiveIndex(clamped);
+    setItem(channels[clamped]?.item ?? null);
+  }, [channels, activeIndex]);
+
+  const totalChannels = channels.length;
+  const activeEntry = totalChannels > 0 ? channels[activeIndex] : null;
+  const activeLabel = activeEntry?.label || activeEntry?.channelId || "";
+  const channelEmpty = !loading && activeEntry && !activeEntry.item;
+
   const timeLabel = item ? formatTimeAgo(item.timestamp) : "";
   const authorLabel = item?.author || "Discord";
   const displayText = item?.contentText ? clampText(item.contentText, 240) : "";
   const cardLabel = item ? `${authorLabel} ${timeLabel}`.trim() : undefined;
-  const empty = !loading && !item;
+  const empty = !loading && totalChannels === 0;
+
+  const goPrev = () => {
+    if (totalChannels <= 1) return;
+    setActiveIndex((i) => (i - 1 + totalChannels) % totalChannels);
+  };
+  const goNext = () => {
+    if (totalChannels <= 1) return;
+    setActiveIndex((i) => (i + 1) % totalChannels);
+  };
 
   return (
     <section className={styles.card} data-i18n-scope="home.news" aria-busy={loading}>
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.news.title">Community news</span>
+        <div className={styles.headerGroup}>
+          <span className={styles.title} data-i18n="home.news.title">Community news</span>
+          {activeLabel && (
+            <span className={styles.subtitle} title={activeLabel}>
+              {activeLabel}
+            </span>
+          )}
+        </div>
+        <div className={styles.carouselCtrls}>
+          <button
+            className={styles.navBtn}
+            onClick={goPrev}
+            disabled={totalChannels <= 1}
+            aria-label="Previous channel"
+            data-i18n-aria-label="home.news.prev"
+          >
+            ‹
+          </button>
+          <button
+            className={styles.navBtn}
+            onClick={goNext}
+            disabled={totalChannels <= 1}
+            aria-label="Next channel"
+            data-i18n-aria-label="home.news.next"
+          >
+            ›
+          </button>
+        </div>
       </header>
       <div className={styles.newsList}>
         {loading && (
@@ -313,6 +369,11 @@ const NewsFeed: React.FC = () => {
               />
             )}
           </article>
+        )}
+        {channelEmpty && (
+          <div className={styles.empty} data-i18n="home.news.emptyChannel">
+            No recent news in this channel.
+          </div>
         )}
         {empty && <div className={styles.empty} data-i18n="home.news.empty">No news yet.</div>}
       </div>

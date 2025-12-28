@@ -55,6 +55,17 @@ export type DiscordNewsListResponse = {
   items: DiscordNewsItem[];
 };
 
+export type DiscordNewsByChannelEntry = {
+  channelId: string;
+  label: string;
+  item: DiscordNewsItem | null;
+};
+
+export type DiscordNewsByChannelResponse = {
+  updatedAt: string;
+  items: DiscordNewsByChannelEntry[];
+};
+
 export type DiscordNewsChannelDiagnostics = {
   channelId: string;
   fetched: number;
