@@ -9,6 +9,8 @@ import internalAdminRouter from "./routes/internalAdmin";
 import scanUploadsRouter from "./routes/scanUploads";
 import userUploadInboxRouter from "./routes/userUploadInbox";
 import scanUploadsPublicRouter from "./routes/scanUploadsPublic";
+import { latestDiscordNewsHandler } from "./public/news/discord/latest.handler";
+import { listDiscordNewsHandler } from "./public/news/discord/list.handler";
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use("/internal", internalAdminRouter);
 app.use("/internal/scan-uploads", scanUploadsRouter);
 app.use("/", scanUploadsPublicRouter);
 app.use("/user", userUploadInboxRouter);
+app.get("/public/news/discord/latest", latestDiscordNewsHandler);
+app.get("/public/news/discord/list", listDiscordNewsHandler);
 
 app.get("/health", (_req, res) => {
   // Lightweight readiness probe for Cloud Run/Functions

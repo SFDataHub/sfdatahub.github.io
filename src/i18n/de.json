@@ -18,7 +18,14 @@
   },
   "home": {
     "historybook": {
-      "coverAlt": "Historybook Cover"
+      "title": "Historybook",
+      "coverAlt": "Historybook Cover",
+      "open": "Historybook oeffnen"
+    },
+    "news": {
+      "title": "Community-News",
+      "empty": "Noch keine Neuigkeiten.",
+      "openOnDiscord": "Auf Discord öffnen"
     }
   },
   "servers": {

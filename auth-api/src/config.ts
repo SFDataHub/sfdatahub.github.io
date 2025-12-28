@@ -14,6 +14,7 @@ type Param = {
 const secrets = {
   DISCORD_CLIENT_SECRET: defineSecret("DISCORD_CLIENT_SECRET"),
   GOOGLE_CLIENT_SECRET: defineSecret("GOOGLE_CLIENT_SECRET"),
+  DISCORD_NEWS_BOT_TOKEN: defineSecret("DISCORD_NEWS_BOT_TOKEN"),
   UPLOAD_INBOX_TOKEN: defineSecret("UPLOAD_INBOX_TOKEN"),
   SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
 } as const;
@@ -27,6 +28,9 @@ const strings = {
   SESSION_COOKIE_DOMAIN: defineString("SESSION_COOKIE_DOMAIN"),
   GOOGLE_CLIENT_ID: defineString("GOOGLE_CLIENT_ID"),
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
+  DISCORD_NEWS_CHANNEL_IDS: defineString("DISCORD_NEWS_CHANNEL_IDS"),
+  DISCORD_NEWS_CACHE_TTL_SEC: defineString("DISCORD_NEWS_CACHE_TTL_SEC"),
+  DISCORD_NEWS_CORS_ORIGINS: defineString("DISCORD_NEWS_CORS_ORIGINS"),
   UPLOAD_INBOX_BUCKET: defineString("UPLOAD_INBOX_BUCKET"),
   SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
 } as const;
@@ -64,6 +68,22 @@ export const PROJECT_ID = resolveProjectId();
 export const DISCORD_CLIENT_ID = readRuntimeValue("DISCORD_CLIENT_ID", strings.DISCORD_CLIENT_ID);
 export const DISCORD_CLIENT_SECRET = readRuntimeValue("DISCORD_CLIENT_SECRET", secrets.DISCORD_CLIENT_SECRET);
 export const DISCORD_REDIRECT_URI = readRuntimeValue("DISCORD_REDIRECT_URI", strings.DISCORD_REDIRECT_URI);
+export const DISCORD_NEWS_BOT_TOKEN = readRuntimeValue(
+  "DISCORD_NEWS_BOT_TOKEN",
+  secrets.DISCORD_NEWS_BOT_TOKEN,
+);
+export const DISCORD_NEWS_CHANNEL_IDS = readRuntimeValue(
+  "DISCORD_NEWS_CHANNEL_IDS",
+  strings.DISCORD_NEWS_CHANNEL_IDS,
+);
+export const DISCORD_NEWS_CACHE_TTL_SEC = readRuntimeValue(
+  "DISCORD_NEWS_CACHE_TTL_SEC",
+  strings.DISCORD_NEWS_CACHE_TTL_SEC,
+);
+export const DISCORD_NEWS_CORS_ORIGINS = readRuntimeValue(
+  "DISCORD_NEWS_CORS_ORIGINS",
+  strings.DISCORD_NEWS_CORS_ORIGINS,
+);
 export const FRONTEND_BASE_URL =
   readRuntimeValue("FRONTEND_BASE_URL", strings.FRONTEND_BASE_URL) ?? "http://localhost:5173";
 export const UPLOAD_INBOX_BUCKET = requireValue("UPLOAD_INBOX_BUCKET", strings.UPLOAD_INBOX_BUCKET);
