@@ -1,4 +1,8 @@
-import type { DiscordLatestResponse, DiscordListResponse } from "./newsFeed.types";
+import type {
+  DiscordByChannelResponse,
+  DiscordLatestResponse,
+  DiscordListResponse,
+} from "./newsFeed.types";
 
 const DEFAULT_TTL_MS = 120 * 1000;
 const DEFAULT_RETRY_COUNT = 1;
@@ -8,6 +12,9 @@ let cached: DiscordLatestResponse | null = null;
 let cachedAt = 0;
 let inflight: Promise<DiscordLatestResponse | null> | null = null;
 let listInflight: Promise<DiscordListResponse | null> | null = null;
+let byChannelCached: DiscordByChannelResponse | null = null;
+let byChannelCachedAt = 0;
+let byChannelInflight: Promise<DiscordByChannelResponse | null> | null = null;
 
 type FetchOptions = {
   ttlMs?: number;
@@ -38,6 +45,33 @@ export async function fetchLatestDiscordNews(
     return await inflight;
   } finally {
     inflight = null;
+  }
+}
+
+export async function fetchDiscordNewsByChannel(
+  url: string,
+  options: FetchOptions = {}
+): Promise<DiscordByChannelResponse | null> {
+  if (!url) return null;
+
+  const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+  const now = Date.now();
+  if (byChannelCached && now - byChannelCachedAt < ttlMs) return byChannelCached;
+  if (byChannelInflight) return byChannelInflight;
+
+  byChannelInflight = (async () => {
+    const result = await fetchByChannelWithRetry(url, options.retryCount ?? DEFAULT_RETRY_COUNT);
+    if (result) {
+      byChannelCached = result;
+      byChannelCachedAt = Date.now();
+    }
+    return result;
+  })();
+
+  try {
+    return await byChannelInflight;
+  } finally {
+    byChannelInflight = null;
   }
 }
 
@@ -100,6 +134,31 @@ async function fetchListWithRetry(
     }
   }
 
+  if (lastError) throw lastError;
+  return null;
+}
+
+async function fetchByChannelWithRetry(
+  url: string,
+  retryCount: number
+): Promise<DiscordByChannelResponse | null> {
+  let lastError: unknown = null;
+  const attempts = Math.max(0, retryCount) + 1;
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return (await res.json()) as DiscordByChannelResponse;
+    } catch (err) {
+      lastError = err;
+      if (i < attempts - 1) {
+        await delay(RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  if (byChannelCached) return byChannelCached;
   if (lastError) throw lastError;
   return null;
 }

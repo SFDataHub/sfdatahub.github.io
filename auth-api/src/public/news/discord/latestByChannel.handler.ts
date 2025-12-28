@@ -4,16 +4,18 @@ import {
   DISCORD_NEWS_BOT_TOKEN,
   DISCORD_NEWS_CACHE_TTL_SEC,
   DISCORD_NEWS_CHANNEL_IDS,
+  DISCORD_NEWS_CHANNEL_LABELS,
   DISCORD_NEWS_CORS_ORIGINS_LIST,
 } from "../../../config";
 import { getCachedValue, setCachedValue } from "./cache.memory";
 import { DISCORD_NEWS_DEFAULT_TTL_SEC } from "./config";
 import { applyDiscordNewsCors } from "./cors";
 import { fetchDiscordNewsItemsForChannel } from "./discord.client";
-import type { DiscordNewsItem, DiscordNewsListResponse } from "./types";
-
-const DEFAULT_LIMIT = 5;
-const MAX_LIMIT = 20;
+import type {
+  DiscordNewsByChannelEntry,
+  DiscordNewsByChannelResponse,
+  DiscordNewsItem,
+} from "./types";
 
 const parseTtlSeconds = (
   value?: string,
@@ -24,13 +26,44 @@ const parseTtlSeconds = (
   return Math.floor(parsed);
 };
 
-const parseLimit = (value: unknown): number => {
-  const parsed = Number(value ?? DEFAULT_LIMIT);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT;
-  return Math.min(Math.floor(parsed), MAX_LIMIT);
+const parseChannelIds = (value?: string): string[] | null => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
+  } catch {
+    return null;
+  }
 };
 
-export const listDiscordNewsHandler = async (req: Request, res: Response) => {
+const parseChannelLabels = (value?: string): Record<string, string> => {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.entries(parsed).reduce<Record<string, string>>((acc, [key, val]) => {
+      const label = String(val ?? "").trim();
+      if (label) acc[key] = label;
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+};
+
+const selectLatestItem = (items: DiscordNewsItem[]): DiscordNewsItem | null => {
+  return items.reduce<DiscordNewsItem | null>((latest, item) => {
+    if (!latest) return item;
+    return new Date(item.timestamp).getTime() > new Date(latest.timestamp).getTime()
+      ? item
+      : latest;
+  }, null);
+};
+
+export const latestDiscordNewsByChannelHandler = async (req: Request, res: Response) => {
   const { allowed } = applyDiscordNewsCors(req, res, DISCORD_NEWS_CORS_ORIGINS_LIST);
   if (req.method === "OPTIONS") {
     if (!allowed) {
@@ -47,16 +80,7 @@ export const listDiscordNewsHandler = async (req: Request, res: Response) => {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const channelIds = (() => {
-    if (!DISCORD_NEWS_CHANNEL_IDS) return null;
-    try {
-      const parsed = JSON.parse(DISCORD_NEWS_CHANNEL_IDS);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
-    } catch {
-      return null;
-    }
-  })();
+  const channelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
   if (!channelIds || channelIds.length === 0) {
     console.error("[discord-news] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -77,24 +101,30 @@ export const listDiscordNewsHandler = async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", `public, max-age=${ttlSeconds}`);
   res.setHeader("Content-Type", "application/json; charset=utf-8");
 
-  const limit = parseLimit(req.query.limit);
-  const cacheKey = `list:${limit}:${channelIds.slice().sort().join(",")}`;
-  const cached = getCachedValue<DiscordNewsListResponse>(cacheKey);
+  const cacheKey = `latest-by-channel:${channelIds.join(",")}:${DISCORD_NEWS_CHANNEL_LABELS ?? ""}`;
+  const cached = getCachedValue<DiscordNewsByChannelResponse>(cacheKey);
   if (cached) {
     return res.status(200).json(cached);
   }
 
-  const perChannelItems = await Promise.all(
-    channelIds.map((channelId) => fetchDiscordNewsItemsForChannel(channelId, token)),
-  );
-  const allItems = perChannelItems.flat();
-  allItems.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  const labels = parseChannelLabels(DISCORD_NEWS_CHANNEL_LABELS);
+
+  const items = await Promise.all(
+    channelIds.map(async (channelId) => {
+      const channelItems = await fetchDiscordNewsItemsForChannel(channelId, token);
+      const latestItem = selectLatestItem(channelItems);
+      const entry: DiscordNewsByChannelEntry = {
+        channelId,
+        label: labels[channelId] ?? channelId,
+        item: latestItem,
+      };
+      return entry;
+    }),
   );
 
-  const responseBody: DiscordNewsListResponse = {
+  const responseBody: DiscordNewsByChannelResponse = {
     updatedAt: new Date().toISOString(),
-    items: allItems.slice(0, limit),
+    items,
   };
 
   setCachedValue(cacheKey, responseBody, ttlSeconds * 1000);

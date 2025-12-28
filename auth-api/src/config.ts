@@ -29,6 +29,7 @@ const strings = {
   GOOGLE_CLIENT_ID: defineString("GOOGLE_CLIENT_ID"),
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
   DISCORD_NEWS_CHANNEL_IDS: defineString("DISCORD_NEWS_CHANNEL_IDS"),
+  DISCORD_NEWS_CHANNEL_LABELS: defineString("DISCORD_NEWS_CHANNEL_LABELS"),
   DISCORD_NEWS_CACHE_TTL_SEC: defineString("DISCORD_NEWS_CACHE_TTL_SEC"),
   DISCORD_NEWS_CORS_ORIGINS: defineString("DISCORD_NEWS_CORS_ORIGINS"),
   UPLOAD_INBOX_BUCKET: defineString("UPLOAD_INBOX_BUCKET"),
@@ -76,6 +77,10 @@ export const DISCORD_NEWS_CHANNEL_IDS = readRuntimeValue(
   "DISCORD_NEWS_CHANNEL_IDS",
   strings.DISCORD_NEWS_CHANNEL_IDS,
 );
+export const DISCORD_NEWS_CHANNEL_LABELS = readRuntimeValue(
+  "DISCORD_NEWS_CHANNEL_LABELS",
+  strings.DISCORD_NEWS_CHANNEL_LABELS,
+);
 export const DISCORD_NEWS_CACHE_TTL_SEC = readRuntimeValue(
   "DISCORD_NEWS_CACHE_TTL_SEC",
   strings.DISCORD_NEWS_CACHE_TTL_SEC,
@@ -84,6 +89,37 @@ export const DISCORD_NEWS_CORS_ORIGINS = readRuntimeValue(
   "DISCORD_NEWS_CORS_ORIGINS",
   strings.DISCORD_NEWS_CORS_ORIGINS,
 );
+
+const DEFAULT_DISCORD_NEWS_CORS_ORIGINS = [
+  "https://sfdatahub.github.io",
+  "http://localhost:5173",
+  "https://sfdatahub.com",
+  "https://www.sfdatahub.com",
+];
+
+const parseCorsOrigins = (value?: string): string[] => {
+  if (!value) return DEFAULT_DISCORD_NEWS_CORS_ORIGINS;
+  const trimmed = value.trim();
+  if (!trimmed) return DEFAULT_DISCORD_NEWS_CORS_ORIGINS;
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        const entries = parsed.map((entry) => String(entry).trim()).filter(Boolean);
+        return entries.length > 0 ? entries : DEFAULT_DISCORD_NEWS_CORS_ORIGINS;
+      }
+    } catch {
+      return DEFAULT_DISCORD_NEWS_CORS_ORIGINS;
+    }
+  }
+  const entries = trimmed
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return entries.length > 0 ? entries : DEFAULT_DISCORD_NEWS_CORS_ORIGINS;
+};
+
+export const DISCORD_NEWS_CORS_ORIGINS_LIST = parseCorsOrigins(DISCORD_NEWS_CORS_ORIGINS);
 export const FRONTEND_BASE_URL =
   readRuntimeValue("FRONTEND_BASE_URL", strings.FRONTEND_BASE_URL) ?? "http://localhost:5173";
 export const UPLOAD_INBOX_BUCKET = requireValue("UPLOAD_INBOX_BUCKET", strings.UPLOAD_INBOX_BUCKET);
