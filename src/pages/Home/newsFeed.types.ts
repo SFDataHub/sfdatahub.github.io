@@ -24,6 +24,13 @@ export type DiscordByChannelResponse = {
   items: DiscordNewsByChannelEntry[];
 };
 
+export type DiscordByChannelSnapshot = {
+  updatedAt: number | null;
+  nextUpdateAt: number | null;
+  hash: string;
+  items: DiscordNewsByChannelEntry[];
+};
+
 export type DiscordListResponse = {
   updatedAt: string;
   items: DiscordNewsItem[];

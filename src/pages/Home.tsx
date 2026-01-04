@@ -3,8 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
-import { fetchDiscordNewsByChannel } from "./Home/newsFeed.client";
-import type { DiscordByChannelResponse, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
+import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
+import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
 
 // Historybook cover (first page of flipbook)
 const HISTORYBOOK_SLUG = "sf-history-book";
@@ -48,10 +48,6 @@ async function loadHistorybookCover(): Promise<string | null> {
 }
 
 // Datenquellen (client-seitig lesbar)
-const AUTH_BASE_URL = (import.meta as any)?.env?.VITE_AUTH_BASE_URL || "";
-const NEWS_BY_CHANNEL_URL =
-  (import.meta as any)?.env?.VITE_DISCORD_NEWS_BY_CHANNEL_URL
-  || (AUTH_BASE_URL ? `${AUTH_BASE_URL.replace(/\/+$/, "")}/public/news/discord/latest-by-channel` : "");
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
@@ -64,6 +60,9 @@ const CREATOR_CSVS = [
   "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=1322077146",  // Hungarian
   "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=2086043774",  // French
 ];
+
+const NEWS_SNAPSHOT_CACHE_KEY = "sfh_news_latestByChannel_v1";
+const NEWS_SNAPSHOT_FALLBACK_UPDATE_MS = 10 * 60 * 1000;
 
 type AnyRecord = Record<string, any>;
 
@@ -138,6 +137,36 @@ function clampText(text: string, maxChars: number): string {
   if (trimmed.length <= maxChars) return trimmed;
   const slice = trimmed.slice(0, Math.max(0, maxChars - 3)).trimEnd();
   return `${slice}...`;
+}
+
+function readSnapshotCache(): DiscordByChannelSnapshot | null {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    const raw = sessionStorage.getItem(NEWS_SNAPSHOT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as DiscordByChannelSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshotCache(snapshot: DiscordByChannelSnapshot): void {
+  try {
+    if (typeof sessionStorage === "undefined") return;
+    sessionStorage.setItem(NEWS_SNAPSHOT_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function resolveNextCheckAt(snapshot: DiscordByChannelSnapshot | null): number | null {
+  if (!snapshot) return null;
+  const now = Date.now();
+  const next = typeof snapshot.nextUpdateAt === "number" ? snapshot.nextUpdateAt : null;
+  if (next && next > now) return next;
+  return now + NEWS_SNAPSHOT_FALLBACK_UPDATE_MS;
 }
 
 function extractYouTubeVideoId(url: string): string | null {
@@ -234,11 +263,16 @@ const HistorybookCard: React.FC = () => {
 
 const NewsFeed: React.FC = () => {
   const [index, setIndex] = useState<number>(0);
-  const [data, setData] = useState<DiscordByChannelResponse | null>(null);
+  const [data, setData] = useState<DiscordByChannelSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const userSelectedRef = useRef(false);
   const autoSelectedOnceRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const dataRef = useRef<DiscordByChannelSnapshot | null>(null);
+  const hashRef = useRef<string | null>(null);
+  const nextCheckAtRef = useRef<number | null>(null);
 
   const pickLatestIndex = (items: DiscordNewsByChannelEntry[]): number => {
     let pickedIndex = -1;
@@ -258,32 +292,95 @@ const NewsFeed: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
-    async function load(){
-      if(!NEWS_BY_CHANNEL_URL){
-        if (alive) {
-          setData(null);
-          setLoading(false);
-        }
+
+    const clearTimer = () => {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
+    const scheduleNext = (snapshot: DiscordByChannelSnapshot | null) => {
+      clearTimer();
+      const nextAt = resolveNextCheckAt(snapshot);
+      if (!nextAt) return;
+      nextCheckAtRef.current = nextAt;
+      const delay = Math.max(0, nextAt - Date.now());
+      timerRef.current = window.setTimeout(() => {
+        runFetch();
+      }, delay);
+    };
+
+    const applySnapshot = (snapshot: DiscordByChannelSnapshot, writeCache: boolean) => {
+      const nextHash = snapshot.hash || String(snapshot.updatedAt ?? "");
+      const currentHash = hashRef.current;
+      if (currentHash && currentHash === nextHash) {
+        dataRef.current = snapshot;
+        if (writeCache) writeSnapshotCache(snapshot);
         return;
       }
+      hashRef.current = nextHash;
+      dataRef.current = snapshot;
+      setData(snapshot);
+      if (writeCache) writeSnapshotCache(snapshot);
+    };
+
+    const runFetch = async () => {
+      if (!alive) return;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      if (!dataRef.current) setLoading(true);
       try {
-        setLoading(true);
-        const data = await fetchDiscordNewsByChannel(NEWS_BY_CHANNEL_URL);
-        if(alive){
-          setData(data ?? null);
+        const incoming = await fetchDiscordNewsSnapshot(controller.signal);
+        if (!alive || controller.signal.aborted) return;
+        if (incoming) {
+          applySnapshot(incoming, true);
           setError(null);
+          scheduleNext(incoming);
         }
-      } catch(e: any){
-        if(alive){
-          setError(String(e?.message||e||"error"));
-          setData(null);
-        }
+      } catch (e: any) {
+        if (!alive || controller.signal.aborted) return;
+        setError(String(e?.message || e || "error"));
       } finally {
-        if(alive) setLoading(false);
+        if (alive && !controller.signal.aborted) {
+          setLoading(false);
+          scheduleNext(dataRef.current);
+        }
       }
+    };
+
+    const cached = readSnapshotCache();
+    if (cached) {
+      applySnapshot(cached, false);
+      setLoading(false);
     }
-    load();
-    return ()=>{ alive = false; };
+
+    const now = Date.now();
+    const isCacheFresh =
+      cached && typeof cached.nextUpdateAt === "number" && cached.nextUpdateAt > now;
+    if (!isCacheFresh) {
+      runFetch();
+    } else {
+      scheduleNext(cached);
+    }
+
+    const onVisibility = () => {
+      if (!alive) return;
+      if (document.visibilityState !== "visible") return;
+      const nextAt = nextCheckAtRef.current;
+      if (typeof nextAt === "number" && Date.now() > nextAt) {
+        runFetch();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      alive = false;
+      clearTimer();
+      abortRef.current?.abort();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   useEffect(() => {
