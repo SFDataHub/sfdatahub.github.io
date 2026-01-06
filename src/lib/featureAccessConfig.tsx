@@ -100,7 +100,7 @@ export const FEATURE_ACCESS_CONFIG: FeatureAccessRule[] = [
   },
   {
     id: "main.guidehub",
-    route: "/guidehub",
+    route: "/guidehub-v2",
     area: "main",
     titleKey: "nav.guideHub",
     status: "active",

@@ -59,6 +59,10 @@
   justify-self: end;
 }
 
+.topbarLeft .mobileSearchBtn{
+  display: none;
+}
+
 /* Icon-Grundstil */
 .ico{
   width: 20px;
@@ -268,6 +272,13 @@
   .label{ display:none; }
 }
 
+@media (max-width: 767px){
+  .topbar{ grid-template-columns: auto 0 auto; }
+  .searchWrap{ display: none; }
+  .topbarLeft .mobileSearchBtn{ display: inline-flex; }
+  .mobileSearchPanel .searchWrap{ display: block; }
+}
+
 /* Bevorzugt reduzierte Bewegung */
 @media (prefers-reduced-motion: reduce){
   .btnIco{ transition: none; }
@@ -276,4 +287,24 @@
 @keyframes topbarSpinner{
   0%{ transform: rotate(0deg); }
   100%{ transform: rotate(360deg); }
+}
+
+/* Mobile Search Drawer */
+.mobileSearchOverlay{
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--topbar-h);
+  bottom: 0;
+  background: rgba(6, 12, 20, 0.65);
+  z-index: 1200;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.mobileSearchPanel{
+  width: 100%;
+  max-width: 680px;
 }

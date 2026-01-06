@@ -3,55 +3,15 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
-import { fetchDiscordNewsByChannel } from "./Home/newsFeed.client";
-import type { DiscordByChannelResponse, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
+import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
+import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
+import guideHubLogo from "../assets/logo_guidehub.png";
 
-// Historybook cover (first page of flipbook)
-const HISTORYBOOK_SLUG = "sf-history-book";
-type ManifestPageEntry = { src?: string; srcset?: { src: string; width?: number }[] };
-type FlipbookManifest = { pages?: ManifestPageEntry[] };
-const BASE_URL = (() => {
-  const b = (import.meta as any)?.env?.BASE_URL || "/";
-  return b.endsWith("/") ? b : `${b}/`;
-})();
-const joinBase = (p: string) => {
-  if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
-  const clean = p.replace(/^\.?\//, "");
-  return `${BASE_URL}${clean}`.replace(/\/{2,}/g, "/");
-};
-const HISTORYBOOK_MANIFEST_URL = joinBase(`flipbooks/${HISTORYBOOK_SLUG}/manifest.json`);
-let historybookCoverCache: string | null = null;
-let historybookCoverPromise: Promise<string | null> | null = null;
-const pickHistorybookCoverFromManifest = (manifest: FlipbookManifest): string | null => {
-  const first = manifest.pages?.[0];
-  if (!first) return null;
-  const src = first.src ?? first.srcset?.[0]?.src;
-  if (!src) return null;
-  const path = /^https?:\/\//i.test(src) || src.startsWith("/")
-    ? src
-    : `flipbooks/${HISTORYBOOK_SLUG}/${src}`;
-  return joinBase(path);
-};
-async function loadHistorybookCover(): Promise<string | null> {
-  if (historybookCoverCache) return historybookCoverCache;
-  if (historybookCoverPromise) return historybookCoverPromise;
-  historybookCoverPromise = fetch(HISTORYBOOK_MANIFEST_URL, { cache: "no-cache" })
-    .then((res) => res.ok ? res.json() as Promise<FlipbookManifest> : null)
-    .then((manifest) => {
-      const picked = manifest ? pickHistorybookCoverFromManifest(manifest) : null;
-      historybookCoverCache = picked;
-      return picked;
-    })
-    .catch(() => null)
-    .finally(() => { historybookCoverPromise = null; });
-  return historybookCoverPromise;
-}
+// Historybook cover (homepage preview)
+const HISTORYBOOK_COVER_URL = "/flipbooks/sf-history-book/history_book_coverpage.png";
+const GUIDEHUB_ROUTE = "/guidehub-v2";
 
 // Datenquellen (client-seitig lesbar)
-const AUTH_BASE_URL = (import.meta as any)?.env?.VITE_AUTH_BASE_URL || "";
-const NEWS_BY_CHANNEL_URL =
-  (import.meta as any)?.env?.VITE_DISCORD_NEWS_BY_CHANNEL_URL
-  || (AUTH_BASE_URL ? `${AUTH_BASE_URL.replace(/\/+$/, "")}/public/news/discord/latest-by-channel` : "");
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
@@ -64,6 +24,9 @@ const CREATOR_CSVS = [
   "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=1322077146",  // Hungarian
   "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=2086043774",  // French
 ];
+
+const NEWS_SNAPSHOT_CACHE_KEY = "sfh_news_latestByChannel_v1";
+const NEWS_SNAPSHOT_FALLBACK_UPDATE_MS = 10 * 60 * 1000;
 
 type AnyRecord = Record<string, any>;
 
@@ -140,6 +103,36 @@ function clampText(text: string, maxChars: number): string {
   return `${slice}...`;
 }
 
+function readSnapshotCache(): DiscordByChannelSnapshot | null {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    const raw = sessionStorage.getItem(NEWS_SNAPSHOT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as DiscordByChannelSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshotCache(snapshot: DiscordByChannelSnapshot): void {
+  try {
+    if (typeof sessionStorage === "undefined") return;
+    sessionStorage.setItem(NEWS_SNAPSHOT_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function resolveNextCheckAt(snapshot: DiscordByChannelSnapshot | null): number | null {
+  if (!snapshot) return null;
+  const now = Date.now();
+  const next = typeof snapshot.nextUpdateAt === "number" ? snapshot.nextUpdateAt : null;
+  if (next && next > now) return next;
+  return now + NEWS_SNAPSHOT_FALLBACK_UPDATE_MS;
+}
+
 function extractYouTubeVideoId(url: string): string | null {
   try {
     const u = new URL(url);
@@ -157,7 +150,6 @@ function extractYouTubeVideoId(url: string): string | null {
 type Tile = { to: string; label: string; icon?: string };
 const TILE_ROUTES: Tile[] = [
   { to: "/toplists/", label: "Toplists" },
-  { to: "/guidehub/?tab=calculators", label: "GuideHub" },
   { to: "/players/", label: "Players" },
   { to: "/guilds/", label: "Guilds" },
   { to: "/community/", label: "Community" },
@@ -184,6 +176,8 @@ const TileGrid: React.FC = () => {
           <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
             {ICON_MANIFEST[t.to] ? (
               <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
+            ) : t.to === GUIDEHUB_ROUTE ? (
+              <img src={guideHubLogo} alt="" className={styles.tileIcon} />
             ) : (
               <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
             )}
@@ -196,37 +190,72 @@ const TileGrid: React.FC = () => {
 };
 
 const HistorybookCard: React.FC = () => {
-  const [historybookCover, setHistorybookCover] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    loadHistorybookCover().then((src) => { if (alive) setHistorybookCover(src); });
-    return () => { alive = false; };
-  }, []);
+  const historybookCover = HISTORYBOOK_COVER_URL;
 
   return (
     <section className={`${styles.card} ${styles.historybookCard}`} data-i18n-scope="home.historybook">
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
+        <div className={styles.historybookHeader}>
+          <div className={styles.historybookHeaderText}>
+            <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
+            <span className={styles.historybookCredit} data-i18n="home.historybook.credit">
+              Historybook - created by Resist 2 Exist & DonMuErte
+            </span>
+          </div>
+        </div>
       </header>
       <Link
-        to="/magazine/historybook/"
+        to="/sfmagazine/historybook"
         className={styles.historybookLink}
         aria-label="Open Historybook"
         data-i18n-aria-label="home.historybook.open"
       >
-        {historybookCover ? (
+        <div className={styles.historybookCoverWrap}>
+          {historybookCover ? (
+            <img
+              src={historybookCover}
+              alt="Historybook cover"
+              data-i18n="home.historybook.coverAlt"
+              className={`${styles.historybookCover} ${styles.historybookCover3d}`}
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className={`${styles.historybookCover} ${styles.historybookCover3d} ${styles.historybookPlaceholder}`} aria-hidden />
+          )}
+        </div>
+      </Link>
+    </section>
+  );
+};
+
+const GuideHubCard: React.FC = () => {
+  return (
+    <section className={`${styles.card} ${styles.guidehubCard}`} data-i18n-scope="home.guidehub">
+      <header className={styles.header}>
+        <div className={styles.historybookHeader}>
+          <div className={styles.historybookHeaderText}>
+            <span className={styles.title} data-i18n="home.guidehub.title">GuideHub</span>
+            <span className={styles.historybookCredit} data-i18n="home.guidehub.subtitle">Guides & calculators</span>
+          </div>
+        </div>
+      </header>
+      <Link
+        to={GUIDEHUB_ROUTE}
+        className={styles.historybookLink}
+        aria-label="Open GuideHub"
+        data-i18n-aria-label="home.guidehub.open"
+      >
+        <div className={styles.guidehubPreviewWrap}>
           <img
-            src={historybookCover}
-            alt="Historybook cover"
-            data-i18n="home.historybook.coverAlt"
-            className={styles.historybookCover}
+            src={guideHubLogo}
+            alt="GuideHub preview"
+            data-i18n="home.guidehub.previewAlt"
+            className={styles.guidehubPreview}
             loading="eager"
             decoding="async"
           />
-        ) : (
-          <div className={`${styles.historybookCover} ${styles.historybookPlaceholder}`} aria-hidden />
-        )}
+        </div>
       </Link>
     </section>
   );
@@ -234,11 +263,16 @@ const HistorybookCard: React.FC = () => {
 
 const NewsFeed: React.FC = () => {
   const [index, setIndex] = useState<number>(0);
-  const [data, setData] = useState<DiscordByChannelResponse | null>(null);
+  const [data, setData] = useState<DiscordByChannelSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const userSelectedRef = useRef(false);
   const autoSelectedOnceRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const dataRef = useRef<DiscordByChannelSnapshot | null>(null);
+  const hashRef = useRef<string | null>(null);
+  const nextCheckAtRef = useRef<number | null>(null);
 
   const pickLatestIndex = (items: DiscordNewsByChannelEntry[]): number => {
     let pickedIndex = -1;
@@ -258,32 +292,95 @@ const NewsFeed: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
-    async function load(){
-      if(!NEWS_BY_CHANNEL_URL){
-        if (alive) {
-          setData(null);
-          setLoading(false);
-        }
+
+    const clearTimer = () => {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
+    const scheduleNext = (snapshot: DiscordByChannelSnapshot | null) => {
+      clearTimer();
+      const nextAt = resolveNextCheckAt(snapshot);
+      if (!nextAt) return;
+      nextCheckAtRef.current = nextAt;
+      const delay = Math.max(0, nextAt - Date.now());
+      timerRef.current = window.setTimeout(() => {
+        runFetch();
+      }, delay);
+    };
+
+    const applySnapshot = (snapshot: DiscordByChannelSnapshot, writeCache: boolean) => {
+      const nextHash = snapshot.hash || String(snapshot.updatedAt ?? "");
+      const currentHash = hashRef.current;
+      if (currentHash && currentHash === nextHash) {
+        dataRef.current = snapshot;
+        if (writeCache) writeSnapshotCache(snapshot);
         return;
       }
+      hashRef.current = nextHash;
+      dataRef.current = snapshot;
+      setData(snapshot);
+      if (writeCache) writeSnapshotCache(snapshot);
+    };
+
+    const runFetch = async () => {
+      if (!alive) return;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      if (!dataRef.current) setLoading(true);
       try {
-        setLoading(true);
-        const data = await fetchDiscordNewsByChannel(NEWS_BY_CHANNEL_URL);
-        if(alive){
-          setData(data ?? null);
+        const incoming = await fetchDiscordNewsSnapshot(controller.signal);
+        if (!alive || controller.signal.aborted) return;
+        if (incoming) {
+          applySnapshot(incoming, true);
           setError(null);
+          scheduleNext(incoming);
         }
-      } catch(e: any){
-        if(alive){
-          setError(String(e?.message||e||"error"));
-          setData(null);
-        }
+      } catch (e: any) {
+        if (!alive || controller.signal.aborted) return;
+        setError(String(e?.message || e || "error"));
       } finally {
-        if(alive) setLoading(false);
+        if (alive && !controller.signal.aborted) {
+          setLoading(false);
+          scheduleNext(dataRef.current);
+        }
       }
+    };
+
+    const cached = readSnapshotCache();
+    if (cached) {
+      applySnapshot(cached, false);
+      setLoading(false);
     }
-    load();
-    return ()=>{ alive = false; };
+
+    const now = Date.now();
+    const isCacheFresh =
+      cached && typeof cached.nextUpdateAt === "number" && cached.nextUpdateAt > now;
+    if (!isCacheFresh) {
+      runFetch();
+    } else {
+      scheduleNext(cached);
+    }
+
+    const onVisibility = () => {
+      if (!alive) return;
+      if (document.visibilityState !== "visible") return;
+      const nextAt = nextCheckAtRef.current;
+      if (typeof nextAt === "number" && Date.now() > nextAt) {
+        runFetch();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      alive = false;
+      clearTimer();
+      abortRef.current?.abort();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -695,26 +792,31 @@ const Home: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   return (
     <ContentShell title="home.title" subtitle="home.subtitle">
-      {/* Row 0 – Kachel-Grid */}
-      <div className={styles.row}>
-        <div className={`${styles.colFull} ${styles.heroGrid}`}>
-          <TileGrid />
-          <HistorybookCard />
-        </div>
-      </div>
-      {/* Row 1 – News & YouTube */}
-      <div className={styles.row}>
-        <div className={styles.colCommunity}>
+      {/* Row 1 — News / Live */}
+      <div className={`${styles.row} ${styles.rowSplit}`}>
+        <div className={styles.splitMain}>
           <NewsFeed />
         </div>
-        <div className={styles.colGuides}>
+        <div className={styles.splitSide}>
+          <LiveNow onOpenSchedule={() => setScheduleOpen(true)} />
+        </div>
+      </div>
+      {/* Row 2 — Historybook / YouTube */}
+      <div className={`${styles.row} ${styles.rowSplit}`}>
+        <div className={styles.splitMain}>
+          <div className={styles.featuredRowWrap}>
+            <HistorybookCard />
+            <GuideHubCard />
+          </div>
+        </div>
+        <div className={styles.splitSide}>
           <YouTubeCarousel />
         </div>
       </div>
-      {/* Row 2 – Live & Plan */}
+      {/* Row 3 — Home */}
       <div className={styles.row}>
         <div className={styles.colFull}>
-          <LiveNow onOpenSchedule={() => setScheduleOpen(true)} />
+          <TileGrid />
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />

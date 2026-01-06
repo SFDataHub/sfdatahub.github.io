@@ -45,7 +45,7 @@ const main: Item[] = [
 
 const categories: Item[] = [
   { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
-  { to: "/guidehub",    label: "Guide Hub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
+  { to: "/guidehub-v2",    label: "Guide Hub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
   { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools", featureId: "main.tools" },
   { to: "/community", label: "Community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
   { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
@@ -168,12 +168,14 @@ function CategoryItem({
   collapsed,
   allowSubmenus,
   subItems,
+  onNavigate,
 }: {
   it: Item;
   label: string;
   collapsed: boolean;
   allowSubmenus: boolean;
   subItems: SubItem[];
+  onNavigate?: () => void;
 }) {
   const hasSub = subItems.length > 0;
   const { open, onEnter, onLeave, setOpen } = useDelayedHover();
@@ -197,6 +199,7 @@ function CategoryItem({
         className={({ isActive }) =>
           `${styles.navBtn} ${isActive ? styles.navBtnActive : ""}`
         }
+        onClick={onNavigate}
       >
         {it.icon}
         <AnimatedLabel text={label} isOpen={!collapsed} />
@@ -220,6 +223,7 @@ function CategoryItem({
               className={({ isActive }) =>
                 `${submenuStyles.link} ${isActive ? submenuStyles.linkActive : ""}`
               }
+              onClick={onNavigate}
             >
               {s.label}
             </NavLink>
@@ -241,6 +245,7 @@ function Block({
   userRoles,
   translate,
   isItemVisible,
+  onNavigate,
 }: {
   title?: string;
   items: Item[];
@@ -249,6 +254,7 @@ function Block({
   userRoles: string[];
   translate: (key: string) => string;
   isItemVisible: (item: Item) => boolean;
+  onNavigate?: () => void;
 }) {
   return (
     <>
@@ -268,6 +274,7 @@ function Block({
                 collapsed={collapsed}
                 allowSubmenus={allowSubmenus}
                 subItems={subItems}
+                onNavigate={onNavigate}
               />
             );
           }
@@ -279,6 +286,7 @@ function Block({
               className={({ isActive }) =>
                 `${styles.navBtn} ${isActive ? styles.navBtnActive : ""}`
               }
+              onClick={onNavigate}
             >
               {it.icon}
               <AnimatedLabel text={label} isOpen={!collapsed} />
@@ -300,12 +308,16 @@ export default function Sidebar({
   pinned,
   setPinned,
   hoverToExpand = true,
+  variant = "default",
+  onNavigate,
 }: {
   expanded: boolean;
   setExpanded: (v: boolean) => void;
   pinned: boolean;
   setPinned: (v: boolean) => void;
   hoverToExpand?: boolean;
+  variant?: "default" | "drawer";
+  onNavigate?: () => void;
 }) {
   const openTimer = React.useRef<number | null>(null);
   const closeTimer = React.useRef<number | null>(null);
@@ -402,6 +414,7 @@ export default function Sidebar({
 
   const handleCharacterClick = (playerId: string | number) => {
     navigate(`/player/${playerId}`);
+    onNavigate?.();
   };
 
   const handleConnectedHintClick = () => {
@@ -411,6 +424,7 @@ export default function Sidebar({
     } else {
       navigate("/help#linking");
     }
+    onNavigate?.();
   };
 
   const emptyConnectedText = isAuthed
@@ -436,7 +450,7 @@ export default function Sidebar({
   return (
     <aside
       id="sidebar-root"
-      className={`${styles.root} ${expanded ? styles.expanded : ""}`}
+      className={`${styles.root} ${expanded ? styles.expanded : ""} ${variant === "drawer" ? styles.drawer : ""}`}
       data-collapsed={collapsed ? "true" : "false"}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
@@ -469,6 +483,7 @@ export default function Sidebar({
               userRoles={userRoles}
               translate={t}
               isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
+              onNavigate={onNavigate}
             />
           </div>
 
@@ -483,6 +498,7 @@ export default function Sidebar({
               userRoles={userRoles}
               translate={t}
               isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
+              onNavigate={onNavigate}
             />
           </div>
 
@@ -537,7 +553,11 @@ export default function Sidebar({
         ) : null}
         <div className={styles.footerRow}>
           <div className={styles.footerRowCell}>
-            <NavLink to="/help" className={`${styles.footerLink} ${styles.footerRowLink}`}>
+            <NavLink
+              to="/help"
+              className={`${styles.footerLink} ${styles.footerRowLink}`}
+              onClick={onNavigate}
+            >
               {t("nav.help", { defaultValue: "Help" })}
             </NavLink>
           </div>

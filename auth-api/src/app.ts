@@ -12,6 +12,7 @@ import scanUploadsPublicRouter from "./routes/scanUploadsPublic";
 import { latestDiscordNewsHandler } from "./public/news/discord/latest.handler";
 import { listDiscordNewsHandler } from "./public/news/discord/list.handler";
 import { latestDiscordNewsByChannelHandler } from "./public/news/discord/latestByChannel.handler";
+import { refreshDiscordNewsSnapshotHandler } from "./internal/news/discord/refreshSnapshot.handler";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/admin", adminRouter);
 app.use("/admin/access-control", adminAccessControlRouter);
 app.use("/internal", internalAdminRouter);
 app.use("/internal/scan-uploads", scanUploadsRouter);
+app.post("/internal/news/discord/refresh-snapshot", refreshDiscordNewsSnapshotHandler);
 app.use("/", scanUploadsPublicRouter);
 app.use("/user", userUploadInboxRouter);
 app.get("/public/news/discord/latest", latestDiscordNewsHandler);

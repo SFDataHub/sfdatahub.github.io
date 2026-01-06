@@ -19,8 +19,17 @@
   "home": {
     "historybook": {
       "title": "Historybook",
+      "credit": "Historybook - created by Resist 2 Exist & DonMuErte",
+      "logoAlt": "Historybook logo",
       "coverAlt": "Historybook cover",
       "open": "Open Historybook"
+    },
+    "guidehub": {
+      "title": "GuideHub",
+      "subtitle": "Guides & calculators",
+      "logoAlt": "GuideHub logo",
+      "previewAlt": "GuideHub preview",
+      "open": "Open GuideHub"
     },
     "news": {
       "title": "Community news",
@@ -382,6 +391,24 @@
     },
     "shortDisclaimer": "SFDataHub is an unofficial, non-commercial fan project. All trademarks and images belong to their respective owners.",
     "copyright": "© 2025 SFDataHub – community project around Shakes & Fidget."
+  },
+  "guides": {
+    "v2": {
+      "searchPlaceholder": "Search guides",
+      "searchLabel": "Search guides",
+      "navHomeLabel": "Home",
+      "emptyStateTitle": "Select a guide",
+      "emptyStateBody": "Choose an entry from the guide navigation.",
+      "loading": "Loading guide...",
+      "missingTitle": "Guide not available yet",
+      "missingBody": "This guide does not have markdown content yet.",
+      "createdLabel": "Created",
+      "updatedLabel": "Last edited",
+      "sectionsLabel": "Sections",
+      "noSections": "No sections",
+      "galleryLabel": "Gallery",
+      "closeLabel": "Close"
+    }
   }
 }
 

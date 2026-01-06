@@ -22,6 +22,16 @@
 
 .expanded{ width: var(--sidebar-expanded-w); }
 
+.drawer{
+  position: relative;
+  top: 0;
+  bottom: auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
+  z-index: auto;
+}
+
 .root *, .root *::before, .root *::after{ box-sizing: border-box; }
 
 /* ====== Header ====== */
@@ -35,6 +45,7 @@
 .pinBtn{
   width:32px; height:32px; border-radius:8px;
   background:var(--tile); border:1px solid var(--line); color:var(--text);
+  display: inline-flex; align-items: center; justify-content: center;
 }
 
 /* ====== Kein Clipping durch Scrollcontainer ====== */
@@ -430,4 +441,30 @@
 /* Hauptnavi-Karte: eigener Hintergrund */
 .mainNavCard{
   background: #0F2030;
+}
+
+/* ====== Mobile Drawer / Trigger ====== */
+.mobileTrigger{
+  position: fixed;
+  left: 0;
+  top: calc(var(--topbar-h) - 52px);
+  z-index: 1100;
+}
+
+.mobileOverlay{
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--topbar-h);
+  bottom: 0;
+  background: rgba(6, 12, 20, 0.65);
+  z-index: 1200;
+  display: flex;
+}
+
+.mobileDrawer{
+  width: var(--sidebar-expanded-w);
+  max-width: 92vw;
+  height: 100%;
+  overflow-y: auto;
 }
