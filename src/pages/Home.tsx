@@ -5,47 +5,11 @@ import ContentShell from "../components/ContentShell";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
 import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
+import guideHubLogo from "../assets/logo_guidehub.png";
 
-// Historybook cover (first page of flipbook)
-const HISTORYBOOK_SLUG = "sf-history-book";
-type ManifestPageEntry = { src?: string; srcset?: { src: string; width?: number }[] };
-type FlipbookManifest = { pages?: ManifestPageEntry[] };
-const BASE_URL = (() => {
-  const b = (import.meta as any)?.env?.BASE_URL || "/";
-  return b.endsWith("/") ? b : `${b}/`;
-})();
-const joinBase = (p: string) => {
-  if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
-  const clean = p.replace(/^\.?\//, "");
-  return `${BASE_URL}${clean}`.replace(/\/{2,}/g, "/");
-};
-const HISTORYBOOK_MANIFEST_URL = joinBase(`flipbooks/${HISTORYBOOK_SLUG}/manifest.json`);
-let historybookCoverCache: string | null = null;
-let historybookCoverPromise: Promise<string | null> | null = null;
-const pickHistorybookCoverFromManifest = (manifest: FlipbookManifest): string | null => {
-  const first = manifest.pages?.[0];
-  if (!first) return null;
-  const src = first.src ?? first.srcset?.[0]?.src;
-  if (!src) return null;
-  const path = /^https?:\/\//i.test(src) || src.startsWith("/")
-    ? src
-    : `flipbooks/${HISTORYBOOK_SLUG}/${src}`;
-  return joinBase(path);
-};
-async function loadHistorybookCover(): Promise<string | null> {
-  if (historybookCoverCache) return historybookCoverCache;
-  if (historybookCoverPromise) return historybookCoverPromise;
-  historybookCoverPromise = fetch(HISTORYBOOK_MANIFEST_URL, { cache: "no-cache" })
-    .then((res) => res.ok ? res.json() as Promise<FlipbookManifest> : null)
-    .then((manifest) => {
-      const picked = manifest ? pickHistorybookCoverFromManifest(manifest) : null;
-      historybookCoverCache = picked;
-      return picked;
-    })
-    .catch(() => null)
-    .finally(() => { historybookCoverPromise = null; });
-  return historybookCoverPromise;
-}
+// Historybook cover (homepage preview)
+const HISTORYBOOK_COVER_URL = "/flipbooks/sf-history-book/history_book_coverpage.png";
+const GUIDEHUB_ROUTE = "/guidehub-v2";
 
 // Datenquellen (client-seitig lesbar)
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
@@ -186,7 +150,6 @@ function extractYouTubeVideoId(url: string): string | null {
 type Tile = { to: string; label: string; icon?: string };
 const TILE_ROUTES: Tile[] = [
   { to: "/toplists/", label: "Toplists" },
-  { to: "/guidehub/?tab=calculators", label: "GuideHub" },
   { to: "/players/", label: "Players" },
   { to: "/guilds/", label: "Guilds" },
   { to: "/community/", label: "Community" },
@@ -213,6 +176,8 @@ const TileGrid: React.FC = () => {
           <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
             {ICON_MANIFEST[t.to] ? (
               <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
+            ) : t.to === GUIDEHUB_ROUTE ? (
+              <img src={guideHubLogo} alt="" className={styles.tileIcon} />
             ) : (
               <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
             )}
@@ -225,37 +190,72 @@ const TileGrid: React.FC = () => {
 };
 
 const HistorybookCard: React.FC = () => {
-  const [historybookCover, setHistorybookCover] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    loadHistorybookCover().then((src) => { if (alive) setHistorybookCover(src); });
-    return () => { alive = false; };
-  }, []);
+  const historybookCover = HISTORYBOOK_COVER_URL;
 
   return (
     <section className={`${styles.card} ${styles.historybookCard}`} data-i18n-scope="home.historybook">
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
+        <div className={styles.historybookHeader}>
+          <div className={styles.historybookHeaderText}>
+            <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
+            <span className={styles.historybookCredit} data-i18n="home.historybook.credit">
+              Historybook - created by Resist 2 Exist & DonMuErte
+            </span>
+          </div>
+        </div>
       </header>
       <Link
-        to="/magazine/historybook/"
+        to="/sfmagazine/historybook"
         className={styles.historybookLink}
         aria-label="Open Historybook"
         data-i18n-aria-label="home.historybook.open"
       >
-        {historybookCover ? (
+        <div className={styles.historybookCoverWrap}>
+          {historybookCover ? (
+            <img
+              src={historybookCover}
+              alt="Historybook cover"
+              data-i18n="home.historybook.coverAlt"
+              className={`${styles.historybookCover} ${styles.historybookCover3d}`}
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className={`${styles.historybookCover} ${styles.historybookCover3d} ${styles.historybookPlaceholder}`} aria-hidden />
+          )}
+        </div>
+      </Link>
+    </section>
+  );
+};
+
+const GuideHubCard: React.FC = () => {
+  return (
+    <section className={`${styles.card} ${styles.guidehubCard}`} data-i18n-scope="home.guidehub">
+      <header className={styles.header}>
+        <div className={styles.historybookHeader}>
+          <div className={styles.historybookHeaderText}>
+            <span className={styles.title} data-i18n="home.guidehub.title">GuideHub</span>
+            <span className={styles.historybookCredit} data-i18n="home.guidehub.subtitle">Guides & calculators</span>
+          </div>
+        </div>
+      </header>
+      <Link
+        to={GUIDEHUB_ROUTE}
+        className={styles.historybookLink}
+        aria-label="Open GuideHub"
+        data-i18n-aria-label="home.guidehub.open"
+      >
+        <div className={styles.guidehubPreviewWrap}>
           <img
-            src={historybookCover}
-            alt="Historybook cover"
-            data-i18n="home.historybook.coverAlt"
-            className={styles.historybookCover}
+            src={guideHubLogo}
+            alt="GuideHub preview"
+            data-i18n="home.guidehub.previewAlt"
+            className={styles.guidehubPreview}
             loading="eager"
             decoding="async"
           />
-        ) : (
-          <div className={`${styles.historybookCover} ${styles.historybookPlaceholder}`} aria-hidden />
-        )}
+        </div>
       </Link>
     </section>
   );
@@ -792,26 +792,31 @@ const Home: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   return (
     <ContentShell title="home.title" subtitle="home.subtitle">
-      {/* Row 0 – Kachel-Grid */}
-      <div className={styles.row}>
-        <div className={`${styles.colFull} ${styles.heroGrid}`}>
-          <TileGrid />
-          <HistorybookCard />
-        </div>
-      </div>
-      {/* Row 1 – News & YouTube */}
-      <div className={styles.row}>
-        <div className={styles.colCommunity}>
+      {/* Row 1 — News / Live */}
+      <div className={`${styles.row} ${styles.rowSplit}`}>
+        <div className={styles.splitMain}>
           <NewsFeed />
         </div>
-        <div className={styles.colGuides}>
+        <div className={styles.splitSide}>
+          <LiveNow onOpenSchedule={() => setScheduleOpen(true)} />
+        </div>
+      </div>
+      {/* Row 2 — Historybook / YouTube */}
+      <div className={`${styles.row} ${styles.rowSplit}`}>
+        <div className={styles.splitMain}>
+          <div className={styles.featuredRowWrap}>
+            <HistorybookCard />
+            <GuideHubCard />
+          </div>
+        </div>
+        <div className={styles.splitSide}>
           <YouTubeCarousel />
         </div>
       </div>
-      {/* Row 2 – Live & Plan */}
+      {/* Row 3 — Home */}
       <div className={styles.row}>
         <div className={styles.colFull}>
-          <LiveNow onOpenSchedule={() => setScheduleOpen(true)} />
+          <TileGrid />
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />

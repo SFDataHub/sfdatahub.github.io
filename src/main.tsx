@@ -56,6 +56,7 @@ import PublicProfilePage from "./pages/PublicProfile/PublicProfilePage";
 
 // Guide Hub
 import GuidesIndex from "./pages/GuideHub/Index";
+import GuideHubV2 from "./pages/GuideHubV2/Index";
 // SF Magazin
 // Community
 import CommunityIndex from "./pages/Community/Index";
@@ -286,6 +287,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route
                   path="/guidehub/*"
                   element={withFeatureGate("main.guidehub", "/guidehub", <GuidesIndex />)}
+                />
+                <Route
+                  path="/guidehub-v2"
+                  element={withFeatureGate("main.guidehub", "/guidehub-v2", <GuideHubV2 />)}
                 />
 
                 {/* Tools */}

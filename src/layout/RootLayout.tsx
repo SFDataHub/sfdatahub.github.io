@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Menu } from "lucide-react";
 import Topbar from "../components/Topbar/Topbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import LogoDock from "../components/LogoDock/LogoDock";
+import sidebarStyles from "../components/Sidebar/Sidebar.module.css";
 import { useAuth } from "../context/AuthContext";
 import LoginModalHost from "../components/auth/LoginModalHost";
 
@@ -23,6 +25,11 @@ const isSafeNextPath = (value: string | null): string | null => {
 export default function RootLayout() {
   const [expanded, setExpanded] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 1023px)").matches;
+  });
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const isOpen = pinned || expanded;
   const { t } = useTranslation();
   const { status: authStatus, user } = useAuth();
@@ -64,10 +71,49 @@ export default function RootLayout() {
     navigate(nextPath, { replace: true });
   }, [authStatus, user, location.pathname, location.search, navigate]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    if ("addEventListener" in media) {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsMobileNavOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen || typeof window === "undefined") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileNavOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileNavOpen]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen || typeof document === "undefined") return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileNavOpen]);
+
   // Eine Variable für ALLES links: Sidebar + Hintergrund + Content-Offset
   const leftVar = useMemo(
-    () => (isOpen ? "var(--sidebar-expanded-w)" : "var(--sidebar-w)"),
-    [isOpen]
+    () => (isMobile ? "0px" : (isOpen ? "var(--sidebar-expanded-w)" : "var(--sidebar-w)")),
+    [isMobile, isOpen]
   );
 
   const aboutParagraphs = t("footer.about.body").split("\n\n");
@@ -76,22 +122,60 @@ export default function RootLayout() {
     { key: "privacy", to: "/playground/legal/tos", label: t("help.sections.legal.items.privacy", { defaultValue: "Privacy Policy" }) },
     { key: "imprint", to: "/help", label: t("help.sections.legal.items.imprint", { defaultValue: "Imprint / Contact" }) },
   ];
+  const openNavLabel = t("nav.open", { defaultValue: "Open navigation" });
+  const sidebarState = isMobile ? "collapsed" : (isOpen ? "expanded" : "collapsed");
 
   return (
-    <div id="app-shell" data-sidebar={isOpen ? "expanded" : "collapsed"} style={{ ["--left" as any]: leftVar }}>
+    <div id="app-shell" data-sidebar={sidebarState} style={{ ["--left" as any]: leftVar }}>
       <LogoDock src="/logo.png" />
       <Topbar />
 
       {/* linker Hintergrundstreifen in Sidebar-Farbe */}
       <div className="logo-fill" />
 
-      <Sidebar
-        expanded={isOpen}
-        setExpanded={setExpanded}
-        pinned={pinned}
-        setPinned={setPinned}
-        hoverToExpand={!pinned}
-      />
+      {!isMobile ? (
+        <Sidebar
+          expanded={isOpen}
+          setExpanded={setExpanded}
+          pinned={pinned}
+          setPinned={setPinned}
+          hoverToExpand={!pinned}
+        />
+      ) : (
+        !isMobileNavOpen && (
+          <div className={`${sidebarStyles.headRow} ${sidebarStyles.mobileTrigger}`}>
+            <button
+              className={sidebarStyles.pinBtn}
+              type="button"
+              aria-label={openNavLabel}
+              aria-expanded={isMobileNavOpen}
+              onClick={() => setIsMobileNavOpen(true)}
+            >
+              <Menu className="ico" />
+            </button>
+          </div>
+        )
+      )}
+
+      {isMobile && isMobileNavOpen ? (
+        <div
+          className={sidebarStyles.mobileOverlay}
+          role="presentation"
+          onClick={() => setIsMobileNavOpen(false)}
+        >
+          <div className={sidebarStyles.mobileDrawer} onClick={(event) => event.stopPropagation()}>
+            <Sidebar
+              expanded={true}
+              setExpanded={setExpanded}
+              pinned={pinned}
+              setPinned={setPinned}
+              hoverToExpand={false}
+              variant="drawer"
+              onNavigate={() => setIsMobileNavOpen(false)}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* Content rechts neben der (eingeklappten/ausgeklappten) Sidebar */}
       <div className="content">

@@ -19,8 +19,17 @@
   "home": {
     "historybook": {
       "title": "Historybook",
+      "credit": "Historybook - erstellt von Resist 2 Exist & DonMuErte",
+      "logoAlt": "Historybook Logo",
       "coverAlt": "Historybook Cover",
       "open": "Historybook oeffnen"
+    },
+    "guidehub": {
+      "title": "GuideHub",
+      "subtitle": "Guides & Rechner",
+      "logoAlt": "GuideHub Logo",
+      "previewAlt": "GuideHub Vorschau",
+      "open": "GuideHub oeffnen"
     },
     "news": {
       "title": "Community-News",
@@ -383,6 +392,24 @@
     },
     "shortDisclaimer": "SFDataHub ist ein inoffizielles, nicht-kommerzielles Fanprojekt. Alle Marken und Bilder gehören ihren jeweiligen Rechteinhabern.",
     "copyright": "© 2025 SFDataHub – Community-Projekt rund um Shakes & Fidget."
+  },
+  "guides": {
+    "v2": {
+      "searchPlaceholder": "Guides suchen",
+      "searchLabel": "Guides suchen",
+      "navHomeLabel": "Startseite",
+      "emptyStateTitle": "Guide auswaehlen",
+      "emptyStateBody": "Waehle einen Eintrag in der Guide-Navigation.",
+      "loading": "Guide wird geladen...",
+      "missingTitle": "Guide noch nicht verfuegbar",
+      "missingBody": "Fuer diesen Guide gibt es noch keinen Markdown-Inhalt.",
+      "createdLabel": "Erstellt",
+      "updatedLabel": "Bearbeitet",
+      "sectionsLabel": "Sektionen",
+      "noSections": "Keine Sektionen",
+      "galleryLabel": "Galerie",
+      "closeLabel": "Schliessen"
+    }
   }
 }
 
