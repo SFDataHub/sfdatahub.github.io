@@ -1,15 +1,24 @@
 // src/pages/Home.tsx
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
+import FeaturedPreviewCard from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard";
+import FeaturedPreviewRow from "../components/wrapper/home/FeaturedPreviewRow/FeaturedPreviewRow";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
 import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
 import guideHubLogo from "../assets/logo_guidehub.png";
+import { guideAssetByKey } from "../data/guidehub/assets";
 
 // Historybook cover (homepage preview)
 const HISTORYBOOK_COVER_URL = "/flipbooks/sf-history-book/history_book_coverpage.png";
 const GUIDEHUB_ROUTE = "/guidehub-v2";
+const SFTOOLS_ASSET = guideAssetByKey("sftools", 512);
+const SFTAVERN_DISCORD_ASSET = guideAssetByKey("sftaverndiscord", 512);
+const SFTOOLS_PREVIEW = SFTOOLS_ASSET.thumb ?? SFTOOLS_ASSET.url ?? "";
+const SFTAVERN_DISCORD_PREVIEW = SFTAVERN_DISCORD_ASSET.thumb ?? SFTAVERN_DISCORD_ASSET.url ?? "";
+const FEATURED_PREVIEW_COMPACT_HEIGHT = "clamp(96px, 22vw, 192px)";
 
 // Datenquellen (client-seitig lesbar)
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
@@ -147,15 +156,15 @@ function extractYouTubeVideoId(url: string): string | null {
 }
 
 // Kachel-Grid
-type Tile = { to: string; label: string; icon?: string };
+type Tile = { to: string; labelKey: string; icon?: string };
 const TILE_ROUTES: Tile[] = [
-  { to: "/toplists/", label: "Toplists" },
-  { to: "/players/", label: "Players" },
-  { to: "/guilds/", label: "Guilds" },
-  { to: "/community/", label: "Community" },
-  { to: "/creator-hub/", label: "Creator Hub" },
-  { to: "/help", label: "Help" },
-  { to: "/settings/", label: "Settings" },
+  { to: "/toplists/", labelKey: "nav.toplists" },
+  { to: "/players/", labelKey: "nav.players" },
+  { to: "/guilds/", labelKey: "nav.guilds" },
+  { to: "/community/", labelKey: "nav.community" },
+  { to: "/creator-hub/", labelKey: "nav.creatorHub" },
+  { to: "/help", labelKey: "nav.help" },
+  { to: "/settings/", labelKey: "nav.settings" },
 ];
 
 const ICON_MANIFEST: Record<string, string> = {
@@ -165,103 +174,36 @@ const ICON_MANIFEST: Record<string, string> = {
 // ---------- Subcomponents ----------
 
 const TileGrid: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <section className={styles.card} data-i18n-scope="home.tiles">
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.title">Home</span>
-        <span className={styles.subtitle} data-i18n="home.subtitle">Welcome back</span>
+        <span className={styles.title} data-i18n="home.title">{t("home.title")}</span>
+        <span className={styles.subtitle} data-i18n="home.subtitle">{t("home.subtitle")}</span>
       </header>
       <div className={styles.tileGrid} role="list">
-        {TILE_ROUTES.map((t) => (
-          <Link key={t.to} to={t.to} role="listitem" className={styles.tile} aria-label={t.label}>
-            {ICON_MANIFEST[t.to] ? (
-              <img src={ICON_MANIFEST[t.to]} alt="" className={styles.tileIcon} />
-            ) : t.to === GUIDEHUB_ROUTE ? (
-              <img src={guideHubLogo} alt="" className={styles.tileIcon} />
-            ) : (
-              <div className={styles.tileIconFallback} aria-hidden>{t.label.slice(0,2).toUpperCase()}</div>
-            )}
-            <div className={styles.tileLabel} data-i18n={`nav.${t.label.toLowerCase()}`}>{t.label}</div>
-          </Link>
-        ))}
+        {TILE_ROUTES.map((tile) => {
+          const label = t(tile.labelKey);
+          return (
+            <Link key={tile.to} to={tile.to} role="listitem" className={styles.tile} aria-label={label}>
+              {ICON_MANIFEST[tile.to] ? (
+                <img src={ICON_MANIFEST[tile.to]} alt="" className={styles.tileIcon} />
+              ) : tile.to === GUIDEHUB_ROUTE ? (
+                <img src={guideHubLogo} alt="" className={styles.tileIcon} />
+              ) : (
+                <div className={styles.tileIconFallback} aria-hidden>{label.slice(0,2).toUpperCase()}</div>
+              )}
+              <div className={styles.tileLabel} data-i18n={tile.labelKey}>{label}</div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
 };
 
-const HistorybookCard: React.FC = () => {
-  const historybookCover = HISTORYBOOK_COVER_URL;
-
-  return (
-    <section className={`${styles.card} ${styles.historybookCard}`} data-i18n-scope="home.historybook">
-      <header className={styles.header}>
-        <div className={styles.historybookHeader}>
-          <div className={styles.historybookHeaderText}>
-            <span className={styles.title} data-i18n="home.historybook.title">Historybook</span>
-            <span className={styles.historybookCredit} data-i18n="home.historybook.credit">
-              Historybook - created by Resist 2 Exist & DonMuErte
-            </span>
-          </div>
-        </div>
-      </header>
-      <Link
-        to="/sfmagazine/historybook"
-        className={styles.historybookLink}
-        aria-label="Open Historybook"
-        data-i18n-aria-label="home.historybook.open"
-      >
-        <div className={styles.historybookCoverWrap}>
-          {historybookCover ? (
-            <img
-              src={historybookCover}
-              alt="Historybook cover"
-              data-i18n="home.historybook.coverAlt"
-              className={`${styles.historybookCover} ${styles.historybookCover3d}`}
-              loading="eager"
-              decoding="async"
-            />
-          ) : (
-            <div className={`${styles.historybookCover} ${styles.historybookCover3d} ${styles.historybookPlaceholder}`} aria-hidden />
-          )}
-        </div>
-      </Link>
-    </section>
-  );
-};
-
-const GuideHubCard: React.FC = () => {
-  return (
-    <section className={`${styles.card} ${styles.guidehubCard}`} data-i18n-scope="home.guidehub">
-      <header className={styles.header}>
-        <div className={styles.historybookHeader}>
-          <div className={styles.historybookHeaderText}>
-            <span className={styles.title} data-i18n="home.guidehub.title">GuideHub</span>
-            <span className={styles.historybookCredit} data-i18n="home.guidehub.subtitle">Guides & calculators</span>
-          </div>
-        </div>
-      </header>
-      <Link
-        to={GUIDEHUB_ROUTE}
-        className={styles.historybookLink}
-        aria-label="Open GuideHub"
-        data-i18n-aria-label="home.guidehub.open"
-      >
-        <div className={styles.guidehubPreviewWrap}>
-          <img
-            src={guideHubLogo}
-            alt="GuideHub preview"
-            data-i18n="home.guidehub.previewAlt"
-            className={styles.guidehubPreview}
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-      </Link>
-    </section>
-  );
-};
-
 const NewsFeed: React.FC = () => {
+  const { t } = useTranslation();
   const [index, setIndex] = useState<number>(0);
   const [data, setData] = useState<DiscordByChannelSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -424,7 +366,7 @@ const NewsFeed: React.FC = () => {
     <section className={styles.card} data-i18n-scope="home.news" aria-busy={loading}>
       <header className={styles.header}>
         <div className={styles.headerGroup}>
-          <span className={styles.title} data-i18n="home.news.title">Community news</span>
+          <span className={styles.title} data-i18n="home.news.title">{t("home.news.title")}</span>
           {activeLabel && (
             <span className={styles.subtitle} title={activeLabel}>
               {activeLabel}
@@ -436,7 +378,7 @@ const NewsFeed: React.FC = () => {
             className={styles.navBtn}
             onClick={goPrev}
             disabled={totalChannels <= 1}
-            aria-label="Previous channel"
+            aria-label={t("home.news.prev")}
             data-i18n-aria-label="home.news.prev"
           >
             ‹
@@ -445,7 +387,7 @@ const NewsFeed: React.FC = () => {
             className={styles.navBtn}
             onClick={goNext}
             disabled={totalChannels <= 1}
-            aria-label="Next channel"
+            aria-label={t("home.news.next")}
             data-i18n-aria-label="home.news.next"
           >
             ›
@@ -476,7 +418,7 @@ const NewsFeed: React.FC = () => {
                   aria-label={cardLabel}
                   data-i18n="home.news.openOnDiscord"
                 >
-                  Open on Discord
+                  {t("home.news.openOnDiscord")}
                 </a>
               </div>
             </div>
@@ -493,16 +435,19 @@ const NewsFeed: React.FC = () => {
         )}
         {channelEmpty && (
           <div className={styles.empty} data-i18n="home.news.emptyChannel">
-            No recent news in this channel.
+            {t("home.news.emptyChannel")}
           </div>
         )}
-        {empty && <div className={styles.empty} data-i18n="home.news.empty">No news yet.</div>}
+        {empty && (
+          <div className={styles.empty} data-i18n="home.news.empty">{t("home.news.empty")}</div>
+        )}
       </div>
       {error && <div className={styles.errorNote} aria-live="polite">{error}</div>}
     </section>
   );
 };
 const YouTubeCarousel: React.FC = () => {
+  const { t } = useTranslation();
   const [items, setItems] = useState<{ title: string; url: string; thumb?: string }[]>([]);
   const [index, setIndex] = useState(0);
   const timer = useRef<number | null>(null);
@@ -540,15 +485,15 @@ const YouTubeCarousel: React.FC = () => {
   return (
     <section className={styles.card} data-i18n-scope="home.youtube">
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.youtube.title">YouTube</span>
+        <span className={styles.title} data-i18n="home.youtube.title">{t("home.youtube.title")}</span>
         <div className={styles.carouselCtrls}>
-          <button className={styles.navBtn} onClick={prev} aria-label="Prev">◀</button>
-          <button className={styles.navBtn} onClick={next} aria-label="Next">▶</button>
+          <button className={styles.navBtn} onClick={prev} aria-label={t("home.youtube.prev")}>◀</button>
+          <button className={styles.navBtn} onClick={next} aria-label={t("home.youtube.next")}>▶</button>
         </div>
       </header>
       <div className={styles.carousel} tabIndex={0} onKeyDown={onKey} aria-roledescription="carousel">
         {items.length === 0 ? (
-          <div className={styles.empty}>No videos</div>
+          <div className={styles.empty} data-i18n="home.youtube.empty">{t("home.youtube.empty")}</div>
         ) : (
           items.map((it, i) => (
             <a key={it.url} href={it.url} target="_blank" rel="noreferrer"
@@ -568,6 +513,7 @@ const YouTubeCarousel: React.FC = () => {
 
 type LiveItem = { id?: string; name: string; url: string; avatar?: string; viewers?: number };
 const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) => {
+  const { t } = useTranslation();
   const [live, setLive] = useState<LiveItem[] | null>(null);
   const [twitchMap, setTwitchMap] = useState<Map<string,string>>(new Map());
   const [index, setIndex] = useState(0);
@@ -623,11 +569,13 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
     return (
       <section className={styles.card} data-i18n-scope="home.live">
         <header className={styles.header}>
-          <span className={styles.title} data-i18n="home.live.title">Live now</span>
+          <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
         </header>
-        <div className={styles.empty} data-i18n="home.live.none">Nobody is live right now.</div>
+        <div className={styles.empty} data-i18n="home.live.none">{t("home.live.none")}</div>
         <div className={styles.actionsRight}>
-          <button className={styles.primaryBtn} onClick={onOpenSchedule} data-i18n="home.schedule.open">Streaming-Plan anzeigen</button>
+          <button className={styles.primaryBtn} onClick={onOpenSchedule} data-i18n="home.schedule.open">
+            {t("home.schedule.open")}
+          </button>
         </div>
       </section>
     );
@@ -648,7 +596,7 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
   return (
     <section className={styles.card} data-i18n-scope="home.live">
       <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.live.title">Live now</span>
+        <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
       </header>
       <div className={styles.liveCard}>
         {cur?.avatar ? (
@@ -659,15 +607,41 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
         <div className={styles.liveInfo}>
           <div className={styles.liveName}>{cur?.name}</div>
           <div className={styles.liveMeta}>
-            <span className={styles.liveBadge}>LIVE</span>
-            {typeof cur?.viewers === 'number' && <span className={styles.liveViewers}>{cur.viewers.toLocaleString()} viewers</span>}
+            <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
+            {typeof cur?.viewers === "number" && (
+              <span className={styles.liveViewers}>
+                {t("home.live.viewers", { viewers: cur.viewers.toLocaleString() })}
+              </span>
+            )}
           </div>
         </div>
-        {resolvedUrl && <a href={resolvedUrl} target="_blank" rel="noreferrer" className={styles.primaryBtn} data-i18n="home.live.open_on_twitch">Auf Twitch öffnen</a>}
+        {resolvedUrl && (
+          <a
+            href={resolvedUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={styles.primaryBtn}
+            data-i18n="home.live.open_on_twitch"
+          >
+            {t("home.live.open_on_twitch")}
+          </a>
+        )}
       </div>
       <div className={styles.carouselCtrls}>
-        <button className={styles.navBtn} onClick={()=> setIndex((i)=> (i-1+live.length) % live.length)} aria-label="Prev">◀</button>
-        <button className={styles.navBtn} onClick={()=> setIndex((i)=> (i+1) % live.length)} aria-label="Next">▶</button>
+        <button
+          className={styles.navBtn}
+          onClick={()=> setIndex((i)=> (i-1+live.length) % live.length)}
+          aria-label={t("home.live.prev")}
+        >
+          ◀
+        </button>
+        <button
+          className={styles.navBtn}
+          onClick={()=> setIndex((i)=> (i+1) % live.length)}
+          aria-label={t("home.live.next")}
+        >
+          ▶
+        </button>
       </div>
     </section>
   );
@@ -675,6 +649,7 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
 
 type ScheduleRow = { weekday: string; start_utc: string; end_utc: string; timezone: string; platform: string; channel_url: string; streamer: string; title: string };
 const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<ScheduleRow[] | null>(null);
   const [platform, setPlatform] = useState("All");
   const [query, setQuery] = useState("");
@@ -728,44 +703,53 @@ const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="schedule-title">
       <div className={styles.modal}>
         <header className={styles.modalHeader}>
-          <h2 id="schedule-title" className={styles.modalTitle} data-i18n="home.schedule.title">Streaming-Plan</h2>
-          <button className={styles.closeBtn} onClick={onClose} data-i18n="home.schedule.close">Schließen</button>
+          <h2 id="schedule-title" className={styles.modalTitle} data-i18n="home.schedule.title">
+            {t("home.schedule.title")}
+          </h2>
+          <button className={styles.closeBtn} onClick={onClose} data-i18n="home.schedule.close">
+            {t("home.schedule.close")}
+          </button>
         </header>
         <div className={styles.modalFilters}>
           <label className={styles.formRow}>
-            <span data-i18n="home.schedule.platform">Platform</span>
+            <span data-i18n="home.schedule.platform">{t("home.schedule.platform")}</span>
             <select value={platform} onChange={(e)=> setPlatform(e.target.value)} className={styles.select}>
-              <option value="All">All</option>
-              <option value="Twitch">Twitch</option>
-              <option value="YouTube">YouTube</option>
+              <option value="All">{t("home.schedule.platformAll")}</option>
+              <option value="Twitch">{t("home.schedule.platformTwitch")}</option>
+              <option value="YouTube">{t("home.schedule.platformYouTube")}</option>
             </select>
           </label>
           <label className={styles.formRow}>
-            <span data-i18n="home.schedule.search">Search</span>
-            <input value={query} onChange={(e)=> setQuery(e.target.value)} className={styles.input} placeholder="Streamer / Title" />
+            <span data-i18n="home.schedule.search">{t("home.schedule.search")}</span>
+            <input
+              value={query}
+              onChange={(e)=> setQuery(e.target.value)}
+              className={styles.input}
+              placeholder={t("home.schedule.searchPlaceholder")}
+            />
           </label>
           <label className={styles.formRowCheckbox}>
             <input type="checkbox" checked={todayOnly} onChange={(e)=> setTodayOnly(e.target.checked)} />
-            <span data-i18n="home.schedule.today">Nur heute</span>
+            <span data-i18n="home.schedule.today">{t("home.schedule.today")}</span>
           </label>
         </div>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>weekday</th>
-                <th>start_utc</th>
-                <th>end_utc</th>
-                <th>timezone</th>
-                <th>platform</th>
-                <th>channel_url</th>
-                <th>streamer</th>
-                <th>title</th>
+                <th>{t("home.schedule.columns.weekday")}</th>
+                <th>{t("home.schedule.columns.start")}</th>
+                <th>{t("home.schedule.columns.end")}</th>
+                <th>{t("home.schedule.columns.timezone")}</th>
+                <th>{t("home.schedule.columns.platform")}</th>
+                <th>{t("home.schedule.columns.channel")}</th>
+                <th>{t("home.schedule.columns.streamer")}</th>
+                <th>{t("home.schedule.columns.title")}</th>
               </tr>
             </thead>
             <tbody>
               {hasTemplateOnly ? (
-                <tr><td colSpan={8} className={styles.empty}>No schedule yet</td></tr>
+                <tr><td colSpan={8} className={styles.empty}>{t("home.schedule.empty")}</td></tr>
               ) : (
                 filtered.map((r, i) => (
                   <tr key={i}>
@@ -774,7 +758,7 @@ const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
                     <td>{r.end_utc}</td>
                     <td>{r.timezone}</td>
                     <td>{r.platform}</td>
-                    <td>{r.channel_url ? <a href={r.channel_url} target="_blank" rel="noreferrer">link</a> : ''}</td>
+                    <td>{r.channel_url ? <a href={r.channel_url} target="_blank" rel="noreferrer">{t("home.schedule.link")}</a> : ""}</td>
                     <td>{r.streamer}</td>
                     <td>{r.title}</td>
                   </tr>
@@ -789,9 +773,10 @@ const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
 };
 
 const Home: React.FC = () => {
+  const { t } = useTranslation();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   return (
-    <ContentShell title="home.title" subtitle="home.subtitle">
+    <ContentShell title={t("home.title")} subtitle={t("home.subtitle")}>
       {/* Row 1 — News / Live */}
       <div className={`${styles.row} ${styles.rowSplit}`}>
         <div className={styles.splitMain}>
@@ -802,12 +787,61 @@ const Home: React.FC = () => {
         </div>
       </div>
       {/* Row 2 — Historybook / YouTube */}
-      <div className={`${styles.row} ${styles.rowSplit}`}>
+      <div className={`${styles.row} ${styles.rowSplit} ${styles.rowFeatured}`}>
         <div className={styles.splitMain}>
-          <div className={styles.featuredRowWrap}>
-            <HistorybookCard />
-            <GuideHubCard />
-          </div>
+          <FeaturedPreviewRow>
+            <FeaturedPreviewCard
+              href="/sfmagazine/historybook"
+              title={t("home.historybook.title")}
+              subtitle={t("home.historybook.credit")}
+              previewImageSrc={HISTORYBOOK_COVER_URL}
+              previewAlt={t("home.historybook.coverAlt")}
+              variant="cover"
+              i18nScope="home.historybook"
+              titleI18nKey="home.historybook.title"
+              subtitleI18nKey="home.historybook.credit"
+              previewAltI18nKey="home.historybook.coverAlt"
+              linkAriaLabel={t("home.historybook.open")}
+              linkAriaI18nKey="home.historybook.open"
+            />
+            <FeaturedPreviewCard
+              href={GUIDEHUB_ROUTE}
+              title={t("home.guidehub.title")}
+              subtitle={t("home.guidehub.subtitle")}
+              previewImageSrc={guideHubLogo}
+              previewAlt={t("home.guidehub.previewAlt")}
+              i18nScope="home.guidehub"
+              titleI18nKey="home.guidehub.title"
+              subtitleI18nKey="home.guidehub.subtitle"
+              previewAltI18nKey="home.guidehub.previewAlt"
+              linkAriaLabel={t("home.guidehub.open")}
+              linkAriaI18nKey="home.guidehub.open"
+            />
+            <FeaturedPreviewCard
+              href="https://sftools.mar21.eu/"
+              title={t("home.sftools.title")}
+              subtitle={t("home.sftools.subtitle")}
+              previewImageSrc={SFTOOLS_PREVIEW}
+              previewAlt={t("home.sftools.previewAlt")}
+              previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
+              i18nScope="home.sftools"
+              titleI18nKey="home.sftools.title"
+              subtitleI18nKey="home.sftools.subtitle"
+              previewAltI18nKey="home.sftools.previewAlt"
+            />
+            <FeaturedPreviewCard
+              href="https://discord.gg/sftavern"
+              title={t("home.taverndiscord.title")}
+              subtitle={t("home.taverndiscord.subtitle")}
+              previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
+              previewAlt={t("home.taverndiscord.previewAlt")}
+              previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
+              i18nScope="home.taverndiscord"
+              titleI18nKey="home.taverndiscord.title"
+              subtitleI18nKey="home.taverndiscord.subtitle"
+              previewAltI18nKey="home.taverndiscord.previewAlt"
+            />
+          </FeaturedPreviewRow>
         </div>
         <div className={styles.splitSide}>
           <YouTubeCarousel />

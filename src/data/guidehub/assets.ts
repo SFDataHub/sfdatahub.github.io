@@ -151,6 +151,10 @@ const DRIVE_BY_KEY: Record<string, string> = {
   luckbig: "1iYlE4rDU6rg3MHKG0vvwwb9wskdmu8-1",
   blackbig: "14bA3CU46YkT4um1tHmFoOGLp8RZE_v0s",
   legendarybig: "1soGwIo5IBQBhyX75KhD3-3jodoMoe450",
+  // credits
+  sftaverndiscord: "1LpjOIafDHg1m6Il1H37gnujPph8tR6CY",
+  sfmagazine: "1DkwbJdIRSI0DxVJCo9aCDD9FyjZGf-TQ",
+  sftools : "1fcnNhvUliXJU6Fuw95mLrcNowjzZlYSh",
   // ===== hier beliebig erweitern =====
   // progressionlatebanner: "DRIVE_FILE_ID_HIER",
   // underworldppsodiagram1: "DRIVE_FILE_ID_HIER",

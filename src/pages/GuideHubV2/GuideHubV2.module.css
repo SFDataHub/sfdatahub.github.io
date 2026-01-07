@@ -1,27 +1,30 @@
-.layout {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
+.viewerWrap {
   width: 100%;
   padding: 8px 0 24px;
   overflow-anchor: none;
 }
 
-.layout * {
+.viewerWrap * {
   overflow-anchor: none;
 }
 
 .nav {
-  position: sticky;
-  top: 18px;
-  align-self: start;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .navCard {
-  background: var(--tableBg, #14273e);
-  border: 1px solid var(--line, #2c4a73);
-  border-radius: 12px;
-  padding: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .navHeader {
@@ -63,6 +66,33 @@
 
 .navHomeWrap {
   margin-bottom: 12px;
+}
+
+.navScroller {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 139, 198, 0.45) transparent;
+}
+
+.navScroller::-webkit-scrollbar {
+  width: 8px;
+}
+
+.navScroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.navScroller::-webkit-scrollbar-thumb {
+  background: rgba(92, 139, 198, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.navScroller::-webkit-scrollbar-thumb:hover {
+  background: rgba(92, 139, 198, 0.6);
 }
 
 .searchInput {
@@ -529,14 +559,6 @@
 }
 
 @media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .nav {
-    position: static;
-  }
-
   .contentGridHasGallery {
     grid-template-columns: 1fr;
   }

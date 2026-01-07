@@ -5,13 +5,25 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview
+## Overview {#overview}
+
 Platzhalter-Uebersicht fuer den Bereich Arena Manager.
 
-## Highlights
+### Highlights
+
 - Fuege wichtige Eintraege hinzu.
 - Verlinke passende Guides.
 
-## Tips
+### Tips
+
 - Fuege hilfreiche Hinweise hinzu.
 
+## SFDataHub Content {#sfdatahub-content}
+
+## TavernDiscord FAQ {#taverndiscord-faq}
+
+## Notes {#notes}
+
+## Changelog {#changelog}
+
+## Sources {#sources}

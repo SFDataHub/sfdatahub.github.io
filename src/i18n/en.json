@@ -14,9 +14,13 @@
     "license": "License",
     "help": "Help",
     "tools": "Tools",
-    "community": "Community"
+    "community": "Community",
+    "creatorHub": "Creator Hub",
+    "settings": "Settings"
   },
   "home": {
+    "title": "Home",
+    "subtitle": "Welcome back",
     "historybook": {
       "title": "Historybook",
       "credit": "Historybook - created by Resist 2 Exist & DonMuErte",
@@ -31,10 +35,62 @@
       "previewAlt": "GuideHub preview",
       "open": "Open GuideHub"
     },
+    "sftools": {
+      "title": "SFTools",
+      "subtitle": "Tools & resources",
+      "previewAlt": "SFTools preview"
+    },
+    "taverndiscord": {
+      "title": "Tavern Discord",
+      "subtitle": "Community Discord",
+      "previewAlt": "Tavern Discord preview"
+    },
     "news": {
       "title": "Community news",
       "empty": "No news yet.",
-      "openOnDiscord": "Open on Discord"
+      "emptyChannel": "No recent news in this channel.",
+      "openOnDiscord": "Open on Discord",
+      "prev": "Previous channel",
+      "next": "Next channel"
+    },
+    "youtube": {
+      "title": "YouTube",
+      "prev": "Previous video",
+      "next": "Next video",
+      "empty": "No videos"
+    },
+    "live": {
+      "title": "Live now",
+      "none": "Nobody is live right now.",
+      "open_on_twitch": "Open on Twitch",
+      "badge": "LIVE",
+      "viewers": "{{viewers}} viewers",
+      "prev": "Previous stream",
+      "next": "Next stream"
+    },
+    "schedule": {
+      "open": "Show streaming schedule",
+      "title": "Streaming schedule",
+      "close": "Close",
+      "platform": "Platform",
+      "platformAll": "All",
+      "platformTwitch": "Twitch",
+      "platformYouTube": "YouTube",
+      "search": "Search",
+      "searchPlaceholder": "Streamer / Title",
+      "today": "Today only",
+      "columns": {
+        "weekday": "Weekday",
+        "start": "Start (UTC)",
+        "end": "End (UTC)",
+        "timezone": "Timezone",
+        "platform": "Platform",
+        "channel": "Channel URL",
+        "streamer": "Streamer",
+        "title": "Title"
+      },
+      "empty": "No schedule yet.",
+      "link": "Link"
     }
   },
   "servers": {

@@ -1,0 +1,114 @@
+.card {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 12px;
+  color: #E7F1FF;
+  --featured-preview-height: clamp(120px, 28vw, 240px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.headerGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.headerIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #2B4C73;
+  background: #152A42;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #F5F9FF;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #B0C4D9;
+}
+
+.previewWrap {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+}
+
+.previewSurface {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  height: var(--featured-preview-height);
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  filter: drop-shadow(0 18px 26px rgba(7, 18, 33, 0.55)) drop-shadow(0 6px 12px rgba(7, 18, 33, 0.35));
+  transition: transform 0.33s ease, filter 0.33s ease;
+  will-change: transform, filter;
+}
+
+.previewLink {
+  text-decoration: none;
+}
+
+.previewStatic {
+}
+
+.previewSurface[data-clickable="true"] {
+  cursor: pointer;
+}
+
+.previewLink:focus-visible {
+  outline: 2px solid #2B8AE0;
+  outline-offset: 4px;
+}
+
+.previewImage {
+  height: auto;
+  width: auto;
+  max-width: 100%;
+  max-height: var(--featured-preview-height-override, var(--featured-preview-height));
+  display: block;
+  object-fit: contain;
+}
+
+.previewImageIcon {
+}
+
+.previewImageCover {
+  background: transparent;
+  border-radius: 14px;
+}
+
+.previewSurface:hover,
+.previewSurface:focus-visible {
+  filter: drop-shadow(0 22px 32px rgba(7, 18, 33, 0.6)) drop-shadow(0 8px 16px rgba(7, 18, 33, 0.4));
+  transform: translateY(-2px) scale(1.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .previewSurface { transition: none; }
+}

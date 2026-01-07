@@ -13,6 +13,13 @@ import {
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 
+type FetchMessagesResult = {
+  messages: DiscordApiMessage[] | null;
+  failureReason?: string;
+  status?: number;
+  errorBody?: string;
+};
+
 const logNotice = (message: string) => {
   console.warn(`[discord-news] ${message}`);
 };
@@ -84,12 +91,13 @@ const resolveAttachmentImage = (message: DiscordApiMessage): {
 const fetchLatestDiscordMessages = async (
   channelId: string,
   token: string,
-): Promise<{ messages: DiscordApiMessage[] | null; failureReason?: string }> => {
+): Promise<FetchMessagesResult> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISCORD_NEWS_REQUEST_TIMEOUT_MS);
   try {
+    const encodedChannelId = encodeURIComponent(channelId);
     const response = await fetch(
-      `${DISCORD_API_BASE_URL}/channels/${channelId}/messages?limit=${DISCORD_NEWS_MAX_PER_CHANNEL}`,
+      `${DISCORD_API_BASE_URL}/channels/${encodedChannelId}/messages?limit=${DISCORD_NEWS_MAX_PER_CHANNEL}`,
       {
         method: "GET",
         headers: {
@@ -102,45 +110,67 @@ const fetchLatestDiscordMessages = async (
     );
 
     const status = response.status;
-    if (status === 401 || status === 403) {
-      logNotice(`Auth error status=${status} channelId=${channelId}`);
-      return { messages: null, failureReason: "authError" };
-    }
-    if (status === 404) {
-      logNotice(`Unknown channel channelId=${channelId}`);
-      return { messages: null, failureReason: "unknownChannel" };
-    }
-    if (status === 429) {
-      const retryAfter = response.headers.get("retry-after");
-      logNotice(
-        `Rate limited status=429 channelId=${channelId} retryAfter=${retryAfter ?? "unknown"}`,
-      );
-      return { messages: null, failureReason: "rateLimited" };
-    }
     if (status !== 200) {
       const bodyText = toSnippet(await response.text());
+      if (status === 401 || status === 403) {
+        logNotice(
+          `Auth error status=${status} channelId=${channelId}${bodyText ? ` body="${bodyText}"` : ""}`,
+        );
+        return { messages: null, failureReason: "authError", status, errorBody: bodyText || undefined };
+      }
+      if (status === 404) {
+        logNotice(
+          `Unknown channel channelId=${channelId}${bodyText ? ` body="${bodyText}"` : ""}`,
+        );
+        return {
+          messages: null,
+          failureReason: "unknownChannel",
+          status,
+          errorBody: bodyText || undefined,
+        };
+      }
+      if (status === 429) {
+        const retryAfter = response.headers.get("retry-after");
+        logNotice(
+          `Rate limited status=429 channelId=${channelId} retryAfter=${retryAfter ?? "unknown"}${bodyText ? ` body="${bodyText}"` : ""}`,
+        );
+        return {
+          messages: null,
+          failureReason: "rateLimited",
+          status,
+          errorBody: bodyText || undefined,
+        };
+      }
       logNotice(`HTTP ${status} channelId=${channelId} body="${bodyText}"`);
-      return { messages: null, failureReason: "httpError" };
+      return { messages: null, failureReason: "httpError", status, errorBody: bodyText || undefined };
     }
 
     const contentType = response.headers.get("content-type") ?? "";
     const rawBody = await response.text();
     if (!contentType.toLowerCase().includes("application/json")) {
-      logNotice(
-        `Non-JSON response status=${status} channelId=${channelId} body="${toSnippet(rawBody)}"`,
-      );
-      return { messages: null, failureReason: "nonJson" };
+      const snippet = toSnippet(rawBody);
+      logNotice(`Non-JSON response status=${status} channelId=${channelId} body="${snippet}"`);
+      return {
+        messages: null,
+        failureReason: "nonJson",
+        status,
+        errorBody: snippet || undefined,
+      };
     }
 
     try {
       return { messages: JSON.parse(rawBody) as DiscordApiMessage[] };
     } catch {
+      const snippet = toSnippet(rawBody);
       logNotice(
-        `Failed to parse JSON status=${status} channelId=${channelId} body="${toSnippet(
-          rawBody,
-        )}"`,
+        `Failed to parse JSON status=${status} channelId=${channelId} body="${snippet}"`,
       );
-      return { messages: null, failureReason: "parseFailed" };
+      return {
+        messages: null,
+        failureReason: "parseFailed",
+        status,
+        errorBody: snippet || undefined,
+      };
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -389,6 +419,68 @@ export const fetchLatestDiscordMessageWithDiagnostics = async (
   }
 
   return { item, diagnostics };
+};
+
+export const fetchDiscordNewsItemsForChannelWithDiagnostics = async (
+  channelId: string,
+  token: string,
+): Promise<{
+  items: DiscordNewsItem[];
+  diagnostics: {
+    channelId: string;
+    fetched: number;
+    usable: number;
+    reason?: string;
+    status?: number;
+    errorBody?: string;
+  };
+}> => {
+  const { messages, failureReason, status, errorBody } = await fetchLatestDiscordMessages(
+    channelId,
+    token,
+  );
+  if (!messages) {
+    return {
+      items: [],
+      diagnostics: {
+        channelId,
+        fetched: 0,
+        usable: 0,
+        reason: failureReason ?? "fetchFailed",
+        status,
+        errorBody,
+      },
+    };
+  }
+
+  const items: DiscordNewsItem[] = [];
+  let usableCount = 0;
+  let lastRejectedReason: string | undefined;
+
+  for (const message of messages) {
+    const evaluation = evaluateMessage(message);
+    if (!evaluation.usable) {
+      lastRejectedReason = evaluation.reason;
+      continue;
+    }
+    const item = buildNewsItem(message, evaluation.contentText, evaluation.imageUrl);
+    if (!item) {
+      lastRejectedReason = "missingFields";
+      continue;
+    }
+    usableCount += 1;
+    items.push(item);
+  }
+
+  return {
+    items,
+    diagnostics: {
+      channelId,
+      fetched: messages.length,
+      usable: usableCount,
+      reason: usableCount === 0 ? lastRejectedReason ?? "noUsable" : undefined,
+    },
+  };
 };
 
 export const fetchDiscordNewsItemsForChannel = async (

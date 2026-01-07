@@ -5,13 +5,25 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview
+## Overview {#overview}
+
 Placeholder overview for the Legendary Dungeon section.
 
-## Highlights
+### Highlights
+
 - Add key entries here.
 - Link related guides.
 
-## Tips
+### Tips
+
 - Add helpful notes or reminders.
 
+## SFDataHub Content {#sfdatahub-content}
+
+## TavernDiscord FAQ {#taverndiscord-faq}
+
+## Notes {#notes}
+
+## Changelog {#changelog}
+
+## Sources {#sources}
