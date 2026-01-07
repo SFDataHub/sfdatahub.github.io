@@ -14,9 +14,13 @@
     "license": "Lizenzen",
     "help": "Hilfe",
     "tools": "Tools",
-    "community": "Community"
+    "community": "Community",
+    "creatorHub": "Creator Hub",
+    "settings": "Einstellungen"
   },
   "home": {
+    "title": "Start",
+    "subtitle": "Willkommen zurueck",
     "historybook": {
       "title": "Historybook",
       "credit": "Historybook - erstellt von Resist 2 Exist & DonMuErte",
@@ -31,10 +35,62 @@
       "previewAlt": "GuideHub Vorschau",
       "open": "GuideHub oeffnen"
     },
+    "sftools": {
+      "title": "SFTools",
+      "subtitle": "Tools & Ressourcen",
+      "previewAlt": "SFTools Vorschau"
+    },
+    "taverndiscord": {
+      "title": "Tavern Discord",
+      "subtitle": "Community-Discord",
+      "previewAlt": "Tavern Discord Vorschau"
+    },
     "news": {
       "title": "Community-News",
       "empty": "Noch keine Neuigkeiten.",
-      "openOnDiscord": "Auf Discord öffnen"
+      "emptyChannel": "Keine aktuellen News in diesem Kanal.",
+      "openOnDiscord": "Auf Discord oeffnen",
+      "prev": "Vorheriger Kanal",
+      "next": "Naechster Kanal"
+    },
+    "youtube": {
+      "title": "YouTube",
+      "prev": "Vorheriges Video",
+      "next": "Naechstes Video",
+      "empty": "Keine Videos"
+    },
+    "live": {
+      "title": "Jetzt live",
+      "none": "Niemand ist gerade live.",
+      "open_on_twitch": "Auf Twitch oeffnen",
+      "badge": "LIVE",
+      "viewers": "{{viewers}} Zuschauer",
+      "prev": "Vorheriger Stream",
+      "next": "Naechster Stream"
+    },
+    "schedule": {
+      "open": "Streaming-Plan anzeigen",
+      "title": "Streaming-Plan",
+      "close": "Schliessen",
+      "platform": "Plattform",
+      "platformAll": "Alle",
+      "platformTwitch": "Twitch",
+      "platformYouTube": "YouTube",
+      "search": "Suche",
+      "searchPlaceholder": "Streamer / Titel",
+      "today": "Nur heute",
+      "columns": {
+        "weekday": "Wochentag",
+        "start": "Start (UTC)",
+        "end": "Ende (UTC)",
+        "timezone": "Zeitzone",
+        "platform": "Plattform",
+        "channel": "Kanal-URL",
+        "streamer": "Streamer",
+        "title": "Titel"
+      },
+      "empty": "Noch kein Streaming-Plan.",
+      "link": "Link"
     }
   },
   "servers": {

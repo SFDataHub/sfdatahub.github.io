@@ -20,6 +20,7 @@ type Props = {
   leftWidth?: number | string;      // 0 = keine linke Spalte
   rightWidth?: number | string;     // 0 = keine rechte Spalte
   stickyRails?: boolean;
+  leftFullHeight?: boolean;
 
   mode?: "page" | "card";
   outerPadding?: string;
@@ -53,6 +54,7 @@ export default function ContentShell({
   leftWidth = 0,
   rightWidth = 0,
   stickyRails = true,
+  leftFullHeight = false,
 
   mode = "card",
   outerPadding = "px-4 py-3",
@@ -134,8 +136,9 @@ export default function ContentShell({
               ...RAIL,
               position: stickyRails ? ("sticky" as const) : "static",
               top: stickyRails ? "1rem" : undefined,
-              alignSelf: "start",
-              height: "fit-content",
+              alignSelf: leftFullHeight ? "stretch" : "start",
+              height: leftFullHeight ? "100%" : "fit-content",
+              minHeight: leftFullHeight ? 0 : undefined,
             }}
           >
             {left}
@@ -196,8 +199,9 @@ export default function ContentShell({
                     ...RAIL,
                     position: stickyRails ? ("sticky" as const) : "static",
                     top: stickyRails ? "1rem" : undefined,
-                    alignSelf: "start",
-                    height: "fit-content",
+                    alignSelf: leftFullHeight ? "stretch" : "start",
+                    height: leftFullHeight ? "100%" : "fit-content",
+                    minHeight: leftFullHeight ? 0 : undefined,
                   }}
                 >
                   {left}

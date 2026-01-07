@@ -26,15 +26,45 @@ const parseTtlSeconds = (
   return Math.floor(parsed);
 };
 
-const parseChannelIds = (value?: string): string[] | null => {
+const CHANNEL_ID_PATTERN = /^\d{17,20}$/;
+
+const parseChannelIds = (value?: string): { valid: string[]; invalid: string[] } | null => {
   if (!value) return null;
-  try {
-    const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return null;
-    return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
-  } catch {
-    return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let entries: unknown[];
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return null;
+      entries = parsed;
+    } catch {
+      return null;
+    }
+  } else {
+    entries = trimmed.split(/[,\s]+/);
   }
+
+  const valid: string[] = [];
+  const invalid: string[] = [];
+
+  for (const entry of entries) {
+    if (typeof entry !== "string") {
+      const raw = String(entry ?? "").trim();
+      if (raw) invalid.push(raw);
+      continue;
+    }
+    const id = entry.trim();
+    if (!id) continue;
+    if (CHANNEL_ID_PATTERN.test(id)) {
+      valid.push(id);
+    } else {
+      invalid.push(id);
+    }
+  }
+
+  return { valid, invalid };
 };
 
 const parseChannelLabels = (value?: string): Record<string, string> => {
@@ -80,12 +110,20 @@ export const latestDiscordNewsByChannelHandler = async (req: Request, res: Respo
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  const channelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
-  if (!channelIds || channelIds.length === 0) {
+  const parsedChannelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
+  if (!parsedChannelIds || parsedChannelIds.valid.length === 0) {
     console.error("[discord-news] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(500).json({ error: "missing_config" });
   }
+
+  if (parsedChannelIds.invalid.length > 0) {
+    parsedChannelIds.invalid.forEach((channelId) => {
+      console.warn(`[discord-news] ch=${channelId} reason=invalidChannelIdFormat`);
+    });
+  }
+
+  const channelIds = parsedChannelIds.valid;
 
   const token = DISCORD_NEWS_BOT_TOKEN;
   if (!token) {

@@ -25,7 +25,10 @@ export type GuideSelection = {
   sub2?: string;
 };
 
-const RAW_MARKDOWN = import.meta.glob("../../content/guidehub-v2/**/*.md", { as: "raw" });
+const RAW_MARKDOWN = import.meta.glob("../../content/guidehub-v2/**/*.md", {
+  query: "?raw",
+  import: "default",
+});
 const CACHE = new Map<string, Promise<MarkdownDoc | null>>();
 
 const EMPTY_FRONTMATTER: Frontmatter = {
@@ -157,9 +160,8 @@ function buildHtml(body: string): { html: string; toc: TocItem[] } {
     }
   };
 
-  const uniqueId = (text: string) => {
-    const base = slugify(text) || "section";
-    let id = base;
+  const uniqueId = (base: string) => {
+    let id = base || "section";
     let i = 1;
     while (usedIds.has(id)) {
       id = `${base}-${i}`;
@@ -167,6 +169,13 @@ function buildHtml(body: string): { html: string; toc: TocItem[] } {
     }
     usedIds.add(id);
     return id;
+  };
+
+  const extractAnchor = (text: string) => {
+    const match = text.match(/\s*\{#([a-zA-Z0-9\-_]+)\}\s*$/);
+    if (!match) return { text, anchor: null as string | null };
+    const cleaned = text.replace(match[0], "").trimEnd();
+    return { text: cleaned, anchor: match[1] };
   };
 
   for (const line of lines) {
@@ -187,16 +196,28 @@ function buildHtml(body: string): { html: string; toc: TocItem[] } {
     if (headingMatch) {
       closeList();
       const level = headingMatch[1].length;
-      const text = headingMatch[2].trim();
+      const rawText = headingMatch[2].trim();
+      const { text, anchor } = extractAnchor(rawText);
       const content = inlineMarkdown(text);
+      const baseId = anchor || slugify(text) || "section";
       if (level === 2) {
-        const id = uniqueId(text);
+        const id = uniqueId(baseId);
         toc.push({ id, text });
         html.push(`<h2 id="${id}">${content}</h2>`);
       } else if (level === 1) {
-        html.push(`<h1>${content}</h1>`);
+        if (anchor) {
+          const id = uniqueId(baseId);
+          html.push(`<h1 id="${id}">${content}</h1>`);
+        } else {
+          html.push(`<h1>${content}</h1>`);
+        }
       } else {
-        html.push(`<h3>${content}</h3>`);
+        if (anchor) {
+          const id = uniqueId(baseId);
+          html.push(`<h3 id="${id}">${content}</h3>`);
+        } else {
+          html.push(`<h3>${content}</h3>`);
+        }
       }
       continue;
     }

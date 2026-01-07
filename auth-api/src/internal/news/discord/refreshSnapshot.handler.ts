@@ -8,7 +8,7 @@ import {
   UPLOAD_INBOX_TOKEN,
 } from "../../../config";
 import { db } from "../../../firebase";
-import { fetchDiscordNewsItemsForChannel } from "../../../public/news/discord/discord.client";
+import { fetchDiscordNewsItemsForChannelWithDiagnostics } from "../../../public/news/discord/discord.client";
 import type { DiscordNewsByChannelEntry, DiscordNewsItem } from "../../../public/news/discord/types";
 
 const INTERNAL_HEADER = "x-internal-token";
@@ -16,16 +16,45 @@ const SNAPSHOT_COLLECTION = "stats_public";
 const SNAPSHOT_DOC = "news_latestByChannel";
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 const CONTENT_TEXT_MAX = 600;
+const CHANNEL_ID_PATTERN = /^\d{17,20}$/;
 
-const parseChannelIds = (value?: string): string[] | null => {
+const parseChannelIds = (value?: string): { valid: string[]; invalid: string[] } | null => {
   if (!value) return null;
-  try {
-    const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return null;
-    return parsed.map((entry) => String(entry)).filter((entry) => entry.length > 0);
-  } catch {
-    return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let entries: unknown[];
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return null;
+      entries = parsed;
+    } catch {
+      return null;
+    }
+  } else {
+    entries = trimmed.split(/[,\s]+/);
   }
+
+  const valid: string[] = [];
+  const invalid: string[] = [];
+
+  for (const entry of entries) {
+    if (typeof entry !== "string") {
+      const raw = String(entry ?? "").trim();
+      if (raw) invalid.push(raw);
+      continue;
+    }
+    const id = entry.trim();
+    if (!id) continue;
+    if (CHANNEL_ID_PATTERN.test(id)) {
+      valid.push(id);
+    } else {
+      invalid.push(id);
+    }
+  }
+
+  return { valid, invalid };
 };
 
 const parseChannelLabels = (value?: string): Record<string, string> => {
@@ -77,6 +106,29 @@ const buildHash = (items: DiscordNewsByChannelEntry[]): string => {
   return createHash("sha256").update(raw).digest("hex");
 };
 
+type SnapshotDiagnostics = {
+  channelId: string;
+  fetched: number;
+  usable: number;
+  picked: string | null;
+  reason?: string;
+  status?: number;
+  errorBody?: string;
+};
+
+const logSnapshotDiagnostics = (diagnostics: SnapshotDiagnostics): void => {
+  const picked = diagnostics.picked ?? "none";
+  const statusText = diagnostics.status ? ` status=${diagnostics.status}` : "";
+  const reasonText = diagnostics.reason ? ` reason=${diagnostics.reason}` : "";
+  const bodyText = diagnostics.errorBody ? ` body="${diagnostics.errorBody}"` : "";
+  const line = `[news-snapshot] ch=${diagnostics.channelId} fetched=${diagnostics.fetched} usable=${diagnostics.usable} picked=${picked}${statusText}${reasonText}${bodyText}`;
+  if (diagnostics.reason) {
+    console.warn(line);
+  } else {
+    console.info(line);
+  }
+};
+
 export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Response) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method_not_allowed" });
@@ -91,8 +143,8 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const channelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
-  if (!channelIds || channelIds.length === 0) {
+  const parsedChannelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
+  if (!parsedChannelIds || (parsedChannelIds.valid.length === 0 && parsedChannelIds.invalid.length === 0)) {
     console.error("[news-snapshot] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
     return res.status(500).json({ error: "missing_config" });
   }
@@ -104,10 +156,30 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
   }
 
   const labels = parseChannelLabels(DISCORD_NEWS_CHANNEL_LABELS);
-  const items = await Promise.all(
-    channelIds.map(async (channelId) => {
-      const channelItems = await fetchDiscordNewsItemsForChannel(channelId, botToken);
-      const latestItem = selectLatestItem(channelItems);
+
+  const invalidEntries: DiscordNewsByChannelEntry[] = parsedChannelIds.invalid.map((channelId) => {
+    logSnapshotDiagnostics({
+      channelId,
+      fetched: 0,
+      usable: 0,
+      picked: null,
+      reason: "invalidChannelIdFormat",
+    });
+    return {
+      channelId,
+      label: labels[channelId] ?? channelId,
+      item: null,
+    };
+  });
+
+  const validEntries = await Promise.all(
+    parsedChannelIds.valid.map(async (channelId) => {
+      const result = await fetchDiscordNewsItemsForChannelWithDiagnostics(channelId, botToken);
+      const latestItem = selectLatestItem(result.items);
+      logSnapshotDiagnostics({
+        ...result.diagnostics,
+        picked: latestItem?.id ?? null,
+      });
       const entry: DiscordNewsByChannelEntry = {
         channelId,
         label: labels[channelId] ?? channelId,
@@ -116,6 +188,8 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
       return entry;
     }),
   );
+
+  const items = [...invalidEntries, ...validEntries];
 
   const hash = buildHash(items);
   const docRef = db.collection(SNAPSHOT_COLLECTION).doc(SNAPSHOT_DOC);
