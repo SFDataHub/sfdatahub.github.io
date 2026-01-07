@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import FeaturedPreviewCard from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard";
 import FeaturedPreviewRow from "../components/wrapper/home/FeaturedPreviewRow/FeaturedPreviewRow";
+import featuredPreviewCardStyles from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard.module.css";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
 import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
@@ -810,6 +811,7 @@ const Home: React.FC = () => {
               subtitle={t("home.guidehub.subtitle")}
               previewImageSrc={guideHubLogo}
               previewAlt={t("home.guidehub.previewAlt")}
+              className={featuredPreviewCardStyles.guidehubScale}
               i18nScope="home.guidehub"
               titleI18nKey="home.guidehub.title"
               subtitleI18nKey="home.guidehub.subtitle"

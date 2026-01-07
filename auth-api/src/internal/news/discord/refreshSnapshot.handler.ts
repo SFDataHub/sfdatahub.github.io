@@ -65,8 +65,9 @@ const parseChannelLabels = (value?: string): Record<string, string> => {
       return {};
     }
     return Object.entries(parsed).reduce<Record<string, string>>((acc, [key, val]) => {
+      const normalizedKey = String(key ?? "").trim();
       const label = String(val ?? "").trim();
-      if (label) acc[key] = label;
+      if (normalizedKey && label) acc[normalizedKey] = label;
       return acc;
     }, {});
   } catch {
@@ -97,6 +98,45 @@ const normalizeItem = (item: DiscordNewsItem | null): DiscordNewsItem | null => 
     ...item,
     contentText,
   };
+};
+
+const normalizeLabelToken = (value: string): string => {
+  const cleaned = value.replace(/^#+/, "").trim();
+  if (!cleaned) return "";
+  const parts = cleaned.split(/[\s_-]+/).filter(Boolean);
+  return parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const extractLabelFromText = (value?: string | null): string | null => {
+  if (!value) return null;
+  const match = value.match(/#([a-z0-9][a-z0-9_-]{1,50})/i);
+  if (!match) return null;
+  const normalized = normalizeLabelToken(match[1]);
+  return normalized || null;
+};
+
+const resolveLabel = (
+  channelId: string,
+  labels: Record<string, string>,
+  item: DiscordNewsItem | null,
+  debugEnabled: boolean,
+): string => {
+  const mapped = labels[channelId];
+  if (mapped && mapped.trim().length > 0) {
+    return mapped;
+  }
+  const fallback =
+    (item ? extractLabelFromText(item.contentText) : null) ??
+    (item ? extractLabelFromText(item.author) : null);
+  if (debugEnabled) {
+    const fallbackSource = fallback ? "metadata" : "channelId";
+    console.warn(
+      `[news-snapshot] missingLabelMapping channelId=${channelId} fallback=${fallbackSource}`,
+    );
+  }
+  return fallback ?? channelId;
 };
 
 const buildHash = (items: DiscordNewsByChannelEntry[]): string => {
@@ -143,6 +183,9 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
     return res.status(401).json({ error: "unauthorized" });
   }
 
+  const debugKey = process.env.DISCORD_NEWS_DEBUG_KEY;
+  const debugEnabled = Boolean(debugKey) && req.header("X-Admin-Key") === debugKey;
+
   const parsedChannelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
   if (!parsedChannelIds || (parsedChannelIds.valid.length === 0 && parsedChannelIds.invalid.length === 0)) {
     console.error("[news-snapshot] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
@@ -182,7 +225,7 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
       });
       const entry: DiscordNewsByChannelEntry = {
         channelId,
-        label: labels[channelId] ?? channelId,
+        label: resolveLabel(channelId, labels, latestItem, debugEnabled),
         item: normalizeItem(latestItem),
       };
       return entry;

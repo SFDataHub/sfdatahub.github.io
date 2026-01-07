@@ -93,6 +93,10 @@ service cloud.firestore {
         allow create, update: if isImporter();
         allow delete: if false;
       }
+      match /history_monthly/{ym}/snapshots/{docId} {
+        allow read: if true;
+        allow write: if isImporter();
+      }
     }
 
     // ---------- Links ----------
