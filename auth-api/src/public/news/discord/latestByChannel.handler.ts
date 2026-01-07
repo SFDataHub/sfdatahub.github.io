@@ -75,8 +75,9 @@ const parseChannelLabels = (value?: string): Record<string, string> => {
       return {};
     }
     return Object.entries(parsed).reduce<Record<string, string>>((acc, [key, val]) => {
+      const normalizedKey = String(key ?? "").trim();
       const label = String(val ?? "").trim();
-      if (label) acc[key] = label;
+      if (normalizedKey && label) acc[normalizedKey] = label;
       return acc;
     }, {});
   } catch {
