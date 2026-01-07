@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
 
 # Gemini CLI project config (local only)
 GEMINI.md
@@ -19,6 +20,7 @@ GEMINI.md
 # Editor/OS
 .vscode/*
 !.vscode/extensions.json
+.history
 .idea
 .DS_Store
 *.suo

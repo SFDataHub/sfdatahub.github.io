@@ -1,5 +1,14 @@
 // src/lib/import/csv.ts
-import { writeBatch, doc, serverTimestamp, getDoc, setDoc } from "firebase/firestore";
+import {
+  writeBatch,
+  doc,
+  serverTimestamp,
+  getDoc,
+  setDoc,
+  runTransaction,
+  collection,
+  getDocs,
+} from "firebase/firestore";
 import { deriveForPlayer } from "../../../tools/playerDerivedHelpers";
 import { db } from "../firebase";
 
@@ -544,6 +553,52 @@ const PLAYERS_INDEX_COL = "stats_index_players_daily_compact";
 const BATCH_SCANS = 120;   // viele, mittelgross
 const BATCH_LATEST = 40;   // gross (alle Felder) -> kleine Batches
 const BATCH_HISTORY = 120; // aggregiert, moderat
+const PLAYER_DERIVED_SNAPSHOT_LIMIT = 500;
+
+type PlayerDerivedSnapshotEntry = {
+  playerId: string;
+  server: string;
+  name: string;
+  class: string;
+  guild: string | null;
+  lastScan: string | null;
+  level: number | null;
+  con: number | null;
+  main: number | null;
+  mine: number | null;
+  ratio: number | null;
+  sum: number | null;
+  treasury: number | null;
+  deltaRank: number | null;
+  deltaSum: number | null;
+};
+
+type LatestCacheEntry = { prevSec: number; exists: boolean };
+
+const toFiniteNumberOrNull = (value: any): number | null => {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
+
+const normalizeServerHost = (value: any) => String(value ?? "").trim().toLowerCase();
+
+async function loadServerHostMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const snap = await getDocs(collection(db, "servers"));
+    snap.forEach((docSnap) => {
+      const data: any = docSnap.data();
+      const host = normalizeServerHost(data?.host);
+      if (host) map.set(host, docSnap.id);
+    });
+  } catch (error) {
+    console.warn("[ImportCsv] Failed to load server host map", { error });
+  }
+  return map;
+}
 
 async function commitBatched(
   docs: Array<(b: ReturnType<typeof writeBatch>) => void>,
@@ -664,13 +719,12 @@ async function writeScansWithResults(
 
 async function writeLatestAndDerived(
   latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
-  derivedDocs: Array<{ pid: string; data: any }>,
   indexDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
   onProgress?: ImportCsvOptions["onProgress"]
 ) {
-  if (!latestDocs.length && !derivedDocs.length && !indexDocs.length) return;
+  if (!latestDocs.length && !indexDocs.length) return;
 
-  const total = latestDocs.length + derivedDocs.length + indexDocs.length;
+  const total = latestDocs.length + indexDocs.length;
   const bulkWriterFactory = (db as any).bulkWriter;
 
   if (typeof bulkWriterFactory === "function") {
@@ -678,8 +732,6 @@ async function writeLatestAndDerived(
     onProgress?.({ phase: "prepare", current: 0, total, pass: "latest" });
 
     for (const { ref, data } of latestDocs) writer.set(ref, data, { merge: true });
-    for (const { pid, data } of derivedDocs)
-      writer.set(doc(db, `${PLAYER_DERIVED_COL}/${pid}`), data, { merge: true });
     for (const { ref, data } of indexDocs) writer.set(ref, data, { merge: true });
 
     onProgress?.({ phase: "write", current: total, total, pass: "latest" });
@@ -691,16 +743,88 @@ async function writeLatestAndDerived(
   const latestBatchers = latestDocs.map(({ ref, data }) => (b: ReturnType<typeof writeBatch>) =>
     b.set(ref, data, { merge: true })
   );
-  const derivedBatchers = derivedDocs.map(({ pid, data }) => (b: ReturnType<typeof writeBatch>) =>
-    b.set(doc(db, `${PLAYER_DERIVED_COL}/${pid}`), data, { merge: true })
-  );
   const indexBatchers = indexDocs.map(({ ref, data }) => (b: ReturnType<typeof writeBatch>) =>
     b.set(ref, data, { merge: true })
   );
 
   await commitBatched(latestBatchers, BATCH_LATEST, "latest", onProgress);
-  await commitBatched(derivedBatchers, BATCH_LATEST, "latest", onProgress);
   await commitBatched(indexBatchers, BATCH_LATEST, "latest", onProgress);
+}
+
+async function upsertPlayerDerivedServerSnapshot(
+  serverKey: string,
+  entries: PlayerDerivedSnapshotEntry[]
+) {
+  if (!entries.length) return;
+
+  const snapshotKey = String(serverKey || "all").trim() || "all";
+  const snapshotRef = doc(db, `${PLAYER_DERIVED_COL}/${toSnapshotDocId(snapshotKey)}`);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(snapshotRef);
+    const existing = snap.exists() ? snap.data()?.players : null;
+    const byId = new Map<string, PlayerDerivedSnapshotEntry>();
+
+    if (Array.isArray(existing)) {
+      for (const raw of existing) {
+        if (!raw || typeof raw !== "object") continue;
+        const pid = String((raw as any).playerId ?? "");
+        if (!pid) continue;
+        byId.set(pid, raw as PlayerDerivedSnapshotEntry);
+      }
+    }
+
+    const findLowest = () => {
+      let minId: string | null = null;
+      let minSum = Number.POSITIVE_INFINITY;
+      for (const [pid, entry] of byId.entries()) {
+        const sum = toFiniteNumberOrNull(entry.sum) ?? 0;
+        if (sum < minSum) {
+          minSum = sum;
+          minId = pid;
+        }
+      }
+      return { minId, minSum };
+    };
+
+    for (const entry of entries) {
+      const pid = String(entry.playerId ?? "");
+      if (!pid) continue;
+
+      if (byId.has(pid)) {
+        byId.set(pid, entry);
+        continue;
+      }
+
+      if (byId.size < PLAYER_DERIVED_SNAPSHOT_LIMIT) {
+        byId.set(pid, entry);
+        continue;
+      }
+
+      const entrySum = toFiniteNumberOrNull(entry.sum) ?? 0;
+      const { minId, minSum } = findLowest();
+      if (minId && entrySum > minSum) {
+        byId.delete(minId);
+        byId.set(pid, entry);
+      }
+    }
+
+    const players = Array.from(byId.values());
+    players.sort((a, b) => {
+      const diff = (toFiniteNumberOrNull(b.sum) ?? 0) - (toFiniteNumberOrNull(a.sum) ?? 0);
+      if (diff !== 0) return diff;
+      return String(a.playerId ?? "").localeCompare(String(b.playerId ?? ""));
+    });
+    if (players.length > PLAYER_DERIVED_SNAPSHOT_LIMIT) {
+      players.length = PLAYER_DERIVED_SNAPSHOT_LIMIT;
+    }
+
+    tx.set(
+      snapshotRef,
+      { server: snapshotKey, updatedAt: serverTimestamp(), players },
+      { merge: true }
+    );
+  });
 }
 
 /** ---- Aggregation ---- */
@@ -740,33 +864,49 @@ function aggregateValues(rowsSortedAsc: RowMeta[], allHeaders: string[]): Record
 }
 
 /** ---- Helper: vorhandenen latest-Zeitpunkt robust lesen (Sekunden) ---- */
-async function readPrevLatestSec(latestRef: ReturnType<typeof doc>): Promise<number> {
+async function readPrevLatestSec(
+  latestRef: ReturnType<typeof doc>,
+  cache?: Map<string, LatestCacheEntry>
+): Promise<number> {
+  const cacheKey = latestRef.path;
+  const cached = cache?.get(cacheKey);
+  if (cached) return cached.prevSec;
+
   const snap = await getDoc(latestRef);
-  if (!snap.exists()) return 0;
+  if (!snap.exists()) {
+    cache?.set(cacheKey, { prevSec: 0, exists: false });
+    return 0;
+  }
   const d: any = snap.data();
+  let prevSec: number | null = null;
 
   // bevorzugt: CSV-String in values.Timestamp
   if (d?.values?.Timestamp != null) {
     const s = toSecFlexible(d.values.Timestamp);
-    if (s != null) return s;
+    if (s != null) prevSec = s;
   }
 
   // optional: timestampRaw (falls vorhanden)
-  if (d?.timestampRaw != null) {
+  if (prevSec == null && d?.timestampRaw != null) {
     const s = toSecFlexible(d.timestampRaw);
-    if (s != null) return s;
+    if (s != null) prevSec = s;
   }
 
   // Fallbacks: ts / timestamp
-  if (typeof d?.ts === "number") return d.ts;
+  if (prevSec == null && typeof d?.ts === "number") prevSec = d.ts;
 
   const v = d?.timestamp;
-  if (typeof v === "number") return v > 9_999_999_999 ? Math.floor(v / 1000) : v;
-  if (typeof v === "string") {
-    const p = Date.parse(v);
-    return Number.isFinite(p) ? Math.floor(p / 1000) : 0;
+  if (prevSec == null && typeof v === "number") {
+    prevSec = v > 9_999_999_999 ? Math.floor(v / 1000) : v;
   }
-  return 0;
+  if (prevSec == null && typeof v === "string") {
+    const p = Date.parse(v);
+    if (Number.isFinite(p)) prevSec = Math.floor(p / 1000);
+  }
+
+  const resolvedPrevSec = prevSec ?? 0;
+  cache?.set(cacheKey, { prevSec: resolvedPrevSec, exists: true });
+  return resolvedPrevSec;
 }
 
 /** ---- Hauptimport ---- */
@@ -807,17 +947,18 @@ export async function importCsvToDB(
     ? ((p: Parameters<NonNullable<ImportCsvOptions["onProgress"]>>[0]) =>
         opts.onProgress?.({ ...p, kind: opts.kind }))
     : undefined;
+  const latestCacheByPath = new Map<string, LatestCacheEntry>();
 
   // ---------- PLAYERS ----------
   if (opts.kind === "players") {
     const playerScanDocs: ScanDoc[] = [];
     const latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }> = [];
-    const derivedDocs: Array<{ pid: string; data: any }> = [];
     const indexByScope = new Map<
       string,
       { dateKey: number; scopeId: string; group: string; serverKey: string; ids: string[]; vals: number[] }
     >();
     const putHistory: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
+    const pendingDerivedByServer = new Map<string, PlayerDerivedSnapshotEntry[]>();
 
     let sourceRows: Row[] = [];
     let sourceHeaders: string[] = [];
@@ -869,6 +1010,11 @@ export async function importCsvToDB(
     playerResults.push(...scanResults);
     counts.writtenScanPlayers = scanResults.filter((r) => r.status === "created").length;
 
+    const serverCodeByHost = await loadServerHostMap();
+    if (!serverCodeByHost.size) {
+      console.warn("[ImportCsv] Server host map empty; derived snapshots will be skipped.");
+    }
+
     for (const [pid, metas] of byPid) {
       metas.sort((a, b) => a.ts - b.ts);
       const last = metas[metas.length - 1];
@@ -886,7 +1032,7 @@ export async function importCsvToDB(
 
       // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
       const latestRef = doc(db, `players/${pid}/latest/latest`);
-      const prevSec = await readPrevLatestSec(latestRef);
+      const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
       if (last.ts > prevSec) {
         const latestUpdatedAt = serverTimestamp();
 
@@ -927,7 +1073,40 @@ export async function importCsvToDB(
           updatedAt: latestUpdatedAt,
         };
         const derived = deriveForPlayer(derivedInput, serverTimestamp);
-        derivedDocs.push({ pid, data: derived });
+        const snapshotServerKey =
+          serverCodeByHost.size > 0 ? serverCodeByHost.get(normalizeServerHost(server)) ?? null : null;
+        if (!snapshotServerKey && serverCodeByHost.size > 0) {
+          console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
+            playerId: pid,
+            server,
+          });
+        }
+        if (snapshotServerKey) {
+          const lastScanRaw = pickByCanon(last.row, COL.PLAYERS.TIMESTAMP);
+          const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
+          const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
+          const snapshotEntry: PlayerDerivedSnapshotEntry = {
+            playerId: String(pid),
+            server: snapshotServerKey,
+            name: String(name ?? ""),
+            class: String(derived.class ?? className ?? ""),
+            guild: guildName ? String(guildName) : null,
+            lastScan: lastScan ? lastScan : null,
+            level: toFiniteNumberOrNull(level ?? derived.level),
+            con: toFiniteNumberOrNull(derived.con),
+            main: toFiniteNumberOrNull(derived.main),
+            mine: toFiniteNumberOrNull(derived.mine),
+            ratio: toFiniteNumberOrNull(derived.ratio),
+            sum: toFiniteNumberOrNull(derived.sum),
+            treasury: toFiniteNumberOrNull(derived.treasury),
+            deltaRank: null,
+            deltaSum: null,
+          };
+          if (!pendingDerivedByServer.has(snapshotServerKey)) {
+            pendingDerivedByServer.set(snapshotServerKey, []);
+          }
+          pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
+        }
 
         const dateKey = dateKeyFromSec(last.ts);
         const scopes = [
@@ -1049,7 +1228,29 @@ export async function importCsvToDB(
       });
     }
 
-    await writeLatestAndDerived(latestDocs, derivedDocs, indexDocs, emitProgress);
+    await writeLatestAndDerived(latestDocs, indexDocs, emitProgress);
+    const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+    if (pendingSnapshotKeys.length) {
+      console.log("[ImportCsv] Derived snapshot flush pending", {
+        count: pendingSnapshotKeys.length,
+        servers: pendingSnapshotKeys,
+      });
+    }
+    const flushedDocIds: string[] = [];
+    for (const [serverKey, entries] of pendingDerivedByServer.entries()) {
+      try {
+        await upsertPlayerDerivedServerSnapshot(serverKey, entries);
+        flushedDocIds.push(toSnapshotDocId(serverKey));
+      } catch (error) {
+        console.warn("[ImportCsv] Derived snapshot upsert failed", { serverKey, error });
+      }
+    }
+    if (pendingSnapshotKeys.length) {
+      console.log("[ImportCsv] Derived snapshot flush done", {
+        count: flushedDocIds.length,
+        docs: flushedDocIds,
+      });
+    }
     await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
   }
 
@@ -1123,7 +1324,7 @@ export async function importCsvToDB(
 
       // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
       const latestRef = doc(db, `guilds/${gid}/latest/latest`);
-      const prevSec = await readPrevLatestSec(latestRef);
+      const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
       if (last.ts > prevSec) {
         putLatest.push((batch) => {
           batch.set(
