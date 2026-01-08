@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { getTimestamp, makeKeyFromTemplate, nowServerTimestamp } from "./db";
 import { bestId, headerValue, normalizeServer } from "./preprocess";
+import { traceGetDoc } from "../debug/firestoreReadTrace";
 
 const MAX_OPS = 450; // Firestore limit < 500
 
@@ -100,7 +101,12 @@ export async function upsertRows(
 
     // upsert into latest: only if ts is newer
     try {
-      const latestSnap = await getDoc(latestRef);
+      const latestSnap = await traceGetDoc(
+        null,
+        latestRef,
+        () => getDoc(latestRef),
+        { label: "ImportUpsert:latest" },
+      );
 
       // *** EINZIGE ERGÄNZUNG ggü. deiner alten Datei: robustes prevTs ***
       // 1) bevorzugt d.values.Timestamp (CSV-String im latest)

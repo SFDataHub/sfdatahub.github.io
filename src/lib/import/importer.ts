@@ -5,6 +5,7 @@
 
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { traceGetDoc } from "../debug/firestoreReadTrace";
 
 export type CSVRow = Record<string, any>;
 
@@ -219,7 +220,12 @@ const isDuplicatePermissionError = (error: unknown): boolean => {
 // ---- NEU (nur für dein gewünschtes Verhalten): helper zum Lesen ----
 async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|null, raw: string|null}> {
   const ref = doc(db, `guilds/${gid}/latest/latest`);
-  const snap = await getDoc(ref);
+  const snap = await traceGetDoc(
+    null,
+    ref,
+    () => getDoc(ref),
+    { label: "ImportGuildSnapshots:latest" },
+  );
   if (!snap.exists()) return { sec: null, raw: null };
   const d: any = snap.data() || {};
   const raw: string | null = d.timestampRaw ?? d.values?.Timestamp ?? null;
@@ -235,7 +241,12 @@ async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|n
 
 async function readPrevSnapshotSec(gid: string): Promise<number> {
   const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-  const snap = await getDoc(ref);
+  const snap = await traceGetDoc(
+    null,
+    ref,
+    () => getDoc(ref),
+    { label: "ImportGuildSnapshots:prevSnapshot" },
+  );
   if (!snap.exists()) return 0;
   const d: any = snap.data() || {};
   if (typeof d.updatedAtMs === "number") return Math.floor(d.updatedAtMs / 1000);

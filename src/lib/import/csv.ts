@@ -3,14 +3,17 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
-  getDoc,
   setDoc,
   runTransaction,
   collection,
+  getDoc,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 import { deriveForPlayer } from "../../../tools/playerDerivedHelpers";
 import { db } from "../firebase";
+import { traceGetDoc, traceGetDocs } from "../debug/firestoreReadTrace";
 
 /** ---- Public types ---- */
 export type ImportCsvKind = "players" | "guilds";
@@ -31,6 +34,7 @@ export type ImportCsvOptions = {
   rows?: Record<string, any>[];
   raw?: string;
   onProgress?: (p: ImportProgress) => void;
+  serverHostMap?: Map<string, string>;
 };
 
 export type ImportRecordStatus = "created" | "duplicate" | "error";
@@ -583,15 +587,43 @@ const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_der
 
 const normalizeServerHost = (value: any) => String(value ?? "").trim().toLowerCase();
 
-async function loadServerHostMap(): Promise<Map<string, string>> {
+const chunkList = <T,>(items: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+};
+
+export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
+  const normalizedHosts = Array.from(
+    new Set(hosts.map((host) => normalizeServerHost(host)).filter((host) => host)),
+  );
+  if (normalizedHosts.length === 0) return map;
   try {
-    const snap = await getDocs(collection(db, "servers"));
-    snap.forEach((docSnap) => {
-      const data: any = docSnap.data();
-      const host = normalizeServerHost(data?.host);
-      if (host) map.set(host, docSnap.id);
-    });
+    const serversRef = collection(db, "servers");
+    const chunks = chunkList(normalizedHosts, 10);
+    for (const chunk of chunks) {
+      const q = query(serversRef, where("host", "in", chunk));
+      const snap = await traceGetDocs(
+        null,
+        { path: serversRef.path },
+        () => getDocs(q),
+        { label: "ImportCsv:serversHostMap" },
+      );
+      snap.forEach((docSnap) => {
+        const data: any = docSnap.data();
+        const host = normalizeServerHost(data?.host);
+        if (host) map.set(host, docSnap.id);
+      });
+    }
+    if (map.size < normalizedHosts.length) {
+      const missing = normalizedHosts.filter((host) => !map.has(host));
+      if (missing.length) {
+        console.warn("[ImportCsv] Server hosts not mapped", { hosts: missing });
+      }
+    }
   } catch (error) {
     console.warn("[ImportCsv] Failed to load server host map", { error });
   }
@@ -759,7 +791,12 @@ async function upsertPlayerDerivedServerSnapshot(
   const snapshotRef = doc(db, `${PLAYER_DERIVED_COL}/${toSnapshotDocId(snapshotKey)}`);
 
   await runTransaction(db, async (tx) => {
-    const snap = await tx.get(snapshotRef);
+    const snap = await traceGetDoc(
+      null,
+      snapshotRef,
+      () => tx.get(snapshotRef),
+      { label: "ImportCsv:derivedSnapshot" },
+    );
     const existing = snap.exists() ? snap.data()?.players : null;
     const byId = new Map<string, PlayerDerivedSnapshotEntry>();
 
@@ -870,7 +907,12 @@ async function readPrevLatestSec(
   const cached = cache?.get(cacheKey);
   if (cached) return cached.prevSec;
 
-  const snap = await getDoc(latestRef);
+  const snap = await traceGetDoc(
+    null,
+    latestRef,
+    () => getDoc(latestRef),
+    { label: "ImportCsv:latestPrev" },
+  );
   if (!snap.exists()) {
     cache?.set(cacheKey, { prevSec: 0, exists: false });
     return 0;
@@ -1008,8 +1050,9 @@ export async function importCsvToDB(
     playerResults.push(...scanResults);
     counts.writtenScanPlayers = scanResults.filter((r) => r.status === "created").length;
 
-    const serverCodeByHost = await loadServerHostMap();
-    if (!serverCodeByHost.size) {
+    const serverCodeByHost =
+      opts.serverHostMap ?? (await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server)));
+    if (!serverCodeByHost.size && parsedPlayers.length > 0) {
       console.warn("[ImportCsv] Server host map empty; derived snapshots will be skipped.");
     }
 
