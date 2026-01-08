@@ -3,6 +3,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import type { AuthUser } from "../auth/types";
 import { getUploadCenterUsage, type UploadCenterUsage } from "./users";
+import { traceGetDoc } from "../debug/firestoreReadTrace";
 
 export type UploadQuotaRoleOverride = {
   enabled?: boolean;
@@ -76,7 +77,12 @@ export async function getUploadQuotaConfigForUser(user: AuthUser | null): Promis
   const ref = doc(db, "upload_quota_config", "default");
 
   try {
-    const snapshot = await getDoc(ref);
+    const snapshot = await traceGetDoc(
+      null,
+      ref,
+      () => getDoc(ref),
+      { label: "UploadQuota:config" },
+    );
     if (!snapshot.exists()) {
       console.warn("[UploadQuota] Missing config document. Using defaults.");
       return DEFAULT_UPLOAD_QUOTA;

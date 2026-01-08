@@ -4,6 +4,7 @@ import {
   type ImportCsvOptions,
   type ImportReport,
   type ImportResultItem,
+  loadServerHostMapByHosts,
 } from "../../lib/import/csv";
 import { writeGuildSnapshotsFromRows } from "../../lib/import/importer";
 import {
@@ -13,7 +14,14 @@ import {
   writeMonthlyDoc,
 } from "../../lib/guilds/monthly";
 import { db } from "../../lib/firebase";
-import { beginReadScope, endReadScope, traceGetDoc, type FirestoreTraceScope } from "../../lib/debug/firestoreReadTrace";
+import {
+  beginReadScope,
+  endReadScope,
+  reportReadSummary,
+  startReadTraceSession,
+  traceGetDoc,
+  type FirestoreTraceScope,
+} from "../../lib/debug/firestoreReadTrace";
 
 type Row = Record<string, any>;
 
@@ -21,6 +29,14 @@ const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
 const pickByCanon = (row: Row, canonKey: string): any => {
   for (const k of Object.keys(row)) if (CANON(k) === canonKey) return row[k];
   return undefined;
+};
+const normalizeServerHost = (value: any) => String(value ?? "").trim().toLowerCase();
+const collectServerHosts = (rows: Row[], target: Set<string>) => {
+  for (const row of rows) {
+    const serverRaw = pickByCanon(row, CANON("Server"));
+    const host = normalizeServerHost(serverRaw);
+    if (host) target.add(host);
+  }
 };
 
 export type ImportSelectionPayload = {
@@ -41,6 +57,12 @@ export async function importSelectionToDb(
   payload: ImportSelectionPayload,
   opts?: { onProgress?: ImportCsvOptions["onProgress"] },
 ): Promise<ImportSelectionResult> {
+  startReadTraceSession("ImportSelection");
+  const serverHosts = new Set<string>();
+  collectServerHosts(payload.playersRows, serverHosts);
+  collectServerHosts(payload.guildsRows, serverHosts);
+  const serverHostMap =
+    serverHosts.size > 0 ? await loadServerHostMapByHosts(Array.from(serverHosts)) : new Map<string, string>();
   const { playersRows, guildsRows } = payload;
   const reports: ImportReport[] = [];
   let players: ImportResultItem[] = [];
@@ -57,6 +79,7 @@ export async function importSelectionToDb(
       kind: "guilds",
       rows: guildsRows,
       onProgress: emitProgress ? (p) => emitProgress(p, "guilds") : undefined,
+      serverHostMap,
     } as ImportCsvOptions);
     reports.push(repGuilds);
     if (Array.isArray(repGuilds.guildResults)) {
@@ -72,6 +95,7 @@ export async function importSelectionToDb(
       kind: "players",
       rows: playersRows,
       onProgress: emitProgress ? (p) => emitProgress(p, "players") : undefined,
+      serverHostMap,
     } as ImportCsvOptions);
     reports.push(repPlayers);
     if (Array.isArray(repPlayers.playerResults)) {
@@ -141,5 +165,6 @@ export async function importSelectionToDb(
     }
   }
 
+  reportReadSummary("ImportSelection");
   return { ok, players, guilds, reports };
 }

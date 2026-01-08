@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { db } from "../firebase";
+import { traceGetDoc } from "../debug/firestoreReadTrace";
 
 export type UploadCenterUsage = {
   date?: string | null;
@@ -25,7 +26,12 @@ export async function getUploadCenterUsage(userId: string | null): Promise<Uploa
   const userRef = doc(db, "users", userId);
 
   try {
-    const snapshot = await getDoc(userRef);
+    const snapshot = await traceGetDoc(
+      null,
+      userRef,
+      () => getDoc(userRef),
+      { label: "UploadCenterUsage:get" },
+    );
     if (!snapshot.exists()) {
       console.warn("[UploadCenterUsage] User document does not exist.", { userId });
       return { date: null, guilds: 0, players: 0 };
@@ -58,7 +64,12 @@ export async function updateUploadCenterUsageForToday(
 
   let snapshot;
   try {
-    snapshot = await getDoc(userRef);
+    snapshot = await traceGetDoc(
+      null,
+      userRef,
+      () => getDoc(userRef),
+      { label: "UploadCenterUsage:update" },
+    );
   } catch (error) {
     console.error("[UploadCenterUsage] Failed to fetch user document.", { userId, error });
     return;
