@@ -15,6 +15,7 @@ export type ParsedCsvPlayer = {
   level?: number;
   className?: string;
   scanTimestampSec: number;
+  values?: Record<string, any>;
 };
 
 export type ParsedCsvGuild = {
@@ -56,6 +57,7 @@ export function buildUploadSessionFromCsv(
       guildId: (p as any).guildId ?? undefined,
       level: p.level,
       className: p.className,
+      values: p.values,
       selected: true,
       status: INITIAL_STATUS,
     };

@@ -569,8 +569,6 @@ type PlayerDerivedSnapshotEntry = {
   ratio: number | null;
   sum: number | null;
   treasury: number | null;
-  deltaRank: number | null;
-  deltaSum: number | null;
 };
 
 type LatestCacheEntry = { prevSec: number; exists: boolean };
@@ -1096,12 +1094,10 @@ export async function importCsvToDB(
             con: toFiniteNumberOrNull(derived.con),
             main: toFiniteNumberOrNull(derived.main),
             mine: toFiniteNumberOrNull(derived.mine),
-            ratio: toFiniteNumberOrNull(derived.ratio),
-            sum: toFiniteNumberOrNull(derived.sum),
-            treasury: toFiniteNumberOrNull(derived.treasury),
-            deltaRank: null,
-            deltaSum: null,
-          };
+          ratio: toFiniteNumberOrNull(derived.ratio),
+          sum: toFiniteNumberOrNull(derived.sum),
+          treasury: toFiniteNumberOrNull(derived.treasury),
+        };
           if (!pendingDerivedByServer.has(snapshotServerKey)) {
             pendingDerivedByServer.set(snapshotServerKey, []);
           }

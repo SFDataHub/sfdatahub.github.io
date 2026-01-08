@@ -406,15 +406,28 @@ function UploadCenterContentBody() {
     const selectedGuilds = activeSession.guilds.filter((g) => g.selected);
     if (!selectedPlayers.length && !selectedGuilds.length) return null;
 
-    const playersRows = selectedPlayers.map((p) => ({
-      Identifier: p.playerId,
-      "Guild Identifier": p.guildId ?? "",
-      Timestamp: p.scanTimestampSec,
-      Server: p.server,
-      Name: p.name,
-      Class: p.className ?? "",
-      Level: p.level ?? "",
-    }));
+    const playersRows = selectedPlayers.map((p) => {
+      if (p.values && typeof p.values === "object") {
+        const row = { ...(p.values as Record<string, any>) };
+        if (row.Identifier == null && row.ID == null) row.Identifier = p.playerId;
+        if (row["Guild Identifier"] == null) row["Guild Identifier"] = p.guildId ?? "";
+        if (row.Timestamp == null) row.Timestamp = p.scanTimestampSec;
+        if (row.Server == null) row.Server = p.server;
+        if (row.Name == null) row.Name = p.name;
+        if (row.Class == null) row.Class = p.className ?? "";
+        if (row.Level == null) row.Level = p.level ?? "";
+        return row;
+      }
+      return {
+        Identifier: p.playerId,
+        "Guild Identifier": p.guildId ?? "",
+        Timestamp: p.scanTimestampSec,
+        Server: p.server,
+        Name: p.name,
+        Class: p.className ?? "",
+        Level: p.level ?? "",
+      };
+    });
 
     const guildsRows = selectedGuilds.map((g) => ({
       "Guild Identifier": g.guildId,

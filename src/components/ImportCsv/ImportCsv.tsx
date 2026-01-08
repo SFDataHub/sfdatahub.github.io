@@ -218,6 +218,7 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
       level: p.level ?? undefined,
       className: p.className ?? undefined,
       scanTimestampSec: p.timestampSec,
+      values: p.raw,
     };
     players.push(player);
 
