@@ -42,5 +42,5 @@
 }
 
 @media (min-width: 1024px) {
-  .track { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .track { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

@@ -16,6 +16,7 @@ export type UploadPlayerPreview = {
   guildId?: string;
   level?: number;
   className?: string;
+  values?: Record<string, any>;
   // More optional fields from CSV can be added later.
   selected: boolean;
   status: UploadRecordStatus;
