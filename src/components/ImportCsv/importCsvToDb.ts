@@ -18,6 +18,7 @@ import {
   beginReadScope,
   endReadScope,
   reportReadSummary,
+  reportWriteSummary,
   startReadTraceSession,
   traceGetDoc,
   type FirestoreTraceScope,
@@ -166,5 +167,6 @@ export async function importSelectionToDb(
   }
 
   reportReadSummary("ImportSelection");
+  reportWriteSummary("ImportSelection");
   return { ok, players, guilds, reports };
 }

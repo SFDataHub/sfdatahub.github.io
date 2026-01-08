@@ -13,7 +13,14 @@ import {
 } from "firebase/firestore";
 import { deriveForPlayer } from "../../../tools/playerDerivedHelpers";
 import { db } from "../firebase";
-import { traceGetDoc, traceGetDocs } from "../debug/firestoreReadTrace";
+import {
+  recordWrite,
+  traceBatchCommit,
+  traceGetDoc,
+  traceGetDocs,
+  traceRunTransaction,
+  traceSetDoc,
+} from "../debug/firestoreReadTrace";
 
 /** ---- Public types ---- */
 export type ImportCsvKind = "players" | "guilds";
@@ -630,8 +637,15 @@ export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<str
   return map;
 }
 
+type BatchWrite = {
+  apply: (b: ReturnType<typeof writeBatch>) => void;
+  path: string;
+  op?: string;
+  label?: string;
+};
+
 async function commitBatched(
-  docs: Array<(b: ReturnType<typeof writeBatch>) => void>,
+  docs: BatchWrite[],
   limit: number,
   passName: "scans" | "latest" | "history",
   onProgress?: ImportCsvOptions["onProgress"]
@@ -640,7 +654,7 @@ async function commitBatched(
   for (let i = 0; i < docs.length; i += limit) {
     const batch = writeBatch(db);
     const slice = docs.slice(i, i + limit);
-    for (const put of slice) put(batch);
+    for (const put of slice) put.apply(batch);
 
     onProgress?.({
       phase: "write",
@@ -649,7 +663,15 @@ async function commitBatched(
       pass: passName,
     });
 
-    await batch.commit();
+    await traceBatchCommit(() => batch.commit(), { label: `ImportCsv:${passName}`, path: `batch:${passName}` });
+    slice.forEach((put) => {
+      recordWrite({
+        path: put.path,
+        op: put.op ?? "setDoc",
+        docCount: 1,
+        label: put.label ?? `ImportCsv:${passName}`,
+      });
+    });
     await new Promise((r) => setTimeout(r, 12));
   }
   onProgress?.({ phase: "done", current: 1, total: 1, pass: passName });
@@ -698,6 +720,7 @@ async function writeScansWithResults(
         .create(ref, data)
         .then(() => {
           created++;
+          recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:scansBulk" });
           results.push({ key, status: "created" });
           tick();
         })
@@ -727,7 +750,7 @@ async function writeScansWithResults(
   // Use per-doc set to avoid whole-batch failures; permission-denied on existing scans is treated as duplicate.
   for (const { ref, data, key } of scans) {
     try {
-      await setDoc(ref, data);
+      await traceSetDoc(ref, () => setDoc(ref, data), { label: "ImportCsv:scansFallback" });
       created++;
       results.push({ key, status: "created" });
     } catch (error: any) {
@@ -766,16 +789,28 @@ async function writeLatestAndDerived(
 
     onProgress?.({ phase: "write", current: total, total, pass: "latest" });
     await writer.close();
+    latestDocs.forEach(({ ref }) =>
+      recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:latestBulk" }),
+    );
+    indexDocs.forEach(({ ref }) =>
+      recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:indexBulk" }),
+    );
     onProgress?.({ phase: "done", current: 1, total: 1, pass: "latest" });
     return;
   }
 
-  const latestBatchers = latestDocs.map(({ ref, data }) => (b: ReturnType<typeof writeBatch>) =>
-    b.set(ref, data, { merge: true })
-  );
-  const indexBatchers = indexDocs.map(({ ref, data }) => (b: ReturnType<typeof writeBatch>) =>
-    b.set(ref, data, { merge: true })
-  );
+  const latestBatchers: BatchWrite[] = latestDocs.map(({ ref, data }) => ({
+    path: ref.path,
+    op: "setDoc",
+    label: "ImportCsv:latest",
+    apply: (b) => b.set(ref, data, { merge: true }),
+  }));
+  const indexBatchers: BatchWrite[] = indexDocs.map(({ ref, data }) => ({
+    path: ref.path,
+    op: "setDoc",
+    label: "ImportCsv:index",
+    apply: (b) => b.set(ref, data, { merge: true }),
+  }));
 
   await commitBatched(latestBatchers, BATCH_LATEST, "latest", onProgress);
   await commitBatched(indexBatchers, BATCH_LATEST, "latest", onProgress);
@@ -790,15 +825,17 @@ async function upsertPlayerDerivedServerSnapshot(
   const snapshotKey = String(serverKey || "all").trim() || "all";
   const snapshotRef = doc(db, `${PLAYER_DERIVED_COL}/${toSnapshotDocId(snapshotKey)}`);
 
-  await runTransaction(db, async (tx) => {
-    const snap = await traceGetDoc(
-      null,
-      snapshotRef,
-      () => tx.get(snapshotRef),
-      { label: "ImportCsv:derivedSnapshot" },
-    );
-    const existing = snap.exists() ? snap.data()?.players : null;
-    const byId = new Map<string, PlayerDerivedSnapshotEntry>();
+  await traceRunTransaction(
+    () =>
+      runTransaction(db, async (tx) => {
+        const snap = await traceGetDoc(
+          null,
+          snapshotRef,
+          () => tx.get(snapshotRef),
+          { label: "ImportCsv:derivedSnapshot" },
+        );
+        const existing = snap.exists() ? snap.data()?.players : null;
+        const byId = new Map<string, PlayerDerivedSnapshotEntry>();
 
     if (Array.isArray(existing)) {
       for (const raw of existing) {
@@ -854,12 +891,14 @@ async function upsertPlayerDerivedServerSnapshot(
       players.length = PLAYER_DERIVED_SNAPSHOT_LIMIT;
     }
 
-    tx.set(
-      snapshotRef,
-      { server: snapshotKey, updatedAt: serverTimestamp(), players },
-      { merge: true }
-    );
-  });
+        tx.set(
+          snapshotRef,
+          { server: snapshotKey, updatedAt: serverTimestamp(), players },
+          { merge: true }
+        );
+      }),
+    { label: "ImportCsv:derivedSnapshot", path: snapshotRef.path },
+  );
 }
 
 /** ---- Aggregation ---- */
@@ -997,7 +1036,7 @@ export async function importCsvToDB(
       string,
       { dateKey: number; scopeId: string; group: string; serverKey: string; ids: string[]; vals: number[] }
     >();
-    const putHistory: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
+    const putHistory: BatchWrite[] = [];
     const pendingDerivedByServer = new Map<string, PlayerDerivedSnapshotEntry[]>();
 
     let sourceRows: Row[] = [];
@@ -1191,24 +1230,29 @@ export async function importCsvToDB(
         const bounds = weekBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        putHistory.push((batch) => {
-          const ref = doc(db, `players/${pid}/history_weekly/${wid}`);
-          batch.set(
-            ref,
-            {
-              playerId: pid,
-              weekId: wid,
-              periodStartSec: bounds.start,
-              periodEndSec: bounds.end,
-              lastTs: lastM.ts,
-              lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
-              server: lastM.parsed.server,
-              name: lastM.parsed.name,
-              values: aggr,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+        const ref = doc(db, `players/${pid}/history_weekly/${wid}`);
+        putHistory.push({
+          path: ref.path,
+          op: "setDoc",
+          label: "ImportCsv:historyWeekly",
+          apply: (batch) => {
+            batch.set(
+              ref,
+              {
+                playerId: pid,
+                weekId: wid,
+                periodStartSec: bounds.start,
+                periodEndSec: bounds.end,
+                lastTs: lastM.ts,
+                lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
+                server: lastM.parsed.server,
+                name: lastM.parsed.name,
+                values: aggr,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          },
         });
         counts.writtenWeeklyPlayers!++;
       }
@@ -1219,24 +1263,29 @@ export async function importCsvToDB(
         const bounds = monthBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        putHistory.push((batch) => {
-          const ref = doc(db, `players/${pid}/history_monthly/${ym}`);
-          batch.set(
-            ref,
-            {
-              playerId: pid,
-              monthId: ym,
-              periodStartSec: bounds.start,
-              periodEndSec: bounds.end,
-              lastTs: lastM.ts,
-              lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
-              server: lastM.parsed.server,
-              name: lastM.parsed.name,
-              values: aggr,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+        const ref = doc(db, `players/${pid}/history_monthly/${ym}`);
+        putHistory.push({
+          path: ref.path,
+          op: "setDoc",
+          label: "ImportCsv:historyMonthly",
+          apply: (batch) => {
+            batch.set(
+              ref,
+              {
+                playerId: pid,
+                monthId: ym,
+                periodStartSec: bounds.start,
+                periodEndSec: bounds.end,
+                lastTs: lastM.ts,
+                lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
+                server: lastM.parsed.server,
+                name: lastM.parsed.name,
+                values: aggr,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          },
         });
         counts.writtenMonthlyPlayers!++;
       }
@@ -1296,8 +1345,8 @@ export async function importCsvToDB(
   // ---------- GUILDS ----------
   if (opts.kind === "guilds") {
     const guildScanDocs: ScanDoc[] = [];
-    const putLatest: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
-    const putHistory: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
+    const putLatest: BatchWrite[] = [];
+    const putHistory: BatchWrite[] = [];
 
     let sourceRows: Row[] = [];
     let sourceHeaders: string[] = [];
@@ -1365,29 +1414,34 @@ export async function importCsvToDB(
       const latestRef = doc(db, `guilds/${gid}/latest/latest`);
       const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
       if (last.ts > prevSec) {
-        putLatest.push((batch) => {
-          batch.set(
-            latestRef,
-            {
-              guildIdentifier: gid,
-              server: parsed.server,
-              timestamp: last.ts,
-              timestampRaw: pickByCanon(last.row, COL.GUILDS.TIMESTAMP),
-              name: parsed.name,
-              values: last.row,
-              updatedAt: serverTimestamp(),
+        putLatest.push({
+          path: latestRef.path,
+          op: "setDoc",
+          label: "ImportCsv:guildLatest",
+          apply: (batch) => {
+            batch.set(
+              latestRef,
+              {
+                guildIdentifier: gid,
+                server: parsed.server,
+                timestamp: last.ts,
+                timestampRaw: pickByCanon(last.row, COL.GUILDS.TIMESTAMP),
+                name: parsed.name,
+                values: last.row,
+                updatedAt: serverTimestamp(),
 
-              // Suchfelder
-              nameFold: toFold(nameForSearch),
-              nameTokens: tokens,
-              nameNgrams: ngrams,
+                // Suchfelder
+                nameFold: toFold(nameForSearch),
+                nameTokens: tokens,
+                nameNgrams: ngrams,
 
-              // Dropdown-Felder
-              memberCount,
-              hofRank,
-            },
-            { merge: true }
-          );
+                // Dropdown-Felder
+                memberCount,
+                hofRank,
+              },
+              { merge: true }
+            );
+          },
         });
         counts.writtenLatestGuilds!++;
       }
@@ -1410,24 +1464,29 @@ export async function importCsvToDB(
         const bounds = weekBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        putHistory.push((batch) => {
-          const ref = doc(db, `guilds/${gid}/history_weekly/${wid}`);
-          batch.set(
-            ref,
-            {
-              guildIdentifier: gid,
-              weekId: wid,
-              periodStartSec: bounds.start,
-              periodEndSec: bounds.end,
-              lastTs: lastM.ts,
-              lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
-              server: lastM.parsed.server,
-              name: lastM.parsed.name,
-              values: aggr,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+        const ref = doc(db, `guilds/${gid}/history_weekly/${wid}`);
+        putHistory.push({
+          path: ref.path,
+          op: "setDoc",
+          label: "ImportCsv:historyWeekly",
+          apply: (batch) => {
+            batch.set(
+              ref,
+              {
+                guildIdentifier: gid,
+                weekId: wid,
+                periodStartSec: bounds.start,
+                periodEndSec: bounds.end,
+                lastTs: lastM.ts,
+                lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
+                server: lastM.parsed.server,
+                name: lastM.parsed.name,
+                values: aggr,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          },
         });
         counts.writtenWeeklyGuilds!++;
       }
@@ -1438,24 +1497,29 @@ export async function importCsvToDB(
         const bounds = monthBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        putHistory.push((batch) => {
-          const ref = doc(db, `guilds/${gid}/history_monthly/${ym}`);
-          batch.set(
-            ref,
-            {
-              guildIdentifier: gid,
-              monthId: ym,
-              periodStartSec: bounds.start,
-              periodEndSec: bounds.end,
-              lastTs: lastM.ts,
-              lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
-              server: lastM.parsed.server,
-              name: lastM.parsed.name,
-              values: aggr,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+        const ref = doc(db, `guilds/${gid}/history_monthly/${ym}`);
+        putHistory.push({
+          path: ref.path,
+          op: "setDoc",
+          label: "ImportCsv:historyMonthly",
+          apply: (batch) => {
+            batch.set(
+              ref,
+              {
+                guildIdentifier: gid,
+                monthId: ym,
+                periodStartSec: bounds.start,
+                periodEndSec: bounds.end,
+                lastTs: lastM.ts,
+                lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
+                server: lastM.parsed.server,
+                name: lastM.parsed.name,
+                values: aggr,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          },
         });
         counts.writtenMonthlyGuilds!++;
       }

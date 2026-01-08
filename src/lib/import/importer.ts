@@ -5,7 +5,7 @@
 
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { traceGetDoc } from "../debug/firestoreReadTrace";
+import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
 
 export type CSVRow = Record<string, any>;
 
@@ -361,7 +361,7 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
     const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
     try {
-      await setDoc(ref, {
+      await traceSetDoc(ref, () => setDoc(ref, {
         guildId: gid,
         count: members.length,
         updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
@@ -380,7 +380,7 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
         members,
         updatedAtServer: serverTimestamp(),
-      }, { merge: true });
+      }, { merge: true }), { label: "ImportGuildSnapshots:summary" });
 
       snapshotsWritten++;
     } catch (error) {
