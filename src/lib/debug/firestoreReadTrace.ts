@@ -202,16 +202,20 @@ export const recordWrite = (params: {
   docCount?: number;
   label?: string;
   callsite?: string;
+  includeInPaths?: boolean;
 }) => {
   if (!isFirestoreWriteTraceEnabled()) return;
   const path = normalizePath(params.path);
   const count = params.docCount ?? 1;
   const callsite = params.callsite ?? params.label ?? extractWriteCallsite();
+  const includeInPaths = params.includeInPaths !== false;
 
-  const pathEntry = writeTotalsByPath.get(path) ?? { total: 0, ops: {} };
-  pathEntry.total += count;
-  pathEntry.ops[params.op] = (pathEntry.ops[params.op] ?? 0) + count;
-  writeTotalsByPath.set(path, pathEntry);
+  if (includeInPaths) {
+    const pathEntry = writeTotalsByPath.get(path) ?? { total: 0, ops: {} };
+    pathEntry.total += count;
+    pathEntry.ops[params.op] = (pathEntry.ops[params.op] ?? 0) + count;
+    writeTotalsByPath.set(path, pathEntry);
+  }
   writeTotalsByOp.set(params.op, (writeTotalsByOp.get(params.op) ?? 0) + count);
   if (callsite) {
     writeTotalsByCallsite.set(callsite, (writeTotalsByCallsite.get(callsite) ?? 0) + count);
@@ -355,10 +359,11 @@ export const traceBatchCommit = async <T>(
 ): Promise<T> => {
   const result = await commitFn();
   recordWrite({
-    path: opts?.path ?? "batch",
+    path: opts?.path ?? "batchCommit",
     op: "batchCommit",
     docCount: 1,
     label: opts?.label,
+    includeInPaths: false,
   });
   return result;
 };
@@ -472,10 +477,10 @@ export const reportReadSummary = (name?: string, opts?: { topN?: number }) => {
   };
   const totalReads = totals.getDoc + totals.getDocs;
 
-  const topPaths = Array.from(readTotalsByPath.entries())
+  const allPaths = Array.from(readTotalsByPath.entries())
     .map(([path, info]) => ({ path, total: info.total, ops: info.ops }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, topN);
+    .sort((a, b) => b.total - a.total);
+  const topPaths = allPaths.slice(0, topN);
 
   const topCallsites = Array.from(readTotalsByCallsite.entries())
     .map(([callsite, count]) => ({ callsite, count }))
@@ -528,10 +533,10 @@ export const reportWriteSummary = (name?: string, opts?: { topN?: number }) => {
 
   const totals = Object.fromEntries(writeTotalsByOp.entries());
   const totalWrites = Array.from(writeTotalsByOp.values()).reduce((sum, v) => sum + v, 0);
-  const topPaths = Array.from(writeTotalsByPath.entries())
+  const allPaths = Array.from(writeTotalsByPath.entries())
     .map(([path, info]) => ({ path, total: info.total, ops: info.ops }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, topN);
+    .sort((a, b) => b.total - a.total);
+  const topPaths = allPaths.slice(0, topN);
 
   const topCallsites = shouldLogWriteCallsite()
     ? Array.from(writeTotalsByCallsite.entries())
@@ -544,6 +549,8 @@ export const reportWriteSummary = (name?: string, opts?: { topN?: number }) => {
   console.groupCollapsed(`[FirestoreTrace] WRITE SUMMARY${sessionSuffix}`);
   log("Totals", { ...totals, total: totalWrites });
   log("Top paths", topPaths);
+  log("All paths", allPaths);
+  log("All paths", allPaths);
   if (topCallsites.length > 0) {
     log("Top callsites", topCallsites);
   }

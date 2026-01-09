@@ -429,13 +429,24 @@ function UploadCenterContentBody() {
       };
     });
 
-    const guildsRows = selectedGuilds.map((g) => ({
-      "Guild Identifier": g.guildId,
-      "Guild Member Count": g.memberCount ?? g.members.length,
-      Timestamp: g.scanTimestampSec,
-      Name: g.name,
-      Server: g.server,
-    }));
+    const guildsRows = selectedGuilds.map((g) => {
+      if (g.values && typeof g.values === "object") {
+        const row = { ...(g.values as Record<string, any>) };
+        if (row["Guild Identifier"] == null) row["Guild Identifier"] = g.guildId;
+        if (row["Guild Member Count"] == null) row["Guild Member Count"] = g.memberCount ?? g.members.length;
+        if (row.Timestamp == null) row.Timestamp = g.scanTimestampSec;
+        if (row.Server == null) row.Server = g.server;
+        if (row.Name == null) row.Name = g.name;
+        return row;
+      }
+      return {
+        "Guild Identifier": g.guildId,
+        "Guild Member Count": g.memberCount ?? g.members.length,
+        Timestamp: g.scanTimestampSec,
+        Name: g.name,
+        Server: g.server,
+      };
+    });
 
     return { playersRows, guildsRows };
   };

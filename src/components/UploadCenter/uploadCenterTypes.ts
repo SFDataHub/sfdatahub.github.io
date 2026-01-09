@@ -38,6 +38,7 @@ export type UploadGuildPreview = {
   memberCount?: number;
   scanTimestampSec: number;
   members: UploadGuildMemberPreview[];
+  values?: Record<string, any>;
   selected: boolean;
   status: UploadRecordStatus;
 };

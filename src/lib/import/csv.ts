@@ -11,7 +11,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { deriveForPlayer } from "../../../tools/playerDerivedHelpers";
+import { computeBaseStats, deriveForPlayer } from "../../../tools/playerDerivedHelpers";
+import type { GuildDerivedAggregate } from "./importer";
 import { db } from "../firebase";
 import {
   recordWrite,
@@ -42,6 +43,7 @@ export type ImportCsvOptions = {
   raw?: string;
   onProgress?: (p: ImportProgress) => void;
   serverHostMap?: Map<string, string>;
+  skipGuildDerived?: boolean;
 };
 
 export type ImportRecordStatus = "created" | "duplicate" | "error";
@@ -117,7 +119,12 @@ export type ParsedGuildCsvRow = {
 
 const norm = (s: any) => String(s ?? "").trim();
 const up = (s: any) => norm(s).toUpperCase();
-const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
+const CANON = (s: string) =>
+  String(s ?? "")
+    .trim()
+    .replace(/:+$/, "")
+    .toLowerCase()
+    .replace(/[\s_\u00a0]+/g, "");
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const dateKeyFromSec = (sec: number | null | undefined): number => {
   const d = sec ? new Date(sec * 1000) : new Date();
@@ -157,6 +164,24 @@ const toNumberLoose = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : null;
+};
+
+const parseMemberCountValue = (value: any): number | null => {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const cleaned = raw.replace(/[\s,\.]/g, "");
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
+};
+
+const MEMBER_COUNT_MIN = 1;
+const MEMBER_COUNT_MAX = 200;
+
+const validateMemberCountValue = (value: number | null): "ok" | "non_numeric" | "out_of_range" => {
+  if (value == null) return "non_numeric";
+  if (value < MEMBER_COUNT_MIN || value > MEMBER_COUNT_MAX) return "out_of_range";
+  return "ok";
 };
 
 const parseLevelValue = (v: any): number | null => {
@@ -257,6 +282,55 @@ const pickWithLookup = (row: Row, lookup: HeaderLookup, canonKey: string): any =
 const pickAnyWithLookup = (row: Row, lookup: HeaderLookup, keys: string[]): any =>
   keys.map((k) => pickWithLookup(row, lookup, k)).find((v) => v != null && String(v) !== "");
 
+const normalizeHeaderLabel = (value: any) => {
+  const raw = String(value ?? "").replace(/\u00a0/g, " ").trim().replace(/\s+/g, " ");
+  const trimmed = raw.replace(/:+$/, "").toLowerCase();
+  const underscored = trimmed.replace(/[\s-]+/g, "_");
+  return underscored.replace(/[^a-z0-9_]/g, "").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+};
+
+const buildHeaderIndex = (headers: string[]) => {
+  const map = new Map<string, string[]>();
+  headers.forEach((header) => {
+    const key = normalizeHeaderLabel(header);
+    if (!key) return;
+    const list = map.get(key) ?? [];
+    list.push(header);
+    map.set(key, list);
+  });
+  return map;
+};
+
+const MEMBER_COUNT_ALIASES = [
+  "guild_member_count",
+  "guild_membercount",
+  "guildmembercount",
+  "member_count",
+  "membercount",
+  "guild_members",
+];
+
+const resolveMemberCountHeaderCandidates = (headers: string[]) => {
+  const map = buildHeaderIndex(headers);
+  const candidates: string[] = [];
+  for (const alias of MEMBER_COUNT_ALIASES) {
+    const matches = map.get(alias);
+    if (!matches) continue;
+    for (const header of matches) if (!candidates.includes(header)) candidates.push(header);
+  }
+  return candidates;
+};
+
+const resolveMemberCountHeader = (headers: string[], candidates?: string[]) => {
+  const list = candidates ?? resolveMemberCountHeaderCandidates(headers);
+  if (!list.length) return null;
+  const canonical = normalizeHeaderLabel("Guild Member Count");
+  const exact = list.find((header) => normalizeHeaderLabel(header) === canonical);
+  if (exact) return exact;
+  if (list.length === 1) return list[0];
+  return list[0];
+};
+
 const MAX_CANON_KEYS = new Set<string>([
   CANON("Strength"),
   CANON("Dexterity"),
@@ -278,6 +352,63 @@ const pickByCanon = (row: Row, canonKey: string): any => {
 
 const pickAnyByCanon = (row: Row, keys: string[]): any =>
   keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
+
+type MemberCountResolutionSource = "primary" | "alias" | "lookup" | "none";
+
+type MemberCountResolution = {
+  header: string | null;
+  headerIndex: number;
+  rawValue: any;
+  parsedValue: number | null;
+  validationResult: "ok" | "non_numeric" | "out_of_range";
+  isValid: boolean;
+  fallbackUsed: boolean;
+  source: MemberCountResolutionSource;
+};
+
+const resolveMemberCountForRow = (
+  row: Row,
+  lookup: HeaderLookup,
+  headers: string[],
+  primaryHeader: string | null,
+  candidateHeaders: string[],
+): MemberCountResolution => {
+  const buildResolution = (
+    header: string | null,
+    rawValue: any,
+    source: MemberCountResolutionSource,
+    fallbackUsed: boolean,
+  ): MemberCountResolution => {
+    const parsedValue = parseMemberCountValue(rawValue);
+    const validationResult = validateMemberCountValue(parsedValue);
+    return {
+      header,
+      headerIndex: header ? headers.indexOf(header) : -1,
+      rawValue,
+      parsedValue,
+      validationResult,
+      isValid: validationResult === "ok",
+      fallbackUsed,
+      source,
+    };
+  };
+
+  if (primaryHeader) {
+    const primary = buildResolution(primaryHeader, row[primaryHeader], "primary", false);
+    if (primary.isValid) return primary;
+  }
+
+  for (const header of candidateHeaders) {
+    if (header === primaryHeader) continue;
+    const candidate = buildResolution(header, row[header], "alias", true);
+    if (candidate.isValid) return candidate;
+  }
+
+  const lookupHeader = lookup.get(COL.GUILDS.MEMBER_COUNT) ?? null;
+  const fallbackRaw = lookupHeader ? row[lookupHeader] : pickByCanon(row, COL.GUILDS.MEMBER_COUNT);
+  const fallback = buildResolution(lookupHeader, fallbackRaw, lookupHeader ? "lookup" : "none", true);
+  return fallback;
+};
 
 // WICHTIG: identisch zu deiner Implementierung
 function toSecFlexible(v: any): number | null {
@@ -355,10 +486,169 @@ function detectDelimiter(headerLine: string) {
   return best;
 }
 
-function parseCsvCompat(text: string): { headers: string[]; rows: Row[] } {
+type CsvParseMeta = {
+  headerCount: number;
+  rowTokenCounts: number[];
+  paddedRowCount: number;
+  truncatedRowCount: number;
+};
+
+const GUILD_CSV_DEBUG_KEY = "sf_debug_guild_csv_parse";
+
+const isGuildCsvParseDebugEnabled = () => {
+  if (typeof window === "undefined" || !window?.localStorage) return false;
+  return window.localStorage.getItem(GUILD_CSV_DEBUG_KEY) === "1";
+};
+
+const truncateDebugValue = (value: string, max = 260) => {
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 3))}...`;
+};
+
+const buildDelimiterStats = (line: string) => {
+  const stats: Record<string, number> = {};
+  const delims = [",", ";", "\t", "|"];
+  for (const delim of delims) {
+    let count = 0;
+    for (let i = 0; i < line.length; i++) if (line[i] === delim) count++;
+    stats[delim === "\t" ? "\\t" : delim] = count;
+  }
+  return stats;
+};
+
+const debugGuildCsvParse = (
+  text: string,
+  parsed: { headers: string[]; rows: Row[]; meta?: CsvParseMeta },
+  result: GuildParseResult,
+) => {
+  if (!isGuildCsvParseDebugEnabled()) return;
+  const normalizedText = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const headerLine = normalizedText.split("\n")[0] ?? "";
+  const headerLineNoBom = headerLine.replace(/^\uFEFF/, "");
+  const hasBom = headerLine.startsWith("\uFEFF");
+  const hasNbsp = headerLine.includes("\u00A0");
+  const delimiter = detectDelimiter(headerLineNoBom);
+  const delimiterCounts = buildDelimiterStats(headerLineNoBom);
+  const normalizedHeaders = parsed.headers.map(normalizeHeaderLabel);
+  const headerIndexMap: Record<string, number[]> = {};
+  parsed.headers.forEach((header, idx) => {
+    const key = normalizeHeaderLabel(header);
+    if (!key) return;
+    const list = headerIndexMap[key] ?? [];
+    list.push(idx);
+    headerIndexMap[key] = list;
+  });
+
+  const guildIdHeader = parsed.headers.find(
+    (header) => normalizeHeaderLabel(header) === normalizeHeaderLabel("Guild Identifier"),
+  );
+  const guildIdHeaderIndex = guildIdHeader ? parsed.headers.indexOf(guildIdHeader) : -1;
+  const memberCountCandidates = resolveMemberCountHeaderCandidates(parsed.headers);
+  const memberCountHeader = resolveMemberCountHeader(parsed.headers, memberCountCandidates);
+  const memberCountHeaderIndex = memberCountHeader ? parsed.headers.indexOf(memberCountHeader) : -1;
+
+  const lookup = buildHeaderLookup(parsed.headers);
+  const sampleRow = parsed.rows[0];
+  const sampleGuildIdentifier = sampleRow ? pickWithLookup(sampleRow, lookup, COL.GUILDS.GUILD_IDENTIFIER) : null;
+  const memberCountResolution = sampleRow
+    ? resolveMemberCountForRow(sampleRow, lookup, parsed.headers, memberCountHeader, memberCountCandidates)
+    : null;
+  const sampleMemberCountRaw = memberCountResolution?.rawValue ?? null;
+  const sampleMemberCount = memberCountResolution?.parsedValue ?? null;
+  const headerCount = parsed.meta?.headerCount ?? parsed.headers.length;
+  const sampleRowTokenCount = parsed.meta?.rowTokenCounts?.[0] ?? null;
+  const sampleRowPadded =
+    sampleRowTokenCount != null && headerCount > 0 ? sampleRowTokenCount < headerCount : null;
+  const paddedRowCount = parsed.meta?.paddedRowCount ?? 0;
+  const truncatedRowCount = parsed.meta?.truncatedRowCount ?? 0;
+
+  const reasons: string[] = [];
+  if (!headerLine) reasons.push("missing header line");
+  if (!parsed.headers.length) reasons.push("no headers parsed");
+  if (parsed.rows.length === 0) reasons.push("no data rows after parse");
+  if (!guildIdHeader) reasons.push("missing guild identifier header");
+  if (!memberCountHeader) reasons.push("missing guild member count header");
+  if (parsed.rows.length > 0 && result.rows.length === 0) {
+    reasons.push(
+      `all rows filtered (missingIdentifier=${result.stats.missingIdentifier}, badTimestamp=${result.stats.badTimestamp}, missingServer=${result.stats.missingServer})`,
+    );
+  }
+  if (!reasons.length && result.rows.length === 0) reasons.push("no parsed guild rows");
+
+  // eslint-disable-next-line no-console
+  console.groupCollapsed("[GuildCsvParse] Debug");
+  // eslint-disable-next-line no-console
+  console.log("headerLine", {
+    length: headerLine.length,
+    hasBom,
+    hasNbsp,
+    delimiter,
+    delimiterCounts,
+    sample: truncateDebugValue(headerLine),
+  });
+  // eslint-disable-next-line no-console
+  console.log("headers", {
+    raw: parsed.headers,
+    normalized: normalizedHeaders,
+    headerIndexMap,
+  });
+  // eslint-disable-next-line no-console
+  console.log("requiredHeaders", {
+    guildIdentifier: guildIdHeader,
+    guildIdentifierIndex: guildIdHeaderIndex,
+    memberCount: memberCountHeader,
+    memberCountIndex: memberCountHeaderIndex,
+    memberCountCandidates,
+  });
+  // eslint-disable-next-line no-console
+  console.log("rowAlignment", {
+    headerCount,
+    sampleRowTokenCount,
+    sampleRowPadded,
+    paddedRowCount,
+    truncatedRowCount,
+  });
+  // eslint-disable-next-line no-console
+  console.log("rows", {
+    parsedRows: parsed.rows.length,
+    guildRows: result.rows.length,
+    stats: result.stats,
+  });
+  // eslint-disable-next-line no-console
+  console.log("sample", {
+    guildIdentifier: sampleGuildIdentifier == null ? null : truncateDebugValue(String(sampleGuildIdentifier)),
+    memberCountRaw: sampleMemberCountRaw == null ? null : truncateDebugValue(String(sampleMemberCountRaw)),
+    memberCount: sampleMemberCount,
+  });
+  if (memberCountResolution) {
+    // eslint-disable-next-line no-console
+    console.log("memberCountResolution", {
+      primaryHeader: memberCountHeader,
+      primaryIndex: memberCountHeaderIndex,
+      resolvedHeader: memberCountResolution.header,
+      resolvedIndex: memberCountResolution.headerIndex,
+      rawValueAtIndex:
+        memberCountResolution.rawValue == null ? null : truncateDebugValue(String(memberCountResolution.rawValue)),
+      parsedMemberCount: memberCountResolution.parsedValue,
+      validationResult: memberCountResolution.validationResult,
+      fallbackUsed: memberCountResolution.fallbackUsed,
+      source: memberCountResolution.source,
+    });
+  }
+  if (reasons.length) {
+    // eslint-disable-next-line no-console
+    console.warn("[GuildCsvParse] Issues", reasons);
+  }
+  // eslint-disable-next-line no-console
+  console.groupEnd();
+};
+
+function parseCsvCompat(text: string): { headers: string[]; rows: Row[]; meta: CsvParseMeta } {
   let t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = t.split("\n");
-  if (!lines.length) return { headers: [], rows: [] };
+  if (!lines.length) {
+    return { headers: [], rows: [], meta: { headerCount: 0, rowTokenCounts: [], paddedRowCount: 0, truncatedRowCount: 0 } };
+  }
   const delim = detectDelimiter(lines[0] ?? "");
   const parseLine = (line: string) => {
     const out: string[] = [];
@@ -381,17 +671,29 @@ function parseCsvCompat(text: string): { headers: string[]; rows: Row[] } {
   };
   const headerCells = lines[0] ? parseLine(lines[0]).map(norm) : [];
   const headers = headerCells.map((h, i) => (h ? h : `col${i}`));
+  const headerCount = headers.length;
   const rows: Row[] = [];
+  const rowTokenCounts: number[] = [];
+  let paddedRowCount = 0;
+  let truncatedRowCount = 0;
   for (let li = 1; li < lines.length; li++) {
     if (!lines[li]) continue;
     const cells = parseLine(lines[li]);
     if (cells.every((c) => norm(c) === "")) continue;
+    const tokenCount = cells.length;
+    if (tokenCount < headerCount) {
+      cells.push(...Array(headerCount - tokenCount).fill(""));
+      paddedRowCount++;
+    } else if (tokenCount > headerCount) {
+      truncatedRowCount++;
+    }
+    rowTokenCounts.push(tokenCount);
     const row: Row = {};
-    for (let ci = 0; ci < headers.length; ci++)
+    for (let ci = 0; ci < headerCount; ci++)
       row[headers[ci]] = cells[ci] != null ? norm(cells[ci]) : "";
     rows.push(row);
   }
-  return { headers, rows };
+  return { headers, rows, meta: { headerCount, rowTokenCounts, paddedRowCount, truncatedRowCount } };
 }
 
 type PlayerParseStats = {
@@ -502,6 +804,8 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
 function parseGuildsFromRows(rows: Row[], headers?: string[]): GuildParseResult {
   const headersResolved = headers && headers.length ? headers : inferHeadersFromRows(rows);
   const lookup = buildHeaderLookup(headersResolved);
+  const memberCountCandidates = resolveMemberCountHeaderCandidates(headersResolved);
+  const memberCountHeader = resolveMemberCountHeader(headersResolved, memberCountCandidates);
   const stats: GuildParseStats = { missingIdentifier: 0, badTimestamp: 0, missingServer: 0 };
   const parsed: ParsedGuildCsvRow[] = [];
 
@@ -529,7 +833,14 @@ function parseGuildsFromRows(rows: Row[], headers?: string[]): GuildParseResult 
     const nameVal = pickWithLookup(row, lookup, COL.GUILDS.NAME);
     const name = nameVal != null && norm(nameVal) !== "" ? String(nameVal) : null;
 
-    const memberCount = toNumberLoose(pickWithLookup(row, lookup, COL.GUILDS.MEMBER_COUNT));
+    const memberCountResolution = resolveMemberCountForRow(
+      row,
+      lookup,
+      headersResolved,
+      memberCountHeader,
+      memberCountCandidates,
+    );
+    const memberCount = memberCountResolution.isValid ? memberCountResolution.parsedValue : null;
     const hofRank = toNumberLoose(
       pickAnyWithLookup(row, lookup, [COL.GUILDS.HOF, COL.GUILDS.HOF_ALT, COL.GUILDS.RANK, COL.GUILDS.GUILD_RANK])
     );
@@ -555,16 +866,20 @@ export function parsePlayersCsvText(text: string): ParsedPlayerCsvRow[] {
 
 export function parseGuildsCsvText(text: string): ParsedGuildCsvRow[] {
   const parsed = parseCsvCompat(text);
-  return parseGuildsFromRows(parsed.rows, parsed.headers).rows;
+  const result = parseGuildsFromRows(parsed.rows, parsed.headers);
+  debugGuildCsvParse(text, parsed, result);
+  return result.rows;
 }
 
 /** ---- batching ---- */
 const PLAYER_DERIVED_COL = "stats_cache_player_derived";
+const GUILD_DERIVED_COL = "stats_cache_guild_derived";
 const PLAYERS_INDEX_COL = "stats_index_players_daily_compact";
 const BATCH_SCANS = 120;   // viele, mittelgross
 const BATCH_LATEST = 40;   // gross (alle Felder) -> kleine Batches
 const BATCH_HISTORY = 120; // aggregiert, moderat
 const PLAYER_DERIVED_SNAPSHOT_LIMIT = 500;
+const GUILD_DERIVED_SNAPSHOT_LIMIT = 500;
 
 type PlayerDerivedSnapshotEntry = {
   playerId: string;
@@ -582,6 +897,27 @@ type PlayerDerivedSnapshotEntry = {
   treasury: number | null;
 };
 
+type GuildDerivedSnapshotEntry = {
+  guildId: string;
+  server: string;
+  name: string;
+  memberCount: number | null;
+  hofRank: number | null;
+  lastScan: string | null;
+  sum: number | null;
+  sumAvg?: number | null;
+  count?: number | null;
+  avgLevel?: number | null;
+  avgTreasury?: number | null;
+  avgMine?: number | null;
+  avgBaseMain?: number | null;
+  avgConBase?: number | null;
+  avgSumBaseTotal?: number | null;
+  avgAttrTotal?: number | null;
+  avgConTotal?: number | null;
+  avgTotalStats?: number | null;
+};
+
 type LatestCacheEntry = { prevSec: number; exists: boolean };
 
 const toFiniteNumberOrNull = (value: any): number | null => {
@@ -591,8 +927,45 @@ const toFiniteNumberOrNull = (value: any): number | null => {
 };
 
 const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
+const toGuildSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_guild_derived`;
 
-const normalizeServerHost = (value: any) => String(value ?? "").trim().toLowerCase();
+const SERVER_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
+
+const normalizeServerInput = (value: any): { code?: string; host?: string } => {
+  const raw = String(value ?? "").replace(/\u00a0/g, " ").trim();
+  if (!raw) return {};
+  let cleaned = raw.replace(/^[a-z]+:\/\//i, "");
+  cleaned = cleaned.split(/[/?#]/)[0] ?? "";
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  if (!cleaned) return {};
+  const collapsed = cleaned.replace(/\s+/g, "");
+  let lowered = collapsed.toLowerCase().replace(/:\d+$/, "");
+  lowered = lowered.replace(/^\.+|\.+$/g, "");
+  if (!lowered) return {};
+
+  if (SERVER_CODE_PATTERN.test(lowered)) {
+    return { code: lowered.toUpperCase() };
+  }
+
+  if (lowered.includes(".")) {
+    if (!lowered.includes("sfgame")) {
+      const simpleHostMatch = lowered.match(/^([a-z]{1,4}\d+)\.?(net|eu)$/i);
+      if (simpleHostMatch) {
+        return { host: `${simpleHostMatch[1]}.sfgame.${simpleHostMatch[2].toLowerCase()}` };
+      }
+    }
+    return { host: lowered };
+  }
+
+  return {};
+};
+
+const normalizeServerLookupKey = (value: any): string | null => {
+  const normalized = normalizeServerInput(value);
+  if (normalized.host) return normalized.host;
+  if (normalized.code) return normalized.code.toLowerCase();
+  return null;
+};
 
 const chunkList = <T,>(items: T[], size: number): T[][] => {
   const out: T[][] = [];
@@ -604,13 +977,33 @@ const chunkList = <T,>(items: T[], size: number): T[][] => {
 
 export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  const normalizedHosts = Array.from(
-    new Set(hosts.map((host) => normalizeServerHost(host)).filter((host) => host)),
-  );
-  if (normalizedHosts.length === 0) return map;
+  const wantedHosts = new Set<string>();
+  const wantedCodes = new Set<string>();
+
+  for (const host of hosts) {
+    const normalized = normalizeServerInput(host);
+    if (normalized.host) wantedHosts.add(normalized.host);
+    if (normalized.code) wantedCodes.add(normalized.code);
+  }
+
+  if (wantedHosts.size === 0 && wantedCodes.size === 0) return map;
+
   try {
     const serversRef = collection(db, "servers");
-    const chunks = chunkList(normalizedHosts, 10);
+
+    for (const code of wantedCodes) {
+      const ref = doc(db, "servers", code);
+      const snap = await traceGetDoc(null, ref, () => getDoc(ref), { label: "ImportCsv:serversHostMap" });
+      if (snap.exists()) {
+        const data: any = snap.data();
+        const normalizedHost = normalizeServerInput(data?.host).host ?? null;
+        if (normalizedHost) map.set(normalizedHost, snap.id);
+        map.set(code.toLowerCase(), snap.id);
+        map.set(code.toUpperCase(), snap.id);
+      }
+    }
+
+    const chunks = chunkList(Array.from(wantedHosts), 10);
     for (const chunk of chunks) {
       const q = query(serversRef, where("host", "in", chunk));
       const snap = await traceGetDocs(
@@ -621,15 +1014,20 @@ export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<str
       );
       snap.forEach((docSnap) => {
         const data: any = docSnap.data();
-        const host = normalizeServerHost(data?.host);
-        if (host) map.set(host, docSnap.id);
+        const normalizedHost = normalizeServerInput(data?.host).host ?? null;
+        if (normalizedHost) map.set(normalizedHost, docSnap.id);
+        map.set(docSnap.id.toLowerCase(), docSnap.id);
+        map.set(docSnap.id.toUpperCase(), docSnap.id);
       });
     }
-    if (map.size < normalizedHosts.length) {
-      const missing = normalizedHosts.filter((host) => !map.has(host));
-      if (missing.length) {
-        console.warn("[ImportCsv] Server hosts not mapped", { hosts: missing });
-      }
+
+    const missingHosts = Array.from(wantedHosts).filter((host) => !map.has(host));
+    if (missingHosts.length) {
+      console.warn("[ImportCsv] Server hosts not mapped", { hosts: missingHosts });
+    }
+    const missingCodes = Array.from(wantedCodes).filter((code) => !map.has(code.toLowerCase()));
+    if (missingCodes.length) {
+      console.warn("[ImportCsv] Server codes not mapped", { codes: missingCodes });
     }
   } catch (error) {
     console.warn("[ImportCsv] Failed to load server host map", { error });
@@ -901,6 +1299,173 @@ async function upsertPlayerDerivedServerSnapshot(
   );
 }
 
+async function upsertGuildDerivedServerSnapshot(
+  serverKey: string,
+  entries: GuildDerivedSnapshotEntry[]
+) {
+  if (!entries.length) return;
+
+  const snapshotKey = String(serverKey || "all").trim() || "all";
+  const snapshotRef = doc(db, `${GUILD_DERIVED_COL}/${toGuildSnapshotDocId(snapshotKey)}`);
+
+  await traceRunTransaction(
+    () =>
+      runTransaction(db, async (tx) => {
+        const snap = await traceGetDoc(
+          null,
+          snapshotRef,
+          () => tx.get(snapshotRef),
+          { label: "ImportCsv:guildDerivedSnapshot" },
+        );
+        const existing = snap.exists() ? snap.data()?.guilds : null;
+        const byId = new Map<string, GuildDerivedSnapshotEntry>();
+
+        if (Array.isArray(existing)) {
+          for (const raw of existing) {
+            if (!raw || typeof raw !== "object") continue;
+            const gid = String((raw as any).guildId ?? "");
+            if (!gid) continue;
+            byId.set(gid, raw as GuildDerivedSnapshotEntry);
+          }
+        }
+
+        const scoreOf = (entry: GuildDerivedSnapshotEntry) =>
+          toFiniteNumberOrNull(entry.sumAvg ?? entry.avgSumBaseTotal ?? entry.sum) ?? 0;
+
+        const findLowest = () => {
+          let minId: string | null = null;
+          let minSum = Number.POSITIVE_INFINITY;
+          for (const [gid, entry] of byId.entries()) {
+            const sum = scoreOf(entry);
+            if (sum < minSum) {
+              minSum = sum;
+              minId = gid;
+            }
+          }
+          return { minId, minSum };
+        };
+
+        for (const entry of entries) {
+          const gid = String(entry.guildId ?? "");
+          if (!gid) continue;
+
+          if (byId.has(gid)) {
+            byId.set(gid, entry);
+            continue;
+          }
+
+          if (byId.size < GUILD_DERIVED_SNAPSHOT_LIMIT) {
+            byId.set(gid, entry);
+            continue;
+          }
+
+          const entrySum = scoreOf(entry);
+          const { minId, minSum } = findLowest();
+          if (minId && entrySum > minSum) {
+            byId.delete(minId);
+            byId.set(gid, entry);
+          }
+        }
+
+        const guilds = Array.from(byId.values()).map((entry) => {
+          if (entry.sumAvg == null) {
+            return { ...entry, sumAvg: toFiniteNumberOrNull(entry.avgSumBaseTotal ?? entry.sum) };
+          }
+          return entry;
+        });
+        guilds.sort((a, b) => {
+          const diff = scoreOf(b) - scoreOf(a);
+          if (diff !== 0) return diff;
+          return String(a.guildId ?? "").localeCompare(String(b.guildId ?? ""));
+        });
+        if (guilds.length > GUILD_DERIVED_SNAPSHOT_LIMIT) {
+          guilds.length = GUILD_DERIVED_SNAPSHOT_LIMIT;
+        }
+
+        tx.set(
+          snapshotRef,
+          { server: snapshotKey, updatedAt: serverTimestamp(), guilds },
+          { merge: true }
+        );
+      }),
+    { label: "ImportCsv:guildDerivedSnapshot", path: snapshotRef.path },
+  );
+}
+
+export async function flushGuildDerivedSnapshotsFromAggregates(
+  aggregatesByGuildId: Map<string, GuildDerivedAggregate>,
+  serverHostMap: Map<string, string>,
+) {
+  if (!aggregatesByGuildId.size) return;
+
+  const pendingDerivedByServer = new Map<string, GuildDerivedSnapshotEntry[]>();
+
+  for (const [gid, aggregate] of aggregatesByGuildId.entries()) {
+    const lookupKey = normalizeServerLookupKey(aggregate.server);
+    const snapshotServerKey = lookupKey ? serverHostMap.get(lookupKey) ?? null : null;
+    if (!snapshotServerKey) {
+      if (lookupKey) {
+        console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
+          guildId: gid,
+          server: aggregate.server,
+        });
+      }
+      continue;
+    }
+
+    const snapshotEntry: GuildDerivedSnapshotEntry = {
+      guildId: String(gid),
+      server: snapshotServerKey,
+      name: String(aggregate.name ?? gid),
+      memberCount: toFiniteNumberOrNull(aggregate.memberCount),
+      hofRank: toFiniteNumberOrNull(aggregate.hofRank),
+      lastScan: aggregate.lastScan ? String(aggregate.lastScan) : null,
+      sum: null,
+      sumAvg: toFiniteNumberOrNull(aggregate.avgSumBaseTotal),
+      count: toFiniteNumberOrNull(aggregate.count),
+      avgLevel: toFiniteNumberOrNull(aggregate.avgLevel),
+      avgTreasury: toFiniteNumberOrNull(aggregate.avgTreasury),
+      avgMine: toFiniteNumberOrNull(aggregate.avgMine),
+      avgBaseMain: toFiniteNumberOrNull(aggregate.avgBaseMain),
+      avgConBase: toFiniteNumberOrNull(aggregate.avgConBase),
+      avgSumBaseTotal: toFiniteNumberOrNull(aggregate.avgSumBaseTotal),
+      avgAttrTotal: toFiniteNumberOrNull(aggregate.avgAttrTotal),
+      avgConTotal: toFiniteNumberOrNull(aggregate.avgConTotal),
+      avgTotalStats: toFiniteNumberOrNull(aggregate.avgTotalStats),
+    };
+
+    if (!pendingDerivedByServer.has(snapshotServerKey)) {
+      pendingDerivedByServer.set(snapshotServerKey, []);
+    }
+    pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
+  }
+
+  const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+  if (pendingSnapshotKeys.length) {
+    console.log("[ImportCsv] Guild derived snapshot flush pending", {
+      count: pendingSnapshotKeys.length,
+      servers: pendingSnapshotKeys,
+    });
+  }
+
+  const flushedDocIds: string[] = [];
+  for (const [serverKey, entries] of pendingDerivedByServer.entries()) {
+    try {
+      await upsertGuildDerivedServerSnapshot(serverKey, entries);
+      flushedDocIds.push(toGuildSnapshotDocId(serverKey));
+    } catch (error) {
+      console.warn("[ImportCsv] Guild derived snapshot upsert failed", { serverKey, error });
+    }
+  }
+
+  if (pendingSnapshotKeys.length) {
+    console.log("[ImportCsv] Guild derived snapshot flush done", {
+      count: flushedDocIds.length,
+      docs: flushedDocIds,
+    });
+  }
+}
+
 /** ---- Aggregation ---- */
 function aggregateValues(rowsSortedAsc: RowMeta[], allHeaders: string[]): Record<string, any> {
   const out: Record<string, any> = {};
@@ -1153,8 +1718,9 @@ export async function importCsvToDB(
           updatedAt: latestUpdatedAt,
         };
         const derived = deriveForPlayer(derivedInput, serverTimestamp);
+        const lookupKey = normalizeServerLookupKey(server);
         const snapshotServerKey =
-          serverCodeByHost.size > 0 ? serverCodeByHost.get(normalizeServerHost(server)) ?? null : null;
+          serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
         if (!snapshotServerKey && serverCodeByHost.size > 0) {
           console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
             playerId: pid,
@@ -1347,6 +1913,8 @@ export async function importCsvToDB(
     const guildScanDocs: ScanDoc[] = [];
     const putLatest: BatchWrite[] = [];
     const putHistory: BatchWrite[] = [];
+    const enableGuildDerived = !opts.skipGuildDerived;
+    const pendingDerivedByServer = new Map<string, GuildDerivedSnapshotEntry[]>();
 
     let sourceRows: Row[] = [];
     let sourceHeaders: string[] = [];
@@ -1398,6 +1966,13 @@ export async function importCsvToDB(
     guildResults.push(...scanResults);
     counts.writtenScanGuilds = scanResults.filter((r) => r.status === "created").length;
 
+    const serverCodeByHost = enableGuildDerived
+      ? opts.serverHostMap ?? (await loadServerHostMapByHosts(parsedGuilds.map((guild) => guild.server)))
+      : new Map<string, string>();
+    if (enableGuildDerived && !serverCodeByHost.size && parsedGuilds.length > 0) {
+      console.warn("[ImportCsv] Server host map empty; guild derived snapshots will be skipped.");
+    }
+
     for (const [gid, metas] of byGid) {
       metas.sort((a, b) => a.ts - b.ts);
       const last = metas[metas.length - 1];
@@ -1444,6 +2019,38 @@ export async function importCsvToDB(
           },
         });
         counts.writtenLatestGuilds!++;
+
+        if (enableGuildDerived) {
+          const lookupKey = normalizeServerLookupKey(parsed.server);
+          const snapshotServerKey =
+            serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
+          if (!snapshotServerKey && serverCodeByHost.size > 0) {
+            console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
+              guildId: gid,
+              server: parsed.server,
+            });
+          }
+          if (snapshotServerKey) {
+            const lastScanRaw = pickByCanon(last.row, COL.GUILDS.TIMESTAMP);
+            const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
+            const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
+            const baseStats = computeBaseStats(last.row ?? {});
+            const snapshotEntry: GuildDerivedSnapshotEntry = {
+              guildId: String(gid),
+              server: snapshotServerKey,
+              name: String(parsed.name ?? gid),
+              memberCount: toFiniteNumberOrNull(memberCount),
+              hofRank: toFiniteNumberOrNull(hofRank),
+              lastScan: lastScan ? lastScan : null,
+              sum: toFiniteNumberOrNull(baseStats.sum),
+              sumAvg: toFiniteNumberOrNull(baseStats.sum),
+            };
+            if (!pendingDerivedByServer.has(snapshotServerKey)) {
+              pendingDerivedByServer.set(snapshotServerKey, []);
+            }
+            pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
+          }
+        }
       }
 
       // buckets
@@ -1460,7 +2067,6 @@ export async function importCsvToDB(
 
       for (const [wid, list] of weekly) {
         list.sort((a, b) => a.ts - b.ts);
-        const aggr = aggregateValues(list, ALL_HEADERS);
         const bounds = weekBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
@@ -1481,7 +2087,7 @@ export async function importCsvToDB(
                 lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
                 server: lastM.parsed.server,
                 name: lastM.parsed.name,
-                values: aggr,
+                values: lastM.row,
                 updatedAt: serverTimestamp(),
               },
               { merge: true }
@@ -1493,7 +2099,6 @@ export async function importCsvToDB(
 
       for (const [ym, list] of monthly) {
         list.sort((a, b) => a.ts - b.ts);
-        const aggr = aggregateValues(list, ALL_HEADERS);
         const bounds = monthBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
@@ -1514,7 +2119,7 @@ export async function importCsvToDB(
                 lastTimestampRaw: pickByCanon(lastM.row, COL.GUILDS.TIMESTAMP),
                 server: lastM.parsed.server,
                 name: lastM.parsed.name,
-                values: aggr,
+                values: lastM.row,
                 updatedAt: serverTimestamp(),
               },
               { merge: true }
@@ -1541,6 +2146,31 @@ export async function importCsvToDB(
         console.warn("[ImportCsv] guild history write skipped (duplicate/permission)", { error });
       } else {
         throw error;
+      }
+    }
+
+    if (enableGuildDerived) {
+      const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+      if (pendingSnapshotKeys.length) {
+        console.log("[ImportCsv] Guild derived snapshot flush pending", {
+          count: pendingSnapshotKeys.length,
+          servers: pendingSnapshotKeys,
+        });
+      }
+      const flushedDocIds: string[] = [];
+      for (const [serverKey, entries] of pendingDerivedByServer.entries()) {
+        try {
+          await upsertGuildDerivedServerSnapshot(serverKey, entries);
+          flushedDocIds.push(toGuildSnapshotDocId(serverKey));
+        } catch (error) {
+          console.warn("[ImportCsv] Guild derived snapshot upsert failed", { serverKey, error });
+        }
+      }
+      if (pendingSnapshotKeys.length) {
+        console.log("[ImportCsv] Guild derived snapshot flush done", {
+          count: flushedDocIds.length,
+          docs: flushedDocIds,
+        });
       }
     }
   }

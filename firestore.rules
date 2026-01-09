@@ -148,6 +148,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /stats_cache_guild_derived/{docId} {
+      allow read: if true;
+      allow create, update: if isImporter();
+      allow delete: if false;
+    }
+
     match /stats_index_players_daily_compact/{docId} {
       allow read: if true;
       allow create, update: if isImporter();
