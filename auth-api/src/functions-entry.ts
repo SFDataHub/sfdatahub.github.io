@@ -2,6 +2,7 @@ import { onRequest } from "firebase-functions/v2/https";
 
 import app from "./app";
 import { FUNCTION_SECRET_PARAMS } from "./config";
+import { publishPlayerLatestToplists } from "./triggers/playerToplists";
 
 export const authApi = onRequest(
   {
@@ -10,3 +11,5 @@ export const authApi = onRequest(
   },
   app,
 );
+
+export { publishPlayerLatestToplists };

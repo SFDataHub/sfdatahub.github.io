@@ -1257,9 +1257,11 @@ async function upsertPlayerDerivedServerSnapshot(
       return { minId, minSum };
     };
 
+    const touchedIds = new Set<string>();
     for (const entry of entries) {
       const pid = String(entry.playerId ?? "");
       if (!pid) continue;
+      touchedIds.add(pid);
 
       if (byId.has(pid)) {
         byId.set(pid, entry);
@@ -1289,9 +1291,14 @@ async function upsertPlayerDerivedServerSnapshot(
       players.length = PLAYER_DERIVED_SNAPSHOT_LIMIT;
     }
 
+        const rawMeta = snap.exists() ? (snap.data() as any)?.meta : null;
+        const prevPending = Number(rawMeta?.pendingSincePublish ?? 0);
+        const pendingSincePublish = (Number.isFinite(prevPending) ? prevPending : 0) + touchedIds.size;
+        const nextMeta = { ...(rawMeta && typeof rawMeta === "object" ? rawMeta : {}), pendingSincePublish };
+
         tx.set(
           snapshotRef,
-          { server: snapshotKey, updatedAt: serverTimestamp(), players },
+          { server: snapshotKey, updatedAt: serverTimestamp(), players, meta: nextMeta },
           { merge: true }
         );
       }),
