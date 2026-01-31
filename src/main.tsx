@@ -5,7 +5,7 @@ import ReactDOM from "react-dom/client";
 import "./styles/index.css";
 import "./i18n";
 
-import { HashRouter, Route, Routes, Navigate } from "react-router-dom";
+import { HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import RootLayout from "./layout/RootLayout";
 
 import Home from "./pages/Home";
@@ -185,6 +185,13 @@ const P = (t: string) => () => (
   </div>
 );
 const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht mehr.");
+const ToplistsLegacyRedirect = ({ tab }: { tab: "players" | "guilds" }) => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("tab", tab);
+  const query = params.toString();
+  return <Navigate to={`/toplists${query ? `?${query}` : ""}`} replace />;
+};
 
 const withFeatureGate = (
   featureId: string,
@@ -516,8 +523,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/guilds/planner" element={NotFoundOld()} />
                 <Route path="/guilds/fusion" element={NotFoundOld()} />
                 <Route path="/guilds/academy" element={NotFoundOld()} />
-                <Route path="/toplists/players" element={NotFoundOld()} />
-                <Route path="/toplists/guilds" element={NotFoundOld()} />
+                <Route path="/toplists/players" element={<ToplistsLegacyRedirect tab="players" />} />
+                <Route path="/toplists/guilds" element={<ToplistsLegacyRedirect tab="guilds" />} />
                 <Route path="/toplists/servers" element={NotFoundOld()} />
                 <Route path="/settings/profile" element={NotFoundOld()} />
                 <Route path="/settings/appearance" element={NotFoundOld()} />

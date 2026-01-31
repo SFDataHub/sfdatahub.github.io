@@ -1,5 +1,5 @@
 ﻿import React, { useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import ContentShell from "../../components/ContentShell";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -9,6 +9,7 @@ import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 
 import { ToplistsProvider, useToplistsData } from "../../context/ToplistsDataContext";
+import GuildToplists from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 
 // HUD -> Provider Sort mapping
@@ -55,6 +56,20 @@ function PlayerToplistsPageContent() {
     sortBy,
   } = f;
   const { serverGroups } = useToplistsData();
+  const [searchParams] = useSearchParams();
+  const serverParam = searchParams.get("server");
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "guilds" ? "guilds" : "players";
+
+  useEffect(() => {
+    if (!serverParam) return;
+    const normalized = serverParam.trim().toUpperCase();
+    if (!normalized) return;
+    setServers((prev: string[]) => {
+      if (prev.length === 1 && prev[0]?.toUpperCase() === normalized) return prev;
+      return [normalized];
+    });
+  }, [serverParam, setServers]);
 
   return (
     <>
@@ -72,7 +87,7 @@ function PlayerToplistsPageContent() {
       >
         <ListSwitcher />
 
-        {listView === "table" && (
+        {activeTab === "players" && listView === "table" && (
           <TableDataView
             servers={servers ?? []}
             classes={classes ?? []}
@@ -80,6 +95,7 @@ function PlayerToplistsPageContent() {
             sortKey={sortBy ?? "level"}
           />
         )}
+        {activeTab === "guilds" && <GuildToplists serverCode={servers?.[0]} />}
       </ContentShell>
 
       <ServerSheet
@@ -246,6 +262,15 @@ function TopActions() {
     setBottomFilterOpen,
     setServerSheetOpen,
   } = useFilters();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "guilds" ? "guilds" : "players";
+
+  const setTab = (next: "players" | "guilds") => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", next);
+    setSearchParams(nextParams);
+  };
 
   return (
     <div className="flex items-center justify-end gap-2 flex-wrap">
@@ -254,8 +279,8 @@ function TopActions() {
         style={{ borderColor: "#2B4C73", background: "#14273E" }}
         aria-label="Toplist Tabs"
       >
-        <TopTab to="/toplists/players" label="Players" />
-        <TopTab to="/toplists/guilds" label="Guilds" />
+        <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label="Players" />
+        <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label="Guilds" />
       </nav>
 
       <span className="hidden md:inline-block w-px h-6" style={{ background: "#2B4C73" }} />
@@ -322,18 +347,25 @@ function TopActions() {
   );
 }
 
-function TopTab({ to, label }: { to: string; label: string }) {
+function TopTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        [
-          "rounded-lg px-3 py-1.5 text-sm text-white border",
-          isActive ? "bg-[#25456B] border-[#5C8BC6]" : "border-transparent",
-        ].join(" ")
-      }
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-lg px-3 py-1.5 text-sm text-white border",
+        active ? "bg-[#25456B] border-[#5C8BC6]" : "border-transparent",
+      ].join(" ")}
     >
       {label}
-    </NavLink>
+    </button>
   );
 }

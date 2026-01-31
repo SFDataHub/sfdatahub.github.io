@@ -188,8 +188,8 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
 
   const parsedChannelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
   if (!parsedChannelIds || (parsedChannelIds.valid.length === 0 && parsedChannelIds.invalid.length === 0)) {
-    console.error("[news-snapshot] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
-    return res.status(500).json({ error: "missing_config" });
+    console.warn("[news-snapshot] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
+    return res.status(200).json({ skipped: true, reason: "missing_channel_ids" });
   }
 
   const botToken = DISCORD_NEWS_BOT_TOKEN;

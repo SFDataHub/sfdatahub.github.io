@@ -7,9 +7,6 @@
 }
 .rowTop { align-items: start; }
 .rowSplit { align-items: start; }
-.rowFeatured {}
-.splitMain {}
-.splitSide {}
 .featuredRowWrap {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -23,17 +20,8 @@
 }
 
 .colFull { grid-column: 1 / -1; }
-.colFreshness {}
-.colKPIs {}
-.colToplists {}
 .colRightstack { display: grid; gap: 16px; }
-.stackItem {}
-.colThird {}
 
-.colCommunity {}
-.colGuides {}
-.colSystem {}
-.colFeedback {}
 
 @media (min-width: 480px) {
   .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -176,6 +164,7 @@
   color: #E7F1FF;
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -215,7 +204,6 @@
 .liveCard { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
 .liveAvatar { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
 .liveAvatarFallback { width: 48px; height: 48px; border-radius: 10px; background: #254364; display: grid; place-items: center; font-weight: 700; }
-.liveInfo {}
 .liveName { font-weight: 600; color: #F5F9FF; }
 .liveMeta { display: flex; gap: 8px; font-size: 12px; color: #B0C4D9; }
 .liveBadge { background: #e02b2b; color: white; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; }

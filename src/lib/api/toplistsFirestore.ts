@@ -1,6 +1,14 @@
 ﻿// src/lib/api/toplistsFirestore.ts
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import {
+  beginReadScope,
+  endReadScope,
+  reportReadSummary,
+  reportWriteSummary,
+  startReadTraceSession,
+  traceGetDoc,
+} from "../debug/firestoreReadTrace";
 
 const STATS_PUBLIC_ROOT = "stats_public";
 const PLAYERS_COLLECTION = "toplists_players_v1";
@@ -147,8 +155,47 @@ export type FirestoreToplistPlayerList = {
   rows: FirestoreToplistPlayerRow[];
 };
 
+export type FirestoreLatestToplistSnapshot = {
+  server: string;
+  updatedAt: number | null;
+  players: FirestoreToplistPlayerRow[];
+};
+
+export type FirestoreToplistGuildRow = {
+  guildId: string;
+  server: string;
+  name: string;
+  memberCount: number | null;
+  hofRank: number | null;
+  lastScan: string | null;
+  sumAvg: number | null;
+  avgLevel: number | null;
+  avgTreasury: number | null;
+  avgMine: number | null;
+  avgBaseMain: number | null;
+  avgConBase: number | null;
+  avgSumBaseTotal: number | null;
+  avgAttrTotal: number | null;
+  avgConTotal: number | null;
+  avgTotalStats: number | null;
+};
+
+export type FirestoreLatestGuildToplistSnapshot = {
+  server: string;
+  updatedAt: number | null;
+  guilds: FirestoreToplistGuildRow[];
+};
+
 export type FirestoreToplistPlayerResult =
   | { ok: true; list: FirestoreToplistPlayerList }
+  | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
+
+export type FirestoreLatestToplistResult =
+  | { ok: true; snapshot: FirestoreLatestToplistSnapshot }
+  | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
+
+export type FirestoreLatestGuildToplistResult =
+  | { ok: true; snapshot: FirestoreLatestGuildToplistSnapshot }
   | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
 
 const toNumber = (value: any): number | null => {
@@ -195,98 +242,153 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
   };
 };
 
-export async function getPlayerToplistById(listId: string): Promise<FirestoreToplistPlayerResult> {
+const mapGuildRow = (raw: any): FirestoreToplistGuildRow | null => {
+  if (!raw || typeof raw !== "object") return null;
+
+  const server = toStringOrNull(raw.server);
+  const name = toStringOrNull(raw.name) ?? toStringOrNull(raw.guildId);
+  const guildId = toStringOrNull(raw.guildId) ?? name;
+
+  if (!server || !name || !guildId) return null;
+
+  const sumAvg = toNumber(raw.sumAvg ?? raw.avgSumBaseTotal ?? raw.sum);
+
+  return {
+    guildId,
+    server,
+    name,
+    memberCount: toNumber(raw.memberCount),
+    hofRank: toNumber(raw.hofRank),
+    lastScan: toStringOrNull(raw.lastScan),
+    sumAvg,
+    avgLevel: toNumber(raw.avgLevel),
+    avgTreasury: toNumber(raw.avgTreasury),
+    avgMine: toNumber(raw.avgMine),
+    avgBaseMain: toNumber(raw.avgBaseMain),
+    avgConBase: toNumber(raw.avgConBase),
+    avgSumBaseTotal: toNumber(raw.avgSumBaseTotal),
+    avgAttrTotal: toNumber(raw.avgAttrTotal),
+    avgConTotal: toNumber(raw.avgConTotal),
+    avgTotalStats: toNumber(raw.avgTotalStats),
+  };
+};
+
+export async function getLatestPlayerToplistSnapshot(serverCode: string): Promise<FirestoreLatestToplistResult> {
+  const code = (serverCode || "").trim().toUpperCase();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing server code" };
+  }
+
+  const sessionName = `ToplistsPlayers:${code}`;
+  startReadTraceSession(sessionName);
+  const scope = beginReadScope(sessionName);
+
   try {
-    const snap = await getDoc(doc(db, STATS_PUBLIC_ROOT, PLAYERS_COLLECTION, "lists", listId));
+    const ref = doc(
+      db,
+      STATS_PUBLIC_ROOT,
+      PLAYERS_COLLECTION,
+      "lists",
+      "latest_toplists",
+      "servers",
+      code
+    );
+    const snap = await traceGetDoc(scope, ref, () => getDoc(ref), { label: "ToplistsPlayers" });
     if (!snap.exists()) {
       return { ok: false, error: "not_found" };
     }
 
     const data: any = snap.data() || {};
-
-    const entity = toStringOrNull(data.entity) || "players";
-    const group = toStringOrNull(data.group);
-    const server = toStringOrNull(data.server);
-    const metric = toStringOrNull(data.metric);
-    const timeRange = toStringOrNull(data.timeRange);
-    const limit = toNumber(data.limit);
-    const rowsRaw = Array.isArray(data.rows) ? data.rows : null;
-
-    if (entity !== "players" || !group || !server || !metric || !timeRange || limit == null || !rowsRaw) {
-      console.error("[toplistsFirestore] Decode failed", {
-        entity,
-        group,
-        server,
-        metric,
-        timeRange,
-        limit,
-        hasRowsArray: Array.isArray(data.rows),
-      });
-      return { ok: false, error: "decode_error", detail: "missing required toplist fields" };
+    const rawPlayers = Array.isArray(data.players) ? data.players : null;
+    if (!rawPlayers) {
+      return { ok: false, error: "decode_error", detail: "missing players array" };
     }
 
-    const rows: FirestoreToplistPlayerRow[] = [];
-    for (const row of rowsRaw) {
+    const players: FirestoreToplistPlayerRow[] = [];
+    for (const row of rawPlayers) {
       const mapped = mapRow(row);
       if (!mapped) {
-        console.error("[toplistsFirestore] Row decode failed", row);
-        return { ok: false, error: "decode_error", detail: "invalid row shape" };
+        console.error("[toplistsFirestore] Latest snapshot row decode failed", row);
+        return { ok: false, error: "decode_error", detail: "invalid player row" };
       }
-      rows.push(mapped);
+      players.push(mapped);
     }
 
-    const list: FirestoreToplistPlayerList = {
-      id: listId,
-      entity: "players",
-      group,
-      server,
-      metric,
-      timeRange,
-      limit,
-      updatedAt: toNumber(data.updatedAt),
-      nextUpdateAt: data.nextUpdateAt !== undefined ? toNumber(data.nextUpdateAt) : undefined,
-      ttlSec: data.ttlSec !== undefined ? toNumber(data.ttlSec) : undefined,
-      rows,
+    return {
+      ok: true,
+      snapshot: {
+        server: toStringOrNull(data.server) ?? code,
+        updatedAt: toNumber(data.updatedAt),
+        players,
+      },
     };
-
-    return { ok: true, list };
   } catch (err: any) {
     console.error("[toplistsFirestore] Firestore error", err);
     return { ok: false, error: "firestore_error", detail: err?.message };
+  } finally {
+    endReadScope(scope);
+    reportReadSummary(sessionName);
+    reportWriteSummary(sessionName);
   }
 }
 
-export async function getPlayerToplistWithFallback(
-  key: PlayerToplistKey
-): Promise<FirestoreToplistPlayerResult> {
-  const primaryId = buildPlayerListId(key);
-  const primary = await getPlayerToplistById(primaryId);
-
-  if (primary.ok && primary.list.rows && primary.list.rows.length > 0) {
-    return primary;
+export async function getLatestGuildToplistSnapshot(
+  serverCode: string
+): Promise<FirestoreLatestGuildToplistResult> {
+  const code = (serverCode || "").trim().toUpperCase();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing server code" };
   }
 
-  const groupNorm = (key.group || "").toLowerCase();
-  if (groupNorm === "all") {
-    return primary;
-  }
+  const sessionName = `ToplistsGuilds:${code}`;
+  startReadTraceSession(sessionName);
+  const scope = beginReadScope(sessionName);
 
-  const fallbackKey: PlayerToplistKey = {
-    ...key,
-    group: "all",
-  };
-  const fallbackId = buildPlayerListId(fallbackKey);
-  const fallback = await getPlayerToplistById(fallbackId);
+  try {
+    const ref = doc(
+      db,
+      STATS_PUBLIC_ROOT,
+      "toplists_guilds_v1",
+      "lists",
+      "latest_toplists",
+      "servers",
+      code
+    );
+    const snap = await traceGetDoc(scope, ref, () => getDoc(ref), { label: "ToplistsGuilds" });
+    if (!snap.exists()) {
+      return { ok: false, error: "not_found" };
+    }
 
-  if (fallback.ok) {
+    const data: any = snap.data() || {};
+    const rawGuilds = Array.isArray(data.guilds) ? data.guilds : null;
+    if (!rawGuilds) {
+      return { ok: false, error: "decode_error", detail: "missing guilds array" };
+    }
+
+    const guilds: FirestoreToplistGuildRow[] = [];
+    for (const row of rawGuilds) {
+      const mapped = mapGuildRow(row);
+      if (!mapped) {
+        console.error("[toplistsFirestore] Latest guild snapshot row decode failed", row);
+        return { ok: false, error: "decode_error", detail: "invalid guild row" };
+      }
+      guilds.push(mapped);
+    }
+
     return {
       ok: true,
-      list: {
-        ...fallback.list,
-        group: key.group,
+      snapshot: {
+        server: toStringOrNull(data.server) ?? code,
+        updatedAt: toNumber(data.updatedAt),
+        guilds,
       },
     };
+  } catch (err: any) {
+    console.error("[toplistsFirestore] Firestore error", err);
+    return { ok: false, error: "firestore_error", detail: err?.message };
+  } finally {
+    endReadScope(scope);
+    reportReadSummary(sessionName);
+    reportWriteSummary(sessionName);
   }
-
-  return primary;
 }

@@ -1352,9 +1352,11 @@ async function upsertGuildDerivedServerSnapshot(
           return { minId, minSum };
         };
 
+        const touchedIds = new Set<string>();
         for (const entry of entries) {
           const gid = String(entry.guildId ?? "");
           if (!gid) continue;
+          touchedIds.add(gid);
 
           if (byId.has(gid)) {
             byId.set(gid, entry);
@@ -1389,9 +1391,15 @@ async function upsertGuildDerivedServerSnapshot(
           guilds.length = GUILD_DERIVED_SNAPSHOT_LIMIT;
         }
 
+        const rawMeta = snap.exists() ? (snap.data() as any)?.meta : null;
+        const prevPending = Number(rawMeta?.pendingSincePublish ?? 0);
+        const pendingSincePublish =
+          (Number.isFinite(prevPending) ? prevPending : 0) + touchedIds.size;
+        const nextMeta = { ...(rawMeta && typeof rawMeta === "object" ? rawMeta : {}), pendingSincePublish };
+
         tx.set(
           snapshotRef,
-          { server: snapshotKey, updatedAt: serverTimestamp(), guilds },
+          { server: snapshotKey, updatedAt: serverTimestamp(), guilds, meta: nextMeta },
           { merge: true }
         );
       }),
