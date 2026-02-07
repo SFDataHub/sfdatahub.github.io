@@ -13,7 +13,16 @@ import type { CsvParsedResult, ParsedCsvGuild, ParsedCsvPlayer } from "../Upload
 
 type Row = Record<string, any>;
 const norm = (s: any) => String(s ?? "").trim();
-const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
+const CANON = (s: string) =>
+  String(s ?? "")
+    .trim()
+    .replace(/:+$/, "")
+    .toLowerCase()
+    .replace(/[\s_\u00a0]+/g, "");
+const normalizeHeaderLabel = (value: any) => {
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+  return raw.replace(/:+$/, "").toLowerCase();
+};
 
 function detectDelimiter(headerLine: string) {
   const c = [",",";","\t","|"];
@@ -83,6 +92,34 @@ const hasCols = (headers: string[], requiredCanon: string[]) => {
 const pickByCanon = (row: Row, canonKey: string): any => {
   for (const k of Object.keys(row)) if (CANON(k) === canonKey) return row[k];
   return undefined;
+};
+const buildHeaderIndex = (headers: string[]) => {
+  const map = new Map<string, string[]>();
+  headers.forEach((header) => {
+    const key = normalizeHeaderLabel(header);
+    if (!key) return;
+    const list = map.get(key) ?? [];
+    list.push(header);
+    map.set(key, list);
+  });
+  return map;
+};
+const resolveMemberCountHeader = (headers: string[]) => {
+  const map = buildHeaderIndex(headers);
+  const aliases = ["guild member count", "guild membercount", "member count", "guild members"];
+  for (const alias of aliases) {
+    const matches = map.get(alias);
+    if (matches && matches.length === 1) return matches[0];
+  }
+  return null;
+};
+const parseMemberCount = (value: any): number | null => {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const cleaned = raw.replace(/[\s,\.]/g, "");
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
 };
 
 /** Dateiname → Typ; Fallback: Header-Scoring */
@@ -168,11 +205,15 @@ function slimPlayers(rows: Row[], headers: string[]): PlayerSlim[] {
 }
 function slimGuilds(rows: Row[], headers: string[]): GuildSlim[] {
   const out: GuildSlim[] = [];
-  if (!hasCols(headers, [COL.GUILDS.GUILD_IDENTIFIER, COL.GUILDS.GUILD_MEMBER_COUNT])) return out;
+  if (!hasCols(headers, [COL.GUILDS.GUILD_IDENTIFIER])) return out;
+  const memberCountHeader = resolveMemberCountHeader(headers);
   for (const r of rows) {
     const gid = pickByCanon(r, COL.GUILDS.GUILD_IDENTIFIER);
-    const mc  = Number(pickByCanon(r, COL.GUILDS.GUILD_MEMBER_COUNT));
-    if (!gid || !Number.isFinite(mc)) continue;
+    const memberRaw = memberCountHeader
+      ? r[memberCountHeader]
+      : pickByCanon(r, COL.GUILDS.GUILD_MEMBER_COUNT);
+    const mc = parseMemberCount(memberRaw);
+    if (!gid || mc == null) continue;
     const ts  = toSec(pickByCanon(r, COL.GUILDS.TIMESTAMP));
     out.push({
       guildIdentifier: String(gid),
@@ -207,7 +248,7 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
 
   const players: ParsedCsvPlayer[] = [];
   const membersByGuild = new Map<string, ParsedCsvPlayer[]>();
-  const guildServerFromPlayers = new Map<string, string>();
+  const playerCountByGuildId = new Map<string, number>();
 
   for (const p of parsedPlayers) {
     const player: ParsedCsvPlayer = {
@@ -222,23 +263,42 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
     };
     players.push(player);
 
-    if (p.guildIdentifier) {
-      if (!membersByGuild.has(p.guildIdentifier)) membersByGuild.set(p.guildIdentifier, []);
-      membersByGuild.get(p.guildIdentifier)!.push(player);
-      if (!guildServerFromPlayers.has(p.guildIdentifier)) guildServerFromPlayers.set(p.guildIdentifier, p.server);
+    const guildId = String(p.guildIdentifier ?? "").trim();
+    if (guildId) {
+      if (!membersByGuild.has(guildId)) membersByGuild.set(guildId, []);
+      membersByGuild.get(guildId)!.push(player);
+      playerCountByGuildId.set(guildId, (playerCountByGuildId.get(guildId) ?? 0) + 1);
     }
   }
 
   const guilds: ParsedCsvGuild[] = [];
+  const guildMemberCountByGuildId = new Map<string, number>();
 
   for (const g of parsedGuilds) {
-    const members = membersByGuild.get(g.guildIdentifier) ?? [];
+    const guildId = String(g.guildIdentifier ?? "").trim();
+    if (!guildId) continue;
+    const memberCount = Number(g.memberCount ?? NaN);
+    if (!Number.isFinite(memberCount) || memberCount <= 0) continue;
+    guildMemberCountByGuildId.set(guildId, memberCount);
+  }
+
+  const uploadableGuildIds = new Set<string>();
+  for (const [guildId, memberCount] of guildMemberCountByGuildId.entries()) {
+    const playersCount = playerCountByGuildId.get(guildId) ?? 0;
+    if (playersCount === memberCount) uploadableGuildIds.add(guildId);
+  }
+
+  for (const g of parsedGuilds) {
+    const guildId = String(g.guildIdentifier ?? "").trim();
+    if (!uploadableGuildIds.has(guildId)) continue;
+    const members = membersByGuild.get(guildId) ?? [];
     guilds.push({
-      guildId: g.guildIdentifier,
-      name: g.name ?? g.guildIdentifier,
+      guildId,
+      name: g.name ?? guildId,
       server: g.server,
       memberCount: g.memberCount ?? members.length,
       scanTimestampSec: g.timestampSec,
+      values: g.raw,
       members: members.map((m) => ({
         playerId: m.playerId,
         name: m.name,
@@ -246,27 +306,7 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
         className: m.className,
       })),
     });
-    membersByGuild.delete(g.guildIdentifier);
-  }
-
-  for (const [gid, members] of membersByGuild.entries()) {
-    if (!members.length) continue;
-    const server = guildServerFromPlayers.get(gid);
-    if (!server) continue;
-    const latestTs = members.reduce((max, m) => Math.max(max, m.scanTimestampSec), members[0].scanTimestampSec);
-    guilds.push({
-      guildId: gid,
-      name: gid,
-      server,
-      memberCount: members.length,
-      scanTimestampSec: latestTs,
-      members: members.map((m) => ({
-        playerId: m.playerId,
-        name: m.name,
-        level: m.level,
-        className: m.className,
-      })),
-    });
+    membersByGuild.delete(guildId);
   }
 
   return {

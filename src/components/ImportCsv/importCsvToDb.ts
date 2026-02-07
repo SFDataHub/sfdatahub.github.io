@@ -4,6 +4,7 @@ import {
   type ImportCsvOptions,
   type ImportReport,
   type ImportResultItem,
+  flushGuildDerivedSnapshotsFromAggregates,
   loadServerHostMapByHosts,
 } from "../../lib/import/csv";
 import { writeGuildSnapshotsFromRows } from "../../lib/import/importer";
@@ -18,6 +19,7 @@ import {
   beginReadScope,
   endReadScope,
   reportReadSummary,
+  reportWriteSummary,
   startReadTraceSession,
   traceGetDoc,
   type FirestoreTraceScope,
@@ -37,6 +39,40 @@ const collectServerHosts = (rows: Row[], target: Set<string>) => {
     const host = normalizeServerHost(serverRaw);
     if (host) target.add(host);
   }
+};
+const normalizeGuildId = (value: any) => String(value ?? "").trim();
+const parseMemberCount = (value: any): number | null => {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
+  const playerCountByGuildId = new Map<string, number>();
+  const guildMemberCountByGuildId = new Map<string, number>();
+
+  for (const row of playersRows) {
+    const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
+    if (!gid) continue;
+    playerCountByGuildId.set(gid, (playerCountByGuildId.get(gid) ?? 0) + 1);
+  }
+
+  for (const row of guildsRows) {
+    const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
+    if (!gid) continue;
+    const memberCount = parseMemberCount(pickByCanon(row, CANON("Guild Member Count")));
+    if (memberCount == null || memberCount <= 0) continue;
+    guildMemberCountByGuildId.set(gid, memberCount);
+  }
+
+  const uploadableGuildIds = new Set<string>();
+  for (const [gid, memberCount] of guildMemberCountByGuildId.entries()) {
+    const playersCount = playerCountByGuildId.get(gid) ?? 0;
+    if (playersCount === memberCount) uploadableGuildIds.add(gid);
+  }
+
+  return { uploadableGuildIds, playerCountByGuildId, guildMemberCountByGuildId };
 };
 
 export type ImportSelectionPayload = {
@@ -63,7 +99,17 @@ export async function importSelectionToDb(
   collectServerHosts(payload.guildsRows, serverHosts);
   const serverHostMap =
     serverHosts.size > 0 ? await loadServerHostMapByHosts(Array.from(serverHosts)) : new Map<string, string>();
-  const { playersRows, guildsRows } = payload;
+  const { uploadableGuildIds } = buildUploadableGuildIds(payload.playersRows, payload.guildsRows);
+  const guildsRowsFiltered = payload.guildsRows.filter((row) => {
+    const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
+    return gid ? uploadableGuildIds.has(gid) : false;
+  });
+  const playersRowsForGuilds = payload.playersRows.filter((row) => {
+    const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
+    return gid ? uploadableGuildIds.has(gid) : false;
+  });
+  const { playersRows } = payload;
+  const guildsRows = guildsRowsFiltered;
   const reports: ImportReport[] = [];
   let players: ImportResultItem[] = [];
   let guilds: ImportResultItem[] = [];
@@ -74,20 +120,23 @@ export async function importSelectionToDb(
         opts.onProgress?.({ ...p, kind })
     : undefined;
 
-  try {
-    const repGuilds = await importCsvToDB(null, {
-      kind: "guilds",
-      rows: guildsRows,
-      onProgress: emitProgress ? (p) => emitProgress(p, "guilds") : undefined,
-      serverHostMap,
-    } as ImportCsvOptions);
-    reports.push(repGuilds);
-    if (Array.isArray(repGuilds.guildResults)) {
-      guilds = repGuilds.guildResults as ImportResultItem[];
+  if (guildsRows.length > 0) {
+    try {
+      const repGuilds = await importCsvToDB(null, {
+        kind: "guilds",
+        rows: guildsRows,
+        onProgress: emitProgress ? (p) => emitProgress(p, "guilds") : undefined,
+        serverHostMap,
+        skipGuildDerived: true,
+      } as ImportCsvOptions);
+      reports.push(repGuilds);
+      if (Array.isArray(repGuilds.guildResults)) {
+        guilds = repGuilds.guildResults as ImportResultItem[];
+      }
+    } catch (error) {
+      console.error("[ImportSelectionToDb] guild import error", error);
+      ok = false;
     }
-  } catch (error) {
-    console.error("[ImportSelectionToDb] guild import error", error);
-    ok = false;
   }
 
   try {
@@ -106,11 +155,25 @@ export async function importSelectionToDb(
     ok = false;
   }
 
-  try {
-    await writeGuildSnapshotsFromRows(playersRows, guildsRows);
-  } catch (error) {
-    console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows skipped", error);
-    ok = false;
+  type GuildSnapshotResult = Awaited<ReturnType<typeof writeGuildSnapshotsFromRows>>;
+  let guildDerivedAggregates: GuildSnapshotResult["aggregatesByGuildId"] | null = null;
+  if (guildsRows.length > 0 && playersRowsForGuilds.length > 0) {
+    try {
+      const summaryResult = await writeGuildSnapshotsFromRows(playersRowsForGuilds, guildsRows);
+      guildDerivedAggregates = summaryResult.aggregatesByGuildId;
+    } catch (error) {
+      console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows skipped", error);
+      ok = false;
+    }
+  }
+
+  if (guildDerivedAggregates && guildDerivedAggregates.size > 0) {
+    try {
+      await flushGuildDerivedSnapshotsFromAggregates(guildDerivedAggregates, serverHostMap);
+    } catch (error) {
+      console.warn("[ImportSelectionToDb] guild derived snapshot flush skipped", error);
+      ok = false;
+    }
   }
 
   const gidSet = new Set<string>();
@@ -118,7 +181,7 @@ export async function importSelectionToDb(
     const v = pickByCanon(r, CANON("Guild Identifier"));
     if (v) gidSet.add(String(v));
   }
-  for (const r of playersRows) {
+  for (const r of playersRowsForGuilds) {
     const v = pickByCanon(r, CANON("Guild Identifier"));
     if (v) gidSet.add(String(v));
   }
@@ -166,5 +229,6 @@ export async function importSelectionToDb(
   }
 
   reportReadSummary("ImportSelection");
+  reportWriteSummary("ImportSelection");
   return { ok, players, guilds, reports };
 }

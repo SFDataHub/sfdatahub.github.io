@@ -1,13 +1,13 @@
 // /src/lib/importer/upsert.ts
 import {
-  collection, doc, getDoc, writeBatch, setDoc, Firestore,
+  collection, doc, getDoc, writeBatch, Firestore,
 } from "firebase/firestore";
 import type {
   CsvRow, ImportReport, Kind, Mapping, MetaAppConfig,
 } from "./types";
 import { getTimestamp, makeKeyFromTemplate, nowServerTimestamp } from "./db";
 import { bestId, headerValue, normalizeServer } from "./preprocess";
-import { traceGetDoc } from "../debug/firestoreReadTrace";
+import { recordWrite, traceBatchCommit, traceGetDoc } from "../debug/firestoreReadTrace";
 
 const MAX_OPS = 450; // Firestore limit < 500
 
@@ -50,12 +50,17 @@ export async function upsertRows(
   let batch = writeBatch(db);
   let ops = 0;
   let processed = 0;
+  let pendingWrites: Array<{ path: string; op: string; label: string }> = [];
 
   const normCfg = meta.csvMapping.serverNormalize;
 
   const flush = async () => {
     if (ops === 0) return;
-    await batch.commit();
+    await traceBatchCommit(() => batch.commit(), { label: "ImportUpsert:batch", path: "batch:importUpsert" });
+    pendingWrites.forEach((entry) => {
+      recordWrite({ path: entry.path, op: entry.op, docCount: 1, label: entry.label });
+    });
+    pendingWrites = [];
     batch = writeBatch(db);
     ops = 0;
   };
@@ -97,6 +102,7 @@ export async function upsertRows(
 
     // upsert into scans (all rows)
     batch.set(scansRef, { ...row, ...common }, { merge: true });
+    pendingWrites.push({ path: scansRef.path, op: "setDoc", label: "ImportUpsert:scans" });
     ops++; writtenScans++;
 
     // upsert into latest: only if ts is newer
@@ -134,6 +140,7 @@ export async function upsertRows(
 
       if (ts > prevTs) {
         batch.set(latestRef, { ...row, ...common }, { merge: true });
+        pendingWrites.push({ path: latestRef.path, op: "setDoc", label: "ImportUpsert:latest" });
         ops++; writtenLatest++;
       } else {
         skippedDuplicate++; // older or equal snapshot

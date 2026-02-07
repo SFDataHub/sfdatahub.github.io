@@ -72,6 +72,10 @@ function RuneIconHeader({ keyName, label }: { keyName: string; label: string }) 
   );
 }
 
+export default function AMRuneBonuses() {
+  return <AMRuneBonusesTable />;
+}
+
 function AchievementBadge({ name }: { name: string }) {
   const key = Object.keys(ACHIEV_ICON_KEYS).find((k) =>
     name.toLowerCase().includes(k.toLowerCase())
@@ -362,7 +366,7 @@ function useFilteredRows(q: string) {
   );
 }
 
-export default function AMRuneBonuses() {
+export function AMRuneBonusesTable() {
   const [q, setQ] = useState("");
   const [hoverTier, setHoverTier] = useState<string | null>(null); // <- Gruppennamen bei Hover
 
@@ -386,11 +390,6 @@ export default function AMRuneBonuses() {
 
   return (
     <div className={styles.wrap}>
-      {/* Header */}
-      <div className={styles.headerBar}>
-        <h2 className={styles.title}>Arena Manager – Rune bonuses</h2>
-        <span className={styles.meta}>last updated: 15.01.2025</span>
-      </div>
       <p className={styles.description}>{DESCRIPTION}</p>
 
       {/* lokale Suche */}

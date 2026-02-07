@@ -5,9 +5,28 @@
 
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { traceGetDoc } from "../debug/firestoreReadTrace";
+import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
 
 export type CSVRow = Record<string, any>;
+export type GuildDerivedAggregate = {
+  guildId: string;
+  server: string | null;
+  name: string | null;
+  memberCount: number | null;
+  hofRank: number | null;
+  lastScan: string | null;
+  timestampSec: number;
+  count: number;
+  avgLevel: number | null;
+  avgTreasury: number | null;
+  avgMine: number | null;
+  avgBaseMain: number | null;
+  avgConBase: number | null;
+  avgSumBaseTotal: number | null;
+  avgAttrTotal: number | null;
+  avgConTotal: number | null;
+  avgTotalStats: number | null;
+};
 
 // ---------- Utils ----------
 const CANON = (s: string) => s.toLowerCase().replace(/[\s_\u00a0]+/g, "");
@@ -85,6 +104,12 @@ const G = {
   GUILD_IDENTIFIER: CANON("Guild Identifier"),
   SERVER: CANON("Server"),
   NAME: CANON("Name"),
+  TIMESTAMP: CANON("Timestamp"),
+  MEMBER_COUNT: CANON("Guild Member Count"),
+  HOF: CANON("Hall of Fame Rank"),
+  HOF_ALT: CANON("Hall of Fame"),
+  RANK: CANON("Rank"),
+  GUILD_RANK: CANON("Guild Rank"),
 } as const;
 
 // ---------- Typen ----------
@@ -267,6 +292,19 @@ async function readPrevSnapshotSec(gid: string): Promise<number> {
  */
 export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsRows: CSVRow[]) {
   const guildNameMap = buildGuildNameMap(guildsRows || []);
+  const aggregatesByGuildId = new Map<string, GuildDerivedAggregate>();
+
+  const latestGuildRowById = new Map<string, { row: CSVRow; tsSec: number }>();
+  const guildRowByIdAndTs = new Map<string, CSVRow>();
+  for (const r of guildsRows || []) {
+    const gid = String(pickByCanon(r, G.GUILD_IDENTIFIER) ?? "").trim();
+    if (!gid) continue;
+    const tsSec = toSecFlexible(pickByCanon(r, G.TIMESTAMP));
+    if (tsSec == null) continue;
+    guildRowByIdAndTs.set(`${gid}__${tsSec}`, r);
+    const prev = latestGuildRowById.get(gid);
+    if (!prev || tsSec > prev.tsSec) latestGuildRowById.set(gid, { row: r, tsSec });
+  }
 
   // Gildenmenge bestimmen (aus guildsRows + playersRows)
   const allGids = new Set<string>();
@@ -361,7 +399,7 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
     const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
     try {
-      await setDoc(ref, {
+      await traceSetDoc(ref, () => setDoc(ref, {
         guildId: gid,
         count: members.length,
         updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
@@ -380,7 +418,38 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
         members,
         updatedAtServer: serverTimestamp(),
-      }, { merge: true });
+      }, { merge: true }), { label: "ImportGuildSnapshots:summary" });
+
+      const metaRow =
+        guildRowByIdAndTs.get(`${gid}__${guildTsSec}`) ?? latestGuildRowById.get(gid)?.row ?? null;
+      const serverRaw = metaRow ? pickByCanon(metaRow, G.SERVER) : null;
+      const nameRaw = metaRow ? pickByCanon(metaRow, G.NAME) : null;
+      const memberCountRaw = metaRow ? pickByCanon(metaRow, G.MEMBER_COUNT) : null;
+      const hofRankRaw = metaRow
+        ? pickAnyByCanon(metaRow, [G.HOF, G.HOF_ALT, G.RANK, G.GUILD_RANK])
+        : null;
+      const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : guildTsRaw;
+      const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : guildTsRaw ?? String(guildTsSec);
+
+      aggregatesByGuildId.set(gid, {
+        guildId: gid,
+        server: serverRaw != null && String(serverRaw).trim() !== "" ? String(serverRaw).trim() : null,
+        name: nameRaw != null && String(nameRaw).trim() !== "" ? String(nameRaw).trim() : null,
+        memberCount: toNumberLoose(memberCountRaw),
+        hofRank: toNumberLoose(hofRankRaw),
+        lastScan: lastScan ? lastScan : null,
+        timestampSec: guildTsSec,
+        count: members.length,
+        avgLevel,
+        avgTreasury,
+        avgMine,
+        avgBaseMain,
+        avgConBase,
+        avgSumBaseTotal,
+        avgAttrTotal,
+        avgConTotal,
+        avgTotalStats,
+      });
 
       snapshotsWritten++;
     } catch (error) {
@@ -397,5 +466,5 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     throw fatalError;
   }
 
-  return { guildsProcessed: allGids.size, snapshotsWritten };
+  return { guildsProcessed: allGids.size, snapshotsWritten, aggregatesByGuildId };
 }

@@ -94,7 +94,7 @@ const DEFAULT_STATE: FiltersState = {
   servers: [],
   classes: [],
   days: "all",
-  sortBy: "level",
+  sortBy: "sum",
   favoritesOnly: false,
   activeOnly: false,
   searchText: "",

@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { db } from "../firebase";
-import { traceGetDoc } from "../debug/firestoreReadTrace";
+import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
 
 export type UploadCenterUsage = {
   date?: string | null;
@@ -90,19 +90,24 @@ export async function updateUploadCenterUsageForToday(
   const nextPlayers = basePlayers + Number(deltaPlayers ?? 0);
 
   try {
-    await setDoc(
+    await traceSetDoc(
       userRef,
-      {
-        uploadCenter: {
-          ...(existingUploadCenter ?? {}),
-          usage: {
-            date: today,
-            guilds: nextGuilds,
-            players: nextPlayers,
+      () =>
+        setDoc(
+          userRef,
+          {
+            uploadCenter: {
+              ...(existingUploadCenter ?? {}),
+              usage: {
+                date: today,
+                guilds: nextGuilds,
+                players: nextPlayers,
+              },
+            },
           },
-        },
-      },
-      { merge: true },
+          { merge: true },
+        ),
+      { label: "UploadCenterUsage:updateWrite" },
     );
   } catch (error) {
     console.error("[UploadCenterUsage] Failed to update usage data.", { userId, error });

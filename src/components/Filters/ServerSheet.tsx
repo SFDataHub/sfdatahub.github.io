@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { RegionKey, ServerGroupsByRegion } from "./serverGroups";
+import { SERVER_BY_ID } from "../../data/servers";
 
 /** Layout-Modus */
 type Mode = "sheet" | "modal";
@@ -40,6 +41,17 @@ const PALETTE = {
   accent: "#5C8BC6",
 };
 
+const normalizeServerId = (value: string) => value.trim().toLowerCase();
+
+const formatServerLabel = (code: string) => {
+  const normalized = normalizeServerId(code);
+  const known = SERVER_BY_ID[normalized]?.label;
+  if (known) return known;
+  const upper = code.trim().toUpperCase();
+  if (!upper) return code;
+  return upper.replace(/^([A-Z]+)(\d+)$/, "$1 $2");
+};
+
 export default function ServerSheet({
   open,
   onClose,
@@ -76,7 +88,8 @@ export default function ServerSheet({
   const filterMatches = (name: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return name.toLowerCase().includes(q);
+    const label = formatServerLabel(name).toLowerCase();
+    return name.toLowerCase().includes(q) || label.includes(q);
   };
 
   if (!open) return null;
@@ -151,16 +164,17 @@ export default function ServerSheet({
                 <div style={chipRow}>
                   {list.map((srv) => {
                     const active = selected.includes(srv);
+                    const label = formatServerLabel(srv);
                     return (
                       <button
                         key={srv}
                         type="button"
                         onClick={() => onToggle(srv)}
                         aria-pressed={active}
-                        title={srv}
+                        title={label}
                         style={{ ...chip, ...(active ? chipActive : null) }}
                       >
-                        {srv}
+                        {label}
                       </button>
                     );
                   })}

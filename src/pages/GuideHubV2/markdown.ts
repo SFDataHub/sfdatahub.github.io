@@ -186,6 +186,21 @@ function buildHtml(body: string): { html: string; toc: TocItem[] } {
       continue;
     }
 
+    const embedMatch = trimmed.match(/^\[\[embed:([a-z0-9-_]+)\]\]$/i);
+    if (embedMatch) {
+      closeList();
+      const key = embedMatch[1].toLowerCase();
+      html.push(`<div data-embed="${key}"></div>`);
+      continue;
+    }
+    const assetMatch = trimmed.match(/^\[\[asset:([a-z0-9-_]+)\]\]$/i);
+    if (assetMatch) {
+      closeList();
+      const key = assetMatch[1].toLowerCase();
+      html.push(`<div data-asset="${key}"></div>`);
+      continue;
+    }
+
     if (trimmed === "---" || trimmed === "***") {
       closeList();
       html.push("<hr />");

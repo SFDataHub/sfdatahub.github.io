@@ -1,7 +1,9 @@
 // Dev-only Firestore read tracing helpers
 // Toggles (localStorage, only active in DEV):
-// - localStorage["sfh:debug:firestoreReads"]="1"         -> enable tracing
-// - localStorage["sfh:debug:firestoreReadsCallsite"]="1" -> include callsite hints
+// - localStorage["sfh:debug:firestoreReads"]="1"          -> enable read tracing
+// - localStorage["sfh:debug:firestoreReadsCallsite"]="1"  -> include read callsite hints
+// - localStorage["sfh:debug:firestoreWrites"]="1"         -> enable write tracing
+// - localStorage["sfh:debug:firestoreWritesCallsite"]="1" -> include write callsite hints
 
 type ReadEntry = {
   collection: string;
@@ -26,11 +28,18 @@ const STORAGE_KEY = "sfh:debug:firestoreReads";
 const CALLSITE_KEY = "sfh:debug:firestoreReadsCallsite";
 const STORAGE_KEY_ALIAS = "sf_debug_firestore_reads";
 const CALLSITE_KEY_ALIAS = "sf_debug_firestore_reads_callsite";
+const WRITE_STORAGE_KEY = "sfh:debug:firestoreWrites";
+const WRITE_CALLSITE_KEY = "sfh:debug:firestoreWritesCallsite";
+const WRITE_STORAGE_KEY_ALIAS = "sf_debug_firestore_writes";
+const WRITE_CALLSITE_KEY_ALIAS = "sf_debug_firestore_writes_callsite";
 const isDev = typeof import.meta !== "undefined" && !!import.meta.env?.DEV;
 const globalTotals = new Map<string, number>();
 const readTotalsByPath = new Map<string, { total: number; ops: Record<string, number> }>();
 const readTotalsByOp = new Map<string, number>();
 const readTotalsByCallsite = new Map<string, number>();
+const writeTotalsByPath = new Map<string, { total: number; ops: Record<string, number> }>();
+const writeTotalsByOp = new Map<string, number>();
+const writeTotalsByCallsite = new Map<string, number>();
 const listenerTotalsByPath = new Map<string, { callbacks: number; docs: number }>();
 const activeListeners = new Map<number, ListenerRecord>();
 let nextScopeId = 1;
@@ -53,12 +62,30 @@ export const isFirestoreReadTraceEnabled = () => {
   );
 };
 
+export const isFirestoreWriteTraceEnabled = () => {
+  if (!isDev) return false;
+  if (typeof window === "undefined" || !window?.localStorage) return false;
+  return (
+    window.localStorage.getItem(WRITE_STORAGE_KEY) === "1" ||
+    window.localStorage.getItem(WRITE_STORAGE_KEY_ALIAS) === "1"
+  );
+};
+
 const shouldLogCallsite = () => {
   if (!isFirestoreReadTraceEnabled()) return false;
   if (typeof window === "undefined" || !window?.localStorage) return false;
   return (
     window.localStorage.getItem(CALLSITE_KEY) === "1" ||
     window.localStorage.getItem(CALLSITE_KEY_ALIAS) === "1"
+  );
+};
+
+const shouldLogWriteCallsite = () => {
+  if (!isFirestoreWriteTraceEnabled()) return false;
+  if (typeof window === "undefined" || !window?.localStorage) return false;
+  return (
+    window.localStorage.getItem(WRITE_CALLSITE_KEY) === "1" ||
+    window.localStorage.getItem(WRITE_CALLSITE_KEY_ALIAS) === "1"
   );
 };
 
@@ -80,6 +107,27 @@ const extractCallsite = () => {
       !line.toLowerCase().includes("tracegetdoc") &&
       !line.toLowerCase().includes("tracegetdocs") &&
       !line.toLowerCase().includes("traceonsnapshot"),
+  );
+  return filtered[1] || filtered[0];
+};
+
+const extractWriteCallsite = () => {
+  if (!shouldLogWriteCallsite()) return undefined;
+  const err = new Error();
+  if (!err.stack) return undefined;
+  const lines = err.stack.split("\n").map((l) => l.trim());
+  const filtered = lines.filter(
+    (line) =>
+      line &&
+      !line.toLowerCase().includes("firestorereadtrace") &&
+      !line.toLowerCase().includes("tracewrit") &&
+      !line.toLowerCase().includes("tracesetdoc") &&
+      !line.toLowerCase().includes("traceupdatedoc") &&
+      !line.toLowerCase().includes("traceadddoc") &&
+      !line.toLowerCase().includes("tracedeletedoc") &&
+      !line.toLowerCase().includes("recordwrite") &&
+      !line.toLowerCase().includes("tracebatchcommit") &&
+      !line.toLowerCase().includes("traceruntransaction"),
   );
   return filtered[1] || filtered[0];
 };
@@ -145,6 +193,32 @@ export const recordRead = (
   readTotalsByOp.set(params.op, (readTotalsByOp.get(params.op) ?? 0) + params.docCount);
   if (callsite) {
     readTotalsByCallsite.set(callsite, (readTotalsByCallsite.get(callsite) ?? 0) + params.docCount);
+  }
+};
+
+export const recordWrite = (params: {
+  path: string;
+  op: string;
+  docCount?: number;
+  label?: string;
+  callsite?: string;
+  includeInPaths?: boolean;
+}) => {
+  if (!isFirestoreWriteTraceEnabled()) return;
+  const path = normalizePath(params.path);
+  const count = params.docCount ?? 1;
+  const callsite = params.callsite ?? params.label ?? extractWriteCallsite();
+  const includeInPaths = params.includeInPaths !== false;
+
+  if (includeInPaths) {
+    const pathEntry = writeTotalsByPath.get(path) ?? { total: 0, ops: {} };
+    pathEntry.total += count;
+    pathEntry.ops[params.op] = (pathEntry.ops[params.op] ?? 0) + count;
+    writeTotalsByPath.set(path, pathEntry);
+  }
+  writeTotalsByOp.set(params.op, (writeTotalsByOp.get(params.op) ?? 0) + count);
+  if (callsite) {
+    writeTotalsByCallsite.set(callsite, (writeTotalsByCallsite.get(callsite) ?? 0) + count);
   }
 };
 
@@ -218,6 +292,96 @@ export const traceGetDocs = async <T>(
   return result;
 };
 
+export const traceSetDoc = async <T>(
+  ref: { path: string },
+  setDocFn: () => Promise<T>,
+  opts?: { label?: string },
+): Promise<T> => {
+  const result = await setDocFn();
+  recordWrite({
+    path: ref.path,
+    op: "setDoc",
+    docCount: 1,
+    label: opts?.label,
+  });
+  return result;
+};
+
+export const traceUpdateDoc = async <T>(
+  ref: { path: string },
+  updateDocFn: () => Promise<T>,
+  opts?: { label?: string },
+): Promise<T> => {
+  const result = await updateDocFn();
+  recordWrite({
+    path: ref.path,
+    op: "updateDoc",
+    docCount: 1,
+    label: opts?.label,
+  });
+  return result;
+};
+
+export const traceAddDoc = async <T>(
+  ref: { path: string },
+  addDocFn: () => Promise<T>,
+  opts?: { label?: string },
+): Promise<T> => {
+  const result = await addDocFn();
+  const resultPath = (result as any)?.path ?? ref.path;
+  recordWrite({
+    path: resultPath,
+    op: "addDoc",
+    docCount: 1,
+    label: opts?.label,
+  });
+  return result;
+};
+
+export const traceDeleteDoc = async <T>(
+  ref: { path: string },
+  deleteDocFn: () => Promise<T>,
+  opts?: { label?: string },
+): Promise<T> => {
+  const result = await deleteDocFn();
+  recordWrite({
+    path: ref.path,
+    op: "deleteDoc",
+    docCount: 1,
+    label: opts?.label,
+  });
+  return result;
+};
+
+export const traceBatchCommit = async <T>(
+  commitFn: () => Promise<T>,
+  opts?: { label?: string; path?: string },
+): Promise<T> => {
+  const result = await commitFn();
+  recordWrite({
+    path: opts?.path ?? "batchCommit",
+    op: "batchCommit",
+    docCount: 1,
+    label: opts?.label,
+    includeInPaths: false,
+  });
+  return result;
+};
+
+export const traceRunTransaction = async <T>(
+  runFn: () => Promise<T>,
+  opts?: { label?: string; path?: string },
+): Promise<T> => {
+  const result = await runFn();
+  recordWrite({
+    path: opts?.path ?? "transaction",
+    op: "runTransaction",
+    docCount: 1,
+    label: opts?.label,
+  });
+  return result;
+};
+
 export const traceOnSnapshot = <T>(
   scope: ScopeRecord | null,
   ref: { path?: string },
@@ -278,11 +442,14 @@ export const traceOnSnapshot = <T>(
 };
 
 export const resetReadTraceTotals = () => {
-  if (!isFirestoreReadTraceEnabled()) return;
+  if (!isFirestoreReadTraceEnabled() && !isFirestoreWriteTraceEnabled()) return;
   globalTotals.clear();
   readTotalsByPath.clear();
   readTotalsByOp.clear();
   readTotalsByCallsite.clear();
+  writeTotalsByPath.clear();
+  writeTotalsByOp.clear();
+  writeTotalsByCallsite.clear();
   listenerTotalsByPath.clear();
   listenerCallbackTotal = 0;
   listenerReadTotal = 0;
@@ -293,7 +460,7 @@ export const resetReadTraceTotals = () => {
 };
 
 export const startReadTraceSession = (name?: string) => {
-  if (!isFirestoreReadTraceEnabled()) return;
+  if (!isFirestoreReadTraceEnabled() && !isFirestoreWriteTraceEnabled()) return;
   resetReadTraceTotals();
   activeSession = { name, startedAt: performance.now() };
 };
@@ -310,10 +477,10 @@ export const reportReadSummary = (name?: string, opts?: { topN?: number }) => {
   };
   const totalReads = totals.getDoc + totals.getDocs;
 
-  const topPaths = Array.from(readTotalsByPath.entries())
+  const allPaths = Array.from(readTotalsByPath.entries())
     .map(([path, info]) => ({ path, total: info.total, ops: info.ops }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, topN);
+    .sort((a, b) => b.total - a.total);
+  const topPaths = allPaths.slice(0, topN);
 
   const topCallsites = Array.from(readTotalsByCallsite.entries())
     .map(([callsite, count]) => ({ callsite, count }))
@@ -358,6 +525,39 @@ export const reportReadSummary = (name?: string, opts?: { topN?: number }) => {
   console.groupEnd();
 };
 
+export const reportWriteSummary = (name?: string, opts?: { topN?: number }) => {
+  if (!isFirestoreWriteTraceEnabled()) return;
+  const topN = opts?.topN ?? 10;
+  const sessionName = name || activeSession?.name;
+  const sessionSuffix = sessionName ? ` (${sessionName})` : "";
+
+  const totals = Object.fromEntries(writeTotalsByOp.entries());
+  const totalWrites = Array.from(writeTotalsByOp.values()).reduce((sum, v) => sum + v, 0);
+  const allPaths = Array.from(writeTotalsByPath.entries())
+    .map(([path, info]) => ({ path, total: info.total, ops: info.ops }))
+    .sort((a, b) => b.total - a.total);
+  const topPaths = allPaths.slice(0, topN);
+
+  const topCallsites = shouldLogWriteCallsite()
+    ? Array.from(writeTotalsByCallsite.entries())
+        .map(([callsite, count]) => ({ callsite, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, topN)
+    : [];
+
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(`[FirestoreTrace] WRITE SUMMARY${sessionSuffix}`);
+  log("Totals", { ...totals, total: totalWrites });
+  log("Top paths", topPaths);
+  log("All paths", allPaths);
+  log("All paths", allPaths);
+  if (topCallsites.length > 0) {
+    log("Top callsites", topCallsites);
+  }
+  // eslint-disable-next-line no-console
+  console.groupEnd();
+};
+
 if (isDev && typeof window !== "undefined") {
   (window as any).__SFH_FIRESTORE_TRACE__ = {
     enable: () => {
@@ -372,6 +572,7 @@ if (isDev && typeof window !== "undefined") {
     getTotals: () => Object.fromEntries(globalTotals.entries()),
     isEnabled: isFirestoreReadTraceEnabled,
     reportSummary: reportReadSummary,
+    reportWriteSummary: reportWriteSummary,
     startSession: startReadTraceSession,
   };
 }

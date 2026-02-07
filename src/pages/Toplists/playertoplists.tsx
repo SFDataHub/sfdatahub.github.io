@@ -1,5 +1,5 @@
 ﻿import React, { useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import ContentShell from "../../components/ContentShell";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -9,7 +9,39 @@ import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 
 import { ToplistsProvider, useToplistsData } from "../../context/ToplistsDataContext";
+import GuildToplists from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
+
+const splitListParam = (value: string | null) =>
+  (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+const normalizeServerList = (list: string[]) => {
+  const set = new Set<string>();
+  list.forEach((entry) => {
+    const normalized = entry.trim().toUpperCase();
+    if (normalized) set.add(normalized);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+};
+
+const normalizeClassList = (list: string[]) => {
+  const set = new Set<string>();
+  list.forEach((entry) => {
+    const normalized = entry
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-");
+    if (normalized) set.add(normalized);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+};
+
+const listEqual = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
 
 // HUD -> Provider Sort mapping
 function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
@@ -50,11 +82,122 @@ function PlayerToplistsPageContent() {
     bottomFilterOpen, setBottomFilterOpen,
     serverSheetOpen, setServerSheetOpen,
     servers, setServers,
-    classes,
+    classes, setClasses,
     range,
     sortBy,
   } = f;
   const { serverGroups } = useToplistsData();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serverParam = searchParams.get("server");
+  const serversParam = searchParams.get("servers");
+  const classParam = searchParams.get("class");
+  const classesParam = searchParams.get("classes");
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "guilds" ? "guilds" : "players";
+  const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
+  const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
+
+  const urlServers = React.useMemo(() => {
+    const raw = serverParam ?? serversParam;
+    return normalizeServerList(splitListParam(raw));
+  }, [serverParam, serversParam]);
+  const urlClasses = React.useMemo(() => {
+    const raw = classParam ?? classesParam;
+    return normalizeClassList(splitListParam(raw));
+  }, [classParam, classesParam]);
+
+  const urlServersProvided = serverParam != null || serversParam != null;
+  const urlClassesProvided = classParam != null || classesParam != null;
+
+  const defaultServer = React.useMemo(() => {
+    const fallback =
+      serverGroups?.EU?.[0] ||
+      Object.values(serverGroups || {}).find((list) => list.length)?.[0] ||
+      "";
+    return fallback ? fallback.toUpperCase() : "";
+  }, [serverGroups]);
+
+  const searchKey = React.useMemo(() => searchParams.toString(), [searchParams]);
+  const normalizedServersKey = normalizedServers.join(",");
+  const normalizedClassesKey = normalizedClasses.join(",");
+  const urlServersKey = urlServers.join(",");
+  const urlClassesKey = urlClasses.join(",");
+
+  const normalizedServersRef = React.useRef(normalizedServers);
+  const normalizedClassesRef = React.useRef(normalizedClasses);
+  const setServersRef = React.useRef(setServers);
+  const setClassesRef = React.useRef(setClasses);
+  const lastUrlWriteRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    normalizedServersRef.current = normalizedServers;
+  }, [normalizedServers]);
+
+  React.useEffect(() => {
+    normalizedClassesRef.current = normalizedClasses;
+  }, [normalizedClasses]);
+
+  React.useEffect(() => {
+    setServersRef.current = setServers;
+  }, [setServers]);
+
+  React.useEffect(() => {
+    setClassesRef.current = setClasses;
+  }, [setClasses]);
+
+  useEffect(() => {
+    if (lastUrlWriteRef.current === searchKey) {
+      lastUrlWriteRef.current = null;
+      return;
+    }
+
+    if (urlServersProvided) {
+      const nextServers =
+        urlServers.length > 0 ? urlServers : defaultServer ? [defaultServer] : [];
+      if (!listEqual(normalizedServersRef.current, nextServers)) {
+        setServersRef.current(nextServers);
+      }
+    } else if (!normalizedServersRef.current.length && defaultServer) {
+      setServersRef.current([defaultServer]);
+    }
+
+    if (urlClassesProvided && !listEqual(normalizedClassesRef.current, urlClasses)) {
+      setClassesRef.current(urlClasses);
+    }
+  }, [
+    searchKey,
+    urlServersProvided,
+    urlClassesProvided,
+    defaultServer,
+    urlServersKey,
+    urlClassesKey,
+  ]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    const nextServers = normalizedServersKey;
+    const nextClasses = normalizedClassesKey;
+
+    if (nextServers) {
+      nextParams.set("server", nextServers);
+    } else {
+      nextParams.delete("server");
+    }
+    nextParams.delete("servers");
+
+    if (nextClasses) {
+      nextParams.set("class", nextClasses);
+    } else {
+      nextParams.delete("class");
+    }
+    nextParams.delete("classes");
+
+    const nextKey = nextParams.toString();
+    if (nextKey !== searchKey) {
+      lastUrlWriteRef.current = nextKey;
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [normalizedServersKey, normalizedClassesKey, searchKey, searchParams, setSearchParams]);
 
   return (
     <>
@@ -72,7 +215,7 @@ function PlayerToplistsPageContent() {
       >
         <ListSwitcher />
 
-        {listView === "table" && (
+        {activeTab === "players" && listView === "table" && (
           <TableDataView
             servers={servers ?? []}
             classes={classes ?? []}
@@ -80,6 +223,7 @@ function PlayerToplistsPageContent() {
             sortKey={sortBy ?? "level"}
           />
         )}
+        {activeTab === "guilds" && <GuildToplists serverCodes={servers ?? []} />}
       </ContentShell>
 
       <ServerSheet
@@ -125,10 +269,12 @@ function TableDataView({
   useEffect(() => {
     const providerRange =
       range === "all" ? "all" : range === 60 ? "30d" : `${range}d`;
-    const group = deriveGroupFromServers(servers);
+    const normalized = normalizeServerList(servers);
+    const normalizedCls = normalizeClassList(classes);
+    const group = deriveGroupFromServers(normalized);
     setFilters({
-      servers,
-      classes,
+      servers: normalized,
+      classes: normalizedCls,
       timeRange: providerRange as any,
       group,
     });
@@ -184,7 +330,7 @@ function TableDataView({
       )}
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
               <th style={{ padding: "8px 6px" }}>#</th>
@@ -207,7 +353,11 @@ function TableDataView({
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={`${r.name}-${r.server}-${i}`} style={{ borderBottom: "1px solid #2C4A73" }}>
+              <tr
+                key={`${r.name}__${r.server}__${r.class ?? ""}`}
+                className="toplists-row"
+                style={{ borderBottom: "1px solid #2C4A73" }}
+              >
                 <td style={{ padding: "8px 6px" }}>{i + 1}</td>
                 <td style={{ padding: "8px 6px" }}>{r.flag ?? ""}</td>
                 <td style={{ padding: "8px 6px" }}>{fmtDelta(r.deltaRank)}</td>
@@ -246,6 +396,15 @@ function TopActions() {
     setBottomFilterOpen,
     setServerSheetOpen,
   } = useFilters();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "guilds" ? "guilds" : "players";
+
+  const setTab = (next: "players" | "guilds") => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", next);
+    setSearchParams(nextParams);
+  };
 
   return (
     <div className="flex items-center justify-end gap-2 flex-wrap">
@@ -254,8 +413,8 @@ function TopActions() {
         style={{ borderColor: "#2B4C73", background: "#14273E" }}
         aria-label="Toplist Tabs"
       >
-        <TopTab to="/toplists/players" label="Players" />
-        <TopTab to="/toplists/guilds" label="Guilds" />
+        <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label="Players" />
+        <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label="Guilds" />
       </nav>
 
       <span className="hidden md:inline-block w-px h-6" style={{ background: "#2B4C73" }} />
@@ -322,18 +481,25 @@ function TopActions() {
   );
 }
 
-function TopTab({ to, label }: { to: string; label: string }) {
+function TopTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        [
-          "rounded-lg px-3 py-1.5 text-sm text-white border",
-          isActive ? "bg-[#25456B] border-[#5C8BC6]" : "border-transparent",
-        ].join(" ")
-      }
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-lg px-3 py-1.5 text-sm text-white border",
+        active ? "bg-[#25456B] border-[#5C8BC6]" : "border-transparent",
+      ].join(" ")}
     >
       {label}
-    </NavLink>
+    </button>
   );
 }

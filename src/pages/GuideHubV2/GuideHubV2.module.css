@@ -402,6 +402,50 @@
   text-decoration: underline;
 }
 
+.hudButtonGrid {
+  display: inline-grid;
+  gap: 10px;
+  margin: 6px 0 14px;
+  width: max-content;
+}
+
+.hudButton {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  text-align: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+
+.hudButtonLink {
+  display: block;
+  text-decoration: none;
+}
+
+.hudButton:focus-visible {
+  outline: 2px solid rgba(92, 139, 198, 0.9);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+.hudButtonBox {
+  width: 100%;
+}
+
+.hudButtonText {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f5f9ff;
+  text-align: center;
+}
+
 .markdown img {
   max-width: 100%;
   border-radius: 12px;
@@ -413,6 +457,110 @@
   border: none;
   border-top: 1px solid rgba(92, 139, 198, 0.35);
   margin: 18px 0;
+}
+
+.infoBlock {
+  margin: 6px 0 18px;
+}
+
+.infoFilters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: min(520px, 100%);
+  margin-bottom: 14px;
+}
+
+.infoSelect {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(176, 196, 217, 0.8);
+}
+
+.infoSelectField {
+  background: rgba(12, 26, 46, 0.9);
+  border: 1px solid rgba(92, 139, 198, 0.6);
+  border-radius: 10px;
+  color: #f5f9ff;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.infoSelectField:focus {
+  outline: 2px solid rgba(127, 178, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.infoGalleryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.infoCard {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(92, 139, 198, 0.45);
+  background: rgba(12, 26, 46, 0.6);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.infoCard:hover {
+  background: rgba(18, 40, 66, 0.7);
+  border-color: rgba(127, 178, 255, 0.8);
+  transform: translateY(-1px);
+}
+
+.infoThumb {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(92, 139, 198, 0.6);
+  background: #0b1b2d;
+  display: block;
+  object-fit: cover;
+}
+
+.infoThumbFallback {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  border: 1px solid rgba(92, 139, 198, 0.6);
+  background: #0b1b2d;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #f5f9ff;
+}
+
+.infoTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5f9ff;
+  text-align: center;
+}
+
+.infoEmpty {
+  padding: 12px 14px;
+  color: rgba(176, 196, 217, 0.8);
+  background: rgba(12, 26, 46, 0.6);
+  border-radius: 12px;
+  border: 1px dashed rgba(92, 139, 198, 0.5);
 }
 
 .markdownHome ul {
@@ -530,21 +678,31 @@
 }
 
 .overlayPanel {
-  background: #0b1b2d;
-  border: 1px solid rgba(127, 178, 255, 0.8);
+  background: transparent;
+  border: none;
   border-radius: 16px;
-  padding: 16px;
+  padding: 0;
   max-width: min(900px, 90vw);
+  width: min(900px, 90vw);
   max-height: 90vh;
   display: grid;
   gap: 12px;
+  position: relative;
 }
 
 .overlayImage {
+  width: 100%;
   max-width: 100%;
   max-height: 70vh;
+  height: auto;
   border-radius: 12px;
-  border: 1px solid rgba(92, 139, 198, 0.6);
+  border: none;
+  object-fit: contain;
+}
+
+.overlayPanel .overlayImage {
+  border: none;
+  margin: 0;
 }
 
 .overlayClose {
@@ -558,8 +716,73 @@
   cursor: pointer;
 }
 
+.overlayNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  cursor: pointer;
+  z-index: 1;
+  padding: 0;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.overlayNav:hover {
+  transform: translateY(-50%) scale(1.1);
+  color: #f5f9ff;
+}
+
+.overlayNav:focus-visible {
+  outline: 2px solid rgba(127, 178, 255, 0.8);
+  outline-offset: 4px;
+}
+
+.overlayNavLeft {
+  left: -52px;
+}
+
+.overlayNavRight {
+  right: -52px;
+}
+
+@media (max-width: 720px) {
+  .overlayNavLeft {
+    left: 8px;
+  }
+
+  .overlayNavRight {
+    right: 8px;
+  }
+}
+
 @media (max-width: 1100px) {
   .contentGridHasGallery {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .infoFilters {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .infoGalleryGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .infoGalleryGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

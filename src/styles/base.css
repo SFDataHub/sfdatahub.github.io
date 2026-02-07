@@ -145,3 +145,11 @@ body::-webkit-scrollbar{
     padding: var(--topbar-h) 12px calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom)) 12px;
   }
 }
+
+/* Toplists table row hover */
+.toplists-table .toplists-row {
+  transition: background-color 0.15s ease;
+}
+.toplists-table .toplists-row:hover {
+  background-color: rgba(44, 74, 115, 0.35);
+}

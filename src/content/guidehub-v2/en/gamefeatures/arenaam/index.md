@@ -9,21 +9,19 @@ gallery: []
 
 Placeholder overview for the Arena Manager section.
 
-### Highlights
+### GuideHub Content
 
-- Add key entries here.
-- Link related guides.
+- Rune Bonuses
+- Build Order
 
 ### Tips
 
-- Add helpful notes or reminders.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
 ## Notes {#notes}
 
-## Changelog {#changelog}
+## related topics
 
-## Sources {#sources}
+SF Tavernen Discord FAQ - 
+
+SF Tools - 
+
+SF Coaching - 

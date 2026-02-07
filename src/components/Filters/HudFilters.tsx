@@ -96,7 +96,7 @@ export default function HudFilters() {
 
       {/* Sort (mit id/name + Labelbindung) */}
       <label className={styles.sortLabel} htmlFor="toplists-sort">
-        Sort
+        Sort.
       </label>
       <select
         id="toplists-sort"
@@ -106,6 +106,7 @@ export default function HudFilters() {
         className={styles.sortSelect}
         aria-label="Sort"
       >
+        <option value="sum">Base Sum</option>
         <option value="level">Level</option>
         <option value="scrapbook">Scrapbook</option>
         <option value="activity">Activity</option>

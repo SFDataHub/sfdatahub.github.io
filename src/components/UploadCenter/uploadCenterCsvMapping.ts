@@ -30,6 +30,7 @@ export type ParsedCsvGuild = {
     level?: number;
     className?: string;
   }[];
+  values?: Record<string, any>;
 };
 
 export type CsvParsedResult = {
@@ -82,6 +83,7 @@ export function buildUploadSessionFromCsv(
       memberCount: g.memberCount ?? g.members.length,
       scanTimestampSec: g.scanTimestampSec,
       members,
+      values: g.values,
       selected: true,
       status: INITIAL_STATUS,
     };

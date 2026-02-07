@@ -99,9 +99,13 @@ export const latestDiscordNewsHandler = async (req: Request, res: Response) => {
 
   const parsedChannelIds = parseChannelIds(DISCORD_NEWS_CHANNEL_IDS);
   if (!parsedChannelIds || parsedChannelIds.valid.length === 0) {
-    console.error("[discord-news] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
+    console.warn("[discord-news] Missing DISCORD_NEWS_CHANNEL_IDS configuration");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    return res.status(500).json({ error: "missing_config" });
+    const responseBody: DiscordNewsResponse = {
+      updatedAt: new Date().toISOString(),
+      item: null,
+    };
+    return res.status(200).json(responseBody);
   }
 
   if (parsedChannelIds.invalid.length > 0) {

@@ -7,6 +7,12 @@ import { guideAssetByKey } from "../../data/guidehub/assets";
 import guideHubLogo from "../../assets/logo_guidehub.png";
 import type { Lang } from "../../i18n";
 import { loadGuideMarkdown, type GuideSelection, type MarkdownDoc } from "./markdown";
+import { AMRuneBonusesTable } from "../GuideHub/GameFeatures/ArenaAM/AMRuneBonuses";
+import { PackageSkipOrderTable } from "../GuideHub/GameFeatures/Fortress/PackageSkipOrder";
+import FortressCalculator from "../GuideHub/Calculators/FortressCalculator";
+import UnderworldCalculator from "../GuideHub/Calculators/UnderworldCalculator";
+import HudBox from "../../components/ui/hud/box/HudBox";
+import InfographicsGallery from "./Infographics/InfographicsGallery";
 import styles from "./GuideHubV2.module.css";
 
 type GuideEntry = {
@@ -40,6 +46,85 @@ type GuideHubSidebarProps = {
   onNavigateCategory: (tabKey: string) => void;
   onNavigateSub: (tabKey: string, subKey: string) => void;
   t: TranslationFn;
+};
+
+const FortressLinkButtons: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub2: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", "fortress");
+    next.set("sub2", sub2);
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress-attack-duplication")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress attack duplication guide</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress-calculator")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress Calculator</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress-package-skip-order")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress Package skip order</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
+const FortressRelatedButtons: React.FC = () => {
+  const relatedLinks = [
+    {
+      label: "SF Coaching",
+      href: "https://discord.com/channels/1381647290606817452/1420473231256850584",
+    },
+    {
+      label: "SF Tavernen Discord FAQ",
+      href: "https://discord.com/channels/551152314329858048/1415410624606896279",
+    },
+    {
+      label: "SF Tools",
+      href: "https://sftools.mar21.eu/fortress.html",
+    },
+  ];
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      {relatedLinks.map((item) => (
+        <a
+          key={item.href}
+          className={`${styles.hudButton} ${styles.hudButtonLink}`}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <HudBox padding="md" hover className={styles.hudButtonBox}>
+            <span className={styles.hudButtonText}>{item.label}</span>
+          </HudBox>
+        </a>
+      ))}
+    </div>
+  );
 };
 
 function buildGuideEntries(): GuideEntry[] {
@@ -304,6 +389,7 @@ const GuideHubV2: React.FC = () => {
   const displayedSub = displayedSelection.sub || "";
   const displayedSub2 = displayedSelection.sub2 || "";
   const isHome = !displayedTab && !displayedSub && !displayedSub2;
+  const isInfographics = displayedTab === "infographics" && !displayedSub && !displayedSub2;
 
   const entries = React.useMemo(() => buildGuideEntries(), []);
   const activeEntry = React.useMemo(
@@ -543,25 +629,159 @@ const GuideHubV2: React.FC = () => {
 
   const renderMarkdown = () => {
     if (!doc) return null;
+    const infographicsBlock = isInfographics ? <InfographicsGallery /> : null;
+    const embedRegistry = {
+      "am-rune-bonuses-table": AMRuneBonusesTable,
+      "fortress-link-buttons": FortressLinkButtons,
+      "fortress-related-buttons": FortressRelatedButtons,
+      "fortress-package-skip-order-table": PackageSkipOrderTable,
+      "fortress-calculator": FortressCalculator,
+      "underworld-calculator": UnderworldCalculator,
+    } as const;
+    const hasEmbeds = Object.keys(embedRegistry).some((key) =>
+      doc.html.includes(`data-embed="${key}"`)
+    );
+    const hasAssets = doc.html.includes('data-asset="');
+    const hasDynamicBlocks = hasEmbeds || hasAssets;
+
+    const renderHtmlWithEmbeds = (html: string) => {
+      if (!hasDynamicBlocks) {
+        return <div dangerouslySetInnerHTML={{ __html: html }} />;
+      }
+
+      const regex = /<div data-(embed|asset)="([a-z0-9-_]+)"><\/div>/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      let chunkIndex = 0;
+      const nodes: React.ReactNode[] = [];
+
+      while ((match = regex.exec(html))) {
+        const before = html.slice(lastIndex, match.index);
+        if (before) {
+          nodes.push(
+            <div
+              key={`html-${chunkIndex}`}
+              dangerouslySetInnerHTML={{ __html: before }}
+            />
+          );
+          chunkIndex += 1;
+        }
+
+        const blockType = match[1];
+        const blockKey = match[2];
+        if (blockType === "embed") {
+          const EmbedComponent = embedRegistry[blockKey as keyof typeof embedRegistry];
+          if (EmbedComponent) {
+            nodes.push(<EmbedComponent key={`embed-${blockKey}-${chunkIndex}`} />);
+            chunkIndex += 1;
+          } else {
+            nodes.push(
+              <div
+                key={`html-${chunkIndex}`}
+                dangerouslySetInnerHTML={{ __html: match[0] }}
+              />
+            );
+            chunkIndex += 1;
+          }
+        } else {
+          const asset = guideAssetByKey(blockKey, 960);
+          const src = asset.thumb || asset.url;
+          if (src) {
+            nodes.push(
+              <img
+                key={`asset-${blockKey}-${chunkIndex}`}
+                src={src}
+                alt={blockKey}
+              />
+            );
+            chunkIndex += 1;
+          } else {
+            nodes.push(<div key={`asset-${blockKey}-${chunkIndex}`} />);
+            chunkIndex += 1;
+          }
+        }
+
+        lastIndex = match.index + match[0].length;
+      }
+
+      const rest = html.slice(lastIndex);
+      if (rest) {
+        nodes.push(
+          <div
+            key={`html-${chunkIndex}`}
+            dangerouslySetInnerHTML={{ __html: rest }}
+          />
+        );
+      }
+
+      if (nodes.length === 0) {
+        return <div dangerouslySetInnerHTML={{ __html: html }} />;
+      }
+
+      return (
+        <>
+          {nodes}
+        </>
+      );
+    };
+
     const overviewTag = '<h2 id="overview">';
     const overviewIndex = doc.html.indexOf(overviewTag);
     if (overviewIndex === -1) {
-      return <div className={markdownClass} dangerouslySetInnerHTML={{ __html: doc.html }} />;
+      if (!hasDynamicBlocks) {
+        return (
+          <div className={markdownClass}>
+            <div dangerouslySetInnerHTML={{ __html: doc.html }} />
+            {infographicsBlock}
+          </div>
+        );
+      }
+      return (
+        <div className={markdownClass}>
+          {renderHtmlWithEmbeds(doc.html)}
+          {infographicsBlock}
+        </div>
+      );
     }
 
     const headingEnd = doc.html.indexOf("</h2>", overviewIndex);
     if (headingEnd === -1) {
-      return <div className={markdownClass} dangerouslySetInnerHTML={{ __html: doc.html }} />;
+      if (!hasDynamicBlocks) {
+        return (
+          <div className={markdownClass}>
+            <div dangerouslySetInnerHTML={{ __html: doc.html }} />
+            {infographicsBlock}
+          </div>
+        );
+      }
+      return (
+        <div className={markdownClass}>
+          {renderHtmlWithEmbeds(doc.html)}
+          {infographicsBlock}
+        </div>
+      );
     }
 
     const before = doc.html.slice(0, headingEnd + 5);
     const after = doc.html.slice(headingEnd + 5);
 
+    if (!hasDynamicBlocks) {
+      return (
+        <div className={markdownClass}>
+          <div dangerouslySetInnerHTML={{ __html: before }} />
+          {renderTocPanel()}
+          {infographicsBlock}
+          <div dangerouslySetInnerHTML={{ __html: after }} />
+        </div>
+      );
+    }
+
     return (
       <div className={markdownClass}>
-        <div dangerouslySetInnerHTML={{ __html: before }} />
+        {renderHtmlWithEmbeds(before)}
         {renderTocPanel()}
-        <div dangerouslySetInnerHTML={{ __html: after }} />
+        {infographicsBlock}
+        {renderHtmlWithEmbeds(after)}
       </div>
     );
   };

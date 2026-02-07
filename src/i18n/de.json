@@ -293,6 +293,11 @@
     "lang_en": "English",
     "lang_de": "Deutsch"
   },
+  "toplistsPage": {
+    "errors": {
+      "noSnapshot": "Noch kein Snapshot fuer diesen Server."
+    }
+  },
   "profile": {
     "public": {
       "title": "Ã–ffentliches Profil",
