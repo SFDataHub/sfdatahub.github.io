@@ -5,25 +5,10 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview {#overview}
 
-Unlocked at Level 25
+[[embed:fortress-link-buttons]]
 
-### Highlights
+## related topics
 
-- Add key entries here.
-- Link related guides.
+[[embed:fortress-related-buttons]]
 
-### Tips
-
-- Add helpful notes or reminders.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}

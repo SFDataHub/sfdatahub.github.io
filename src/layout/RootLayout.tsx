@@ -76,12 +76,8 @@ export default function RootLayout() {
     const media = window.matchMedia("(max-width: 1023px)");
     const update = () => setIsMobile(media.matches);
     update();
-    if ("addEventListener" in media) {
-      media.addEventListener("change", update);
-      return () => media.removeEventListener("change", update);
-    }
-    media.addListener(update);
-    return () => media.removeListener(update);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {

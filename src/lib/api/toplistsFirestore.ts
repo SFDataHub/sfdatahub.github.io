@@ -12,6 +12,30 @@ import {
 
 const STATS_PUBLIC_ROOT = "stats_public";
 const PLAYERS_COLLECTION = "toplists_players_v1";
+const SNAPSHOT_CACHE_VERSION = "v1";
+const SNAPSHOT_CACHE_PREFIX = `snapshot:${SNAPSHOT_CACHE_VERSION}`;
+
+const bundleWarnedOnce = new Set<string>();
+
+const warnBundleOnce = (key: string, message: string, meta?: Record<string, unknown>) => {
+  if (bundleWarnedOnce.has(key)) return;
+  bundleWarnedOnce.add(key);
+  if (meta) {
+    console.warn(message, meta);
+  } else {
+    console.warn(message);
+  }
+};
+
+const errorBundleOnce = (key: string, message: string, meta?: Record<string, unknown>) => {
+  if (bundleWarnedOnce.has(key)) return;
+  bundleWarnedOnce.add(key);
+  if (meta) {
+    console.error(message, meta);
+  } else {
+    console.error(message);
+  }
+};
 
 export type PlayerToplistKey = {
   group: string;
@@ -54,25 +78,64 @@ export async function loadToplistServersFromBundle(): Promise<ToplistServersResu
     const data: any = snap.data() || {};
     const rawServers: unknown = data.servers;
 
+    const parseServerStringFallback = (rawText: string) =>
+      rawText
+        .split(/[\n,;]+/g)
+        .map((entry) => entry.replace(/^[\s\["']+|[\s\]"']+$/g, "").trim())
+        .filter((entry) => !!entry);
+
     let parsedServers: unknown = null;
+    let failureReason: string | null = null;
+    let failureMeta: Record<string, unknown> | undefined;
     if (Array.isArray(rawServers)) {
       parsedServers = rawServers;
     } else if (typeof rawServers === "string") {
-      try {
-        const parsed = JSON.parse(rawServers);
-        if (Array.isArray(parsed)) {
-          parsedServers = parsed;
+      const rawText = rawServers.trim();
+      if (!rawText) {
+        failureReason = "servers string empty";
+      } else if (!rawText.startsWith("[")) {
+        const fallback = parseServerStringFallback(rawText);
+        if (fallback.length) {
+          parsedServers = fallback;
         } else {
-          console.warn("[toplistsFirestore] Server bundle string is not an array after parse");
+          failureReason = "servers string is not a JSON array";
+          failureMeta = { preview: rawText.slice(0, 120) };
         }
-      } catch (err) {
-        console.warn("[toplistsFirestore] Failed to parse server bundle string", err);
+      } else {
+        try {
+          const parsed = JSON.parse(rawText);
+          if (Array.isArray(parsed)) {
+            parsedServers = parsed;
+          } else {
+            failureReason = "servers JSON parsed but not an array";
+          }
+        } catch (err: any) {
+          const fallback = parseServerStringFallback(rawText);
+          if (fallback.length) {
+            parsedServers = fallback;
+          } else {
+            failureReason = "servers JSON parse failed";
+            failureMeta = { message: err?.message };
+          }
+        }
       }
+    } else if (rawServers == null) {
+      failureReason = "servers field missing";
+    } else {
+      failureReason = `servers has unexpected type: ${typeof rawServers}`;
     }
 
     if (!Array.isArray(parsedServers)) {
-      console.warn("[toplistsFirestore] Server bundle missing/invalid, falling back to static config");
-      return { ok: false, error: "decode_failed", detail: "servers missing or invalid" };
+      warnBundleOnce(
+        "bundle_invalid",
+        "[toplistsFirestore] Server bundle missing/invalid, falling back to static config",
+        failureMeta ? { reason: failureReason ?? "unknown", ...failureMeta } : { reason: failureReason ?? "unknown" }
+      );
+      return {
+        ok: false,
+        error: "decode_failed",
+        detail: failureReason ?? "servers missing or invalid",
+      };
     }
 
     const servers: string[] = [];
@@ -89,7 +152,11 @@ export async function loadToplistServersFromBundle(): Promise<ToplistServersResu
 
     return { ok: true, servers };
   } catch (err: any) {
-    console.error("[toplistsFirestore] Firestore error while loading toplist servers", err);
+    errorBundleOnce(
+      "bundle_firestore_error",
+      "[toplistsFirestore] Firestore error while loading toplist servers",
+      { code: err?.code, message: err?.message }
+    );
     return { ok: false, error: "firestore_error", detail: err?.message };
   }
 }
@@ -332,6 +399,86 @@ export async function getLatestPlayerToplistSnapshot(serverCode: string): Promis
   }
 }
 
+type SnapshotCacheEntry<T> = {
+  snapshot: T;
+  fetchedAt: number;
+  expiresAt: number;
+};
+
+const getSnapshotCacheKey = (type: "players" | "guilds", serverCode: string) =>
+  `${SNAPSHOT_CACHE_PREFIX}:${type}:${serverCode}`;
+
+const nextFullHour = (nowMs: number) => {
+  const d = new Date(nowMs);
+  d.setMinutes(0, 0, 0);
+  if (d.getTime() <= nowMs) {
+    d.setHours(d.getHours() + 1);
+  }
+  return d.getTime();
+};
+
+const readSnapshotCache = <T,>(key: string): SnapshotCacheEntry<T> | null => {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.expiresAt !== "number") return null;
+    if (!("snapshot" in parsed)) return null;
+    return parsed as SnapshotCacheEntry<T>;
+  } catch {
+    return null;
+  }
+};
+
+const writeSnapshotCache = <T,>(key: string, entry: SnapshotCacheEntry<T>) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // ignore cache write errors (quota, privacy mode, etc.)
+  }
+};
+
+const clearSnapshotCache = (key: string) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+};
+
+export async function getLatestPlayerToplistSnapshotCached(
+  serverCode: string
+): Promise<FirestoreLatestToplistResult> {
+  const code = (serverCode || "").trim().toUpperCase();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing server code" };
+  }
+
+  const key = getSnapshotCacheKey("players", code);
+  const now = Date.now();
+  const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
+  if (cached) {
+    if (now < cached.expiresAt) {
+      return { ok: true, snapshot: cached.snapshot };
+    }
+    clearSnapshotCache(key);
+  }
+
+  const result = await getLatestPlayerToplistSnapshot(code);
+  if (result.ok) {
+    writeSnapshotCache(key, {
+      snapshot: result.snapshot,
+      fetchedAt: now,
+      expiresAt: nextFullHour(now),
+    });
+  }
+  return result;
+}
+
 export async function getLatestGuildToplistSnapshot(
   serverCode: string
 ): Promise<FirestoreLatestGuildToplistResult> {
@@ -391,4 +538,33 @@ export async function getLatestGuildToplistSnapshot(
     reportReadSummary(sessionName);
     reportWriteSummary(sessionName);
   }
+}
+
+export async function getLatestGuildToplistSnapshotCached(
+  serverCode: string
+): Promise<FirestoreLatestGuildToplistResult> {
+  const code = (serverCode || "").trim().toUpperCase();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing server code" };
+  }
+
+  const key = getSnapshotCacheKey("guilds", code);
+  const now = Date.now();
+  const cached = readSnapshotCache<FirestoreLatestGuildToplistSnapshot>(key);
+  if (cached) {
+    if (now < cached.expiresAt) {
+      return { ok: true, snapshot: cached.snapshot };
+    }
+    clearSnapshotCache(key);
+  }
+
+  const result = await getLatestGuildToplistSnapshot(code);
+  if (result.ok) {
+    writeSnapshotCache(key, {
+      snapshot: result.snapshot,
+      fetchedAt: now,
+      expiresAt: nextFullHour(now),
+    });
+  }
+  return result;
 }

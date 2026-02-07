@@ -7,23 +7,6 @@ gallery: []
 ---
 ## Overview {#overview}
 
-Placeholder content for AM Rune bonuses.
-
-### Details
-
-- Add steps and explanation here.
-- Include any key tips or warnings.
-
 ### Tips
 
-- Add practical tips or follow-up actions.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}
+[[embed:am-rune-bonuses-table]]

@@ -35,9 +35,9 @@ export const MAIN_BY_CLASS: Record<string, "Base Strength" | "Base Dexterity" | 
   Scout: "Base Dexterity",
   Assassin: "Base Dexterity",
   "Demon Hunter": "Base Dexterity",
-  Bard: "Base Dexterity",
+  Bard: "Base Intelligence",
   Mage: "Base Intelligence",
-  "Battle Mage": "Base Intelligence",
+  "Battle Mage": "Base Strength",
   Necromancer: "Base Intelligence",
   Druid: "Base Intelligence",
 };
@@ -75,7 +75,7 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
   const { group, serverKey } = normalizeServer(serverRaw);
   const base = computeBaseStats(values);
 
-  const mainKey = MAIN_BY_CLASS[String(className)] ?? "Base Intelligence";
+  const mainKey = MAIN_BY_CLASS[String(className ?? "")] ?? "Base Intelligence";
   const main = toNumber(pick(values, mainKey));
   const sum = base.sum;
   const con = base.con;

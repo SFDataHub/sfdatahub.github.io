@@ -5,25 +5,7 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview {#overview}
 
-Placeholder content for Fortress Package skip order.
+This guide outlines the optimal order to upgrade your Fortress and associated buildings in Shakes & Fidget. Follow the suggested order to minimize resource use and maximize efficiency.
 
-### Details
-
-- Add steps and explanation here.
-- Include any key tips or warnings.
-
-### Tips
-
-- Add practical tips or follow-up actions.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}
+[[embed:fortress-package-skip-order-table]]

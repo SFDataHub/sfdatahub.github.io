@@ -15,6 +15,31 @@ if (!cfg.projectId) {
   console.error("[FB] Missing env (projectId). Add .env.local and restart dev server.");
 }
 
+const maybeRedirectToAuthDomain = () => {
+  if (typeof window === "undefined") return;
+  if (import.meta.env.DEV) return;
+  const host = window.location.hostname?.toLowerCase();
+  const authHost = String(cfg.authDomain ?? "").toLowerCase();
+  if (!host || !authHost) return;
+  if (host === authHost) return;
+
+  const isLocalhost = host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+  if (isLocalhost) return;
+
+  const altHost = authHost.endsWith(".firebaseapp.com")
+    ? authHost.replace(".firebaseapp.com", ".web.app")
+    : authHost.endsWith(".web.app")
+    ? authHost.replace(".web.app", ".firebaseapp.com")
+    : "";
+
+  if (altHost && host === altHost) {
+    const nextUrl = window.location.href.replace(host, authHost);
+    window.location.replace(nextUrl);
+  }
+};
+
+maybeRedirectToAuthDomain();
+
 const app = getApps().length ? getApp() : initializeApp(cfg);
 export const db = getFirestore(app);
 export const auth = getAuth(app);

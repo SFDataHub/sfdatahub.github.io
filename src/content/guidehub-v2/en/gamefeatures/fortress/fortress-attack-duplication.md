@@ -7,23 +7,33 @@ gallery: []
 ---
 ## Overview {#overview}
 
-Placeholder content for Fortress attack duplication guide.
+## Step 1
 
-### Details
+You will need at least 1 Fortress Attack from your buddy saved in your inbox where you can counterattack.
 
-- Add steps and explanation here.
-- Include any key tips or warnings.
+[[asset:step1adg]]
 
-### Tips
+## Step 2
 
-- Add practical tips or follow-up actions.
+Open up the counterattack window and close it again.
 
-## SFDataHub Content {#sfdatahub-content}
+[[asset:step2adg]]
 
-## TavernDiscord FAQ {#taverndiscord-faq}
+## Step 3 
 
-## Notes {#notes}
+Go to your Fortress and press attack, you will see your buddy on screen.
 
-## Changelog {#changelog}
+[[asset:step3adg]]
 
-## Sources {#sources}
+## Step 4
+
+Close this window again and don't do any attacks in Fortress for around 2 hours.
+
+## Step 5
+
+After around 2 hours, you will do your Fortress attack first, afterwards you can still do your counterattack from your mail inbox.
+
+## Note 
+
+SF does not remember after the 2 hours have passed that the attack in Fortress is linked to the counterattack in the mail,												
+thus you can easily duplicate the attack. If your buddy does the same, you can get 2 extra attacks each cycle.												

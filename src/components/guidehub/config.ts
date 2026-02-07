@@ -15,7 +15,7 @@ export type Category = {
   sub?: SubCategory[];        // Sub-Ebene
 };
 
-/** 11 Hauptkategorien (inkl. Dungeons) */
+/** 11 Hauptkategorien */
 export const categories: Category[] = [
   // LEFT
 {
@@ -98,12 +98,6 @@ export const categories: Category[] = [
         { key: "fortress-attack-duplication", label: "Fortress attack duplication guide", to: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-attack-duplication" },
     ],
   },
-        {
-          key: "dungeons",
-          label: "Dungeons",
-          to: "/guidehub?tab=dungeons",
-          sub2: [], // Inhalte später
-        },
 	{ key: "underworld", 
 	label: "Underworld", 
 	to: "/guidehub?tab=gamefeatures&sub=underworld",

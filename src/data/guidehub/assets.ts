@@ -155,6 +155,11 @@ const DRIVE_BY_KEY: Record<string, string> = {
   sftaverndiscord: "1LpjOIafDHg1m6Il1H37gnujPph8tR6CY",
   sfmagazine: "1DkwbJdIRSI0DxVJCo9aCDD9FyjZGf-TQ",
   sftools : "1fcnNhvUliXJU6Fuw95mLrcNowjzZlYSh",
+  //attack duplication 
+  step1adg: "1s18qj9thQdvKQySqdgv3jhAZ6WXu4Z_T",
+  step2adg: "1XD6h0xe56G4nfatc4Cs9wFnPveWwyxr8",
+  step3adg: "1FBYaP5H-UhlrMiAhlfxcEyP8PGBWbPO5",
+
   // ===== hier beliebig erweitern =====
   // progressionlatebanner: "DRIVE_FILE_ID_HIER",
   // underworldppsodiagram1: "DRIVE_FILE_ID_HIER",

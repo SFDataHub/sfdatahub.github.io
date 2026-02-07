@@ -54,6 +54,7 @@ export const SERVERS: Server[] = [
   { id: "f25", label: "F 25", region: "Fusion", active: true },
   { id: "f26", label: "F 26", region: "Fusion", active: true },
   { id: "f27", label: "F 27", region: "Fusion", active: true },
+  { id: "f28", label: "F 28", region: "Fusion", active: true },
   { id: "mearwynn", label: "MEARWYNN", region: "Fusion", active: true },
   { id: "blackforest", label: "BLACKFOREST", region: "Fusion", active: true },
   { id: "gnarogrim", label: "GNAROGRIM", region: "Fusion", active: true },

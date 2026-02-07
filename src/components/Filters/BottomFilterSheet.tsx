@@ -109,7 +109,7 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
 
         {/* Sort (mit id/name + Labelbindung) */}
         <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-          <label htmlFor="sheet-toplists-sort" style={{ color: PALETTE.text2, fontSize: 12 }}>Sort</label>
+          <label htmlFor="sheet-toplists-sort" style={{ color: PALETTE.text2, fontSize: 12 }}>Sort.</label>
           <select
             id="sheet-toplists-sort"
             name="sheet-toplists-sort"
