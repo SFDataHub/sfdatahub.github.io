@@ -57,9 +57,6 @@ export function joinParts(parts: Array<string | null | undefined>): string {
  */
 const DRIVE_BY_KEY: Record<string, string> = {
   // ===== FORTRESS =====
-  // fortress banner
-  // URL: https://drive.google.com/file/d/DRIVE_FILE_ID_HIER/view?usp=sharing
-  fortressbanner: "DRIVE_FILE_ID_HIER",
 
   // fortress calculator
   woodcuttergif: "1wss7GO8uQd4EDNOqlxi6XnPTJN9a3_XX",
@@ -75,14 +72,7 @@ const DRIVE_BY_KEY: Record<string, string> = {
   archerygif: "19gHfiOcOSg3hFkkqalPWUbRAhSUrqjcE",
   academygif: "1ecNA5rlJhtZBwgDZeiw3SJFNl2jM51z9",
 
-  fortressgemcalculatoricon: "DRIVE_FILE_ID_HIER",
-  // fortress diagramme (mehrere Bilder → durchnummerieren)
-  fortressdiagram1: "DRIVE_FILE_ID_HIER",
-  fortressdiagram2: "DRIVE_FILE_ID_HIER",
-
   // ===== UNDERWORLD =====
-  underworldbanner: "DRIVE_FILE_ID_HIER",
-  underworldcalculatoricon: "DRIVE_FILE_ID_HIER",
 
   // Underworld calculator
   uwgategif: "1FzKBmJcqXCOAUfdG7esFW6nOPkB8iJA3",
@@ -98,8 +88,32 @@ const DRIVE_BY_KEY: Record<string, string> = {
 
 
   // ===== ARENA / AM =====
+
   amicon: "1a_gPOH3j87wcsuI4sitTgwVA9lvlLJku",
   ambuildorder: "17euou3ng62FCr7HVeesQm-kZGcV7Ij7l",
+  amruneoverview: "1YlAG-4hNVBfXHTBvcMIWXs-h-_8Yz7MS",
+
+  // Runes
+  totalresrune: "1mdvEK5WDkBnR7pFs5-yVE_wTsAE6PqqH",
+  lightresrune: "1692qgkv23P76tnkV22tpGQwmFQv3lrjc",
+  lightdmgrune: "1932ov-vly-qu_ghlMmJrqH9zEH2UzZZ_",
+  iceresrune: "1-8ocIDqs8wrDM8CgoaA3RCQN-A-pquWj",
+  icedmgrune: "1idRxpKUIx5EBlO1D9c_CF0DxVmPtxR6O",
+  fireresrune: "1N2eh0YOSGGkNzgDlnsnEdlbyU2BpfQqQ",
+  firedmgrune: "1jCHfsLEZIg0konSNvDfmv42SUNWj3FEo",
+  healthrune: "1rQCSliXuZi-Z3REBaHkNO9Dtte6MR4Bt",
+  xprune: "1Okqq4A7pUaVhmNzYEBpyrHlSzISbnpXs",
+  goldrune: "1qMhCTNrBV2NOvLxWsybCeXOrR96PBHt5",
+  itemqualrune: "1J-kvaKzyxj_HU31rPUVk8g1wF32DjG-S",
+  epicrune: "1J-kvaKzyxj_HU31rPUVk8g1wF32DjG-S",
+  singlerune: "1FowkAzWip7QNI2k6CUAjDWBdAMJU1pFV",
+  doublerune: "16ZL63Rh9SW76iSZLSYxFkFNyBMY57Lr8",
+  
+  //Rune Archievements
+  stinkingrich: "1wtKrBGPIhb-c381aRwdFdItZ4bjcQuFs",
+  runemaster: "13jn9YGSj6jwAHAyFgZci7xItANOMLEvb",
+  runeemporer: "1NoV1yiiq3aa-jtUL0F8j0MUG--5sVkDW",
+  capitalist: "1i7276mR37xH9ywdGAf5QqAZmy9ecbeom",
 
   // ===== HELLEVATOR =====
   hellevatorbanner: "DRIVE_FILE_ID_HIER",
@@ -125,28 +139,17 @@ const DRIVE_BY_KEY: Record<string, string> = {
   progressionmiddungeonpauseoverview: "DRIVE_FILE_ID_HIER", // Leerzeichen ok; wird normalisiert
 
   // ===== INFOGRAPHICS / CLASS BOOK / DUNGEONS =====
-  infographicsbanner: "DRIVE_FILE_ID_HIER",
-  classbookcover: "DRIVE_FILE_ID_HIER",
-  classbookback: "DRIVE_FILE_ID_HIER",
-  dungeonsbanner: "DRIVE_FILE_ID_HIER",
-
+ 
   // XP & Gold Curve
   goldxpcurve: "1UbZoa4h3bouL8sDdxLpKzz3kFEgFim_-",
-  // Runes
-  totalresrune: "1mdvEK5WDkBnR7pFs5-yVE_wTsAE6PqqH",
-  lightresrune: "1692qgkv23P76tnkV22tpGQwmFQv3lrjc",
-  lightdmgrune: "1932ov-vly-qu_ghlMmJrqH9zEH2UzZZ_",
-  iceresrune: "1-8ocIDqs8wrDM8CgoaA3RCQN-A-pquWj",
-  icedmgrune: "1idRxpKUIx5EBlO1D9c_CF0DxVmPtxR6O",
-  fireresrune: "1N2eh0YOSGGkNzgDlnsnEdlbyU2BpfQqQ",
-  firedmgrune: "1jCHfsLEZIg0konSNvDfmv42SUNWj3FEo",
-  healthrune: "1rQCSliXuZi-Z3REBaHkNO9Dtte6MR4Bt",
-  xprune: "1Okqq4A7pUaVhmNzYEBpyrHlSzISbnpXs",
-  goldrune: "1qMhCTNrBV2NOvLxWsybCeXOrR96PBHt5",
-  itemqualrune: "1J-kvaKzyxj_HU31rPUVk8g1wF32DjG-S",
-  epicrune: "1J-kvaKzyxj_HU31rPUVk8g1wF32DjG-S",
-  singlerune: "1FowkAzWip7QNI2k6CUAjDWBdAMJU1pFV",
-  doublerune: "16ZL63Rh9SW76iSZLSYxFkFNyBMY57Lr8",
+  
+  // Calendar
+  calendarrewards: "1K9bm0OUtW0_QUg5i9q40N0slV6kg_iTd",
+  calendarskip: "1jOgaf09diVUyCdXWdFoc-kXj4mUHejo7",
+  //Pets
+  elementaladvantages: "1wuV_5LJCMKVWA9FkCVILcQ_xF6GS9NM3",
+  petsp2w: "1Smy-lLOCHFd_n4qqhy_mQh1cQEfIfYfW",
+  petsf2p: "1_LfcLaZ9Yte_55iO0jl40KO8ZIvOyzjd",
   //Gems
   luckbig: "1iYlE4rDU6rg3MHKG0vvwwb9wskdmu8-1",
   blackbig: "14bA3CU46YkT4um1tHmFoOGLp8RZE_v0s",

@@ -60,7 +60,7 @@
 .tableWrap {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table {
@@ -69,16 +69,16 @@
   font-size: 14px;
 }
 
-.thead { background: rgba(255,255,255,0.02); }
+.thead { background: #1A2F4A; }
 
 .th {
   text-align: left;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #1A2F4A;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3;
 }
 
 .td {
@@ -99,7 +99,12 @@
   background: #1A2F4A; border: 1px solid #2B4C73;
   display: grid; place-items: center; font-weight: 800; color: #fff;
 }
-.tierTexts { display: grid; gap: 4px; }
+.tierTexts {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .tierName { color: #F5F9FF; font-weight: 700; }
 
 /* Badges */
@@ -128,9 +133,10 @@
 }
 
 /* Achievements */
+.achievTooltip { justify-self: end; margin-right: 12px; }
 .achiev { display: inline-flex; align-items: center; gap: 6px; color: #B0C4D9; }
 .achievImg {
-  width: 16px; height: 16px; border-radius: 3px;
+  width: 72px; height: 72px; border-radius: 3px;
   background: #1A2F4A; border: 1px solid #2C4A73;
 }
 

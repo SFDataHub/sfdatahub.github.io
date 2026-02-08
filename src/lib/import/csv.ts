@@ -11,7 +11,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { computeBaseStats, deriveForPlayer } from "../../../tools/playerDerivedHelpers";
+import { buildPlayerDerivedSnapshotEntry, computeBaseStats, deriveForPlayer } from "../../../tools/playerDerivedHelpers";
 import type { GuildDerivedAggregate } from "./importer";
 import { db } from "../firebase";
 import {
@@ -352,6 +352,32 @@ const pickByCanon = (row: Row, canonKey: string): any => {
 
 const pickAnyByCanon = (row: Row, keys: string[]): any =>
   keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
+
+const SERVER_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
+const SERVER_CODE_SUFFIX_PATTERN = /^([a-z]{1,4}\d+)[_.-]?(net|eu)$/i;
+const SERVER_HOST_PATTERN = /^([a-z]{1,4}\d+)\.sfgame\.(net|eu)$/i;
+
+const normalizeServerCodeFromKey = (value: string): string | null => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const lowered = trimmed.toLowerCase();
+  if (SERVER_CODE_PATTERN.test(lowered)) return lowered.toUpperCase();
+  const suffixMatch = lowered.match(SERVER_CODE_SUFFIX_PATTERN);
+  if (suffixMatch) return suffixMatch[1].toUpperCase();
+  const hostMatch = lowered.match(SERVER_HOST_PATTERN);
+  if (hostMatch) return hostMatch[1].toUpperCase();
+  return trimmed;
+};
+
+export const parseServerKeyFromIdentifier = (identifier: any): string | null => {
+  const raw = String(identifier ?? "").trim();
+  if (!raw) return null;
+  const match = raw.match(/^(.+)_p(\d+)$/);
+  if (!match) return null;
+  const serverKey = match[1]?.trim();
+  if (!serverKey) return null;
+  return normalizeServerCodeFromKey(serverKey);
+};
 
 type MemberCountResolutionSource = "primary" | "alias" | "lookup" | "none";
 
@@ -758,8 +784,12 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
       continue;
     }
 
+    const identifierRaw = pickWithLookup(row, lookup, COL.PLAYERS.IDENTIFIER);
+    const identifier = norm(identifierRaw);
+    const serverFromIdentifier = parseServerKeyFromIdentifier(identifier);
     const serverRaw = pickWithLookup(row, lookup, COL.PLAYERS.SERVER);
-    const server = serverRaw && norm(serverRaw) !== "" ? up(serverRaw) : undefined;
+    const serverFallback = serverRaw && norm(serverRaw) !== "" ? up(serverRaw) : undefined;
+    const server = serverFromIdentifier ?? (!identifier ? serverFallback : undefined);
     if (!server) {
       stats.missingServer++;
       continue;
@@ -929,8 +959,6 @@ const toFiniteNumberOrNull = (value: any): number | null => {
 const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
 const toGuildSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_guild_derived`;
 
-const SERVER_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
-
 const normalizeServerInput = (value: any): { code?: string; host?: string } => {
   const raw = String(value ?? "").replace(/\u00a0/g, " ").trim();
   if (!raw) return {};
@@ -945,6 +973,11 @@ const normalizeServerInput = (value: any): { code?: string; host?: string } => {
 
   if (SERVER_CODE_PATTERN.test(lowered)) {
     return { code: lowered.toUpperCase() };
+  }
+
+  const suffixMatch = lowered.match(SERVER_CODE_SUFFIX_PATTERN);
+  if (suffixMatch) {
+    return { code: suffixMatch[1].toUpperCase() };
   }
 
   if (lowered.includes(".")) {
@@ -1669,8 +1702,21 @@ export async function importCsvToDB(
     playerResults.push(...scanResults);
     counts.writtenScanPlayers = scanResults.filter((r) => r.status === "created").length;
 
-    const serverCodeByHost =
-      opts.serverHostMap ?? (await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server)));
+    let serverCodeByHost = opts.serverHostMap ? new Map(opts.serverHostMap) : new Map<string, string>();
+    if (!opts.serverHostMap) {
+      serverCodeByHost = await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server));
+    } else if (parsedPlayers.length > 0) {
+      const needsEnrichment = parsedPlayers.some((player) => {
+        const lookupKey = normalizeServerLookupKey(player.server);
+        return lookupKey ? !serverCodeByHost.has(lookupKey) : false;
+      });
+      if (needsEnrichment) {
+        const fromParsed = await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server));
+        for (const [key, value] of fromParsed.entries()) {
+          if (!serverCodeByHost.has(key)) serverCodeByHost.set(key, value);
+        }
+      }
+    }
     if (!serverCodeByHost.size && parsedPlayers.length > 0) {
       console.warn("[ImportCsv] Server host map empty; derived snapshots will be skipped.");
     }
@@ -1744,23 +1790,17 @@ export async function importCsvToDB(
         }
         if (snapshotServerKey) {
           const lastScanRaw = pickByCanon(last.row, COL.PLAYERS.TIMESTAMP);
-          const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
-          const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
-          const snapshotEntry: PlayerDerivedSnapshotEntry = {
-            playerId: String(pid),
+          const snapshotEntry: PlayerDerivedSnapshotEntry = buildPlayerDerivedSnapshotEntry({
+            playerId: pid,
             server: snapshotServerKey,
-            name: String(name ?? ""),
-            class: String(derived.class ?? className ?? ""),
-            guild: guildName ? String(guildName) : null,
-            lastScan: lastScan ? lastScan : null,
-            level: toFiniteNumberOrNull(level ?? derived.level),
-            con: toFiniteNumberOrNull(derived.con),
-            main: toFiniteNumberOrNull(derived.main),
-            mine: toFiniteNumberOrNull(derived.mine),
-          ratio: toFiniteNumberOrNull(derived.ratio),
-          sum: toFiniteNumberOrNull(derived.sum),
-          treasury: toFiniteNumberOrNull(derived.treasury),
-        };
+            name,
+            className,
+            guildName,
+            level,
+            lastScanRaw,
+            timestampSec: last.ts,
+            derived,
+          });
           if (!pendingDerivedByServer.has(snapshotServerKey)) {
             pendingDerivedByServer.set(snapshotServerKey, []);
           }

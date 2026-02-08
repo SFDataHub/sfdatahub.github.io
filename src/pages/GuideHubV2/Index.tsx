@@ -92,6 +92,80 @@ const FortressLinkButtons: React.FC = () => {
   );
 };
 
+const ArenaAMLinkButtons: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub2: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", "arenaam");
+    next.set("sub2", sub2);
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("am-rune-bonuses")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Rune Bonuses</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("am-build-order")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Build Order</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
+const ArenaAMRelatedButtons: React.FC = () => {
+  const { i18n } = useTranslation();
+  const isGerman = i18n.language?.startsWith("de");
+  const relatedLinks = [
+    {
+      label: "SF Tavernen Discord FAQ",
+      href: "https://discord.com/channels/551152314329858048/1415410382981562542",
+    },
+    {
+      label: "SF Tools",
+      href: "https://sftools.mar21.eu/idle.html",
+    },
+    {
+      label: "SF Coaching",
+      href: isGerman
+        ? "https://discord.com/channels/1381647290606817452/1420471280284733491"
+        : "https://discord.com/channels/1381647290606817452/1420473511364923432",
+    },
+  ];
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      {relatedLinks.map((item) => (
+        <a
+          key={item.href}
+          className={`${styles.hudButton} ${styles.hudButtonLink}`}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <HudBox padding="md" hover className={styles.hudButtonBox}>
+            <span className={styles.hudButtonText}>{item.label}</span>
+          </HudBox>
+        </a>
+      ))}
+    </div>
+  );
+};
+
 const FortressRelatedButtons: React.FC = () => {
   const relatedLinks = [
     {
@@ -632,6 +706,8 @@ const GuideHubV2: React.FC = () => {
     const infographicsBlock = isInfographics ? <InfographicsGallery /> : null;
     const embedRegistry = {
       "am-rune-bonuses-table": AMRuneBonusesTable,
+      "arenaam-link-buttons": ArenaAMLinkButtons,
+      "arenaam-related-buttons": ArenaAMRelatedButtons,
       "fortress-link-buttons": FortressLinkButtons,
       "fortress-related-buttons": FortressRelatedButtons,
       "fortress-package-skip-order-table": PackageSkipOrderTable,

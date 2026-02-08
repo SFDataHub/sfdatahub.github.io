@@ -4,6 +4,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 
 import { accessGroupSeeds, featureAccessSeeds } from "../admin/accessSeeds";
+import { writeFeatureAccessSnapshot } from "../admin/featureAccessSnapshot";
 import { UPLOAD_INBOX_BUCKET, UPLOAD_INBOX_TOKEN } from "../config";
 import { admin, db } from "../firebase";
 
@@ -39,6 +40,8 @@ internalAdminRouter.post("/seed/access-control", async (req, res) => {
       await db.collection("access_groups").doc(seed.id).set(seed, { merge: true });
       groupCount += 1;
     }
+
+    await writeFeatureAccessSnapshot();
 
     return res.json({ ok: true, featureCount, groupCount });
   } catch (error) {

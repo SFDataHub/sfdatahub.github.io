@@ -103,3 +103,70 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
     updatedAtFromLatest: updatedAt ?? updatedAtFallback ?? null,
   };
 };
+
+export type PlayerDerivedSnapshotEntry = {
+  playerId: string;
+  server: string;
+  name: string;
+  class: string;
+  guild: string | null;
+  lastScan: string | null;
+  level: number | null;
+  con: number | null;
+  main: number | null;
+  mine: number | null;
+  ratio: number | null;
+  sum: number | null;
+  treasury: number | null;
+};
+
+export const toFiniteNumberOrNull = (value: any): number | null => {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+export type BuildPlayerDerivedSnapshotInput = {
+  playerId: any;
+  server: any;
+  name?: any;
+  className?: any;
+  guildName?: any;
+  level?: any;
+  lastScanRaw?: any;
+  timestampSec?: any;
+  derived: {
+    class?: any;
+    level?: any;
+    con?: any;
+    main?: any;
+    mine?: any;
+    ratio?: any;
+    sum?: any;
+    treasury?: any;
+  };
+};
+
+export const buildPlayerDerivedSnapshotEntry = (
+  input: BuildPlayerDerivedSnapshotInput
+): PlayerDerivedSnapshotEntry => {
+  const lastScanRaw = input.lastScanRaw != null ? String(input.lastScanRaw).trim() : "";
+  const lastScanFallback = String(input.timestampSec ?? "").trim();
+  const lastScan = (lastScanRaw || lastScanFallback).trim();
+
+  return {
+    playerId: String(input.playerId ?? ""),
+    server: String(input.server ?? ""),
+    name: String(input.name ?? ""),
+    class: String(input.derived?.class ?? input.className ?? ""),
+    guild: input.guildName ? String(input.guildName) : null,
+    lastScan: lastScan ? lastScan : null,
+    level: toFiniteNumberOrNull(input.level ?? input.derived?.level),
+    con: toFiniteNumberOrNull(input.derived?.con),
+    main: toFiniteNumberOrNull(input.derived?.main),
+    mine: toFiniteNumberOrNull(input.derived?.mine),
+    ratio: toFiniteNumberOrNull(input.derived?.ratio),
+    sum: toFiniteNumberOrNull(input.derived?.sum),
+    treasury: toFiniteNumberOrNull(input.derived?.treasury),
+  };
+};

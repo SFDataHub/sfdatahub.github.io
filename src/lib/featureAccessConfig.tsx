@@ -1,12 +1,12 @@
 import React from "react";
 import type { FirebaseError } from "firebase/app";
-import { collection, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useAuth } from "../context/AuthContext";
 import {
   beginReadScope,
   endReadScope,
-  traceGetDocs,
+  traceGetDoc,
   type FirestoreTraceScope,
   isFirestoreReadTraceEnabled,
 } from "./debug/firestoreReadTrace";
@@ -92,8 +92,8 @@ export const FEATURE_ACCESS_CONFIG: FeatureAccessRule[] = [
     route: "/toplists",
     area: "main",
     titleKey: "nav.toplists",
-    status: "active",
-    minRole: "user",
+    status: "public",
+    minRole: "guest",
     showInSidebar: true,
     showInTopbar: false,
     navOrder: 40,
@@ -103,8 +103,8 @@ export const FEATURE_ACCESS_CONFIG: FeatureAccessRule[] = [
     route: "/guidehub-v2",
     area: "main",
     titleKey: "nav.guideHub",
-    status: "active",
-    minRole: "user",
+    status: "public",
+    minRole: "guest",
     showInSidebar: true,
     showInTopbar: false,
     navOrder: 50,
@@ -291,6 +291,31 @@ function mapDocToRule(docId: string, data: unknown): FeatureAccessRule | null {
   return normalizeRule(rule);
 }
 
+function extractSnapshotRules(snapshotData: unknown): FeatureAccessRule[] {
+  if (!snapshotData || typeof snapshotData !== "object") return [];
+  const payload = snapshotData as Record<string, unknown>;
+  const items = payload.items;
+
+  if (Array.isArray(items)) {
+    return items
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const entry = item as Record<string, unknown>;
+        const docId = typeof entry.id === "string" ? entry.id : "";
+        return mapDocToRule(docId, entry);
+      })
+      .filter((rule): rule is FeatureAccessRule => Boolean(rule));
+  }
+
+  if (items && typeof items === "object") {
+    return Object.entries(items as Record<string, unknown>)
+      .map(([docId, item]) => mapDocToRule(docId, item))
+      .filter((rule): rule is FeatureAccessRule => Boolean(rule));
+  }
+
+  return [];
+}
+
 function buildRuleMaps(rules: FeatureAccessRule[]): FeatureAccessRuleMap {
   const byId: Record<string, FeatureAccessRule> = {};
   const byRoute: Record<string, FeatureAccessRule> = {};
@@ -311,6 +336,8 @@ const DEFAULT_STATE: FeatureAccessState = {
   error: null,
 };
 const FEATURE_ACCESS_CACHE_TTL_MS = 5 * 60 * 1000;
+const FEATURE_ACCESS_SNAPSHOT_COLLECTION = "stats_public";
+const FEATURE_ACCESS_SNAPSHOT_DOC = "feature_access_main_nav";
 
 type FeatureAccessFetchResult = {
   rules: FeatureAccessRuleMap;
@@ -330,17 +357,11 @@ const loadFeatureAccessRules = async (scope: FirestoreTraceScope | null): Promis
   }
 
   featureAccessInflight = (async () => {
-    const colRef = collection(db, "feature_access");
-    const snapshot = await traceGetDocs(scope, colRef, () => getDocs(colRef), {
-      collectionHint: "feature_access",
+    const docRef = doc(db, FEATURE_ACCESS_SNAPSHOT_COLLECTION, FEATURE_ACCESS_SNAPSHOT_DOC);
+    const snapshot = await traceGetDoc(scope, docRef, () => getDoc(docRef), {
+      label: "feature_access_snapshot",
     });
-    const dynamicRules: FeatureAccessRule[] = [];
-
-    snapshot.forEach((doc) => {
-      const rule = mapDocToRule(doc.id, doc.data());
-      if (!rule) return;
-      dynamicRules.push(rule);
-    });
+    const dynamicRules = snapshot.exists() ? extractSnapshotRules(snapshot.data()) : [];
 
     const merged = mergeRuleMaps(dynamicRules);
     const payload: FeatureAccessFetchResult = {
@@ -421,7 +442,7 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
           typeof window !== "undefined" && window.location.hostname === "localhost";
         if (shouldWarn) {
           console.warn(
-            `[FeatureAccess] Firestore feature_access ${
+            `[FeatureAccess] Firestore stats_public feature access snapshot ${
               isPermissionIssue ? "not readable" : "load failed"
             }. Falling back to defaults.`,
             error,
@@ -494,7 +515,6 @@ export function canAccessWithRule(
   }
 
   const effectiveRole = userRole ?? "user";
-
   if (rule.status === "hidden") {
     return false;
   }

@@ -5,25 +5,8 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview {#overview}
+Build your Attractions according to the picture below for maximum efficiency.
 
-Placeholder content for AM Build order.
+Upgrading to full Platinum on all Attractions will cost you 4300 Mushrooms.
 
-### Details
-
-- Add steps and explanation here.
-- Include any key tips or warnings.
-
-### Tips
-
-- Add practical tips or follow-up actions.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}
+[[asset:ambuildorder]]
