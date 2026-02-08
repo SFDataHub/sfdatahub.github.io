@@ -5,25 +5,8 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview {#overview}
+[[embed:fortress-link-buttons]]
 
-Platzhalter-Uebersicht fuer den Bereich Fortress.
+## related topics
 
-### Highlights
-
-- Fuege wichtige Eintraege hinzu.
-- Verlinke passende Guides.
-
-### Tips
-
-- Fuege hilfreiche Hinweise hinzu.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}
+[[embed:fortress-related-buttons]]

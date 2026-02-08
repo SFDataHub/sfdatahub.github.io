@@ -5,6 +5,7 @@ import {
   type ImportReport,
   parseGuildsCsvText,
   parsePlayersCsvText,
+  parseServerKeyFromIdentifier,
 } from "../../lib/import/csv";
 import { importSelectionToDb } from "./importCsvToDb";
 import type { CsvParsedResult, ParsedCsvGuild, ParsedCsvPlayer } from "../UploadCenter/uploadCenterCsvMapping";
@@ -190,8 +191,12 @@ function slimPlayers(rows: Row[], headers: string[]): PlayerSlim[] {
   for (const r of rows) {
     const gid = pickByCanon(r, COL.PLAYERS.GUILD_IDENTIFIER);
     if (!gid) continue;
+    const identifierRaw = pickByCanon(r, COL.PLAYERS.IDENTIFIER);
+    const identifier = identifierRaw != null ? String(identifierRaw).trim() : "";
+    const serverFromIdentifier = parseServerKeyFromIdentifier(identifier);
     const rawServer = pickByCanon(r, COL.PLAYERS.SERVER);
-    const server = rawServer && String(rawServer).trim() !== "" ? String(rawServer).trim().toUpperCase() : undefined; // KEIN UNKNOWN
+    const serverFallback = rawServer && String(rawServer).trim() !== "" ? String(rawServer).trim().toUpperCase() : undefined;
+    const server = serverFromIdentifier ?? (!identifier ? serverFallback : undefined); // KEIN UNKNOWN
     out.push({
       guildIdentifier: String(gid),
       id: pickByCanon(r, COL.PLAYERS.IDENTIFIER) || undefined,

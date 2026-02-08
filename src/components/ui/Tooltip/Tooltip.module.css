@@ -4,6 +4,19 @@
   align-items: center;
 }
 
+.bottom .bubble {
+  top: calc(100% + 12px);
+  bottom: auto;
+  transform: translateY(-6px);
+}
+
+.bottom .tail {
+  top: -6px;
+  bottom: auto;
+  border-bottom: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .trigger {
   display: inline-flex;
   align-items: center;

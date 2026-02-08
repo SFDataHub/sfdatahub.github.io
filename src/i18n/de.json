@@ -93,6 +93,92 @@
       "link": "Link"
     }
   },
+  "guidehub": {
+    "arenaManager": {
+      "amRuneBonuses": {
+        "description": "Komplette Uebersicht der Arena-Manager-Runen mit ihren Bonuswerten. Gruppiert nach Tier; Max, Errungenschaften und Breakpoints sind markiert.",
+        "searchPlaceholder": "Suche (z. B. thousand, E34, x60)...",
+        "table": {
+          "tier": "Tier",
+          "amount": "Menge",
+          "goldBonus": "Gold Bonus",
+          "xpBonus": "XP Bonus",
+          "hpBonus": "HP Bonus",
+          "totalResistance": "Gesamtwiderstand",
+          "singleResistance": "Einzelwiderstand",
+          "elementalDamage": "Elementarschaden",
+          "improvedItemQuality": "Verbesserte Item-Qualitaet",
+          "chancesOfEpics": "Chance auf Epics",
+          "tags": "Tags"
+        },
+        "badges": {
+          "max": "MAX",
+          "achievement": "Errungenschaft",
+          "x2": "x2",
+          "x12": "x12",
+          "x60": "x60",
+          "x8": "x8"
+        },
+        "achievements": {
+          "capitalist": "Kapitalist Errungenschaft",
+          "stinkingrich": "Stinkreich Errungenschaft",
+          "runemaster": "Runenmeister"
+        },
+        "tiers": {
+          "thousand": "Thousand",
+          "million": "Million",
+          "billion": "Billion",
+          "trillion": "Trillion",
+          "quadrillion": "Quadrillion",
+          "quintillion": "Quintillion",
+          "sextillion": "Sextillion",
+          "septillion": "Septillion",
+          "octillion": "Octillion",
+          "nonillion": "Nonillion",
+          "decillion": "Decillion",
+          "undecillion": "Undecillion",
+          "duodecillion": "Duodecillion",
+          "tredecillion": "Tredecillion",
+          "quattuordecillion": "Quattuordecillion",
+          "quindecillion": "Quindecillion",
+          "sexdecillion": "Sexdecillion",
+          "septendecillion": "Septendecillion",
+          "octodecillion": "Octodecillion",
+          "novendecillion": "Novendecillion",
+          "vigintillion": "Vigintillion",
+          "unvigintillion": "Unvigintillion",
+          "duovigintillion": "Duovigintillion",
+          "trevigintillion": "Trevigintillion",
+          "quattuorvigintillion": "Quattuorvigintillion",
+          "quinquavigintillion": "Quinquavigintillion",
+          "sesvigintillion": "Sesvigintillion",
+          "septemvigintillion": "Septemvigintillion",
+          "octovigintillion": "Octovigintillion",
+          "novemvigintillion": "Novemvigintillion",
+          "trigintillion": "Trigintillion",
+          "untrigintillion": "Untrigintillion",
+          "duotrigintillion": "Duotrigintillion",
+          "trestrigintillion": "Trestrigintillion",
+          "quattuortrigintillion": "Quattuortrigintillion",
+          "quinquatrigintillion": "Quinquatrigintillion",
+          "sextrigintillion": "Sextrigintillion",
+          "septentrigintillion": "Septentrigintillion",
+          "octotrigintillion": "Octotrigintillion",
+          "noventrigintillion": "Noventrigintillion",
+          "quadragintillion": "Quadragintillion",
+          "unquadragintillion": "Unquadragintillion",
+          "duoquadragintillion": "Duoquadragintillion",
+          "trequadragintillion": "Trequadragintillion",
+          "quattuorquadragintillion": "Quattuorquadragintillion",
+          "quinquadragintillion": "Quinquadragintillion",
+          "sexquadragintillion": "Sexquadragintillion",
+          "septenquadragintillion": "Septenquadragintillion",
+          "octoquadragintillion": "Octoquadragintillion",
+          "novenquadragintillion": "Novenquadragintillion"
+        }
+      }
+    }
+  },
   "servers": {
     "tiles": {
       "overview": {

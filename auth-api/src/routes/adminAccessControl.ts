@@ -10,6 +10,7 @@ import {
   writeAdminAuditLog,
 } from "../lib/adminAuditLog";
 import { requireAdmin, requireModerator } from "../middleware/auth";
+import { writeFeatureAccessSnapshot } from "../admin/featureAccessSnapshot";
 
 const FEATURE_COLLECTION = "feature_access";
 const GROUP_COLLECTION = "access_groups";
@@ -390,6 +391,15 @@ adminAccessControlRouter.patch("/features/:id", async (req: Request, res: Respon
         summary,
         changes,
       });
+    }
+
+    try {
+      await writeFeatureAccessSnapshot();
+    } catch (snapshotError) {
+      console.error(
+        "[admin-access] Failed to refresh feature access snapshot after update",
+        snapshotError,
+      );
     }
 
     return res.json({ ok: true, feature: updatedFeature });
