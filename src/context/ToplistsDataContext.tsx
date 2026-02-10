@@ -312,6 +312,8 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       error: null,
     }));
 
+    type SnapshotError = { error: string; detail?: string };
+
     (async () => {
       const results = await Promise.all(
         missingServers.map((serverCode) => getLatestPlayerToplistSnapshotCached(serverCode))
@@ -319,24 +321,26 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       const snapshots: FirestoreLatestToplistSnapshot[] = [...cachedSnapshots];
-      let firstError: { error: string; detail?: string } | null = null;
+      let firstErrorCode: SnapshotError["error"] | null = null;
+      let firstErrorDetail: string | null = null;
 
       results.forEach((result, idx) => {
         const serverCode = missingServers[idx] || "";
         if (result.ok) {
           playerCacheRef.current.set(serverCode, { snapshot: result.snapshot, cachedAt: Date.now() });
           snapshots.push(result.snapshot);
-        } else if (!firstError) {
-          firstError = result;
+        } else if (!firstErrorCode) {
+          firstErrorCode = result.error;
+          firstErrorDetail = result.detail ?? null;
         }
       });
 
       if (!snapshots.length) {
-        const detail = firstError?.detail ? ` (${firstError.detail})` : "";
+        const detail = firstErrorDetail ? ` (${firstErrorDetail})` : "";
         let errorMsg = "Firestore Fehler";
-        if (firstError?.error === "not_found") {
+        if (firstErrorCode === "not_found") {
           errorMsg = i18n.t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server.");
-        } else if (firstError?.error === "decode_error") {
+        } else if (firstErrorCode === "decode_error") {
           errorMsg = "Fehler beim Lesen der Daten";
         }
 
@@ -388,6 +392,21 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
     let rows = Array.isArray(playerState.rows) ? [...playerState.rows] : [];
     if (!rows.length) return rows;
 
+    const deriveRatio = (main: number | null, con: number | null) => {
+      const m = typeof main === "number" && Number.isFinite(main) ? main : 0;
+      const c = typeof con === "number" && Number.isFinite(con) ? con : 0;
+      const total = m + c;
+      if (!(total > 0)) return { label: "—", mainRatio: null as number | null };
+      const mainRatio = Math.round((m / total) * 100);
+      const conRatio = 100 - mainRatio;
+      return { label: `${mainRatio}/${conRatio}`, mainRatio };
+    };
+
+    rows = rows.map((row) => {
+      const { label, mainRatio } = deriveRatio(row.main, row.con);
+      return { ...row, ratio: label, _ratioLabel: label, _ratioMain: mainRatio } as any;
+    });
+
     const serverFilter = normalizedServers;
     const serverSet = serverFilter.length ? new Set(serverFilter) : null;
     const classFilter = normalizedClasses;
@@ -413,6 +432,13 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       const diff = aVal - bVal;
       return sort.dir === "asc" ? diff : -diff;
     };
+    const compareText = (aVal: string | null, bVal: string | null) => {
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
+      return sort.dir === "asc" ? diff : -diff;
+    };
 
     rows.sort((a, b) => {
       switch (sort.key) {
@@ -434,7 +460,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
         case "sum":
           return compareNumber(a.sum, b.sum);
         case "ratio":
-          return compareNumber(a.ratio, b.ratio);
+          return compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
         case "mine":
           return compareNumber(a.mine, b.mine);
         case "treasury":

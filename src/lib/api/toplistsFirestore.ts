@@ -201,7 +201,7 @@ export type FirestoreToplistPlayerRow = {
   main: number | null;
   con: number | null;
   sum: number | null;
-  ratio: number | null;
+  ratio: string | null;
   mine: number | null;
   treasury: number | null;
   lastScan: string | null;
@@ -301,7 +301,7 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
     main: toNumber(raw.main),
     con: toNumber(raw.con),
     sum: toNumber(raw.sum),
-    ratio: toNumber(raw.ratio),
+    ratio: toStringOrNull(raw.ratio),
     mine: toNumber(raw.mine),
     treasury: toNumber(raw.treasury),
     lastScan: toStringOrNull(raw.lastScan),
@@ -399,6 +399,65 @@ export async function getLatestPlayerToplistSnapshot(serverCode: string): Promis
   }
 }
 
+async function getPlayerToplistSnapshotByDocId(docId: string): Promise<FirestoreLatestToplistResult> {
+  const code = (docId || "").trim();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing doc id" };
+  }
+
+  const sessionName = `ToplistsPlayersCompare:${code}`;
+  startReadTraceSession(sessionName);
+  const scope = beginReadScope(sessionName);
+
+  try {
+    const ref = doc(
+      db,
+      STATS_PUBLIC_ROOT,
+      PLAYERS_COLLECTION,
+      "lists",
+      "latest_toplists",
+      "servers",
+      code
+    );
+    const snap = await traceGetDoc(scope, ref, () => getDoc(ref), { label: `ToplistsPlayersCompare:${code}` });
+    if (!snap.exists()) {
+      return { ok: false, error: "not_found" };
+    }
+
+    const data: any = snap.data() || {};
+    const rawPlayers = Array.isArray(data.players) ? data.players : null;
+    if (!rawPlayers) {
+      return { ok: false, error: "decode_error", detail: "missing players array" };
+    }
+
+    const players: FirestoreToplistPlayerRow[] = [];
+    for (const row of rawPlayers) {
+      const mapped = mapRow(row);
+      if (!mapped) {
+        console.error("[toplistsFirestore] Snapshot row decode failed", row);
+        return { ok: false, error: "decode_error", detail: "invalid player row" };
+      }
+      players.push(mapped);
+    }
+
+    return {
+      ok: true,
+      snapshot: {
+        server: toStringOrNull(data.server) ?? code,
+        updatedAt: toNumber(data.updatedAt),
+        players,
+      },
+    };
+  } catch (err: any) {
+    console.error("[toplistsFirestore] Firestore error", err);
+    return { ok: false, error: "firestore_error", detail: err?.message };
+  } finally {
+    endReadScope(scope);
+    reportReadSummary(sessionName);
+    reportWriteSummary(sessionName);
+  }
+}
+
 type SnapshotCacheEntry<T> = {
   snapshot: T;
   fetchedAt: number;
@@ -432,6 +491,15 @@ const readSnapshotCache = <T,>(key: string): SnapshotCacheEntry<T> | null => {
   }
 };
 
+const ratioLooksValid = (value: unknown) =>
+  value == null || (typeof value === "string" && value.includes("/"));
+
+const snapshotHasInvalidRatio = (snapshot: FirestoreLatestToplistSnapshot | null | undefined) => {
+  const rows = snapshot?.players;
+  if (!Array.isArray(rows)) return false;
+  return rows.some((row) => row && !ratioLooksValid((row as any).ratio));
+};
+
 const writeSnapshotCache = <T,>(key: string, entry: SnapshotCacheEntry<T>) => {
   try {
     if (typeof localStorage === "undefined") return;
@@ -462,7 +530,7 @@ export async function getLatestPlayerToplistSnapshotCached(
   const now = Date.now();
   const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
   if (cached) {
-    if (now < cached.expiresAt) {
+    if (now < cached.expiresAt && !snapshotHasInvalidRatio(cached.snapshot)) {
       return { ok: true, snapshot: cached.snapshot };
     }
     clearSnapshotCache(key);
@@ -474,6 +542,31 @@ export async function getLatestPlayerToplistSnapshotCached(
       snapshot: result.snapshot,
       fetchedAt: now,
       expiresAt: nextFullHour(now),
+    });
+  }
+  return result;
+}
+
+export async function getPlayerToplistSnapshotByDocIdCached(
+  docId: string,
+  ttlMs = 5 * 60 * 1000 // default 5 minutes for testing (was 24h)
+): Promise<FirestoreLatestToplistResult> {
+  const key = `${SNAPSHOT_CACHE_PREFIX}:players-doc:${docId}`;
+  const now = Date.now();
+  const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
+  if (cached) {
+    if (now < cached.expiresAt && !snapshotHasInvalidRatio(cached.snapshot)) {
+      return { ok: true, snapshot: cached.snapshot };
+    }
+    clearSnapshotCache(key);
+  }
+
+  const result = await getPlayerToplistSnapshotByDocId(docId);
+  if (result.ok) {
+    writeSnapshotCache(key, {
+      snapshot: result.snapshot,
+      fetchedAt: now,
+      expiresAt: now + ttlMs,
     });
   }
   return result;

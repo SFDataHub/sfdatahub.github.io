@@ -19,6 +19,7 @@ type FiltersState = {
   // Daten-Filter
   servers: string[];
   classes: string[];
+  guilds: string[];
   days: DaysFilter;        // interne Quelle
   sortBy: string;          // "level" | "main" | "constitution" | "sum" | "lastScan" | "name" ...
   favoritesOnly: boolean;
@@ -39,6 +40,7 @@ type FiltersContextValue = {
   // Daten-Filter (lesen)
   servers: string[];
   classes: string[];
+  guilds: string[];
   days: DaysFilter;
   /** Backwards-Compat: gleicher Wert wie `days` */
   range: DaysFilter;
@@ -64,6 +66,11 @@ type FiltersContextValue = {
   setClasses: (next: StringArrayUpdater) => void;
   toggleClass: (cls: string) => void;
   clearClasses: () => void;
+
+  // Mutationen (Gilden)
+  setGuilds: (next: StringArrayUpdater) => void;
+  toggleGuild: (guild: string) => void;
+  clearGuilds: () => void;
 
   // Mutationen (Zeit/Sort/Flags)
   setDays: (d: DaysFilter) => void;
@@ -93,6 +100,7 @@ const LS_KEY = "TL_FILTERS_V2";
 const DEFAULT_STATE: FiltersState = {
   servers: [],
   classes: [],
+  guilds: [],
   days: "all",
   sortBy: "sum",
   favoritesOnly: false,
@@ -140,6 +148,7 @@ function loadFromStorage(): FiltersState {
       ...parsed,
       servers: Array.isArray(parsed.servers) ? parsed.servers : [],
       classes: Array.isArray(parsed.classes) ? parsed.classes : [],
+      guilds: Array.isArray(parsed.guilds) ? parsed.guilds : [],
       favoritesOnly: typeof parsed.favoritesOnly === "boolean" ? parsed.favoritesOnly : parsedQuickFav,
       activeOnly: typeof parsed.activeOnly === "boolean" ? parsed.activeOnly : parsedQuickActive,
       quickFav: parsedQuickFav,
@@ -211,6 +220,22 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
 
   const clearClasses = () => setState((s) => ({ ...s, classes: [] }));
 
+  // --------- Gilden ----------
+  const setGuilds = (next: StringArrayUpdater) =>
+    setState((s) => ({
+      ...s,
+      guilds: uniqueList(resolveNext(next, s.guilds)),
+    }));
+
+  const toggleGuild = (guild: string) =>
+    setState((s) => {
+      const set = new Set(s.guilds);
+      set.has(guild) ? set.delete(guild) : set.add(guild);
+      return { ...s, guilds: Array.from(set) };
+    });
+
+  const clearGuilds = () => setState((s) => ({ ...s, guilds: [] }));
+
   // --------- Zeit / Sort / Flags ----------
   const setDays = (d: DaysFilter) => setState((s) => ({ ...s, days: d }));
   const setRange = (d: DaysFilter) => setDays(d); // Alias
@@ -261,6 +286,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       // Daten-Filter (lesen)
       servers: state.servers,
       classes: state.classes,
+      guilds: state.guilds,
       days: state.days,
       range: state.days, // Backwards-Compat
       sortBy: state.sortBy,
@@ -283,6 +309,9 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       setClasses,
       toggleClass,
       clearClasses,
+      setGuilds,
+      toggleGuild,
+      clearGuilds,
       setDays,
       setRange,
       setSortBy,
@@ -314,6 +343,7 @@ export function useFilters(): FiltersContextValue {
     // damit die Seite nicht crasht, aber Funktionen vorhanden sind.
     return {
       ...DEFAULT_STATE,
+      guilds: DEFAULT_STATE.guilds,
       range: DEFAULT_STATE.days,
       searchText: DEFAULT_STATE.searchText,
       quickFav: DEFAULT_STATE.quickFav,
@@ -324,6 +354,9 @@ export function useFilters(): FiltersContextValue {
       setClasses: () => {},
       toggleClass: () => {},
       clearClasses: () => {},
+      setGuilds: () => {},
+      toggleGuild: () => {},
+      clearGuilds: () => {},
       setDays: () => {},
       setRange: () => {},
       setSortBy: () => {},

@@ -1,5 +1,6 @@
 ﻿import React, { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -11,6 +12,12 @@ import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { ToplistsProvider, useToplistsData } from "../../context/ToplistsDataContext";
 import GuildToplists from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
+import {
+  getPlayerToplistSnapshotByDocIdCached,
+  type FirestoreLatestToplistSnapshot,
+  type FirestoreToplistPlayerRow,
+  type FirestoreLatestToplistResult,
+} from "../../lib/api/toplistsFirestore";
 
 const splitListParam = (value: string | null) =>
   (value ?? "")
@@ -40,8 +47,33 @@ const normalizeClassList = (list: string[]) => {
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 };
 
+const normalizeGuildKey = (value: string | null | undefined) =>
+  (value ?? "").toString().trim().toLowerCase();
+
 const listEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
+
+const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
+const formatMonth = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+
+const generateRecentMonths = (count: number) => {
+  const months: string[] = [];
+  const cursor = new Date();
+  // Only include fully completed months: start from previous month.
+  cursor.setUTCDate(1);
+  cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+  for (let i = 0; i < count; i++) {
+    months.push(formatMonth(cursor));
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+  }
+  return months;
+};
+
+const toNumberSafe = (value: any): number | null => {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
 
 // HUD -> Provider Sort mapping
 function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
@@ -83,10 +115,11 @@ function PlayerToplistsPageContent() {
     serverSheetOpen, setServerSheetOpen,
     servers, setServers,
     classes, setClasses,
+    setGuilds,
     range,
     sortBy,
   } = f;
-  const { serverGroups } = useToplistsData();
+  const { serverGroups, player } = useToplistsData();
   const [searchParams, setSearchParams] = useSearchParams();
   const serverParam = searchParams.get("server");
   const serversParam = searchParams.get("servers");
@@ -94,6 +127,8 @@ function PlayerToplistsPageContent() {
   const classesParam = searchParams.get("classes");
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
+  const [compareMonth, setCompareMonth] = React.useState<string>(searchParams.get("compare") ?? "");
+  const monthOptions = React.useMemo(() => generateRecentMonths(17), []);
   const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
   const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
 
@@ -122,6 +157,7 @@ function PlayerToplistsPageContent() {
   const normalizedClassesKey = normalizedClasses.join(",");
   const urlServersKey = urlServers.join(",");
   const urlClassesKey = urlClasses.join(",");
+  const prevServersKeyRef = React.useRef<string | null>(null);
 
   const normalizedServersRef = React.useRef(normalizedServers);
   const normalizedClassesRef = React.useRef(normalizedClasses);
@@ -144,6 +180,14 @@ function PlayerToplistsPageContent() {
   React.useEffect(() => {
     setClassesRef.current = setClasses;
   }, [setClasses]);
+
+  React.useEffect(() => {
+    const prevKey = prevServersKeyRef.current;
+    prevServersKeyRef.current = normalizedServersKey;
+    if (prevKey != null && prevKey !== normalizedServersKey) {
+      setGuilds([]);
+    }
+  }, [normalizedServersKey, setGuilds]);
 
   useEffect(() => {
     if (lastUrlWriteRef.current === searchKey) {
@@ -199,6 +243,28 @@ function PlayerToplistsPageContent() {
     }
   }, [normalizedServersKey, normalizedClassesKey, searchKey, searchParams, setSearchParams]);
 
+  const guildOptions = React.useMemo(() => {
+    const rows = Array.isArray(player?.rows) ? player.rows : [];
+    if (!rows.length) return [];
+    const map = new Map<string, { value: string; label: string }>();
+    rows.forEach((row) => {
+      const name = String(row.guild ?? "").trim();
+      if (!name) return;
+      const key = normalizeGuildKey(name);
+      if (!key) return;
+      const serverCode =
+        (row.server && String(row.server).trim().toUpperCase()) ||
+        (normalizedServers.length === 1 ? normalizedServers[0] : "");
+      const label = serverCode ? `${name} (${serverCode})` : name;
+      if (!map.has(key)) {
+        map.set(key, { value: name, label });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+    );
+  }, [player?.rows, normalizedServers]);
+
   return (
     <>
       <ContentShell
@@ -207,7 +273,16 @@ function PlayerToplistsPageContent() {
         actions={<TopActions />}
         leftWidth={0}
         rightWidth={0}
-        subheader={filterMode === "hud" ? <HudFilters /> : null}
+        subheader={
+          filterMode === "hud" ? (
+            <HudFilters
+              compareMonth={compareMonth}
+              setCompareMonth={setCompareMonth}
+              monthOptions={monthOptions}
+              guildOptions={guildOptions}
+            />
+          ) : null
+        }
         centerFramed={false}
         stickyTopbar
         stickySubheader
@@ -221,6 +296,7 @@ function PlayerToplistsPageContent() {
             classes={classes ?? []}
             range={(range ?? "all") as any}
             sortKey={sortBy ?? "level"}
+            compareMonth={compareMonth}
           />
         )}
         {activeTab === "guilds" && <GuildToplists serverCodes={servers ?? []} />}
@@ -248,14 +324,18 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey
+  servers, classes, range, sortKey, compareMonth,
 }: {
   servers: string[];
   classes: string[];
   range: DaysFilter;
   sortKey: string;
+  compareMonth: string;
 }) {
+  const { t } = useTranslation();
+  const { guilds } = useFilters();
   const {
+    player,
     playerRows,
     playerLoading,
     playerError,
@@ -300,13 +380,214 @@ function TableDataView({
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "—");
 
   const rows = playerRows || [];
+  const selectedGuildSet = React.useMemo(() => {
+    const keys = (guilds || []).map(normalizeGuildKey).filter(Boolean);
+    return keys.length ? new Set(keys) : null;
+  }, [guilds]);
+  const hasGuildData = React.useMemo(() => {
+    const rawRows = Array.isArray(player?.rows) ? player.rows : [];
+    return rawRows.some((row) => Boolean(normalizeGuildKey(row.guild)));
+  }, [player?.rows]);
+
+  const filteredRows = React.useMemo(() => {
+    if (!selectedGuildSet || !hasGuildData) return rows;
+    return rows.filter((row) => {
+      const key = normalizeGuildKey(row.guild);
+      return key ? selectedGuildSet.has(key) : false;
+    });
+  }, [rows, selectedGuildSet, hasGuildData]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [compareState, setCompareState] = React.useState<{
+    rows: FirestoreToplistPlayerRow[];
+    loading: boolean;
+    missing: boolean;
+    error: string | null;
+  }>({ rows: [], loading: false, missing: false, error: null });
+  const compareCacheRef = React.useRef<Map<string, FirestoreLatestToplistSnapshot>>(new Map());
+
+  const showCompare = Boolean(compareMonth) && !compareState.loading && !compareState.missing && compareState.rows.length > 0;
+
+  // persist compare selection in URL (optional param)
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (compareMonth) {
+      nextParams.set("compare", compareMonth);
+    } else {
+      nextParams.delete("compare");
+    }
+    const prev = searchParams.get("compare") ?? "";
+    if (prev !== compareMonth) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [compareMonth, searchParams, setSearchParams]);
+
+  // Load monthly snapshot(s) for comparison
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!compareMonth) {
+      setCompareState({ rows: [], loading: false, missing: false, error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const normalizedServers = normalizeServerList(servers);
+    if (!normalizedServers.length) {
+      setCompareState({ rows: [], loading: false, missing: true, error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const docIds = normalizedServers.map((s) => `${s}__${compareMonth}`);
+    const cachedSnapshots: FirestoreLatestToplistSnapshot[] = [];
+    const missingDocIds: string[] = [];
+
+    for (const docId of docIds) {
+      const cached = compareCacheRef.current.get(docId);
+      if (cached) {
+        cachedSnapshots.push(cached);
+      } else {
+        missingDocIds.push(docId);
+      }
+    }
+
+    const mergeSnapshots = (snapshots: FirestoreLatestToplistSnapshot[]) => {
+      const mergedRows: FirestoreToplistPlayerRow[] = [];
+      for (const snapshot of snapshots) {
+        const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+        for (const row of players) mergedRows.push(row.server ? row : { ...row, server: snapshot.server });
+      }
+      return mergedRows;
+    };
+
+    if (missingDocIds.length === 0) {
+      setCompareState({
+        rows: mergeSnapshots(cachedSnapshots),
+        loading: false,
+        missing: false,
+        error: null,
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setCompareState((prev) => ({ ...prev, loading: true, missing: false, error: null }));
+
+    (async () => {
+      const results: FirestoreLatestToplistResult[] = await Promise.all(
+        missingDocIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
+      );
+      if (cancelled) return;
+
+      const snapshots: FirestoreLatestToplistSnapshot[] = [...cachedSnapshots];
+      let missing = false;
+      let firstErrorCode: string | null = null;
+      let firstErrorDetail: string | null = null;
+
+      results.forEach((result: FirestoreLatestToplistResult, idx) => {
+        const docId = missingDocIds[idx];
+        if (result.ok) {
+          compareCacheRef.current.set(docId, result.snapshot);
+          snapshots.push(result.snapshot);
+        } else {
+          const err: any = result;
+          missing = missing || err.error === "not_found";
+          if (!firstErrorCode) {
+            firstErrorCode = err.error ?? null;
+            firstErrorDetail = err.detail ?? null;
+          }
+        }
+      });
+
+      const errorMsg = firstErrorDetail ?? firstErrorCode ?? null;
+
+      setCompareState({
+        rows: snapshots.length ? mergeSnapshots(snapshots) : [],
+        loading: false,
+        missing,
+        error: errorMsg,
+      });
+    })().catch((err) => {
+      if (cancelled) return;
+      setCompareState({ rows: [], loading: false, missing: true, error: String(err) });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [compareMonth, servers]);
+
+  const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
+    // Fallback key: server + name + class (playerId is not present in toplist rows)
+    return `${row.server || "ALL"}:${row.name}:${row.class || ""}`;
+  }, []);
+
+  const compareMap = React.useMemo(() => {
+    if (!showCompare) return new Map<string, { row: FirestoreToplistPlayerRow; rank: number }>();
+    const map = new Map<string, { row: FirestoreToplistPlayerRow; rank: number }>();
+    const rankPerServer = new Map<string, number>();
+
+    compareState.rows.forEach((row) => {
+      const serverKey = row.server || "ALL";
+      const nextRank = (rankPerServer.get(serverKey) || 0) + 1;
+      rankPerServer.set(serverKey, nextRank);
+
+      const key = buildRowKey(row);
+      if (!map.has(key)) {
+        map.set(key, { row, rank: nextRank });
+      }
+    });
+    return map;
+  }, [showCompare, compareState.rows, buildRowKey]);
+
+  const enhancedRows = React.useMemo(() => {
+    return filteredRows.map((row, idx) => {
+      if (!showCompare) {
+        return { ...row, _rank: idx + 1 };
+      }
+      const key = buildRowKey(row);
+      const past = compareMap.get(key);
+      const rankDelta = past ? past.rank - (idx + 1) : null;
+      const delta = (field: keyof FirestoreToplistPlayerRow) => {
+        if (!past) return null;
+        if (field === "ratio") return null;
+        const curr = toNumberSafe((row as any)[field]);
+        const prev = toNumberSafe((past.row as any)[field]);
+        if (prev == null) return null;
+        return (curr ?? 0) - prev;
+      };
+      return {
+        ...row,
+        _rank: idx + 1,
+        _rankDelta: rankDelta,
+        _delta: {
+          level: delta("level"),
+          main: delta("main"),
+          con: delta("con"),
+          sum: delta("sum"),
+          ratio: delta("ratio"),
+          mine: delta("mine"),
+          treasury: delta("treasury"),
+        },
+      };
+    });
+  }, [filteredRows, showCompare, compareMap]);
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{playerLoading ? "Loading..." : playerError ? "Error" : "Ready"} - {rows.length} rows</div>
+        <div>{playerLoading ? "Loading..." : playerError ? "Error" : "Ready"} - {enhancedRows.length} rows</div>
         <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
       </div>
+      {compareMonth && compareState.missing && (
+        <div style={{ fontSize: 12, color: "#ffb347" }}>
+          {t("toplists.compareMissingSnapshot", "No snapshot found for this month.")}
+        </div>
+      )}
       {playerScopeStatus && (
         <div style={{ opacity: 0.75, fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span>
@@ -352,7 +633,17 @@ function TableDataView({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {enhancedRows.map((r, i) => {
+              const rankDelta = showCompare ? (r as any)._rankDelta : null;
+              const deltas = (r as any)._delta || {};
+              const renderDelta = (value: number | null) =>
+                showCompare ? (
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>
+                    {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
+                  </div>
+                ) : null;
+
+              return (
               <tr
                 key={`${r.name}__${r.server}__${r.class ?? ""}`}
                 className="toplists-row"
@@ -360,26 +651,61 @@ function TableDataView({
               >
                 <td style={{ padding: "8px 6px" }}>{i + 1}</td>
                 <td style={{ padding: "8px 6px" }}>{r.flag ?? ""}</td>
-                <td style={{ padding: "8px 6px" }}>{fmtDelta(r.deltaRank)}</td>
+                <td style={{ padding: "8px 6px" }}>{rankDelta == null ? "" : fmtDelta(rankDelta)}</td>
                 <td style={{ padding: "8px 6px" }}>{r.server}</td>
                 <td style={{ padding: "8px 6px" }}>{r.name}</td>
                 <td style={{ padding: "8px 6px" }}>{r.class}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.level)}</td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.level)}</span>
+                    {renderDelta(deltas.level ?? null)}
+                  </div>
+                </td>
                 <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.main)}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.con)}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.sum)}</td>
-                <td style={{ padding: "8px 6px" }}>{r.ratio ?? ""}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.mine)}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(r.treasury)}</td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.main)}</span>
+                    {renderDelta(deltas.main ?? null)}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.con)}</span>
+                    {renderDelta(deltas.con ?? null)}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.sum)}</span>
+                    {renderDelta(deltas.sum ?? null)}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 6px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                    <span>{(r as any)._ratioLabel ?? r.ratio ?? "—"}</span>
+                    {deltas.ratio == null ? null : renderDelta(deltas.ratio)}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.mine)}</span>
+                    {renderDelta(deltas.mine ?? null)}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span>{fmtNum(r.treasury)}</span>
+                    {renderDelta(deltas.treasury ?? null)}
+                  </div>
+                </td>
                 <td style={{ padding: "8px 6px" }}>{r.lastScan ?? ""}</td>
-                <td style={{ padding: "8px 6px" }}>{fmtDelta(r.deltaSum)}</td>
+                <td style={{ padding: "8px 6px" }}>{fmtDelta((r as any).deltaSum)}</td>
               </tr>
-            ))}
-            {playerLoading && rows.length === 0 && (
+            );})}
+            {playerLoading && enhancedRows.length === 0 && (
               <tr><td colSpan={16} style={{ padding: 12 }}>Loading...</td></tr>
             )}
-            {!playerLoading && !playerError && rows.length === 0 && (
+            {!playerLoading && !playerError && enhancedRows.length === 0 && (
               <tr><td colSpan={16} style={{ padding: 12 }}>No results</td></tr>
             )}
           </tbody>
@@ -477,6 +803,7 @@ function TopActions() {
           Table
         </button>
       </div>
+
     </div>
   );
 }
