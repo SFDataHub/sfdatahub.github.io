@@ -384,6 +384,21 @@
       "noSnapshot": "Noch kein Snapshot fuer diesen Server."
     }
   },
+  "toplists": {
+    "compareMonth": "Vergleichsmonat",
+    "compareOff": "Aus",
+    "compareMissingSnapshot": "Kein Snapshot für diesen Monat gefunden.",
+    "deltaNew": "NEU",
+    "filters": {
+      "guilds": {
+        "label": "Gilden",
+        "placeholder": "Alle Gilden",
+        "empty": "Keine Gilden im Snapshot.",
+        "clear": "Leeren",
+        "selected": "{{count}} ausgewaehlt"
+      }
+    }
+  },
   "profile": {
     "public": {
       "title": "Ã–ffentliches Profil",

@@ -384,6 +384,21 @@
       "noSnapshot": "No snapshot yet for this server."
     }
   },
+  "toplists": {
+    "compareMonth": "Compare month",
+    "compareOff": "Off",
+    "compareMissingSnapshot": "No snapshot found for this month.",
+    "deltaNew": "NEW",
+    "filters": {
+      "guilds": {
+        "label": "Guilds",
+        "placeholder": "All guilds",
+        "empty": "No guilds in snapshot.",
+        "clear": "Clear",
+        "selected": "{{count}} selected"
+      }
+    }
+  },
   "profile": {
     "public": {
       "title": "Public profile",

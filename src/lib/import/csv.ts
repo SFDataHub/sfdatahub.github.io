@@ -904,7 +904,6 @@ export function parseGuildsCsvText(text: string): ParsedGuildCsvRow[] {
 /** ---- batching ---- */
 const PLAYER_DERIVED_COL = "stats_cache_player_derived";
 const GUILD_DERIVED_COL = "stats_cache_guild_derived";
-const PLAYERS_INDEX_COL = "stats_index_players_daily_compact";
 const BATCH_SCANS = 120;   // viele, mittelgross
 const BATCH_LATEST = 40;   // gross (alle Felder) -> kleine Batches
 const BATCH_HISTORY = 120; // aggregiert, moderat
@@ -1201,14 +1200,13 @@ async function writeScansWithResults(
   return results;
 }
 
-async function writeLatestAndDerived(
+async function writeLatest(
   latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
-  indexDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
   onProgress?: ImportCsvOptions["onProgress"]
 ) {
-  if (!latestDocs.length && !indexDocs.length) return;
+  if (!latestDocs.length) return;
 
-  const total = latestDocs.length + indexDocs.length;
+  const total = latestDocs.length;
   const bulkWriterFactory = (db as any).bulkWriter;
 
   if (typeof bulkWriterFactory === "function") {
@@ -1216,15 +1214,11 @@ async function writeLatestAndDerived(
     onProgress?.({ phase: "prepare", current: 0, total, pass: "latest" });
 
     for (const { ref, data } of latestDocs) writer.set(ref, data, { merge: true });
-    for (const { ref, data } of indexDocs) writer.set(ref, data, { merge: true });
 
     onProgress?.({ phase: "write", current: total, total, pass: "latest" });
     await writer.close();
     latestDocs.forEach(({ ref }) =>
       recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:latestBulk" }),
-    );
-    indexDocs.forEach(({ ref }) =>
-      recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:indexBulk" }),
     );
     onProgress?.({ phase: "done", current: 1, total: 1, pass: "latest" });
     return;
@@ -1236,15 +1230,8 @@ async function writeLatestAndDerived(
     label: "ImportCsv:latest",
     apply: (b) => b.set(ref, data, { merge: true }),
   }));
-  const indexBatchers: BatchWrite[] = indexDocs.map(({ ref, data }) => ({
-    path: ref.path,
-    op: "setDoc",
-    label: "ImportCsv:index",
-    apply: (b) => b.set(ref, data, { merge: true }),
-  }));
 
   await commitBatched(latestBatchers, BATCH_LATEST, "latest", onProgress);
-  await commitBatched(indexBatchers, BATCH_LATEST, "latest", onProgress);
 }
 
 async function upsertPlayerDerivedServerSnapshot(
@@ -1645,10 +1632,6 @@ export async function importCsvToDB(
   if (opts.kind === "players") {
     const playerScanDocs: ScanDoc[] = [];
     const latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }> = [];
-    const indexByScope = new Map<
-      string,
-      { dateKey: number; scopeId: string; group: string; serverKey: string; ids: string[]; vals: number[] }
-    >();
     const putHistory: BatchWrite[] = [];
     const pendingDerivedByServer = new Map<string, PlayerDerivedSnapshotEntry[]>();
 
@@ -1807,28 +1790,6 @@ export async function importCsvToDB(
           pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
         }
 
-        const dateKey = dateKeyFromSec(last.ts);
-        const scopes = [
-          { scopeId: "all_all_sum", group: "ALL", serverKey: "all" },
-          { scopeId: `${derived.group || "ALL"}_all_sum`, group: derived.group || "ALL", serverKey: "all" },
-        ];
-        if (derived.serverKey && derived.serverKey !== "all") {
-          scopes.push({
-            scopeId: `${derived.group || "ALL"}_${derived.serverKey}_sum`,
-            group: derived.group || "ALL",
-            serverKey: derived.serverKey,
-          });
-        }
-
-        for (const s of scopes) {
-          const key = `${dateKey}__${s.scopeId}`;
-          if (!indexByScope.has(key)) {
-            indexByScope.set(key, { dateKey, scopeId: s.scopeId, group: s.group, serverKey: s.serverKey, ids: [], vals: [] });
-          }
-          const bucket = indexByScope.get(key)!;
-          bucket.ids.push(pid);
-          bucket.vals.push(Number(derived.sum ?? 0));
-        }
         counts.writtenLatestPlayers!++;
       }
 
@@ -1912,32 +1873,7 @@ export async function importCsvToDB(
       }
     }
 
-    // Tages-Indizes aus dem Batch berechnen
-    const indexDocs: Array<{ ref: ReturnType<typeof doc>; data: any }> = [];
-    for (const { dateKey, scopeId, group, serverKey, ids, vals } of indexByScope.values()) {
-      const entries = ids.map((id, i) => ({ id, val: vals[i] ?? 0 }));
-      entries.sort((a, b) => b.val - a.val);
-      const sortedIds = entries.map((e) => e.id);
-      const sortedVals = entries.map((e) => e.val);
-      const ranks = entries.map((_, i) => i + 1);
-
-      indexDocs.push({
-        ref: doc(db, `${PLAYERS_INDEX_COL}/${dateKey}__${scopeId}`),
-        data: {
-          n: entries.length,
-          ids: sortedIds,
-          vals: sortedVals,
-          ranks,
-          generatedAt: Date.now(),
-          group,
-          serverKey,
-          metric: "sum",
-          dateKey,
-        },
-      });
-    }
-
-    await writeLatestAndDerived(latestDocs, indexDocs, emitProgress);
+    await writeLatest(latestDocs, emitProgress);
     const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
     if (pendingSnapshotKeys.length) {
       console.log("[ImportCsv] Derived snapshot flush pending", {

@@ -1,7 +1,12 @@
 // src/components/toplists/GuildToplists.tsx
 import React, { useEffect, useMemo, useState } from "react";
 
-import { getLatestGuildToplistSnapshotCached, type FirestoreToplistGuildRow } from "../../lib/api/toplistsFirestore";
+import {
+  getLatestGuildToplistSnapshotCached,
+  type FirestoreToplistGuildRow,
+  type FirestoreLatestGuildToplistSnapshot,
+  type FirestoreLatestGuildToplistResult,
+} from "../../lib/api/toplistsFirestore";
 import { SERVERS } from "../../data/servers";
 import i18n from "../../i18n";
 
@@ -50,26 +55,30 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
       };
     }
 
+    type SnapshotError = { error: string; detail?: string };
     Promise.all(resolvedServers.map((serverCode) => getLatestGuildToplistSnapshotCached(serverCode)))
       .then((results) => {
         if (!active) return;
-        const snapshots = [];
-        let firstError: { error: string; detail?: string } | null = null;
+        const snapshots: FirestoreLatestGuildToplistSnapshot[] = [];
+        let firstErrorCode: string | null = null;
+        let firstErrorDetail: string | null = null;
 
-        results.forEach((result) => {
+        results.forEach((result: FirestoreLatestGuildToplistResult) => {
           if (result.ok) {
             snapshots.push(result.snapshot);
-          } else if (!firstError) {
-            firstError = result;
+          } else if (!firstErrorCode) {
+            const err: any = result;
+            firstErrorCode = err.error ?? null;
+            firstErrorDetail = err.detail ?? null;
           }
         });
 
         if (!snapshots.length) {
-          const detail = firstError?.detail ? ` (${firstError.detail})` : "";
+          const detail = firstErrorDetail ? ` (${firstErrorDetail})` : "";
           let errorMsg = "Firestore Fehler";
-          if (firstError?.error === "not_found") {
+          if (firstErrorCode === "not_found") {
             errorMsg = i18n.t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server.");
-          } else if (firstError?.error === "decode_error") {
+          } else if (firstErrorCode === "decode_error") {
             errorMsg = "Fehler beim Lesen der Daten";
           }
           setRows([]);
@@ -89,8 +98,8 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
           }
           const guilds = Array.isArray(snapshot.guilds) ? snapshot.guilds : [];
           nextLimit = Math.max(nextLimit, guilds.length);
-          guilds.forEach((row) => {
-            merged.push(row.server ? row : { ...row, server: snapshot.server });
+          guilds.forEach((row: FirestoreToplistGuildRow) => {
+            merged.push(row.server ? row : row);
           });
         });
 
