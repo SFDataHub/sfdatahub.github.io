@@ -385,7 +385,7 @@
     }
   },
   "toplists": {
-    "compareMonth": "Compare month",
+    "compareMonth": "Progress since",
     "compareOff": "Off",
     "compareMissingSnapshot": "No snapshot found for this month.",
     "deltaNew": "NEW",

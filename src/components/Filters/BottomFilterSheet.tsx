@@ -117,15 +117,14 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
             onChange={(e) => setSortBy(e.target.value as any)}
             aria-label="Sort"
             autoComplete="off"
-            style={select}
-          >
-            <option value="sum">Base Sum</option>
-            <option value="main">Main Base Stat</option>
-            <option value="constitution">Constitution</option>
-            <option value="level">Level</option>
-            <option value="delta">Δ Rank</option>
-            <option value="lastActivity" disabled>Last activity (disabled)</option>
-          </select>
+          style={select}
+        >
+          <option value="main">Main</option>
+          <option value="constitution">Constitution</option>
+          <option value="sum">Base Stats</option>
+          <option value="level">Level</option>
+          <option value="mine">Mine</option>
+        </select>
         </div>
 
         {/* Quick-Filter */}

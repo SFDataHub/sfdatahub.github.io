@@ -1,5 +1,5 @@
-ï»¿import React, { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import React, { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
@@ -8,6 +8,7 @@ import HudFilters from "../../components/Filters/HudFilters";
 import ServerSheet from "../../components/Filters/ServerSheet";
 import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
+import { getClassIconUrl } from "../../components/ui/shared/classIcons";
 
 import { ToplistsProvider, useToplistsData } from "../../context/ToplistsDataContext";
 import GuildToplists from "./guildtoplists";
@@ -69,11 +70,69 @@ const generateRecentMonths = (count: number) => {
   return months;
 };
 
+const MIN_COMPARE_MONTH = "2026-01";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const computeLastScanColor = (lastScan: unknown, nowMs: number): string | null => {
+  if (!lastScan) return null;
+  const ts = new Date(lastScan as any).getTime();
+  if (!Number.isFinite(ts)) return null;
+  const days = Math.max(0, Math.floor((nowMs - ts) / MS_PER_DAY));
+  if (days <= 0) return "#34d399"; // today
+  if (days === 1) return "#4ade80";
+  if (days <= 3) return "#a3e635";
+  if (days <= 7) return "#facc15";
+  if (days <= 14) return "#f97316";
+  if (days <= 30) return "#ef4444";
+  return "#b91c1c";
+};
+
 const toNumberSafe = (value: any): number | null => {
   if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
+type CellDecor = {
+  mainRank?: number;
+  conRank?: number;
+  levelRank?: number;
+  mineTier?: 1 | 2 | 3 | 4;
+  statsNorm?: number;
+  statsIsBest?: boolean;
+};
+
+const MAIN_RANK_COLORS = ["#f6e7a6", "#f4de89", "#f2d56d", "#f0cc51", "#edc236"];
+const CON_RANK_COLORS = ["#ffe4b3", "#ffdda0", "#ffd68d", "#ffcf7a", "#ffc867"];
+const LEVEL_RANK_COLORS = ["#9ec5ff", "#8ab7ff", "#76a9ff", "#629bff", "#4e8dff"];
+const MINE_TIER_COLORS: Record<number, string> = {
+  1: "#d8b4fe",
+  2: "#c084fc",
+  3: "#a855f7",
+  4: "#f472b6",
+};
+const BEST_STATS_COLOR = "#f59e0b";
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const getRankTone = (rank: number | undefined, palette: string[]) =>
+  rank && rank > 0 && rank <= palette.length ? palette[rank - 1] : null;
+const getMineTone = (tier: number | undefined) =>
+  tier ? MINE_TIER_COLORS[tier] ?? null : null;
+const getStatsPlusTone = (decor?: CellDecor) => {
+  if (!decor) return null;
+  if (decor.statsIsBest) return BEST_STATS_COLOR;
+  if (decor.statsNorm == null) return null;
+  const alpha = 0.2 + 0.6 * clamp01(decor.statsNorm);
+  return `rgba(34, 197, 94, ${alpha.toFixed(2)})`;
+};
+const getFrameStyle = (color?: string | null): React.CSSProperties | undefined =>
+  color
+    ? {
+        boxShadow: `inset 0 0 0 1px ${color}`,
+        borderRadius: 6,
+        padding: "0 4px",
+        display: "inline-flex",
+        alignItems: "center",
+      }
+    : undefined;
 
 // HUD -> Provider Sort mapping
 function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
@@ -82,13 +141,17 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
     case "main":         return { key: "main",     dir: "desc" };
     case "constitution": return { key: "con",      dir: "desc" };
     case "sum":          return { key: "sum",      dir: "desc" };
+    case "mainTotal":    return { key: "mainTotal", dir: "desc" };
+    case "conTotal":     return { key: "conTotal",  dir: "desc" };
+    case "sumTotal":     return { key: "sumTotal",  dir: "desc" };
+    case "xpProgress":   return { key: "xpProgress", dir: "desc" };
+    case "xpTotal":      return { key: "xpTotal",   dir: "desc" };
     case "lastActivity": // solange nicht vorhanden -> Last Scan
     case "lastScan":     return { key: "lastScan", dir: "desc" };
     case "name":         return { key: "name",     dir: "asc" };
     default:              return { key: "level",    dir: "desc" };
   }
 }
-
 function deriveGroupFromServers(servers: string[]): string {
   const first = (servers[0] || "").toUpperCase();
   if (first.startsWith("EU")) return "EU";
@@ -120,6 +183,7 @@ function PlayerToplistsPageContent() {
     sortBy,
   } = f;
   const { serverGroups, player } = useToplistsData();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const serverParam = searchParams.get("server");
   const serversParam = searchParams.get("servers");
@@ -128,7 +192,10 @@ function PlayerToplistsPageContent() {
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
   const [compareMonth, setCompareMonth] = React.useState<string>(searchParams.get("compare") ?? "");
-  const monthOptions = React.useMemo(() => generateRecentMonths(17), []);
+  const monthOptions = React.useMemo(
+    () => generateRecentMonths(17).filter((m) => m >= MIN_COMPARE_MONTH),
+    [],
+  );
   const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
   const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
 
@@ -143,14 +210,6 @@ function PlayerToplistsPageContent() {
 
   const urlServersProvided = serverParam != null || serversParam != null;
   const urlClassesProvided = classParam != null || classesParam != null;
-
-  const defaultServer = React.useMemo(() => {
-    const fallback =
-      serverGroups?.EU?.[0] ||
-      Object.values(serverGroups || {}).find((list) => list.length)?.[0] ||
-      "";
-    return fallback ? fallback.toUpperCase() : "";
-  }, [serverGroups]);
 
   const searchKey = React.useMemo(() => searchParams.toString(), [searchParams]);
   const normalizedServersKey = normalizedServers.join(",");
@@ -196,13 +255,10 @@ function PlayerToplistsPageContent() {
     }
 
     if (urlServersProvided) {
-      const nextServers =
-        urlServers.length > 0 ? urlServers : defaultServer ? [defaultServer] : [];
+      const nextServers = urlServers;
       if (!listEqual(normalizedServersRef.current, nextServers)) {
         setServersRef.current(nextServers);
       }
-    } else if (!normalizedServersRef.current.length && defaultServer) {
-      setServersRef.current([defaultServer]);
     }
 
     if (urlClassesProvided && !listEqual(normalizedClassesRef.current, urlClasses)) {
@@ -212,7 +268,6 @@ function PlayerToplistsPageContent() {
     searchKey,
     urlServersProvided,
     urlClassesProvided,
-    defaultServer,
     urlServersKey,
     urlClassesKey,
   ]);
@@ -344,7 +399,9 @@ function TableDataView({
     setFilters,
     setSort,
   } = useToplistsData();
+  const navigate = useNavigate();
 
+  const hasServers = (servers?.length ?? 0) > 0;
   // HUD-Filter -> Provider
   useEffect(() => {
     const providerRange =
@@ -377,7 +434,7 @@ function TableDataView({
     const ms = ts < 1e12 ? ts * 1000 : ts;
     return new Date(ms).toLocaleString();
   };
-  const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "â€”");
+  const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "—");
 
   const rows = playerRows || [];
   const selectedGuildSet = React.useMemo(() => {
@@ -569,6 +626,11 @@ function TableDataView({
           main: delta("main"),
           con: delta("con"),
           sum: delta("sum"),
+          mainTotal: delta("mainTotal"),
+          conTotal: delta("conTotal"),
+          sumTotal: delta("sumTotal"),
+          xpProgress: delta("xpProgress"),
+          xpTotal: delta("xpTotal"),
           ratio: delta("ratio"),
           mine: delta("mine"),
           treasury: delta("treasury"),
@@ -577,10 +639,94 @@ function TableDataView({
     });
   }, [filteredRows, showCompare, compareMap]);
 
+  const decorMap = React.useMemo(() => {
+    const map = new Map<string, CellDecor>();
+    const rows = enhancedRows;
+    const keyFor = (row: FirestoreToplistPlayerRow) =>
+      (row as any).playerId ?? (row as any).id ?? buildRowKey(row);
+
+    const ensure = (row: FirestoreToplistPlayerRow) => {
+      const key = keyFor(row);
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {};
+        map.set(key, entry);
+      }
+      return entry;
+    };
+
+    const rankBy = (
+      valueGetter: (row: FirestoreToplistPlayerRow) => number | null,
+      field: "mainRank" | "conRank" | "levelRank",
+    ) => {
+      const ranked = rows
+        .map((row, idx) => {
+          const value = valueGetter(row);
+          if (value == null) return null;
+          return { row, value, idx };
+        })
+        .filter(Boolean) as { row: FirestoreToplistPlayerRow; value: number; idx: number }[];
+      ranked.sort((a, b) => b.value - a.value || a.idx - b.idx);
+      ranked.slice(0, 5).forEach((entry, i) => {
+        ensure(entry.row)[field] = i + 1;
+      });
+    };
+
+    rankBy((row) => toNumberSafe(row.main), "mainRank");
+    rankBy((row) => toNumberSafe(row.con), "conRank");
+    rankBy((row) => toNumberSafe(row.level), "levelRank");
+
+    rows.forEach((row) => {
+      const mineValue = toNumberSafe(row.mine);
+      if (mineValue == null) return;
+      const tier =
+        mineValue >= 100 ? 4 :
+        mineValue >= 80 ? 3 :
+        mineValue >= 65 ? 2 :
+        mineValue >= 50 ? 1 :
+        null;
+      if (tier) ensure(row).mineTier = tier as 1 | 2 | 3 | 4;
+    });
+
+    const statsEntries = rows
+      .map((row) => {
+        const value = toNumberSafe((row as any).deltaSum);
+        if (value == null) return null;
+        return { row, value };
+      })
+      .filter(Boolean) as { row: FirestoreToplistPlayerRow; value: number }[];
+    if (statsEntries.length) {
+      let min = statsEntries[0].value;
+      let max = statsEntries[0].value;
+      statsEntries.forEach((entry) => {
+        if (entry.value < min) min = entry.value;
+        if (entry.value > max) max = entry.value;
+      });
+      const denom = max - min;
+      statsEntries.forEach((entry) => {
+        const t = denom === 0 ? 0.5 : (entry.value - min) / denom;
+        const target = ensure(entry.row);
+        target.statsNorm = t;
+        if (entry.value === max) target.statsIsBest = true;
+      });
+    }
+
+    return map;
+  }, [enhancedRows, buildRowKey]);
+
+  const nowMs = Date.now();
+  const statusLabel = !hasServers
+    ? "No server selected"
+    : playerLoading
+      ? "Loading..."
+      : playerError
+        ? "Error"
+        : "Ready";
+
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{playerLoading ? "Loading..." : playerError ? "Error" : "Ready"} - {enhancedRows.length} rows</div>
+        <div>{statusLabel} - {enhancedRows.length} rows</div>
         <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
       </div>
       {compareMonth && compareState.missing && (
@@ -591,7 +737,7 @@ function TableDataView({
       {playerScopeStatus && (
         <div style={{ opacity: 0.75, fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span>
-            Scope {playerScopeStatus.scopeId} â€¢ {playerScopeStatus.changesSinceLastRebuild}/{playerScopeStatus.minChanges ?? "?"} changes since last rebuild
+            Scope {playerScopeStatus.scopeId} • {playerScopeStatus.changesSinceLastRebuild}/{playerScopeStatus.minChanges ?? "?"} changes since last rebuild
           </span>
           <span>
             Auto rebuild at {playerScopeStatus.minChanges ?? "?"} changes or after {playerScopeStatus.maxAgeDays ?? "?"} days
@@ -602,7 +748,7 @@ function TableDataView({
         </div>
       )}
 
-      {playerError && (
+      {hasServers && playerError && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Error</div>
           <div style={{ wordBreak: "break-all" }}>{playerError}</div>
@@ -610,118 +756,173 @@ function TableDataView({
         </div>
       )}
 
-      <div style={{ overflowX: "auto" }}>
-        <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
-              <th style={{ padding: "8px 6px" }}>#</th>
-              <th style={{ padding: "8px 6px" }}>Flag</th>
-              <th style={{ padding: "8px 6px" }}>Delta Rank</th>
-              <th style={{ padding: "8px 6px" }}>Server</th>
-              <th style={{ padding: "8px 6px" }}>Name</th>
-              <th style={{ padding: "8px 6px" }}>Class</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
-              <th style={{ padding: "8px 6px" }}>Guild</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
-              <th style={{ padding: "8px 6px" }}>Ratio</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
-              <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
-              <th style={{ padding: "8px 6px" }}>Last Scan</th>
-              <th style={{ padding: "8px 6px" }}>Stats+</th>
-            </tr>
-          </thead>
-          <tbody>
-            {enhancedRows.map((r, i) => {
-              const rankDelta = showCompare ? (r as any)._rankDelta : null;
-              const deltas = (r as any)._delta || {};
-              const renderDelta = (value: number | null) =>
-                showCompare ? (
-                  <div style={{ fontSize: 11, opacity: 0.8 }}>
-                    {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
-                  </div>
-                ) : null;
-
-              return (
-              <tr
-                key={`${r.name}__${r.server}__${r.class ?? ""}`}
-                className="toplists-row"
-                style={{ borderBottom: "1px solid #2C4A73" }}
-              >
-                <td style={{ padding: "8px 6px" }}>{i + 1}</td>
-                <td style={{ padding: "8px 6px" }}>{r.flag ?? ""}</td>
-                <td style={{ padding: "8px 6px" }}>{rankDelta == null ? "" : fmtDelta(rankDelta)}</td>
-                <td style={{ padding: "8px 6px" }}>{r.server}</td>
-                <td style={{ padding: "8px 6px" }}>{r.name}</td>
-                <td style={{ padding: "8px 6px" }}>{r.class}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.level)}</span>
-                    {renderDelta(deltas.level ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.main)}</span>
-                    {renderDelta(deltas.main ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.con)}</span>
-                    {renderDelta(deltas.con ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.sum)}</span>
-                    {renderDelta(deltas.sum ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                    <span>{(r as any)._ratioLabel ?? r.ratio ?? "â€”"}</span>
-                    {deltas.ratio == null ? null : renderDelta(deltas.ratio)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.mine)}</span>
-                    {renderDelta(deltas.mine ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span>{fmtNum(r.treasury)}</span>
-                    {renderDelta(deltas.treasury ?? null)}
-                  </div>
-                </td>
-                <td style={{ padding: "8px 6px" }}>{r.lastScan ?? ""}</td>
-                <td style={{ padding: "8px 6px" }}>{fmtDelta((r as any).deltaSum)}</td>
+      {!hasServers ? (
+        <div style={{ padding: 12, color: "#B0C4D9" }}>
+          Please select at least one server.
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
+                <th style={{ padding: "8px 6px" }}>#</th>
+                <th style={{ padding: "8px 6px" }}>Flag</th>
+                <th style={{ padding: "8px 6px" }}>Delta Rank</th>
+                <th style={{ padding: "8px 6px" }}>Server</th>
+                <th style={{ padding: "8px 6px" }}>Name</th>
+                <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
+                <th style={{ padding: "8px 6px" }}>Guild</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
+                <th style={{ padding: "8px 6px" }}>Ratio</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
+                <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
+                <th style={{ padding: "8px 6px" }}>Last Scan</th>
+                <th style={{ padding: "8px 6px" }}>Stats+</th>
               </tr>
-            );})}
-            {playerLoading && enhancedRows.length === 0 && (
-              <tr><td colSpan={16} style={{ padding: 12 }}>Loading...</td></tr>
-            )}
-            {!playerLoading && !playerError && enhancedRows.length === 0 && (
-              <tr><td colSpan={16} style={{ padding: 12 }}>No results</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {enhancedRows.map((r, i) => {
+                const rankDelta = showCompare ? (r as any)._rankDelta : null;
+                const deltas = (r as any)._delta || {};
+                const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
+                const classIconUrl = getClassIconUrl((r as any).class, 48);
+                const playerId = (r as any).playerId ?? (r as any).id ?? null;
+                const rowKey = playerId ?? buildRowKey(r);
+                const decor = decorMap.get(rowKey);
+                const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
+                const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
+                const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
+                const mineTone = getMineTone(decor?.mineTier);
+                const statsPlusTone = getStatsPlusTone(decor);
+                const renderDelta = (value: number | null) =>
+                  showCompare ? (
+                    <div style={{ fontSize: 11, opacity: 0.8 }}>
+                      {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
+                    </div>
+                  ) : null;
+
+                return (
+                <tr
+                  key={`${r.name}__${r.server}__${r.class ?? ""}`}
+                  className="toplists-row"
+                  style={{ borderBottom: "1px solid #2C4A73", cursor: playerId ? "pointer" : undefined }}
+                  onClick={() => {
+                    if (playerId) navigate(`/player/${encodeURIComponent(playerId)}`);
+                  }}
+                >
+                  <td style={{ padding: "8px 6px" }}>{i + 1}</td>
+                  <td style={{ padding: "8px 6px" }}>{r.flag ?? ""}</td>
+                  <td style={{ padding: "8px 6px" }}>{rankDelta == null ? "" : fmtDelta(rankDelta)}</td>
+                  <td style={{ padding: "8px 6px" }}>{r.server}</td>
+                  <td style={{ padding: "8px 6px" }}>{r.name}</td>
+                  <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    >
+                      {classIconUrl ? (
+                        <img
+                          src={classIconUrl}
+                          alt={r.class ?? "class"}
+                          width={20}
+                          height={20}
+                          loading="lazy"
+                          style={{ display: "block", objectFit: "contain" }}
+                        />
+                      ) : (
+                        <span>{r.class ?? ""}</span>
+                      )}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
+                      {renderDelta(deltas.level ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={getFrameStyle(mainTone)}>{fmtNum(r.main)}</span>
+                      {renderDelta(deltas.main ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={getFrameStyle(conTone)}>{fmtNum(r.con)}</span>
+                      {renderDelta(deltas.con ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span>{fmtNum(r.sum)}</span>
+                      {renderDelta(deltas.sum ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <span>{(r as any)._ratioLabel ?? r.ratio ?? "—"}</span>
+                      {deltas.ratio == null ? null : renderDelta(deltas.ratio)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
+                      {renderDelta(deltas.mine ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span>{fmtNum(r.treasury)}</span>
+                      {renderDelta(deltas.treasury ?? null)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 6px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span>{r.lastScan ?? ""}</span>
+                      {lastScanDotColor && (
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: lastScanDotColor,
+                            boxShadow: "0 0 6px rgba(0, 0, 0, 0.35)",
+                          }}
+                        />
+                      )}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 6px" }}>
+                    <span style={getFrameStyle(statsPlusTone)}>{fmtDelta((r as any).deltaSum)}</span>
+                  </td>
+                </tr>
+                );
+              })}
+              {playerLoading && enhancedRows.length === 0 && (
+                <tr><td colSpan={16} style={{ padding: 12 }}>Loading...</td></tr>
+              )}
+              {!playerLoading && !playerError && enhancedRows.length === 0 && (
+                <tr><td colSpan={16} style={{ padding: 12 }}>No results</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
 function TopActions() {
-  const {
-    filterMode, setFilterMode,
-    listView, setListView,
-    setBottomFilterOpen,
-    setServerSheetOpen,
-  } = useFilters();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
@@ -742,72 +943,9 @@ function TopActions() {
         <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label="Players" />
         <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label="Guilds" />
       </nav>
-
-      <span className="hidden md:inline-block w-px h-6" style={{ background: "#2B4C73" }} />
-
-      <div
-        className="inline-flex gap-1 rounded-xl border p-1"
-        style={{ borderColor: "#2B4C73", background: "#14273E" }}
-        role="group" aria-label="Filter UI"
-      >
-        <button aria-pressed={filterMode === "hud"} onClick={() => setFilterMode("hud")}
-          className="rounded-lg px-3 py-1.5 text-sm text-white border border-transparent"
-          style={filterMode === "hud" ? { background: "#25456B", borderColor: "#5C8BC6" } : {}}
-        >
-          HUD
-        </button>
-        <button aria-pressed={filterMode === "sheet"} onClick={() => setFilterMode("sheet")}
-          className="rounded-lg px-3 py-1.5 text-sm text-white border border-transparent"
-          style={filterMode === "sheet" ? { background: "#25456B", borderColor: "#5C8BC6" } : {}}
-        >
-          Bottom Sheet
-        </button>
-        <button onClick={() => setBottomFilterOpen(true)}
-          className="rounded-lg px-3 py-1.5 text-sm text-white"
-          style={{ border: "1px solid #2B4C73", background: "#14273E" }}
-        >
-          Open
-        </button>
-      </div>
-
-      <button
-        onClick={() => setServerSheetOpen(true)}
-        className="rounded-lg px-3 py-1.5 text-sm text-white"
-        style={{ border: "1px solid #2B4C73", background: "#14273E" }}
-        title="Open Server Picker"
-      >
-        Servers
-      </button>
-
-      <div
-        className="inline-flex gap-1 rounded-xl border p-1"
-        style={{ borderColor: "#2B4C73", background: "#14273E" }}
-        role="group" aria-label="List View"
-      >
-        <button aria-pressed={listView === "cards"} onClick={() => setListView("cards")}
-          className="rounded-lg px-3 py-1.5 text-sm text-white border border-transparent"
-          style={listView === "cards" ? { background: "#25456B", borderColor: "#5C8BC6" } : {}}
-        >
-          Cards
-        </button>
-        <button aria-pressed={listView === "buttons"} onClick={() => setListView("buttons")}
-          className="rounded-lg px-3 py-1.5 text-sm text-white border border-transparent"
-          style={listView === "buttons" ? { background: "#25456B", borderColor: "#5C8BC6" } : {}}
-        >
-          Buttons
-        </button>
-        <button aria-pressed={listView === "table"} onClick={() => setListView("table")}
-          className="rounded-lg px-3 py-1.5 text-sm text-white border border-transparent"
-          style={listView === "table" ? { background: "#25456B", borderColor: "#5C8BC6" } : {}}
-        >
-          Table
-        </button>
-      </div>
-
     </div>
   );
 }
-
 function TopTab({
   active,
   onClick,
@@ -830,3 +968,7 @@ function TopTab({
     </button>
   );
 }
+
+
+
+
