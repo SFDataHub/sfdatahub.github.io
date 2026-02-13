@@ -128,11 +128,7 @@ const normalizeClassList = (list: string[] | null | undefined) => {
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 };
-
-const pickDefaultServer = (groups: ServerGroupsByRegion) =>
-  (groups[DEFAULT_GROUP]?.[0] ||
-    Object.values(groups).find((list) => list.length)?.[0] ||
-    "");
+
 
 const toMsFromLastScan = (value: string | number | null | undefined): number | null => {
   if (value == null) return null;
@@ -179,11 +175,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
   const [serverGroups, setServerGroups] = useState<ServerGroupsByRegion>(FALLBACK_SERVER_GROUPS);
   const normalizedServers = useMemo(() => normalizeServerList(filters.servers), [filters.servers]);
   const normalizedClasses = useMemo(() => normalizeClassList(filters.classes), [filters.classes]);
-  const resolvedServers = useMemo(() => {
-    if (normalizedServers.length) return normalizedServers;
-    const fallback = pickDefaultServer(serverGroups);
-    return fallback ? [normalizeServerCode(fallback)] : [];
-  }, [normalizedServers, serverGroups]);
+  const resolvedServers = useMemo(() => normalizedServers, [normalizedServers]);
   const resolvedServerKey = useMemo(() => resolvedServers.join(","), [resolvedServers]);
 
   // Setter nur updaten, wenn sich wirklich etwas aendert
@@ -465,6 +457,16 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
           return compareNumber(a.mine, b.mine);
         case "treasury":
           return compareNumber(a.treasury, b.treasury);
+        case "mainTotal":
+          return compareNumber(a.mainTotal, b.mainTotal);
+        case "conTotal":
+          return compareNumber(a.conTotal, b.conTotal);
+        case "sumTotal":
+          return compareNumber(a.sumTotal, b.sumTotal);
+        case "xpProgress":
+          return compareNumber(a.xpProgress, b.xpProgress);
+        case "xpTotal":
+          return compareNumber(a.xpTotal, b.xpTotal);
         case "level":
         default:
           return compareNumber(a.level, b.level);

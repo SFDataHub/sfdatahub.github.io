@@ -920,6 +920,11 @@ type PlayerDerivedSnapshotEntry = {
   level: number | null;
   con: number | null;
   main: number | null;
+  mainTotal: number | null;
+  conTotal: number | null;
+  sumTotal: number | null;
+  xpProgress: number | null;
+  xpTotal: number | null;
   mine: number | null;
   ratio: number | null;
   sum: number | null;

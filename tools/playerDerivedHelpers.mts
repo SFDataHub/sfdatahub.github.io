@@ -11,6 +11,22 @@ export const toNumber = (v: any): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const CANON = (s: string) =>
+  String(s ?? "")
+    .trim()
+    .replace(/:+$/, "")
+    .toLowerCase()
+    .replace(/[\s_\u00a0]+/g, "");
+
+const pickByCanonKey = (obj: Record<string, any>, key: string): any => {
+  if (!obj || typeof obj !== "object") return undefined;
+  const canonKey = CANON(key);
+  for (const k of Object.keys(obj)) {
+    if (CANON(k) === canonKey) return obj[k];
+  }
+  return undefined;
+};
+
 export type ServerNorm = { group: "EU" | "US" | "INT" | "FUSION" | "ALL"; serverKey: string };
 export const normalizeServer = (raw: any): ServerNorm => {
   if (!raw) return { group: "ALL", serverKey: "all" };
@@ -80,6 +96,11 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
   const sum = base.sum;
   const con = base.con;
   const ratio = level > 0 ? sum / level : 0;
+  const mainTotal = toNumber(pickByCanonKey(values, "Attribute"));
+  const conTotal = toNumber(pickByCanonKey(values, "Constitution"));
+  const sumTotal = mainTotal + conTotal;
+  const xpProgress = toNumber(pickByCanonKey(values, "XP"));
+  const xpTotal = toNumber(pickByCanonKey(values, "XP Total"));
   const mine = toNumber(pick(values, "Gem Mine"));
   const treasury = toNumber(pick(values, "Treasury"));
   const updatedAtFallback = makeServerTimestamp ? makeServerTimestamp() : null;
@@ -97,6 +118,11 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
     main,
     con,
     ratio,
+    mainTotal,
+    conTotal,
+    sumTotal,
+    xpProgress,
+    xpTotal,
     mine,
     treasury,
     timestamp: toNumber(timestamp),
@@ -114,6 +140,11 @@ export type PlayerDerivedSnapshotEntry = {
   level: number | null;
   con: number | null;
   main: number | null;
+  mainTotal: number | null;
+  conTotal: number | null;
+  sumTotal: number | null;
+  xpProgress: number | null;
+  xpTotal: number | null;
   mine: number | null;
   ratio: number | null;
   sum: number | null;
@@ -140,6 +171,11 @@ export type BuildPlayerDerivedSnapshotInput = {
     level?: any;
     con?: any;
     main?: any;
+    mainTotal?: any;
+    conTotal?: any;
+    sumTotal?: any;
+    xpProgress?: any;
+    xpTotal?: any;
     mine?: any;
     ratio?: any;
     sum?: any;
@@ -164,6 +200,11 @@ export const buildPlayerDerivedSnapshotEntry = (
     level: toFiniteNumberOrNull(input.level ?? input.derived?.level),
     con: toFiniteNumberOrNull(input.derived?.con),
     main: toFiniteNumberOrNull(input.derived?.main),
+    mainTotal: toFiniteNumberOrNull(input.derived?.mainTotal),
+    conTotal: toFiniteNumberOrNull(input.derived?.conTotal),
+    sumTotal: toFiniteNumberOrNull(input.derived?.sumTotal),
+    xpProgress: toFiniteNumberOrNull(input.derived?.xpProgress),
+    xpTotal: toFiniteNumberOrNull(input.derived?.xpTotal),
     mine: toFiniteNumberOrNull(input.derived?.mine),
     ratio: toFiniteNumberOrNull(input.derived?.ratio),
     sum: toFiniteNumberOrNull(input.derived?.sum),

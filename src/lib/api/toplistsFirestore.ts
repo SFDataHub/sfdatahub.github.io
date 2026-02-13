@@ -191,6 +191,7 @@ export async function loadToplistsMeta(): Promise<ToplistsMeta | null> {
 
 // Row-Daten einer Spieler-Topliste - Keys 1:1 wie columnKeysPlayers
 export type FirestoreToplistPlayerRow = {
+  playerId?: string | null;
   flag: string | null;
   deltaRank: number | null;
   server: string;
@@ -202,6 +203,11 @@ export type FirestoreToplistPlayerRow = {
   con: number | null;
   sum: number | null;
   ratio: string | null;
+  mainTotal: number | null;
+  conTotal: number | null;
+  sumTotal: number | null;
+  xpProgress: number | null;
+  xpTotal: number | null;
   mine: number | null;
   treasury: number | null;
   lastScan: string | null;
@@ -280,6 +286,11 @@ const toNumber = (value: any): number | null => {
 };
 
 const toStringOrNull = (value: any): string | null => (typeof value === "string" ? value : null);
+const toIdStringOrNull = (value: any): string | null => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+};
 
 const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
   if (!raw || typeof raw !== "object") return null;
@@ -291,6 +302,7 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
   if (!server || !name || !cls) return null;
 
   return {
+    playerId: toIdStringOrNull(raw.playerId ?? raw.id ?? raw.player_id),
     flag: toStringOrNull(raw.flag),
     deltaRank: toNumber(raw.deltaRank),
     server,
@@ -302,6 +314,11 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
     con: toNumber(raw.con),
     sum: toNumber(raw.sum),
     ratio: toStringOrNull(raw.ratio),
+    mainTotal: toNumber(raw.mainTotal),
+    conTotal: toNumber(raw.conTotal),
+    sumTotal: toNumber(raw.sumTotal),
+    xpProgress: toNumber(raw.xpProgress),
+    xpTotal: toNumber(raw.xpTotal),
     mine: toNumber(raw.mine),
     treasury: toNumber(raw.treasury),
     lastScan: toStringOrNull(raw.lastScan),

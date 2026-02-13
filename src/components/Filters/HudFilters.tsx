@@ -1,19 +1,10 @@
 // src/components/Filters/HudFilters.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { useFilters, type DaysFilter } from "./FilterContext";
+import { useFilters } from "./FilterContext";
 import { CLASSES } from "../../data/classes";
 import styles from "./filters.module.css";
 import { ClassIconButton } from "./atoms";
-
-const RANGE_OPTIONS: { label: string; value: DaysFilter }[] = [
-  { label: "3d", value: 3 },
-  { label: "7d", value: 7 },
-  { label: "14d", value: 14 },
-  { label: "30d", value: 30 },
-  { label: "90d", value: 90 },
-  { label: "all", value: "all" },
-];
 
 type Props = {
   compareMonth: string;
@@ -29,10 +20,7 @@ export default function HudFilters({ compareMonth, setCompareMonth, monthOptions
     servers, // nur für den Counter/Label genutzt
     classes, setClasses,
     guilds, toggleGuild, clearGuilds,
-    range, setRange,
     sortBy, setSortBy,
-    quickFav, setQuickFav,
-    quickActive, setQuickActive,
 
     // UI modes
     filterMode,
@@ -132,19 +120,6 @@ export default function HudFilters({ compareMonth, setCompareMonth, monthOptions
         )}
       </div>
 
-      {/* Range */}
-      <div className={styles.segmented} role="group" aria-label="Range">
-        {RANGE_OPTIONS.map((option) => (
-          <button
-            type="button"
-            key={option.label}
-            aria-pressed={range === option.value}
-            onClick={() => setRange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
 
       {/* Sort (mit id/name + Labelbindung) */}
       <label className={styles.sortLabel} htmlFor="toplists-sort">
@@ -158,11 +133,11 @@ export default function HudFilters({ compareMonth, setCompareMonth, monthOptions
         className={styles.sortSelect}
         aria-label="Sort"
       >
-        <option value="sum">Base Sum</option>
+        <option value="main">Main</option>
+        <option value="constitution">Constitution</option>
+        <option value="sum">Base Stats</option>
         <option value="level">Level</option>
-        <option value="scrapbook">Scrapbook</option>
-        <option value="activity">Activity</option>
-        <option value="lastScan">Last scan</option>
+        <option value="mine">Mine</option>
       </select>
 
       {/* Compare month */}
@@ -184,22 +159,6 @@ export default function HudFilters({ compareMonth, setCompareMonth, monthOptions
           </option>
         ))}
       </select>
-
-      {/* Quick chips */}
-      <button
-        type="button"
-        className={`${styles.chip} ${quickFav ? styles.isActive : ""}`}
-        onClick={() => setQuickFav((v) => !v)}
-      >
-        ⭐ Favorites
-      </button>
-      <button
-        type="button"
-        className={`${styles.chip} ${quickActive ? styles.isActive : ""}`}
-        onClick={() => setQuickActive((v) => !v)}
-      >
-        ⚡ Active
-      </button>
 
       {/* Right Side Actions */}
       <div className="ml-auto flex items-center gap-2">
