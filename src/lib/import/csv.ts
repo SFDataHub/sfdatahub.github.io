@@ -357,15 +357,23 @@ const SERVER_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
 const SERVER_CODE_SUFFIX_PATTERN = /^([a-z]{1,4}\d+)[_.-]?(net|eu)$/i;
 const SERVER_HOST_PATTERN = /^([a-z]{1,4}\d+)\.sfgame\.(net|eu)$/i;
 
+const normalizeServerCodeAlias = (value: string): string => {
+  const cleaned = String(value ?? "").trim().toUpperCase();
+  if (!cleaned) return cleaned;
+  const match = cleaned.match(/^S(\d+)$/);
+  if (match) return `EU${match[1]}`;
+  return cleaned;
+};
+
 const normalizeServerCodeFromKey = (value: string): string | null => {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return null;
   const lowered = trimmed.toLowerCase();
-  if (SERVER_CODE_PATTERN.test(lowered)) return lowered.toUpperCase();
+  if (SERVER_CODE_PATTERN.test(lowered)) return normalizeServerCodeAlias(lowered);
   const suffixMatch = lowered.match(SERVER_CODE_SUFFIX_PATTERN);
-  if (suffixMatch) return suffixMatch[1].toUpperCase();
+  if (suffixMatch) return normalizeServerCodeAlias(suffixMatch[1]);
   const hostMatch = lowered.match(SERVER_HOST_PATTERN);
-  if (hostMatch) return hostMatch[1].toUpperCase();
+  if (hostMatch) return normalizeServerCodeAlias(hostMatch[1]);
   return trimmed;
 };
 
@@ -976,12 +984,12 @@ const normalizeServerInput = (value: any): { code?: string; host?: string } => {
   if (!lowered) return {};
 
   if (SERVER_CODE_PATTERN.test(lowered)) {
-    return { code: lowered.toUpperCase() };
+    return { code: normalizeServerCodeAlias(lowered) };
   }
 
   const suffixMatch = lowered.match(SERVER_CODE_SUFFIX_PATTERN);
   if (suffixMatch) {
-    return { code: suffixMatch[1].toUpperCase() };
+    return { code: normalizeServerCodeAlias(suffixMatch[1]) };
   }
 
   if (lowered.includes(".")) {
@@ -1481,10 +1489,15 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
   }
 
   const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+  const pendingEntryCount = Array.from(pendingDerivedByServer.values()).reduce(
+    (sum, entries) => sum + entries.length,
+    0
+  );
   if (pendingSnapshotKeys.length) {
     console.log("[ImportCsv] Guild derived snapshot flush pending", {
       count: pendingSnapshotKeys.length,
       servers: pendingSnapshotKeys,
+      entries: pendingEntryCount,
     });
   }
 
@@ -1727,9 +1740,10 @@ export async function importCsvToDB(
       // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
       const latestRef = doc(db, `players/${pid}/latest/latest`);
       const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
-      if (last.ts > prevSec) {
-        const latestUpdatedAt = serverTimestamp();
+      const shouldWriteLatest = last.ts > prevSec;
+      const latestUpdatedAt = shouldWriteLatest ? serverTimestamp() : null;
 
+      if (shouldWriteLatest) {
         latestDocs.push({
           ref: latestRef,
           data: {
@@ -1753,49 +1767,48 @@ export async function importCsvToDB(
             guildNameFold: guildName ? toFold(guildName) : null,
           },
         });
+        counts.writtenLatestPlayers!++;
+      }
 
-        const derivedInput = {
+      const derivedInput = {
+        playerId: pid,
+        name,
+        className,
+        level,
+        server,
+        guildIdentifier: guildIdentifier || undefined,
+        guildName: guildName || undefined,
+        values: last.row,
+        timestamp: last.ts,
+        updatedAt: latestUpdatedAt ?? undefined,
+      };
+      const derived = deriveForPlayer(derivedInput, serverTimestamp);
+      const lookupKey = normalizeServerLookupKey(server);
+      const snapshotServerKey =
+        serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
+      if (!snapshotServerKey && serverCodeByHost.size > 0) {
+        console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
           playerId: pid,
+          server,
+        });
+      }
+      if (snapshotServerKey) {
+        const lastScanRaw = pickByCanon(last.row, COL.PLAYERS.TIMESTAMP);
+        const snapshotEntry: PlayerDerivedSnapshotEntry = buildPlayerDerivedSnapshotEntry({
+          playerId: pid,
+          server: snapshotServerKey,
           name,
           className,
+          guildName,
           level,
-          server,
-          guildIdentifier: guildIdentifier || undefined,
-          guildName: guildName || undefined,
-          values: last.row,
-          timestamp: last.ts,
-          updatedAt: latestUpdatedAt,
-        };
-        const derived = deriveForPlayer(derivedInput, serverTimestamp);
-        const lookupKey = normalizeServerLookupKey(server);
-        const snapshotServerKey =
-          serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
-        if (!snapshotServerKey && serverCodeByHost.size > 0) {
-          console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
-            playerId: pid,
-            server,
-          });
+          lastScanRaw,
+          timestampSec: last.ts,
+          derived,
+        });
+        if (!pendingDerivedByServer.has(snapshotServerKey)) {
+          pendingDerivedByServer.set(snapshotServerKey, []);
         }
-        if (snapshotServerKey) {
-          const lastScanRaw = pickByCanon(last.row, COL.PLAYERS.TIMESTAMP);
-          const snapshotEntry: PlayerDerivedSnapshotEntry = buildPlayerDerivedSnapshotEntry({
-            playerId: pid,
-            server: snapshotServerKey,
-            name,
-            className,
-            guildName,
-            level,
-            lastScanRaw,
-            timestampSec: last.ts,
-            derived,
-          });
-          if (!pendingDerivedByServer.has(snapshotServerKey)) {
-            pendingDerivedByServer.set(snapshotServerKey, []);
-          }
-          pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
-        }
-
-        counts.writtenLatestPlayers!++;
+        pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
       }
 
       // buckets
@@ -1880,10 +1893,15 @@ export async function importCsvToDB(
 
     await writeLatest(latestDocs, emitProgress);
     const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+    const pendingEntryCount = Array.from(pendingDerivedByServer.values()).reduce(
+      (sum, entries) => sum + entries.length,
+      0
+    );
     if (pendingSnapshotKeys.length) {
       console.log("[ImportCsv] Derived snapshot flush pending", {
         count: pendingSnapshotKeys.length,
         servers: pendingSnapshotKeys,
+        entries: pendingEntryCount,
       });
     }
     const flushedDocIds: string[] = [];
@@ -1984,7 +2002,9 @@ export async function importCsvToDB(
       // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
       const latestRef = doc(db, `guilds/${gid}/latest/latest`);
       const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
-      if (last.ts > prevSec) {
+      const shouldWriteLatest = last.ts > prevSec;
+
+      if (shouldWriteLatest) {
         putLatest.push({
           path: latestRef.path,
           op: "setDoc",
@@ -2015,37 +2035,37 @@ export async function importCsvToDB(
           },
         });
         counts.writtenLatestGuilds!++;
+      }
 
-        if (enableGuildDerived) {
-          const lookupKey = normalizeServerLookupKey(parsed.server);
-          const snapshotServerKey =
-            serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
-          if (!snapshotServerKey && serverCodeByHost.size > 0) {
-            console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
-              guildId: gid,
-              server: parsed.server,
-            });
+      if (enableGuildDerived) {
+        const lookupKey = normalizeServerLookupKey(parsed.server);
+        const snapshotServerKey =
+          serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
+        if (!snapshotServerKey && serverCodeByHost.size > 0) {
+          console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
+            guildId: gid,
+            server: parsed.server,
+          });
+        }
+        if (snapshotServerKey) {
+          const lastScanRaw = pickByCanon(last.row, COL.GUILDS.TIMESTAMP);
+          const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
+          const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
+          const baseStats = computeBaseStats(last.row ?? {});
+          const snapshotEntry: GuildDerivedSnapshotEntry = {
+            guildId: String(gid),
+            server: snapshotServerKey,
+            name: String(parsed.name ?? gid),
+            memberCount: toFiniteNumberOrNull(memberCount),
+            hofRank: toFiniteNumberOrNull(hofRank),
+            lastScan: lastScan ? lastScan : null,
+            sum: toFiniteNumberOrNull(baseStats.sum),
+            sumAvg: toFiniteNumberOrNull(baseStats.sum),
+          };
+          if (!pendingDerivedByServer.has(snapshotServerKey)) {
+            pendingDerivedByServer.set(snapshotServerKey, []);
           }
-          if (snapshotServerKey) {
-            const lastScanRaw = pickByCanon(last.row, COL.GUILDS.TIMESTAMP);
-            const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
-            const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
-            const baseStats = computeBaseStats(last.row ?? {});
-            const snapshotEntry: GuildDerivedSnapshotEntry = {
-              guildId: String(gid),
-              server: snapshotServerKey,
-              name: String(parsed.name ?? gid),
-              memberCount: toFiniteNumberOrNull(memberCount),
-              hofRank: toFiniteNumberOrNull(hofRank),
-              lastScan: lastScan ? lastScan : null,
-              sum: toFiniteNumberOrNull(baseStats.sum),
-              sumAvg: toFiniteNumberOrNull(baseStats.sum),
-            };
-            if (!pendingDerivedByServer.has(snapshotServerKey)) {
-              pendingDerivedByServer.set(snapshotServerKey, []);
-            }
-            pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
-          }
+          pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
         }
       }
 
@@ -2147,10 +2167,15 @@ export async function importCsvToDB(
 
     if (enableGuildDerived) {
       const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
+      const pendingEntryCount = Array.from(pendingDerivedByServer.values()).reduce(
+        (sum, entries) => sum + entries.length,
+        0
+      );
       if (pendingSnapshotKeys.length) {
         console.log("[ImportCsv] Guild derived snapshot flush pending", {
           count: pendingSnapshotKeys.length,
           servers: pendingSnapshotKeys,
+          entries: pendingEntryCount,
         });
       }
       const flushedDocIds: string[] = [];

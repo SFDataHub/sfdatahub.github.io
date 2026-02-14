@@ -6,6 +6,6 @@ updatedAt: "2025-01-01"
 gallery: []
 ---
 
-This guide outlines the optimal order to upgrade your Fortress and associated buildings in Shakes & Fidget. Follow the suggested order to minimize resource use and maximize efficiency.
+Dieser Guide zeigt die optimale Reihenfolge, um deine Festung und die zugehoerigen Gebaeude in Shakes & Fidget auszubauen. Folge der vorgeschlagenen Reihenfolge, um Ressourcen zu sparen und die Effizienz zu maximieren.
 
 [[embed:fortress-package-skip-order-table]]

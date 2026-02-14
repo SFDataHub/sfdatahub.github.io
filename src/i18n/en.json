@@ -387,7 +387,7 @@
   "toplists": {
     "compareMonth": "Progress since",
     "compareOff": "Off",
-    "compareMissingSnapshot": "No snapshot found for this month.",
+    "compareMissingSnapshot": "No baseline data for {{key}}.",
     "deltaNew": "NEW",
     "filters": {
       "guilds": {
@@ -554,6 +554,78 @@
     "shortDisclaimer": "SFDataHub is an unofficial, non-commercial fan project. All trademarks and images belong to their respective owners.",
     "copyright": "© 2025 SFDataHub – community project around Shakes & Fidget."
   },
+  "calculators": {
+    "gem": {
+      "title": "Gem Calculator",
+      "inputs": {
+        "charLevel": {
+          "label": "Char Level",
+          "placeholder": "e.g., 360"
+        },
+        "mineLevel": {
+          "label": "Mine Level",
+          "placeholder": "e.g., 10"
+        },
+        "guildHok": {
+          "label": "Guild HoK",
+          "placeholder": "e.g., 840"
+        }
+      },
+      "gems": {
+        "normal": {
+          "label": "Normal",
+          "alt": "Normal Gem"
+        },
+        "black": {
+          "label": "Black",
+          "alt": "Black Gem"
+        },
+        "legendary": {
+          "label": "Legendary",
+          "alt": "Legendary Gem"
+        }
+      },
+      "hint": {
+        "prefix": "The values are approximations and represent the ",
+        "emphasis": "max possible",
+        "suffix": " you can find. Actual results may vary slightly."
+      }
+    },
+    "calculators": {
+      "fortress": {
+        "title": "Fortress - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Select building",
+          "l2Label": "L2 (Laborers)"
+        },
+        "table": {
+          "level": "Level",
+          "wood": "Wood",
+          "stone": "Stone",
+          "buildTime": "Build Time",
+          "buildTimeL2": "Build Time (L2)",
+          "skip": "Skip (Mushr.)"
+        },
+        "hints": {
+          "l2Effect": "Note: L2 applies to all buildings (0-15 -> 0-75%). Skip is based on the L2 time (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "woodcutter": "Woodcutter",
+          "treasury": "Treasury",
+          "smithy": "Smithy",
+          "quarry": "Quarry",
+          "magetower": "Mage Tower",
+          "laborersquarter": "Laborers Quarters",
+          "gemmine": "Gem Mine",
+          "fortress": "Fortress",
+          "fortifications": "Fortification",
+          "barracks": "Barracks",
+          "archery": "Archery",
+          "academy": "Academy"
+        }
+      }
+    }
+  },
   "guides": {
     "v2": {
       "searchPlaceholder": "Search guides",
@@ -573,6 +645,3 @@
     }
   }
 }
-
-
-

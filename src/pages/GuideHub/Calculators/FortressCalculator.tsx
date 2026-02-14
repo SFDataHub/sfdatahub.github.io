@@ -1,6 +1,7 @@
 // FILE: src/pages/GuideHub/Calculators/FortressCalculator.tsx
 
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./FortressCalculator.module.css";
 
 import { gdrive } from "../../../lib/urls";
@@ -28,6 +29,7 @@ function secToHHMMSS(totalSec: number): string {
 }
 
 const FortressCalculator: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<BuildingKey>(DEFAULT_TAB as BuildingKey);
   const [l2, setL2] = useState<number>(1);
 
@@ -44,19 +46,24 @@ const FortressCalculator: React.FC = () => {
   }, [activeTab]);
 
   const mult = useMemo(() => l2Multiplier(l2), [l2]);
+  const activeBuildingLabel = t(`guidehub.calculators.fortress.buildings.${activeTab}`);
 
   return (
     <div className={`${styles.foCalc}`}>
       {/* Building-Auswahl */}
       <div className="tabs">
-        <span className="tabSelectLabel">Select building</span>
+        <span className="tabSelectLabel">
+          {t("guidehub.calculators.fortress.inputs.buildingSelectLabel")}
+        </span>
         <select
           className="tabSelect"
           value={activeTab}
           onChange={(e) => setActiveTab(e.target.value as BuildingKey)}
         >
-          {TABS.map((t) => (
-            <option key={t.key} value={t.key}>{t.label}</option>
+          {TABS.map((tab) => (
+            <option key={tab.key} value={tab.key}>
+              {t(`guidehub.calculators.fortress.buildings.${tab.key}`)}
+            </option>
           ))}
         </select>
       </div>
@@ -66,16 +73,20 @@ const FortressCalculator: React.FC = () => {
         <div className="media">
           {mediaSrc ? (
             // GIF-Animation bleibt erhalten (Proxy bevorzugt)
-            <img src={mediaSrc} alt={activeTab} />
+            <img src={mediaSrc} alt={activeBuildingLabel} />
           ) : null}
         </div>
 
         <div className={styles.panel}>
           {/* Panel-Kopf mit Titel + L2 */}
           <div className={styles.panelHead}>
-            <div className={styles.panelTitle}>Fortress — {activeTab}</div>
+            <div className={styles.panelTitle}>
+              {t("guidehub.calculators.fortress.title", { building: activeBuildingLabel })}
+            </div>
             <div className={styles.controls}>
-              <span className={styles.ctrlLabel}>L2 (Laborers)</span>
+              <span className={styles.ctrlLabel}>
+                {t("guidehub.calculators.fortress.inputs.l2Label")}
+              </span>
               <select
                 className={styles.ctrlSelect}
                 value={l2}
@@ -93,12 +104,12 @@ const FortressCalculator: React.FC = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>Level</th>
-                  <th className={styles.th}>Wood</th>
-                  <th className={styles.th}>Stone</th>
-                  <th className={styles.th}>Build Time</th>
-                  <th className={styles.th}>Build Time (L2)</th>
-                  <th className={styles.th}>Skip (Mushr.)</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.level")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.wood")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.stone")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.buildTime")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.buildTimeL2")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.skip")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,7 +134,7 @@ const FortressCalculator: React.FC = () => {
           </div>
 
           <div className={styles.note}>
-            Hinweis: L2 wirkt für alle Buildings (0–15 → 0–75%). Skip basiert auf der L2-Zeit (ceil(ceil(sec/60)/10)).
+            {t("guidehub.calculators.fortress.hints.l2Effect")}
           </div>
         </div>
       </div>

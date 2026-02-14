@@ -9,6 +9,8 @@ gallery: []
 
 Placeholder content for Max Item Stats Calculator.
 
+[[embed:max-item-stats-calculator]]
+
 ### Details
 
 - Add steps and explanation here.

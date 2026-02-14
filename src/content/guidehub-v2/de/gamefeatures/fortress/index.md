@@ -7,6 +7,6 @@ gallery: []
 ---
 [[embed:fortress-link-buttons]]
 
-## related topics
+## Verwandte Themen
 
 [[embed:fortress-related-buttons]]

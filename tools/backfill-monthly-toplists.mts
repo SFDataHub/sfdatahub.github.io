@@ -166,6 +166,57 @@ const parseLabel = (value: string): string => {
   return trimmed;
 };
 
+type ResolvedServerKeys = {
+  input: string;
+  queryServerKey: string;
+  fallbackServerKey?: string;
+  writeServerKey: string;
+};
+
+const resolveServerKeys = (input: string): ResolvedServerKeys => {
+  const upper = input.trim().toUpperCase();
+  let match = upper.match(/^S(\d+)\.EU$/);
+  if (match) {
+    const num = match[1];
+    return {
+      input: upper,
+      queryServerKey: `S${num}.EU`,
+      fallbackServerKey: `S${num}`,
+      writeServerKey: `EU${num}`,
+    };
+  }
+  match = upper.match(/^S(\d+)$/);
+  if (match) {
+    const num = match[1];
+    return {
+      input: upper,
+      queryServerKey: `S${num}`,
+      fallbackServerKey: `S${num}.EU`,
+      writeServerKey: `EU${num}`,
+    };
+  }
+  match = upper.match(/^EU(\d+)$/);
+  if (match) {
+    const num = match[1];
+    return {
+      input: upper,
+      queryServerKey: `EU${num}`,
+      fallbackServerKey: `S${num}`,
+      writeServerKey: `EU${num}`,
+    };
+  }
+  match = upper.match(/^F(\d+)$/);
+  if (match) {
+    const num = match[1];
+    return {
+      input: upper,
+      queryServerKey: `F${num}`,
+      writeServerKey: `F${num}`,
+    };
+  }
+  return { input: upper, queryServerKey: upper, writeServerKey: upper };
+};
+
 // ---------- Main ----------
 const run = async () => {
   const serverArg = requireArg("server").trim();
@@ -185,59 +236,81 @@ const run = async () => {
   if (!Number.isFinite(topN) || topN <= 0) throw new Error(`Invalid --topN: ${topNArg}`);
 
   const dryRun = args.get("dry-run") === "true";
-  const serverCode = serverArg.toUpperCase();
+  const resolvedServer = resolveServerKeys(serverArg);
+  const serverCode = resolvedServer.writeServerKey;
   const docId = `${serverCode}__${label}`;
   const targetPath = `${STATS_PUBLIC_LATEST}/${docId}`;
 
-  let scansInWindow = 0;
-  let skippedNonPlayers = 0;
-  let skippedMissingId = 0;
-  let skippedBadTimestamp = 0;
+  console.log(
+    `[monthly-toplists] Resolved server: input=${resolvedServer.input} query=${resolvedServer.queryServerKey} write=${serverCode} label=${label}`
+  );
 
-  const byPlayer = new Map<string, { ts: number; data: any; docId: string }>();
+  const scanForServer = async (serverKey: string) => {
+    let scansInWindow = 0;
+    let skippedNonPlayers = 0;
+    let skippedMissingId = 0;
+    let skippedBadTimestamp = 0;
+    const byPlayer = new Map<string, { ts: number; data: any; docId: string }>();
 
-  let q: Query = db.collectionGroup("scans") as Query;
-  q = q.where("server", "==", serverArg);
-  q = q.where("timestamp", ">=", fromSec).where("timestamp", "<=", toSec);
-  q = q.orderBy("timestamp", "asc");
+    let q: Query = db.collectionGroup("scans") as Query;
+    q = q.where("server", "==", serverKey);
+    q = q.where("timestamp", ">=", fromSec).where("timestamp", "<=", toSec);
+    q = q.orderBy("timestamp", "asc");
 
-  try {
-    const stream = q.stream() as AsyncIterable<QueryDocumentSnapshot>;
-    for await (const doc of stream) {
-      const path = doc.ref.path;
-      if (!path.startsWith("players/") || !path.includes("/scans/")) {
-        skippedNonPlayers++;
-        continue;
+    try {
+      const stream = q.stream() as AsyncIterable<QueryDocumentSnapshot>;
+      for await (const doc of stream) {
+        const path = doc.ref.path;
+        if (!path.startsWith("players/") || !path.includes("/scans/")) {
+          skippedNonPlayers++;
+          continue;
+        }
+
+        const data = doc.data() || {};
+        const playerId = String(data.playerId ?? doc.ref.parent.parent?.id ?? "");
+        if (!playerId) {
+          skippedMissingId++;
+          continue;
+        }
+
+        const ts = resolveTimestampSec(data, doc.id);
+        if (!ts) {
+          skippedBadTimestamp++;
+          continue;
+        }
+        if (ts < fromSec || ts > toSec) continue;
+
+        scansInWindow++;
+        const prev = byPlayer.get(playerId);
+        if (!prev || ts > prev.ts) {
+          byPlayer.set(playerId, { ts, data, docId: doc.id });
+        }
       }
-
-      const data = doc.data() || {};
-      const playerId = String(data.playerId ?? doc.ref.parent.parent?.id ?? "");
-      if (!playerId) {
-        skippedMissingId++;
-        continue;
+    } catch (err: any) {
+      const msg = String(err?.message ?? err);
+      if (msg.toLowerCase().includes("index")) {
+        console.warn("[monthly-toplists] Query failed due to missing index.");
+        console.warn(
+          "[monthly-toplists] Firestore may require a composite index for collectionGroup(scans) + server + timestamp."
+        );
       }
-
-      const ts = resolveTimestampSec(data, doc.id);
-      if (!ts) {
-        skippedBadTimestamp++;
-        continue;
-      }
-      if (ts < fromSec || ts > toSec) continue;
-
-      scansInWindow++;
-      const prev = byPlayer.get(playerId);
-      if (!prev || ts > prev.ts) {
-        byPlayer.set(playerId, { ts, data, docId: doc.id });
-      }
+      throw err;
     }
-  } catch (err: any) {
-    const msg = String(err?.message ?? err);
-    if (msg.toLowerCase().includes("index")) {
-      console.warn("[monthly-toplists] Query failed due to missing index.");
-      console.warn("[monthly-toplists] Firestore may require a composite index for collectionGroup(scans) + server + timestamp.");
-    }
-    throw err;
+
+    return { scansInWindow, skippedNonPlayers, skippedMissingId, skippedBadTimestamp, byPlayer };
+  };
+
+  let activeQueryServer = resolvedServer.queryServerKey;
+  let scanResult = await scanForServer(activeQueryServer);
+  if (scanResult.scansInWindow === 0 && resolvedServer.fallbackServerKey) {
+    console.warn(
+      `[monthly-toplists] No scans found for ${resolvedServer.queryServerKey}. Retrying with ${resolvedServer.fallbackServerKey}.`
+    );
+    activeQueryServer = resolvedServer.fallbackServerKey;
+    scanResult = await scanForServer(activeQueryServer);
   }
+
+  const { scansInWindow, skippedNonPlayers, skippedMissingId, skippedBadTimestamp, byPlayer } = scanResult;
 
   const uniquePlayers = byPlayer.size;
   if (uniquePlayers === 0) {
@@ -266,7 +339,7 @@ const run = async () => {
       name,
       className,
       level,
-      server: data.server ?? serverArg,
+      server: serverCode,
       guildIdentifier,
       guildName,
       values,

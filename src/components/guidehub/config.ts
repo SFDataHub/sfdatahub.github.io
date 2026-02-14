@@ -24,8 +24,6 @@ export const categories: Category[] = [
     to: "/guidehub?tab=events",
     side: "left",
     sub: [
-      { key: "event-list", label: "Event List", to: "/guidehub?tab=events&sub=event-list" },
-      { key: "event-cycle", label: "Event Cycle", to: "/guidehub?tab=events&sub=event-cycle" },
       { key: "hellevator",
       label: "Hellevator", 
       to: "/guidehub?tab=hellevator",
@@ -55,11 +53,6 @@ export const categories: Category[] = [
         to: "/guidehub?tab=progression&sub=early",
         sub2: [
           { key: "first-weekend-guide", label: "First Weekend Guide", to: "/guidehub?tab=progression&sub=early&sub2=first-weekend-guide" },
-          { key: "max-item-stats-calculator", label: "Max Item Stats Calculator", to: "/guidehub?tab=progression&sub=early&sub2=max-item-stats-calculator" },
-          { key: "fortress-package-skip-order", label: "Fortress Package skip order", to: "/guidehub?tab=progression&sub=early&sub2=fortress-package-skip-order" },
-          { key: "underworld-pro-package-skip-order", label: "Underworld Pro Package skip order", to: "/guidehub?tab=progression&sub=early&sub2=underworld-pro-package-skip-order" },
-          { key: "gem-calculator", label: "Gem Calculator", to: "/guidehub?tab=progression&sub=early&sub2=gem-calculator" },
-          { key: "fortress-attack-duplication", label: "Fortress attack duplication guide", to: "/guidehub?tab=progression&sub=early&sub2=fortress-attack-duplication" },
         ],
       },
       {
