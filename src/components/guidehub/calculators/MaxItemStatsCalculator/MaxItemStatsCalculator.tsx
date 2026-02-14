@@ -166,7 +166,9 @@ const MaxItemStatsCalculator: React.FC = () => {
             </label>
             <div className={styles.field}>
               <span>Theoretical Item Quality</span>
-              <div className={styles.readonly}>{formatValue(theoreticalQuality, 2)}</div>
+              <div className={styles.readonly}>
+                {theoreticalQuality == null ? "-" : Math.floor(theoreticalQuality).toLocaleString("en-US")}
+              </div>
             </div>
           </div>
         </div>

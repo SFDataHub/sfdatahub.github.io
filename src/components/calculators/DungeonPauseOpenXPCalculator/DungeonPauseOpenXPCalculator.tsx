@@ -268,62 +268,72 @@ export default function DungeonPauseOpenXPCalculator({
         <button className={styles.resetBtn} onClick={reset}>Reset</button>
         <span className={styles.resetNote}>Resets all selections to defaults.</span>
       </div>
-      <Panel
-        title="Light World"
-        rows={dungeonPauseOpenXPData.light}
-        ranges={lightRanges}
-        setRanges={handleLightChange}
-      />
+      <div className={styles.gridContainer}>
+        <div className={styles.rowOne}>
+          <div className={styles.cardWrapper}>
+            <Panel
+              title="Light World"
+              rows={dungeonPauseOpenXPData.light}
+              ranges={lightRanges}
+              setRanges={handleLightChange}
+            />
+          </div>
 
-      <Panel
-        title="Shadow World"
-        rows={dungeonPauseOpenXPData.shadow}
-        ranges={shadowRanges}
-        setRanges={handleShadowChange}
-      />
-
-      <div className={styles.panel}>
-        <div className={styles.header}>
-          <div className={styles.title}>Special Dungeons</div>
+          <div className={styles.cardWrapper}>
+            <Panel
+              title="Shadow World"
+              rows={dungeonPauseOpenXPData.shadow}
+              ranges={shadowRanges}
+              setRanges={handleShadowChange}
+            />
+          </div>
         </div>
 
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Dungeon</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Sum</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dungeonPauseOpenXPData.special.map((r: SpecialRow) => (
-              <Row
-                key={r.key}
-                row={r}
-                range={specialRanges[r.key] ?? { from: 0, to: 0 }}
-                onChange={(next) => handleSpecialChange(r.key, next)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className={styles.rowTwo}>
+          <div className={styles.panel}>
+            <div className={styles.header}>
+              <div className={styles.title}>Special Dungeons</div>
+            </div>
 
-        <div className={styles.footer}>
-          <div className={styles.footerLine}>
-            <span>Sum Total Special</span>
-            <span>{numberFmt(specialTotal)} XP</span>
-          </div>
-          <div className={styles.footerLine}>
-            <span>Total XP</span>
-            <span className={styles.resultStack}>
-              <span className={styles.resultXP}>{numberFmt(totalXP)} XP</span>
-              <span className={styles.resultLevel}>
-                <span className={styles.resultLevelLabel}>Level</span> {levelFmt(totalXP)}
-              </span>
-            </span>
-          </div>
-          <div className={styles.note}>
-            XP values are summed per selection and converted to level using the project formula.
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Dungeon</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Sum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dungeonPauseOpenXPData.special.map((r: SpecialRow) => (
+                  <Row
+                    key={r.key}
+                    row={r}
+                    range={specialRanges[r.key] ?? { from: 0, to: 0 }}
+                    onChange={(next) => handleSpecialChange(r.key, next)}
+                  />
+                ))}
+              </tbody>
+            </table>
+
+            <div className={styles.footer}>
+              <div className={styles.footerLine}>
+                <span>Sum Total Special</span>
+                <span>{numberFmt(specialTotal)} XP</span>
+              </div>
+              <div className={styles.footerLine}>
+                <span>Total XP</span>
+                <span className={styles.resultStack}>
+                  <span className={styles.resultXP}>{numberFmt(totalXP)} XP</span>
+                  <span className={styles.resultLevel}>
+                    <span className={styles.resultLevelLabel}>Level</span> {levelFmt(totalXP)}
+                  </span>
+                </span>
+              </div>
+              <div className={styles.note}>
+                XP values are summed per selection and converted to level using the project formula.
+              </div>
+            </div>
           </div>
         </div>
       </div>
