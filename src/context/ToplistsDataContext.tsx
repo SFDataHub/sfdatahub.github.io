@@ -140,8 +140,33 @@ const toMsFromLastScan = (value: string | number | null | undefined): number | n
     if (!Number.isFinite(n)) return null;
     return n < 1e12 ? n * 1000 : n;
   }
-  const parsed = Date.parse(raw);
-  return Number.isFinite(parsed) ? parsed : null;
+  const parts = raw.split(/\s+/);
+  const datePart = parts[0] ?? "";
+  const timePart = parts[1] ?? "";
+  const dateBits = datePart.split(".");
+  if (dateBits.length !== 3) return null;
+  const day = Number(dateBits[0]);
+  const month = Number(dateBits[1]);
+  const year = Number(dateBits[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null;
+  let hours = 0;
+  let minutes = 0;
+  if (timePart) {
+    const timeBits = timePart.split(":");
+    if (timeBits.length < 2) return null;
+    hours = Number(timeBits[0]);
+    minutes = Number(timeBits[1]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  }
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date.getTime();
 };
 
 // ---- provider --------------------------------------------------------------
@@ -431,46 +456,73 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
       return sort.dir === "asc" ? diff : -diff;
     };
+    const compareTie = (a: FirestoreToplistPlayerRow, b: FirestoreToplistPlayerRow) => {
+      const aServer = normalizeServerCode(String(a.server ?? ""));
+      const bServer = normalizeServerCode(String(b.server ?? ""));
+      const aPid = (a as any).playerId ?? (a as any).id ?? a.name ?? "";
+      const bPid = (b as any).playerId ?? (b as any).id ?? b.name ?? "";
+      const aKey = `${aServer}__${String(aPid).trim()}__${String(a.class ?? "").trim()}`;
+      const bKey = `${bServer}__${String(bPid).trim()}__${String(b.class ?? "").trim()}`;
+      const diff = aKey.localeCompare(bKey, undefined, { numeric: true, sensitivity: "base" });
+      return sort.dir === "asc" ? diff : -diff;
+    };
 
     rows.sort((a, b) => {
+      let result = 0;
       switch (sort.key) {
         case "name": {
           const aName = String(a.name ?? "");
           const bName = String(b.name ?? "");
           const cmp = aName.localeCompare(bName, undefined, { sensitivity: "base" });
-          return sort.dir === "asc" ? cmp : -cmp;
+          result = sort.dir === "asc" ? cmp : -cmp;
+          break;
         }
         case "lastScan": {
           const aMs = toMsFromLastScan(a.lastScan);
           const bMs = toMsFromLastScan(b.lastScan);
-          return compareNumber(aMs == null ? null : aMs, bMs == null ? null : bMs);
+          result = compareNumber(aMs == null ? null : aMs, bMs == null ? null : bMs);
+          break;
         }
         case "main":
-          return compareNumber(a.main, b.main);
+          result = compareNumber(a.main, b.main);
+          break;
         case "con":
-          return compareNumber(a.con, b.con);
+          result = compareNumber(a.con, b.con);
+          break;
         case "sum":
-          return compareNumber(a.sum, b.sum);
+          result = compareNumber(a.sum, b.sum);
+          break;
         case "ratio":
-          return compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
+          result = compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
+          break;
         case "mine":
-          return compareNumber(a.mine, b.mine);
+          result = compareNumber(a.mine, b.mine);
+          break;
         case "treasury":
-          return compareNumber(a.treasury, b.treasury);
+          result = compareNumber(a.treasury, b.treasury);
+          break;
         case "mainTotal":
-          return compareNumber(a.mainTotal, b.mainTotal);
+          result = compareNumber(a.mainTotal, b.mainTotal);
+          break;
         case "conTotal":
-          return compareNumber(a.conTotal, b.conTotal);
+          result = compareNumber(a.conTotal, b.conTotal);
+          break;
         case "sumTotal":
-          return compareNumber(a.sumTotal, b.sumTotal);
+          result = compareNumber(a.sumTotal, b.sumTotal);
+          break;
         case "xpProgress":
-          return compareNumber(a.xpProgress, b.xpProgress);
+          result = compareNumber(a.xpProgress, b.xpProgress);
+          break;
         case "xpTotal":
-          return compareNumber(a.xpTotal, b.xpTotal);
+          result = compareNumber(a.xpTotal, b.xpTotal);
+          break;
         case "level":
         default:
-          return compareNumber(a.level, b.level);
+          result = compareNumber(a.level, b.level);
+          break;
       }
+      if (result !== 0) return result;
+      return compareTie(a, b);
     });
 
     if (playerState.rowLimit != null && playerState.rowLimit > 0 && rows.length > playerState.rowLimit) {

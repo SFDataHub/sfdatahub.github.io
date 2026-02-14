@@ -1,29 +1,29 @@
-﻿---
+---
 title: "Fortress Package skip order"
 category: "Progression"
 createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-## Overview {#overview}
+## Uebersicht {#overview}
 
-Placeholder content for Fortress Package skip order.
+Platzhalter-Inhalt fuer den Guide zur Skip-Reihenfolge der Fortress-Pakete.
 
 ### Details
 
-- Add steps and explanation here.
-- Include any key tips or warnings.
+- Fuege hier Schritte und Erklaerungen hinzu.
+- Fuege wichtige Tipps oder Warnungen hinzu.
 
-### Tips
+### Tipps
 
-- Add practical tips or follow-up actions.
+- Fuege praktische Tipps oder Folgeaktionen hinzu.
 
-## SFDataHub Content {#sfdatahub-content}
+## SFDataHub Inhalt {#sfdatahub-content}
 
 ## TavernDiscord FAQ {#taverndiscord-faq}
 
-## Notes {#notes}
+## Notizen {#notes}
 
-## Changelog {#changelog}
+## Aenderungshistorie {#changelog}
 
-## Sources {#sources}
+## Quellen {#sources}

@@ -336,7 +336,7 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
     // nur schreiben, wenn neuer als vorhandener Snapshot
     const prevSec = await readPrevSnapshotSec(gid);
-    if (guildTsSec <= prevSec) continue;
+    const shouldWriteSnapshot = guildTsSec > prevSec;
 
     // Spielerzeilen mit exakt diesem Timestamp und passender Gilde einsammeln
     const byPid = new Map<string, CSVRow>();
@@ -397,69 +397,72 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     });
     const hash = djb2HashString(hashBasis);
 
-    const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-    try {
-      await traceSetDoc(ref, () => setDoc(ref, {
-        guildId: gid,
-        count: members.length,
-        updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
-        updatedAtMs: guildTsSec * 1000,              // intern als ms
-        hash,
+    if (shouldWriteSnapshot) {
+      const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
+      try {
+        await traceSetDoc(ref, () => setDoc(ref, {
+          guildId: gid,
+          count: members.length,
+          updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
+          updatedAtMs: guildTsSec * 1000,              // intern als ms
+          hash,
 
-        avgLevel,
-        avgTreasury,
-        avgMine,
-        avgBaseMain,
-        avgConBase,
-        avgSumBaseTotal,
-        avgAttrTotal,
-        avgConTotal,
-        avgTotalStats,
+          avgLevel,
+          avgTreasury,
+          avgMine,
+          avgBaseMain,
+          avgConBase,
+          avgSumBaseTotal,
+          avgAttrTotal,
+          avgConTotal,
+          avgTotalStats,
 
-        members,
-        updatedAtServer: serverTimestamp(),
-      }, { merge: true }), { label: "ImportGuildSnapshots:summary" });
+          members,
+          updatedAtServer: serverTimestamp(),
+        }, { merge: true }), { label: "ImportGuildSnapshots:summary" });
 
-      const metaRow =
-        guildRowByIdAndTs.get(`${gid}__${guildTsSec}`) ?? latestGuildRowById.get(gid)?.row ?? null;
-      const serverRaw = metaRow ? pickByCanon(metaRow, G.SERVER) : null;
-      const nameRaw = metaRow ? pickByCanon(metaRow, G.NAME) : null;
-      const memberCountRaw = metaRow ? pickByCanon(metaRow, G.MEMBER_COUNT) : null;
-      const hofRankRaw = metaRow
-        ? pickAnyByCanon(metaRow, [G.HOF, G.HOF_ALT, G.RANK, G.GUILD_RANK])
-        : null;
-      const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : guildTsRaw;
-      const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : guildTsRaw ?? String(guildTsSec);
-
-      aggregatesByGuildId.set(gid, {
-        guildId: gid,
-        server: serverRaw != null && String(serverRaw).trim() !== "" ? String(serverRaw).trim() : null,
-        name: nameRaw != null && String(nameRaw).trim() !== "" ? String(nameRaw).trim() : null,
-        memberCount: toNumberLoose(memberCountRaw),
-        hofRank: toNumberLoose(hofRankRaw),
-        lastScan: lastScan ? lastScan : null,
-        timestampSec: guildTsSec,
-        count: members.length,
-        avgLevel,
-        avgTreasury,
-        avgMine,
-        avgBaseMain,
-        avgConBase,
-        avgSumBaseTotal,
-        avgAttrTotal,
-        avgConTotal,
-        avgTotalStats,
-      });
-
-      snapshotsWritten++;
-    } catch (error) {
-      if (isDuplicatePermissionError(error)) {
-        console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
+        snapshotsWritten++;
+      } catch (error) {
+        if (isDuplicatePermissionError(error)) {
+          console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
+          continue;
+        }
+        console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
+        fatalError = fatalError || error;
         continue;
       }
-      console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
-      fatalError = fatalError || error;
     }
+
+    const metaRow =
+      guildRowByIdAndTs.get(`${gid}__${guildTsSec}`) ?? latestGuildRowById.get(gid)?.row ?? null;
+    const serverRaw = metaRow ? pickByCanon(metaRow, G.SERVER) : null;
+    const nameRaw = metaRow ? pickByCanon(metaRow, G.NAME) : null;
+    const memberCountRaw = metaRow ? pickByCanon(metaRow, G.MEMBER_COUNT) : null;
+    const hofRankRaw = metaRow
+      ? pickAnyByCanon(metaRow, [G.HOF, G.HOF_ALT, G.RANK, G.GUILD_RANK])
+      : null;
+    const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : guildTsRaw;
+    const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : guildTsRaw ?? String(guildTsSec);
+
+    aggregatesByGuildId.set(gid, {
+      guildId: gid,
+      server: serverRaw != null && String(serverRaw).trim() !== "" ? String(serverRaw).trim() : null,
+      name: nameRaw != null && String(nameRaw).trim() !== "" ? String(nameRaw).trim() : null,
+      memberCount: toNumberLoose(memberCountRaw),
+      hofRank: toNumberLoose(hofRankRaw),
+      lastScan: lastScan ? lastScan : null,
+      timestampSec: guildTsSec,
+      count: members.length,
+      avgLevel,
+      avgTreasury,
+      avgMine,
+      avgBaseMain,
+      avgConBase,
+      avgSumBaseTotal,
+      avgAttrTotal,
+      avgConTotal,
+      avgTotalStats,
+    });
   }
 
   if (fatalError) {

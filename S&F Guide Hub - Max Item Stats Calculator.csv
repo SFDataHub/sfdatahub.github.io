@@ -1,0 +1,18 @@
+,,,,Max Item Stats Calculator,,,,,,last updated:,26.11.2025,
+,Edit the Yellow highlighted cells! The Armor and Weapon average DMG calculator work off the Item Quality you insert!                  All values are the maximum possible you can in theory find!,,,,,,,,,,,
+,Item Quality,,,,,,Base for Quality 350+,,Theoretical Item Quality Calculator,,,
+,,,,,,,401.4725009,,Level,Aura,Item Quality Rune,Rune calculation
+,266,,,Normal Item 1 stat,532,,,,460,181,0%,1.00
+,,,,Normal Item 2 stat,532,<- Both stats combined,,,,644,,
+,,,,3 Stat Epic,319,,,,,,,
+,,,,5 Stat Epic,266,,,,,,,
+,,,,Legendary,343,,,Legendary ?,Armor,,,
+,,,,,,,,FALSE,Light,798,,
+,,,,,,,,FALSE,Medium,1995,,
+,,,,,,,,FALSE,Heavy,3990,,
+,,,,,,,Base for Weapon DMG,,,,,
+,,,,,,,534,Legendary ?,Average Weapon DMG,,,
+,,,,,,,554,FALSE,Melee,~534,,
+,,,,,,,,FALSE,Ranged,~668,,
+,,,,,,,,FALSE,Magic,~1202,,
+,,,,,,,,,Credits to the SF Tavern for the Formulas,,,

@@ -32,11 +32,17 @@ export const normalizeServer = (raw: any): ServerNorm => {
   if (!raw) return { group: "ALL", serverKey: "all" };
   const s = String(raw).toUpperCase();
 
-  let m = s.match(/S?(\d+)[._-]?EU|S(\d+)\.SFGAME\.EU/);
+  let m = s.match(/EU(\d+)/);
+  if (m) {
+    return { group: "EU", serverKey: `EU${m[1]}` };
+  }
+  m = s.match(/S?(\d+)[._-]?EU|S(\d+)\.SFGAME\.EU/);
   if (m) {
     const num = m[1] || m[2];
     return { group: "EU", serverKey: `EU${num}` };
   }
+  m = s.match(/^S(\d+)$/);
+  if (m) return { group: "EU", serverKey: `EU${m[1]}` };
   if (s.includes("AM1") || s.includes("S1.SFGAME.US")) return { group: "US", serverKey: "AM1" };
   if (s.includes("MAERWYNN")) return { group: "INT", serverKey: "MAERWYNN" };
   m = s.match(/F(\d+)/);

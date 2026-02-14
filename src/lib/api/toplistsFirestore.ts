@@ -484,6 +484,9 @@ type SnapshotCacheEntry<T> = {
 const getSnapshotCacheKey = (type: "players" | "guilds", serverCode: string) =>
   `${SNAPSHOT_CACHE_PREFIX}:${type}:${serverCode}`;
 
+const getCompareSnapshotCacheKey = (docId: string) => `toplists:compare:${docId}`;
+const compareInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+
 const nextFullHour = (nowMs: number) => {
   const d = new Date(nowMs);
   d.setMinutes(0, 0, 0);
@@ -566,9 +569,14 @@ export async function getLatestPlayerToplistSnapshotCached(
 
 export async function getPlayerToplistSnapshotByDocIdCached(
   docId: string,
-  ttlMs = 5 * 60 * 1000 // default 5 minutes for testing (was 24h)
+  ttlMs?: number
 ): Promise<FirestoreLatestToplistResult> {
-  const key = `${SNAPSHOT_CACHE_PREFIX}:players-doc:${docId}`;
+  const code = (docId || "").trim();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing doc id" };
+  }
+
+  const key = getCompareSnapshotCacheKey(code);
   const now = Date.now();
   const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
   if (cached) {
@@ -578,15 +586,28 @@ export async function getPlayerToplistSnapshotByDocIdCached(
     clearSnapshotCache(key);
   }
 
-  const result = await getPlayerToplistSnapshotByDocId(docId);
-  if (result.ok) {
-    writeSnapshotCache(key, {
-      snapshot: result.snapshot,
-      fetchedAt: now,
-      expiresAt: now + ttlMs,
-    });
+  const existing = compareInFlight.get(code);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const result = await getPlayerToplistSnapshotByDocId(code);
+    if (result.ok) {
+      const expiresAt = typeof ttlMs === "number" && ttlMs > 0 ? now + ttlMs : nextFullHour(now);
+      writeSnapshotCache(key, {
+        snapshot: result.snapshot,
+        fetchedAt: now,
+        expiresAt,
+      });
+    }
+    return result;
+  })();
+
+  compareInFlight.set(code, promise);
+  try {
+    return await promise;
+  } finally {
+    compareInFlight.delete(code);
   }
-  return result;
 }
 
 export async function getLatestGuildToplistSnapshot(

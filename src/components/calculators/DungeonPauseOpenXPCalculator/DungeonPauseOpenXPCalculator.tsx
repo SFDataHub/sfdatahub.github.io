@@ -16,6 +16,8 @@ interface DungeonPauseOpenXPCalculatorProps {
 }
 
 const numberFmt = (n: number) => n.toLocaleString("en-US");
+const levelFromXp = (xp: number) => Math.round((xp / 1500000000) * 100) / 100;
+const levelFmt = (xp: number) => levelFromXp(xp).toFixed(2);
 
 function useInitialRanges() {
   const light: RangeMap = {};
@@ -124,6 +126,10 @@ function Panel({
           <span>Sum Total {title}</span>
           <span>{numberFmt(total)} XP</span>
         </div>
+        <div className={styles.footerLine}>
+          <span>Level</span>
+          <span>{levelFmt(total)}</span>
+        </div>
       </div>
     </div>
   );
@@ -223,6 +229,10 @@ export default function DungeonPauseOpenXPCalculator({
 
   return (
     <div className={styles.wrapper}>
+      <div className={styles.controls}>
+        <button className={styles.resetBtn} onClick={reset}>Reset</button>
+        <span className={styles.resetNote}>Resets all selections to defaults.</span>
+      </div>
       <Panel
         title="Light World"
         rows={dungeonPauseOpenXPData.light}
@@ -240,7 +250,6 @@ export default function DungeonPauseOpenXPCalculator({
       <div className={styles.panel}>
         <div className={styles.header}>
           <div className={styles.title}>Special Dungeons</div>
-          <button className={styles.resetBtn} onClick={reset}>RESET</button>
         </div>
 
         <table className={styles.table}>
@@ -273,8 +282,12 @@ export default function DungeonPauseOpenXPCalculator({
             <span>Total XP</span>
             <span>{numberFmt(totalXP)} XP</span>
           </div>
+          <div className={styles.footerLine}>
+            <span>Level</span>
+            <span>{levelFmt(totalXP)}</span>
+          </div>
           <div className={styles.note}>
-            Fülle die XP-Arrays in <code>src/lib/calculators/dungeonPauseOpenXP/data.ts</code>, dann rechnet es 1:1 wie im Sheet.
+            XP values are summed per selection and converted to level using the project formula.
           </div>
         </div>
       </div>

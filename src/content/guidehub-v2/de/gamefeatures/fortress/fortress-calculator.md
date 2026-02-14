@@ -5,6 +5,6 @@ createdAt: "2025-01-01"
 updatedAt: "2025-01-01"
 gallery: []
 ---
-Select your Laborers Quarter Level in the cell next to "Laborers Calc" to see the correct Build Time & Mushroom cost to skip!
+Waehle dein Arbeiterquartier-Level in der Zelle neben "Laborers Calc", um die korrekte Bauzeit und die Pilzkosten zum Ueberspringen zu sehen!
 
 [[embed:fortress-calculator]]

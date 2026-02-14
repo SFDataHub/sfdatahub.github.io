@@ -45,10 +45,6 @@ import HellevatorGuide from "./Hellevator/HellevatorGuide";
 /* Legendary Dungeon */
 import LegendaryGuideEpicsLegendaries from "./LegendaryDungeon/GuideEpicsLegendaries";
 
-/* Events */
-import EventList from "./Events/EventList";
-import EventCycle from "./Events/EventCycle";
-
 /* Calculators */
 import CalcFortress from "./Calculators/FortressCalculator";
 import CalcUnderworld from "./Calculators/UnderworldCalculator";
@@ -109,10 +105,6 @@ const SUB_MAP: Record<string, Record<string, Cmp>> = {
   },
   "legendary-dungeon": {
     "legendary-dungeon-guide-epics-legendaries": LegendaryGuideEpicsLegendaries,
-  },
-  events: {
-    "event-list": EventList,
-    "event-cycle": EventCycle,
   },
   calculators: {
     "fortress-calculator": CalcFortress,

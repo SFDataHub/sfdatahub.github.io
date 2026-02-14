@@ -122,6 +122,7 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
           <option value="main">Main</option>
           <option value="constitution">Constitution</option>
           <option value="sum">Base Stats</option>
+          <option value="statsDay">Stats/Day</option>
           <option value="level">Level</option>
           <option value="mine">Mine</option>
         </select>

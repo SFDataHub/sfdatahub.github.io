@@ -387,7 +387,7 @@
   "toplists": {
     "compareMonth": "Fortschritt seit",
     "compareOff": "Aus",
-    "compareMissingSnapshot": "Kein Snapshot für diesen Monat gefunden.",
+    "compareMissingSnapshot": "Keine Basisdaten für {{key}}.",
     "deltaNew": "NEU",
     "filters": {
       "guilds": {
@@ -555,6 +555,78 @@
     "shortDisclaimer": "SFDataHub ist ein inoffizielles, nicht-kommerzielles Fanprojekt. Alle Marken und Bilder gehören ihren jeweiligen Rechteinhabern.",
     "copyright": "© 2025 SFDataHub – Community-Projekt rund um Shakes & Fidget."
   },
+  "calculators": {
+    "gem": {
+      "title": "Edelstein-Rechner",
+      "inputs": {
+        "charLevel": {
+          "label": "Charakterlevel",
+          "placeholder": "z. B. 360"
+        },
+        "mineLevel": {
+          "label": "Minenlevel",
+          "placeholder": "z. B. 10"
+        },
+        "guildHok": {
+          "label": "Gilden-HoK",
+          "placeholder": "z. B. 840"
+        }
+      },
+      "gems": {
+        "normal": {
+          "label": "Normal",
+          "alt": "Normaler Edelstein"
+        },
+        "black": {
+          "label": "Schwarz",
+          "alt": "Schwarzer Edelstein"
+        },
+        "legendary": {
+          "label": "Legendaer",
+          "alt": "Legendaerer Edelstein"
+        }
+      },
+      "hint": {
+        "prefix": "Die Werte sind Schaetzwerte und geben das ",
+        "emphasis": "maximal Moegliche",
+        "suffix": " an, das du finden kannst. Tatsaechliche Ergebnisse koennen leicht abweichen."
+      }
+    },
+    "calculators": {
+      "fortress": {
+        "title": "Festung - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Gebaeude auswaehlen",
+          "l2Label": "L2 (Arbeiter)"
+        },
+        "table": {
+          "level": "Level",
+          "wood": "Holz",
+          "stone": "Stein",
+          "buildTime": "Bauzeit",
+          "buildTimeL2": "Bauzeit (L2)",
+          "skip": "Skip (Pilze)"
+        },
+        "hints": {
+          "l2Effect": "Hinweis: L2 gilt fuer alle Gebaeude (0-15 -> 0-75%). Skip basiert auf der L2-Zeit (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "woodcutter": "Holzfaeller",
+          "treasury": "Schatzkammer",
+          "smithy": "Schmiede",
+          "quarry": "Steinbruch",
+          "magetower": "Magierturm",
+          "laborersquarter": "Arbeiterquartier",
+          "gemmine": "Edelsteinmine",
+          "fortress": "Festung",
+          "fortifications": "Befestigung",
+          "barracks": "Kaserne",
+          "archery": "Bogenschuetzen",
+          "academy": "Akademie"
+        }
+      }
+    }
+  },
   "guides": {
     "v2": {
       "searchPlaceholder": "Guides suchen",
@@ -574,6 +646,3 @@
     }
   }
 }
-
-
-

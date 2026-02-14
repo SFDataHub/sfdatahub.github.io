@@ -9,8 +9,6 @@ gallery: []
 The Guide Hub collects strategy notes, calculators, and event checklists.
 
 ## Quick Links
-- Event List
-- Event Cycle
 - Hellevator Guide
 - Legendary Dungeon Guide
 

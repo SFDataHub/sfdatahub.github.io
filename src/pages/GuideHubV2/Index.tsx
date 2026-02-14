@@ -11,6 +11,10 @@ import { AMRuneBonusesTable } from "../GuideHub/GameFeatures/ArenaAM/AMRuneBonus
 import { PackageSkipOrderTable } from "../GuideHub/GameFeatures/Fortress/PackageSkipOrder";
 import FortressCalculator from "../GuideHub/Calculators/FortressCalculator";
 import UnderworldCalculator from "../GuideHub/Calculators/UnderworldCalculator";
+import { GemCalculator, type GemSimState } from "../../components/calculators/Gem";
+import { MaxItemStatsCalculator } from "../../components/guidehub/calculators/MaxItemStatsCalculator";
+import { UnderworldProPackSkipOrder } from "../../components/guidehub/calculators/UnderworldProPackSkipOrder";
+import DungeonPauseOpenXPCalculator from "../../components/calculators/DungeonPauseOpenXPCalculator";
 import HudBox from "../../components/ui/hud/box/HudBox";
 import InfographicsGallery from "./Infographics/InfographicsGallery";
 import styles from "./GuideHubV2.module.css";
@@ -201,6 +205,47 @@ const FortressRelatedButtons: React.FC = () => {
   );
 };
 
+const GEM_CACHE_KEY = "guidehub-v2:gem-calculator";
+
+const readGemCache = (): GemSimState | undefined => {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(GEM_CACHE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Partial<GemSimState> | null;
+    if (!parsed || typeof parsed !== "object") return undefined;
+    const { charLevel, mineLevel, guildHoKLevel } = parsed;
+    if (
+      typeof charLevel !== "number" ||
+      typeof mineLevel !== "number" ||
+      typeof guildHoKLevel !== "number"
+    ) {
+      return undefined;
+    }
+    return { charLevel, mineLevel, guildHoKLevel };
+  } catch {
+    return undefined;
+  }
+};
+
+const writeGemCache = (state: GemSimState) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GEM_CACHE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore storage write errors (private mode/quota/etc.)
+  }
+};
+
+const GuideHubV2GemCalculator: React.FC = () => {
+  const initialState = React.useMemo(() => readGemCache(), []);
+  const handleStateChange = React.useCallback((state: GemSimState) => {
+    writeGemCache(state);
+  }, []);
+
+  return <GemCalculator initialState={initialState} onStateChange={handleStateChange} />;
+};
+
 function buildGuideEntries(): GuideEntry[] {
   const entries: GuideEntry[] = [];
 
@@ -289,6 +334,22 @@ const GuideHubSidebar: React.FC<GuideHubSidebarProps> = ({
       const subBlocks = (cat.sub || []).map((subItem) => {
         const subMatches = catMatches || matchText(subItem.label);
         let leafBlocks: React.ReactNode[] = [];
+
+        if (!subItem.sub2 || subItem.sub2.length === 0) {
+          if (!subMatches && queryLower) return null;
+          return (
+            <button
+              key={`${cat.key}-${subItem.key}`}
+              className={`${styles.navItem} ${
+                tab === cat.key && sub === subItem.key && !sub2 ? styles.navItemActive : ""
+              }`}
+              onClick={() => onNavigateSub(cat.key, subItem.key)}
+              type="button"
+            >
+              {subItem.label}
+            </button>
+          );
+        }
 
         if (subItem.sub2 && subItem.sub2.length) {
           const hasDeeper = subItem.sub2.some((s2) => s2.sub2 && s2.sub2.length);
@@ -713,6 +774,10 @@ const GuideHubV2: React.FC = () => {
       "fortress-package-skip-order-table": PackageSkipOrderTable,
       "fortress-calculator": FortressCalculator,
       "underworld-calculator": UnderworldCalculator,
+      "gem-calculator": GuideHubV2GemCalculator,
+      "max-item-stats-calculator": MaxItemStatsCalculator,
+      "underworld-pro-package-skip-order": UnderworldProPackSkipOrder,
+      "dungeon-pause-open-xp-calculator": DungeonPauseOpenXPCalculator,
     } as const;
     const hasEmbeds = Object.keys(embedRegistry).some((key) =>
       doc.html.includes(`data-embed="${key}"`)
