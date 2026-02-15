@@ -1158,8 +1158,7 @@ function TableDataView({
             <thead>
               <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
                 <th style={{ padding: "8px 6px" }}>#</th>
-                <th style={{ padding: "8px 6px" }}>Flag</th>
-                <th style={{ padding: "8px 6px" }}>Delta Rank</th>
+                <th style={{ padding: "8px 6px" }}>Δ Rank</th>
                 <th style={{ padding: "8px 6px" }}>Server</th>
                 <th style={{ padding: "8px 6px" }}>Name</th>
                 <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
@@ -1227,7 +1226,6 @@ function TableDataView({
                   }}
                 >
                   <td style={{ padding: "8px 6px" }}>{i + 1}</td>
-                  <td style={{ padding: "8px 6px" }}>{r.flag ?? ""}</td>
                   <td style={{ padding: "8px 6px" }}>
                     {rankDeltaDisplay ? (
                       <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
@@ -1330,10 +1328,10 @@ function TableDataView({
                 );
               })}
               {playerLoading && enhancedRows.length === 0 && (
-                <tr><td colSpan={16} style={{ padding: 12 }}>Loading...</td></tr>
+                <tr><td colSpan={15} style={{ padding: 12 }}>Loading...</td></tr>
               )}
               {!playerLoading && !playerError && enhancedRows.length === 0 && (
-                <tr><td colSpan={16} style={{ padding: 12 }}>No results</td></tr>
+                <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
               )}
             </tbody>
           </table>

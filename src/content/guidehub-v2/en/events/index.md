@@ -1,8 +1,7 @@
 ﻿---
 title: "Events"
 category: "Events"
-createdAt: "2025-01-01"
-updatedAt: "2025-01-01"
+status: "work_in_progress"
 gallery: []
 ---
 ## Overview {#overview}

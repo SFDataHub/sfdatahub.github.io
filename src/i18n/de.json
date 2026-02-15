@@ -177,6 +177,71 @@
           "novenquadragintillion": "Novenquadragintillion"
         }
       }
+    },
+    "calculators": {
+      "fortress": {
+        "title": "Festung - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Gebaeude auswaehlen",
+          "l2Label": "L2 (Arbeiter)"
+        },
+        "table": {
+          "level": "Level",
+          "wood": "Holz",
+          "stone": "Stein",
+          "buildTime": "Bauzeit",
+          "buildTimeL2": "Bauzeit (L2)",
+          "skip": "Skip (Pilze)"
+        },
+        "hints": {
+          "l2Effect": "Hinweis: L2 gilt fuer alle Gebaeude (0-15 -> 0-75%). Skip basiert auf der L2-Zeit (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "woodcutter": "Holzfaeller",
+          "treasury": "Schatzkammer",
+          "smithy": "Schmiede",
+          "quarry": "Steinbruch",
+          "magetower": "Magierturm",
+          "laborersquarter": "Arbeiterquartier",
+          "gemmine": "Edelsteinmine",
+          "fortress": "Festung",
+          "fortifications": "Befestigung",
+          "barracks": "Kaserne",
+          "archery": "Bogenschuetzen",
+          "academy": "Akademie"
+        }
+      },
+      "underworld": {
+        "title": "Unterwelt - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Gebaeude auswaehlen",
+          "l2Label": "L2 (Arbeiter)"
+        },
+        "table": {
+          "level": "Level",
+          "soul": "Seelen",
+          "gold": "Gold",
+          "buildTime": "Bauzeit",
+          "buildTimeL2": "Bauzeit (L2)",
+          "skip": "Skip (Pilze)"
+        },
+        "empty": "Noch keine Daten fuer dieses Gebaeude.",
+        "hints": {
+          "l2Effect": "Hinweis: L2 gilt fuer alle Gebaeude (1-15 -> bis zu 75%). Skip basiert auf der L2-Zeit (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "uwgate": "Unterwelt-Tor",
+          "trollblock": "Trollblock",
+          "torturechamber": "Folterkammer",
+          "soulextractor": "Seelenextraktor",
+          "keeper": "Waechter",
+          "hearthofdarkn": "Herd der Finsternis",
+          "goldpit": "Goldgrube",
+          "goblinpit": "Goblin-Grube",
+          "gladiator": "Gladiator",
+          "adventuromatic": "Abenteuer-o-mat"
+        }
+      }
     }
   },
   "servers": {
@@ -625,6 +690,28 @@
           "academy": "Akademie"
         }
       }
+    }
+  },
+  "arenaManager": {
+    "links": {
+      "runeBonuses": "Runen-Boni",
+      "buildOrder": "Build Order"
+    },
+    "buildOrder": {
+      "title": "Arena Manager — Build Order",
+      "updated": "Zuletzt aktualisiert: {{date}}",
+      "body1": "Baue deine Attraktionen gemaess dem Bild unten fuer maximale Effizienz.",
+      "body2": "Das Aufwerten auf vollstaendiges Platin bei allen Attraktionen kostet dich {{mushrooms}}.",
+      "imageAlt": "Arena Manager Build Order",
+      "credit": "Dank an {{discord}}."
+    }
+  },
+  "guide": {
+    "status": {
+      "label": "Status",
+      "up_to_date": "Aktuell",
+      "work_in_progress": "In Arbeit",
+      "outdated": "Veraltet"
     }
   },
   "guides": {

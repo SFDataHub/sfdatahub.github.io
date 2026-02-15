@@ -6,7 +6,7 @@ import { categories } from "../../components/guidehub/config";
 import { guideAssetByKey } from "../../data/guidehub/assets";
 import guideHubLogo from "../../assets/logo_guidehub.png";
 import type { Lang } from "../../i18n";
-import { loadGuideMarkdown, type GuideSelection, type MarkdownDoc } from "./markdown";
+import { loadGuideMarkdown, type GuideSelection, type GuideStatus, type MarkdownDoc } from "./markdown";
 import { AMRuneBonusesTable } from "../GuideHub/GameFeatures/ArenaAM/AMRuneBonuses";
 import { PackageSkipOrderTable } from "../GuideHub/GameFeatures/Fortress/PackageSkipOrder";
 import FortressCalculator from "../GuideHub/Calculators/FortressCalculator";
@@ -96,7 +96,69 @@ const FortressLinkButtons: React.FC = () => {
   );
 };
 
+const UnderworldLinkButtons: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub2: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", "underworld");
+    next.set("sub2", sub2);
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("underworld-calculator")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Underworld Calculator</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("underworld-pro-package-skip-order")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Underworld Pro Package skip order</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
+const UnderworldProPackSkipOrderButton: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub2: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", "underworld");
+    next.set("sub2", sub2);
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("underworld-pro-package-skip-order")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Underworld Pro Package skip order</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
 const ArenaAMLinkButtons: React.FC = () => {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
 
   const openSub = (sub2: string) => {
@@ -115,7 +177,9 @@ const ArenaAMLinkButtons: React.FC = () => {
         onClick={() => openSub("am-rune-bonuses")}
       >
         <HudBox padding="md" hover className={styles.hudButtonBox}>
-          <span className={styles.hudButtonText}>Rune Bonuses</span>
+          <span className={styles.hudButtonText}>
+            {t("guidehub.arenaManager.links.runeBonuses")}
+          </span>
         </HudBox>
       </button>
       <button
@@ -124,7 +188,9 @@ const ArenaAMLinkButtons: React.FC = () => {
         onClick={() => openSub("am-build-order")}
       >
         <HudBox padding="md" hover className={styles.hudButtonBox}>
-          <span className={styles.hudButtonText}>Build Order</span>
+          <span className={styles.hudButtonText}>
+            {t("guidehub.arenaManager.links.buildOrder")}
+          </span>
         </HudBox>
       </button>
     </div>
@@ -300,6 +366,13 @@ function normalizeLang(value: string | undefined): Lang {
 }
 
 const MIN_LOADING_MS = 330;
+
+function resolveGuideStatus(status: GuideStatus | undefined): GuideStatus {
+  if (status === "up_to_date" || status === "outdated" || status === "work_in_progress") {
+    return status;
+  }
+  return "work_in_progress";
+}
 
 const GuideHubSidebar: React.FC<GuideHubSidebarProps> = ({
   tab,
@@ -736,6 +809,19 @@ const GuideHubV2: React.FC = () => {
   const markdownClass = isHome
     ? `${styles.markdown} ${styles.markdownHome}`
     : styles.markdown;
+  const status = resolveGuideStatus(doc?.frontmatter.status);
+  const statusText =
+    status === "up_to_date"
+      ? t("guide.status.up_to_date", { defaultValue: "Up to date" })
+      : status === "outdated"
+        ? t("guide.status.outdated", { defaultValue: "Outdated" })
+        : t("guide.status.work_in_progress", { defaultValue: "Work in progress" });
+  const statusClass =
+    status === "up_to_date"
+      ? styles.statusChipUpToDate
+      : status === "outdated"
+        ? styles.statusChipOutdated
+        : styles.statusChipWorkInProgress;
   const renderTocPanel = () => (
     <div className={styles.tocRow}>
       <div className={styles.tocLabel}>
@@ -770,12 +856,14 @@ const GuideHubV2: React.FC = () => {
       "arenaam-link-buttons": ArenaAMLinkButtons,
       "arenaam-related-buttons": ArenaAMRelatedButtons,
       "fortress-link-buttons": FortressLinkButtons,
+      "underworld-link-buttons": UnderworldLinkButtons,
       "fortress-related-buttons": FortressRelatedButtons,
       "fortress-package-skip-order-table": PackageSkipOrderTable,
       "fortress-calculator": FortressCalculator,
       "underworld-calculator": UnderworldCalculator,
       "gem-calculator": GuideHubV2GemCalculator,
       "max-item-stats-calculator": MaxItemStatsCalculator,
+      "underworld-pro-pack-link-button": UnderworldProPackSkipOrderButton,
       "underworld-pro-package-skip-order": UnderworldProPackSkipOrder,
       "dungeon-pause-open-xp-calculator": DungeonPauseOpenXPCalculator,
     } as const;
@@ -971,15 +1059,9 @@ const GuideHubV2: React.FC = () => {
                     <div className={styles.metaRow}>
                       <span>
                         <span className={styles.metaLabel}>
-                          {t("guides.v2.createdLabel", { defaultValue: "Created" })}:
+                          {t("guide.status.label", { defaultValue: "Status" })}:
                         </span>
-                        {doc.frontmatter.createdAt || "-"}
-                      </span>
-                      <span>
-                        <span className={styles.metaLabel}>
-                          {t("guides.v2.updatedLabel", { defaultValue: "Last edited" })}:
-                        </span>
-                        {doc.frontmatter.updatedAt || "-"}
+                        <span className={`${styles.statusChip} ${statusClass}`}>{statusText}</span>
                       </span>
                     </div>
                   </div>

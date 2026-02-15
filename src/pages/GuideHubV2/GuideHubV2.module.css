@@ -298,6 +298,36 @@
   margin-right: 4px;
 }
 
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  background: rgba(12, 26, 46, 0.6);
+}
+
+.statusChipUpToDate {
+  color: #7ee08a;
+  border-color: rgba(126, 224, 138, 0.6);
+  background: rgba(22, 68, 36, 0.35);
+}
+
+.statusChipWorkInProgress {
+  color: #f3c56b;
+  border-color: rgba(243, 197, 107, 0.6);
+  background: rgba(74, 58, 18, 0.35);
+}
+
+.statusChipOutdated {
+  color: #ff9a9a;
+  border-color: rgba(255, 154, 154, 0.6);
+  background: rgba(86, 30, 30, 0.35);
+}
+
 .categoryPill {
   margin-left: auto;
   background: linear-gradient(135deg, rgba(92, 139, 198, 0.75), rgba(127, 178, 255, 0.85));

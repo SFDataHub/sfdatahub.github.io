@@ -1,11 +1,8 @@
-﻿---
-title: "AM Rune bonuses"
+---
+title: "AM Runen-Boni"
 category: "Game Features"
-createdAt: "2025-01-01"
-updatedAt: "2025-01-01"
+status: "work_in_progress"
 gallery: []
 ---
 
 [[embed:am-rune-bonuses-table]]
-
-

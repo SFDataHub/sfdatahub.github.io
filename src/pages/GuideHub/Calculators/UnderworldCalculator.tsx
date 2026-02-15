@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./UnderworldCalculator.module.css";
 
 import { gdrive } from "../../../lib/urls";
@@ -22,6 +23,7 @@ const UW_GIF_KEYS: string[] = [
 ];
 
 const UnderworldCalculator: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("hearthofdarkngif");
   const [l2, setL2] = useState<number>(1); // 1–15
 
@@ -37,6 +39,7 @@ const UnderworldCalculator: React.FC = () => {
     () => (GIFKEY_TO_BUILDING_KEY[activeTab] ?? "hearthofdarkn") as BuildingKey,
     [activeTab]
   );
+  const activeBuildingLabel = t(`guidehub.calculators.underworld.buildings.${buildingKey}`);
 
   // Tabellenzeilen berechnen (inkl. L2 & Skip)
   const rows = useMemo(() => computeRows(buildingKey, l2), [buildingKey, l2]);
@@ -45,7 +48,9 @@ const UnderworldCalculator: React.FC = () => {
     <div className={styles.uwCalc}>
       {/* Building-Auswahl */}
       <div className="tabs">
-        <span className="tabSelectLabel">Select building</span>
+        <span className="tabSelectLabel">
+          {t("guidehub.calculators.underworld.inputs.buildingSelectLabel")}
+        </span>
         <select
           className="tabSelect"
           value={activeTab}
@@ -53,7 +58,9 @@ const UnderworldCalculator: React.FC = () => {
         >
           {UW_GIF_KEYS.map((key) => (
             <option key={key} value={key}>
-              {key.replace(/gif$/i, "")}
+              {t(
+                `guidehub.calculators.underworld.buildings.${GIFKEY_TO_BUILDING_KEY[key] ?? "hearthofdarkn"}`
+              )}
             </option>
           ))}
         </select>
@@ -62,16 +69,18 @@ const UnderworldCalculator: React.FC = () => {
       {/* GIF links | Panel/Tabelle rechts */}
       <div className="mediaRow">
         <div className="media">
-          {mediaSrc ? <img src={mediaSrc} alt={activeTab} /> : null}
+          {mediaSrc ? <img src={mediaSrc} alt={activeBuildingLabel} /> : null}
         </div>
 
         <div className={styles.panel}>
           {/* Panel-Kopf mit Titel + L2 */}
           <div className={styles.panelHead}>
-            <div className={styles.panelTitle}>Underworld — {buildingKey}</div>
+            <div className={styles.panelTitle}>
+              {t("guidehub.calculators.underworld.title", { building: activeBuildingLabel })}
+            </div>
             <div className={styles.controls}>
               <label htmlFor="uw-l2" className={styles.ctrlLabel}>
-                L2 (Laborers)
+                {t("guidehub.calculators.underworld.inputs.l2Label")}
               </label>
               <select
                 id="uw-l2"
@@ -93,19 +102,19 @@ const UnderworldCalculator: React.FC = () => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>Level</th>
-                  <th className={styles.th}>Soul</th>
-                  <th className={styles.th}>Gold</th>
-                  <th className={styles.th}>Build Time</th>
-                  <th className={styles.th}>Build Time (L2)</th>
-                  <th className={styles.th}>Skip (Mushr.)</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.level")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.soul")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.gold")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.buildTime")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.buildTimeL2")}</th>
+                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.skip")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr className={styles.row}>
                     <td className={styles.td} colSpan={6}>
-                      No data for this building yet.
+                      {t("guidehub.calculators.underworld.empty")}
                     </td>
                   </tr>
                 ) : (
@@ -124,10 +133,7 @@ const UnderworldCalculator: React.FC = () => {
             </table>
           </div>
 
-          <p className={styles.note}>
-            Hinweis: L2 wirkt für alle Buildings (0–15 → 0–75%). Skip basiert auf
-            der L2-Zeit (ceil(ceil(sec/60)/10)).
-          </p>
+          <p className={styles.note}>{t("guidehub.calculators.underworld.hints.l2Effect")}</p>
         </div>
       </div>
     </div>

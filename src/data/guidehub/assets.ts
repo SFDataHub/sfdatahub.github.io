@@ -146,10 +146,34 @@ const DRIVE_BY_KEY: Record<string, string> = {
   // Calendar
   calendarrewards: "1K9bm0OUtW0_QUg5i9q40N0slV6kg_iTd",
   calendarskip: "1jOgaf09diVUyCdXWdFoc-kXj4mUHejo7",
-  //Pets
+  // Pets
   elementaladvantages: "1wuV_5LJCMKVWA9FkCVILcQ_xF6GS9NM3",
   petsp2w: "1Smy-lLOCHFd_n4qqhy_mQh1cQEfIfYfW",
   petsf2p: "1_LfcLaZ9Yte_55iO0jl40KO8ZIvOyzjd",
+  // Mushroom Packs
+  normalpack: "",
+  leveluppack: "1U5IfT1x471-eiA20GIkeVddLRp5z1-C3",
+  birthdaysale: "1tnGr2TqWZ8-mbfB_FLA81cmawN6MHM2U",
+  blackfridaysale: "151Vt48Snv14yaemu2br4a0p5ZJOwoBAJ",
+  christmassale: "1YtjNmFDSdoZOMP7pr4u8Hpq-ngUoZSnL",
+  communitysale: "1IcqlVQSmUmTjK5d-3uDSgWzfMdSoYXOz",
+  eastersale: "1VjRJ5FYsPMH8shHO3ygFy8o7OW7Ok2s9",
+  fallsale: "1WEBrcC16kKEuDqVrNN1_30YE-mvbLKRL",
+  luckysale: "1ghdb7rzBd9IwfIThrZkWoBu_cJUu52Y8",
+  newyearsale: "1oqiVjh189TymQOJ6rFgplKX5d19F8dRQ",
+  oktoberfestsale: "15_EJDighENIzrGyWc_G-zoS90hf21I2O",
+  prechristmassale: "1oF2EBqkCQoIpbea4DbWtBwVjiU0CQ3qH",
+  soulfulsale: "1QXKH1xPEzpA1vPBL4KVYXs3Wz61Xwaoh",
+  summersale: "1QXKH1xPEzpA1vPBL4KVYXs3Wz61Xwaoh",
+  wintersale: "1dQgJjNPUwhYXFXe_D3ECSCZVxQ-tI4Wi",
+  worldbosssale: "1PAtXeA1xucL-NQdEpl4c7koesaN6o4n9",
+  // Hydra
+  hydrastages: "1NosDzLmsNFLkTOuzpEKV0wjPo9TbMpMG",
+  //Guild
+  guildskillcost: "18Bx5BeItjYGP3cyNhvJ-Rwr3mfqNQkpc",
+  //Progress
+  levelzweibiszweihundert: "1xisisp1_yooyzPpjAdUEEi_0p284CtCz",
+  levelzweihunzehnbissiebenhun: "1xisisp1_yooyzPpjAdUEEi_0p284CtCz",
   //Gems
   luckbig: "1iYlE4rDU6rg3MHKG0vvwwb9wskdmu8-1",
   blackbig: "14bA3CU46YkT4um1tHmFoOGLp8RZE_v0s",

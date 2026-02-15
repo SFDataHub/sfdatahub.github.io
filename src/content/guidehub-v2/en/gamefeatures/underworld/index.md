@@ -1,10 +1,12 @@
 ﻿---
 title: "Underworld"
 category: "Game Features"
-createdAt: "2025-01-01"
-updatedAt: "2025-01-01"
+status: "work_in_progress"
 gallery: []
 ---
+
+[[embed:underworld-link-buttons]]
+
 ## Overview {#overview}
 
 Placeholder overview for the Underworld section.
