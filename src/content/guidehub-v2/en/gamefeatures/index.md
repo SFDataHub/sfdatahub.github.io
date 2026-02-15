@@ -1,10 +1,8 @@
 ﻿---
 title: "Game Features"
 category: "Game Features"
-createdAt: "2025-01-01"
-updatedAt: "2025-01-01"
+status: "work_in_progress"
 gallery: []
-status: work in progress
 ---
 ## Overview {#overview}
 

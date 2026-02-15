@@ -3,10 +3,11 @@ import type { Lang } from "../../i18n";
 export type Frontmatter = {
   title: string;
   category: string;
-  createdAt: string;
-  updatedAt: string;
+  status: GuideStatus;
   gallery: string[];
 };
+
+export type GuideStatus = "up_to_date" | "work_in_progress" | "outdated";
 
 export type TocItem = { id: string; text: string };
 
@@ -34,10 +35,13 @@ const CACHE = new Map<string, Promise<MarkdownDoc | null>>();
 const EMPTY_FRONTMATTER: Frontmatter = {
   title: "",
   category: "",
-  createdAt: "",
-  updatedAt: "",
+  status: "work_in_progress",
   gallery: [],
 };
+
+function isGuideStatus(value: string): value is GuideStatus {
+  return value === "up_to_date" || value === "work_in_progress" || value === "outdated";
+}
 
 function stripQuotes(value: string): string {
   const trimmed = value.trim();
@@ -94,7 +98,15 @@ function parseFrontmatter(raw: string): { frontmatter: Frontmatter; body: string
       continue;
     }
 
-    if (key === "title" || key === "category" || key === "createdAt" || key === "updatedAt") {
+    if (key === "status") {
+      const cleaned = stripQuotes(value);
+      if (isGuideStatus(cleaned)) {
+        frontmatter.status = cleaned;
+      }
+      continue;
+    }
+
+    if (key === "title" || key === "category") {
       frontmatter[key] = stripQuotes(value);
     }
   }

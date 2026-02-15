@@ -177,6 +177,71 @@
           "novenquadragintillion": "Novenquadragintillion"
         }
       }
+    },
+    "calculators": {
+      "fortress": {
+        "title": "Fortress - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Select building",
+          "l2Label": "L2 (Laborers)"
+        },
+        "table": {
+          "level": "Level",
+          "wood": "Wood",
+          "stone": "Stone",
+          "buildTime": "Build Time",
+          "buildTimeL2": "Build Time (L2)",
+          "skip": "Skip (Mushr.)"
+        },
+        "hints": {
+          "l2Effect": "Note: L2 applies to all buildings (0-15 -> 0-75%). Skip is based on the L2 time (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "woodcutter": "Woodcutter",
+          "treasury": "Treasury",
+          "smithy": "Smithy",
+          "quarry": "Quarry",
+          "magetower": "Mage Tower",
+          "laborersquarter": "Laborers Quarters",
+          "gemmine": "Gem Mine",
+          "fortress": "Fortress",
+          "fortifications": "Fortification",
+          "barracks": "Barracks",
+          "archery": "Archery",
+          "academy": "Academy"
+        }
+      },
+      "underworld": {
+        "title": "Underworld - {{building}}",
+        "inputs": {
+          "buildingSelectLabel": "Select building",
+          "l2Label": "L2 (Laborers)"
+        },
+        "table": {
+          "level": "Level",
+          "soul": "Soul",
+          "gold": "Gold",
+          "buildTime": "Build Time",
+          "buildTimeL2": "Build Time (L2)",
+          "skip": "Skip (Mushr.)"
+        },
+        "empty": "No data for this building yet.",
+        "hints": {
+          "l2Effect": "Note: L2 applies to all buildings (1-15 -> up to 75%). Skip is based on the L2 time (ceil(ceil(sec/60)/10))."
+        },
+        "buildings": {
+          "uwgate": "Underworld Gate",
+          "trollblock": "Troll Block",
+          "torturechamber": "Torture Chamber",
+          "soulextractor": "Soul Extractor",
+          "keeper": "Keeper",
+          "hearthofdarkn": "Hearth of Darkness",
+          "goldpit": "Gold Pit",
+          "goblinpit": "Goblin Pit",
+          "gladiator": "Gladiator",
+          "adventuromatic": "Adventuromatic"
+        }
+      }
     }
   },
   "servers": {
@@ -624,6 +689,28 @@
           "academy": "Academy"
         }
       }
+    }
+  },
+  "arenaManager": {
+    "links": {
+      "runeBonuses": "Rune Bonuses",
+      "buildOrder": "Build Order"
+    },
+    "buildOrder": {
+      "title": "Arena Manager — Build Order",
+      "updated": "Last updated: {{date}}",
+      "body1": "Build your Attractions according to the picture below for maximum efficiency.",
+      "body2": "Upgrading to full Platinum on all Attractions will cost you {{mushrooms}}.",
+      "imageAlt": "Arena Manager build order",
+      "credit": "Credit to {{discord}}."
+    }
+  },
+  "guide": {
+    "status": {
+      "label": "Status",
+      "up_to_date": "Up to date",
+      "work_in_progress": "Work in progress",
+      "outdated": "Outdated"
     }
   },
   "guides": {

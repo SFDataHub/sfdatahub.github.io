@@ -137,13 +137,6 @@ export const categories: Category[] = [
     side: "right",
     sub: [], // innerhalb der Seite per Dropdown
   },
-  {
-    key: "class-book",
-    label: "Class book",
-    to: "/guidehub?tab=class-book",
-    side: "right",
-    sub: [],
-  },
 
   // DUNGEONS als eigene Hauptkategorie (dein Wunsch)
   
