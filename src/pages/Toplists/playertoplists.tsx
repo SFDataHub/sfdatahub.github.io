@@ -335,7 +335,7 @@ const sortToplistRows = (rows: FirestoreToplistPlayerRow[], sort: SortSpec) => {
         result = compareNumber(a.con, b.con);
         break;
       case "sum":
-        result = compareNumber(a.sum, b.sum);
+        result = compareNumber((a as any)._calculatedSum, (b as any)._calculatedSum);
         break;
       case "statsDay":
         result = compareNumber((a as any)._statsPerDay, (b as any)._statsPerDay);
@@ -1055,7 +1055,14 @@ function TableDataView({
       const mainRatio = deriveRatioMain(row.main, row.con);
       const currentMatch = currentRowByKey.get(buildCompareKey(row));
       const stats = currentMatch ? computeStatsDay(currentMatch, row) : { days: null, perDay: null };
-      return { ...row, _ratioMain: mainRatio, _statsPerDay: stats.perDay, _statsDays: stats.days } as any;
+      const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
+      return {
+        ...row,
+        _ratioMain: mainRatio,
+        _statsPerDay: stats.perDay,
+        _statsDays: stats.days,
+        _calculatedSum: calculatedSum,
+      } as any;
     });
 
     rows = filterToplistRows(rows, filters);
@@ -1298,7 +1305,7 @@ function TableDataView({
                 const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
                 const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
                 const mineTone = getMineTone(decor?.mineTier);
-                const calculatedSum = (r.main ?? 0) + (r.con ?? 0);
+                const calculatedSum = (r as any)._calculatedSum ?? 0;
                 const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
                   if (!showCompare) return null;
                   if (missing) {

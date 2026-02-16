@@ -421,7 +421,8 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
 
     rows = rows.map((row) => {
       const { label, mainRatio } = deriveRatio(row.main, row.con);
-      return { ...row, ratio: label, _ratioLabel: label, _ratioMain: mainRatio } as any;
+      const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
+      return { ...row, ratio: label, _ratioLabel: label, _ratioMain: mainRatio, _calculatedSum: calculatedSum } as any;
     });
 
     const serverFilter = normalizedServers;
@@ -490,7 +491,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
           result = compareNumber(a.con, b.con);
           break;
         case "sum":
-          result = compareNumber(a.sum, b.sum);
+          result = compareNumber((a as any)._calculatedSum, (b as any)._calculatedSum);
           break;
         case "ratio":
           result = compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
