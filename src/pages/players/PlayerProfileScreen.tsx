@@ -26,6 +26,7 @@ import {
 import { toDriveThumbProxy } from "../../lib/urls";
 import { iconForClassName } from "../../data/classes";
 import { db } from "../../lib/firebase";
+import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
 import {
   beginReadScope,
   endReadScope,
@@ -38,8 +39,9 @@ import "./player-profile.css";
 const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
 type TabKey = (typeof TABS)[number];
 
-const PROFILE_CACHE_PREFIX = "player-profile-cache:";
-const PROFILE_CACHE_TTL_MS = 15 * 60 * 1000;
+const PROFILE_CACHE_PREFIX = "sf_profile_player__";
+const PROFILE_SERVER_INDEX_KEY = "sf_profile_player_server_index";
+const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
 const CHARTS_CACHE_PREFIX = "playerProfile:charts:monthly3:";
 const CHARTS_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CHARTS_CACHE_VERSION = 3;
@@ -116,42 +118,44 @@ export default function PlayerProfileScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    const scope: FirestoreTraceScope = beginReadScope("PlayerProfile:load");
 
     async function load() {
       setLoading(true);
       setErr(null);
-      const cacheKey = `${PROFILE_CACHE_PREFIX}${playerId}`;
+      const id = (playerId || "").trim();
 
-      const loadFromCache = () => {
-        try {
-          const raw = typeof window !== "undefined" ? window.localStorage.getItem(cacheKey) : null;
-          if (!raw) return null;
-          const parsed = JSON.parse(raw);
-          if (!parsed?.data || typeof parsed.timestamp !== "number") return null;
-          const isFresh = Date.now() - parsed.timestamp < PROFILE_CACHE_TTL_MS;
-          if (!isFresh) return null;
-          return {
-            data: parsed.data as PlayerSnapshot,
-            timestamp: parsed.timestamp as number,
-            version: typeof parsed.version === "number" ? parsed.version : null,
-          };
-        } catch {
-          return null;
-        }
-      };
-
-      const cached = loadFromCache();
-      if (cached) {
-        setSnapshot(cached.data);
-        endReadScope(scope);
+      if (!id) {
+        setSnapshot(null);
+        setErr("Kein Spieler ausgewählt.");
         setLoading(false);
         return;
       }
-      try {
-        const id = (playerId || "").trim();
-        if (!id) throw new Error("Kein Spieler ausgewählt.");
 
+      const readServerIndex = (): Record<string, string> => {
+        if (typeof window === "undefined") return {};
+        try {
+          const raw = window.localStorage.getItem(PROFILE_SERVER_INDEX_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+        } catch {
+          return {};
+        }
+      };
+
+      const cachedServer = readServerIndex()[id];
+      const cacheKey = cachedServer ? `${PROFILE_CACHE_PREFIX}${cachedServer}__${id}` : null;
+      if (cacheKey) {
+        const cached = readTtlCache(cacheKey, PROFILE_CACHE_TTL_MS);
+        if (cached && typeof cached === "object") {
+          setSnapshot(cached as PlayerSnapshot);
+          setLoading(false);
+          return;
+        }
+      }
+      let scope: FirestoreTraceScope = null;
+      try {
+        scope = beginReadScope("PlayerProfile:load");
         const ref = doc(db, `players/${id}/latest/latest`);
         const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
         if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
@@ -247,14 +251,16 @@ export default function PlayerProfileScreen() {
 
         if (typeof window !== "undefined") {
           try {
-            window.localStorage.setItem(
-              cacheKey,
-              JSON.stringify({
-                data: nextSnapshot,
-                timestamp: Date.now(),
-                version: timestampSeconds ?? null,
-              }),
-            );
+            const normalizedServer = String(nextSnapshot.server ?? "")
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "");
+            const cacheServer = normalizedServer || "unknown";
+            const nextCacheKey = `${PROFILE_CACHE_PREFIX}${cacheServer}__${id}`;
+            const index = readServerIndex();
+            index[id] = cacheServer;
+            writeTtlCache(nextCacheKey, nextSnapshot);
+            window.localStorage.setItem(PROFILE_SERVER_INDEX_KEY, JSON.stringify(index));
           } catch {
             // ignore cache write failures
           }

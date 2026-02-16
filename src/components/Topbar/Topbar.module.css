@@ -113,6 +113,22 @@
   font-weight: 600;
 }
 
+.gameLinkButton{
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--btn);
+  border: 0;
+  font-weight: 600;
+  transition: transform .12s ease, filter .12s ease;
+}
+.gameLinkButton:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+.gameLinkButton:active{
+  transform: none;
+}
+
 /* Upload-Button */
 .upload{
   display: inline-flex;

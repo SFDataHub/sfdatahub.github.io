@@ -113,11 +113,7 @@ export default function RootLayout() {
   );
 
   const aboutParagraphs = t("footer.about.body").split("\n\n");
-  const legalLinks = [
-    { key: "tos", to: "/playground/legal/tos", label: t("help.sections.legal.items.tos", { defaultValue: "Terms of Service (ToS)" }) },
-    { key: "privacy", to: "/playground/legal/tos", label: t("help.sections.legal.items.privacy", { defaultValue: "Privacy Policy" }) },
-    { key: "imprint", to: "/help", label: t("help.sections.legal.items.imprint", { defaultValue: "Imprint / Contact" }) },
-  ];
+  const visibleLegalLinks: Array<{ key: string; to: string; label: string }> = [];
   const openNavLabel = t("nav.open", { defaultValue: "Open navigation" });
   const sidebarState = isMobile ? "collapsed" : (isOpen ? "expanded" : "collapsed");
 
@@ -196,7 +192,7 @@ export default function RootLayout() {
                   <div>{t("footer.shortDisclaimer", { defaultValue: "SFDataHub is an unofficial, non-commercial fan project. All trademarks and images belong to their respective owners." })}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-[13px]" style={{ color: "#9EC7FF" }}>
-                  {legalLinks.map((link) => (
+                  {visibleLegalLinks.map((link) => (
                     <Link key={link.key} to={link.to} className="underline hover:no-underline">
                       {link.label}
                     </Link>

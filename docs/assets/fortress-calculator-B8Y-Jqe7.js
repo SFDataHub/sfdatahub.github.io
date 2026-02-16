@@ -1,0 +1,10 @@
+const r=`\uFEFF---\r
+title: "Fortress Calculator"\r
+category: "Game Features"\r
+status: "up_to_date"\r
+gallery: []\r
+---\r
+Select your Laborers Quarter Level in the cell next to "Laborers Calc" to see the correct Build Time & Mushroom cost to skip!\r
+\r
+[[embed:fortress-calculator]]\r
+`;export{r as default};

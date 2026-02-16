@@ -1,7 +1,7 @@
 ---
 title: "Fortress attack duplication guide"
 category: "Progression"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
 ## Uebersicht {#overview}

@@ -95,6 +95,10 @@
   },
   "guidehub": {
     "arenaManager": {
+      "links": {
+        "runeBonuses": "Rune Bonuses",
+        "buildOrder": "Build Order"
+      },
       "amRuneBonuses": {
         "description": "Complete overview of Arena Manager runes and their bonus values. Grouped by tier; max, achievements, and breakpoints are highlighted.",
         "searchPlaceholder": "Search (e.g., thousand, E34, x60)...",
@@ -183,14 +187,14 @@
         "title": "Fortress - {{building}}",
         "inputs": {
           "buildingSelectLabel": "Select building",
-          "l2Label": "L2 (Laborers)"
+          "l2Label": "Laborers Quarter"
         },
         "table": {
           "level": "Level",
           "wood": "Wood",
           "stone": "Stone",
           "buildTime": "Build Time",
-          "buildTimeL2": "Build Time (L2)",
+          "buildTimeL2": "Build Time",
           "skip": "Skip (Mushr.)"
         },
         "hints": {
@@ -215,14 +219,14 @@
         "title": "Underworld - {{building}}",
         "inputs": {
           "buildingSelectLabel": "Select building",
-          "l2Label": "L2 (Laborers)"
+          "l2Label": "Laborers Quarter"
         },
         "table": {
           "level": "Level",
           "soul": "Soul",
           "gold": "Gold",
           "buildTime": "Build Time",
-          "buildTimeL2": "Build Time (L2)",
+          "buildTimeL2": "Build Time",
           "skip": "Skip (Mushr.)"
         },
         "empty": "No data for this building yet.",
@@ -431,6 +435,7 @@
   "topbar": {
     "quickAccess": "Quick access",
     "upload": "Upload scan",
+    "officialGameSite": "Visit the official game website",
     "search": "Search /",
     "settings": "Settings",
     "profile": "Profile",

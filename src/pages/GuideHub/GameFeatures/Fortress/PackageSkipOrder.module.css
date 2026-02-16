@@ -115,3 +115,56 @@
     width: 100%;
   }
 }
+
+/* Underworld Pro table style (GuideHub v2 embed) */
+.uwWrap {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.uwCard {
+  width: min(980px, 100%);
+  background: rgba(8, 16, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 24px;
+  color: var(--title, #f5f9ff);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.uwTitle {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.uwTableWrap {
+  overflow-x: auto;
+}
+
+.uwTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.uwTh,
+.uwTd {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.uwTh {
+  color: var(--text-soft, #b0c4d9);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.uwTdNumber {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,11 +1,11 @@
 ﻿---
 title: "First Weekend Guide"
 category: "Progression"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
 ## Overview {#overview}
-
+***
 ## Preparation before launch														
 - Pre-register your account early to start collecting Twitch drops.														
 - Collect drops a few weeks before the server opens, but only grab the ones that expire soon (7 days after the Dropy Cycle ends). Save rewards like stone/wood packages until your fortress is built up. Remember that you can stack multiple Drop Campaigns without collecting them first. Hold onto potion drops until you hit level 32 to get the big potion.Resources from Twitch Drops generate as soon as you hit "claim" on Twitch.														
@@ -14,7 +14,7 @@ gallery: []
 - Pre-purchase the Starter Pack to avoid transaction issues at server launch.														
 - On day 1 and 2, your main limitation is the 300 thirst, so use it wisely.														
 - Heavy shroomer level goals: You can aim for level 69 on day 1, level 90-125 on day 2 (depending on your class), and try for level 200-210 on day 3, especially if you unlock the underworld.														
-______________________________
+***
 ## Day 1
 
 ### Level 1-3																
@@ -50,14 +50,14 @@ ______________________________
 
 ### Level 25+
 - After unlocking the fortress, buy the Fortress Package and upgrade according to the guide here:
-[[embed:fortress-link-buttons]]
+[[embed:fortress-package-skip-order-button]]
 - Be sure to leave your Gem Mine on Level 1 and Wall on Level 0 unless specifically otherwise instructed!
 - Farm some Scrapbook percentage and use gold to upgrade your guild skills.																
 - If you're stopping here for day 1, finish your arena fights and spin the Wheel of Fortune. If you're pushing further, save the spins for later.																
 																
 ### Congratulations!																
 If you're playing casually, this is a good spot to end day 1. If you want to keep pushing, follow the day 2 guide.																
-______________________________																
+***															
 ## Day 2
 
 ### Level 25-50																
@@ -79,7 +79,6 @@ ______________________________
 - Upgrade your guild skills to 10/10 and keep improving your Hall of Knight to enhance guild and personal gems.																
 																
 ### Level 75 is a good place to stop on day 2, since you unlock pets. Use any remaining thirst to collect missing pets. If you want to push further, continue with day 3.																
-______________________________
 ***
 ## Day 3
 

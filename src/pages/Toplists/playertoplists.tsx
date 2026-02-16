@@ -47,6 +47,74 @@ const normalizeCompareServerKey = (value: string) => {
 
 const buildCompareDocId = (serverKey: string, month: string) =>
   `${normalizeCompareServerKey(serverKey)}__${month}`;
+type CompareSnapshotScope = "players" | "guilds";
+type CompareSnapshotState = {
+  rows: FirestoreToplistPlayerRow[];
+  baselineServers: string[];
+  missingServers: string[];
+  error: string | null;
+};
+
+const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
+
+const normalizeCompareSnapshotServers = (servers: string[]) => {
+  const set = new Set<string>();
+  servers.forEach((server) => {
+    const normalized = normalizeCompareServerKey(server).trim().toLowerCase();
+    if (normalized) set.add(normalized);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+};
+
+const buildCompareSnapshotCacheKey = ({
+  scope,
+  servers,
+  month,
+  mode,
+}: {
+  scope: CompareSnapshotScope;
+  servers: string[];
+  month: string;
+  mode?: string;
+}) => {
+  const monthKey = String(month ?? "").trim();
+  const serversKey = normalizeCompareSnapshotServers(servers).join("+");
+  const modeKey = String(mode ?? "").trim();
+  const modeSuffix = modeKey ? `__${modeKey.toLowerCase()}` : "";
+  return `${COMPARE_SNAPSHOT_CACHE_PREFIX}__${scope}__${serversKey}__${monthKey}${modeSuffix}`;
+};
+
+const readCompareSnapshotCache = (key: string): CompareSnapshotState | null => {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const maybe = parsed as Partial<CompareSnapshotState>;
+    if (!Array.isArray(maybe.rows)) return null;
+    if (!Array.isArray(maybe.baselineServers)) return null;
+    if (!Array.isArray(maybe.missingServers)) return null;
+    if (maybe.error != null && typeof maybe.error !== "string") return null;
+    return {
+      rows: maybe.rows as FirestoreToplistPlayerRow[],
+      baselineServers: maybe.baselineServers.map((server) => String(server || "").trim()).filter(Boolean),
+      missingServers: maybe.missingServers.map((server) => String(server || "").trim()).filter(Boolean),
+      error: maybe.error ?? null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage write errors (quota/privacy mode)
+  }
+};
 const normalizeClassList = (list: string[]) => {
   const set = new Set<string>();
   list.forEach((entry) => {
@@ -743,8 +811,11 @@ function TableDataView({
   // Load monthly snapshot(s) for comparison
   useEffect(() => {
     let cancelled = false;
+    const normalizedCompareMonth = String(compareMonth ?? "").trim();
+    const compareDisabled =
+      !normalizedCompareMonth || normalizedCompareMonth.toLowerCase() === "off";
 
-    if (!compareMonth) {
+    if (compareDisabled) {
       setCompareState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
       return () => {
         cancelled = true;
@@ -758,7 +829,22 @@ function TableDataView({
       };
     }
 
-    const docIds = compareServers.map((s) => buildCompareDocId(s, compareMonth));
+    const docIds = compareServers.map((s) => buildCompareDocId(s, normalizedCompareMonth));
+    const compareCacheKey = buildCompareSnapshotCacheKey({
+      scope: "players",
+      servers: compareServers,
+      month: normalizedCompareMonth,
+    });
+    const cachedCompareState = readCompareSnapshotCache(compareCacheKey);
+    if (cachedCompareState) {
+      setCompareState({
+        ...cachedCompareState,
+        loading: false,
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const mergeSnapshots = (snapshots: FirestoreLatestToplistSnapshot[]) => {
       const mergedRows: FirestoreToplistPlayerRow[] = [];
@@ -813,13 +899,22 @@ function TableDataView({
         ? t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
         : (firstErrorDetail ?? firstErrorCode ?? null);
 
-      setCompareState({
+      const nextState = {
         rows: mergedRows,
         loading: false,
         baselineServers,
         missingServers,
         error: errorMsg,
-      });
+      };
+      setCompareState(nextState);
+      if (!missingServers.length) {
+        writeCompareSnapshotCache(compareCacheKey, {
+          rows: nextState.rows,
+          baselineServers: nextState.baselineServers,
+          missingServers: [],
+          error: null,
+        });
+      }
     })().catch((err) => {
       if (cancelled) return;
       const missingKey = docIds.join(", ");

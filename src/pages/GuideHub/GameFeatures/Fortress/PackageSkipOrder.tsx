@@ -2,60 +2,89 @@
 import React from "react";
 import styles from "./PackageSkipOrder.module.css";
 
-export function PackageSkipOrderTable() {
-  return (
-    <section className={styles.tableSection}>
-      <h3 className={styles.sectionTitle}>Fortress Build Order</h3>
-      <table className={styles.table}>
+type PackageSkipOrderTableVariant = "guidehub" | "underworld";
+
+export function PackageSkipOrderTable({
+  variant = "guidehub",
+}: {
+  variant?: PackageSkipOrderTableVariant;
+}) {
+  const isUnderworld = variant === "underworld";
+  const thClass = isUnderworld ? styles.uwTh : undefined;
+  const thNumberClass = isUnderworld ? `${styles.uwTh} ${styles.uwTdNumber}` : undefined;
+  const tdClass = isUnderworld ? styles.uwTd : undefined;
+  const tdNumberClass = isUnderworld ? `${styles.uwTd} ${styles.uwTdNumber}` : undefined;
+
+  const table = (
+    <div className={isUnderworld ? styles.uwTableWrap : undefined}>
+      <table className={isUnderworld ? styles.uwTable : styles.table}>
         <thead>
           <tr>
-            <th>Building</th>
-            <th>Level</th>
-            <th>Gold Cost</th>
-            <th>Shroom Cost</th>
-            <th>Wood Cost</th>
-            <th>Stone Cost</th>
+            <th className={thClass}>Building</th>
+            <th className={thNumberClass}>Level</th>
+            <th className={thNumberClass}>Gold Cost</th>
+            <th className={thNumberClass}>Shroom Cost</th>
+            <th className={thNumberClass}>Wood Cost</th>
+            <th className={thNumberClass}>Stone Cost</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Fortress</td><td>1</td><td>10</td><td>2</td><td>0</td><td>0</td></tr>
-          <tr><td>Laborer's Quarter</td><td>1</td><td>5</td><td>2</td><td>35</td><td>12</td></tr>
-          <tr><td>Fortress</td><td>2</td><td>20</td><td>4</td><td>150</td><td>50</td></tr>
-          <tr><td>Laborer's Quarter</td><td>2</td><td>10</td><td>3</td><td>138</td><td>46</td></tr>
-          <tr><td>Fortress</td><td>3</td><td>30</td><td>6</td><td>440</td><td>140</td></tr>
-          <tr><td>Laborer's Quarter</td><td>3</td><td>15</td><td>6</td><td>406</td><td>129</td></tr>
-          <tr><td>Fortress</td><td>4</td><td>40</td><td>12</td><td>1,100</td><td>333</td></tr>
-          <tr><td>Laborer's Quarter</td><td>4</td><td>20</td><td>12</td><td>1,015</td><td>308</td></tr>
-          <tr><td>Fortress</td><td>5</td><td>50</td><td>24</td><td>2,500</td><td>800</td></tr>
-          <tr><td>Laborer's Quarter</td><td>5</td><td>25</td><td>24</td><td>2,308</td><td>738</td></tr>
-          <tr><td>Fortress</td><td>6</td><td>60</td><td>36</td><td>6,000</td><td>2,000</td></tr>
-          <tr><td>Laborer's Quarter</td><td>6</td><td>30</td><td>36</td><td>5,538</td><td>1,849</td></tr>
-          <tr><td>Fortress</td><td>7</td><td>70</td><td>48</td><td>13,417</td><td>4,433</td></tr>
-          <tr><td>Fortress</td><td>8</td><td>80</td><td>78</td><td>27,200</td><td>9,280</td></tr>
-          <tr><td>Hall of Knight</td><td>1</td><td>0</td><td>0</td><td>720</td><td>240</td></tr>
-          <tr><td>Hall of Knight</td><td>2</td><td>0</td><td>0</td><td>1,408</td><td>448</td></tr>
-          <tr><td>Hall of Knight</td><td>3</td><td>0</td><td>0</td><td>2,640</td><td>800</td></tr>
-		      <tr><td>Hall of Knight</td><td>4</td><td>0</td><td>0</td><td>4,800</td><td>1,536</td></tr>
-		      <tr><td>Hall of Knight</td><td>5</td><td>0</td><td>0</td><td>9,600</td><td>3,200</td></tr>
-		      <tr><td>Hall of Knight</td><td>6</td><td>0</td><td>0</td><td>18,400</td><td>6,080</td></tr>
-          <tr><td>Gem Mine</td><td>1</td><td>15</td><td>2</td><td>50</td><td>17</td></tr>
-          <tr><td>Treasury</td><td>1</td><td>25</td><td>2</td><td>40</td><td>13</td></tr>
-          <tr><td>Woodcutter</td><td>1</td><td>2</td><td>2</td><td>0</td><td>20</td></tr>
-          <tr><td>Woodcutter</td><td>2</td><td>4</td><td>3</td><td>30</td><td>20</td></tr>
-          <tr><td>Woodcutter</td><td>3</td><td>6</td><td>5</td><td>88</td><td>56</td></tr>
-          <tr><td>Woodcutter</td><td>4</td><td>8</td><td>10</td><td>220</td><td>133</td></tr>
-          <tr><td>Woodcutter</td><td>5</td><td>10</td><td>21</td><td>500</td><td>320</td></tr>
-          <tr><td>Quarry</td><td>1</td><td>3</td><td>2</td><td>22</td><td>0</td></tr>
-          <tr><td>Quarry</td><td>2</td><td>6</td><td>3</td><td>90</td><td>16</td></tr>
-          <tr><td>Quarry</td><td>3</td><td>9</td><td>5</td><td>264</td><td>45</td></tr>
-          <tr><td>Quarry</td><td>4</td><td>12</td><td>10</td><td>660</td><td>107</td></tr>
-          <tr><td>Barracks</td><td>1</td><td>4</td><td>2</td><td>20</td><td>14</td></tr>
-          <tr><td>Barracks</td><td>2</td><td>8</td><td>3</td><td>82</td><td>55</td></tr>
-          <tr><td>Total cost</td><td>-</td><td>577</td><td>363</td><td>99,881</td><td>33,218</td></tr>
-          <tr><td>Fortress Pack ressources</td><td>-</td><td>-</td><td>300</td><td>100,000</td><td>50,000</td></tr>
-          <tr><td>Left over</td><td>-</td><td>-577</td><td>-63</td><td>119</td><td>16,782</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>10</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>35</td><td className={tdNumberClass}>12</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>20</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>150</td><td className={tdNumberClass}>50</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>10</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>138</td><td className={tdNumberClass}>46</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>30</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>440</td><td className={tdNumberClass}>140</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>15</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>406</td><td className={tdNumberClass}>129</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>40</td><td className={tdNumberClass}>12</td><td className={tdNumberClass}>1,100</td><td className={tdNumberClass}>333</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>20</td><td className={tdNumberClass}>12</td><td className={tdNumberClass}>1,015</td><td className={tdNumberClass}>308</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>50</td><td className={tdNumberClass}>24</td><td className={tdNumberClass}>2,500</td><td className={tdNumberClass}>800</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>25</td><td className={tdNumberClass}>24</td><td className={tdNumberClass}>2,308</td><td className={tdNumberClass}>738</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>60</td><td className={tdNumberClass}>36</td><td className={tdNumberClass}>6,000</td><td className={tdNumberClass}>2,000</td></tr>
+          <tr><td className={tdClass}>Laborer's Quarter</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>30</td><td className={tdNumberClass}>36</td><td className={tdNumberClass}>5,538</td><td className={tdNumberClass}>1,849</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>7</td><td className={tdNumberClass}>70</td><td className={tdNumberClass}>48</td><td className={tdNumberClass}>13,417</td><td className={tdNumberClass}>4,433</td></tr>
+          <tr><td className={tdClass}>Fortress</td><td className={tdNumberClass}>8</td><td className={tdNumberClass}>80</td><td className={tdNumberClass}>78</td><td className={tdNumberClass}>27,200</td><td className={tdNumberClass}>9,280</td></tr>
+          <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>720</td><td className={tdNumberClass}>240</td></tr>
+          <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>1,408</td><td className={tdNumberClass}>448</td></tr>
+          <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>2,640</td><td className={tdNumberClass}>800</td></tr>
+		      <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>4,800</td><td className={tdNumberClass}>1,536</td></tr>
+		      <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>9,600</td><td className={tdNumberClass}>3,200</td></tr>
+		      <tr><td className={tdClass}>Hall of Knight</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>18,400</td><td className={tdNumberClass}>6,080</td></tr>
+          <tr><td className={tdClass}>Gem Mine</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>15</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>50</td><td className={tdNumberClass}>17</td></tr>
+          <tr><td className={tdClass}>Treasury</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>25</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>40</td><td className={tdNumberClass}>13</td></tr>
+          <tr><td className={tdClass}>Woodcutter</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>0</td><td className={tdNumberClass}>20</td></tr>
+          <tr><td className={tdClass}>Woodcutter</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>30</td><td className={tdNumberClass}>20</td></tr>
+          <tr><td className={tdClass}>Woodcutter</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>88</td><td className={tdNumberClass}>56</td></tr>
+          <tr><td className={tdClass}>Woodcutter</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>8</td><td className={tdNumberClass}>10</td><td className={tdNumberClass}>220</td><td className={tdNumberClass}>133</td></tr>
+          <tr><td className={tdClass}>Woodcutter</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>10</td><td className={tdNumberClass}>21</td><td className={tdNumberClass}>500</td><td className={tdNumberClass}>320</td></tr>
+          <tr><td className={tdClass}>Quarry</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>22</td><td className={tdNumberClass}>0</td></tr>
+          <tr><td className={tdClass}>Quarry</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>6</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>90</td><td className={tdNumberClass}>16</td></tr>
+          <tr><td className={tdClass}>Quarry</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>9</td><td className={tdNumberClass}>5</td><td className={tdNumberClass}>264</td><td className={tdNumberClass}>45</td></tr>
+          <tr><td className={tdClass}>Quarry</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>12</td><td className={tdNumberClass}>10</td><td className={tdNumberClass}>660</td><td className={tdNumberClass}>107</td></tr>
+          <tr><td className={tdClass}>Barracks</td><td className={tdNumberClass}>1</td><td className={tdNumberClass}>4</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>20</td><td className={tdNumberClass}>14</td></tr>
+          <tr><td className={tdClass}>Barracks</td><td className={tdNumberClass}>2</td><td className={tdNumberClass}>8</td><td className={tdNumberClass}>3</td><td className={tdNumberClass}>82</td><td className={tdNumberClass}>55</td></tr>
+          <tr><td className={tdClass}>Total cost</td><td className={tdNumberClass}>-</td><td className={tdNumberClass}>577</td><td className={tdNumberClass}>363</td><td className={tdNumberClass}>99,881</td><td className={tdNumberClass}>33,218</td></tr>
+          <tr><td className={tdClass}>Fortress Pack ressources</td><td className={tdNumberClass}>-</td><td className={tdNumberClass}>-</td><td className={tdNumberClass}>300</td><td className={tdNumberClass}>100,000</td><td className={tdNumberClass}>50,000</td></tr>
+          <tr><td className={tdClass}>Left over</td><td className={tdNumberClass}>-</td><td className={tdNumberClass}>-577</td><td className={tdNumberClass}>-63</td><td className={tdNumberClass}>119</td><td className={tdNumberClass}>16,782</td></tr>
         </tbody>
       </table>
+    </div>
+  );
+
+  if (isUnderworld) {
+    return (
+      <div className={styles.uwWrap}>
+        <div className={styles.uwCard}>
+          <h2 className={styles.uwTitle}>Fortress Build Order</h2>
+          {table}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section className={styles.tableSection}>
+      <h3 className={styles.sectionTitle}>Fortress Build Order</h3>
+      {table}
     </section>
   );
 }

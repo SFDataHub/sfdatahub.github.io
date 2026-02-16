@@ -142,7 +142,9 @@ function inlineMarkdown(value: string): string {
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) => {
     const safeText = escapeHtml(String(text ?? ""));
     const safeUrl = escapeAttr(String(url ?? ""));
-    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>`;
+    const isExternal = /^https?:\/\//i.test(url);
+    const target = isExternal ? ' target="_blank" rel="noopener noreferrer"' : "";
+    return `<a href="${safeUrl}"${target}>${safeText}</a>`;
   });
 
   out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");

@@ -792,20 +792,6 @@ const Home: React.FC = () => {
         <div className={styles.splitMain}>
           <FeaturedPreviewRow>
             <FeaturedPreviewCard
-              href="/sfmagazine/historybook"
-              title={t("home.historybook.title")}
-              subtitle={t("home.historybook.credit")}
-              previewImageSrc={HISTORYBOOK_COVER_URL}
-              previewAlt={t("home.historybook.coverAlt")}
-              variant="cover"
-              i18nScope="home.historybook"
-              titleI18nKey="home.historybook.title"
-              subtitleI18nKey="home.historybook.credit"
-              previewAltI18nKey="home.historybook.coverAlt"
-              linkAriaLabel={t("home.historybook.open")}
-              linkAriaI18nKey="home.historybook.open"
-            />
-            <FeaturedPreviewCard
               href={GUIDEHUB_ROUTE}
               title={t("home.guidehub.title")}
               subtitle={t("home.guidehub.subtitle")}
@@ -847,12 +833,6 @@ const Home: React.FC = () => {
         </div>
         <div className={styles.splitSide}>
           <YouTubeCarousel />
-        </div>
-      </div>
-      {/* Row 3 — Home */}
-      <div className={styles.row}>
-        <div className={styles.colFull}>
-          <TileGrid />
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
