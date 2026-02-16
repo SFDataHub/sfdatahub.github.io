@@ -1,7 +1,7 @@
 ---
 title: "AM Build order"
 category: "Game Features"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
 Baue deine Attraktionen gemaess dem Bild unten fuer maximale Effizienz.

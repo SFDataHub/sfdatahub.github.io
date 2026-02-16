@@ -107,7 +107,6 @@ const FortressCalculator: React.FC = () => {
                   <th className={styles.th}>{t("guidehub.calculators.fortress.table.level")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.fortress.table.wood")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.fortress.table.stone")}</th>
-                  <th className={styles.th}>{t("guidehub.calculators.fortress.table.buildTime")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.fortress.table.buildTimeL2")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.fortress.table.skip")}</th>
                 </tr>
@@ -123,7 +122,6 @@ const FortressCalculator: React.FC = () => {
                       <td className={styles.td}>{r.level}</td>
                       <td className={styles.td}>{r.wood?.toLocaleString?.() ?? r.wood}</td>
                       <td className={styles.td}>{r.stone?.toLocaleString?.() ?? r.stone}</td>
-                      <td className={styles.td}>{secToHHMMSS(baseSec)}</td>
                       <td className={styles.td}>{secToHHMMSS(l2Sec)}</td>
                       <td className={styles.td}>{skip.toLocaleString()}</td>
                     </tr>

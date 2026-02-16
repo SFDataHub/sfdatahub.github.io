@@ -945,6 +945,14 @@ type GuildDerivedSnapshotEntry = {
   name: string;
   memberCount: number | null;
   hofRank: number | null;
+  honor?: number;
+  hydra?: number;
+  instructor?: number;
+  knights?: number;
+  knights15Plus?: number;
+  portalFloor?: number;
+  raids?: number;
+  treasury?: number;
   lastScan: string | null;
   sum: number | null;
   sumAvg?: number | null;
@@ -967,6 +975,46 @@ const toFiniteNumberOrNull = (value: any): number | null => {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
+
+const toDigitsOnlyNumber = (value: any): number => {
+  if (value == null) return 0;
+  const cleaned = String(value).replace(/[^0-9]/g, "");
+  if (!cleaned) return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
+  if (!values || typeof values !== "object") return undefined;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(values, key)) return (values as any)[key];
+  }
+  return undefined;
+};
+
+const GUILD_LATEST_VALUE_KEYS = {
+  honor: ["Guild Honor"],
+  hydra: ["Guild Hydra"],
+  instructor: ["Guild Instructor"],
+  knights: ["Guild Knights"],
+  knights15Plus: ["Guild Knights 15+"],
+  memberCount: ["Guild Member Count"],
+  portalFloor: ["Guild Portal Floor"],
+  raids: ["Guild Raids"],
+  treasury: ["Guild Treasure", "Guild Treasury"],
+} as const;
+
+const readGuildLatestMeta = (values: Record<string, any> | null | undefined) => ({
+  honor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.honor)),
+  hydra: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.hydra)),
+  instructor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.instructor)),
+  knights: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights)),
+  knights15Plus: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights15Plus)),
+  memberCount: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.memberCount)),
+  portalFloor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.portalFloor)),
+  raids: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.raids)),
+  treasury: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.treasury)),
+});
 
 const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
 const toGuildSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_guild_derived`;
@@ -1465,8 +1513,16 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
       guildId: String(gid),
       server: snapshotServerKey,
       name: String(aggregate.name ?? gid),
-      memberCount: toFiniteNumberOrNull(aggregate.memberCount),
+      memberCount: toFiniteNumberOrNull(aggregate.memberCount) ?? 0,
       hofRank: toFiniteNumberOrNull(aggregate.hofRank),
+      honor: toFiniteNumberOrNull(aggregate.honor) ?? 0,
+      hydra: toFiniteNumberOrNull(aggregate.hydra) ?? 0,
+      instructor: toFiniteNumberOrNull(aggregate.instructor) ?? 0,
+      knights: toFiniteNumberOrNull(aggregate.knights) ?? 0,
+      knights15Plus: toFiniteNumberOrNull(aggregate.knights15Plus) ?? 0,
+      portalFloor: toFiniteNumberOrNull(aggregate.portalFloor) ?? 0,
+      raids: toFiniteNumberOrNull(aggregate.raids) ?? 0,
+      treasury: toFiniteNumberOrNull(aggregate.treasury) ?? 0,
       lastScan: aggregate.lastScan ? String(aggregate.lastScan) : null,
       sum: null,
       sumAvg: toFiniteNumberOrNull(aggregate.avgSumBaseTotal),
@@ -2052,12 +2108,25 @@ export async function importCsvToDB(
           const lastScanValue = lastScanRaw != null ? String(lastScanRaw).trim() : "";
           const lastScan = (lastScanValue || String(last.ts ?? "")).trim();
           const baseStats = computeBaseStats(last.row ?? {});
+          const latestMeta = readGuildLatestMeta(last.row ?? null);
+          const memberCountValue =
+            latestMeta.memberCount > 0
+              ? latestMeta.memberCount
+              : toFiniteNumberOrNull(memberCount) ?? 0;
           const snapshotEntry: GuildDerivedSnapshotEntry = {
             guildId: String(gid),
             server: snapshotServerKey,
             name: String(parsed.name ?? gid),
-            memberCount: toFiniteNumberOrNull(memberCount),
+            memberCount: memberCountValue,
             hofRank: toFiniteNumberOrNull(hofRank),
+            honor: latestMeta.honor,
+            hydra: latestMeta.hydra,
+            instructor: latestMeta.instructor,
+            knights: latestMeta.knights,
+            knights15Plus: latestMeta.knights15Plus,
+            portalFloor: latestMeta.portalFloor,
+            raids: latestMeta.raids,
+            treasury: latestMeta.treasury,
             lastScan: lastScan ? lastScan : null,
             sum: toFiniteNumberOrNull(baseStats.sum),
             sumAvg: toFiniteNumberOrNull(baseStats.sum),

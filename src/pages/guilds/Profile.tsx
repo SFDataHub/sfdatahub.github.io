@@ -30,7 +30,7 @@ import type {
 } from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
 import type { Member as GuildMember } from "../../components/guilds/guild-tabs/guild-members/types";
 
-// Right-Rail: einzelne Views (nicht verändern)
+// Right-Rail: einzelne Views (nicht veraendern)
 import ClassCrestGrid from "../../components/guilds/GuildClassOverview/ClassCrestGrid";
 import ClassDonut from "../../components/guilds/GuildClassOverview/ClassDonut";
 
@@ -40,6 +40,7 @@ import { CLASSES } from "../../data/classes";
 
 // Globale HUD-Tabs (nur Seitencode)
 import HudLabel from "../../components/ui/hud/HudLabel";
+import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
 
 const C = {
   tile: "#152A42",
@@ -54,6 +55,17 @@ const C = {
 type Guild = GuildLike;
 type MemberSummary = GuildMember;
 type MembersSnapshot = MembersSnapshotLike;
+type GuildProfileLoadResult = {
+  guild: Guild;
+  snapshot: MembersSnapshot | null;
+};
+type GuildProfileCacheValue = { cachedAt: number; data: GuildProfileLoadResult };
+const guildProfileInFlight = new Map<string, Promise<GuildProfileLoadResult>>();
+const guildProfileMemory = new Map<string, GuildProfileCacheValue>();
+
+const GUILD_CACHE_PREFIX = "sf_profile_guild__";
+const GUILD_SERVER_INDEX_KEY = "sf_profile_guild_server_index";
+const GUILD_CACHE_TTL_MS = 60 * 60 * 1000;
 
 const normalizeMember = (entry: MemberSummaryLike): MemberSummary => ({
   id: entry.id,
@@ -175,11 +187,11 @@ function LeftRail({ guild }: { guild: Guild }) {
 
       <Section title="GILDEN INFO">
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <StatRow k="Mitglieder" v={guild.memberCount ?? "—"} />
-          <StatRow k="HoF-Rang" v={guild.hofRank != null ? `#${guild.hofRank}` : "—"} />
-          <StatRow k="Server" v={guild.server ?? "—"} />
+          <StatRow k="Mitglieder" v={guild.memberCount ?? "-"} />
+          <StatRow k="HoF-Rang" v={guild.hofRank != null ? `#${guild.hofRank}` : "-"} />
+          <StatRow k="Server" v={guild.server ?? "-"} />
           <StatRow k="Inaktiv" v="0" />
-          <StatRow k="Aktivität" v="100%" />
+          <StatRow k="Aktivitaet" v="100%" />
         </div>
       </Section>
     </div>
@@ -211,72 +223,155 @@ export default function GuildProfile() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const scope: FirestoreTraceScope = beginReadScope("GuildProfile:load");
       setLoading(true);
       setErr(null);
+      const id = guildId.trim();
+      if (!id) {
+        setErr("Keine Gilde gewaehlt.");
+        setLoading(false);
+        return;
+      }
+
+      const readServerIndex = (): Record<string, string> => {
+        if (typeof window === "undefined") return {};
+        try {
+          const raw = window.localStorage.getItem(GUILD_SERVER_INDEX_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+        } catch {
+          return {};
+        }
+      };
+
+      const cachedServer = readServerIndex()[id];
+      const cacheKey = cachedServer ? `${GUILD_CACHE_PREFIX}${cachedServer}__${id}` : null;
+
+      if (cacheKey) {
+        const mem = guildProfileMemory.get(cacheKey);
+        if (mem) {
+          if (Date.now() - mem.cachedAt < GUILD_CACHE_TTL_MS) {
+            if (!cancelled) {
+              setGuild(mem.data.guild);
+              setSnapshot(mem.data.snapshot);
+              setLoading(false);
+            }
+            return;
+          } else {
+            guildProfileMemory.delete(cacheKey);
+          }
+        }
+      }
+
+      if (cacheKey) {
+        const cached = readTtlCache(cacheKey, GUILD_CACHE_TTL_MS);
+        if (cached && typeof cached === "object") {
+          const data = cached as GuildProfileLoadResult;
+          guildProfileMemory.set(cacheKey, { cachedAt: Date.now(), data });
+          if (!cancelled) {
+            setGuild(data.guild);
+            setSnapshot(data.snapshot);
+            setLoading(false);
+          }
+          return;
+        }
+      }
+
+      const fetchProfile = async (): Promise<GuildProfileLoadResult> => {
+        let scope: FirestoreTraceScope = null;
+        try {
+          scope = beginReadScope("GuildProfile:load");
+
+          const refLatest = doc(db, `guilds/${id}/latest/latest`);
+          const snapLatest = await traceGetDoc(scope, refLatest, () => getDoc(refLatest));
+          if (!snapLatest.exists()) {
+            throw new Error("Gilde nicht gefunden.");
+          }
+          const d = snapLatest.data() as any;
+          const name = d.name ?? d.values?.Name ?? id;
+          const server = d.server ?? d.values?.Server ?? null;
+          const memberCount =
+            toNum(d.memberCount ?? d.values?.["Guild Member Count"] ?? d.values?.GuildMemberCount) ?? null;
+          const hofRank =
+            toNum(
+              d.hofRank ??
+                d.values?.["Hall of Fame Rank"] ??
+                d.values?.HoF ??
+                d.values?.Rank ??
+                d.values?.["Guild Rank"]
+            ) ?? null;
+          const lastScanDays = daysSince(toNum(d.timestamp));
+          const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
+          let nextSnapshot: MembersSnapshot | null = null;
+
+          const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
+          const snap = await traceGetDoc(scope, refSnap, () => getDoc(refSnap));
+          if (snap.exists()) {
+            const sdata = snap.data() as any;
+            nextSnapshot = {
+              guildId: String(sdata.guildId ?? id),
+              updatedAt: String(sdata.updatedAt ?? d.values?.Timestamp ?? ""),
+              updatedAtMs: Number(sdata.updatedAtMs ?? d.timestamp * 1000 ?? 0),
+              count: Number(sdata.count ?? 0),
+              hash: String(sdata.hash ?? ""),
+              avgLevel: sdata.avgLevel ?? null,
+              avgTreasury: sdata.avgTreasury ?? null,
+              avgMine: sdata.avgMine ?? null,
+              avgBaseMain: sdata.avgBaseMain ?? null,
+              avgConBase: sdata.avgConBase ?? null,
+              avgSumBaseTotal: sdata.avgSumBaseTotal ?? null,
+              avgAttrTotal: sdata.avgAttrTotal ?? null,
+              avgConTotal: sdata.avgConTotal ?? null,
+              avgTotalStats: sdata.avgTotalStats ?? null,
+              members: Array.isArray(sdata.members)
+                ? (sdata.members as MemberSummaryLike[])
+                : [],
+            };
+          }
+
+          return { guild: g, snapshot: nextSnapshot };
+        } finally {
+          endReadScope(scope);
+        }
+      };
+
+      const inFlightKey = cacheKey ?? id.toLowerCase();
+      const existing = guildProfileInFlight.get(inFlightKey);
+      const promise = existing ?? fetchProfile();
+      if (!existing) {
+        guildProfileInFlight.set(inFlightKey, promise);
+      }
+
       try {
-        const id = guildId.trim();
-        if (!id) {
-          setErr("Keine Gilde gewählt.");
-          setLoading(false);
-          return;
+        const result = await promise;
+
+        const normalizedServer = String(result.guild.server ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+        const cacheServer = normalizedServer || "unknown";
+        const nextCacheKey = `${GUILD_CACHE_PREFIX}${cacheServer}__${id}`;
+
+        if (typeof window !== "undefined") {
+          try {
+            const index = readServerIndex();
+            index[id] = cacheServer;
+            window.localStorage.setItem(GUILD_SERVER_INDEX_KEY, JSON.stringify(index));
+            writeTtlCache(nextCacheKey, result);
+          } catch {
+            // ignore cache write errors
+          }
         }
 
-        // Latest-Gildeninfo
-        const refLatest = doc(db, `guilds/${id}/latest/latest`);
-        const snapLatest = await traceGetDoc(scope, refLatest, () => getDoc(refLatest));
-        if (!snapLatest.exists()) {
-          setErr("Gilde nicht gefunden.");
-          setLoading(false);
-          return;
-        }
-        const d = snapLatest.data() as any;
-        const name = d.name ?? d.values?.Name ?? id;
-        const server = d.server ?? d.values?.Server ?? null;
-        const memberCount =
-          toNum(d.memberCount ?? d.values?.["Guild Member Count"] ?? d.values?.GuildMemberCount) ?? null;
-        const hofRank =
-          toNum(
-            d.hofRank ??
-              d.values?.["Hall of Fame Rank"] ??
-              d.values?.HoF ??
-              d.values?.Rank ??
-              d.values?.["Guild Rank"]
-          ) ?? null;
-        const lastScanDays = daysSince(toNum(d.timestamp));
-        const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
-        if (!cancelled) setGuild(g);
-
-        // Members-Snapshot (falls vorhanden)
-        const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
-        const snap = await traceGetDoc(scope, refSnap, () => getDoc(refSnap));
-        if (snap.exists() && !cancelled) {
-          const sdata = snap.data() as any;
-          const s: MembersSnapshot = {
-            guildId: String(sdata.guildId ?? id),
-            updatedAt: String(sdata.updatedAt ?? d.values?.Timestamp ?? ""),
-            updatedAtMs: Number(sdata.updatedAtMs ?? d.timestamp * 1000 ?? 0),
-            count: Number(sdata.count ?? 0),
-            hash: String(sdata.hash ?? ""),
-            avgLevel: sdata.avgLevel ?? null,
-            avgTreasury: sdata.avgTreasury ?? null,
-            avgMine: sdata.avgMine ?? null,
-            avgBaseMain: sdata.avgBaseMain ?? null,
-            avgConBase: sdata.avgConBase ?? null,
-            avgSumBaseTotal: sdata.avgSumBaseTotal ?? null,
-            avgAttrTotal: sdata.avgAttrTotal ?? null,
-            avgConTotal: sdata.avgConTotal ?? null,
-            avgTotalStats: sdata.avgTotalStats ?? null,
-            members: Array.isArray(sdata.members)
-              ? (sdata.members as MemberSummaryLike[])
-              : [],
-          };
-          setSnapshot(s);
+        guildProfileMemory.set(nextCacheKey, { cachedAt: Date.now(), data: result });
+        if (!cancelled) {
+          setGuild(result.guild);
+          setSnapshot(result.snapshot);
         }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
       } finally {
-        endReadScope(scope);
+        if (!existing) guildProfileInFlight.delete(inFlightKey);
         if (!cancelled) setLoading(false);
       }
     }
@@ -294,7 +389,7 @@ export default function GuildProfile() {
   if (loading) {
     return (
       <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed>
-        <div className="text-sm" style={{ color: C.soft }}>Lade Gildenprofil…</div>
+        <div className="text-sm" style={{ color: C.soft }}>Lade Gildenprofil...</div>
       </ContentShell>
     );
   }
@@ -346,7 +441,7 @@ export default function GuildProfile() {
           </div>
           <div className="min-w-[220px] text-right text-xs" style={{ color: C.soft }}>
             Zuletzt aktualisiert:&nbsp;
-            {snapshot?.updatedAt ? snapshot.updatedAt : "—"}{" "}
+            {snapshot?.updatedAt ? snapshot.updatedAt : "-"}{" "}
             <span className="inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#4CAF50" }} />
           </div>
         </div>
@@ -389,7 +484,7 @@ export default function GuildProfile() {
               <div className="w-full max-w-[980px]">
                 <GuildBaseStatsBroadcastTile
                   guildName={guild.name}
-                  server={guild.server ?? "—"}
+                  server={guild.server ?? "-"}
                   emblemUrl={guildIconUrlByName(guild.name, 512) || undefined}
                   lastScanISO={snapshot?.updatedAtMs ? new Date(snapshot.updatedAtMs).toISOString() : undefined}
                   members={guild.memberCount ?? 0}
@@ -414,24 +509,24 @@ export default function GuildProfile() {
 
           {/* RIGHT RAIL */}
           <div className="col-span-12 md:col-span-3">
-            {/* Tabs (nur Buttons über der ersten Komponente) */}
+            {/* Tabs (nur Buttons ueber der ersten Komponente) */}
             <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setRightView("grid")} aria-label="Klassenübersicht">
-                <HudLabel text="Klassenübersicht" tone={rightView === "grid" ? "accent" : "default"} />
+              <button onClick={() => setRightView("grid")} aria-label="Klassenuebersicht">
+                <HudLabel text="Klassenuebersicht" tone={rightView === "grid" ? "accent" : "default"} />
               </button>
               <button onClick={() => setRightView("donut")} aria-label="Klassenverteilung">
                 <HudLabel text="Klassenverteilung" tone={rightView === "donut" ? "accent" : "default"} />
               </button>
             </div>
 
-            {/* Umschalten zwischen den zwei vorhandenen Komponenten – ohne Extra-Container */}
+            {/* Umschalten zwischen den zwei vorhandenen Komponenten - ohne Extra-Container */}
             {rightView === "grid" ? (
               <ClassCrestGrid
                 data={membersForList}
                 classMeta={safeMeta as any}
                 onPickClass={(id) => {
                   const url = new URL(window.location.href);
-                  url.searchParams.set("tab", "Übersicht");
+                  url.searchParams.set("tab", "Uebersicht");
                   url.searchParams.set("class", id);
                   window.location.href = url.toString();
                 }}
@@ -458,11 +553,11 @@ function Tabs({
   guildName: string;
   guildServer: string | null;
 }) {
-  const [tab, setTab] = useState<"Übersicht" | "Rankings" | "Monthly Progress" | "Historie">("Übersicht");
+  const [tab, setTab] = useState<"Uebersicht" | "Rankings" | "Monthly Progress" | "Historie">("Uebersicht");
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 border-b" style={{ borderColor: C.line }} role="tablist">
-        {(["Übersicht", "Rankings", "Monthly Progress", "Historie"] as const).map((t) => {
+        {(["Uebersicht", "Rankings", "Monthly Progress", "Historie"] as const).map((t) => {
           const active = t === tab;
           return (
             <button
@@ -484,7 +579,7 @@ function Tabs({
       </div>
 
       <Section>
-        {tab === "Übersicht" && (
+        {tab === "Uebersicht" && (
           <GuildMemberBrowser
             members={members}
             defaultView="list"
@@ -494,7 +589,7 @@ function Tabs({
 
         {tab === "Rankings" && (
           <div className="text-sm" style={{ color: C.soft }}>
-            Platzhalter <b>Rankings</b> – Inhalt folgt.
+            Platzhalter <b>Rankings</b> - Inhalt folgt.
           </div>
         )}
 
@@ -508,7 +603,7 @@ function Tabs({
 
         {tab === "Historie" && (
           <div className="text-sm" style={{ color: C.soft }}>
-            Platzhalter <b>Historie</b> – Inhalt folgt.
+            Platzhalter <b>Historie</b> - Inhalt folgt.
           </div>
         )}
       </Section>

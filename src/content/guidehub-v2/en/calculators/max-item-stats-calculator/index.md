@@ -1,30 +1,8 @@
 ﻿---
 title: "Max Item Stats Calculator"
 category: "Progression"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
-## Overview {#overview}
-
-Placeholder content for Max Item Stats Calculator.
 
 [[embed:max-item-stats-calculator]]
-
-### Details
-
-- Add steps and explanation here.
-- Include any key tips or warnings.
-
-### Tips
-
-- Add practical tips or follow-up actions.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}

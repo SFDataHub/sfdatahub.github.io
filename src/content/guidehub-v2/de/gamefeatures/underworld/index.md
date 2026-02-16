@@ -1,28 +1,8 @@
 ﻿---
 title: "Underworld"
 category: "Game Features"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
-## Overview {#overview}
+[[embed:underworld-link-buttons]]
 
-Platzhalter-Uebersicht fuer den Bereich Underworld.
-
-### Highlights
-
-- Fuege wichtige Eintraege hinzu.
-- Verlinke passende Guides.
-
-### Tips
-
-- Fuege hilfreiche Hinweise hinzu.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}

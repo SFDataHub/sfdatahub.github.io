@@ -141,13 +141,14 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
         {/* RECHTS */}
         <div className={styles.topbarRight}>
           <a
-            className={`${styles.pill} ${styles.onlyExpanded}`}
+            className={`${styles.pill} ${styles.gameLinkButton} ${styles.onlyExpanded}`}
             href="https://www.sfgame.net"
             target="_blank"
             rel="noreferrer"
+            aria-label={t("topbar.officialGameSite", { defaultValue: "Visit the official game website" })}
           >
             <Globe className={styles.ico} />
-            www.sfgame.net
+            {t("topbar.officialGameSite", { defaultValue: "Visit the official game website" })}
           </a>
 
           {canUse ? (

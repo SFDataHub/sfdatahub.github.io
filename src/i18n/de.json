@@ -95,6 +95,10 @@
   },
   "guidehub": {
     "arenaManager": {
+      "links": {
+        "runeBonuses": "Runen-Boni",
+        "buildOrder": "Build Order"
+      },
       "amRuneBonuses": {
         "description": "Komplette Uebersicht der Arena-Manager-Runen mit ihren Bonuswerten. Gruppiert nach Tier; Max, Errungenschaften und Breakpoints sind markiert.",
         "searchPlaceholder": "Suche (z. B. thousand, E34, x60)...",
@@ -183,14 +187,14 @@
         "title": "Festung - {{building}}",
         "inputs": {
           "buildingSelectLabel": "Gebaeude auswaehlen",
-          "l2Label": "L2 (Arbeiter)"
+          "l2Label": "Laborers Quarter"
         },
         "table": {
           "level": "Level",
           "wood": "Holz",
           "stone": "Stein",
           "buildTime": "Bauzeit",
-          "buildTimeL2": "Bauzeit (L2)",
+          "buildTimeL2": "Bauzeit",
           "skip": "Skip (Pilze)"
         },
         "hints": {
@@ -215,14 +219,14 @@
         "title": "Unterwelt - {{building}}",
         "inputs": {
           "buildingSelectLabel": "Gebaeude auswaehlen",
-          "l2Label": "L2 (Arbeiter)"
+          "l2Label": "Laborers Quarter"
         },
         "table": {
           "level": "Level",
           "soul": "Seelen",
           "gold": "Gold",
           "buildTime": "Bauzeit",
-          "buildTimeL2": "Bauzeit (L2)",
+          "buildTimeL2": "Bauzeit",
           "skip": "Skip (Pilze)"
         },
         "empty": "Noch keine Daten fuer dieses Gebaeude.",
@@ -417,20 +421,21 @@
       "renameErrorEmpty": "Bitte einen Namen eingeben."
     },
     "sync": {
-      "buttonSave": "Ã„nderungen im Account speichern",
+      "buttonSave": "Änderungen im Account speichern",
       "saving": "Speichere â€¦",
-      "error": "Deine Ã„nderungen konnten nicht gespeichert werden. Bitte versuche es erneut.",
+      "error": "Deine Änderungen konnten nicht gespeichert werden. Bitte versuche es erneut.",
       "statusUnsynced": "Nicht gespeicherte Ã„nderungen",
-      "statusSynced": "Alle Ã„nderungen synchronisiert",
+      "statusSynced": "Alle Änderungen synchronisiert",
       "statusNever": "Noch nie synchronisiert",
       "lastSyncLabel": "Letzte Synchronisierung",
       "noChanges": "Keine Ã„nderungen zum Speichern",
-      "cooldownLabel": "NÃ¤chster Sync in {{time}}"
+      "cooldownLabel": "NÄchster Sync in {{time}}"
     }
   },
   "topbar": {
     "quickAccess": "Schnellzugriff",
     "upload": "Scan hochladen",
+    "officialGameSite": "Besuche die offizielle Spielseite",
     "search": "Suchen /",
     "settings": "Einstellungen",
     "profile": "Profil",

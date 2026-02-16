@@ -1,28 +1,8 @@
 ﻿---
 title: "Game Features"
 category: "Game Features"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
-## Overview {#overview}
+[[embed:gamefeatures-link-buttons]]
 
-Placeholder overview for the Game Features category.
-
-### Highlights
-
-- Add key entries here.
-- Link important guides.
-
-### Tips
-
-- Add helpful notes or reminders.
-
-## SFDataHub Content {#sfdatahub-content}
-
-## TavernDiscord FAQ {#taverndiscord-faq}
-
-## Notes {#notes}
-
-## Changelog {#changelog}
-
-## Sources {#sources}

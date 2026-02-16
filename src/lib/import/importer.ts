@@ -14,6 +14,14 @@ export type GuildDerivedAggregate = {
   name: string | null;
   memberCount: number | null;
   hofRank: number | null;
+  honor: number;
+  hydra: number;
+  instructor: number;
+  knights: number;
+  knights15Plus: number;
+  portalFloor: number;
+  raids: number;
+  treasury: number;
   lastScan: string | null;
   timestampSec: number;
   count: number;
@@ -71,6 +79,46 @@ function toSecFlexible(v: any): number | null {
   if (Number.isFinite(t)) return Math.floor(t / 1000);
   return null;
 }
+
+const toDigitsOnlyNumber = (value: any): number => {
+  if (value == null) return 0;
+  const cleaned = String(value).replace(/[^0-9]/g, "");
+  if (!cleaned) return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
+  if (!values || typeof values !== "object") return undefined;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(values, key)) return (values as any)[key];
+  }
+  return undefined;
+};
+
+const GUILD_LATEST_VALUE_KEYS = {
+  honor: ["Guild Honor"],
+  hydra: ["Guild Hydra"],
+  instructor: ["Guild Instructor"],
+  knights: ["Guild Knights"],
+  knights15Plus: ["Guild Knights 15+"],
+  memberCount: ["Guild Member Count"],
+  portalFloor: ["Guild Portal Floor"],
+  raids: ["Guild Raids"],
+  treasury: ["Guild Treasure", "Guild Treasury"],
+} as const;
+
+const readGuildLatestMeta = (values: Record<string, any> | null | undefined) => ({
+  honor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.honor)),
+  hydra: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.hydra)),
+  instructor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.instructor)),
+  knights: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights)),
+  knights15Plus: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights15Plus)),
+  memberCount: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.memberCount)),
+  portalFloor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.portalFloor)),
+  raids: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.raids)),
+  treasury: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.treasury)),
+});
 
 // ---------- Felddefinitionen ----------
 const P = {
@@ -243,7 +291,9 @@ const isDuplicatePermissionError = (error: unknown): boolean => {
 };
 
 // ---- NEU (nur für dein gewünschtes Verhalten): helper zum Lesen ----
-async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|null, raw: string|null}> {
+async function readGuildLatestTimeSecAndRaw(
+  gid: string
+): Promise<{ sec: number | null; raw: string | null; values: Record<string, any> | null }> {
   const ref = doc(db, `guilds/${gid}/latest/latest`);
   const snap = await traceGetDoc(
     null,
@@ -251,9 +301,10 @@ async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|n
     () => getDoc(ref),
     { label: "ImportGuildSnapshots:latest" },
   );
-  if (!snap.exists()) return { sec: null, raw: null };
+  if (!snap.exists()) return { sec: null, raw: null, values: null };
   const d: any = snap.data() || {};
   const raw: string | null = d.timestampRaw ?? d.values?.Timestamp ?? null;
+  const values = d.values && typeof d.values === "object" ? d.values : null;
 
   let sec: number | null = null;
   if (typeof d.timestamp === "number") {
@@ -261,7 +312,7 @@ async function readGuildLatestTimeSecAndRaw(gid: string): Promise<{sec: number|n
   } else if (raw) {
     sec = toSecFlexible(raw);
   }
-  return { sec, raw };
+  return { sec, raw, values };
 }
 
 async function readPrevSnapshotSec(gid: string): Promise<number> {
@@ -331,7 +382,8 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
 
   for (const gid of allGids) {
     // maßgeblichen Timestamp der Gilde aus latest holen
-    const { sec: guildTsSec, raw: guildTsRaw } = await readGuildLatestTimeSecAndRaw(gid);
+    const { sec: guildTsSec, raw: guildTsRaw, values: latestValues } = await readGuildLatestTimeSecAndRaw(gid);
+    const latestMeta = readGuildLatestMeta(latestValues);
     if (guildTsSec == null) continue;
 
     // nur schreiben, wenn neuer als vorhandener Snapshot
@@ -443,13 +495,28 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
       : null;
     const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : guildTsRaw;
     const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : guildTsRaw ?? String(guildTsSec);
+    const memberCountFallback = toNumberLoose(memberCountRaw);
+    const memberCount =
+      latestMeta.memberCount > 0
+        ? latestMeta.memberCount
+        : memberCountFallback != null
+          ? memberCountFallback
+          : 0;
 
     aggregatesByGuildId.set(gid, {
       guildId: gid,
       server: serverRaw != null && String(serverRaw).trim() !== "" ? String(serverRaw).trim() : null,
       name: nameRaw != null && String(nameRaw).trim() !== "" ? String(nameRaw).trim() : null,
-      memberCount: toNumberLoose(memberCountRaw),
+      memberCount,
       hofRank: toNumberLoose(hofRankRaw),
+      honor: latestMeta.honor,
+      hydra: latestMeta.hydra,
+      instructor: latestMeta.instructor,
+      knights: latestMeta.knights,
+      knights15Plus: latestMeta.knights15Plus,
+      portalFloor: latestMeta.portalFloor,
+      raids: latestMeta.raids,
+      treasury: latestMeta.treasury,
       lastScan: lastScan ? lastScan : null,
       timestampSec: guildTsSec,
       count: members.length,

@@ -22,10 +22,17 @@ type Props = {
   guildServer?: string | null;
 };
 
+type GuildMonthlyLoadResult = {
+  opts: MonthOption[];
+  progressByMonth: Record<string, any>;
+};
+
+const guildMonthlyLoadInFlight = new Map<string, Promise<GuildMonthlyLoadResult>>();
+const guildMonthlyLoadCache = new Map<string, GuildMonthlyLoadResult>();
+
 /**
- * Container: holt Monatsübersicht + Progress-Daten aus Firestore
- * und befüllt den UI-Presenter. Ohne vorhandene Daten -> Fallback „-”
- * und leere Tabellen.
+ * Container: holt Monatsuebersicht + Progress-Daten aus Firestore
+ * und bef\u00fcllt den UI-Presenter. Ohne vorhandene Daten -> Fallback "-" und leere Tabellen.
  */
 const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
   guildId,
@@ -45,39 +52,56 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
 
   useEffect(() => {
     let cancelled = false;
+    const guildKey = guildId.trim().toLowerCase();
 
-    async function loadMonthsAndMaybeProgress() {
+    const applyLoadedResult = (result: GuildMonthlyLoadResult) => {
+      progressCache.current = { ...result.progressByMonth };
+      const opts = result.opts;
+      if (!opts.length) {
+        setMonths(null);
+        setCurrentMonthKey(undefined);
+        setUiData(emptyUiData(guildName, guildServer));
+        return;
+      }
+      setMonths(opts);
+      const firstKey = opts[0].key;
+      setCurrentMonthKey(firstKey);
+      const firstProgress = progressCache.current[firstKey];
+      setUiData(
+        progressToUiData(firstProgress, {
+          guildName,
+          guildServer,
+          currentMonthKey: firstKey,
+          months: opts,
+        })
+      );
+    };
+
+    const fetchMonths = async (): Promise<GuildMonthlyLoadResult> => {
       const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:months");
       setLoading(true);
       try {
-        // 1) Monate auflisten: guilds/{id}/history_monthly/*
         const monthCol = collection(db, `guilds/${guildId}/history_monthly`);
         const monthSnaps = await traceGetDocs(scope, { path: monthCol.path }, () => getDocs(monthCol));
-
         const opts: MonthOption[] = [];
-
-        // Für jeden Monat direkt das Monatsdokument lesen (kein /progress mehr)
+        const progressByMonth: Record<string, any> = {};
         for (const mDoc of monthSnaps.docs) {
-          const key = mDoc.id; // "YYYY-MM"
+          const key = mDoc.id;
           const p = mDoc.data() as any;
           if (!p) continue;
-
-          progressCache.current[key] = p; // cache
-
+          progressByMonth[key] = p;
           const meta = p?.meta ?? {};
           const fromISO: string = meta.fromISO || meta.baselineISO || meta.firstISO || "";
           const toISO: string = meta.toISO || meta.latestISO || meta.nowISO || "";
           const span: number =
             Number(meta.daysSpan ?? Math.floor((+new Date(toISO) - +new Date(fromISO)) / 86400000)) || 0;
           const available: boolean = Boolean(p?.status?.available ?? (fromISO && toISO ? span <= 40 : false));
-
           const label =
             meta.label ||
             new Date(key + "-01T00:00:00").toLocaleString("de-DE", {
               month: "short",
               year: "numeric",
             });
-
           opts.push({
             key,
             label,
@@ -88,14 +112,16 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
             reason: available ? undefined : (p?.status?.reason as any),
           });
         }
-
-        // Sort: neueste zuerst
         opts.sort((a, b) => (a.key < b.key ? 1 : -1));
+        return { opts, progressByMonth };
+      } finally {
+        endReadScope(scope);
+      }
+    };
 
-        if (cancelled) return;
-
-        if (opts.length === 0) {
-          // keine Daten vorhanden -> Fallback „-” und leere Tabellen
+    async function loadMonthsAndMaybeProgress() {
+      try {
+        if (!guildKey) {
           setMonths(null);
           setCurrentMonthKey(undefined);
           setUiData(emptyUiData(guildName, guildServer));
@@ -103,28 +129,29 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
           return;
         }
 
-        setMonths(opts);
-        const firstKey = opts[0].key;
-        setCurrentMonthKey(firstKey);
+        const cached = guildMonthlyLoadCache.get(guildKey);
+        if (cached) {
+          if (!cancelled) applyLoadedResult(cached);
+          setLoading(false);
+          return;
+        }
 
-        // 2) UI-Daten aus progress für den ersten Monat
-        const firstProgress = progressCache.current[firstKey];
-        setUiData(
-          progressToUiData(firstProgress, {
-            guildName,
-            guildServer,
-            currentMonthKey: firstKey,
-            months: opts,
-          })
-        );
+        const existing = guildMonthlyLoadInFlight.get(guildKey);
+        const promise = existing ?? fetchMonths();
+        if (!existing) guildMonthlyLoadInFlight.set(guildKey, promise);
+
+        const result = await promise;
+        guildMonthlyLoadCache.set(guildKey, result);
+        if (!cancelled) applyLoadedResult(result);
       } catch (e) {
         console.error(e);
-        // Sicherheit: Fallback
-        setMonths(null);
-        setCurrentMonthKey(undefined);
-        setUiData(emptyUiData(guildName, guildServer));
+        if (!cancelled) {
+          setMonths(null);
+          setCurrentMonthKey(undefined);
+          setUiData(emptyUiData(guildName, guildServer));
+        }
       } finally {
-        endReadScope(scope);
+        if (!existing) guildMonthlyLoadInFlight.delete(guildKey);
         if (!cancelled) setLoading(false);
       }
     }
@@ -200,7 +227,7 @@ function emptyUiData(
 ): GuildMonthlyProgressData {
   return {
     header: {
-      title: `${guildName} – Monthly Progress`,
+      title: `${guildName} - Monthly Progress`,
       monthRange: "-", // Fallback-Anzeige
       emblemUrl: guildIconUrlByName(guildName, 512) || undefined,
       centerCaption: "Most Base Stats gained",
@@ -229,7 +256,7 @@ function mkBlock(title: string, subtitle?: string): TableBlock {
   return {
     title,
     subtitle,
-    columns: [], // Presenter zeigt „No data“, wenn rows leer bleiben
+    columns: [], // Presenter zeigt "No data", wenn rows leer bleiben
     rows: [],
   };
 }
@@ -252,8 +279,8 @@ function progressToUiData(
 ): GuildMonthlyProgressData {
   const meta = progress?.meta ?? {};
   const header: GuildMonthlyProgressData["header"] = {
-    title: `${ctx.guildName} – Monthly Progress`,
-    monthRange: undefined, // Dropdown übernimmt
+    title: `${ctx.guildName} - Monthly Progress`,
+    monthRange: undefined, // Dropdown uebernimmt
     emblemUrl: guildIconUrlByName(ctx.guildName, 512) || undefined,
     centerCaption: "Most Base Stats gained",
     months: ctx.months,
@@ -273,7 +300,7 @@ function progressToUiData(
         ...colRankName,
         { key: "level", label: "Level", width: 70, align: "right", format: "num" as const },
         { key: "base", label: "Base", width: 80, align: "right", format: "num" as const },
-        { key: "delta", label: "Δ", width: 70, align: "right", format: "num" as const },
+        { key: "delta", label: "Delta", width: 70, align: "right", format: "num" as const },
       ],
       rows: (progress?.mostBaseGained ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -289,8 +316,8 @@ function progressToUiData(
       columns: [
         ...colRankName,
         { key: "base", label: "Base", width: 100, align: "right", format: "num" as const },
-        { key: "stam", label: "Stam Δ", width: 90, align: "right", format: "num" as const },
-        { key: "sho", label: "Sho Δ", width: 90, align: "right", format: "num" as const },
+        { key: "stam", label: "Stam Delta", width: 90, align: "right", format: "num" as const },
+        { key: "sho", label: "Sho Delta", width: 90, align: "right", format: "num" as const },
       ],
       rows: (progress?.sumBaseStats ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -306,7 +333,7 @@ function progressToUiData(
       columns: [
         ...colRankName,
         { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Δ", width: 80, align: "right", format: "num" as const },
+        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
       ],
       rows: (progress?.highestBaseStats ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -325,7 +352,7 @@ function progressToUiData(
         ...colRankName,
         { key: "class", label: "Class", width: 72, align: "center" as const },
         { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Δ", width: 80, align: "right", format: "num" as const },
+        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
       ],
       rows: (progress?.mainAndCon ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -341,8 +368,8 @@ function progressToUiData(
       columns: [
         ...colRankName,
         { key: "base", label: "Base", width: 100, align: "right", format: "num" as const },
-        { key: "stam", label: "Stam Δ", width: 90, align: "right", format: "num" as const },
-        { key: "sho", label: "Sho Δ", width: 90, align: "right", format: "num" as const },
+        { key: "stam", label: "Stam Delta", width: 90, align: "right", format: "num" as const },
+        { key: "sho", label: "Sho Delta", width: 90, align: "right", format: "num" as const },
       ],
       rows: (progress?.sumBaseStats ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -358,7 +385,7 @@ function progressToUiData(
       columns: [
         ...colRankName,
         { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Δ", width: 80, align: "right", format: "num" as const },
+        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
       ],
       rows: (progress?.highestBaseStats ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,
@@ -373,7 +400,7 @@ function progressToUiData(
       columns: [
         ...colRankName,
         { key: "total", label: "Total Stats", width: 120, align: "right", format: "num" as const },
-        { key: "delta", label: "Δ", width: 80, align: "right", format: "num" as const },
+        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
       ],
       rows: (progress?.highestTotalStats ?? []).map((r: any, i: number) => ({
         id: r.playerId ?? i,

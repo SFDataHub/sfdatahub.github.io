@@ -34,6 +34,12 @@ type NavSelection = {
   sub2?: string;
 };
 
+type HomeQuickLink = {
+  key: string;
+  label: string;
+  selection: NavSelection;
+};
+
 type TranslationFn = ReturnType<typeof useTranslation>["t"];
 
 type GuideHubSidebarProps = {
@@ -52,6 +58,123 @@ type GuideHubSidebarProps = {
   t: TranslationFn;
 };
 
+const HomeQuickLinks: React.FC = () => {
+  const { i18n } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const isGerman = i18n.language?.startsWith("de");
+  const links: HomeQuickLink[] = isGerman
+    ? [
+        {
+          key: "first-weekend-guide",
+          label: "First-Weekend-Guide",
+          selection: { tab: "progression", sub: "early", sub2: "first-weekend-guide" },
+        },
+        {
+          key: "hellevator-guide",
+          label: "Hellevator-Guide",
+          selection: { tab: "hellevator", sub: "hellevator-guide" },
+        },
+        {
+          key: "legendary-dungeon-guide",
+          label: "Legend\u00C3\u00A4rer Dungeon-Guide",
+          selection: {
+            tab: "legendary-dungeon",
+            sub: "legendary-dungeon-guide-epics-legendaries",
+          },
+        },
+        {
+          key: "rune-bonuses",
+          label: "Runen-Boni",
+          selection: { tab: "gamefeatures", sub: "arenaam", sub2: "am-rune-bonuses" },
+        },
+        {
+          key: "calculators",
+          label: "Rechner",
+          selection: { tab: "calculators" },
+        },
+      ]
+    : [
+        {
+          key: "first-weekend-guide",
+          label: "First Weekend Guide",
+          selection: { tab: "progression", sub: "early", sub2: "first-weekend-guide" },
+        },
+        {
+          key: "hellevator-guide",
+          label: "Hellevator Guide",
+          selection: { tab: "hellevator", sub: "hellevator-guide" },
+        },
+        {
+          key: "legendary-dungeon-guide",
+          label: "Legendary Dungeon Guide",
+          selection: {
+            tab: "legendary-dungeon",
+            sub: "legendary-dungeon-guide-epics-legendaries",
+          },
+        },
+        {
+          key: "rune-bonuses",
+          label: "Rune Bonuses",
+          selection: { tab: "gamefeatures", sub: "arenaam", sub2: "am-rune-bonuses" },
+        },
+        {
+          key: "calculators",
+          label: "Calculators",
+          selection: { tab: "calculators" },
+        },
+      ];
+
+  const buildHref = (selection: NavSelection) => {
+    const next = new URLSearchParams();
+    next.set("tab", selection.tab);
+    if (selection.sub) next.set("sub", selection.sub);
+    if (selection.sub2) next.set("sub2", selection.sub2);
+    return `/guidehub?${next.toString()}`;
+  };
+
+  const openSelection = (selection: NavSelection) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", selection.tab);
+    if (selection.sub) {
+      next.set("sub", selection.sub);
+    } else {
+      next.delete("sub");
+    }
+    if (selection.sub2) {
+      next.set("sub2", selection.sub2);
+    } else {
+      next.delete("sub2");
+    }
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  const handleClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    selection: NavSelection
+  ) => {
+    if (event.defaultPrevented) return;
+    if (event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    openSelection(selection);
+  };
+
+  return (
+    <ul>
+      {links.map((item) => (
+        <li key={item.key}>
+          <a
+            href={buildHref(item.selection)}
+            onClick={(event) => handleClick(event, item.selection)}
+          >
+            {item.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 const FortressLinkButtons: React.FC = () => {
   const [params, setParams] = useSearchParams();
 
@@ -65,15 +188,6 @@ const FortressLinkButtons: React.FC = () => {
 
   return (
     <div className={styles.hudButtonGrid}>
-      <button
-        type="button"
-        className={styles.hudButton}
-        onClick={() => openSub("fortress-attack-duplication")}
-      >
-        <HudBox padding="md" hover className={styles.hudButtonBox}>
-          <span className={styles.hudButtonText}>Fortress attack duplication guide</span>
-        </HudBox>
-      </button>
       <button
         type="button"
         className={styles.hudButton}
@@ -92,9 +206,92 @@ const FortressLinkButtons: React.FC = () => {
           <span className={styles.hudButtonText}>Fortress Package skip order</span>
         </HudBox>
       </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress-attack-duplication")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress attack duplication guide</span>
+        </HudBox>
+      </button>
     </div>
   );
 };
+
+const GameFeaturesLinkButtons: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", sub);
+    next.delete("sub2");
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("underworld")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Underworld</span>
+        </HudBox>
+      </button>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("arenaam")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Arena Manager</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
+const FortressPackageSkipOrderButton: React.FC = () => {
+  const [params, setParams] = useSearchParams();
+
+  const openSub = (sub2: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "gamefeatures");
+    next.set("sub", "fortress");
+    next.set("sub2", sub2);
+    setParams(next, { replace: false, preventScrollReset: true });
+  };
+
+  return (
+    <div className={styles.hudButtonGrid}>
+      <button
+        type="button"
+        className={styles.hudButton}
+        onClick={() => openSub("fortress-package-skip-order")}
+      >
+        <HudBox padding="md" hover className={styles.hudButtonBox}>
+          <span className={styles.hudButtonText}>Fortress Package skip order</span>
+        </HudBox>
+      </button>
+    </div>
+  );
+};
+
+const FortressPackageSkipOrderTableCard: React.FC = () => (
+  <PackageSkipOrderTable variant="underworld" />
+);
 
 const UnderworldLinkButtons: React.FC = () => {
   const [params, setParams] = useSearchParams();
@@ -855,10 +1052,13 @@ const GuideHubV2: React.FC = () => {
       "am-rune-bonuses-table": AMRuneBonusesTable,
       "arenaam-link-buttons": ArenaAMLinkButtons,
       "arenaam-related-buttons": ArenaAMRelatedButtons,
+      "gamefeatures-link-buttons": GameFeaturesLinkButtons,
+      "home-quick-links": HomeQuickLinks,
       "fortress-link-buttons": FortressLinkButtons,
+      "fortress-package-skip-order-button": FortressPackageSkipOrderButton,
       "underworld-link-buttons": UnderworldLinkButtons,
       "fortress-related-buttons": FortressRelatedButtons,
-      "fortress-package-skip-order-table": PackageSkipOrderTable,
+      "fortress-package-skip-order-table": FortressPackageSkipOrderTableCard,
       "fortress-calculator": FortressCalculator,
       "underworld-calculator": UnderworldCalculator,
       "gem-calculator": GuideHubV2GemCalculator,

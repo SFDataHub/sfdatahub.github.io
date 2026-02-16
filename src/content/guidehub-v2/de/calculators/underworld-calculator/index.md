@@ -1,7 +1,7 @@
 ﻿---
 title: "Underworld Calculator"
-category: "Game Features"
-status: "work_in_progress"
+category: "Progression"
+status: "up_to_date"
 gallery: []
 ---
 [[embed:underworld-calculator]]

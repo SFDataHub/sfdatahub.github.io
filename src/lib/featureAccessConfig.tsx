@@ -336,6 +336,8 @@ const DEFAULT_STATE: FeatureAccessState = {
   error: null,
 };
 const FEATURE_ACCESS_CACHE_TTL_MS = 5 * 60 * 1000;
+const FEATURE_ACCESS_LOCAL_CACHE_KEY = "sf_feature_access_snapshot";
+const FEATURE_ACCESS_LOCAL_DATE_KEY = "sf_feature_access_date";
 const FEATURE_ACCESS_SNAPSHOT_COLLECTION = "stats_public";
 const FEATURE_ACCESS_SNAPSHOT_DOC = "feature_access_main_nav";
 
@@ -419,6 +421,34 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
     let active = true;
 
     const fetchRules = async () => {
+      const today = new Date().toISOString().split("T")[0];
+      if (typeof window !== "undefined") {
+        try {
+          const cachedSnapshot = window.localStorage.getItem(FEATURE_ACCESS_LOCAL_CACHE_KEY);
+          const cachedDate = window.localStorage.getItem(FEATURE_ACCESS_LOCAL_DATE_KEY);
+          if (cachedSnapshot && cachedDate === today) {
+            const parsed = JSON.parse(cachedSnapshot) as FeatureAccessRuleMap;
+            if (parsed && typeof parsed === "object") {
+              const payload: FeatureAccessFetchResult = {
+                rules: parsed,
+                fetchedAt: Date.now(),
+              };
+              featureAccessCache = payload;
+              if (active) {
+                setState({
+                  ...parsed,
+                  loading: false,
+                  error: null,
+                });
+              }
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn("[FeatureAccess] localStorage cache read failed; falling back to Firestore.", error);
+        }
+      }
+
       const shouldTrace = isFirestoreReadTraceEnabled();
       const scope: FirestoreTraceScope =
         shouldTrace && !featureAccessCache && !featureAccessInflight
@@ -433,6 +463,14 @@ export const FeatureAccessProvider: React.FC<{ children: React.ReactNode }> = ({
             loading: false,
             error: null,
           });
+        }
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(FEATURE_ACCESS_LOCAL_CACHE_KEY, JSON.stringify(rules));
+            window.localStorage.setItem(FEATURE_ACCESS_LOCAL_DATE_KEY, today);
+          } catch (error) {
+            console.warn("[FeatureAccess] localStorage cache write failed.", error);
+          }
         }
       } catch (error) {
         const err = error as FirebaseError;

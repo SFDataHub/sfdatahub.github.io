@@ -105,7 +105,6 @@ const UnderworldCalculator: React.FC = () => {
                   <th className={styles.th}>{t("guidehub.calculators.underworld.table.level")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.underworld.table.soul")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.underworld.table.gold")}</th>
-                  <th className={styles.th}>{t("guidehub.calculators.underworld.table.buildTime")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.underworld.table.buildTimeL2")}</th>
                   <th className={styles.th}>{t("guidehub.calculators.underworld.table.skip")}</th>
                 </tr>
@@ -113,7 +112,7 @@ const UnderworldCalculator: React.FC = () => {
               <tbody>
                 {rows.length === 0 ? (
                   <tr className={styles.row}>
-                    <td className={styles.td} colSpan={6}>
+                    <td className={styles.td} colSpan={5}>
                       {t("guidehub.calculators.underworld.empty")}
                     </td>
                   </tr>
@@ -123,7 +122,6 @@ const UnderworldCalculator: React.FC = () => {
                       <td className={styles.td}>{r.level}</td>
                       <td className={styles.td}>{r.soul}</td>
                       <td className={styles.td}>{r.gold}</td>
-                      <td className={styles.td}>{formatHMS(r.timeSec)}</td>
                       <td className={styles.td}>{formatHMS(r.timeAdjSec)}</td>
                       <td className={styles.td}>{r.skipMushroomsAdj}</td>
                     </tr>

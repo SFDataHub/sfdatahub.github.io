@@ -60,6 +60,7 @@ const HelpPage: React.FC = () => {
       ],
     },
   ];
+  const visibleSections = sections.filter((section) => section.key !== "legal");
 
   return (
     <ContentShell
@@ -82,7 +83,7 @@ const HelpPage: React.FC = () => {
         </section>
 
         <div className={styles.grid}>
-          {sections.map((section) => {
+          {visibleSections.map((section) => {
             const sectionId = section.key === "login" ? "linking" : undefined;
             return (
               <section key={section.key} id={sectionId} className={styles.card}>

@@ -1,7 +1,7 @@
 ﻿---
 title: "Arena Manager"
 category: "Game Features"
-status: "work_in_progress"
+status: "up_to_date"
 gallery: []
 ---
 ## Uebersicht {#overview}

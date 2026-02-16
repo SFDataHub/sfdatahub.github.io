@@ -4,21 +4,9 @@ category: "GuideHub"
 status: "work_in_progress"
 gallery: []
 ---
-## Guide Hub (Offline)
-Der Guide Hub sammelt Strategien, Rechner und Event-Checklisten.
-
-## Quick Links
-- Hellevator Guide
-- Legendary Dungeon Guide
-
----
-## Recently Added
-- Platzhalter Eintrag A
-- Platzhalter Eintrag B
-- Platzhalter Eintrag C
-
----
-## Last Edited
-- Platzhalter Update 01
-- Platzhalter Update 02
-- Platzhalter Update 03
+***
+[[asset:sftaverndiscord]]
+Vielen Dank an das SF Tavern Team, das den Großteil der im Guide Hub verwendeten Infografiken bereitstellt!
+***
+## Schnellzugriff
+[[embed:home-quick-links]]
