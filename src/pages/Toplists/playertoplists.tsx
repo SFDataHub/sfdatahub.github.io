@@ -1298,6 +1298,7 @@ function TableDataView({
                 const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
                 const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
                 const mineTone = getMineTone(decor?.mineTier);
+                const calculatedSum = (r.main ?? 0) + (r.con ?? 0);
                 const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
                   if (!showCompare) return null;
                   if (missing) {
@@ -1374,7 +1375,7 @@ function TableDataView({
                   </td>
                   <td style={{ padding: "8px 6px", textAlign: "right" }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span>{fmtNum(r.sum)}</span>
+                      <span>{fmtNum(calculatedSum)}</span>
                       {renderDelta(deltas.sum ?? null, compareMissing)}
                     </div>
                   </td>
