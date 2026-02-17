@@ -75,9 +75,7 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],
   "/settings": [
-    { to: "/settings/profile",    labelKey: "nav.profile" },
     { to: "/settings/account",    labelKey: "nav.account" },
-    { to: "/settings/appearance", labelKey: "nav.appearance" },
   ],
    "/playground": [
     { to: "/playground/list-views",       labelKey: "nav.listViews" },

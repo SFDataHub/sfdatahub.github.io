@@ -93,7 +93,6 @@ import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
 
 // Settings
-import Settings from "./pages/Settings";
 import AccountSettingsPage from "./pages/Settings/AccountSettingsPage";
 
 // Playground
@@ -428,7 +427,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* Settings */}
                 <Route
                   path="/settings"
-                  element={withFeatureGate("main.settings", "/settings", <Settings />)}
+                  element={withFeatureGate("main.settings", "/settings", <Navigate to="/settings/account" replace />)}
                 />
                 <Route
                   path="/settings/account"
