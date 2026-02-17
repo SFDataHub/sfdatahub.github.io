@@ -12,12 +12,14 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { beginReadScope, endReadScope, traceGetDocs } from "../../lib/debug/firestoreReadTrace";
+import { buildPlayerIdentifier, parsePlayerIdentifier } from "../../lib/players/identifier";
 
 // Klassen-Mapping lokal einbinden (Icon-Auflösung findet hier statt)
 import { CLASSES, CLASS_BY_KEY } from "../../data/classes";
 
 type PlayerHit = {
   playerId: string;
+  identifier?: string | null;
   name: string | null;
   nameFold: string | null;
   guildName: string | null;
@@ -43,6 +45,28 @@ function fold(s?: string | null) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
 }
+
+const toStringOrNull = (value: any): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const resolvePlayerIdentifier = (docId: string | undefined, data: any): string | null => {
+  const explicit =
+    toStringOrNull(data?.identifier) ??
+    toStringOrNull(data?.playerIdentifier) ??
+    toStringOrNull(data?.values?.Identifier) ??
+    toStringOrNull(data?.values?.identifier);
+  if (explicit) return explicit;
+
+  const docIdString = toStringOrNull(docId);
+  if (docIdString && parsePlayerIdentifier(docIdString)) return docIdString;
+
+  const pid = toStringOrNull(data?.playerId) ?? docIdString;
+  const server = toStringOrNull(data?.server) ?? toStringOrNull(data?.values?.Server);
+  return buildPlayerIdentifier(server, pid);
+};
 
 // Interne, robuste Icon-Auflösung (nutzt labels & keys aus classes.ts)
 function resolveClassIcon(className?: string | null): string | undefined {
@@ -144,12 +168,16 @@ export default function PlayerSearch({
         const rows: PlayerHit[] = [];
 
         function pushDoc(docSnap: any) {
-          const playerId = docSnap.ref.parent.parent?.id || "";
-          if (!playerId || seen.has(playerId)) return;
-          seen.add(playerId);
+          const docId = docSnap.ref.parent.parent?.id || "";
           const d = docSnap.data() as any;
+          const identifier = resolvePlayerIdentifier(docId, d);
+          const playerId = toStringOrNull(d.playerId) ?? docId;
+          const dedupeKey = identifier ?? playerId ?? "";
+          if (!dedupeKey || seen.has(dedupeKey)) return;
+          seen.add(dedupeKey);
           rows.push({
-            playerId,
+            playerId: playerId ?? "",
+            identifier,
             name: d.name ?? null,
             nameFold: d.nameFold ?? null,
             guildName: d.guildName ?? d.values?.Guild ?? null,
@@ -198,11 +226,12 @@ export default function PlayerSearch({
   }, []);
 
   function gotoHit(hit: PlayerHit) {
-    if (!hit?.playerId) return;
+    const profileIdentifier = hit.identifier ?? buildPlayerIdentifier(hit.server ?? null, hit.playerId);
+    if (!profileIdentifier) return;
     setHits([]);
     setActiveIndex(-1);
     setQ("");
-    navigate(`/player/${encodeURIComponent(hit.playerId)}`);
+    navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -264,7 +293,7 @@ export default function PlayerSearch({
 
               return (
                 <button
-                  key={`${h.playerId}-${i}`}
+                  key={`${h.identifier ?? h.playerId}-${i}`}
                   onClick={() => gotoHit(h)}
                   style={active ? sx.itemActive : sx.item}
                   title={h.name || ""}

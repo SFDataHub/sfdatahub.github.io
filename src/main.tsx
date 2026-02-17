@@ -262,10 +262,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/players/rankings" element={<PlayersRankings />} />
                 <Route path="/players/stats" element={<PlayersStats />} />
                 <Route path="/players/profile" element={<PlayerProfile />} />
-                <Route path="/players/profile/:playerId" element={<PlayerProfile />} />
+                <Route path="/players/profile/:identifier" element={<PlayerProfile />} />
                 <Route path="/players/compare" element={<PlayersCompare />} />
                 {/* kurze Route f?r Suche */}
-                <Route path="/player/:playerId" element={<PlayerProfile />} />
+                <Route path="/player/:identifier" element={<PlayerProfile />} />
 
                 {/* Guilds */}
                 <Route path="/guilds" element={<GuildsIndex />} />

@@ -11,6 +11,8 @@ import {
   pick,
   computeBaseStats,
   deriveForPlayer,
+  readDerivedScanSec,
+  withDerivedScanSec,
 } from "./playerDerivedHelpers.mts";
 
 // ---------- Config ----------
@@ -51,6 +53,8 @@ const run = async () => {
     if (!path.startsWith(`${PLAYERS_COL}/`) || !path.endsWith(`/latest/${LATEST_DOC_ID}`)) return;
 
     const latest = snap.data();
+    const incomingSecRaw = Number(latest?.timestamp);
+    const incomingSec = Number.isFinite(incomingSecRaw) ? Math.trunc(incomingSecRaw) : null;
     const derived = deriveForPlayer(latest, () => FieldValue.serverTimestamp());
     // Fallback-ID, falls playerId im Doc fehlt: players/{pid}
     const fallbackId =
@@ -60,7 +64,37 @@ const run = async () => {
       snap.id;
 
     const destRef = db.collection(PLAYER_CACHE_COL).doc(String(fallbackId));
-    writer.set(destRef, derived, { merge: true });
+    if (incomingSec == null) {
+      console.info("[update-player-derived] skip derived update: missing timestamp", {
+        playerId: String(fallbackId),
+        server: derived.serverKey || latest?.server || null,
+        path: destRef.path,
+        function: "update-player-derived",
+      });
+      return;
+    }
+
+    const storedSnap = await destRef.get();
+    const storedInfo = storedSnap.exists ? readDerivedScanSec(storedSnap.data() as Record<string, any>) : { sec: null, field: null };
+
+    if (
+      storedInfo.sec != null &&
+      incomingSec != null &&
+      incomingSec < storedInfo.sec
+    ) {
+      console.info("[update-player-derived] skip derived update: older scan", {
+        playerId: String(fallbackId),
+        server: derived.serverKey || latest?.server || null,
+        incoming: incomingSec,
+        stored: storedInfo.sec,
+        path: destRef.path,
+        function: "update-player-derived",
+      });
+      return;
+    }
+
+    const nextDerived = withDerivedScanSec(derived as Record<string, any>, incomingSec, "latestScanAtSec");
+    writer.set(destRef, nextDerived, { merge: true });
     processed++;
 
     const group = derived.group || "ALL";

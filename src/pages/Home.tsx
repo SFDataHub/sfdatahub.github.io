@@ -10,6 +10,7 @@ import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
 import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
 import guideHubLogo from "../assets/logo_guidehub.png";
+import discordLogo from "../assets/discord-logo.svg";
 import { guideAssetByKey } from "../data/guidehub/assets";
 
 // Historybook cover (homepage preview)
@@ -20,6 +21,7 @@ const SFTAVERN_DISCORD_ASSET = guideAssetByKey("sftaverndiscord", 512);
 const SFTOOLS_PREVIEW = SFTOOLS_ASSET.thumb ?? SFTOOLS_ASSET.url ?? "";
 const SFTAVERN_DISCORD_PREVIEW = SFTAVERN_DISCORD_ASSET.thumb ?? SFTAVERN_DISCORD_ASSET.url ?? "";
 const FEATURED_PREVIEW_COMPACT_HEIGHT = "clamp(96px, 22vw, 192px)";
+const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
 
 // Datenquellen (client-seitig lesbar)
 const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
@@ -818,7 +820,7 @@ const Home: React.FC = () => {
               previewAltI18nKey="home.sftools.previewAlt"
             />
             <FeaturedPreviewCard
-              href="https://discord.gg/sftavern"
+              href={DISCORD_INVITE_URL}
               title={t("home.taverndiscord.title")}
               subtitle={t("home.taverndiscord.subtitle")}
               previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
@@ -833,6 +835,33 @@ const Home: React.FC = () => {
         </div>
         <div className={styles.splitSide}>
           <YouTubeCarousel />
+        </div>
+      </div>
+      {/* Row 3 — Discord CTA */}
+      <div className={styles.row}>
+        <div className={styles.discordBannerWrap}>
+          <a
+            href={DISCORD_INVITE_URL}
+            className={`${styles.card} ${styles.discordBanner}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={t("home.discordBanner.aria")}
+            data-i18n-scope="home.discordBanner"
+          >
+            <div className={styles.discordBannerText}>
+              <img
+                src={discordLogo}
+                alt="Discord Logo"
+                className={styles.discordBannerLogo}
+              />
+              <h2 className={styles.discordBannerTitle} data-i18n="home.discordBanner.title">
+                {t("home.discordBanner.title")}
+              </h2>
+              <p className={styles.discordBannerSubtitle} data-i18n="home.discordBanner.subtitle">
+                {t("home.discordBanner.subtitle")}
+              </p>
+            </div>
+          </a>
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />

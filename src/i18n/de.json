@@ -68,6 +68,14 @@
       "subtitle": "Community-Discord",
       "previewAlt": "Tavern Discord Vorschau"
     },
+    "discordBanner": {
+      "title": "JOIN OUR DISCORD",
+      "subtitle": "HIER BEITRETEN",
+      "linkLabel": "Invite",
+      "linkValue": "discord.gg/2FqSvXC3",
+      "aria": "SFDataHub Discord-Invite oeffnen",
+      "logoAlt": "Discord-Logo"
+    },
     "news": {
       "title": "Community-News",
       "empty": "Noch keine Neuigkeiten.",

@@ -3,7 +3,8 @@
 export type GameClassKey =
   | "warrior" | "mage" | "scout" | "assassin"
   | "demon-hunter" | "berserker" | "battle-mage"
-  | "druid" | "bard" | "necromancer" | "paladin";
+  | "druid" | "bard" | "necromancer" | "paladin"
+  | "plague-doctor";
 
 export type ClassMeta = {
   key: GameClassKey;
@@ -23,6 +24,7 @@ const DRIVE: Record<GameClassKey, string> = {
   mage:           "1sZ1ifX3V2V6KBZubOcCgkkhqW7oWpijS",
   necromancer:    "1mZKuTZKPEJTuwWhbhVsmFfs6vfnv2Wi9",
   paladin:        "1dx7zcadr6xFLNudjojKVerP19Vt6_lbB",
+  "plague-doctor": "1sRziBjLKnZ-iE7OC44c_mJ_0j62ra9fg",
   scout:          "12eL2NkyvJg2CL8GUbA8whKOA7TLBoa6x",
   warrior:        "13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt",
 };
@@ -53,6 +55,7 @@ export const CLASSES: ClassMeta[] = [
   { key: "bard",         label: "Bard",         iconUrl: driveViewUrl(DRIVE["bard"]),         fallback: "🎶"  },
   { key: "necromancer",  label: "Necromancer",  iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
   { key: "paladin",      label: "Paladin",      iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
+  { key: "plague-doctor", label: "Plague Doctor", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
 ];
 
 export const CLASS_BY_KEY = Object.fromEntries(CLASSES.map(c => [c.key, c] as const));
@@ -79,6 +82,7 @@ add("druide", "druid");
 add("barde", "bard");
 add("necro", "necromancer"); add("nekromant", "necromancer");
 add("pala", "paladin");
+add("plaguedoctor", "plague-doctor"); add("plague doctor", "plague-doctor"); add("plague-doctor", "plague-doctor");
 
 /** Öffentliche Helper: aus beliebigem Namen verlässlich das Icon bestimmen. */
 export function iconForClassName(input?: string | null): { url?: string; fallback?: string } {

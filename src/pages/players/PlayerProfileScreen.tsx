@@ -1,7 +1,18 @@
 // src/pages/players/PlayerProfileScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  collection,
+  collectionGroup,
+  doc,
+  documentId,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import HeroPanel from "../../components/player-profile/HeroPanel";
 import {
   ChartsTab,
@@ -34,6 +45,7 @@ import {
   traceGetDocs,
   type FirestoreTraceScope,
 } from "../../lib/debug/firestoreReadTrace";
+import { buildPlayerIdentifier, normalizeServerKeyFromInput, parsePlayerIdentifier } from "../../lib/players/identifier";
 import "./player-profile.css";
 
 const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
@@ -67,6 +79,7 @@ type PlayerSnapshot = {
   guildIdentifier: string | null;
   guildJoined: string | null;
   server: string | null;
+  identifier?: string | null;
   avatarIdentifier?: string | null;
   scrapbookPct?: number | null;
   totalStats?: number | null;
@@ -102,7 +115,14 @@ type ChartsCachePayload = {
 
 export default function PlayerProfileScreen() {
   const params = useParams<Record<string, string>>();
-  const playerId = params.id || params.pid || params.playerId || params.player || "";
+  const location = useLocation();
+  const routeParam = params.identifier || params.id || params.pid || params.playerId || params.player || "";
+  const parsedIdentifier = parsePlayerIdentifier(routeParam);
+  const serverFromQuery = normalizeServerKeyFromInput(
+    new URLSearchParams(location.search).get("server") ?? "",
+  );
+  const resolvedPlayerId = (parsedIdentifier?.playerId ?? routeParam).trim();
+  const resolvedServerKey = parsedIdentifier?.serverKey ?? serverFromQuery ?? null;
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -126,7 +146,7 @@ export default function PlayerProfileScreen() {
     async function load() {
       setLoading(true);
       setErr(null);
-      const id = (playerId || "").trim();
+      const id = (resolvedPlayerId || "").trim();
 
       if (!id) {
         setSnapshot(null);
@@ -147,7 +167,10 @@ export default function PlayerProfileScreen() {
         }
       };
 
-      const cachedServer = readServerIndex()[id];
+      const cacheServerFromRoute = resolvedServerKey
+        ? String(resolvedServerKey).trim().toLowerCase().replace(/[^a-z0-9]/g, "")
+        : "";
+      const cachedServer = cacheServerFromRoute || readServerIndex()[id];
       const cacheKey = cachedServer ? `${PROFILE_CACHE_PREFIX}${cachedServer}__${id}` : null;
       if (cacheKey) {
         const cached = readTtlCache(cacheKey, PROFILE_CACHE_TTL_MS);
@@ -160,10 +183,40 @@ export default function PlayerProfileScreen() {
       let scope: FirestoreTraceScope = null;
       try {
         scope = beginReadScope("PlayerProfile:load");
-        const ref = doc(db, `players/${id}/latest/latest`);
-        const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
-        if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
-        const data = (snap.data() ?? {}) as any;
+        let data: any = null;
+        if (parsedIdentifier?.identifier) {
+          const ref = doc(db, `players/${parsedIdentifier.identifier}/latest/latest`);
+          const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
+          if (snap.exists()) {
+            data = snap.data();
+          }
+        }
+
+        if (!data && resolvedServerKey) {
+          const cg = collectionGroup(db, "latest");
+          const q = query(
+            cg,
+            where("playerId", "==", id),
+            where("server", "==", resolvedServerKey),
+            limit(1),
+          );
+          const snap = await traceGetDocs(
+            scope,
+            { path: "players/latest (collectionGroup)" },
+            () => getDocs(q),
+          );
+          if (!snap.empty) {
+            data = snap.docs[0]?.data() ?? null;
+          }
+        }
+
+        if (!data) {
+          const ref = doc(db, `players/${id}/latest/latest`);
+          const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
+          if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
+          data = snap.data();
+        }
+        if (!data || typeof data !== "object") throw new Error("Spieler nicht gefunden.");
 
         const values =
           (typeof data.values === "object" && data.values ? data.values : {}) as Record<string, unknown>;
@@ -183,6 +236,7 @@ export default function PlayerProfileScreen() {
           (typeof values?.saveString === "string" && values.saveString) ||
           undefined;
 
+        const playerIdValue = String((data as any)?.playerId ?? id).trim() || id;
         const level = toNum(data.level ?? values?.Level) ?? null;
         const className = (data.className ?? values?.Class ?? null) || null;
         const guildName = (data.guildName ?? values?.Guild ?? null) || null;
@@ -191,7 +245,7 @@ export default function PlayerProfileScreen() {
           typeof rawGuildIdentifier === "string" ? rawGuildIdentifier.trim() || null : null;
         const rawGuildJoined = values["Guild Joined"];
         const guildJoined = typeof rawGuildJoined === "string" ? rawGuildJoined.trim() || null : null;
-        const name = data.name ?? values?.Name ?? id;
+        const name = data.name ?? values?.Name ?? playerIdValue;
         const server = data.server ?? values?.Server ?? null;
         const serverNormalized =
           typeof server === "string"
@@ -200,12 +254,17 @@ export default function PlayerProfileScreen() {
                 .toLowerCase()
                 .replace(/\./g, "_")
             : "";
+        const profileIdentifier =
+          (typeof data.identifier === "string" && data.identifier.trim() ? data.identifier.trim() : null) ??
+          (typeof values?.Identifier === "string" && values.Identifier.trim() ? values.Identifier.trim() : null) ??
+          (typeof values?.identifier === "string" && values.identifier.trim() ? values.identifier.trim() : null) ??
+          buildPlayerIdentifier(server, playerIdValue);
         const avatarIdentifier =
           data.avatarIdentifier ??
           data.identifier ??
           values?.avatarIdentifier ??
           values?.identifier ??
-          (serverNormalized ? `${id}__${serverNormalized}` : null);
+          (serverNormalized ? `${playerIdValue}__${serverNormalized}` : null);
         const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
         const base = toNum(data.base ?? values?.Base ?? values?.base) ?? null;
         const con = toNum(data.con ?? values?.Con ?? values?.con) ?? null;
@@ -240,7 +299,7 @@ export default function PlayerProfileScreen() {
             : undefined;
 
         const nextSnapshot: PlayerSnapshot = {
-          id,
+          id: playerIdValue,
           name,
           className,
           level,
@@ -248,6 +307,7 @@ export default function PlayerProfileScreen() {
           guildIdentifier,
           guildJoined,
           server,
+          identifier: profileIdentifier,
           avatarIdentifier,
           scrapbookPct,
           totalStats,
@@ -295,14 +355,14 @@ export default function PlayerProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [playerId]);
+  }, [resolvedPlayerId, resolvedServerKey, parsedIdentifier?.identifier]);
 
   useEffect(() => {
     setChartsSeries(null);
     chartsLoadingRef.current = false;
     chartsSourceRef.current = null;
     chartsLoadedKeyRef.current = null;
-  }, [playerId, snapshot?.server]);
+  }, [resolvedPlayerId, snapshot?.server]);
 
   useEffect(() => {
     chartsSeriesRef.current = chartsSeries;
@@ -469,7 +529,11 @@ export default function PlayerProfileScreen() {
 
       if (action === "copy-link") {
         if (typeof window !== "undefined" && navigator?.clipboard) {
-          const link = `${window.location.origin}/players/profile/${snapshot.id}`;
+          const linkId =
+            snapshot.identifier ??
+            buildPlayerIdentifier(snapshot.server ?? null, snapshot.id) ??
+            snapshot.id;
+          const link = `${window.location.origin}/players/profile/${encodeURIComponent(linkId)}`;
           try {
             await navigator.clipboard.writeText(link);
             showFeedback("Profil-Link wurde kopiert.");
