@@ -11,6 +11,7 @@ import submenuStyles from "./SubmenuPortal.module.css";
 import { useAuth } from "../../context/AuthContext";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
 import { useTranslation } from "react-i18next";
+import { buildPlayerIdentifier } from "../../lib/players/identifier";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -426,8 +427,12 @@ export default function Sidebar({
     }
   };
 
-  const handleCharacterClick = (playerId: string | number) => {
-    navigate(`/player/${playerId}`);
+  const handleCharacterClick = (playerId: string | number, server?: string | null) => {
+    const pid = String(playerId ?? "").trim();
+    if (!pid || pid === "-") return;
+    const profileIdentifier = buildPlayerIdentifier(server ?? null, pid);
+    if (!profileIdentifier) return;
+    navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
     onNavigate?.();
   };
 
@@ -542,7 +547,7 @@ export default function Sidebar({
                         key={key}
                         type="button"
                         className={styles.characterChip}
-                        onClick={() => handleCharacterClick(playerId)}
+                        onClick={() => handleCharacterClick(playerId, char.server ?? null)}
                       >
                         <span className={styles.characterChipId}>{playerId}</span>
                         {metaParts && <span className={styles.characterChipMeta}>{metaParts}</span>}

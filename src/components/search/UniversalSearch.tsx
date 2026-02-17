@@ -21,6 +21,7 @@ import {
   normalizeQuery,
   setCachedSuggestions,
 } from "../../lib/search/searchCache";
+import { buildPlayerIdentifier, parsePlayerIdentifier } from "../../lib/players/identifier";
 
 type PlayerHit = {
   kind: "player";
@@ -83,6 +84,11 @@ const toNumberLoose = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : null;
+};
+const toStringOrNull = (v: any): string | null => {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed ? trimmed : null;
 };
 const fold = (s?: string | null) =>
   String(s ?? "")
@@ -188,6 +194,22 @@ function getRootAndId(docSnap: any): { root?: string; id?: string } {
   const rootCol = parentDoc?.parent; // /players | /guilds
   return { root: rootCol?.id, id: parentDoc?.id };
 }
+
+const resolvePlayerIdentifier = (docId: string | undefined, data: any): string | null => {
+  const explicit =
+    toStringOrNull(data?.identifier) ??
+    toStringOrNull(data?.playerIdentifier) ??
+    toStringOrNull(data?.values?.Identifier) ??
+    toStringOrNull(data?.values?.identifier);
+  if (explicit) return explicit;
+
+  const docIdString = toStringOrNull(docId);
+  if (docIdString && parsePlayerIdentifier(docIdString)) return docIdString;
+
+  const pid = toStringOrNull(data?.playerId) ?? docIdString;
+  const server = toStringOrNull(data?.server) ?? toStringOrNull(data?.values?.Server);
+  return buildPlayerIdentifier(server, pid);
+};
 
 export default function UniversalSearch({
   placeholder = "Suchen … (Spieler, Gilden, Server)",
@@ -313,14 +335,14 @@ export default function UniversalSearch({
         function considerPG(docSnap: any) {
           const d = docSnap.data() as any;
           const { root, id } = getRootAndId(docSnap);
-          const safeId = id || d.playerId || d.guildIdentifier || "";
 
           if (root === "players" || (!!d.playerId && !d.guildIdentifier)) {
-            if (!safeId || seenP.has(safeId)) return;
-            seenP.add(safeId);
+            const identifier = resolvePlayerIdentifier(id, d);
+            if (!identifier || seenP.has(identifier)) return;
+            seenP.add(identifier);
             rowsP.push({
               kind: "player",
-              id: safeId,
+              id: identifier,
               name: d.name ?? d.values?.Name ?? null,
               nameFold: d.nameFold ?? null,
               server: d.server ?? d.values?.Server ?? null,
@@ -333,6 +355,7 @@ export default function UniversalSearch({
           }
 
           if (root === "guilds" || (!!d.guildIdentifier && !d.playerId)) {
+            const safeId = id || d.guildIdentifier || "";
             if (!safeId || seenG.has(safeId)) return;
             seenG.add(safeId);
             rowsG.push({
@@ -529,9 +552,12 @@ export default function UniversalSearch({
 
   const navigateTo = (hit: Hit) => {
     if (hit.kind === "player") {
+      const profileIdentifier =
+        parsePlayerIdentifier(hit.id) ? hit.id : buildPlayerIdentifier(hit.server ?? null, hit.id);
+      if (!profileIdentifier) return;
       persistRecent({
         kind: "player",
-        id: hit.id,
+        id: profileIdentifier,
         name: hit.name,
         className: hit.className,
         level: hit.level,
@@ -539,7 +565,7 @@ export default function UniversalSearch({
         server: hit.server,
       });
       setRecents(loadRecents());
-      navigate(`/player/${encodeURIComponent(hit.id)}`);
+      navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
     } else if (hit.kind === "guild") {
       persistRecent({
         kind: "guild",

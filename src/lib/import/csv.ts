@@ -11,7 +11,13 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { buildPlayerDerivedSnapshotEntry, computeBaseStats, deriveForPlayer } from "../../../tools/playerDerivedHelpers";
+import {
+  buildPlayerDerivedSnapshotEntry,
+  computeBaseStats,
+  deriveForPlayer,
+  readDerivedScanSec,
+  withDerivedScanSec,
+} from "../../../tools/playerDerivedHelpers";
 import type { GuildDerivedAggregate } from "./importer";
 import { db } from "../firebase";
 import {
@@ -940,6 +946,13 @@ type PlayerDerivedSnapshotEntry = {
   treasury: number | null;
 };
 
+type DerivedUpsertResult = {
+  skipped: Array<{ playerId?: string; guildId?: string; server: string; incoming: number; stored: number }>;
+  skippedMissingTs: number;
+  applied: number;
+  wrote: boolean;
+};
+
 type GuildDerivedSnapshotEntry = {
   guildId: string;
   server: string;
@@ -984,49 +997,6 @@ const toDigitsOnlyNumber = (value: any): number => {
   if (!cleaned) return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
-};
-
-const DERIVED_SCAN_SEC_FIELDS = [
-  "latestScanAtSec",
-  "latestScanAt",
-  "lastScanAtSec",
-  "lastScanAt",
-  "scanAtSec",
-  "scanAt",
-] as const;
-
-const normalizeScanSec = (value: unknown): number | null => {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return null;
-    return value > 1e12 ? Math.floor(value / 1000) : value;
-  }
-  if (typeof value === "string") {
-    const raw = value.trim();
-    if (/^\d{13}$/.test(raw)) return Math.floor(Number(raw) / 1000);
-    if (/^\d{10}$/.test(raw)) return Number(raw);
-  }
-  return null;
-};
-
-const readDerivedScanSec = (
-  entry: Record<string, any>,
-): { sec: number | null; field: string | null } => {
-  for (const field of DERIVED_SCAN_SEC_FIELDS) {
-    if (!Object.prototype.hasOwnProperty.call(entry, field)) continue;
-    return { sec: normalizeScanSec((entry as any)[field]), field };
-  }
-  return { sec: null, field: null };
-};
-
-const withDerivedScanSec = <T extends Record<string, any>>(
-  entry: T,
-  sec: number | null,
-  field?: string | null,
-): T => {
-  if (!Number.isFinite(sec)) return entry;
-  const target = field ?? "latestScanAtSec";
-  if ((entry as any)[target] === sec) return entry;
-  return { ...entry, [target]: sec };
 };
 
 const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
@@ -1387,8 +1357,10 @@ async function writeLatest(
 async function upsertPlayerDerivedServerSnapshot(
   serverKey: string,
   entries: PlayerDerivedSnapshotEntry[]
-) {
-  if (!entries.length) return;
+): Promise<DerivedUpsertResult> {
+  if (!entries.length) {
+    return { skipped: [], skippedMissingTs: 0, applied: 0, wrote: false };
+  }
 
   const snapshotKey = String(serverKey || "all").trim() || "all";
   const snapshotRef = doc(db, `${PLAYER_DERIVED_COL}/${toSnapshotDocId(snapshotKey)}`);
@@ -1433,6 +1405,7 @@ async function upsertPlayerDerivedServerSnapshot(
           incoming: number;
           stored: number;
         }> = [];
+        let skippedMissingTs = 0;
         const touchedIds = new Set<string>();
 
         for (const entry of entries) {
@@ -1441,6 +1414,10 @@ async function upsertPlayerDerivedServerSnapshot(
 
           const incomingInfo = readDerivedScanSec(entry as Record<string, any>);
           const incomingSec = incomingInfo.sec;
+          if (incomingSec == null) {
+            skippedMissingTs += 1;
+            continue;
+          }
           const existingEntry = byId.get(pid);
           const storedInfo = existingEntry
             ? readDerivedScanSec(existingEntry as Record<string, any>)
@@ -1489,7 +1466,7 @@ async function upsertPlayerDerivedServerSnapshot(
         }
 
         if (touchedIds.size === 0) {
-          return { skipped, wrote: false };
+          return { skipped, skippedMissingTs, applied: 0, wrote: false };
         }
 
         const players = Array.from(byId.values());
@@ -1514,23 +1491,36 @@ async function upsertPlayerDerivedServerSnapshot(
           { merge: true }
         );
 
-        return { skipped, wrote: true };
+        return { skipped, skippedMissingTs, applied: touchedIds.size, wrote: true };
       }),
     { label: "ImportCsv:derivedSnapshot", path: snapshotRef.path },
   );
 
   if (result?.skipped?.length) {
     for (const entry of result.skipped) {
-      console.info("[ImportCsv] skip derived update: older scan", entry);
+      console.info("[ImportCsv] skip derived update: older scan", {
+        ...entry,
+        path: snapshotRef.path,
+        function: "upsertPlayerDerivedServerSnapshot",
+      });
     }
   }
+
+  return {
+    skipped: result?.skipped ?? [],
+    skippedMissingTs: result?.skippedMissingTs ?? 0,
+    applied: result?.applied ?? 0,
+    wrote: Boolean(result?.wrote),
+  };
 }
 
 async function upsertGuildDerivedServerSnapshot(
   serverKey: string,
   entries: GuildDerivedSnapshotEntry[]
-) {
-  if (!entries.length) return;
+): Promise<DerivedUpsertResult> {
+  if (!entries.length) {
+    return { skipped: [], skippedMissingTs: 0, applied: 0, wrote: false };
+  }
 
   const snapshotKey = String(serverKey || "all").trim() || "all";
   const snapshotRef = doc(db, `${GUILD_DERIVED_COL}/${toGuildSnapshotDocId(snapshotKey)}`);
@@ -1578,6 +1568,7 @@ async function upsertGuildDerivedServerSnapshot(
           incoming: number;
           stored: number;
         }> = [];
+        let skippedMissingTs = 0;
         const touchedIds = new Set<string>();
 
         for (const entry of entries) {
@@ -1586,6 +1577,10 @@ async function upsertGuildDerivedServerSnapshot(
 
           const incomingInfo = readDerivedScanSec(entry as Record<string, any>);
           const incomingSec = incomingInfo.sec;
+          if (incomingSec == null) {
+            skippedMissingTs += 1;
+            continue;
+          }
           const existingEntry = byId.get(gid);
           const storedInfo = existingEntry
             ? readDerivedScanSec(existingEntry as Record<string, any>)
@@ -1634,7 +1629,7 @@ async function upsertGuildDerivedServerSnapshot(
         }
 
         if (touchedIds.size === 0) {
-          return { skipped, wrote: false };
+          return { skipped, skippedMissingTs, applied: 0, wrote: false };
         }
 
         const guilds = Array.from(byId.values()).map((entry) => {
@@ -1664,16 +1659,27 @@ async function upsertGuildDerivedServerSnapshot(
           { merge: true }
         );
 
-        return { skipped, wrote: true };
+        return { skipped, skippedMissingTs, applied: touchedIds.size, wrote: true };
       }),
     { label: "ImportCsv:guildDerivedSnapshot", path: snapshotRef.path },
   );
 
   if (result?.skipped?.length) {
     for (const entry of result.skipped) {
-      console.info("[ImportCsv] skip derived update: older scan", entry);
+      console.info("[ImportCsv] skip derived update: older scan", {
+        ...entry,
+        path: snapshotRef.path,
+        function: "upsertGuildDerivedServerSnapshot",
+      });
     }
   }
+
+  return {
+    skipped: result?.skipped ?? [],
+    skippedMissingTs: result?.skippedMissingTs ?? 0,
+    applied: result?.applied ?? 0,
+    wrote: Boolean(result?.wrote),
+  };
 }
 
 export async function flushGuildDerivedSnapshotsFromAggregates(
@@ -2149,6 +2155,9 @@ export async function importCsvToDB(
       (sum, entries) => sum + entries.length,
       0
     );
+    let appliedWritesPlayers = 0;
+    let skippedOlderPlayers = 0;
+    let missingTsPlayers = 0;
     if (pendingSnapshotKeys.length) {
       console.log("[ImportCsv] Derived snapshot flush pending", {
         count: pendingSnapshotKeys.length,
@@ -2159,17 +2168,31 @@ export async function importCsvToDB(
     const flushedDocIds: string[] = [];
     for (const [serverKey, entries] of pendingDerivedByServer.entries()) {
       try {
-        await upsertPlayerDerivedServerSnapshot(serverKey, entries);
-        flushedDocIds.push(toSnapshotDocId(serverKey));
+        const res = await upsertPlayerDerivedServerSnapshot(serverKey, entries);
+        appliedWritesPlayers += res.applied;
+        skippedOlderPlayers += res.skipped.length;
+        missingTsPlayers += res.skippedMissingTs;
+        if (res.wrote) flushedDocIds.push(toSnapshotDocId(serverKey));
       } catch (error) {
         console.warn("[ImportCsv] Derived snapshot upsert failed", { serverKey, error });
       }
     }
     if (pendingSnapshotKeys.length) {
-      console.log("[ImportCsv] Derived snapshot flush done", {
-        count: flushedDocIds.length,
-        docs: flushedDocIds,
-      });
+      if (appliedWritesPlayers === 0) {
+        console.log("[ImportCsv] Derived snapshot flush skipped (no applied writes)", {
+          servers: pendingSnapshotKeys,
+          skippedOlder: skippedOlderPlayers,
+          missingTimestamp: missingTsPlayers,
+        });
+      } else {
+        console.log("[ImportCsv] Derived snapshot flush done", {
+          count: flushedDocIds.length,
+          docs: flushedDocIds,
+          appliedWrites: appliedWritesPlayers,
+          skippedOlder: skippedOlderPlayers,
+          missingTimestamp: missingTsPlayers,
+        });
+      }
     }
     await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
   }
@@ -2448,20 +2471,37 @@ export async function importCsvToDB(
           entries: pendingEntryCount,
         });
       }
+      let appliedWritesGuilds = 0;
+      let skippedOlderGuilds = 0;
+      let missingTsGuilds = 0;
       const flushedDocIds: string[] = [];
       for (const [serverKey, entries] of pendingDerivedByServer.entries()) {
         try {
-          await upsertGuildDerivedServerSnapshot(serverKey, entries);
-          flushedDocIds.push(toGuildSnapshotDocId(serverKey));
+          const res = await upsertGuildDerivedServerSnapshot(serverKey, entries);
+          appliedWritesGuilds += res.applied;
+          skippedOlderGuilds += res.skipped.length;
+          missingTsGuilds += res.skippedMissingTs;
+          if (res.wrote) flushedDocIds.push(toGuildSnapshotDocId(serverKey));
         } catch (error) {
           console.warn("[ImportCsv] Guild derived snapshot upsert failed", { serverKey, error });
         }
       }
       if (pendingSnapshotKeys.length) {
-        console.log("[ImportCsv] Guild derived snapshot flush done", {
-          count: flushedDocIds.length,
-          docs: flushedDocIds,
-        });
+        if (appliedWritesGuilds === 0) {
+          console.log("[ImportCsv] Guild derived snapshot flush skipped (no applied writes)", {
+            servers: pendingSnapshotKeys,
+            skippedOlder: skippedOlderGuilds,
+            missingTimestamp: missingTsGuilds,
+          });
+        } else {
+          console.log("[ImportCsv] Guild derived snapshot flush done", {
+            count: flushedDocIds.length,
+            docs: flushedDocIds,
+            appliedWrites: appliedWritesGuilds,
+            skippedOlder: skippedOlderGuilds,
+            missingTimestamp: missingTsGuilds,
+          });
+        }
       }
     }
   }

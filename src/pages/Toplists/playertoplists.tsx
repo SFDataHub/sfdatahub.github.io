@@ -19,6 +19,7 @@ import {
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
+import { buildPlayerIdentifier } from "../../lib/players/identifier";
 
 const splitListParam = (value: string | null) =>
   (value ?? "")
@@ -1299,6 +1300,17 @@ function TableDataView({
                 const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
                 const classIconUrl = getClassIconUrl((r as any).class, 48);
                 const playerId = (r as any).playerId ?? (r as any).id ?? null;
+                const explicitIdentifier =
+                  (r as any).identifier ??
+                  (r as any).playerIdentifier ??
+                  (r as any).values?.Identifier ??
+                  (r as any).values?.identifier ??
+                  null;
+                const profileIdentifier =
+                  (typeof explicitIdentifier === "string" && explicitIdentifier.trim()
+                    ? explicitIdentifier.trim()
+                    : null) ??
+                  buildPlayerIdentifier((r as any).server ?? null, playerId);
                 const rowKey = playerId ?? buildRowKey(r);
                 const decor = decorMap.get(rowKey);
                 const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
@@ -1323,9 +1335,9 @@ function TableDataView({
                 <tr
                   key={`${r.name}__${r.server}__${r.class ?? ""}`}
                   className="toplists-row"
-                  style={{ borderBottom: "1px solid #2C4A73", cursor: playerId ? "pointer" : undefined }}
+                  style={{ borderBottom: "1px solid #2C4A73", cursor: profileIdentifier ? "pointer" : undefined }}
                   onClick={() => {
-                    if (playerId) navigate(`/player/${encodeURIComponent(playerId)}`);
+                    if (profileIdentifier) navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
                   }}
                 >
                   <td style={{ padding: "8px 6px" }}>{i + 1}</td>

@@ -166,6 +166,42 @@ export const toFiniteNumberOrNull = (value: any): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+export const DERIVED_SCAN_SEC_FIELDS = ["latestScanAtSec"] as const;
+
+export const normalizeScanSec = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    return value > 1e12 ? Math.floor(value / 1000) : value;
+  }
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (/^\d{13}$/.test(raw)) return Math.floor(Number(raw) / 1000);
+    if (/^\d{10}$/.test(raw)) return Number(raw);
+  }
+  return null;
+};
+
+export const readDerivedScanSec = (
+  entry: Record<string, any>,
+): { sec: number | null; field: string | null } => {
+  for (const field of DERIVED_SCAN_SEC_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(entry, field)) continue;
+    return { sec: normalizeScanSec((entry as any)[field]), field };
+  }
+  return { sec: null, field: null };
+};
+
+export const withDerivedScanSec = <T extends Record<string, any>>(
+  entry: T,
+  sec: number | null,
+  field?: string | null,
+): T => {
+  if (!Number.isFinite(sec)) return entry;
+  const target = field ?? "latestScanAtSec";
+  if ((entry as any)[target] === sec) return entry;
+  return { ...entry, [target]: sec };
+};
+
 export type BuildPlayerDerivedSnapshotInput = {
   playerId: any;
   server: any;
