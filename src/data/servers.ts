@@ -2,10 +2,6 @@ export type Server = { id: string; label: string; region?: string; active?: bool
 
 export const SERVERS: Server[] = [
   { id: "am1", label: "AM 1", region: "NA", active: true },
-  { id: "eu1", label: "EU 1", region: "EU", active: true },
-  { id: "eu2", label: "EU 2", region: "EU", active: true },
-  { id: "eu3", label: "EU 3", region: "EU", active: true },
-  { id: "eu4", label: "EU 4", region: "EU", active: true },
   { id: "eu5", label: "EU 5", region: "EU", active: true },
   { id: "eu6", label: "EU 6", region: "EU", active: true },
   { id: "eu7", label: "EU 7", region: "EU", active: true },
@@ -27,11 +23,6 @@ export const SERVERS: Server[] = [
   { id: "eu23", label: "EU 23", region: "EU", active: true },
   { id: "eu24", label: "EU 24", region: "EU", active: true },
   { id: "eu25", label: "EU 25", region: "EU", active: true },
-  { id: "f1", label: "F 1", region: "Fusion", active: true },
-  { id: "f2", label: "F 2", region: "Fusion", active: true },
-  { id: "f3", label: "F 3", region: "Fusion", active: true },
-  { id: "f4", label: "F 4", region: "Fusion", active: true },
-  { id: "f5", label: "F 5", region: "Fusion", active: true },
   { id: "f6", label: "F 6", region: "Fusion", active: true },
   { id: "f7", label: "F 7", region: "Fusion", active: true },
   { id: "f8", label: "F 8", region: "Fusion", active: true },

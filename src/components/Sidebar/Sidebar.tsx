@@ -14,77 +14,76 @@ import { useTranslation } from "react-i18next";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
-type SubItem = { to: string; label: string; minRole?: "mod" | "admin" };
+type SubItem = { to: string; labelKey: string; minRole?: "mod" | "admin" };
 
 type Item = {
   to: string;
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   end?: boolean;
-  i18nKey?: string;
   featureId?: string;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 type LanguageCode = "en" | "de";
 
-const languageOptions: { code: LanguageCode; label: string; ariaLabel: string }[] = [
-  { code: "en", label: "EN", ariaLabel: "Switch language to English" },
-  { code: "de", label: "DE", ariaLabel: "Switch language to German" },
+const languageOptions: { code: LanguageCode; ariaLabelKey: string }[] = [
+  { code: "en", ariaLabelKey: "sidebar.languageSwitchEn" },
+  { code: "de", ariaLabelKey: "sidebar.languageSwitchDe" },
 ];
 
 const main: Item[] = [
-  { to: "/",           label: "Home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
-  { to: "/discover",   label: "Discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
-  { to: "/dashboard",  label: "Dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
-  { to: "/settings",   label: "Settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
-  { to: "/guild-hub",  label: "Guild Hub", icon: <Shield className="ico" />, featureId: "main.guildHub" },
-  { to: "/admin",      label: "Admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
-  { to: "/playground", label: "Playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
+  { to: "/",           labelKey: "nav.home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
+  { to: "/discover",   labelKey: "nav.discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
+  { to: "/dashboard",  labelKey: "nav.dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
+  { to: "/settings",   labelKey: "nav.settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
+  { to: "/guild-hub",  labelKey: "nav.guildHub",  icon: <Shield className="ico" />, featureId: "main.guildHub" },
+  { to: "/admin",      labelKey: "nav.admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
+  { to: "/playground", labelKey: "nav.playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
 ];
 
 
 const categories: Item[] = [
-  { to: "/toplists",  label: "Toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
-  { to: "/guidehub-v2",    label: "Guide Hub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
-  { to: "/tools",    label: "Tools", icon: <Wrench className="ico" />, i18nKey: "nav.tools", featureId: "main.tools" },
-  { to: "/community", label: "Community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
-  { to: "/scans",     label: "Scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
+  { to: "/toplists",  labelKey: "nav.toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
+  { to: "/guidehub-v2",    labelKey: "nav.guideHub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
+  { to: "/tools",    labelKey: "nav.tools", icon: <Wrench className="ico" />, featureId: "main.tools" },
+  { to: "/community", labelKey: "nav.community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
+  { to: "/scans",     labelKey: "nav.scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
 ];
 
 const SUBTABS: Record<string, SubItem[]> = {
   "/guild-hub": [
-    { to: "/guild-hub", label: "Overview" },
-    { to: "/guild-hub/planner", label: "Guild Planner" },
-    { to: "/guild-hub/fusion-planner", label: "Fusion Planner" },
-    { to: "/guild-hub/compare-guilds", label: "Gildenvergleich" },
-    { to: "/guild-hub/waitlist", label: "Waitlist" },
-    { to: "/guild-hub/settings", label: "Settings" },
+    { to: "/guild-hub", labelKey: "nav.overview" },
+    { to: "/guild-hub/planner", labelKey: "nav.guildPlanner" },
+    { to: "/guild-hub/fusion-planner", labelKey: "nav.fusionPlanner" },
+    { to: "/guild-hub/compare-guilds", labelKey: "nav.guildCompare" },
+    { to: "/guild-hub/waitlist", labelKey: "nav.waitlist" },
+    { to: "/guild-hub/settings", labelKey: "nav.settings" },
   ],
   "/discover": [
-    { to: "/players",            label: "Players" },
-    { to: "/sfmagazine",         label: "SFMagazine" },
-    { to: "/sfmagazine/historybook",         label: "History Book" },
-    { to: "/guilds",             label: "Guilds" },
-    { to: "/servers",            label: "Servers" },
-    { to: "/scans",              label: "Scans" },
-    { to: "/discover/favorites", label: "Favorites" },
+    { to: "/players",            labelKey: "nav.players" },
+    { to: "/sfmagazine",         labelKey: "nav.sfMagazine" },
+    { to: "/sfmagazine/historybook",         labelKey: "nav.historyBook" },
+    { to: "/guilds",             labelKey: "nav.guilds" },
+    { to: "/servers",            labelKey: "nav.servers" },
+    { to: "/scans",              labelKey: "nav.scans" },
+    { to: "/discover/favorites", labelKey: "nav.favorites" },
   ],
   "/admin": [
-    { to: "/admin",        label: "Overview" },
-    { to: "/admin/errors", label: "Error log" },
-    { to: "/admin/feedback", label: "Feedback" },
-    { to: "/admin/users",  label: "Users", minRole: "mod" },
+    { to: "/admin",        labelKey: "nav.overview" },
+    { to: "/admin/errors", labelKey: "nav.errorLog" },
+    { to: "/admin/feedback", labelKey: "nav.feedback" },
+    { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],
   "/settings": [
-    { to: "/settings/profile",    label: "Profile" },
-    { to: "/settings/account",    label: "Account" },
-    { to: "/settings/appearance", label: "Appearance" },
+    { to: "/settings/profile",    labelKey: "nav.profile" },
+    { to: "/settings/account",    labelKey: "nav.account" },
+    { to: "/settings/appearance", labelKey: "nav.appearance" },
   ],
    "/playground": [
-    { to: "/playground/list-views",       label: "List Views" },
-    { to: "/playground/rescan-widget",    label: "Rescan Widget" },
-    { to: "/playground/upload-sim",       label: "Upload Simulator" },
-    { to: "/playground/hud/game-buttons", label: "HUD · Game Buttons" },
+    { to: "/playground/list-views",       labelKey: "nav.listViews" },
+    { to: "/playground/rescan-widget",    labelKey: "nav.rescanWidget" },
+    { to: "/playground/upload-sim",       labelKey: "nav.uploadSimulator" },
+    { to: "/playground/hud/game-buttons", labelKey: "nav.hudGameButtons" },
   ],
 };
 
@@ -174,7 +173,7 @@ function CategoryItem({
   label: string;
   collapsed: boolean;
   allowSubmenus: boolean;
-  subItems: SubItem[];
+  subItems: Array<{ to: string; label: string }>;
   onNavigate?: () => void;
 }) {
   const hasSub = subItems.length > 0;
@@ -264,8 +263,12 @@ function Block({
           if (!isItemVisible(it)) return null;
 
           const subItems = filterSubItems(SUBTABS[it.to], userRoles);
-          const label = it.i18nKey ? translate(it.i18nKey) : it.label;
-          if (subItems.length) {
+          const resolvedSubItems = subItems.map((item) => ({
+            to: item.to,
+            label: translate(item.labelKey),
+          }));
+          const label = translate(it.labelKey);
+          if (resolvedSubItems.length) {
             return (
               <CategoryItem
                 key={it.to}
@@ -273,7 +276,7 @@ function Block({
                 label={label}
                 collapsed={collapsed}
                 allowSubmenus={allowSubmenus}
-                subItems={subItems}
+                subItems={resolvedSubItems}
                 onNavigate={onNavigate}
               />
             );
@@ -372,6 +375,19 @@ export default function Sidebar({
   const userRoles = user?.roles ?? [];
   const linkedPlayers = React.useMemo(() => user?.linkedPlayers ?? [], [user?.linkedPlayers]);
   const { isVisibleInSidebar } = useFeatureAccess();
+  const canSeeConnectedCharacters = React.useMemo(() => {
+    if (!userRoles.length) return false;
+    const normalized = userRoles
+      .filter((role): role is string => typeof role === "string")
+      .map((role) => role.toLowerCase());
+    return (
+      normalized.includes("admin")
+      || normalized.includes("developer")
+      || normalized.includes("dev")
+      || normalized.includes("moderator")
+      || normalized.includes("mod")
+    );
+  }, [userRoles]);
 
   const [language, setLanguage] = React.useState<LanguageCode>("en");
 
@@ -455,16 +471,16 @@ export default function Sidebar({
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onTransitionEnd={onTransitionEnd}
-      aria-label="Navigation"
+      aria-label={t("sidebar.navigation", { defaultValue: "Navigation" })}
     >
       <div className={styles.headRow}>
         <div className={styles.headTitle}>
-          <span className={styles.headDot} /> <span className={styles.headLabel}>Navigation</span>
+          <span className={styles.headDot} /> <span className={styles.headLabel}>{t("sidebar.navigation", { defaultValue: "Navigation" })}</span>
         </div>
         <button
           className={styles.pinBtn}
           aria-pressed={pinned}
-          title={pinned ? "Unpin" : "Pin"}
+          title={pinned ? t("sidebar.unpin", { defaultValue: "Unpin" }) : t("sidebar.pin", { defaultValue: "Pin" })}
           onClick={() => setPinned(!pinned)}
           type="button"
         >
@@ -487,7 +503,7 @@ export default function Sidebar({
             />
           </div>
 
-          <div className={styles.segTitle}>Kategorien</div>
+          <div className={styles.segTitle}>{t("sidebar.categories", { defaultValue: "Categories" })}</div>
 
           {/* Kategorien */}
           <div className={`${styles.segCard} ${styles.mainNavCard}`}>
@@ -502,41 +518,43 @@ export default function Sidebar({
             />
           </div>
 
-          <div className={`${styles.segCard} ${styles.mainNavCard} ${styles.connectedCharactersCard}`}>
-            <div className={styles.connectedCharactersTitle}>
-              {t("sidebar.connectedCharacters.title", { defaultValue: "Connected characters" })}
-            </div>
-            {linkedPlayers.length === 0 ? (
-              <button
-                type="button"
-                className={styles.connectedCharactersEmpty}
-                onClick={handleConnectedHintClick}
-              >
-                <span className={styles.connectedCharactersEmptyText}>{emptyConnectedText}</span>
-                <span className={styles.connectedCharactersEmptyCta}>{emptyCta}</span>
-              </button>
-            ) : (
-              <div className={styles.connectedCharactersList} data-collapsed={collapsed ? "true" : "false"}>
-                {linkedPlayers.map((char) => {
-                  const metaParts = [char.server, char.class].filter(Boolean).join(" | ");
-                  const playerId = char.playerId ?? "-";
-                  const key = `${char.server ?? "server"}-${playerId}`;
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={styles.characterChip}
-                      onClick={() => handleCharacterClick(playerId)}
-                    >
-                      <span className={styles.characterChipId}>{playerId}</span>
-                      {metaParts && <span className={styles.characterChipMeta}>{metaParts}</span>}
-                    </button>
-                  );
-                })}
+          {canSeeConnectedCharacters ? (
+            <div className={`${styles.segCard} ${styles.mainNavCard} ${styles.connectedCharactersCard}`}>
+              <div className={styles.connectedCharactersTitle}>
+                {t("sidebar.connectedCharacters.title", { defaultValue: "Connected characters" })}
               </div>
-            )}
-          </div>
+              {linkedPlayers.length === 0 ? (
+                <button
+                  type="button"
+                  className={styles.connectedCharactersEmpty}
+                  onClick={handleConnectedHintClick}
+                >
+                  <span className={styles.connectedCharactersEmptyText}>{emptyConnectedText}</span>
+                  <span className={styles.connectedCharactersEmptyCta}>{emptyCta}</span>
+                </button>
+              ) : (
+                <div className={styles.connectedCharactersList} data-collapsed={collapsed ? "true" : "false"}>
+                  {linkedPlayers.map((char) => {
+                    const metaParts = [char.server, char.class].filter(Boolean).join(" | ");
+                    const playerId = char.playerId ?? "-";
+                    const key = `${char.server ?? "server"}-${playerId}`;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={styles.characterChip}
+                        onClick={() => handleCharacterClick(playerId)}
+                      >
+                        <span className={styles.characterChipId}>{playerId}</span>
+                        {metaParts && <span className={styles.characterChipMeta}>{metaParts}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -544,7 +562,10 @@ export default function Sidebar({
       <div className={`${styles.footer} ${styles.segCard} ${styles.mainNavCard}`}>
         <button className={styles.login} type="button" onClick={handleFooterClick}>
           <Shield className="ico" />
-          <AnimatedLabel text={isAuthed ? "Logout" : "Login"} isOpen={!collapsed} />
+          <AnimatedLabel
+            text={isAuthed ? t("sidebar.logout", { defaultValue: "Logout" }) : t("sidebar.login", { defaultValue: "Login" })}
+            isOpen={!collapsed}
+          />
         </button>
         {isAuthed && user?.displayName ? (
           <div className={styles.userMeta} title={user.displayName}>
@@ -562,7 +583,7 @@ export default function Sidebar({
             </NavLink>
           </div>
           <div className={styles.footerRowCell}>
-            <div className={styles.languageSwitch} role="group" aria-label="Sidebar language preference">
+            <div className={styles.languageSwitch} role="group" aria-label={t("sidebar.languagePreference", { defaultValue: "Sidebar language preference" })}>
               {languageOptions.map((option) => {
                 const isActive = language === option.code;
                 const segmentClass = `${styles.languageSegment} ${option.code === "de" ? styles.languageSegmentDe : styles.languageSegmentEn} ${isActive ? styles.languageSegmentActive : styles.languageSegmentInactive}`;
@@ -573,7 +594,7 @@ export default function Sidebar({
                     className={segmentClass}
                     onClick={() => handleLanguageSelect(option.code)}
                     aria-pressed={isActive}
-                    aria-label={option.ariaLabel}
+                    aria-label={t(option.ariaLabelKey, { defaultValue: option.code === "de" ? "Switch language to German" : "Switch language to English" })}
                   />
                 );
               })}

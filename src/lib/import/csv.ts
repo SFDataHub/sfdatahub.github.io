@@ -925,6 +925,7 @@ type PlayerDerivedSnapshotEntry = {
   class: string;
   guild: string | null;
   lastScan: string | null;
+  latestScanAtSec?: number | null;
   level: number | null;
   con: number | null;
   main: number | null;
@@ -954,6 +955,7 @@ type GuildDerivedSnapshotEntry = {
   raids?: number;
   treasury?: number;
   lastScan: string | null;
+  latestScanAtSec?: number | null;
   sum: number | null;
   sumAvg?: number | null;
   count?: number | null;
@@ -982,6 +984,49 @@ const toDigitsOnlyNumber = (value: any): number => {
   if (!cleaned) return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
+};
+
+const DERIVED_SCAN_SEC_FIELDS = [
+  "latestScanAtSec",
+  "latestScanAt",
+  "lastScanAtSec",
+  "lastScanAt",
+  "scanAtSec",
+  "scanAt",
+] as const;
+
+const normalizeScanSec = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    return value > 1e12 ? Math.floor(value / 1000) : value;
+  }
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (/^\d{13}$/.test(raw)) return Math.floor(Number(raw) / 1000);
+    if (/^\d{10}$/.test(raw)) return Number(raw);
+  }
+  return null;
+};
+
+const readDerivedScanSec = (
+  entry: Record<string, any>,
+): { sec: number | null; field: string | null } => {
+  for (const field of DERIVED_SCAN_SEC_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(entry, field)) continue;
+    return { sec: normalizeScanSec((entry as any)[field]), field };
+  }
+  return { sec: null, field: null };
+};
+
+const withDerivedScanSec = <T extends Record<string, any>>(
+  entry: T,
+  sec: number | null,
+  field?: string | null,
+): T => {
+  if (!Number.isFinite(sec)) return entry;
+  const target = field ?? "latestScanAtSec";
+  if ((entry as any)[target] === sec) return entry;
+  return { ...entry, [target]: sec };
 };
 
 const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
@@ -1019,44 +1064,75 @@ const readGuildLatestMeta = (values: Record<string, any> | null | undefined) => 
 const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
 const toGuildSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_guild_derived`;
 
-const normalizeServerInput = (value: any): { code?: string; host?: string } => {
-  const raw = String(value ?? "").replace(/\u00a0/g, " ").trim();
-  if (!raw) return {};
-  let cleaned = raw.replace(/^[a-z]+:\/\//i, "");
-  cleaned = cleaned.split(/[/?#]/)[0] ?? "";
-  cleaned = cleaned.replace(/\s+/g, " ").trim();
-  if (!cleaned) return {};
-  const collapsed = cleaned.replace(/\s+/g, "");
-  let lowered = collapsed.toLowerCase().replace(/:\d+$/, "");
-  lowered = lowered.replace(/^\.+|\.+$/g, "");
-  if (!lowered) return {};
+const canonicalCodeFromSubdomain = (subdomain: string): string | null => {
+  const trimmed = String(subdomain ?? "").trim();
+  if (!trimmed) return null;
+  const lowered = trimmed.toLowerCase();
+  const euMatch = lowered.match(/^eu(\d+)$/);
+  if (euMatch) return `EU${euMatch[1]}`;
+  const fMatch = lowered.match(/^f(\d+)$/);
+  if (fMatch) return `F${fMatch[1]}`;
+  return normalizeServerCodeAlias(trimmed);
+};
 
-  if (SERVER_CODE_PATTERN.test(lowered)) {
-    return { code: normalizeServerCodeAlias(lowered) };
-  }
-
-  const suffixMatch = lowered.match(SERVER_CODE_SUFFIX_PATTERN);
-  if (suffixMatch) {
-    return { code: normalizeServerCodeAlias(suffixMatch[1]) };
-  }
-
-  if (lowered.includes(".")) {
-    if (!lowered.includes("sfgame")) {
-      const simpleHostMatch = lowered.match(/^([a-z]{1,4}\d+)\.?(net|eu)$/i);
-      if (simpleHostMatch) {
-        return { host: `${simpleHostMatch[1]}.sfgame.${simpleHostMatch[2].toLowerCase()}` };
-      }
+const extractHostname = (value: string): string | null => {
+  if (!value) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    try {
+      const hostname = new URL(value).hostname;
+      if (hostname) return hostname.toLowerCase();
+    } catch {
+      // fallback below
     }
-    return { host: lowered };
   }
+  let cleaned = value.replace(/^[a-z]+:\/\//i, "");
+  cleaned = cleaned.split(/[/?#]/)[0] ?? "";
+  cleaned = cleaned.replace(/\s+/g, "").trim();
+  if (!cleaned) return null;
+  let lowered = cleaned.toLowerCase().replace(/:\d+$/, "");
+  lowered = lowered.replace(/^\.+|\.+$/g, "");
+  return lowered || null;
+};
 
+const describeServerInput = (value: any) => {
+  const raw = String(value ?? "").replace(/\u00a0/g, " ").trim();
+  if (!raw) {
+    return { input: raw, hostname: null, subdomain: null, canonicalCode: null };
+  }
+  const hostname = extractHostname(raw);
+  const subdomain = hostname ? hostname.split(".")[0] ?? "" : "";
+  const canonicalCode = subdomain ? canonicalCodeFromSubdomain(subdomain) : null;
+  return {
+    input: raw,
+    hostname,
+    subdomain: subdomain || null,
+    canonicalCode,
+  };
+};
+
+const normalizeServerInput = (value: any): { code?: string; host?: string } => {
+  const info = describeServerInput(value);
+  const code = info.subdomain ? canonicalCodeFromSubdomain(info.subdomain) : null;
+  const host = info.hostname && info.hostname.includes(".") ? info.hostname : null;
+  if (code && host) return { code, host };
+  if (code) return { code };
+  if (host) return { host };
   return {};
 };
 
-const normalizeServerLookupKey = (value: any): string | null => {
+const resolveServerCodeFromMap = (serverCodeByHost: Map<string, string>, value: any): string | null => {
   const normalized = normalizeServerInput(value);
-  if (normalized.host) return normalized.host;
-  if (normalized.code) return normalized.code.toLowerCase();
+  if (normalized.code) {
+    const direct =
+      serverCodeByHost.get(normalized.code) ??
+      serverCodeByHost.get(normalized.code.toLowerCase()) ??
+      serverCodeByHost.get(normalized.code.toUpperCase());
+    if (direct) return direct;
+  }
+  if (normalized.host) {
+    const byHost = serverCodeByHost.get(normalized.host);
+    if (byHost) return byHost;
+  }
   return null;
 };
 
@@ -1070,16 +1146,18 @@ const chunkList = <T,>(items: T[], size: number): T[][] => {
 
 export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  const wantedHosts = new Set<string>();
   const wantedCodes = new Set<string>();
+  const hostCandidates: Array<{ host: string; code?: string | null }> = [];
 
   for (const host of hosts) {
     const normalized = normalizeServerInput(host);
-    if (normalized.host) wantedHosts.add(normalized.host);
     if (normalized.code) wantedCodes.add(normalized.code);
+    if (normalized.host) {
+      hostCandidates.push({ host: normalized.host, code: normalized.code ?? null });
+    }
   }
 
-  if (wantedHosts.size === 0 && wantedCodes.size === 0) return map;
+  if (hostCandidates.length === 0 && wantedCodes.size === 0) return map;
 
   try {
     const serversRef = collection(db, "servers");
@@ -1096,7 +1174,18 @@ export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<str
       }
     }
 
-    const chunks = chunkList(Array.from(wantedHosts), 10);
+    const unresolvedHosts = new Set<string>();
+    const hasCodeMapping = (code?: string | null) => {
+      if (!code) return false;
+      return map.has(code) || map.has(code.toLowerCase()) || map.has(code.toUpperCase());
+    };
+    for (const candidate of hostCandidates) {
+      if (!candidate.host) continue;
+      if (hasCodeMapping(candidate.code)) continue;
+      unresolvedHosts.add(candidate.host);
+    }
+
+    const chunks = chunkList(Array.from(unresolvedHosts), 10);
     for (const chunk of chunks) {
       const q = query(serversRef, where("host", "in", chunk));
       const snap = await traceGetDocs(
@@ -1114,7 +1203,7 @@ export async function loadServerHostMapByHosts(hosts: string[]): Promise<Map<str
       });
     }
 
-    const missingHosts = Array.from(wantedHosts).filter((host) => !map.has(host));
+    const missingHosts = Array.from(unresolvedHosts).filter((host) => !map.has(host));
     if (missingHosts.length) {
       console.warn("[ImportCsv] Server hosts not mapped", { hosts: missingHosts });
     }
@@ -1304,7 +1393,7 @@ async function upsertPlayerDerivedServerSnapshot(
   const snapshotKey = String(serverKey || "all").trim() || "all";
   const snapshotRef = doc(db, `${PLAYER_DERIVED_COL}/${toSnapshotDocId(snapshotKey)}`);
 
-  await traceRunTransaction(
+  const result = await traceRunTransaction(
     () =>
       runTransaction(db, async (tx) => {
         const snap = await traceGetDoc(
@@ -1325,56 +1414,98 @@ async function upsertPlayerDerivedServerSnapshot(
       }
     }
 
-    const findLowest = () => {
-      let minId: string | null = null;
-      let minSum = Number.POSITIVE_INFINITY;
-      for (const [pid, entry] of byId.entries()) {
-        const sum = toFiniteNumberOrNull(entry.sum) ?? 0;
-        if (sum < minSum) {
-          minSum = sum;
-          minId = pid;
+        const findLowest = () => {
+          let minId: string | null = null;
+          let minSum = Number.POSITIVE_INFINITY;
+          for (const [pid, entry] of byId.entries()) {
+            const sum = toFiniteNumberOrNull(entry.sum) ?? 0;
+            if (sum < minSum) {
+              minSum = sum;
+              minId = pid;
+            }
+          }
+          return { minId, minSum };
+        };
+
+        const skipped: Array<{
+          playerId: string;
+          server: string;
+          incoming: number;
+          stored: number;
+        }> = [];
+        const touchedIds = new Set<string>();
+
+        for (const entry of entries) {
+          const pid = String(entry.playerId ?? "");
+          if (!pid) continue;
+
+          const incomingInfo = readDerivedScanSec(entry as Record<string, any>);
+          const incomingSec = incomingInfo.sec;
+          const existingEntry = byId.get(pid);
+          const storedInfo = existingEntry
+            ? readDerivedScanSec(existingEntry as Record<string, any>)
+            : { sec: null, field: null as string | null };
+
+          if (
+            existingEntry &&
+            incomingSec != null &&
+            storedInfo.sec != null &&
+            incomingSec < storedInfo.sec
+          ) {
+            skipped.push({
+              playerId: pid,
+              server: snapshotKey,
+              incoming: incomingSec,
+              stored: storedInfo.sec,
+            });
+            continue;
+          }
+
+          const nextEntry = withDerivedScanSec(
+            entry as Record<string, any>,
+            incomingSec,
+            storedInfo.field ?? incomingInfo.field,
+          ) as PlayerDerivedSnapshotEntry;
+
+          if (existingEntry) {
+            byId.set(pid, nextEntry);
+            touchedIds.add(pid);
+            continue;
+          }
+
+          if (byId.size < PLAYER_DERIVED_SNAPSHOT_LIMIT) {
+            byId.set(pid, nextEntry);
+            touchedIds.add(pid);
+            continue;
+          }
+
+          const entrySum = toFiniteNumberOrNull(nextEntry.sum) ?? 0;
+          const { minId, minSum } = findLowest();
+          if (minId && entrySum > minSum) {
+            byId.delete(minId);
+            byId.set(pid, nextEntry);
+            touchedIds.add(pid);
+          }
         }
-      }
-      return { minId, minSum };
-    };
 
-    const touchedIds = new Set<string>();
-    for (const entry of entries) {
-      const pid = String(entry.playerId ?? "");
-      if (!pid) continue;
-      touchedIds.add(pid);
+        if (touchedIds.size === 0) {
+          return { skipped, wrote: false };
+        }
 
-      if (byId.has(pid)) {
-        byId.set(pid, entry);
-        continue;
-      }
-
-      if (byId.size < PLAYER_DERIVED_SNAPSHOT_LIMIT) {
-        byId.set(pid, entry);
-        continue;
-      }
-
-      const entrySum = toFiniteNumberOrNull(entry.sum) ?? 0;
-      const { minId, minSum } = findLowest();
-      if (minId && entrySum > minSum) {
-        byId.delete(minId);
-        byId.set(pid, entry);
-      }
-    }
-
-    const players = Array.from(byId.values());
-    players.sort((a, b) => {
-      const diff = (toFiniteNumberOrNull(b.sum) ?? 0) - (toFiniteNumberOrNull(a.sum) ?? 0);
-      if (diff !== 0) return diff;
-      return String(a.playerId ?? "").localeCompare(String(b.playerId ?? ""));
-    });
-    if (players.length > PLAYER_DERIVED_SNAPSHOT_LIMIT) {
-      players.length = PLAYER_DERIVED_SNAPSHOT_LIMIT;
-    }
+        const players = Array.from(byId.values());
+        players.sort((a, b) => {
+          const diff = (toFiniteNumberOrNull(b.sum) ?? 0) - (toFiniteNumberOrNull(a.sum) ?? 0);
+          if (diff !== 0) return diff;
+          return String(a.playerId ?? "").localeCompare(String(b.playerId ?? ""));
+        });
+        if (players.length > PLAYER_DERIVED_SNAPSHOT_LIMIT) {
+          players.length = PLAYER_DERIVED_SNAPSHOT_LIMIT;
+        }
 
         const rawMeta = snap.exists() ? (snap.data() as any)?.meta : null;
         const prevPending = Number(rawMeta?.pendingSincePublish ?? 0);
-        const pendingSincePublish = (Number.isFinite(prevPending) ? prevPending : 0) + touchedIds.size;
+        const pendingSincePublish =
+          (Number.isFinite(prevPending) ? prevPending : 0) + touchedIds.size;
         const nextMeta = { ...(rawMeta && typeof rawMeta === "object" ? rawMeta : {}), pendingSincePublish };
 
         tx.set(
@@ -1382,9 +1513,17 @@ async function upsertPlayerDerivedServerSnapshot(
           { server: snapshotKey, updatedAt: serverTimestamp(), players, meta: nextMeta },
           { merge: true }
         );
+
+        return { skipped, wrote: true };
       }),
     { label: "ImportCsv:derivedSnapshot", path: snapshotRef.path },
   );
+
+  if (result?.skipped?.length) {
+    for (const entry of result.skipped) {
+      console.info("[ImportCsv] skip derived update: older scan", entry);
+    }
+  }
 }
 
 async function upsertGuildDerivedServerSnapshot(
@@ -1396,7 +1535,7 @@ async function upsertGuildDerivedServerSnapshot(
   const snapshotKey = String(serverKey || "all").trim() || "all";
   const snapshotRef = doc(db, `${GUILD_DERIVED_COL}/${toGuildSnapshotDocId(snapshotKey)}`);
 
-  await traceRunTransaction(
+  const result = await traceRunTransaction(
     () =>
       runTransaction(db, async (tx) => {
         const snap = await traceGetDoc(
@@ -1433,28 +1572,69 @@ async function upsertGuildDerivedServerSnapshot(
           return { minId, minSum };
         };
 
+        const skipped: Array<{
+          guildId: string;
+          server: string;
+          incoming: number;
+          stored: number;
+        }> = [];
         const touchedIds = new Set<string>();
+
         for (const entry of entries) {
           const gid = String(entry.guildId ?? "");
           if (!gid) continue;
-          touchedIds.add(gid);
 
-          if (byId.has(gid)) {
-            byId.set(gid, entry);
+          const incomingInfo = readDerivedScanSec(entry as Record<string, any>);
+          const incomingSec = incomingInfo.sec;
+          const existingEntry = byId.get(gid);
+          const storedInfo = existingEntry
+            ? readDerivedScanSec(existingEntry as Record<string, any>)
+            : { sec: null, field: null as string | null };
+
+          if (
+            existingEntry &&
+            incomingSec != null &&
+            storedInfo.sec != null &&
+            incomingSec < storedInfo.sec
+          ) {
+            skipped.push({
+              guildId: gid,
+              server: snapshotKey,
+              incoming: incomingSec,
+              stored: storedInfo.sec,
+            });
+            continue;
+          }
+
+          const nextEntry = withDerivedScanSec(
+            entry as Record<string, any>,
+            incomingSec,
+            storedInfo.field ?? incomingInfo.field,
+          ) as GuildDerivedSnapshotEntry;
+
+          if (existingEntry) {
+            byId.set(gid, nextEntry);
+            touchedIds.add(gid);
             continue;
           }
 
           if (byId.size < GUILD_DERIVED_SNAPSHOT_LIMIT) {
-            byId.set(gid, entry);
+            byId.set(gid, nextEntry);
+            touchedIds.add(gid);
             continue;
           }
 
-          const entrySum = scoreOf(entry);
+          const entrySum = scoreOf(nextEntry);
           const { minId, minSum } = findLowest();
           if (minId && entrySum > minSum) {
             byId.delete(minId);
-            byId.set(gid, entry);
+            byId.set(gid, nextEntry);
+            touchedIds.add(gid);
           }
+        }
+
+        if (touchedIds.size === 0) {
+          return { skipped, wrote: false };
         }
 
         const guilds = Array.from(byId.values()).map((entry) => {
@@ -1483,9 +1663,17 @@ async function upsertGuildDerivedServerSnapshot(
           { server: snapshotKey, updatedAt: serverTimestamp(), guilds, meta: nextMeta },
           { merge: true }
         );
+
+        return { skipped, wrote: true };
       }),
     { label: "ImportCsv:guildDerivedSnapshot", path: snapshotRef.path },
   );
+
+  if (result?.skipped?.length) {
+    for (const entry of result.skipped) {
+      console.info("[ImportCsv] skip derived update: older scan", entry);
+    }
+  }
 }
 
 export async function flushGuildDerivedSnapshotsFromAggregates(
@@ -1497,13 +1685,17 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
   const pendingDerivedByServer = new Map<string, GuildDerivedSnapshotEntry[]>();
 
   for (const [gid, aggregate] of aggregatesByGuildId.entries()) {
-    const lookupKey = normalizeServerLookupKey(aggregate.server);
-    const snapshotServerKey = lookupKey ? serverHostMap.get(lookupKey) ?? null : null;
+    const snapshotServerKey = resolveServerCodeFromMap(serverHostMap, aggregate.server);
     if (!snapshotServerKey) {
-      if (lookupKey) {
+      if (aggregate.server) {
+        const serverInfo = describeServerInput(aggregate.server);
         console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
           guildId: gid,
           server: aggregate.server,
+          input: serverInfo.input,
+          hostname: serverInfo.hostname,
+          subdomain: serverInfo.subdomain,
+          canonicalCode: serverInfo.canonicalCode,
         });
       }
       continue;
@@ -1524,6 +1716,7 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
       raids: toFiniteNumberOrNull(aggregate.raids) ?? 0,
       treasury: toFiniteNumberOrNull(aggregate.treasury) ?? 0,
       lastScan: aggregate.lastScan ? String(aggregate.lastScan) : null,
+      latestScanAtSec: toFiniteNumberOrNull(aggregate.timestampSec),
       sum: null,
       sumAvg: toFiniteNumberOrNull(aggregate.avgSumBaseTotal),
       count: toFiniteNumberOrNull(aggregate.count),
@@ -1764,8 +1957,7 @@ export async function importCsvToDB(
       serverCodeByHost = await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server));
     } else if (parsedPlayers.length > 0) {
       const needsEnrichment = parsedPlayers.some((player) => {
-        const lookupKey = normalizeServerLookupKey(player.server);
-        return lookupKey ? !serverCodeByHost.has(lookupKey) : false;
+        return !resolveServerCodeFromMap(serverCodeByHost, player.server);
       });
       if (needsEnrichment) {
         const fromParsed = await loadServerHostMapByHosts(parsedPlayers.map((player) => player.server));
@@ -1839,13 +2031,17 @@ export async function importCsvToDB(
         updatedAt: latestUpdatedAt ?? undefined,
       };
       const derived = deriveForPlayer(derivedInput, serverTimestamp);
-      const lookupKey = normalizeServerLookupKey(server);
       const snapshotServerKey =
-        serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
+        serverCodeByHost.size > 0 ? resolveServerCodeFromMap(serverCodeByHost, server) : null;
       if (!snapshotServerKey && serverCodeByHost.size > 0) {
+        const serverInfo = describeServerInput(server);
         console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
           playerId: pid,
           server,
+          input: serverInfo.input,
+          hostname: serverInfo.hostname,
+          subdomain: serverInfo.subdomain,
+          canonicalCode: serverInfo.canonicalCode,
         });
       }
       if (snapshotServerKey) {
@@ -2094,13 +2290,17 @@ export async function importCsvToDB(
       }
 
       if (enableGuildDerived) {
-        const lookupKey = normalizeServerLookupKey(parsed.server);
         const snapshotServerKey =
-          serverCodeByHost.size > 0 && lookupKey ? serverCodeByHost.get(lookupKey) ?? null : null;
+          serverCodeByHost.size > 0 ? resolveServerCodeFromMap(serverCodeByHost, parsed.server) : null;
         if (!snapshotServerKey && serverCodeByHost.size > 0) {
+          const serverInfo = describeServerInput(parsed.server);
           console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
             guildId: gid,
             server: parsed.server,
+            input: serverInfo.input,
+            hostname: serverInfo.hostname,
+            subdomain: serverInfo.subdomain,
+            canonicalCode: serverInfo.canonicalCode,
           });
         }
         if (snapshotServerKey) {
@@ -2128,6 +2328,7 @@ export async function importCsvToDB(
             raids: latestMeta.raids,
             treasury: latestMeta.treasury,
             lastScan: lastScan ? lastScan : null,
+            latestScanAtSec: last.ts,
             sum: toFiniteNumberOrNull(baseStats.sum),
             sumAvg: toFiniteNumberOrNull(baseStats.sum),
           };

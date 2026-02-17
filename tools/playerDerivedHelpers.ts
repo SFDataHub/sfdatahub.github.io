@@ -96,10 +96,12 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
   const level = toNumber(levelRaw);
   const { group, serverKey } = normalizeServer(serverRaw);
   const base = computeBaseStats(values);
+  const baseMain = toNumber(pickByCanonKey(values, "Base"));
+  const baseConstitution = toNumber(pickByCanonKey(values, "Base Constitution"));
 
   const mainKey = MAIN_BY_CLASS[String(className ?? "")] ?? "Base Intelligence";
   const main = toNumber(pick(values, mainKey));
-  const sum = base.sum;
+  const sum = baseMain + baseConstitution;
   const con = base.con;
   const ratio = level > 0 ? sum / level : 0;
   const mainTotal = toNumber(pickByCanonKey(values, "Attribute"));
@@ -143,6 +145,7 @@ export type PlayerDerivedSnapshotEntry = {
   class: string;
   guild: string | null;
   lastScan: string | null;
+  latestScanAtSec?: number | null;
   level: number | null;
   con: number | null;
   main: number | null;
@@ -203,6 +206,7 @@ export const buildPlayerDerivedSnapshotEntry = (
     class: String(input.derived?.class ?? input.className ?? ""),
     guild: input.guildName ? String(input.guildName) : null,
     lastScan: lastScan ? lastScan : null,
+    latestScanAtSec: toFiniteNumberOrNull(input.timestampSec),
     level: toFiniteNumberOrNull(input.level ?? input.derived?.level),
     con: toFiniteNumberOrNull(input.derived?.con),
     main: toFiniteNumberOrNull(input.derived?.main),
