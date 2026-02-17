@@ -115,6 +115,7 @@ export type HeroPanelData = {
   baseStats?: BaseStatValues;
   baseStatBenchmarks?: BaseStatBenchmarks;
   totalStats?: BaseStatValues;
+  totalStatsValue?: number | null;
 };
 
 export type AttributeStat = {

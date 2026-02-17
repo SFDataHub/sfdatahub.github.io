@@ -111,20 +111,11 @@ function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
   const heroMetrics = useMemo(() => {
     return data.metrics.map((metric) => {
       if (metric.label === "Total Base Stats" && mode === "total") {
-        const totalStats = data.totalStats;
-        if (totalStats) {
-          const sum =
-            (Number(totalStats.str) || 0) +
-            (Number(totalStats.dex) || 0) +
-            (Number(totalStats.int) || 0) +
-            (Number(totalStats.con) || 0) +
-            (Number(totalStats.lck) || 0);
-          return { ...metric, label: "Total Stats", value: formatNumber(sum) };
-        }
+        return { ...metric, label: "Total Stats", value: formatNumber(data.totalStatsValue ?? 0) };
       }
       return metric;
     });
-  }, [data.metrics, data.totalStats, mode]);
+  }, [data.metrics, data.totalStatsValue, mode]);
 
   return (
     <section className="player-profile__hero" aria-busy={loading}>

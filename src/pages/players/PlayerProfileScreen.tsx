@@ -70,6 +70,10 @@ type PlayerSnapshot = {
   avatarIdentifier?: string | null;
   scrapbookPct?: number | null;
   totalStats?: number | null;
+  base?: number | null;
+  con?: number | null;
+  conTotal?: number | null;
+  attributeTotal?: number | null;
   lastScanDays?: number | null;
   values: Record<string, any>;
   portraitConfig?: Partial<PortraitOptions>;
@@ -203,6 +207,11 @@ export default function PlayerProfileScreen() {
           values?.identifier ??
           (serverNormalized ? `${id}__${serverNormalized}` : null);
         const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
+        const base = toNum(data.base ?? values?.Base ?? values?.base) ?? null;
+        const con = toNum(data.con ?? values?.Con ?? values?.con) ?? null;
+        const attributeTotal =
+          toNum(data.attributeTotal ?? values?.["Attribute Total"] ?? values?.AttributeTotal) ?? null;
+        const conTotal = toNum(data.conTotal ?? values?.["Con Total"] ?? values?.ConTotal) ?? null;
         const scrapbookRaw =
           data.scrapbookPct ??
           data.scrapbook ??
@@ -242,6 +251,10 @@ export default function PlayerProfileScreen() {
           avatarIdentifier,
           scrapbookPct,
           totalStats,
+          base,
+          con,
+          conTotal,
+          attributeTotal,
           lastScanDays,
           values,
           portraitConfig,
@@ -931,6 +944,23 @@ const buildProfileView = (
     }
   });
   const totalBaseStats = hasBaseStats ? Object.values(baseStats).reduce((sum, val) => sum + val, 0) : null;
+  const classKey = canonicalize(snapshot.className ?? "");
+  const mainAttrKey =
+    classKey === "warrior" || classKey === "krieger" || classKey === "berserker" || classKey === "paladin"
+      ? "str"
+      : classKey === "mage" || classKey === "magier" || classKey === "battlemage" || classKey === "battlemage"
+        || classKey === "necromancer" || classKey === "nekromant" || classKey === "druid" || classKey === "druide"
+        || classKey === "bard" || classKey === "barde"
+        ? "int"
+        : classKey === "scout" || classKey === "jaeger" || classKey === "jäger" || classKey === "assassin"
+          || classKey === "meuchelmoerder" || classKey === "meuchelmorder"
+          || classKey === "demonhunter" || classKey === "daemonenjaeger" || classKey === "dämonenjäger"
+          ? "dex"
+          : null;
+  const baseValue = snapshot.base ?? (mainAttrKey ? baseStats[mainAttrKey] : 0);
+  const conValue = snapshot.con ?? baseStats.con ?? 0;
+  const calculatedTotalBaseStats = baseValue + conValue;
+  const calculatedTotalStats = (snapshot.attributeTotal ?? 0) + (snapshot.conTotal ?? 0);
   const scrapbookProgress = scrapbook ?? null;
   const fortress = lookup.number(["fortresslevel", "fortress"]) ?? Math.round(rand() * 20) + 30;
   const underworld = lookup.number(["underworld", "underworldlevel"]) ?? Math.round(rand() * 10) + 20;
@@ -978,7 +1008,7 @@ const buildProfileView = (
     { label: "Last Scan", value: lastScanDisplay },
     { label: "Level", value: level != null ? `Lvl ${formatNumber(level)}` : "-" },
     { label: "Scrapbook", value: formatPercent(scrapbookProgress) },
-    { label: "Total Base Stats", value: totalBaseStats != null ? formatNumber(totalBaseStats) : "-" },
+    { label: "Total Base Stats", value: calculatedTotalBaseStats != null ? formatNumber(calculatedTotalBaseStats) : "-" },
   ];
   const heroBadges = [
     { label: "Mount", value: mountLabel ?? "-", tone: "neutral" as const },
@@ -1020,6 +1050,7 @@ const buildProfileView = (
     portraitFallbackLabel,
     baseStats: heroBaseStats,
     totalStats: hasTotalStats ? totalStatsDetail : undefined,
+    totalStatsValue: calculatedTotalStats,
   };
 
   const statsTab = {
