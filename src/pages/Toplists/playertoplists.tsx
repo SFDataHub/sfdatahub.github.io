@@ -1,6 +1,8 @@
 ﻿import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { toPng } from "html-to-image";
 
 import ContentShell from "../../components/ContentShell";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -415,6 +417,7 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
     case "constitution": return { key: "con",      dir: "desc" };
     case "sum":          return { key: "sum",      dir: "desc" };
     case "statsDay":     return { key: "statsDay", dir: "desc" };
+    case "mine":         return { key: "mine",     dir: "desc" };
     case "mainTotal":    return { key: "mainTotal", dir: "desc" };
     case "conTotal":     return { key: "conTotal",  dir: "desc" };
     case "sumTotal":     return { key: "sumTotal",  dir: "desc" };
@@ -470,6 +473,7 @@ function PlayerToplistsPageContent() {
     () => generateRecentMonths(17).filter((m) => m >= MIN_COMPARE_MONTH),
     [],
   );
+  const hasServersSelected = (servers?.length ?? 0) > 0;
   const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
   const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
 
@@ -497,6 +501,31 @@ function PlayerToplistsPageContent() {
   const setServersRef = React.useRef(setServers);
   const setClassesRef = React.useRef(setClasses);
   const lastUrlWriteRef = React.useRef<string | null>(null);
+  const tableRef = React.useRef<HTMLDivElement | null>(null);
+
+  const handleExportPng = async () => {
+    const exportContent = document.getElementById("toplist-export-content") as HTMLElement | null;
+    if (!exportContent || !tableRef.current) return;
+    const width = tableRef.current.offsetWidth;
+    const prevWidth = exportContent.style.width;
+    exportContent.style.width = `${width}px`;
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const pixelRatio = Math.min(3, window.devicePixelRatio || 2);
+      const dataUrl = await toPng(exportContent, {
+        pixelRatio,
+        cacheBust: true,
+        backgroundColor: "#0C1C2E",
+      });
+      const link = document.createElement("a");
+      link.download = "sfdatahub_toplist.png";
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      exportContent.style.width = prevWidth;
+    }
+  };
 
   React.useEffect(() => {
     normalizedServersRef.current = normalizedServers;
@@ -609,6 +638,8 @@ function PlayerToplistsPageContent() {
               setCompareMonth={setCompareMonth}
               monthOptions={monthOptions}
               guildOptions={guildOptions}
+              onExportPng={handleExportPng}
+              exportDisabled={!hasServersSelected || activeTab !== "players" || listView !== "table"}
             />
           ) : null
         }
@@ -626,6 +657,7 @@ function PlayerToplistsPageContent() {
             range={(range ?? "all") as any}
             sortKey={sortBy ?? "level"}
             compareMonth={compareMonth}
+            tableRef={tableRef}
           />
         )}
         {activeTab === "guilds" && <GuildToplists serverCodes={servers ?? []} />}
@@ -653,13 +685,14 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMonth,
+  servers, classes, range, sortKey, compareMonth, tableRef,
 }: {
   servers: string[];
   classes: string[];
   range: DaysFilter;
   sortKey: string;
   compareMonth: string;
+  tableRef: React.RefObject<HTMLDivElement>;
 }) {
   const { t } = useTranslation();
   const { guilds } = useFilters();
@@ -1217,6 +1250,248 @@ function TableDataView({
       : playerError
         ? "Error"
         : "Ready";
+  const exportRows = enhancedRows.slice(0, 50);
+
+  const renderToplistTable = (opts: {
+    interactive: boolean;
+    imgLoading: "lazy" | "eager";
+    rows?: FirestoreToplistPlayerRow[];
+  }) => {
+    const rows = opts.rows ?? enhancedRows;
+    return (
+    <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
+          <th style={{ padding: "8px 6px" }}>#</th>
+          <th style={{ padding: "8px 6px" }}>Δ Rank</th>
+          <th style={{ padding: "8px 6px" }}>Server</th>
+          <th style={{ padding: "8px 6px" }}>Name</th>
+          <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
+          <th style={{ padding: "8px 6px" }}>Guild</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Stats/Day</th>
+          <th style={{ padding: "8px 6px" }}>Ratio</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
+          <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
+          <th style={{ padding: "8px 6px" }}>Last Scan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const rankDelta = showCompare ? (r as any)._rankDelta : null;
+          const deltas = (r as any)._delta || {};
+          const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
+          const rankDeltaDisplay = showCompare ? getRankDeltaDisplay(rankDelta, compareMissing) : null;
+          const statsPerDayValue = showCompare ? (r as any)._statsPerDay : null;
+          const statsDaysValue = showCompare ? (r as any)._statsDays : null;
+          const statsPerDayText = statsPerDayValue == null ? "-" : fmtNum(statsPerDayValue);
+          const statsDaysText = statsDaysValue == null ? "-" : `${statsDaysValue}d`;
+          const statsDayVariant = getStatsDayVariant(statsPerDayValue, avgTop100StatsPerDay);
+          const isBestStatsDay =
+            statsPerDayValue != null &&
+            maxStatsPerDay != null &&
+            statsPerDayValue === maxStatsPerDay;
+          const statsDayClassName = isBestStatsDay
+            ? "stats-day-chip stats-day-chip--best"
+            : statsDayVariant
+              ? `stats-day-chip stats-day-chip--${statsDayVariant}`
+              : "stats-day-chip";
+          const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
+          const classIconUrl = getClassIconUrl((r as any).class, 48);
+          const playerId = (r as any).playerId ?? (r as any).id ?? null;
+          const explicitIdentifier =
+            (r as any).identifier ??
+            (r as any).playerIdentifier ??
+            (r as any).values?.Identifier ??
+            (r as any).values?.identifier ??
+            null;
+          const profileIdentifier =
+            (typeof explicitIdentifier === "string" && explicitIdentifier.trim()
+              ? explicitIdentifier.trim()
+              : null) ??
+            buildPlayerIdentifier((r as any).server ?? null, playerId);
+          const rowKey = playerId ?? buildRowKey(r);
+          const decor = decorMap.get(rowKey);
+          const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
+          const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
+          const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
+          const mineTone = getMineTone(decor?.mineTier);
+          const calculatedSum = (r as any)._calculatedSum ?? 0;
+          const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
+            if (!showCompare) return null;
+            if (missing) {
+              return <div style={{ fontSize: 11, opacity: 0.8 }}>-</div>;
+            }
+            if (value == null && hideIfNull) return null;
+            return (
+              <div style={{ fontSize: 11, opacity: 0.8 }}>
+                {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
+              </div>
+            );
+          };
+          const rowOnClick =
+            opts.interactive && profileIdentifier
+              ? () => {
+                  if (profileIdentifier) navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
+                }
+              : undefined;
+
+          return (
+            <tr
+              key={`${r.name}__${r.server}__${r.class ?? ""}`}
+              className="toplists-row"
+              style={{
+                borderBottom: "1px solid #2C4A73",
+                cursor: opts.interactive && profileIdentifier ? "pointer" : undefined,
+              }}
+              onClick={rowOnClick}
+            >
+              <td style={{ padding: "8px 6px" }}>{i + 1}</td>
+              <td style={{ padding: "8px 6px" }}>
+                {rankDeltaDisplay ? (
+                  <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
+                    {rankDeltaDisplay.text}
+                  </span>
+                ) : ""}
+              </td>
+              <td style={{ padding: "8px 6px" }}>{r.server}</td>
+              <td style={{ padding: "8px 6px" }}>{r.name}</td>
+              <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  {classIconUrl ? (
+                    <img
+                      src={classIconUrl}
+                      alt={r.class ?? "class"}
+                      loading={opts.imgLoading}
+                      className="class-icon-toplist"
+                      style={{ display: "block", objectFit: "contain" }}
+                    />
+                  ) : (
+                    <span>{r.class ?? ""}</span>
+                  )}
+                </span>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
+                  {renderDelta(deltas.level ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span style={getFrameStyle(mainTone)}>{fmtNum(r.main)}</span>
+                  {renderDelta(deltas.main ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span style={getFrameStyle(conTone)}>{fmtNum(r.con)}</span>
+                  {renderDelta(deltas.con ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span>{fmtNum(calculatedSum)}</span>
+                  {renderDelta(deltas.sum ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span className={statsDayClassName}>{statsPerDayText}</span>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>{statsDaysText}</div>
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                  <span>{(r as any)._ratioLabel ?? r.ratio ?? "�"}</span>
+                  {renderDelta(deltas.ratio ?? null, compareMissing, true)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
+                  {renderDelta(deltas.mine ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <span>{fmtNum(r.treasury)}</span>
+                  {renderDelta(deltas.treasury ?? null, compareMissing)}
+                </div>
+              </td>
+              <td style={{ padding: "8px 6px" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span>{r.lastScan ?? ""}</span>
+                  {lastScanDotColor && (
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: lastScanDotColor,
+                        boxShadow: "0 0 6px rgba(0, 0, 0, 0.35)",
+                      }}
+                    />
+                  )}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+        {playerLoading && enhancedRows.length === 0 && (
+          <tr><td colSpan={15} style={{ padding: 12 }}>Loading...</td></tr>
+        )}
+        {!playerLoading && !playerError && rows.length === 0 && (
+          <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
+        )}
+      </tbody>
+    </table>
+    );
+  };
+  const exportPortal =
+    typeof document !== "undefined"
+      ? createPortal(
+          <div
+            id="toplist-export-node"
+            aria-hidden="true"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              opacity: 0,
+              pointerEvents: "none",
+              transform: "translate3d(-10000px, 0, 0)",
+              contain: "layout paint style",
+              zIndex: -1,
+            }}
+          >
+            <div
+              id="toplist-export-content"
+              style={{
+                transform: "translateZ(0)",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+              }}
+            >
+              {renderToplistTable({ interactive: false, imgLoading: "eager", rows: exportRows })}
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
@@ -1256,202 +1531,13 @@ function TableDataView({
           Please select at least one server.
         </div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
-                <th style={{ padding: "8px 6px" }}>#</th>
-                <th style={{ padding: "8px 6px" }}>Δ Rank</th>
-                <th style={{ padding: "8px 6px" }}>Server</th>
-                <th style={{ padding: "8px 6px" }}>Name</th>
-                <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
-                <th style={{ padding: "8px 6px" }}>Guild</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Stats/Day</th>
-                <th style={{ padding: "8px 6px" }}>Ratio</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
-                <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
-                <th style={{ padding: "8px 6px" }}>Last Scan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {enhancedRows.map((r, i) => {
-                const rankDelta = showCompare ? (r as any)._rankDelta : null;
-                const deltas = (r as any)._delta || {};
-                const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
-                const rankDeltaDisplay = showCompare ? getRankDeltaDisplay(rankDelta, compareMissing) : null;
-                const statsPerDayValue = showCompare ? (r as any)._statsPerDay : null;
-                const statsDaysValue = showCompare ? (r as any)._statsDays : null;
-                const statsPerDayText = statsPerDayValue == null ? "-" : fmtNum(statsPerDayValue);
-                const statsDaysText = statsDaysValue == null ? "-" : `${statsDaysValue}d`;
-                const statsDayVariant = getStatsDayVariant(statsPerDayValue, avgTop100StatsPerDay);
-                const isBestStatsDay =
-                  statsPerDayValue != null &&
-                  maxStatsPerDay != null &&
-                  statsPerDayValue === maxStatsPerDay;
-                const statsDayClassName = isBestStatsDay
-                  ? "stats-day-chip stats-day-chip--best"
-                  : statsDayVariant
-                    ? `stats-day-chip stats-day-chip--${statsDayVariant}`
-                    : "stats-day-chip";
-                const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
-                const classIconUrl = getClassIconUrl((r as any).class, 48);
-                const playerId = (r as any).playerId ?? (r as any).id ?? null;
-                const explicitIdentifier =
-                  (r as any).identifier ??
-                  (r as any).playerIdentifier ??
-                  (r as any).values?.Identifier ??
-                  (r as any).values?.identifier ??
-                  null;
-                const profileIdentifier =
-                  (typeof explicitIdentifier === "string" && explicitIdentifier.trim()
-                    ? explicitIdentifier.trim()
-                    : null) ??
-                  buildPlayerIdentifier((r as any).server ?? null, playerId);
-                const rowKey = playerId ?? buildRowKey(r);
-                const decor = decorMap.get(rowKey);
-                const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
-                const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
-                const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
-                const mineTone = getMineTone(decor?.mineTier);
-                const calculatedSum = (r as any)._calculatedSum ?? 0;
-                const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
-                  if (!showCompare) return null;
-                  if (missing) {
-                    return <div style={{ fontSize: 11, opacity: 0.8 }}>-</div>;
-                  }
-                  if (value == null && hideIfNull) return null;
-                  return (
-                    <div style={{ fontSize: 11, opacity: 0.8 }}>
-                      {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
-                    </div>
-                  );
-                };
-
-                return (
-                <tr
-                  key={`${r.name}__${r.server}__${r.class ?? ""}`}
-                  className="toplists-row"
-                  style={{ borderBottom: "1px solid #2C4A73", cursor: profileIdentifier ? "pointer" : undefined }}
-                  onClick={() => {
-                    if (profileIdentifier) navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
-                  }}
-                >
-                  <td style={{ padding: "8px 6px" }}>{i + 1}</td>
-                  <td style={{ padding: "8px 6px" }}>
-                    {rankDeltaDisplay ? (
-                      <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
-                        {rankDeltaDisplay.text}
-                      </span>
-                    ) : ""}
-                  </td>
-                  <td style={{ padding: "8px 6px" }}>{r.server}</td>
-                  <td style={{ padding: "8px 6px" }}>{r.name}</td>
-                  <td style={{ padding: "8px 6px", textAlign: "center" }}>
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "100%",
-                        height: "100%",
-                      }}
-                    >
-                      {classIconUrl ? (
-                        <img
-                          src={classIconUrl}
-                          alt={r.class ?? "class"}
-                          loading="lazy"
-                          className="class-icon-toplist"
-                          style={{ display: "block", objectFit: "contain" }}
-                        />
-                      ) : (
-                        <span>{r.class ?? ""}</span>
-                      )}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
-                      {renderDelta(deltas.level ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span style={getFrameStyle(mainTone)}>{fmtNum(r.main)}</span>
-                      {renderDelta(deltas.main ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span style={getFrameStyle(conTone)}>{fmtNum(r.con)}</span>
-                      {renderDelta(deltas.con ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span>{fmtNum(calculatedSum)}</span>
-                      {renderDelta(deltas.sum ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span className={statsDayClassName}>{statsPerDayText}</span>
-                      <div style={{ fontSize: 11, opacity: 0.8 }}>{statsDaysText}</div>
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                      <span>{(r as any)._ratioLabel ?? r.ratio ?? "�"}</span>
-                      {renderDelta(deltas.ratio ?? null, compareMissing, true)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
-                      {renderDelta(deltas.mine ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span>{fmtNum(r.treasury)}</span>
-                      {renderDelta(deltas.treasury ?? null, compareMissing)}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px 6px" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <span>{r.lastScan ?? ""}</span>
-                      {lastScanDotColor && (
-                        <span
-                          aria-hidden
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            background: lastScanDotColor,
-                            boxShadow: "0 0 6px rgba(0, 0, 0, 0.35)",
-                          }}
-                        />
-                      )}
-                    </span>
-                  </td>
-                </tr>
-                );
-              })}
-              {playerLoading && enhancedRows.length === 0 && (
-                <tr><td colSpan={15} style={{ padding: 12 }}>Loading...</td></tr>
-              )}
-              {!playerLoading && !playerError && enhancedRows.length === 0 && (
-                <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div ref={tableRef} style={{ overflowX: "auto" }}>
+            {renderToplistTable({ interactive: true, imgLoading: "lazy" })}
+          </div>
+        </>
       )}
+      {exportPortal}
     </div>
   );
 }

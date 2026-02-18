@@ -11,9 +11,18 @@ type Props = {
   setCompareMonth: (v: string) => void;
   monthOptions: string[];
   guildOptions: { value: string; label: string }[];
+  onExportPng?: () => void;
+  exportDisabled?: boolean;
 };
 
-export default function HudFilters({ compareMonth, setCompareMonth, monthOptions, guildOptions }: Props) {
+export default function HudFilters({
+  compareMonth,
+  setCompareMonth,
+  monthOptions,
+  guildOptions,
+  onExportPng,
+  exportDisabled,
+}: Props) {
   const { t } = useTranslation();
   const {
     // Filter states
@@ -163,6 +172,15 @@ export default function HudFilters({ compareMonth, setCompareMonth, monthOptions
 
       {/* Right Side Actions */}
       <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          className={styles.hudSubBtn}
+          onClick={onExportPng}
+          disabled={exportDisabled || !onExportPng}
+          style={exportDisabled || !onExportPng ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
+        >
+          Export PNG
+        </button>
         <button type="button" className={styles.hudSubBtn} onClick={resetAll}>
           Reset
         </button>

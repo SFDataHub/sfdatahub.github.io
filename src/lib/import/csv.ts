@@ -102,6 +102,7 @@ type RowMeta = { row: Row; ts: number };
 
 export type ParsedPlayerCsvRow = {
   playerId: string;
+  identifier: string;
   server: string;
   name: string | null;
   timestampSec: number;
@@ -391,6 +392,14 @@ export const parseServerKeyFromIdentifier = (identifier: any): string | null => 
   const serverKey = match[1]?.trim();
   if (!serverKey) return null;
   return normalizeServerCodeFromKey(serverKey);
+};
+
+const parsePlayerIdFromIdentifier = (identifier: any): string | null => {
+  const raw = String(identifier ?? "").trim();
+  if (!raw) return null;
+  const match = raw.match(/^(.+)_p(\d+)$/);
+  if (!match) return null;
+  return match[2] ?? null;
 };
 
 type MemberCountResolutionSource = "primary" | "alias" | "lookup" | "none";
@@ -785,8 +794,15 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
 
   const headerMap = buildPlayerHeaderMap(headersResolved);
   for (const row of rows) {
-    const pidRaw = pickWithLookup(row, lookup, COL.PLAYERS.PID) ?? pickWithLookup(row, lookup, COL.PLAYERS.IDENTIFIER);
-    const playerId = norm(pidRaw);
+    const identifierRaw = pickWithLookup(row, lookup, COL.PLAYERS.IDENTIFIER);
+    const identifier = norm(identifierRaw);
+    if (!identifier) {
+      stats.missingIdentifier++;
+      continue;
+    }
+
+    const pidRaw = pickWithLookup(row, lookup, COL.PLAYERS.PID);
+    const playerId = norm(pidRaw || parsePlayerIdFromIdentifier(identifier));
     if (!playerId) {
       stats.missingIdentifier++;
       continue;
@@ -798,8 +814,6 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
       continue;
     }
 
-    const identifierRaw = pickWithLookup(row, lookup, COL.PLAYERS.IDENTIFIER);
-    const identifier = norm(identifierRaw);
     const serverFromIdentifier = parseServerKeyFromIdentifier(identifier);
     const serverRaw = pickWithLookup(row, lookup, COL.PLAYERS.SERVER);
     const serverFallback = serverRaw && norm(serverRaw) !== "" ? up(serverRaw) : undefined;
@@ -830,6 +844,7 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
 
     parsed.push({
       playerId,
+      identifier,
       server,
       name,
       timestampSec: tsSec,
@@ -1067,13 +1082,25 @@ const extractHostname = (value: string): string | null => {
 const describeServerInput = (value: any) => {
   const raw = String(value ?? "").replace(/\u00a0/g, " ").trim();
   if (!raw) {
-    return { input: raw, hostname: null, subdomain: null, canonicalCode: null };
+    return { input: raw, normalizedInput: raw, hostname: null, subdomain: null, canonicalCode: null };
   }
-  const hostname = extractHostname(raw);
+
+  // Accept tags like "maerwynn_net" that already carry a region suffix.
+  const normalizedInput = (() => {
+    let lowered = raw.toLowerCase();
+    if (lowered.includes("_") && lowered.endsWith("_net")) {
+      lowered = lowered.split("_")[0] ?? lowered;
+    }
+    return lowered;
+  })()
+    .trim();
+
+  const hostname = extractHostname(normalizedInput);
   const subdomain = hostname ? hostname.split(".")[0] ?? "" : "";
   const canonicalCode = subdomain ? canonicalCodeFromSubdomain(subdomain) : null;
   return {
     input: raw,
+    normalizedInput,
     hostname,
     subdomain: subdomain || null,
     canonicalCode,
@@ -1082,7 +1109,7 @@ const describeServerInput = (value: any) => {
 
 const normalizeServerInput = (value: any): { code?: string; host?: string } => {
   const info = describeServerInput(value);
-  const code = info.subdomain ? canonicalCodeFromSubdomain(info.subdomain) : null;
+  const code = info.canonicalCode ?? (info.subdomain ? canonicalCodeFromSubdomain(info.subdomain) : null);
   const host = info.hostname && info.hostname.includes(".") ? info.hostname : null;
   if (code && host) return { code, host };
   if (code) return { code };
@@ -1691,14 +1718,17 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
   const pendingDerivedByServer = new Map<string, GuildDerivedSnapshotEntry[]>();
 
   for (const [gid, aggregate] of aggregatesByGuildId.entries()) {
-    const snapshotServerKey = resolveServerCodeFromMap(serverHostMap, aggregate.server);
+    const serverInfo = describeServerInput(aggregate.server);
+    const serverCode = serverInfo.canonicalCode ?? null;
+    const snapshotServerKey = resolveServerCodeFromMap(serverHostMap, serverCode ?? aggregate.server);
     if (!snapshotServerKey) {
       if (aggregate.server) {
-        const serverInfo = describeServerInput(aggregate.server);
         console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
           guildId: gid,
           server: aggregate.server,
           input: serverInfo.input,
+          normalizedInput: serverInfo.normalizedInput,
+          serverCode,
           hostname: serverInfo.hostname,
           subdomain: serverInfo.subdomain,
           canonicalCode: serverInfo.canonicalCode,
@@ -1932,13 +1962,13 @@ export async function importCsvToDB(
     const ALL_HEADERS = playerHeaders.length ? playerHeaders : inferHeadersFromRows(sourceRows);
 
     type PlayerRowMeta = { row: Row; ts: number; parsed: ParsedPlayerCsvRow };
-    const byPid = new Map<string, PlayerRowMeta[]>();
+    const byIdentifier = new Map<string, PlayerRowMeta[]>();
 
     for (const parsed of parsedPlayers) {
       const scanKey = `${parsed.playerId}__${parsed.server}__${parsed.timestampSec}`;
       playerScanDocs.push({
         key: scanKey,
-        ref: doc(db, `players/${parsed.playerId}/scans/${parsed.timestampSec}`),
+        ref: doc(db, `players/${parsed.identifier}/scans/${parsed.timestampSec}`),
         data: {
           playerId: parsed.playerId,
           server: parsed.server,
@@ -1950,8 +1980,8 @@ export async function importCsvToDB(
         },
       });
 
-      if (!byPid.has(parsed.playerId)) byPid.set(parsed.playerId, []);
-      byPid.get(parsed.playerId)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
+      if (!byIdentifier.has(parsed.identifier)) byIdentifier.set(parsed.identifier, []);
+      byIdentifier.get(parsed.identifier)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
     }
 
     const scanResults = await writeScansWithResults(playerScanDocs, emitProgress, "players");
@@ -1976,10 +2006,11 @@ export async function importCsvToDB(
       console.warn("[ImportCsv] Server host map empty; derived snapshots will be skipped.");
     }
 
-    for (const [pid, metas] of byPid) {
+    for (const [identifier, metas] of byIdentifier) {
       metas.sort((a, b) => a.ts - b.ts);
       const last = metas[metas.length - 1];
       const parsed = last.parsed;
+      const pid = parsed.playerId;
       const server = parsed.server;
       const name = parsed.name;
       const level = parsed.level ?? null;
@@ -1992,7 +2023,7 @@ export async function importCsvToDB(
       const ngrams = tokensToNgrams(tokens);
 
       // *** NEU: latest nur schreiben, wenn neuer als vorhandener latest ***
-      const latestRef = doc(db, `players/${pid}/latest/latest`);
+      const latestRef = doc(db, `players/${identifier}/latest/latest`);
       const prevSec = await readPrevLatestSec(latestRef, latestCacheByPath);
       const shouldWriteLatest = last.ts > prevSec;
       const latestUpdatedAt = shouldWriteLatest ? serverTimestamp() : null;
@@ -2024,12 +2055,14 @@ export async function importCsvToDB(
         counts.writtenLatestPlayers!++;
       }
 
+      const serverInfo = describeServerInput(server);
+      const serverCode = serverInfo.canonicalCode ?? null;
       const derivedInput = {
         playerId: pid,
         name,
         className,
         level,
-        server,
+        server: serverCode ?? server,
         guildIdentifier: guildIdentifier || undefined,
         guildName: guildName || undefined,
         values: last.row,
@@ -2038,13 +2071,14 @@ export async function importCsvToDB(
       };
       const derived = deriveForPlayer(derivedInput, serverTimestamp);
       const snapshotServerKey =
-        serverCodeByHost.size > 0 ? resolveServerCodeFromMap(serverCodeByHost, server) : null;
+        serverCodeByHost.size > 0 ? resolveServerCodeFromMap(serverCodeByHost, serverCode ?? server) : null;
       if (!snapshotServerKey && serverCodeByHost.size > 0) {
-        const serverInfo = describeServerInput(server);
         console.warn("[ImportCsv] Derived snapshot skipped (server host not mapped)", {
           playerId: pid,
           server,
           input: serverInfo.input,
+          normalizedInput: serverInfo.normalizedInput,
+          serverCode,
           hostname: serverInfo.hostname,
           subdomain: serverInfo.subdomain,
           canonicalCode: serverInfo.canonicalCode,
@@ -2088,7 +2122,7 @@ export async function importCsvToDB(
         const bounds = weekBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        const ref = doc(db, `players/${pid}/history_weekly/${wid}`);
+        const ref = doc(db, `players/${identifier}/history_weekly/${wid}`);
         putHistory.push({
           path: ref.path,
           op: "setDoc",
@@ -2121,7 +2155,7 @@ export async function importCsvToDB(
         const bounds = monthBoundsFromSec(list[list.length - 1].ts);
         const lastM = list[list.length - 1];
 
-        const ref = doc(db, `players/${pid}/history_monthly/${ym}`);
+        const ref = doc(db, `players/${identifier}/history_monthly/${ym}`);
         putHistory.push({
           path: ref.path,
           op: "setDoc",
@@ -2314,13 +2348,17 @@ export async function importCsvToDB(
 
       if (enableGuildDerived) {
         const snapshotServerKey =
-          serverCodeByHost.size > 0 ? resolveServerCodeFromMap(serverCodeByHost, parsed.server) : null;
+          serverCodeByHost.size > 0
+            ? resolveServerCodeFromMap(serverCodeByHost, describeServerInput(parsed.server).canonicalCode ?? parsed.server)
+            : null;
         if (!snapshotServerKey && serverCodeByHost.size > 0) {
           const serverInfo = describeServerInput(parsed.server);
           console.warn("[ImportCsv] Guild derived snapshot skipped (server host not mapped)", {
             guildId: gid,
             server: parsed.server,
             input: serverInfo.input,
+            normalizedInput: serverInfo.normalizedInput,
+            serverCode: serverInfo.canonicalCode ?? null,
             hostname: serverInfo.hostname,
             subdomain: serverInfo.subdomain,
             canonicalCode: serverInfo.canonicalCode,
