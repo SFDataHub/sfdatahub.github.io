@@ -1018,34 +1018,16 @@ const buildProfileView = (
       hasTotalStats = true;
     }
   });
-  const latestDocData = snapshot as any;
-  const vRoot = snapshot.values || {};
-  const v =
-    vRoot && typeof vRoot === "object" && typeof (vRoot as any).values === "object"
-      ? (vRoot as any).values
-      : vRoot;
+  const v = snapshot.values || {};
   const parseStat = (val: any) => {
-    const cleaned = String(val ?? "0").replace(/[^\d-]/g, "");
-    if (!cleaned) return 0;
+    const cleaned = String(val ?? "0").replace(/[.\\s]/g, "");
     const n = parseInt(cleaned, 10);
     return Number.isFinite(n) ? n : 0;
   };
-  const baseValue = parseStat(v.base);
-  const baseConValue = parseStat(v.baseConstitution);
-  const attrValue = parseStat(v.attribute);
-  const conValue = parseStat(v.constitution);
-  if (import.meta.env.DEV) {
-    console.log("[Profile latest data]", latestDocData);
-    console.log("[Profile latest values]", latestDocData?.values);
-    console.log("[Profile latest values.values]", latestDocData?.values?.values);
-    console.log("[Profile bars/source v]", v);
-    console.log("[Profile stat samples]", {
-      base: v?.base,
-      baseConstitution: v?.baseConstitution,
-      attribute: v?.attribute,
-      constitution: v?.constitution,
-    });
-  }
+  const baseValue = parseStat((v as any)["Base"]);
+  const baseConValue = parseStat((v as any)["Base Constitution"]);
+  const attrValue = parseStat((v as any)["Attribute"]);
+  const conValue = parseStat((v as any)["Constitution"]);
   const totalBaseStats = hasBaseStats ? Object.values(baseStats).reduce((sum, val) => sum + val, 0) : null;
   const calculatedTotalBaseStats = baseValue + baseConValue;
   const calculatedTotalStats = attrValue + conValue;
