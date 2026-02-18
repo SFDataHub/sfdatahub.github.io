@@ -14,7 +14,7 @@ import type {
   MonthOption,
   TableBlock,
 } from "./GuildMonthlyProgressTab.types";
-import { guildIconUrlByName } from "../../../../data/guilds";
+import { guildIconUrlByIdentifier } from "../../../../data/guilds";
 
 type Props = {
   guildId: string;
@@ -47,7 +47,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
   const progressCache = useRef<Record<string, any>>({});
 
   const [uiData, setUiData] = useState<GuildMonthlyProgressData>(() =>
-    emptyUiData(guildName, guildServer)
+    emptyUiData(guildId, guildName, guildServer)
   );
 
   useEffect(() => {
@@ -60,7 +60,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
       if (!opts.length) {
         setMonths(null);
         setCurrentMonthKey(undefined);
-        setUiData(emptyUiData(guildName, guildServer));
+        setUiData(emptyUiData(guildId, guildName, guildServer));
         return;
       }
       setMonths(opts);
@@ -69,6 +69,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
       const firstProgress = progressCache.current[firstKey];
       setUiData(
         progressToUiData(firstProgress, {
+          guildId,
           guildName,
           guildServer,
           currentMonthKey: firstKey,
@@ -124,7 +125,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
         if (!guildKey) {
           setMonths(null);
           setCurrentMonthKey(undefined);
-          setUiData(emptyUiData(guildName, guildServer));
+          setUiData(emptyUiData(guildId, guildName, guildServer));
           setLoading(false);
           return;
         }
@@ -148,7 +149,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
         if (!cancelled) {
           setMonths(null);
           setCurrentMonthKey(undefined);
-          setUiData(emptyUiData(guildName, guildServer));
+          setUiData(emptyUiData(guildId, guildName, guildServer));
         }
       } finally {
         if (!existing) guildMonthlyLoadInFlight.delete(guildKey);
@@ -189,7 +190,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
     if (!p) {
       // Monat existiert nicht -> leer rendern, aber Dropdown bleibt
       setUiData(
-        emptyUiData(guildName, guildServer, {
+        emptyUiData(guildId, guildName, guildServer, {
           currentMonthKey: key,
           months: months ?? undefined,
         })
@@ -199,6 +200,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
 
     setUiData(
       progressToUiData(p, {
+        guildId,
         guildName,
         guildServer,
         currentMonthKey: key,
@@ -221,6 +223,7 @@ export default GuildMonthlyProgressTabContainer;
 /* ====================== Helpers ====================== */
 
 function emptyUiData(
+  guildId: string,
   guildName: string,
   guildServer?: string | null,
   extra?: Partial<Pick<GuildMonthlyProgressData["header"], "currentMonthKey" | "months">>
@@ -229,7 +232,7 @@ function emptyUiData(
     header: {
       title: `${guildName} - Monthly Progress`,
       monthRange: "-", // Fallback-Anzeige
-      emblemUrl: guildIconUrlByName(guildName, 512) || undefined,
+      emblemUrl: guildIconUrlByIdentifier(guildId, 512) || undefined,
       centerCaption: "Most Base Stats gained",
       currentMonthKey: extra?.currentMonthKey,
       months: extra?.months,
@@ -271,6 +274,7 @@ function mkBlock(title: string, subtitle?: string): TableBlock {
 function progressToUiData(
   progress: any,
   ctx: {
+    guildId: string;
     guildName: string;
     guildServer?: string | null;
     currentMonthKey: string;
@@ -281,7 +285,7 @@ function progressToUiData(
   const header: GuildMonthlyProgressData["header"] = {
     title: `${ctx.guildName} - Monthly Progress`,
     monthRange: undefined, // Dropdown uebernimmt
-    emblemUrl: guildIconUrlByName(ctx.guildName, 512) || undefined,
+    emblemUrl: guildIconUrlByIdentifier(ctx.guildId, 512) || undefined,
     centerCaption: "Most Base Stats gained",
     months: ctx.months,
     currentMonthKey: ctx.currentMonthKey,

@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
-import { guildIconUrlByName } from "../../data/guilds";
+import { guildIconUrlByIdentifier } from "../../data/guilds";
 import {
   beginReadScope,
   endReadScope,
@@ -145,7 +145,7 @@ function StatRow({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 function LeftRail({ guild }: { guild: Guild }) {
-  const emblemUrl = guildIconUrlByName(guild.name, 800);
+  const emblemUrl = guildIconUrlByIdentifier(guild.id, 800);
   return (
     <div className="space-y-4">
       <div
@@ -476,7 +476,7 @@ export default function GuildProfile() {
             <GuildProfileInfo
               guild={guild}
               snapshot={snapshot}
-              emblemUrl={guildIconUrlByName(guild.name, 512) || undefined}
+              emblemUrl={guildIconUrlByIdentifier(guild.id, 512) || undefined}
               colors={C}
             />
 
@@ -485,7 +485,7 @@ export default function GuildProfile() {
                 <GuildBaseStatsBroadcastTile
                   guildName={guild.name}
                   server={guild.server ?? "-"}
-                  emblemUrl={guildIconUrlByName(guild.name, 512) || undefined}
+                  emblemUrl={guildIconUrlByIdentifier(guild.id, 512) || undefined}
                   lastScanISO={snapshot?.updatedAtMs ? new Date(snapshot.updatedAtMs).toISOString() : undefined}
                   members={guild.memberCount ?? 0}
                   avgLevel={snapshot?.avgLevel ?? 0}

@@ -211,10 +211,7 @@ export default function PlayerProfileScreen() {
         }
 
         if (!data) {
-          const ref = doc(db, `players/${id}/latest/latest`);
-          const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
-          if (!snap.exists()) throw new Error("Spieler nicht gefunden.");
-          data = snap.data();
+          throw new Error("Spieler nicht gefunden.");
         }
         if (!data || typeof data !== "object") throw new Error("Spieler nicht gefunden.");
 
@@ -462,7 +459,21 @@ export default function PlayerProfileScreen() {
 
     const loadMonthlyHistory = async () => {
       try {
-        const colRef = collection(db, `players/${snapshot.id}/history_monthly`);
+        const historyIdentifier = snapshot.identifier;
+        if (!historyIdentifier) {
+          removeChartsCache(cacheKey);
+          if (!cancelled) {
+            const fallbackSeries = buildFallbackCharts(snapshot);
+            chartsSeriesRef.current = fallbackSeries;
+            chartsSourceRef.current = "fallback";
+            chartsLoadedKeyRef.current = currentKey;
+            setChartsSeries((prev) => (trendSeriesEqual(prev, fallbackSeries) ? prev : fallbackSeries));
+            console.log(`[charts] load done key=${currentKey} months=0 (missing identifier)`);
+          }
+          return;
+        }
+
+        const colRef = collection(db, `players/${historyIdentifier}/history_monthly`);
         const q = query(colRef, orderBy(documentId(), "desc"), limit(3));
         const snap = await traceGetDocs(scope, { path: colRef.path }, () => getDocs(q));
         const months = snap.docs
@@ -510,7 +521,7 @@ export default function PlayerProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [tab, snapshot?.id, snapshot?.server]);
+  }, [tab, snapshot?.id, snapshot?.identifier, snapshot?.server]);
 
   const viewModel = useMemo<PlayerProfileViewModel | null>(
     () => (snapshot ? buildProfileView(snapshot, avatarSnapshot, chartsSeries) : null),
@@ -1007,24 +1018,37 @@ const buildProfileView = (
       hasTotalStats = true;
     }
   });
+  const latestDocData = snapshot as any;
+  const vRoot = snapshot.values || {};
+  const v =
+    vRoot && typeof vRoot === "object" && typeof (vRoot as any).values === "object"
+      ? (vRoot as any).values
+      : vRoot;
+  const parseStat = (val: any) => {
+    const cleaned = String(val ?? "0").replace(/[^\d-]/g, "");
+    if (!cleaned) return 0;
+    const n = parseInt(cleaned, 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const baseValue = parseStat(v.base);
+  const baseConValue = parseStat(v.baseConstitution);
+  const attrValue = parseStat(v.attribute);
+  const conValue = parseStat(v.constitution);
+  if (import.meta.env.DEV) {
+    console.log("[Profile latest data]", latestDocData);
+    console.log("[Profile latest values]", latestDocData?.values);
+    console.log("[Profile latest values.values]", latestDocData?.values?.values);
+    console.log("[Profile bars/source v]", v);
+    console.log("[Profile stat samples]", {
+      base: v?.base,
+      baseConstitution: v?.baseConstitution,
+      attribute: v?.attribute,
+      constitution: v?.constitution,
+    });
+  }
   const totalBaseStats = hasBaseStats ? Object.values(baseStats).reduce((sum, val) => sum + val, 0) : null;
-  const classKey = canonicalize(snapshot.className ?? "");
-  const mainAttrKey =
-    classKey === "warrior" || classKey === "krieger" || classKey === "berserker" || classKey === "paladin"
-      ? "str"
-      : classKey === "mage" || classKey === "magier" || classKey === "battlemage" || classKey === "battlemage"
-        || classKey === "necromancer" || classKey === "nekromant" || classKey === "druid" || classKey === "druide"
-        || classKey === "bard" || classKey === "barde"
-        ? "int"
-        : classKey === "scout" || classKey === "jaeger" || classKey === "jäger" || classKey === "assassin"
-          || classKey === "meuchelmoerder" || classKey === "meuchelmorder"
-          || classKey === "demonhunter" || classKey === "daemonenjaeger" || classKey === "dämonenjäger"
-          ? "dex"
-          : null;
-  const baseValue = snapshot.base ?? (mainAttrKey ? baseStats[mainAttrKey] : 0);
-  const conValue = snapshot.con ?? baseStats.con ?? 0;
-  const calculatedTotalBaseStats = baseValue + conValue;
-  const calculatedTotalStats = (snapshot.attributeTotal ?? 0) + (snapshot.conTotal ?? 0);
+  const calculatedTotalBaseStats = baseValue + baseConValue;
+  const calculatedTotalStats = attrValue + conValue;
   const scrapbookProgress = scrapbook ?? null;
   const fortress = lookup.number(["fortresslevel", "fortress"]) ?? Math.round(rand() * 20) + 30;
   const underworld = lookup.number(["underworld", "underworldlevel"]) ?? Math.round(rand() * 10) + 20;
