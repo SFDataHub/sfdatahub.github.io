@@ -6,12 +6,14 @@ import {
   ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
+import homeStyles from "../../pages/Home.module.css";
 import SubmenuPortal from "./SubmenuPortal";
 import submenuStyles from "./SubmenuPortal.module.css";
 import { useAuth } from "../../context/AuthContext";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
 import { useTranslation } from "react-i18next";
 import { buildPlayerIdentifier } from "../../lib/players/identifier";
+import discordLogo from "../../assets/discord-logo.svg";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -31,6 +33,7 @@ const languageOptions: { code: LanguageCode; ariaLabelKey: string }[] = [
   { code: "en", ariaLabelKey: "sidebar.languageSwitchEn" },
   { code: "de", ariaLabelKey: "sidebar.languageSwitchDe" },
 ];
+const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
 
 const main: Item[] = [
   { to: "/",           labelKey: "nav.home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
@@ -558,6 +561,28 @@ export default function Sidebar({
               )}
             </div>
           ) : null}
+          <a
+            href={DISCORD_INVITE_URL}
+            className={`${homeStyles.card} ${homeStyles.discordBanner}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={t("home.discordBanner.aria")}
+            data-i18n-scope="home.discordBanner"
+          >
+            <div className={homeStyles.discordBannerText}>
+              <img
+                src={discordLogo}
+                alt="Discord Logo"
+                className={homeStyles.discordBannerLogo}
+              />
+              <h2 className={homeStyles.discordBannerTitle} data-i18n="home.discordBanner.title">
+                {t("home.discordBanner.title")}
+              </h2>
+              <p className={homeStyles.discordBannerSubtitle} data-i18n="home.discordBanner.subtitle">
+                {t("home.discordBanner.subtitle")}
+              </p>
+            </div>
+          </a>
         </div>
       </div>
 

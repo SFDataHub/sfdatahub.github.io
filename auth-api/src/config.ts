@@ -33,6 +33,8 @@ const strings = {
   SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
   TWITCH_CLIENT_ID: defineString("TWITCH_CLIENT_ID"),
   TWITCH_CHANNELS: defineString("TWITCH_CHANNELS"),
+  TWITCH_GAME_ID: defineString("TWITCH_GAME_ID"),
+  TWITCH_LOG_FULL_RESPONSE: defineString("TWITCH_LOG_FULL_RESPONSE"),
 } as const;
 
 const readRuntimeValue = (key: string, param?: Param): string | undefined => {
@@ -85,6 +87,11 @@ export const DISCORD_NEWS_CORS_ORIGINS = readRuntimeValue(
 export const TWITCH_CLIENT_ID = readRuntimeValue("TWITCH_CLIENT_ID", strings.TWITCH_CLIENT_ID);
 export const TWITCH_CLIENT_SECRET = readRuntimeValue("TWITCH_CLIENT_SECRET", secrets.TWITCH_CLIENT_SECRET);
 export const TWITCH_CHANNELS = readRuntimeValue("TWITCH_CHANNELS", strings.TWITCH_CHANNELS);
+export const TWITCH_GAME_ID = readRuntimeValue("TWITCH_GAME_ID", strings.TWITCH_GAME_ID);
+export const TWITCH_LOG_FULL_RESPONSE = readRuntimeValue(
+  "TWITCH_LOG_FULL_RESPONSE",
+  strings.TWITCH_LOG_FULL_RESPONSE,
+);
 
 const DEFAULT_DISCORD_NEWS_CORS_ORIGINS = [
   "https://sfdatahub.github.io",
