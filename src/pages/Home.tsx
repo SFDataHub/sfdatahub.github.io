@@ -519,8 +519,10 @@ type TwitchLiveResponse =
   | { live: false }
   | {
       live: true;
-      channel: { login: string; displayName: string; url: string };
-      stream: { title: string; viewerCount: number; startedAt: string; thumbnailUrl: string };
+      items: Array<{
+        channel: { login: string; displayName: string; url: string };
+        stream: { title: string; viewerCount: number; startedAt: string; thumbnailUrl: string };
+      }>;
     };
 const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) => {
   const { t } = useTranslation();
@@ -558,41 +560,45 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
     );
   }
 
-  const displayName = live.channel.displayName || live.channel.login;
-  const streamTitle = live.stream.title ? clampText(live.stream.title, 80) : "";
   return (
     <section className={styles.card} data-i18n-scope="home.live">
       <header className={styles.header}>
         <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
       </header>
-      <div className={styles.liveCard}>
-        {live.stream.thumbnailUrl ? (
-          <img src={live.stream.thumbnailUrl} alt="" className={styles.liveAvatar} />
-        ) : (
-          <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
-        )}
-        <div className={styles.liveInfo}>
-          <div className={styles.liveName}>{displayName}</div>
-          <div className={styles.liveMeta}>
-            <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
-            {typeof live.stream.viewerCount === "number" && (
-              <span className={styles.liveViewers}>
-                {t("home.live.viewers", { viewers: live.stream.viewerCount.toLocaleString() })}
-              </span>
+      {live.items.map((item) => {
+        const displayName = item.channel.displayName || item.channel.login;
+        const streamTitle = item.stream.title ? clampText(item.stream.title, 80) : "";
+        return (
+          <div className={styles.liveCard} key={item.channel.login}>
+            {item.stream.thumbnailUrl ? (
+              <img src={item.stream.thumbnailUrl} alt="" className={styles.liveAvatar} />
+            ) : (
+              <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
             )}
+            <div className={styles.liveInfo}>
+              <div className={styles.liveName}>{displayName}</div>
+              <div className={styles.liveMeta}>
+                <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
+                {typeof item.stream.viewerCount === "number" && (
+                  <span className={styles.liveViewers}>
+                    {t("home.live.viewers", { viewers: item.stream.viewerCount.toLocaleString() })}
+                  </span>
+                )}
+              </div>
+              {streamTitle && <div className={styles.liveMeta}>{streamTitle}</div>}
+            </div>
+            <a
+              href={item.channel.url}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.primaryBtn}
+              data-i18n="home.live.open_on_twitch"
+            >
+              {t("home.live.open_on_twitch")}
+            </a>
           </div>
-          {streamTitle && <div className={styles.liveMeta}>{streamTitle}</div>}
-        </div>
-        <a
-          href={live.channel.url}
-          target="_blank"
-          rel="noreferrer"
-          className={styles.primaryBtn}
-          data-i18n="home.live.open_on_twitch"
-        >
-          {t("home.live.open_on_twitch")}
-        </a>
-      </div>
+        );
+      })}
     </section>
   );
 };
