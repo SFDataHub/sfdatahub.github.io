@@ -12,6 +12,7 @@ import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home
 import guideHubLogo from "../assets/logo_guidehub.png";
 import discordLogo from "../assets/discord-logo.svg";
 import { guideAssetByKey } from "../data/guidehub/assets";
+import { AUTH_BASE_URL } from "../lib/auth/config";
 
 // Historybook cover (homepage preview)
 const HISTORYBOOK_COVER_URL = "/flipbooks/sf-history-book/history_book_coverpage.png";
@@ -24,7 +25,7 @@ const FEATURED_PREVIEW_COMPACT_HEIGHT = "clamp(96px, 22vw, 192px)";
 const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
 
 // Datenquellen (client-seitig lesbar)
-const TWITCH_LIVE_URL = "";          // Twitch-Live (JSON, gefiltert serverseitig)
+const TWITCH_LIVE_URL = AUTH_BASE_URL ? `${AUTH_BASE_URL}/api/twitch/live` : "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
 // Creators CSVs (öffentlich, mergen)
@@ -514,61 +515,34 @@ const YouTubeCarousel: React.FC = () => {
   );
 };
 
-type LiveItem = { id?: string; name: string; url: string; avatar?: string; viewers?: number };
+type TwitchLiveResponse =
+  | { live: false }
+  | {
+      live: true;
+      channel: { login: string; displayName: string; url: string };
+      stream: { title: string; viewerCount: number; startedAt: string; thumbnailUrl: string };
+    };
 const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) => {
   const { t } = useTranslation();
-  const [live, setLive] = useState<LiveItem[] | null>(null);
-  const [twitchMap, setTwitchMap] = useState<Map<string,string>>(new Map());
-  const [index, setIndex] = useState(0);
-  const timer = useRef<number | null>(null);
+  const [live, setLive] = useState<TwitchLiveResponse | null>(null);
 
   useEffect(() => {
     let alive = true;
     async function load(){
-      if(!TWITCH_LIVE_URL){ setLive([]); return; }
+      if(!TWITCH_LIVE_URL){ setLive({ live: false }); return; }
       try{
         const res = await fetch(TWITCH_LIVE_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("Twitch live request failed");
         const data = await res.json();
-        const arr: LiveItem[] = Array.isArray(data) ? data : (Array.isArray(data?.live) ? data.live : []);
-        if(alive) setLive(arr);
-      } catch { if(alive) setLive([]); }
+        if(alive) setLive(data as TwitchLiveResponse);
+      } catch { if(alive) setLive({ live: false }); }
     }
     load();
     return ()=>{ alive = false; };
   }, []);
 
-  // Load Twitch links from creator CSVs to enrich missing URLs
-  useEffect(() => {
-    let alive = true;
-    async function loadTwitch(){
-      try{
-        const creators = await loadCreatorsMerged();
-        const m = new Map<string,string>();
-        for(const r of creators){
-          const name = String(r["Creator Name"] || r["creator_name"] || r["name"] || "").trim();
-          const twitch = String(r["Twitch Link"] || r["twitch"] || r["Twitch"] || "").trim();
-          if(!name || !twitch) continue;
-          // normalize to channel handle key
-          const channel = (() => { try { const u = new URL(twitch); return u.pathname.replace(/^\//,'').toLowerCase(); } catch { return twitch.toLowerCase(); } })();
-          if(channel) m.set(channel, twitch);
-          m.set(name.toLowerCase(), twitch);
-        }
-        if(alive) setTwitchMap(m);
-      } catch {
-        if(alive) setTwitchMap(new Map());
-      }
-    }
-    loadTwitch();
-    return ()=>{ alive = false; };
-  }, []);
 
-  useEffect(() => {
-    if(!live || live.length <= 1) return;
-    timer.current = window.setInterval(() => setIndex((i)=> (i+1) % live.length), 8000);
-    return ()=>{ if(timer.current) window.clearInterval(timer.current); };
-  }, [live]);
-
-  if(!live || live.length === 0){
+  if(!live || !live.live){
     return (
       <section className={styles.card} data-i18n-scope="home.live">
         <header className={styles.header}>
@@ -584,67 +558,40 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
     );
   }
 
-  const cur = live[index];
-  const resolvedUrl = (() => {
-    const byName = (cur?.name || "").toLowerCase();
-    if (cur?.url) return cur.url;
-    if (!byName) return undefined;
-    // try by provided name direct
-    if (twitchMap.has(byName)) return twitchMap.get(byName);
-    // try channel path = name
-    if (twitchMap.has(byName.replace(/^@/,""))) return twitchMap.get(byName.replace(/^@/,""));
-    // generic fallback
-    return `https://www.twitch.tv/${byName}`;
-  })();
+  const displayName = live.channel.displayName || live.channel.login;
+  const streamTitle = live.stream.title ? clampText(live.stream.title, 80) : "";
   return (
     <section className={styles.card} data-i18n-scope="home.live">
       <header className={styles.header}>
         <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
       </header>
       <div className={styles.liveCard}>
-        {cur?.avatar ? (
-          <img src={cur.avatar} alt="" className={styles.liveAvatar} />
+        {live.stream.thumbnailUrl ? (
+          <img src={live.stream.thumbnailUrl} alt="" className={styles.liveAvatar} />
         ) : (
-          <div className={styles.liveAvatarFallback} aria-hidden>{cur?.name?.slice(0,2).toUpperCase()}</div>
+          <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
         )}
         <div className={styles.liveInfo}>
-          <div className={styles.liveName}>{cur?.name}</div>
+          <div className={styles.liveName}>{displayName}</div>
           <div className={styles.liveMeta}>
             <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
-            {typeof cur?.viewers === "number" && (
+            {typeof live.stream.viewerCount === "number" && (
               <span className={styles.liveViewers}>
-                {t("home.live.viewers", { viewers: cur.viewers.toLocaleString() })}
+                {t("home.live.viewers", { viewers: live.stream.viewerCount.toLocaleString() })}
               </span>
             )}
           </div>
+          {streamTitle && <div className={styles.liveMeta}>{streamTitle}</div>}
         </div>
-        {resolvedUrl && (
-          <a
-            href={resolvedUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={styles.primaryBtn}
-            data-i18n="home.live.open_on_twitch"
-          >
-            {t("home.live.open_on_twitch")}
-          </a>
-        )}
-      </div>
-      <div className={styles.carouselCtrls}>
-        <button
-          className={styles.navBtn}
-          onClick={()=> setIndex((i)=> (i-1+live.length) % live.length)}
-          aria-label={t("home.live.prev")}
+        <a
+          href={live.channel.url}
+          target="_blank"
+          rel="noreferrer"
+          className={styles.primaryBtn}
+          data-i18n="home.live.open_on_twitch"
         >
-          ◀
-        </button>
-        <button
-          className={styles.navBtn}
-          onClick={()=> setIndex((i)=> (i+1) % live.length)}
-          aria-label={t("home.live.next")}
-        >
-          ▶
-        </button>
+          {t("home.live.open_on_twitch")}
+        </a>
       </div>
     </section>
   );

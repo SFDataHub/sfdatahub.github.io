@@ -941,6 +941,7 @@ const GUILD_DERIVED_SNAPSHOT_LIMIT = 500;
 
 type PlayerDerivedSnapshotEntry = {
   playerId: string;
+  identifier: string | null;
   server: string;
   name: string;
   class: string;
@@ -970,6 +971,7 @@ type DerivedUpsertResult = {
 
 type GuildDerivedSnapshotEntry = {
   guildId: string;
+  guildIdentifier: string | null;
   server: string;
   name: string;
   memberCount: number | null;
@@ -1739,6 +1741,7 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
 
     const snapshotEntry: GuildDerivedSnapshotEntry = {
       guildId: String(gid),
+      guildIdentifier: String(gid),
       server: snapshotServerKey,
       name: String(aggregate.name ?? gid),
       memberCount: toFiniteNumberOrNull(aggregate.memberCount) ?? 0,
@@ -2059,6 +2062,7 @@ export async function importCsvToDB(
       const serverCode = serverInfo.canonicalCode ?? null;
       const derivedInput = {
         playerId: pid,
+        identifier,
         name,
         className,
         level,
@@ -2088,6 +2092,7 @@ export async function importCsvToDB(
         const lastScanRaw = pickByCanon(last.row, COL.PLAYERS.TIMESTAMP);
         const snapshotEntry: PlayerDerivedSnapshotEntry = buildPlayerDerivedSnapshotEntry({
           playerId: pid,
+          identifier,
           server: snapshotServerKey,
           name,
           className,
@@ -2376,6 +2381,7 @@ export async function importCsvToDB(
               : toFiniteNumberOrNull(memberCount) ?? 0;
           const snapshotEntry: GuildDerivedSnapshotEntry = {
             guildId: String(gid),
+            guildIdentifier: String(gid),
             server: snapshotServerKey,
             name: String(parsed.name ?? gid),
             memberCount: memberCountValue,
