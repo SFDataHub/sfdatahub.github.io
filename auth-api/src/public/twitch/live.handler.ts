@@ -32,17 +32,19 @@ type TwitchLiveResponse =
   | { live: false }
   | {
       live: true;
-      channel: {
-        login: string;
-        displayName: string;
-        url: string;
-      };
-      stream: {
-        title: string;
-        viewerCount: number;
-        startedAt: string;
-        thumbnailUrl: string;
-      };
+      items: Array<{
+        channel: {
+          login: string;
+          displayName: string;
+          url: string;
+        };
+        stream: {
+          title: string;
+          viewerCount: number;
+          startedAt: string;
+          thumbnailUrl: string;
+        };
+      }>;
     };
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
@@ -104,10 +106,8 @@ const renderThumbnail = (template?: string, width = 640, height = 360): string =
   return template.replace("{width}", String(width)).replace("{height}", String(height));
 };
 
-const pickTopStream = (streams: TwitchStream[]): TwitchStream | null => {
-  if (!streams.length) return null;
-  return streams.slice().sort((a, b) => b.viewer_count - a.viewer_count)[0] ?? null;
-};
+const sortStreams = (streams: TwitchStream[]): TwitchStream[] =>
+  streams.slice().sort((a, b) => b.viewer_count - a.viewer_count);
 
 export const twitchLiveHandler = async (req: Request, res: Response) => {
   if (req.method !== "GET") {
@@ -162,24 +162,27 @@ export const twitchLiveHandler = async (req: Request, res: Response) => {
 
   const payload = (await response.json()) as TwitchStreamsResponse;
   const streams = Array.isArray(payload?.data) ? payload.data : [];
-  const topStream = pickTopStream(streams);
+  const sorted = sortStreams(streams);
 
-  const responseBody: TwitchLiveResponse = topStream
-    ? {
-        live: true,
-        channel: {
-          login: topStream.user_login,
-          displayName: topStream.user_name,
-          url: `https://www.twitch.tv/${topStream.user_login}`,
-        },
-        stream: {
-          title: topStream.title,
-          viewerCount: topStream.viewer_count,
-          startedAt: topStream.started_at,
-          thumbnailUrl: renderThumbnail(topStream.thumbnail_url),
-        },
-      }
-    : { live: false };
+  const responseBody: TwitchLiveResponse =
+    sorted.length > 0
+      ? {
+          live: true,
+          items: sorted.map((stream) => ({
+            channel: {
+              login: stream.user_login,
+              displayName: stream.user_name,
+              url: `https://www.twitch.tv/${stream.user_login}`,
+            },
+            stream: {
+              title: stream.title,
+              viewerCount: stream.viewer_count,
+              startedAt: stream.started_at,
+              thumbnailUrl: renderThumbnail(stream.thumbnail_url),
+            },
+          })),
+        }
+      : { live: false };
 
   setCachedValue(cacheKey, responseBody, LIVE_CACHE_TTL_MS);
   return res.status(200).json(responseBody);
