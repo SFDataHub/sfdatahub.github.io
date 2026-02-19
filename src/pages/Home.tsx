@@ -10,7 +10,6 @@ import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
 import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
 import guideHubLogo from "../assets/logo_guidehub.png";
-import discordLogo from "../assets/discord-logo.svg";
 import { guideAssetByKey } from "../data/guidehub/assets";
 import { AUTH_BASE_URL } from "../lib/auth/config";
 
@@ -544,7 +543,7 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
   }, []);
 
 
-  if(!live || !live.live){
+  if(!live || !live.live || !Array.isArray(live.items) || live.items.length === 0){
     return (
       <section className={styles.card} data-i18n-scope="home.live">
         <header className={styles.header}>
@@ -788,33 +787,6 @@ const Home: React.FC = () => {
         </div>
         <div className={styles.splitSide}>
           <YouTubeCarousel />
-        </div>
-      </div>
-      {/* Row 3 — Discord CTA */}
-      <div className={styles.row}>
-        <div className={styles.discordBannerWrap}>
-          <a
-            href={DISCORD_INVITE_URL}
-            className={`${styles.card} ${styles.discordBanner}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label={t("home.discordBanner.aria")}
-            data-i18n-scope="home.discordBanner"
-          >
-            <div className={styles.discordBannerText}>
-              <img
-                src={discordLogo}
-                alt="Discord Logo"
-                className={styles.discordBannerLogo}
-              />
-              <h2 className={styles.discordBannerTitle} data-i18n="home.discordBanner.title">
-                {t("home.discordBanner.title")}
-              </h2>
-              <p className={styles.discordBannerSubtitle} data-i18n="home.discordBanner.subtitle">
-                {t("home.discordBanner.subtitle")}
-              </p>
-            </div>
-          </a>
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />

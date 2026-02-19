@@ -1,5 +1,4 @@
 ﻿import React, { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toPng } from "html-to-image";
@@ -135,12 +134,6 @@ const normalizeGuildKey = (value: string | null | undefined) =>
 
 const listEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
-
-const buildExportIconSrc = (baseUrl?: string, exportSeq = 0, rowKey = "") => {
-  if (!baseUrl) return "";
-  const rowId = rowKey ? encodeURIComponent(rowKey) : "row";
-  return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}export=${exportSeq}&row=${rowId}`;
-};
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const formatMonth = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
@@ -507,30 +500,73 @@ function PlayerToplistsPageContent() {
   const setClassesRef = React.useRef(setClasses);
   const lastUrlWriteRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
-  const exportSeqRef = React.useRef(0);
 
   const handleExportPng = async () => {
-    exportSeqRef.current += 1;
-    const exportSeq = exportSeqRef.current;
-    const exportContent = document.getElementById("toplist-export-content") as HTMLElement | null;
-    if (!exportContent) return;
-    exportContent.dataset.exportSeq = String(exportSeq);
-    const exportImages = Array.from(exportContent.querySelectorAll<HTMLImageElement>("img[data-export-base]"));
-    exportImages.forEach((img) => {
-      const baseUrl = img.getAttribute("data-export-base") ?? undefined;
-      const rowId = img.getAttribute("data-row-key") ?? "";
-      const nextSrc = buildExportIconSrc(baseUrl, exportSeq, rowId);
-      if (nextSrc) img.src = nextSrc;
+    if (typeof document === "undefined") return;
+    const tableRoot = tableRef.current;
+    if (!tableRoot) return;
+
+    const resolveExportBackground = () => {
+      let node: HTMLElement | null = tableRoot;
+      while (node) {
+        const color = window.getComputedStyle(node).backgroundColor;
+        if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") {
+          return color;
+        }
+        node = node.parentElement;
+      }
+      return "#0C1C2E";
+    };
+
+    const cloned = tableRoot.cloneNode(true) as HTMLElement;
+    cloned.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+      img.loading = "eager";
+      img.decoding = "sync";
     });
-    const dataUrl = await toPng(exportContent, {
-      pixelRatio: 2,
-      cacheBust: true,
-      backgroundColor: "#0C1C2E",
-    });
-    const link = document.createElement("a");
-    link.download = "sfdatahub_toplist.png";
-    link.href = dataUrl;
-    link.click();
+
+    const tbodyRows = Array.from(cloned.querySelectorAll<HTMLTableRowElement>("tbody tr"));
+    if (tbodyRows.length > 50) {
+      tbodyRows.slice(50).forEach((row) => row.remove());
+    } else if (tbodyRows.length === 0) {
+      const roleRows = Array.from(cloned.querySelectorAll<HTMLElement>('[role="row"]'));
+      const bodyRows = roleRows.filter((row) => {
+        if (row.closest("thead")) return false;
+        if (row.querySelector('[role="columnheader"]')) return false;
+        return true;
+      });
+      if (bodyRows.length > 50) {
+        bodyRows.slice(50).forEach((row) => row.remove());
+      }
+    }
+
+    const backgroundColor = resolveExportBackground();
+    const temp = document.createElement("div");
+    temp.setAttribute("aria-hidden", "true");
+    temp.style.position = "fixed";
+    temp.style.top = "0";
+    temp.style.left = "0";
+    temp.style.transform = "translate3d(-10000px, 0, 0)";
+    temp.style.pointerEvents = "none";
+    temp.style.padding = "0";
+    temp.style.background = backgroundColor;
+    temp.style.width = `${Math.max(1, tableRoot.offsetWidth)}px`;
+    temp.appendChild(cloned);
+    document.body.appendChild(temp);
+
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const dataUrl = await toPng(temp, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor,
+      });
+      const link = document.createElement("a");
+      link.download = "sfdatahub_toplist.png";
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      temp.remove();
+    }
   };
 
   React.useEffect(() => {
@@ -1257,17 +1293,11 @@ function TableDataView({
       : playerError
         ? "Error"
         : "Ready";
-  const exportRows = enhancedRows.slice(0, 50);
 
   const renderToplistTable = (opts: {
-    interactive: boolean;
     imgLoading: "lazy" | "eager";
-    rows?: FirestoreToplistPlayerRow[];
-    exportMode?: boolean;
   }) => {
-    const rows = opts.rows ?? enhancedRows;
-    const exportMode = opts.exportMode ?? false;
-    const classIconSize = 28;
+    const rows = enhancedRows;
     const resolveIdentifier = (row: FirestoreToplistPlayerRow) => {
       const candidates = [
         (row as any).identifier,
@@ -1327,12 +1357,10 @@ function TableDataView({
               : "stats-day-chip";
           const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
           const classKey = String(r.class ?? "").trim();
-          const classIconUrl = getClassIconUrl(classKey, exportMode ? 64 : 48);
+          const classIconUrl = getClassIconUrl(classKey, 48);
           const playerId = (r as any).playerId ?? (r as any).id ?? null;
           const profileIdentifier = resolveIdentifier(r);
           const rowKey = playerId ?? buildRowKey(r);
-          const exportRowId = rowKey;
-          const exportIconUrl = classIconUrl;
           const decor = decorMap.get(rowKey);
           const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
           const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
@@ -1387,33 +1415,14 @@ function TableDataView({
                     height: "100%",
                   }}
                 >
-                  {exportIconUrl ? (
-                    exportMode ? (
-                      <img
-                        src={exportIconUrl}
-                        data-export-base={classIconUrl}
-                        data-row-key={exportRowId}
-                        alt={classKey || "class"}
-                        loading="eager"
-                        crossOrigin="anonymous"
-                        width={classIconSize}
-                        height={classIconSize}
-                        style={{
-                          display: "block",
-                          width: classIconSize,
-                          height: classIconSize,
-                          objectFit: "contain",
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src={exportIconUrl}
-                        alt={classKey || "class"}
-                        loading={opts.imgLoading}
-                        className="class-icon-toplist"
-                        style={{ display: "block", objectFit: "contain" }}
-                      />
-                    )
+                  {classIconUrl ? (
+                    <img
+                      src={classIconUrl}
+                      alt={classKey || "class"}
+                      loading={opts.imgLoading}
+                      className="class-icon-toplist"
+                      style={{ display: "block", objectFit: "contain" }}
+                    />
                   ) : (
                     <span>{classKey}</span>
                   )}
@@ -1498,38 +1507,6 @@ function TableDataView({
     </table>
     );
   };
-  const exportPortal =
-    typeof document !== "undefined"
-      ? createPortal(
-          <div
-            id="toplist-export-node"
-            aria-hidden="true"
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              opacity: 0,
-              pointerEvents: "none",
-              transform: "translate3d(-10000px, 0, 0)",
-              contain: "layout paint style",
-              zIndex: -1,
-            }}
-          >
-            <div
-              id="toplist-export-content"
-              style={{
-                transform: "translateZ(0)",
-                WebkitFontSmoothing: "antialiased",
-                MozOsxFontSmoothing: "grayscale",
-              }}
-            >
-              {renderToplistTable({ interactive: false, imgLoading: "eager", rows: exportRows, exportMode: true })}
-            </div>
-          </div>,
-          document.body
-        )
-      : null;
-
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
@@ -1575,11 +1552,10 @@ function TableDataView({
       ) : (
         <>
           <div ref={tableRef} style={{ overflowX: "auto" }}>
-            {renderToplistTable({ interactive: true, imgLoading: "lazy" })}
+            {renderToplistTable({ imgLoading: "lazy" })}
           </div>
         </>
       )}
-      {exportPortal}
     </div>
   );
 }

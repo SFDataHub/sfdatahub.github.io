@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 
-import { TWITCH_CHANNELS, TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET } from "../../config";
+import {
+  TWITCH_CHANNELS,
+  TWITCH_CLIENT_ID,
+  TWITCH_CLIENT_SECRET,
+  TWITCH_GAME_ID,
+  TWITCH_LOG_FULL_RESPONSE,
+} from "../../config";
 import { getCachedValue, setCachedValue } from "./cache.memory";
 
 const TWITCH_TOKEN_ENDPOINT = "https://id.twitch.tv/oauth2/token";
@@ -22,6 +28,8 @@ type TwitchStream = {
   viewer_count: number;
   started_at: string;
   thumbnail_url: string;
+  game_id?: string;
+  game_name?: string;
 };
 
 type TwitchStreamsResponse = {
@@ -106,6 +114,19 @@ const renderThumbnail = (template?: string, width = 640, height = 360): string =
   return template.replace("{width}", String(width)).replace("{height}", String(height));
 };
 
+const shouldLogFullResponse = (value?: string): boolean => {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+};
+
+const isShakesAndFidget = (stream: TwitchStream): boolean => {
+  if (TWITCH_GAME_ID) {
+    return stream.game_id === TWITCH_GAME_ID;
+  }
+  return stream.game_name === "Shakes and Fidget";
+};
+
 const sortStreams = (streams: TwitchStream[]): TwitchStream[] =>
   streams.slice().sort((a, b) => b.viewer_count - a.viewer_count);
 
@@ -161,8 +182,19 @@ export const twitchLiveHandler = async (req: Request, res: Response) => {
   }
 
   const payload = (await response.json()) as TwitchStreamsResponse;
+  if (shouldLogFullResponse(TWITCH_LOG_FULL_RESPONSE)) {
+    const channelLabel = parsed.channels.join(",");
+    console.log(
+      `[twitch-live] helix/streams response ts=${new Date().toISOString()} channels=${channelLabel}\n${JSON.stringify(
+        payload,
+        null,
+        2,
+      )}`,
+    );
+  }
   const streams = Array.isArray(payload?.data) ? payload.data : [];
-  const sorted = sortStreams(streams);
+  const filtered = streams.filter(isShakesAndFidget);
+  const sorted = sortStreams(filtered);
 
   const responseBody: TwitchLiveResponse =
     sorted.length > 0
