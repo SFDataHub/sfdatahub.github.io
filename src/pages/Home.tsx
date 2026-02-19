@@ -544,7 +544,7 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
   }, []);
 
 
-  if(!live || !live.live){
+  if(!live || !live.live || !Array.isArray(live.items) || live.items.length === 0){
     return (
       <section className={styles.card} data-i18n-scope="home.live">
         <header className={styles.header}>
