@@ -13,6 +13,7 @@ import { latestDiscordNewsHandler } from "./public/news/discord/latest.handler";
 import { listDiscordNewsHandler } from "./public/news/discord/list.handler";
 import { latestDiscordNewsByChannelHandler } from "./public/news/discord/latestByChannel.handler";
 import { refreshDiscordNewsSnapshotHandler } from "./internal/news/discord/refreshSnapshot.handler";
+import { twitchLiveHandler } from "./public/twitch/live.handler";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/user", userUploadInboxRouter);
 app.get("/public/news/discord/latest", latestDiscordNewsHandler);
 app.get("/public/news/discord/list", listDiscordNewsHandler);
 app.get("/public/news/discord/latest-by-channel", latestDiscordNewsByChannelHandler);
+app.get("/api/twitch/live", twitchLiveHandler);
 
 app.get("/health", (_req, res) => {
   // Lightweight readiness probe for Cloud Run/Functions

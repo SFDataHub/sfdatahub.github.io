@@ -82,6 +82,7 @@ export const computeBaseStats = (values: Record<string, any>) => {
 export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) => {
   const {
     playerId,
+    identifier,
     name,
     className,
     level: levelRaw,
@@ -112,9 +113,14 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
   const mine = toNumber(pick(values, "Gem Mine"));
   const treasury = toNumber(pick(values, "Treasury"));
   const updatedAtFallback = makeServerTimestamp ? makeServerTimestamp() : null;
+  const playerIdValue = String(playerId ?? "").trim();
+  const identifierValue = typeof identifier === "string" ? identifier.trim() : "";
+  const derivedIdentifier =
+    identifierValue || (playerIdValue && serverKey ? `${serverKey.toLowerCase()}_p${playerIdValue}` : "");
 
   return {
     playerId: String(playerId ?? ""),
+    identifier: derivedIdentifier || null,
     name: String(name ?? ""),
     class: String(className ?? ""),
     level,
@@ -140,6 +146,7 @@ export const deriveForPlayer = (latest: any, makeServerTimestamp?: () => any) =>
 
 export type PlayerDerivedSnapshotEntry = {
   playerId: string;
+  identifier: string | null;
   server: string;
   name: string;
   class: string;
@@ -205,6 +212,7 @@ export const withDerivedScanSec = <T extends Record<string, any>>(
 export type BuildPlayerDerivedSnapshotInput = {
   playerId: any;
   server: any;
+  identifier?: any;
   name?: any;
   className?: any;
   guildName?: any;
@@ -234,9 +242,15 @@ export const buildPlayerDerivedSnapshotEntry = (
   const lastScanRaw = input.lastScanRaw != null ? String(input.lastScanRaw).trim() : "";
   const lastScanFallback = String(input.timestampSec ?? "").trim();
   const lastScan = (lastScanRaw || lastScanFallback).trim();
+  const playerIdValue = String(input.playerId ?? "").trim();
+  const serverValue = String(input.server ?? "").trim();
+  const identifierValue = typeof input.identifier === "string" ? input.identifier.trim() : "";
+  const derivedIdentifier =
+    identifierValue || (playerIdValue && serverValue ? `${serverValue.toLowerCase()}_p${playerIdValue}` : "");
 
   return {
     playerId: String(input.playerId ?? ""),
+    identifier: derivedIdentifier || null,
     server: String(input.server ?? ""),
     name: String(input.name ?? ""),
     class: String(input.derived?.class ?? input.className ?? ""),

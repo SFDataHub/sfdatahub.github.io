@@ -1,6 +1,6 @@
 ﻿import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toPng } from "html-to-image";
 
@@ -21,7 +21,6 @@ import {
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
-import { buildPlayerIdentifier } from "../../lib/players/identifier";
 
 const splitListParam = (value: string | null) =>
   (value ?? "")
@@ -136,6 +135,12 @@ const normalizeGuildKey = (value: string | null | undefined) =>
 
 const listEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
+
+const buildExportIconSrc = (baseUrl?: string, exportSeq = 0, rowKey = "") => {
+  if (!baseUrl) return "";
+  const rowId = rowKey ? encodeURIComponent(rowKey) : "row";
+  return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}export=${exportSeq}&row=${rowId}`;
+};
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const formatMonth = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
@@ -502,29 +507,30 @@ function PlayerToplistsPageContent() {
   const setClassesRef = React.useRef(setClasses);
   const lastUrlWriteRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
+  const exportSeqRef = React.useRef(0);
 
   const handleExportPng = async () => {
+    exportSeqRef.current += 1;
+    const exportSeq = exportSeqRef.current;
     const exportContent = document.getElementById("toplist-export-content") as HTMLElement | null;
-    if (!exportContent || !tableRef.current) return;
-    const width = tableRef.current.offsetWidth;
-    const prevWidth = exportContent.style.width;
-    exportContent.style.width = `${width}px`;
-    try {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const pixelRatio = Math.min(3, window.devicePixelRatio || 2);
-      const dataUrl = await toPng(exportContent, {
-        pixelRatio,
-        cacheBust: true,
-        backgroundColor: "#0C1C2E",
-      });
-      const link = document.createElement("a");
-      link.download = "sfdatahub_toplist.png";
-      link.href = dataUrl;
-      link.click();
-    } finally {
-      exportContent.style.width = prevWidth;
-    }
+    if (!exportContent) return;
+    exportContent.dataset.exportSeq = String(exportSeq);
+    const exportImages = Array.from(exportContent.querySelectorAll<HTMLImageElement>("img[data-export-base]"));
+    exportImages.forEach((img) => {
+      const baseUrl = img.getAttribute("data-export-base") ?? undefined;
+      const rowId = img.getAttribute("data-row-key") ?? "";
+      const nextSrc = buildExportIconSrc(baseUrl, exportSeq, rowId);
+      if (nextSrc) img.src = nextSrc;
+    });
+    const dataUrl = await toPng(exportContent, {
+      pixelRatio: 2,
+      cacheBust: true,
+      backgroundColor: "#0C1C2E",
+    });
+    const link = document.createElement("a");
+    link.download = "sfdatahub_toplist.png";
+    link.href = dataUrl;
+    link.click();
   };
 
   React.useEffect(() => {
@@ -709,6 +715,7 @@ function TableDataView({
     setSort,
   } = useToplistsData();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const hasServers = (servers?.length ?? 0) > 0;
   // HUD-Filter -> Provider
@@ -1256,8 +1263,27 @@ function TableDataView({
     interactive: boolean;
     imgLoading: "lazy" | "eager";
     rows?: FirestoreToplistPlayerRow[];
+    exportMode?: boolean;
   }) => {
     const rows = opts.rows ?? enhancedRows;
+    const exportMode = opts.exportMode ?? false;
+    const classIconSize = 28;
+    const resolveIdentifier = (row: FirestoreToplistPlayerRow) => {
+      const candidates = [
+        (row as any).identifier,
+        (row as any).original?.identifier,
+        (row as any).value?.identifier,
+        (row as any).data?.identifier,
+        (row as any).player?.identifier,
+        (row as any).value?.player?.identifier,
+      ];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+      return null;
+    };
     return (
     <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
@@ -1300,20 +1326,13 @@ function TableDataView({
               ? `stats-day-chip stats-day-chip--${statsDayVariant}`
               : "stats-day-chip";
           const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
-          const classIconUrl = getClassIconUrl((r as any).class, 48);
+          const classKey = String(r.class ?? "").trim();
+          const classIconUrl = getClassIconUrl(classKey, exportMode ? 64 : 48);
           const playerId = (r as any).playerId ?? (r as any).id ?? null;
-          const explicitIdentifier =
-            (r as any).identifier ??
-            (r as any).playerIdentifier ??
-            (r as any).values?.Identifier ??
-            (r as any).values?.identifier ??
-            null;
-          const profileIdentifier =
-            (typeof explicitIdentifier === "string" && explicitIdentifier.trim()
-              ? explicitIdentifier.trim()
-              : null) ??
-            buildPlayerIdentifier((r as any).server ?? null, playerId);
+          const profileIdentifier = resolveIdentifier(r);
           const rowKey = playerId ?? buildRowKey(r);
+          const exportRowId = rowKey;
+          const exportIconUrl = classIconUrl;
           const decor = decorMap.get(rowKey);
           const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
           const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
@@ -1332,12 +1351,10 @@ function TableDataView({
               </div>
             );
           };
-          const rowOnClick =
-            opts.interactive && profileIdentifier
-              ? () => {
-                  if (profileIdentifier) navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
-                }
-              : undefined;
+          const rowOnClick = () => {
+            if (!profileIdentifier) return;
+            navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
+          };
 
           return (
             <tr
@@ -1345,7 +1362,8 @@ function TableDataView({
               className="toplists-row"
               style={{
                 borderBottom: "1px solid #2C4A73",
-                cursor: opts.interactive && profileIdentifier ? "pointer" : undefined,
+                cursor: "pointer",
+                userSelect: "none",
               }}
               onClick={rowOnClick}
             >
@@ -1369,16 +1387,35 @@ function TableDataView({
                     height: "100%",
                   }}
                 >
-                  {classIconUrl ? (
-                    <img
-                      src={classIconUrl}
-                      alt={r.class ?? "class"}
-                      loading={opts.imgLoading}
-                      className="class-icon-toplist"
-                      style={{ display: "block", objectFit: "contain" }}
-                    />
+                  {exportIconUrl ? (
+                    exportMode ? (
+                      <img
+                        src={exportIconUrl}
+                        data-export-base={classIconUrl}
+                        data-row-key={exportRowId}
+                        alt={classKey || "class"}
+                        loading="eager"
+                        crossOrigin="anonymous"
+                        width={classIconSize}
+                        height={classIconSize}
+                        style={{
+                          display: "block",
+                          width: classIconSize,
+                          height: classIconSize,
+                          objectFit: "contain",
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={exportIconUrl}
+                        alt={classKey || "class"}
+                        loading={opts.imgLoading}
+                        className="class-icon-toplist"
+                        style={{ display: "block", objectFit: "contain" }}
+                      />
+                    )
                   ) : (
-                    <span>{r.class ?? ""}</span>
+                    <span>{classKey}</span>
                   )}
                 </span>
               </td>
@@ -1486,7 +1523,7 @@ function TableDataView({
                 MozOsxFontSmoothing: "grayscale",
               }}
             >
-              {renderToplistTable({ interactive: false, imgLoading: "eager", rows: exportRows })}
+              {renderToplistTable({ interactive: false, imgLoading: "eager", rows: exportRows, exportMode: true })}
             </div>
           </div>,
           document.body
@@ -1522,7 +1559,12 @@ function TableDataView({
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Error</div>
           <div style={{ wordBreak: "break-all" }}>{playerError}</div>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 8 }}>Retry</button>
+          <button
+            onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)}
+            style={{ marginTop: 8 }}
+          >
+            Retry
+          </button>
         </div>
       )}
 

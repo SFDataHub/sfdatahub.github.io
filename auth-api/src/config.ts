@@ -17,6 +17,7 @@ const secrets = {
   DISCORD_NEWS_BOT_TOKEN: defineSecret("DISCORD_NEWS_BOT_TOKEN"),
   UPLOAD_INBOX_TOKEN: defineSecret("UPLOAD_INBOX_TOKEN"),
   SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
+  TWITCH_CLIENT_SECRET: defineSecret("TWITCH_CLIENT_SECRET"),
 } as const;
 
 const strings = {
@@ -30,6 +31,8 @@ const strings = {
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
   UPLOAD_INBOX_BUCKET: defineString("UPLOAD_INBOX_BUCKET"),
   SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
+  TWITCH_CLIENT_ID: defineString("TWITCH_CLIENT_ID"),
+  TWITCH_CHANNELS: defineString("TWITCH_CHANNELS"),
 } as const;
 
 const readRuntimeValue = (key: string, param?: Param): string | undefined => {
@@ -79,6 +82,9 @@ export const DISCORD_NEWS_CACHE_TTL_SEC = readRuntimeValue(
 export const DISCORD_NEWS_CORS_ORIGINS = readRuntimeValue(
   "DISCORD_NEWS_CORS_ORIGINS",
 );
+export const TWITCH_CLIENT_ID = readRuntimeValue("TWITCH_CLIENT_ID", strings.TWITCH_CLIENT_ID);
+export const TWITCH_CLIENT_SECRET = readRuntimeValue("TWITCH_CLIENT_SECRET", secrets.TWITCH_CLIENT_SECRET);
+export const TWITCH_CHANNELS = readRuntimeValue("TWITCH_CHANNELS", strings.TWITCH_CHANNELS);
 
 const DEFAULT_DISCORD_NEWS_CORS_ORIGINS = [
   "https://sfdatahub.github.io",

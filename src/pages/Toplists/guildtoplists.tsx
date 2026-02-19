@@ -1,5 +1,6 @@
 // src/components/toplists/GuildToplists.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   getLatestGuildToplistSnapshotCached,
@@ -29,6 +30,8 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [rowLimit, setRowLimit] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const resolvedServers = useMemo(() => {
     const normalized = normalizeServerList(serverCodes ?? []);
@@ -166,7 +169,12 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Error</div>
           <div style={{ wordBreak: "break-all" }}>{error}</div>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 8 }}>Retry</button>
+          <button
+            onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)}
+            style={{ marginTop: 8 }}
+          >
+            Retry
+          </button>
         </div>
       )}
 

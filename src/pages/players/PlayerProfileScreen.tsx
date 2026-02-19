@@ -1,9 +1,8 @@
 // src/pages/players/PlayerProfileScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   collection,
-  collectionGroup,
   doc,
   documentId,
   getDoc,
@@ -11,7 +10,6 @@ import {
   limit,
   orderBy,
   query,
-  where,
 } from "firebase/firestore";
 import HeroPanel from "../../components/player-profile/HeroPanel";
 import {
@@ -45,7 +43,7 @@ import {
   traceGetDocs,
   type FirestoreTraceScope,
 } from "../../lib/debug/firestoreReadTrace";
-import { buildPlayerIdentifier, normalizeServerKeyFromInput, parsePlayerIdentifier } from "../../lib/players/identifier";
+import { buildPlayerIdentifier } from "../../lib/players/identifier";
 import "./player-profile.css";
 
 const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
@@ -115,14 +113,7 @@ type ChartsCachePayload = {
 
 export default function PlayerProfileScreen() {
   const params = useParams<Record<string, string>>();
-  const location = useLocation();
-  const routeParam = params.identifier || params.id || params.pid || params.playerId || params.player || "";
-  const parsedIdentifier = parsePlayerIdentifier(routeParam);
-  const serverFromQuery = normalizeServerKeyFromInput(
-    new URLSearchParams(location.search).get("server") ?? "",
-  );
-  const resolvedPlayerId = (parsedIdentifier?.playerId ?? routeParam).trim();
-  const resolvedServerKey = parsedIdentifier?.serverKey ?? serverFromQuery ?? null;
+  const routeIdentifier = params.identifier ?? "";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -146,7 +137,7 @@ export default function PlayerProfileScreen() {
     async function load() {
       setLoading(true);
       setErr(null);
-      const id = (resolvedPlayerId || "").trim();
+      const id = routeIdentifier;
 
       if (!id) {
         setSnapshot(null);
@@ -167,10 +158,7 @@ export default function PlayerProfileScreen() {
         }
       };
 
-      const cacheServerFromRoute = resolvedServerKey
-        ? String(resolvedServerKey).trim().toLowerCase().replace(/[^a-z0-9]/g, "")
-        : "";
-      const cachedServer = cacheServerFromRoute || readServerIndex()[id];
+      const cachedServer = readServerIndex()[id];
       const cacheKey = cachedServer ? `${PROFILE_CACHE_PREFIX}${cachedServer}__${id}` : null;
       if (cacheKey) {
         const cached = readTtlCache(cacheKey, PROFILE_CACHE_TTL_MS);
@@ -184,30 +172,10 @@ export default function PlayerProfileScreen() {
       try {
         scope = beginReadScope("PlayerProfile:load");
         let data: any = null;
-        if (parsedIdentifier?.identifier) {
-          const ref = doc(db, `players/${parsedIdentifier.identifier}/latest/latest`);
-          const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
-          if (snap.exists()) {
-            data = snap.data();
-          }
-        }
-
-        if (!data && resolvedServerKey) {
-          const cg = collectionGroup(db, "latest");
-          const q = query(
-            cg,
-            where("playerId", "==", id),
-            where("server", "==", resolvedServerKey),
-            limit(1),
-          );
-          const snap = await traceGetDocs(
-            scope,
-            { path: "players/latest (collectionGroup)" },
-            () => getDocs(q),
-          );
-          if (!snap.empty) {
-            data = snap.docs[0]?.data() ?? null;
-          }
+        const ref = doc(db, "players", id, "latest", "latest");
+        const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
+        if (snap.exists()) {
+          data = snap.data();
         }
 
         if (!data) {
@@ -251,11 +219,7 @@ export default function PlayerProfileScreen() {
                 .toLowerCase()
                 .replace(/\./g, "_")
             : "";
-        const profileIdentifier =
-          (typeof data.identifier === "string" && data.identifier.trim() ? data.identifier.trim() : null) ??
-          (typeof values?.Identifier === "string" && values.Identifier.trim() ? values.Identifier.trim() : null) ??
-          (typeof values?.identifier === "string" && values.identifier.trim() ? values.identifier.trim() : null) ??
-          buildPlayerIdentifier(server, playerIdValue);
+        const profileIdentifier = id || null;
         const avatarIdentifier =
           data.avatarIdentifier ??
           data.identifier ??
@@ -352,14 +316,14 @@ export default function PlayerProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resolvedPlayerId, resolvedServerKey, parsedIdentifier?.identifier]);
+  }, [routeIdentifier]);
 
   useEffect(() => {
     setChartsSeries(null);
     chartsLoadingRef.current = false;
     chartsSourceRef.current = null;
     chartsLoadedKeyRef.current = null;
-  }, [resolvedPlayerId, snapshot?.server]);
+  }, [routeIdentifier, snapshot?.server]);
 
   useEffect(() => {
     chartsSeriesRef.current = chartsSeries;
