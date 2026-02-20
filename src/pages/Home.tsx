@@ -732,61 +732,65 @@ const Home: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   return (
     <ContentShell title={t("home.title")} subtitle={t("home.subtitle")}>
-      {/* Row 1 — News / Live */}
-      <div className={`${styles.row} ${styles.rowSplit}`}>
-        <div className={styles.splitMain}>
-          <NewsFeed />
+      <div className={styles.homeLayout}>
+        <div className={styles.homeMain}>
+          {/* Row 1 - Community News */}
+          <div className={styles.homeNews}>
+            <NewsFeed />
+          </div>
+
+          {/* Row 2 - Icons / Featured */}
+          <div className={styles.homeIcons}>
+            <FeaturedPreviewRow>
+              <FeaturedPreviewCard
+                href={GUIDEHUB_ROUTE}
+                title={t("home.guidehub.title")}
+                subtitle={t("home.guidehub.subtitle")}
+                previewImageSrc={guideHubLogo}
+                previewAlt={t("home.guidehub.previewAlt")}
+                className={featuredPreviewCardStyles.guidehubScale}
+                i18nScope="home.guidehub"
+                titleI18nKey="home.guidehub.title"
+                subtitleI18nKey="home.guidehub.subtitle"
+                previewAltI18nKey="home.guidehub.previewAlt"
+                linkAriaLabel={t("home.guidehub.open")}
+                linkAriaI18nKey="home.guidehub.open"
+              />
+              <FeaturedPreviewCard
+                href="https://sftools.mar21.eu/"
+                title={t("home.sftools.title")}
+                subtitle={t("home.sftools.subtitle")}
+                previewImageSrc={SFTOOLS_PREVIEW}
+                previewAlt={t("home.sftools.previewAlt")}
+                previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
+                i18nScope="home.sftools"
+                titleI18nKey="home.sftools.title"
+                subtitleI18nKey="home.sftools.subtitle"
+                previewAltI18nKey="home.sftools.previewAlt"
+              />
+              <FeaturedPreviewCard
+                href={DISCORD_INVITE_URL}
+                title={t("home.taverndiscord.title")}
+                subtitle={t("home.taverndiscord.subtitle")}
+                previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
+                previewAlt={t("home.taverndiscord.previewAlt")}
+                previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
+                i18nScope="home.taverndiscord"
+                titleI18nKey="home.taverndiscord.title"
+                subtitleI18nKey="home.taverndiscord.subtitle"
+                previewAltI18nKey="home.taverndiscord.previewAlt"
+              />
+            </FeaturedPreviewRow>
+          </div>
+
+          {/* Row 3 - YouTube */}
+          <div className={styles.homeYouTube}>
+            <YouTubeCarousel />
+          </div>
         </div>
-        <div className={styles.splitSide}>
+
+        <div className={styles.homeLiveColumn}>
           <LiveNow onOpenSchedule={() => setScheduleOpen(true)} />
-        </div>
-      </div>
-      {/* Row 2 — Historybook / YouTube */}
-      <div className={`${styles.row} ${styles.rowSplit} ${styles.rowFeatured}`}>
-        <div className={styles.splitMain}>
-          <FeaturedPreviewRow>
-            <FeaturedPreviewCard
-              href={GUIDEHUB_ROUTE}
-              title={t("home.guidehub.title")}
-              subtitle={t("home.guidehub.subtitle")}
-              previewImageSrc={guideHubLogo}
-              previewAlt={t("home.guidehub.previewAlt")}
-              className={featuredPreviewCardStyles.guidehubScale}
-              i18nScope="home.guidehub"
-              titleI18nKey="home.guidehub.title"
-              subtitleI18nKey="home.guidehub.subtitle"
-              previewAltI18nKey="home.guidehub.previewAlt"
-              linkAriaLabel={t("home.guidehub.open")}
-              linkAriaI18nKey="home.guidehub.open"
-            />
-            <FeaturedPreviewCard
-              href="https://sftools.mar21.eu/"
-              title={t("home.sftools.title")}
-              subtitle={t("home.sftools.subtitle")}
-              previewImageSrc={SFTOOLS_PREVIEW}
-              previewAlt={t("home.sftools.previewAlt")}
-              previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
-              i18nScope="home.sftools"
-              titleI18nKey="home.sftools.title"
-              subtitleI18nKey="home.sftools.subtitle"
-              previewAltI18nKey="home.sftools.previewAlt"
-            />
-            <FeaturedPreviewCard
-              href={DISCORD_INVITE_URL}
-              title={t("home.taverndiscord.title")}
-              subtitle={t("home.taverndiscord.subtitle")}
-              previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
-              previewAlt={t("home.taverndiscord.previewAlt")}
-              previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
-              i18nScope="home.taverndiscord"
-              titleI18nKey="home.taverndiscord.title"
-              subtitleI18nKey="home.taverndiscord.subtitle"
-              previewAltI18nKey="home.taverndiscord.previewAlt"
-            />
-          </FeaturedPreviewRow>
-        </div>
-        <div className={styles.splitSide}>
-          <YouTubeCarousel />
         </div>
       </div>
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
@@ -795,3 +799,4 @@ const Home: React.FC = () => {
 };
 
 export default Home;
+
