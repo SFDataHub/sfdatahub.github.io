@@ -499,6 +499,27 @@
     "compareOff": "Off",
     "compareMissingSnapshot": "No baseline data for {{key}}.",
     "deltaNew": "NEW",
+    "exportDialog": {
+      "title": "Export PNG",
+      "amount": "Amount",
+      "selection": "Selection",
+      "currentView": "Current view",
+      "guilds": "Guilds",
+      "guildsSummary": "Guilds: {{list}}",
+      "guildsPlaceholder": "Guilds: none selected",
+      "guildsEmpty": "No guilds available",
+      "range": {
+        "title": "Rank range",
+        "enable": "Use rank range",
+        "from": "From",
+        "to": "To",
+        "max": "Max: {{count}}",
+        "oneBased": "Ranks are 1-based"
+      },
+      "cancel": "Cancel",
+      "export": "Export",
+      "exporting": "Exporting..."
+    },
     "filters": {
       "guilds": {
         "label": "Guilds",

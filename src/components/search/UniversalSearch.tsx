@@ -14,6 +14,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { db } from "../../lib/firebase";
 import { CLASSES } from "../../data/classes";
+import { guildIconByIdentifier } from "../../data/guilds";
 import { toDriveThumbProxy } from "../../lib/urls";
 import { beginReadScope, endReadScope, traceGetDocs } from "../../lib/debug/firestoreReadTrace";
 import {
@@ -210,6 +211,17 @@ const resolvePlayerIdentifier = (docId: string | undefined, data: any): string |
   const server = toStringOrNull(data?.server) ?? toStringOrNull(data?.values?.Server);
   return buildPlayerIdentifier(server, pid);
 };
+const resolveGuildIdentifier = (docId: string | undefined, data: any): string | null => {
+  return (
+    toStringOrNull(data?.identifier) ??
+    toStringOrNull(data?.guildIdentifier) ??
+    toStringOrNull(data?.values?.Identifier) ??
+    toStringOrNull(data?.values?.identifier) ??
+    toStringOrNull(data?.values?.["Guild Identifier"]) ??
+    toStringOrNull(data?.values?.GuildIdentifier) ??
+    toStringOrNull(docId)
+  );
+};
 
 export default function UniversalSearch({
   placeholder = "Suchen … (Spieler, Gilden, Server)",
@@ -355,12 +367,12 @@ export default function UniversalSearch({
           }
 
           if (root === "guilds" || (!!d.guildIdentifier && !d.playerId)) {
-            const safeId = id || d.guildIdentifier || "";
-            if (!safeId || seenG.has(safeId)) return;
-            seenG.add(safeId);
+            const guildIdentifier = resolveGuildIdentifier(id, d);
+            if (!guildIdentifier || seenG.has(guildIdentifier)) return;
+            seenG.add(guildIdentifier);
             rowsG.push({
               kind: "guild",
-              id: safeId,
+              id: guildIdentifier,
               name: d.name ?? d.values?.Name ?? null,
               nameFold: d.nameFold ?? null,
               server: d.server ?? d.values?.Server ?? null,
@@ -691,6 +703,8 @@ export default function UniversalSearch({
 
   const renderGuildRow = (h: GuildHit, idx: number, isRecent = false, recentKey?: string) => {
     const active = idx === activeIndex;
+    const emblem = guildIconByIdentifier(h.id, 64);
+    const emblemUrl = emblem.thumb || undefined;
     const Wrapper: any = isRecent ? "div" : "button";
     const wrapperProps = isRecent
       ? {
@@ -713,7 +727,18 @@ export default function UniversalSearch({
         onMouseEnter={() => setActiveIndex(idx)}
         {...wrapperProps}
       >
-        <div style={sx.iconBox}>🏰</div>
+        <div style={sx.iconBox}>
+          {emblemUrl ? (
+            <img
+              src={emblemUrl}
+              alt={`${h.name ?? h.id} emblem`}
+              style={sx.iconImgShadow}
+              loading="lazy"
+            />
+          ) : (
+            <span style={sx.iconFallback}>{emblem.fallback}</span>
+          )}
+        </div>
         <div style={sx.meta}>
           <div style={sx.line1}>
             <span style={sx.name}>{h.name ?? h.id}</span>
@@ -961,7 +986,7 @@ const sx: Record<string, React.CSSProperties> = {
   item: { display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", background: "transparent", textAlign: "left" as const, padding: 10, borderRadius: 10, cursor: "pointer", color: "#fff" },
   itemActive: { display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", textAlign: "left" as const, padding: 10, borderRadius: 10, cursor: "pointer", color: "#fff", background: "rgba(45,78,120,0.35)", outline: "1px solid rgba(92,139,198,0.55)" },
 
-  iconBox: { width: 36, height: 36, borderRadius: 8, background: "rgba(26,47,74,1)", display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 },
+  iconBox: { width: 36, height: 36, borderRadius: 8, background: "transparent", display: "grid", placeItems: "center", overflow: "visible", flexShrink: 0 },
   iconBoxPlain: { width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent", flexShrink: 0 },
 
   iconImgShadow: {
@@ -1011,3 +1036,4 @@ const sx: Record<string, React.CSSProperties> = {
     padding: "0 4px",
   },
 };
+

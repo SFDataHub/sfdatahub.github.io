@@ -499,6 +499,27 @@
     "compareOff": "Aus",
     "compareMissingSnapshot": "Keine Basisdaten für {{key}}.",
     "deltaNew": "NEU",
+    "exportDialog": {
+      "title": "PNG exportieren",
+      "amount": "Menge",
+      "selection": "Auswahl",
+      "currentView": "Aktuelle Ansicht",
+      "guilds": "Gilden",
+      "guildsSummary": "Gilden: {{list}}",
+      "guildsPlaceholder": "Gilden: keine ausgewaehlt",
+      "guildsEmpty": "Keine Gilden verfuegbar",
+      "range": {
+        "title": "Rangbereich",
+        "enable": "Rangbereich verwenden",
+        "from": "Von",
+        "to": "Bis",
+        "max": "Max: {{count}}",
+        "oneBased": "Rangwerte sind 1-basiert"
+      },
+      "cancel": "Abbrechen",
+      "export": "Exportieren",
+      "exporting": "Exportiere..."
+    },
     "filters": {
       "guilds": {
         "label": "Gilden",

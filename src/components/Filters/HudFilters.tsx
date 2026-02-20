@@ -47,6 +47,7 @@ export default function HudFilters({
   const guildPlaceholder = t("toplists.filters.guilds.placeholder", "All guilds");
   const guildEmpty = t("toplists.filters.guilds.empty", "No guilds in snapshot");
   const guildClear = t("toplists.filters.guilds.clear", "Clear");
+  const exportPngLabel = t("toplists.exportDialog.title", "Export PNG");
   const guildSelection = guilds.length
     ? t("toplists.filters.guilds.selected", "{{count}} selected", { count: guilds.length })
     : guildPlaceholder;
@@ -179,7 +180,7 @@ export default function HudFilters({
           disabled={exportDisabled || !onExportPng}
           style={exportDisabled || !onExportPng ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
         >
-          Export PNG
+          {exportPngLabel}
         </button>
         <button type="button" className={styles.hudSubBtn} onClick={resetAll}>
           Reset

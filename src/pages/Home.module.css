@@ -25,6 +25,28 @@
   gap: 16px;
 }
 
+.homeLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.homeMain {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.homeNews,
+.homeIcons,
+.homeYouTube {
+  min-width: 0;
+}
+
+.homeLiveColumn {
+  min-width: 0;
+}
+
 .colFull { grid-column: 1 / -1; }
 .colRightstack { display: grid; gap: 16px; }
 
@@ -39,6 +61,8 @@
 @media (min-width: 768px) and (max-width: 1023px) {
   .row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
   .heroGrid { gap: 18px; }
+  .homeLayout { gap: 18px; }
+  .homeMain { gap: 18px; }
   .splitMain { grid-column: 1 / span 2; }
   .splitSide { grid-column: 3; }
   .rowFeatured .discordBannerWrap { grid-column: 1 / -1; }
@@ -53,6 +77,12 @@
   }
 
   .heroGrid { grid-template-columns: 1fr 360px; gap: 20px; align-items: stretch; }
+  .homeLayout { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+  .homeMain { gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .homeNews { grid-column: 1 / span 2; }
+  .homeIcons { grid-column: 1 / -1; }
+  .homeYouTube { grid-column: 2 / 3; }
+  .homeLiveColumn { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
 
   .colThird { grid-column: span 2; }
   .rowSplit { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -84,6 +114,8 @@
 @media (min-width: 1440px) {
   .row { gap: 24px; margin-bottom: 24px; }
   .heroGrid { gap: 24px; grid-template-columns: 1fr 380px; }
+  .homeLayout { gap: 24px; grid-template-columns: minmax(0, 1fr) 380px; }
+  .homeMain { gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* Mobile */
@@ -91,6 +123,8 @@
   .row { gap: 14px; margin-bottom: 14px; }
   .colRightstack { gap: 14px; }
   .heroGrid { gap: 14px; }
+  .homeLayout { gap: 14px; }
+  .homeMain { gap: 14px; }
 }
 
 /* ---------- Shared Cards / Sections ---------- */

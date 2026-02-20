@@ -1,7 +1,7 @@
 ﻿import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { toPng } from "html-to-image";
+import html2canvas from "html2canvas";
 
 import ContentShell from "../../components/ContentShell";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -10,6 +10,11 @@ import ServerSheet from "../../components/Filters/ServerSheet";
 import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
+import ToplistExportTable, { type ToplistExportRow } from "../../components/export/ToplistExportTable";
+import ToplistPngExportDialog, {
+  type ToplistExportAmount,
+  type ToplistExportSelection,
+} from "../../components/export/ToplistPngExportDialog";
 
 import { ToplistsProvider, useToplistsData, type Filters, type SortSpec } from "../../context/ToplistsDataContext";
 import GuildToplists from "./guildtoplists";
@@ -54,6 +59,16 @@ type CompareSnapshotState = {
   baselineServers: string[];
   missingServers: string[];
   error: string | null;
+};
+type ToplistExportSnapshot = {
+  rows: ToplistExportRow[];
+  showCompare: boolean;
+};
+type ToplistExportRenderState = {
+  rows: ToplistExportRow[];
+  showCompare: boolean;
+  width: number;
+  backgroundColor: string;
 };
 
 const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
@@ -436,6 +451,54 @@ function deriveGroupFromServers(servers: string[]): string {
   return "EU";
 }
 
+const resolveExportBackground = (tableRoot: HTMLElement) => {
+  let node: HTMLElement | null = tableRoot;
+  while (node) {
+    const color = window.getComputedStyle(node).backgroundColor;
+    if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") {
+      return color;
+    }
+    node = node.parentElement;
+  }
+  return "#0C1C2E";
+};
+
+const waitForAnimationFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+const waitForImagesInNode = async (node: HTMLElement) => {
+  const images = Array.from(node.querySelectorAll<HTMLImageElement>("img"));
+  const pending = images.filter((img) => !img.complete);
+  if (!pending.length) return;
+
+  await Promise.all(
+    pending.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", done, { once: true });
+        })
+    )
+  );
+};
+
+const deriveExportGuildNames = (rows: ToplistExportRow[]) => {
+  const map = new Map<string, string>();
+  rows.forEach((row) => {
+    const name = String(row.guild ?? "").trim();
+    if (!name) return;
+    const key = normalizeGuildKey(name);
+    if (!key || map.has(key)) return;
+    map.set(key, name);
+  });
+  return Array.from(map.values()).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+};
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
 export default function PlayerToplistsPage() {
   return (
     <ToplistsProvider>
@@ -500,72 +563,181 @@ function PlayerToplistsPageContent() {
   const setClassesRef = React.useRef(setClasses);
   const lastUrlWriteRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
+  const tableExportSnapshotRef = React.useRef<ToplistExportSnapshot>({
+    rows: [],
+    showCompare: false,
+  });
+  const exportNodeRef = React.useRef<HTMLDivElement | null>(null);
+  const [isExportDialogOpen, setIsExportDialogOpen] = React.useState(false);
+  const [exportAmount, setExportAmount] = React.useState<ToplistExportAmount>(50);
+  const [exportSelection, setExportSelection] = React.useState<ToplistExportSelection>("current");
+  const [exportSelectedGuilds, setExportSelectedGuilds] = React.useState<string[]>([]);
+  const [exportRangeEnabled, setExportRangeEnabled] = React.useState(false);
+  const [exportRangeFrom, setExportRangeFrom] = React.useState(1);
+  const [exportRangeTo, setExportRangeTo] = React.useState(50);
+  const [exportDialogRows, setExportDialogRows] = React.useState<ToplistExportRow[]>([]);
+  const [exportDialogShowCompare, setExportDialogShowCompare] = React.useState(false);
+  const [exportGuildOptions, setExportGuildOptions] = React.useState<string[]>([]);
+  const [exportRenderState, setExportRenderState] = React.useState<ToplistExportRenderState | null>(null);
+  const [exportRenderKey, setExportRenderKey] = React.useState(0);
+  const [exportNonce, setExportNonce] = React.useState(0);
+  const [isExportingPng, setIsExportingPng] = React.useState(false);
 
-  const handleExportPng = async () => {
+  const buildExportBaseRows = React.useCallback(
+    (selection: ToplistExportSelection, selectedGuilds: string[]) => {
+      if (selection !== "guilds") return exportDialogRows;
+      if (!selectedGuilds.length) return [];
+      const selectedGuildKeySet = new Set(selectedGuilds.map((entry) => normalizeGuildKey(entry)).filter(Boolean));
+      return exportDialogRows.filter((row) => {
+        const key = normalizeGuildKey(row.guild);
+        return key ? selectedGuildKeySet.has(key) : false;
+      });
+    },
+    [exportDialogRows]
+  );
+  const exportBaseRows = React.useMemo(
+    () => buildExportBaseRows(exportSelection, exportSelectedGuilds),
+    [buildExportBaseRows, exportSelection, exportSelectedGuilds]
+  );
+  const exportAvailableCount = exportBaseRows.length;
+  const exportRangeMax = Math.max(1, exportAvailableCount);
+  const exportRangeFromClamped = clampNumber(
+    Number.isFinite(exportRangeFrom) ? exportRangeFrom : 1,
+    1,
+    exportRangeMax
+  );
+  const exportRangeToClamped = clampNumber(
+    Number.isFinite(exportRangeTo) ? exportRangeTo : exportRangeFromClamped,
+    exportRangeFromClamped,
+    exportRangeMax
+  );
+
+  const openExportDialog = () => {
+    const snapshot = tableExportSnapshotRef.current;
+    const snapshotRows = Array.isArray(snapshot.rows) ? [...snapshot.rows] : [];
+    setExportDialogRows(snapshotRows);
+    setExportDialogShowCompare(Boolean(snapshot.showCompare));
+    setExportGuildOptions(deriveExportGuildNames(snapshotRows));
+    setExportAmount(50);
+    setExportSelection("current");
+    setExportSelectedGuilds([]);
+    setExportRangeEnabled(false);
+    setExportRangeFrom(1);
+    setExportRangeTo(50);
+    setIsExportDialogOpen(true);
+  };
+
+  const handleToggleExportGuild = (guildName: string) => {
+    setExportSelectedGuilds((prev) =>
+      prev.includes(guildName) ? prev.filter((entry) => entry !== guildName) : [...prev, guildName]
+    );
+  };
+  const handleExportAmountChange = (value: ToplistExportAmount) => {
+    setExportAmount(value);
+    if (!exportRangeEnabled) return;
+    const nextTo = clampNumber(exportRangeFromClamped + (value - 1), exportRangeFromClamped, exportRangeMax);
+    setExportRangeTo(nextTo);
+  };
+  const handleExportSelectionChange = (value: ToplistExportSelection) => {
+    setExportSelection(value);
+  };
+  const handleExportRangeEnabledChange = (enabled: boolean) => {
+    setExportRangeEnabled(enabled);
+    if (!enabled) return;
+    const from = exportRangeFromClamped;
+    setExportRangeFrom(from);
+    const nextTo = clampNumber(from + (exportAmount - 1), from, exportRangeMax);
+    setExportRangeTo(nextTo);
+  };
+  const handleExportRangeFromChange = (value: number) => {
+    const nextFrom = clampNumber(Number.isFinite(value) ? Math.trunc(value) : 1, 1, exportRangeMax);
+    setExportRangeFrom(nextFrom);
+    setExportRangeTo((prev) => {
+      const prevNum = Number.isFinite(prev) ? prev : nextFrom;
+      return clampNumber(prevNum, nextFrom, exportRangeMax);
+    });
+  };
+  const handleExportRangeToChange = (value: number) => {
+    const nextTo = clampNumber(
+      Number.isFinite(value) ? Math.trunc(value) : exportRangeFromClamped,
+      exportRangeFromClamped,
+      exportRangeMax
+    );
+    setExportRangeTo(nextTo);
+  };
+
+  const handleConfirmExportPng = async () => {
     if (typeof document === "undefined") return;
     const tableRoot = tableRef.current;
-    if (!tableRoot) return;
+    if (!tableRoot || isExportingPng) return;
+    const baseRows = exportBaseRows;
+    if (baseRows.length === 0) return;
 
-    const resolveExportBackground = () => {
-      let node: HTMLElement | null = tableRoot;
-      while (node) {
-        const color = window.getComputedStyle(node).backgroundColor;
-        if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") {
-          return color;
-        }
-        node = node.parentElement;
-      }
-      return "#0C1C2E";
-    };
+    let rowsForExport: ToplistExportRow[] = [];
+    if (exportRangeEnabled) {
+      const rawFrom = Number.isFinite(exportRangeFrom) ? Math.trunc(exportRangeFrom) : 1;
+      const rawTo = Number.isFinite(exportRangeTo) ? Math.trunc(exportRangeTo) : rawFrom;
+      const from = clampNumber(rawFrom, 1, baseRows.length);
+      const to = clampNumber(rawTo, from, baseRows.length);
+      rowsForExport = baseRows.slice(from - 1, to);
+    } else {
+      rowsForExport = baseRows.slice(0, exportAmount);
+    }
+    const width = Math.max(1, Math.round(tableRoot.getBoundingClientRect().width || tableRoot.offsetWidth || 1));
+    const backgroundColor = resolveExportBackground(tableRoot);
+    const nextExportNonce = exportNonce + 1;
+    const nextExportRenderKey = exportRenderKey + 1;
 
-    const cloned = tableRoot.cloneNode(true) as HTMLElement;
-    cloned.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
-      img.loading = "eager";
-      img.decoding = "sync";
+    setIsExportingPng(true);
+    setExportNonce(nextExportNonce);
+    setExportRenderKey(nextExportRenderKey);
+    setExportRenderState({
+      rows: rowsForExport,
+      showCompare: exportDialogShowCompare,
+      width,
+      backgroundColor,
     });
 
-    const tbodyRows = Array.from(cloned.querySelectorAll<HTMLTableRowElement>("tbody tr"));
-    if (tbodyRows.length > 50) {
-      tbodyRows.slice(50).forEach((row) => row.remove());
-    } else if (tbodyRows.length === 0) {
-      const roleRows = Array.from(cloned.querySelectorAll<HTMLElement>('[role="row"]'));
-      const bodyRows = roleRows.filter((row) => {
-        if (row.closest("thead")) return false;
-        if (row.querySelector('[role="columnheader"]')) return false;
-        return true;
-      });
-      if (bodyRows.length > 50) {
-        bodyRows.slice(50).forEach((row) => row.remove());
-      }
-    }
-
-    const backgroundColor = resolveExportBackground();
-    const temp = document.createElement("div");
-    temp.setAttribute("aria-hidden", "true");
-    temp.style.position = "fixed";
-    temp.style.top = "0";
-    temp.style.left = "0";
-    temp.style.transform = "translate3d(-10000px, 0, 0)";
-    temp.style.pointerEvents = "none";
-    temp.style.padding = "0";
-    temp.style.background = backgroundColor;
-    temp.style.width = `${Math.max(1, tableRoot.offsetWidth)}px`;
-    temp.appendChild(cloned);
-    document.body.appendChild(temp);
-
     try {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const dataUrl = await toPng(temp, {
-        pixelRatio: 2,
-        cacheBust: true,
+      await waitForAnimationFrame();
+      await waitForAnimationFrame();
+      const exportNode = exportNodeRef.current;
+      if (!exportNode) return;
+      await waitForImagesInNode(exportNode);
+
+      const canvas = await html2canvas(exportNode, {
         backgroundColor,
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        imageTimeout: 15000,
       });
-      const link = document.createElement("a");
-      link.download = "sfdatahub_toplist.png";
-      link.href = dataUrl;
-      link.click();
+
+      await new Promise<void>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              console.error("[export] Failed to create PNG blob");
+              reject(new Error("Failed to create PNG blob"));
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.download = "sfdatahub_toplist.png";
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            resolve();
+          },
+          "image/png",
+          1,
+        );
+      });
+      setIsExportDialogOpen(false);
     } finally {
-      temp.remove();
+      setExportRenderState(null);
+      setIsExportingPng(false);
     }
   };
 
@@ -680,7 +852,7 @@ function PlayerToplistsPageContent() {
               setCompareMonth={setCompareMonth}
               monthOptions={monthOptions}
               guildOptions={guildOptions}
-              onExportPng={handleExportPng}
+              onExportPng={openExportDialog}
               exportDisabled={!hasServersSelected || activeTab !== "players" || listView !== "table"}
             />
           ) : null
@@ -700,6 +872,7 @@ function PlayerToplistsPageContent() {
             sortKey={sortBy ?? "level"}
             compareMonth={compareMonth}
             tableRef={tableRef}
+            exportSnapshotRef={tableExportSnapshotRef}
           />
         )}
         {activeTab === "guilds" && <GuildToplists serverCodes={servers ?? []} />}
@@ -722,12 +895,64 @@ function PlayerToplistsPageContent() {
         open={filterMode === "sheet" && bottomFilterOpen}
         onClose={() => setBottomFilterOpen(false)}
       />
+
+      <ToplistPngExportDialog
+        isOpen={isExportDialogOpen}
+        amount={exportAmount}
+        selection={exportSelection}
+        guildOptions={exportGuildOptions}
+        selectedGuilds={exportSelectedGuilds}
+        availableCount={exportAvailableCount}
+        rangeEnabled={exportRangeEnabled}
+        rangeFrom={exportRangeFromClamped}
+        rangeTo={exportRangeToClamped}
+        exporting={isExportingPng}
+        onAmountChange={handleExportAmountChange}
+        onSelectionChange={handleExportSelectionChange}
+        onToggleGuild={handleToggleExportGuild}
+        onRangeEnabledChange={handleExportRangeEnabledChange}
+        onRangeFromChange={handleExportRangeFromChange}
+        onRangeToChange={handleExportRangeToChange}
+        onCancel={() => {
+          if (isExportingPng) return;
+          setIsExportDialogOpen(false);
+        }}
+        onExport={handleConfirmExportPng}
+      />
+
+      {exportRenderState && (
+        <div
+          aria-hidden
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            transform: "translate3d(-12000px, 0, 0)",
+            opacity: 0,
+            pointerEvents: "none",
+            width: `${exportRenderState.width}px`,
+            background: exportRenderState.backgroundColor,
+            padding: 0,
+            margin: 0,
+          }}
+        >
+          <div ref={exportNodeRef}>
+            <ToplistExportTable
+              key={exportRenderKey}
+              rows={exportRenderState.rows}
+              showCompare={exportRenderState.showCompare}
+              width={exportRenderState.width}
+              exportNonce={exportNonce}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMonth, tableRef,
+  servers, classes, range, sortKey, compareMonth, tableRef, exportSnapshotRef,
 }: {
   servers: string[];
   classes: string[];
@@ -735,6 +960,7 @@ function TableDataView({
   sortKey: string;
   compareMonth: string;
   tableRef: React.RefObject<HTMLDivElement>;
+  exportSnapshotRef: React.MutableRefObject<ToplistExportSnapshot>;
 }) {
   const { t } = useTranslation();
   const { guilds } = useFilters();
@@ -1206,6 +1432,10 @@ function TableDataView({
       };
     });
   }, [showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
+  exportSnapshotRef.current = {
+    rows: enhancedRows as ToplistExportRow[],
+    showCompare,
+  };
 
   const avgTop100StatsPerDay = (() => {
     if (!showCompare) return null;
@@ -1551,7 +1781,7 @@ function TableDataView({
         </div>
       ) : (
         <>
-          <div ref={tableRef} style={{ overflowX: "auto" }}>
+          <div ref={tableRef} className="toplists-table-viewport">
             {renderToplistTable({ imgLoading: "lazy" })}
           </div>
         </>
