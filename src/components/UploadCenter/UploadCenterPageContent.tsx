@@ -6,7 +6,11 @@ import type { UploadRecordKey, UploadRecordStatus } from "./uploadCenterTypes";
 import type { UploadSessionId } from "./uploadCenterTypes";
 import { buildUploadSessionFromCsv, type CsvParsedResult } from "./uploadCenterCsvMapping";
 import { useUploadCenterSessions } from "./UploadCenterSessionsContext";
-import { importSelectionToDb, type ImportSelectionPayload } from "../ImportCsv/importCsvToDb";
+import {
+  importSelectionToDb,
+  type ImportSelectionPayload,
+  type ImportSelectionStageEvent,
+} from "../ImportCsv/importCsvToDb";
 import type { ImportProgress } from "../../lib/import/csv";
 import {
   DEFAULT_UPLOAD_QUOTA,
@@ -170,6 +174,15 @@ function UploadCenterContentBody() {
     buildQuotaState(DEFAULT_UPLOAD_QUOTA, { date: null, guilds: 0, players: 0 }, formatTodayString()),
   );
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [activityStage, setActivityStage] = useState<string>("idle");
+  const [isFinalizing, setIsFinalizing] = useState<boolean>(false);
+  const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
+  const [activityLastTickAt, setActivityLastTickAt] = useState<number | null>(null);
+  const [activityNow, setActivityNow] = useState<number>(() =>
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now(),
+  );
 
   const applyQuotaState = useCallback((config: UploadQuotaConfig, usage: UploadCenterUsage) => {
     const today = formatTodayString();
@@ -399,6 +412,25 @@ function UploadCenterContentBody() {
   }, [activeSession]);
   const isUploadBusy =
     uploadProgress.phase === "uploading" || uploadProgress.phase === "finalizing";
+  const getNowMs = () =>
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+  const formatElapsed = (ms: number) => {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+    const ss = String(totalSec % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
+  useEffect(() => {
+    if (!isUploadBusy || activityStartedAt == null) return;
+    setActivityNow(getNowMs());
+    const timer = window.setInterval(() => {
+      setActivityNow(getNowMs());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isUploadBusy, activityStartedAt]);
 
   const buildPayloadFromActiveSession = (): ImportSelectionPayload | null => {
     if (!activeSession) return null;
@@ -532,9 +564,42 @@ function UploadCenterContentBody() {
     });
     const playerProgress = { processed: 0, created: 0, duplicate: 0, error: 0 };
     const guildProgress = { processed: 0, created: 0, duplicate: 0, error: 0 };
+    const startNow = getNowMs();
+    setActivityStage("scans");
+    setIsFinalizing(false);
+    setActivityStartedAt(startNow);
+    setActivityLastTickAt(startNow);
+    setActivityNow(startNow);
+    const nowMs = () =>
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    const runLocalStage = async <T,>(stage: string, fn: () => Promise<T>): Promise<T> => {
+      setActivityStage(stage);
+      setActivityLastTickAt(nowMs());
+      const started = nowMs();
+      try {
+        return await fn();
+      } finally {
+        const ms = Math.round(nowMs() - started);
+        setActivityLastTickAt(nowMs());
+        console.info(`[upload] stage=${stage} ms=${ms}`);
+      }
+    };
+    const handleImportStage = (event: ImportSelectionStageEvent) => {
+      if (event.status === "start") {
+        setActivityStage(event.stage);
+        setActivityLastTickAt(nowMs());
+        return;
+      }
+      setActivityLastTickAt(nowMs());
+      const msPart = typeof event.ms === "number" ? ` ms=${event.ms}` : "";
+      console.info(`[upload] stage=${event.stage} done${msPart}`, event.details ?? {});
+    };
     const updateTotals = () => {
       const processed = Math.min(playerProgress.processed + guildProgress.processed, totalSelected);
       const phase: UploadPhase = processed >= totalSelected && totalSelected > 0 ? "finalizing" : "uploading";
+      setIsFinalizing(phase === "finalizing");
       setUploadProgress({
         phase,
         processed,
@@ -546,6 +611,8 @@ function UploadCenterContentBody() {
     };
     const handleProgress = (kind: "players" | "guilds") => (p: ImportProgress) => {
       if (p?.pass !== "scans") return;
+      setActivityStage(`scans:${kind}`);
+      setActivityLastTickAt(nowMs());
       const target = kind === "players" ? playerProgress : guildProgress;
       if (typeof p.current === "number") target.processed = Math.min(p.current, p.total ?? p.current);
       if (typeof p.created === "number") target.created = p.created;
@@ -564,6 +631,7 @@ function UploadCenterContentBody() {
           if (p?.kind === "players") handleProgress("players")(p);
           else if (p?.kind === "guilds") handleProgress("guilds")(p);
         },
+        onStage: handleImportStage,
       });
 
       const sessionId = activeSession.id;
@@ -597,20 +665,26 @@ function UploadCenterContentBody() {
           );
         } else {
           try {
-            await updateUploadCenterUsageForToday(
-              userId,
-              selectedGuilds.length,
-              selectedPlayers.length,
+            await runLocalStage("usage:update", async () =>
+              updateUploadCenterUsageForToday(
+                userId,
+                selectedGuilds.length,
+                selectedPlayers.length,
+              ),
             );
           } catch (error) {
             console.error("[UploadCenter] Failed to record upload usage.", error);
           }
         }
-        await refreshQuotaFromRemote();
+        await runLocalStage("quota:refresh", refreshQuotaFromRemote);
       }
     } catch (error) {
       console.error("[UploadCenter] Failed to upload selection", error);
     } finally {
+      setActivityStage("idle");
+      setIsFinalizing(false);
+      setActivityStartedAt(null);
+      setActivityLastTickAt(null);
       setUploadProgress((prev) => ({ ...prev, phase: "done" }));
     }
   };
@@ -892,6 +966,25 @@ function UploadCenterContentBody() {
                     ) : null}
                   </div>
                 )}
+                {isUploadBusy && activityStartedAt != null ? (
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                      {isFinalizing ? (
+                        <span className="inline-flex h-4 w-4 items-center justify-center">
+                          <span className="h-3 w-3 rounded-full border-2 border-emerald-300 border-t-transparent animate-spin" />
+                        </span>
+                      ) : null}
+                      <span>Stage: {activityStage}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      Running: {formatElapsed(activityNow - activityStartedAt)}
+                      {activityLastTickAt != null
+                        ? ` | Last update: ${Math.max(0, Math.floor((activityNow - activityLastTickAt) / 1000))}s ago`
+                        : ""}
+                    </div>
+                  </div>
+                ) : null}
                 {activeSession ? (
                   <div className="rounded-xl border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
                     {`Active session: ${activeSession.sourceFilename || activeSession.id} - ${activeSession.players.length} players, ${activeSession.guilds.length} guilds`}
