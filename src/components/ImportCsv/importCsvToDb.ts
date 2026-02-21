@@ -89,11 +89,49 @@ export type ImportSelectionResult = {
   reports: ImportReport[];
 };
 
+export type ImportSelectionStageName =
+  | "import:guilds"
+  | "import:players"
+  | "derived:guild-snapshots"
+  | "derived:flush"
+  | "monthly:rebuild";
+
+export type ImportSelectionStageEvent = {
+  stage: ImportSelectionStageName;
+  status: "start" | "end";
+  ms?: number;
+  details?: Record<string, unknown>;
+};
+
 export async function importSelectionToDb(
   payload: ImportSelectionPayload,
-  opts?: { onProgress?: ImportCsvOptions["onProgress"] },
+  opts?: {
+    onProgress?: ImportCsvOptions["onProgress"];
+    onStage?: (event: ImportSelectionStageEvent) => void;
+  },
 ): Promise<ImportSelectionResult> {
   startReadTraceSession("ImportSelection");
+  const nowMs = () =>
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+  const emitStage = (event: ImportSelectionStageEvent) => opts?.onStage?.(event);
+  const runStage = async <T>(
+    stage: ImportSelectionStageName,
+    details: Record<string, unknown>,
+    fn: () => Promise<T>,
+  ): Promise<T> => {
+    emitStage({ stage, status: "start", details });
+    const started = nowMs();
+    try {
+      return await fn();
+    } finally {
+      const ms = nowMs() - started;
+      const roundedMs = Math.round(ms);
+      emitStage({ stage, status: "end", ms: roundedMs, details });
+      console.info(`[upload] stage=${stage} ms=${roundedMs}`, details);
+    }
+  };
   const serverHosts = new Set<string>();
   collectServerHosts(payload.playersRows, serverHosts);
   collectServerHosts(payload.guildsRows, serverHosts);
@@ -122,13 +160,18 @@ export async function importSelectionToDb(
 
   if (guildsRows.length > 0) {
     try {
-      const repGuilds = await importCsvToDB(null, {
-        kind: "guilds",
-        rows: guildsRows,
-        onProgress: emitProgress ? (p) => emitProgress(p, "guilds") : undefined,
-        serverHostMap,
-        skipGuildDerived: true,
-      } as ImportCsvOptions);
+      const repGuilds = await runStage(
+        "import:guilds",
+        { rows: guildsRows.length },
+        async () =>
+          importCsvToDB(null, {
+            kind: "guilds",
+            rows: guildsRows,
+            onProgress: emitProgress ? (p) => emitProgress(p, "guilds") : undefined,
+            serverHostMap,
+            skipGuildDerived: true,
+          } as ImportCsvOptions),
+      );
       reports.push(repGuilds);
       if (Array.isArray(repGuilds.guildResults)) {
         guilds = repGuilds.guildResults as ImportResultItem[];
@@ -140,12 +183,17 @@ export async function importSelectionToDb(
   }
 
   try {
-    const repPlayers = await importCsvToDB(null, {
-      kind: "players",
-      rows: playersRows,
-      onProgress: emitProgress ? (p) => emitProgress(p, "players") : undefined,
-      serverHostMap,
-    } as ImportCsvOptions);
+    const repPlayers = await runStage(
+      "import:players",
+      { rows: playersRows.length },
+      async () =>
+        importCsvToDB(null, {
+          kind: "players",
+          rows: playersRows,
+          onProgress: emitProgress ? (p) => emitProgress(p, "players") : undefined,
+          serverHostMap,
+        } as ImportCsvOptions),
+    );
     reports.push(repPlayers);
     if (Array.isArray(repPlayers.playerResults)) {
       players = repPlayers.playerResults as ImportResultItem[];
@@ -159,7 +207,14 @@ export async function importSelectionToDb(
   let guildDerivedAggregates: GuildSnapshotResult["aggregatesByGuildId"] | null = null;
   if (guildsRows.length > 0 && playersRowsForGuilds.length > 0) {
     try {
-      const summaryResult = await writeGuildSnapshotsFromRows(playersRowsForGuilds, guildsRows);
+      const summaryResult = await runStage(
+        "derived:guild-snapshots",
+        {
+          playerRows: playersRowsForGuilds.length,
+          guildRows: guildsRows.length,
+        },
+        async () => writeGuildSnapshotsFromRows(playersRowsForGuilds, guildsRows),
+      );
       guildDerivedAggregates = summaryResult.aggregatesByGuildId;
     } catch (error) {
       console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows skipped", error);
@@ -169,7 +224,11 @@ export async function importSelectionToDb(
 
   if (guildDerivedAggregates && guildDerivedAggregates.size > 0) {
     try {
-      await flushGuildDerivedSnapshotsFromAggregates(guildDerivedAggregates, serverHostMap);
+      await runStage(
+        "derived:flush",
+        { guilds: guildDerivedAggregates.size },
+        async () => flushGuildDerivedSnapshotsFromAggregates(guildDerivedAggregates, serverHostMap),
+      );
     } catch (error) {
       console.warn("[ImportSelectionToDb] guild derived snapshot flush skipped", error);
       ok = false;
@@ -186,47 +245,65 @@ export async function importSelectionToDb(
     if (v) gidSet.add(String(v));
   }
 
-  for (const guildId of gidSet) {
-    const scope: FirestoreTraceScope = beginReadScope("ImportCsv:guildLatest");
-    const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
-    let latestSnap;
-    try {
-      latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
-    } finally {
-      endReadScope(scope);
-    }
-    if (!latestSnap.exists()) continue;
+  await runStage(
+    "monthly:rebuild",
+    { guildIds: gidSet.size },
+    async () => {
+      let latestFound = 0;
+      let ensureAttempts = 0;
+      let monthlyWriteAttempts = 0;
+      for (const guildId of gidSet) {
+        const scope: FirestoreTraceScope = beginReadScope("ImportCsv:guildLatest");
+        const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
+        let latestSnap;
+        try {
+          latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
+        } finally {
+          endReadScope(scope);
+        }
+        if (!latestSnap.exists()) continue;
+        latestFound++;
 
-    const latest = latestSnap.data() as any;
-    const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
-    const monthKey = monthKeyFromMs(latestTsMs);
+        const latest = latestSnap.data() as any;
+        const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
+        const monthKey = monthKeyFromMs(latestTsMs);
 
-    let first: any = null;
-    let firstTsMs: number | null = null;
-    try {
-      const res = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
-      first = res.first;
-      firstTsMs = res.firstTsMs;
-    } catch (error) {
-      console.warn("[ImportSelectionToDb] ensureFirstOfMonth skipped", { guildId, monthKey, error });
-    }
+        let first: any = null;
+        let firstTsMs: number | null = null;
+        try {
+          ensureAttempts++;
+          const res = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
+          first = res.first;
+          firstTsMs = res.firstTsMs;
+        } catch (error) {
+          console.warn("[ImportSelectionToDb] ensureFirstOfMonth skipped", { guildId, monthKey, error });
+        }
 
-    const progress = computeProgressDoc({
-      guildId,
-      monthKey,
-      server: latest.server ?? null,
-      first,
-      firstTsMs,
-      latest,
-      latestTsMs,
-    });
+        const progress = computeProgressDoc({
+          guildId,
+          monthKey,
+          server: latest.server ?? null,
+          first,
+          firstTsMs,
+          latest,
+          latestTsMs,
+        });
 
-    try {
-      await writeMonthlyDoc(guildId, monthKey, progress);
-    } catch (error) {
-      console.warn("[ImportSelectionToDb] writeMonthlyDoc skipped", { guildId, monthKey, error });
-    }
-  }
+        try {
+          monthlyWriteAttempts++;
+          await writeMonthlyDoc(guildId, monthKey, progress);
+        } catch (error) {
+          console.warn("[ImportSelectionToDb] writeMonthlyDoc skipped", { guildId, monthKey, error });
+        }
+      }
+      console.info("[upload] stage=monthly:rebuild counts", {
+        guildIds: gidSet.size,
+        latestFound,
+        ensureAttempts,
+        monthlyWriteAttempts,
+      });
+    },
+  );
 
   reportReadSummary("ImportSelection");
   reportWriteSummary("ImportSelection");

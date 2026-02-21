@@ -2,7 +2,7 @@
 // Build monthly player toplist snapshots from scans in a time window.
 // Raw->Derived pipeline reference: src/lib/import/csv.ts (deriveForPlayer + buildPlayerDerivedSnapshotEntry).
 // Run example:
-//   npx tsx tools/backfill-monthly-toplists.mts --server EU1 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2025-12 --topN 500 --dry-run
+//   npx tsx tools/backfill-monthly-toplists.mts --server S12 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2025-01 --topN 500 --dry-run
 //
 // Auth: gcloud auth application-default login
 
@@ -22,7 +22,7 @@ try {
 const db = getFirestore();
 
 // ---------- Config ----------
-const STATS_PUBLIC_LATEST = "stats_public/toplists_players_v1/lists/latest_toplists/servers";
+const STATS_PUBLIC_LATEST = "stats_public/toplists_players_v1/lists/latest_toplists/progress";
 const DOC_SIZE_LIMIT_BYTES = 1_000_000;
 
 // ---------- Args ----------
@@ -248,7 +248,7 @@ const run = async () => {
   const scanForServer = async (serverKey: string) => {
     let scansInWindow = 0;
     let skippedNonPlayers = 0;
-    let skippedMissingId = 0;
+    let skippedMissingIdentifier = 0;
     let skippedBadTimestamp = 0;
     const byPlayer = new Map<string, { ts: number; data: any; docId: string }>();
 
@@ -267,9 +267,9 @@ const run = async () => {
         }
 
         const data = doc.data() || {};
-        const playerId = String(data.playerId ?? doc.ref.parent.parent?.id ?? "");
-        if (!playerId) {
-          skippedMissingId++;
+        const identifier = String(doc.ref.parent.parent?.id ?? "").trim();
+        if (!identifier) {
+          skippedMissingIdentifier++;
           continue;
         }
 
@@ -281,9 +281,9 @@ const run = async () => {
         if (ts < fromSec || ts > toSec) continue;
 
         scansInWindow++;
-        const prev = byPlayer.get(playerId);
+        const prev = byPlayer.get(identifier);
         if (!prev || ts > prev.ts) {
-          byPlayer.set(playerId, { ts, data, docId: doc.id });
+          byPlayer.set(identifier, { ts, data, docId: doc.id });
         }
       }
     } catch (err: any) {
@@ -297,7 +297,7 @@ const run = async () => {
       throw err;
     }
 
-    return { scansInWindow, skippedNonPlayers, skippedMissingId, skippedBadTimestamp, byPlayer };
+    return { scansInWindow, skippedNonPlayers, skippedMissingIdentifier, skippedBadTimestamp, byPlayer };
   };
 
   let activeQueryServer = resolvedServer.queryServerKey;
@@ -310,7 +310,7 @@ const run = async () => {
     scanResult = await scanForServer(activeQueryServer);
   }
 
-  const { scansInWindow, skippedNonPlayers, skippedMissingId, skippedBadTimestamp, byPlayer } = scanResult;
+  const { scansInWindow, skippedNonPlayers, skippedMissingIdentifier, skippedBadTimestamp, byPlayer } = scanResult;
 
   const uniquePlayers = byPlayer.size;
   if (uniquePlayers === 0) {
@@ -318,9 +318,10 @@ const run = async () => {
   }
 
   const players: any[] = [];
-  for (const [playerId, picked] of byPlayer.entries()) {
+  for (const [identifier, picked] of byPlayer.entries()) {
     const data = picked.data || {};
     const values = data.values && typeof data.values === "object" ? data.values : {};
+    const playerId = data.playerId ?? null;
     const name = data.name ?? pickByCanon(values, COL.PLAYERS.NAME);
     const guildName = data.guildName ?? pickByCanon(values, COL.PLAYERS.GUILD);
 
@@ -335,6 +336,7 @@ const run = async () => {
     const lastScanRaw = data.timestampRaw ?? pickByCanon(values, COL.PLAYERS.TIMESTAMP);
 
     const derivedInput = {
+      identifier,
       playerId,
       name,
       className,
@@ -347,6 +349,7 @@ const run = async () => {
     };
     const derived = deriveForPlayer(derivedInput);
     const snapshotEntry = buildPlayerDerivedSnapshotEntry({
+      identifier,
       playerId,
       server: serverCode,
       name,
@@ -363,7 +366,7 @@ const run = async () => {
   players.sort((a, b) => {
     const diff = (toFiniteNumberOrNull(b.sum) ?? 0) - (toFiniteNumberOrNull(a.sum) ?? 0);
     if (diff !== 0) return diff;
-    return String(a.playerId ?? "").localeCompare(String(b.playerId ?? ""));
+    return String(a.identifier ?? "").localeCompare(String(b.identifier ?? ""));
   });
   if (players.length > topN) players.length = topN;
 
@@ -390,10 +393,11 @@ const run = async () => {
   console.log("[monthly-toplists] Unique players:", uniquePlayers);
   console.log("[monthly-toplists] Players written:", players.length);
   console.log("[monthly-toplists] Target doc:", targetPath);
+  console.log("[monthly-toplists] Primary key:", "identifier");
   console.log("[monthly-toplists] Label:", label);
   console.log("[monthly-toplists] Dry run:", dryRun);
   console.log("[monthly-toplists] Skipped non-players:", skippedNonPlayers);
-  console.log("[monthly-toplists] Skipped missing playerId:", skippedMissingId);
+  console.log("[monthly-toplists] Skipped missing identifier:", skippedMissingIdentifier);
   console.log("[monthly-toplists] Skipped bad timestamp:", skippedBadTimestamp);
 };
 

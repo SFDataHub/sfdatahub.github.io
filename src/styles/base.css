@@ -148,29 +148,47 @@ body::-webkit-scrollbar{
 
 /* Toplists table row hover */
 .toplists-table-viewport {
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: hidden;
+}
+.toplists-table-viewport .toplists-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.toplists-table-viewport .toplists-table thead {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: transparent;
+}
+.toplists-table-viewport .toplists-table tbody {
+  display: block;
   max-height: min(68vh, calc(100vh - 260px));
+  overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: auto;
   -ms-overflow-style: auto;
   scrollbar-gutter: stable;
 }
-.toplists-table-viewport::-webkit-scrollbar {
+.toplists-table-viewport .toplists-table tbody::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-.toplists-table-viewport::-webkit-scrollbar-thumb {
+.toplists-table-viewport .toplists-table tbody::-webkit-scrollbar-thumb {
   background: rgba(176, 196, 217, 0.55);
   border-radius: 999px;
 }
-.toplists-table-viewport::-webkit-scrollbar-track {
+.toplists-table-viewport .toplists-table tbody::-webkit-scrollbar-track {
   background: rgba(12, 28, 46, 0.55);
 }
-.toplists-table-viewport .toplists-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #14273e;
+.toplists-table-viewport .toplists-table tbody tr,
+.toplists-table-viewport .toplists-table thead tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 .toplists-table .toplists-row {
   transition: background-color 0.15s ease;

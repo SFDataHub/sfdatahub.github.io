@@ -166,6 +166,13 @@ const isPermissionDuplicateError = (error: unknown): boolean => {
   return code.includes("permission") || code.includes("already") || code.includes("failed-precondition");
 };
 
+const extractFirestoreErrorCode = (error: unknown): string | null => {
+  const rawCode = (error as any)?.code;
+  if (rawCode == null) return null;
+  const normalized = String(rawCode).trim().toLowerCase();
+  return normalized || null;
+};
+
 // Zahl locker parsen
 const toNumberLoose = (v: any): number | null => {
   if (v == null || v === "") return null;
@@ -1261,7 +1268,8 @@ type ScanDoc = { ref: ReturnType<typeof doc>; data: any; key: string };
 async function writeScansWithResults(
   scans: ScanDoc[],
   onProgress?: ImportCsvOptions["onProgress"],
-  kind?: ImportCsvKind
+  kind?: ImportCsvKind,
+  onErrorCode?: (error: unknown) => void,
 ): Promise<ImportResultItem[]> {
   const results: ImportResultItem[] = [];
   if (!scans.length) return results;
@@ -1287,7 +1295,24 @@ async function writeScansWithResults(
   emit("prepare");
 
   const bulkWriterFactory = (db as any).bulkWriter;
-  if (typeof bulkWriterFactory === "function") {
+  const bulkWriterAvailable = typeof bulkWriterFactory === "function";
+  if (bulkWriterAvailable) {
+    console.info("[ImportCsv] bulkWriter mode", {
+      kind,
+      pass: "scans",
+      bulkWriterAvailable: true,
+      bulkWriterChosen: true,
+    });
+  } else {
+    console.info("[ImportCsv] bulkWriter mode", {
+      kind,
+      pass: "scans",
+      bulkWriterAvailable: false,
+      bulkWriterChosen: false,
+      fallbackReason: "db.bulkWriter undefined",
+    });
+  }
+  if (bulkWriterAvailable) {
     const writer = bulkWriterFactory.call(db, { throttling: true });
     const tick = () => {
       processed++;
@@ -1304,6 +1329,7 @@ async function writeScansWithResults(
           tick();
         })
         .catch((error: any) => {
+          onErrorCode?.(error);
           const code = String(error?.code ?? "").toLowerCase();
           if (code.includes("already") && code.includes("exist")) {
             duplicate++;
@@ -1319,6 +1345,7 @@ async function writeScansWithResults(
     try {
       await writer.close();
     } catch (error) {
+      onErrorCode?.(error);
       console.warn("[ImportCsv] bulkWriter close with errors", { error });
     }
     emit("done");
@@ -1333,6 +1360,7 @@ async function writeScansWithResults(
       created++;
       results.push({ key, status: "created" });
     } catch (error: any) {
+      onErrorCode?.(error);
       const code = String(error?.code ?? "").toLowerCase();
       if (code.includes("permission") || code.includes("already")) {
         duplicate++;
@@ -1351,21 +1379,45 @@ async function writeScansWithResults(
 
 async function writeLatest(
   latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
-  onProgress?: ImportCsvOptions["onProgress"]
+  onProgress?: ImportCsvOptions["onProgress"],
+  kind?: ImportCsvKind,
+  onErrorCode?: (error: unknown) => void,
 ) {
   if (!latestDocs.length) return;
 
   const total = latestDocs.length;
   const bulkWriterFactory = (db as any).bulkWriter;
+  const bulkWriterAvailable = typeof bulkWriterFactory === "function";
+  if (bulkWriterAvailable) {
+    console.info("[ImportCsv] bulkWriter mode", {
+      kind,
+      pass: "latest",
+      bulkWriterAvailable: true,
+      bulkWriterChosen: true,
+    });
+  } else {
+    console.info("[ImportCsv] bulkWriter mode", {
+      kind,
+      pass: "latest",
+      bulkWriterAvailable: false,
+      bulkWriterChosen: false,
+      fallbackReason: "db.bulkWriter undefined",
+    });
+  }
 
-  if (typeof bulkWriterFactory === "function") {
+  if (bulkWriterAvailable) {
     const writer = bulkWriterFactory.call(db, { throttling: true });
     onProgress?.({ phase: "prepare", current: 0, total, pass: "latest" });
 
     for (const { ref, data } of latestDocs) writer.set(ref, data, { merge: true });
 
     onProgress?.({ phase: "write", current: total, total, pass: "latest" });
-    await writer.close();
+    try {
+      await writer.close();
+    } catch (error) {
+      onErrorCode?.(error);
+      throw error;
+    }
     latestDocs.forEach(({ ref }) =>
       recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:latestBulk" }),
     );
@@ -1923,10 +1975,20 @@ export async function importCsvToDB(
     skippedBadTsGuild: 0,
     skippedMissingNameGuild: 0,
   };
+  const errorCodeCounts = new Map<string, number>();
+  const trackFirestoreErrorCode = (error: unknown) => {
+    const code = extractFirestoreErrorCode(error);
+    if (!code) return;
+    errorCodeCounts.set(code, (errorCodeCounts.get(code) ?? 0) + 1);
+  };
   const playerResults: ImportResultItem[] = [];
   const guildResults: ImportResultItem[] = [];
 
   if (!opts || !opts.kind) throw new Error('CSV-Typ fehlt: { kind: "players" | "guilds" }.');
+  console.info("[ImportCsv] bulkWriter capability", {
+    kind: opts.kind,
+    bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
+  });
 
   const emitProgress = opts.onProgress
     ? ((p: Parameters<NonNullable<ImportCsvOptions["onProgress"]>>[0]) =>
@@ -1986,8 +2048,24 @@ export async function importCsvToDB(
       if (!byIdentifier.has(parsed.identifier)) byIdentifier.set(parsed.identifier, []);
       byIdentifier.get(parsed.identifier)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
     }
+    console.info("[ImportCsv] bulkWriter decision", {
+      kind: "players",
+      pass: "scans",
+      scans: playerScanDocs.length,
+      bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
+      bulkWriterChosen: typeof (db as any).bulkWriter === "function" && playerScanDocs.length > 0,
+      fallbackReason:
+        typeof (db as any).bulkWriter === "function"
+          ? null
+          : "db.bulkWriter undefined",
+    });
 
-    const scanResults = await writeScansWithResults(playerScanDocs, emitProgress, "players");
+    const scanResults = await writeScansWithResults(
+      playerScanDocs,
+      emitProgress,
+      "players",
+      trackFirestoreErrorCode,
+    );
     playerResults.push(...scanResults);
     counts.writtenScanPlayers = scanResults.filter((r) => r.status === "created").length;
 
@@ -2188,7 +2266,7 @@ export async function importCsvToDB(
       }
     }
 
-    await writeLatest(latestDocs, emitProgress);
+    await writeLatest(latestDocs, emitProgress, "players", trackFirestoreErrorCode);
     const pendingSnapshotKeys = Array.from(pendingDerivedByServer.keys());
     const pendingEntryCount = Array.from(pendingDerivedByServer.values()).reduce(
       (sum, entries) => sum + entries.length,
@@ -2213,6 +2291,7 @@ export async function importCsvToDB(
         missingTsPlayers += res.skippedMissingTs;
         if (res.wrote) flushedDocIds.push(toSnapshotDocId(serverKey));
       } catch (error) {
+        trackFirestoreErrorCode(error);
         console.warn("[ImportCsv] Derived snapshot upsert failed", { serverKey, error });
       }
     }
@@ -2233,7 +2312,12 @@ export async function importCsvToDB(
         });
       }
     }
-    await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
+    try {
+      await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
+    } catch (error) {
+      trackFirestoreErrorCode(error);
+      throw error;
+    }
   }
 
   // ---------- GUILDS ----------
@@ -2289,8 +2373,24 @@ export async function importCsvToDB(
       if (!byGid.has(parsed.guildIdentifier)) byGid.set(parsed.guildIdentifier, []);
       byGid.get(parsed.guildIdentifier)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
     }
+    console.info("[ImportCsv] bulkWriter decision", {
+      kind: "guilds",
+      pass: "scans",
+      scans: guildScanDocs.length,
+      bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
+      bulkWriterChosen: typeof (db as any).bulkWriter === "function" && guildScanDocs.length > 0,
+      fallbackReason:
+        typeof (db as any).bulkWriter === "function"
+          ? null
+          : "db.bulkWriter undefined",
+    });
 
-    const scanResults = await writeScansWithResults(guildScanDocs, emitProgress, "guilds");
+    const scanResults = await writeScansWithResults(
+      guildScanDocs,
+      emitProgress,
+      "guilds",
+      trackFirestoreErrorCode,
+    );
     guildResults.push(...scanResults);
     counts.writtenScanGuilds = scanResults.filter((r) => r.status === "created").length;
 
@@ -2486,6 +2586,7 @@ export async function importCsvToDB(
     try {
       await commitBatched(putLatest, BATCH_LATEST, "latest", emitProgress);
     } catch (error) {
+      trackFirestoreErrorCode(error);
       if (isPermissionDuplicateError(error)) {
         console.warn("[ImportCsv] guild latest write skipped (duplicate/permission)", { error });
       } else {
@@ -2495,6 +2596,7 @@ export async function importCsvToDB(
     try {
       await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
     } catch (error) {
+      trackFirestoreErrorCode(error);
       if (isPermissionDuplicateError(error)) {
         console.warn("[ImportCsv] guild history write skipped (duplicate/permission)", { error });
       } else {
@@ -2527,6 +2629,7 @@ export async function importCsvToDB(
           missingTsGuilds += res.skippedMissingTs;
           if (res.wrote) flushedDocIds.push(toGuildSnapshotDocId(serverKey));
         } catch (error) {
+          trackFirestoreErrorCode(error);
           console.warn("[ImportCsv] Guild derived snapshot upsert failed", { serverKey, error });
         }
       }
@@ -2551,6 +2654,22 @@ export async function importCsvToDB(
   }
 
   const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (errorCodeCounts.size > 0) {
+    const totalOps =
+      (counts.writtenScanPlayers ?? 0) +
+      (counts.writtenLatestPlayers ?? 0) +
+      (counts.writtenWeeklyPlayers ?? 0) +
+      (counts.writtenMonthlyPlayers ?? 0) +
+      (counts.writtenScanGuilds ?? 0) +
+      (counts.writtenLatestGuilds ?? 0) +
+      (counts.writtenWeeklyGuilds ?? 0) +
+      (counts.writtenMonthlyGuilds ?? 0);
+    console.warn("[ImportCsv] Firestore error summary", {
+      kind: opts.kind,
+      totalOperations: totalOps,
+      errorCounts: Object.fromEntries(errorCodeCounts.entries()),
+    });
+  }
   return {
     detectedType: opts.kind,
     counts,
