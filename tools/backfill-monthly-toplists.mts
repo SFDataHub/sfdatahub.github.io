@@ -575,6 +575,7 @@ const resolveScanQueryKeyForServer = async (
   const writeKey = String(resolved.writeServerKey ?? "").trim().toUpperCase();
   if (!writeKey) return resolved.queryServerKey;
   if (isEuServerCode(writeKey)) return writeKey;
+  if (isFusionNumericCode(writeKey)) return writeKey;
 
   const candidateDocIds = Array.from(
     new Set([writeKey, writeKey.toLowerCase(), String(resolved.queryServerKey ?? "").trim(), String(resolved.queryServerKey ?? "").trim().toLowerCase()].filter(Boolean))
@@ -589,7 +590,7 @@ const resolveScanQueryKeyForServer = async (
   }
 
   const inputHadNetSuffix = Boolean(resolved.inputHadNetSuffix);
-  if (isFusionNumericCode(writeKey) || inputHadNetSuffix) {
+  if (inputHadNetSuffix) {
     return `${writeKey.toLowerCase()}_net`;
   }
 
