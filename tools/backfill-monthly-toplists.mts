@@ -2,7 +2,7 @@
 // Build monthly player toplist snapshots from scans in a time window.
 // Raw->Derived pipeline reference: src/lib/import/csv.ts (deriveForPlayer + buildPlayerDerivedSnapshotEntry).
 // Run example:
-//   npx tsx tools/backfill-monthly-toplists.mts --server S12 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2025-01 --topN 500 --dry-run
+//   npx tsx tools/backfill-monthly-toplists.mts --server S12 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2026-01 --topN 500 --dry-run
 //
 // Auth (REST, ADC-free):
 //   Default:       gcloud auth print-access-token (user token)
@@ -281,50 +281,44 @@ type ResolvedServerKeys = {
   queryServerKey: string;
   fallbackServerKey?: string;
   writeServerKey: string;
+  inputHadNetSuffix?: boolean;
 };
 
 const resolveServerKeys = (input: string): ResolvedServerKeys => {
-  const upper = input.trim().toUpperCase();
-  let match = upper.match(/^S(\d+)\.EU$/);
+  const upperInput = input.trim().toUpperCase();
+  const inputHadNetSuffix = /\s*\.\s*NET\s*$/.test(upperInput);
+  const upper = upperInput.replace(/\s*\.\s*(NET|EU)\s*$/, "").trim();
+  let match = upper.match(/^S(\d+)$/);
   if (match) {
     const num = match[1];
     return {
-      input: upper,
-      queryServerKey: `S${num}.EU`,
-      fallbackServerKey: `S${num}`,
+      input: upperInput,
+      queryServerKey: `EU${num}`,
       writeServerKey: `EU${num}`,
-    };
-  }
-  match = upper.match(/^S(\d+)$/);
-  if (match) {
-    const num = match[1];
-    return {
-      input: upper,
-      queryServerKey: `S${num}`,
-      fallbackServerKey: `S${num}.EU`,
-      writeServerKey: `EU${num}`,
+      inputHadNetSuffix,
     };
   }
   match = upper.match(/^EU(\d+)$/);
   if (match) {
     const num = match[1];
     return {
-      input: upper,
+      input: upperInput,
       queryServerKey: `EU${num}`,
-      fallbackServerKey: `S${num}`,
       writeServerKey: `EU${num}`,
+      inputHadNetSuffix,
     };
   }
   match = upper.match(/^F(\d+)$/);
   if (match) {
     const num = match[1];
     return {
-      input: upper,
+      input: upperInput,
       queryServerKey: `F${num}`,
       writeServerKey: `F${num}`,
+      inputHadNetSuffix,
     };
   }
-  return { input: upper, queryServerKey: upper, writeServerKey: upper };
+  return { input: upperInput, queryServerKey: upper, writeServerKey: upper, inputHadNetSuffix };
 };
 
 type FirestoreCursor = { ts: number; name: string } | null;
@@ -424,6 +418,7 @@ const buildScansRunQueryBody = (serverKey: string, fromSec: number, toSec: numbe
         filters: [
           {
             fieldFilter: {
+              // Query on the short normalized key (e.g. EU14), not payload value.server.
               field: { fieldPath: "server" },
               op: "EQUAL",
               value: { stringValue: serverKey },
@@ -461,6 +456,39 @@ const buildScansRunQueryBody = (serverKey: string, fromSec: number, toSec: numbe
   return JSON.stringify({ structuredQuery });
 };
 
+const buildDebugScansWindowQueryBody = (fromSec: number, toSec: number): string => {
+  const structuredQuery: any = {
+    from: [{ collectionId: "scans", allDescendants: true }],
+    where: {
+      compositeFilter: {
+        op: "AND",
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: "timestamp" },
+              op: "GREATER_THAN_OR_EQUAL",
+              value: { integerValue: String(fromSec) },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: "timestamp" },
+              op: "LESS_THAN_OR_EQUAL",
+              value: { integerValue: String(toSec) },
+            },
+          },
+        ],
+      },
+    },
+    orderBy: [
+      { field: { fieldPath: "timestamp" }, direction: "ASCENDING" },
+      { field: { fieldPath: "__name__" }, direction: "ASCENDING" },
+    ],
+    limit: 20,
+  };
+  return JSON.stringify({ structuredQuery });
+};
+
 const runScansQueryPage = async (
   baseDocsUrl: string,
   accessToken: string,
@@ -489,6 +517,83 @@ const runScansQueryPage = async (
     rows.push({ name: doc.name, docId: extractDocId(doc.name), data });
   }
   return { rows, nextCursor, rawRows: res.length };
+};
+
+const runDebugScansWindowSample = async (
+  baseDocsUrl: string,
+  accessToken: string,
+  fromSec: number,
+  toSec: number
+): Promise<FirestoreDocRow[]> => {
+  const body = buildDebugScansWindowQueryBody(fromSec, toSec);
+  const json = await requestWithRetry("POST", `${baseDocsUrl}:runQuery`, accessToken, body);
+  const res = Array.isArray(json) ? json : [];
+  const rows: FirestoreDocRow[] = [];
+  for (const r of res) {
+    const doc = r?.document;
+    if (!doc || typeof doc.name !== "string") continue;
+    rows.push({
+      name: doc.name,
+      docId: extractDocId(doc.name),
+      data: parseFirestoreDocumentFields(doc),
+    });
+  }
+  return rows;
+};
+
+const getFirestoreDocument = async (
+  baseDocsUrl: string,
+  accessToken: string,
+  docPath: string
+): Promise<any | null> => {
+  const url = `${baseDocsUrl}/${docPath}`;
+  try {
+    return await requestWithRetry("GET", url, accessToken);
+  } catch (err: any) {
+    const status = err?.status;
+    if (status === 404) return null;
+    throw err;
+  }
+};
+
+const isEuServerCode = (code: string) => /^EU\d+$/i.test(code);
+const isFusionNumericCode = (code: string) => /^F\d+$/i.test(code);
+
+const deriveNetQueryKeyFromHost = (hostValue: unknown): string | null => {
+  const host = String(hostValue ?? "").trim().toLowerCase();
+  if (!host || !host.includes(".") || !host.endsWith(".net")) return null;
+  const hostPrefix = host.split(".")[0]?.trim();
+  if (!hostPrefix) return null;
+  return `${hostPrefix}_net`;
+};
+
+const resolveScanQueryKeyForServer = async (
+  baseDocsUrl: string,
+  accessToken: string,
+  resolved: ResolvedServerKeys
+): Promise<string> => {
+  const writeKey = String(resolved.writeServerKey ?? "").trim().toUpperCase();
+  if (!writeKey) return resolved.queryServerKey;
+  if (isEuServerCode(writeKey)) return writeKey;
+
+  const candidateDocIds = Array.from(
+    new Set([writeKey, writeKey.toLowerCase(), String(resolved.queryServerKey ?? "").trim(), String(resolved.queryServerKey ?? "").trim().toLowerCase()].filter(Boolean))
+  );
+  for (const docId of candidateDocIds) {
+    const serverDoc = await getFirestoreDocument(baseDocsUrl, accessToken, `servers/${docId}`);
+    if (!serverDoc) continue;
+    const data = parseFirestoreDocumentFields(serverDoc);
+    const host = data?.host ?? data?.hostname ?? null;
+    const netQueryKey = deriveNetQueryKeyFromHost(host);
+    if (netQueryKey) return netQueryKey;
+  }
+
+  const inputHadNetSuffix = Boolean(resolved.inputHadNetSuffix);
+  if (isFusionNumericCode(writeKey) || inputHadNetSuffix) {
+    return `${writeKey.toLowerCase()}_net`;
+  }
+
+  return resolved.queryServerKey;
 };
 
 const writeProgressSnapshotDoc = async (
@@ -543,7 +648,11 @@ const run = async () => {
   if (!Number.isFinite(topN) || topN <= 0) throw new Error(`Invalid --topN: ${topNArg}`);
 
   const dryRun = args.get("dry-run") === "true";
-  const resolvedServer = resolveServerKeys(serverArg);
+  const baseResolvedServer = resolveServerKeys(serverArg);
+  const resolvedServer = {
+    ...baseResolvedServer,
+    queryServerKey: await resolveScanQueryKeyForServer(baseDocsUrl, accessToken, baseResolvedServer),
+  };
   const serverCode = resolvedServer.writeServerKey;
   const docId = `${serverCode}__${label}`;
   const targetPath = `${STATS_PUBLIC_LATEST}/${docId}`;
@@ -551,12 +660,18 @@ const run = async () => {
   console.log(
     `[monthly-toplists] Resolved server: input=${resolvedServer.input} query=${resolvedServer.queryServerKey} write=${serverCode} label=${label}`
   );
+  if (resolvedServer.queryServerKey !== serverCode) {
+    console.log(
+      `[monthly-toplists] query/write key mismatch active (scan field uses query key, progress doc uses canonical write key)`
+    );
+  }
   console.log(`[monthly-toplists] Target path (progress): ${targetPath}`);
 
   const scanForServer = async (serverKey: string) => {
     let scansInWindow = 0;
-    let skippedNonPlayers = 0;
-    let skippedMissingIdentifier = 0;
+    let skippedNonPlayerPath = 0;
+    let skippedLegacyPlayerIdNamespace = 0;
+    let skippedBadIdentifierField = 0;
     let skippedBadTimestamp = 0;
     const byPlayer = new Map<string, { ts: number; data: any; docId: string }>();
 
@@ -569,19 +684,34 @@ const run = async () => {
         for (const doc of rows) {
           const path = String(doc.name).split("/documents/")[1] ?? "";
           if (!path) {
-            skippedNonPlayers++;
-            continue;
-          }
-          if (!path.startsWith("players/") || !path.includes("/scans/")) {
-            skippedNonPlayers++;
+            skippedNonPlayerPath++;
             continue;
           }
 
           const data = doc.data || {};
-          const identifierMatch = /^players\/([^/]+)\/scans\/[^/]+$/.exec(path);
-          const identifier = String(identifierMatch?.[1] ?? "").trim();
+          const pathMatch = /^players\/([^/]+)\/scans\/([^/]+)$/.exec(path);
+          if (!pathMatch) {
+            skippedNonPlayerPath++;
+            continue;
+          }
+          const playerDocId = String(pathMatch[1] ?? "").trim();
+          if (!playerDocId) {
+            skippedNonPlayerPath++;
+            continue;
+          }
+          if (/^\d+$/.test(playerDocId)) {
+            skippedLegacyPlayerIdNamespace++;
+            continue;
+          }
+
+          const identifierField = String(data?.identifier ?? "").trim();
+          if (identifierField && /^\d+$/.test(identifierField)) {
+            skippedBadIdentifierField++;
+          }
+
+          const identifier = playerDocId;
           if (!identifier) {
-            skippedMissingIdentifier++;
+            skippedNonPlayerPath++;
             continue;
           }
 
@@ -616,20 +746,92 @@ const run = async () => {
       throw err;
     }
 
-    return { scansInWindow, skippedNonPlayers, skippedMissingIdentifier, skippedBadTimestamp, byPlayer };
+    return {
+      scansInWindow,
+      skippedNonPlayerPath,
+      skippedLegacyPlayerIdNamespace,
+      skippedBadIdentifierField,
+      skippedBadTimestamp,
+      byPlayer,
+    };
+  };
+
+  const logZeroResultDebugSample = async (serverKey: string) => {
+    console.warn(`[monthly-toplists] No scans found for server=${serverKey}. Debug sample follows...`);
+    try {
+      const sampleRows = await runDebugScansWindowSample(baseDocsUrl, accessToken, fromSec, toSec);
+      if (sampleRows.length === 0) {
+        console.warn("[monthly-toplists] Debug sample returned 0 docs for the time window as well.");
+        return;
+      }
+
+      const shortServerCounts = new Map<string, number>();
+      let sampleSkippedNonPlayerPath = 0;
+      let sampleSkippedLegacyPlayerIdNamespace = 0;
+      let sampleBadIdentifierFieldNumeric = 0;
+      for (const row of sampleRows) {
+        const shortServer = String(row.data?.server ?? "").trim() || "(missing)";
+        shortServerCounts.set(shortServer, (shortServerCounts.get(shortServer) ?? 0) + 1);
+        const relPath = String(row.name).split("/documents/")[1] ?? "";
+        const pathMatch = /^players\/([^/]+)\/scans\/([^/]+)$/.exec(relPath);
+        if (!pathMatch) {
+          sampleSkippedNonPlayerPath++;
+        } else if (/^\d+$/.test(String(pathMatch[1] ?? "").trim())) {
+          sampleSkippedLegacyPlayerIdNamespace++;
+        }
+        const identifierField = String(row.data?.identifier ?? "").trim();
+        if (identifierField && /^\d+$/.test(identifierField)) {
+          sampleBadIdentifierFieldNumeric++;
+        }
+      }
+
+      console.warn(`[monthly-toplists] Debug sample size: ${sampleRows.length} (window-only query, limit=20)`);
+      sampleRows.slice(0, 5).forEach((row, idx) => {
+        const path = String(row.name).split("/documents/")[1] ?? row.name;
+        const shortServer = row.data?.server ?? null;
+        const longServer = row.data?.value?.server ?? row.data?.values?.server ?? null;
+        console.warn(
+          `[monthly-toplists] sample[${idx}]: path=${path} server=${JSON.stringify(shortServer)} value.server=${JSON.stringify(longServer)}`
+        );
+      });
+
+      const distinctSummary = [...shortServerCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([server, count]) => `${server}:${count}`)
+        .join(", ");
+      console.warn(
+        `[monthly-toplists] Debug top-level server values (distinct ${shortServerCounts.size} / sample ${sampleRows.length}): ${distinctSummary}`
+      );
+      console.warn(
+        `[monthly-toplists] Debug sample counters: skippedNonPlayerPath=${sampleSkippedNonPlayerPath}, skippedLegacyPlayerIdNamespace=${sampleSkippedLegacyPlayerIdNamespace}, skippedBadIdentifierField=${sampleBadIdentifierFieldNumeric}`
+      );
+    } catch (err: any) {
+      console.warn(`[monthly-toplists] Debug sample query failed: ${String(err?.message ?? err)}`);
+    }
   };
 
   let activeQueryServer = resolvedServer.queryServerKey;
   let scanResult = await scanForServer(activeQueryServer);
   if (scanResult.scansInWindow === 0 && resolvedServer.fallbackServerKey) {
+    await logZeroResultDebugSample(activeQueryServer);
     console.warn(
       `[monthly-toplists] No scans found for ${resolvedServer.queryServerKey}. Retrying with ${resolvedServer.fallbackServerKey}.`
     );
     activeQueryServer = resolvedServer.fallbackServerKey;
     scanResult = await scanForServer(activeQueryServer);
   }
+  if (scanResult.scansInWindow === 0 && !resolvedServer.fallbackServerKey) {
+    await logZeroResultDebugSample(activeQueryServer);
+  }
 
-  const { scansInWindow, skippedNonPlayers, skippedMissingIdentifier, skippedBadTimestamp, byPlayer } = scanResult;
+  const {
+    scansInWindow,
+    skippedNonPlayerPath,
+    skippedLegacyPlayerIdNamespace,
+    skippedBadIdentifierField,
+    skippedBadTimestamp,
+    byPlayer,
+  } = scanResult;
 
   const uniquePlayers = byPlayer.size;
   if (uniquePlayers === 0) {
@@ -706,11 +908,12 @@ const run = async () => {
   console.log("[monthly-toplists] Unique players:", uniquePlayers);
   console.log("[monthly-toplists] Players written:", players.length);
   console.log("[monthly-toplists] Target doc:", targetPath);
-  console.log("[monthly-toplists] Primary key:", "identifier");
+  console.log("[monthly-toplists] Primary key source:", "path(players/{playerDocId})");
   console.log("[monthly-toplists] Label:", label);
   console.log("[monthly-toplists] Dry run:", dryRun);
-  console.log("[monthly-toplists] Skipped non-players:", skippedNonPlayers);
-  console.log("[monthly-toplists] Skipped missing identifier:", skippedMissingIdentifier);
+  console.log("[monthly-toplists] Skipped non-player path:", skippedNonPlayerPath);
+  console.log("[monthly-toplists] Skipped legacy playerId namespace:", skippedLegacyPlayerIdNamespace);
+  console.log("[monthly-toplists] Skipped bad identifier field:", skippedBadIdentifierField);
   console.log("[monthly-toplists] Skipped bad timestamp:", skippedBadTimestamp);
 };
 
