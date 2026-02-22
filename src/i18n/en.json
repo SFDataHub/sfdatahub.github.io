@@ -531,6 +531,14 @@
     }
   },
   "profile": {
+    "overlay": {
+      "heroActions": {
+        "openPlayerProfile": "Open player profile",
+        "openGuild": "Open guild",
+        "share": "Share",
+        "copyLink": "Copy link"
+      }
+    },
     "public": {
       "title": "Public profile",
       "subtitle": "Read-only showcase of this SFDataHub identity",

@@ -700,13 +700,15 @@ const debugGuildCsvParse = (
 };
 
 function parseCsvCompat(text: string): { headers: string[]; rows: Row[]; meta: CsvParseMeta } {
-  let t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = t.split("\n");
-  if (!lines.length) {
+  const t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!t) {
     return { headers: [], rows: [], meta: { headerCount: 0, rowTokenCounts: [], paddedRowCount: 0, truncatedRowCount: 0 } };
   }
-  const delim = detectDelimiter(lines[0] ?? "");
-  const parseLine = (line: string) => {
+
+  const firstNl = t.indexOf("\n");
+  const headerLine = firstNl >= 0 ? t.slice(0, firstNl) : t;
+  const delim = detectDelimiter(headerLine);
+  const parseSingleLine = (line: string) => {
     const out: string[] = [];
     let cur = "";
     let q = false;
@@ -725,30 +727,110 @@ function parseCsvCompat(text: string): { headers: string[]; rows: Row[]; meta: C
     out.push(cur);
     return out;
   };
-  const headerCells = lines[0] ? parseLine(lines[0]).map(norm) : [];
-  const headers = headerCells.map((h, i) => (h ? h : `col${i}`));
+
+  const headerCells = parseSingleLine(headerLine).map(norm);
+  const seenHeaders = new Map<string, number>();
+  const headers = headerCells.map((h, i) => {
+    const base = h ? h : `col${i}`;
+    const count = (seenHeaders.get(base) ?? 0) + 1;
+    seenHeaders.set(base, count);
+    return count === 1 ? base : `${base}__dup${count}`;
+  });
   const headerCount = headers.length;
+
   const rows: Row[] = [];
   const rowTokenCounts: number[] = [];
   let paddedRowCount = 0;
   let truncatedRowCount = 0;
-  for (let li = 1; li < lines.length; li++) {
-    if (!lines[li]) continue;
-    const cells = parseLine(lines[li]);
-    if (cells.every((c) => norm(c) === "")) continue;
-    const tokenCount = cells.length;
+
+  const body = firstNl >= 0 ? t.slice(firstNl + 1) : "";
+  if (!body) {
+    return { headers, rows, meta: { headerCount, rowTokenCounts, paddedRowCount, truncatedRowCount } };
+  }
+
+  let currentCells: string[] = [];
+  let cur = "";
+  let q = false;
+
+  const pushRow = () => {
+    if (currentCells.length === 0 && norm(cur) === "") {
+      cur = "";
+      return;
+    }
+    currentCells.push(cur);
+    cur = "";
+    if (currentCells.every((c) => norm(c) === "")) {
+      currentCells = [];
+      return;
+    }
+
+    const tokenCount = currentCells.length;
     if (tokenCount < headerCount) {
-      cells.push(...Array(headerCount - tokenCount).fill(""));
+      currentCells.push(...Array(headerCount - tokenCount).fill(""));
       paddedRowCount++;
     } else if (tokenCount > headerCount) {
       truncatedRowCount++;
     }
     rowTokenCounts.push(tokenCount);
+
     const row: Row = {};
-    for (let ci = 0; ci < headerCount; ci++)
-      row[headers[ci]] = cells[ci] != null ? norm(cells[ci]) : "";
+    for (let ci = 0; ci < headerCount; ci++) row[headers[ci]] = currentCells[ci] != null ? norm(currentCells[ci]) : "";
     rows.push(row);
+    currentCells = [];
+  };
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '"') {
+      if (!q) {
+        q = true;
+        continue;
+      }
+      const next = body[i + 1];
+      if (next === '"') {
+        const afterNext = body[i + 2];
+        if (afterNext === delim || afterNext === "\n" || afterNext == null) {
+          cur += '"';
+          q = false;
+          i++;
+          continue;
+        }
+        cur += '"';
+        i++;
+        continue;
+      }
+      if (next == null) {
+        q = false;
+        continue;
+      }
+      if (next === delim) {
+        q = false;
+        continue;
+      }
+      if (next === "\n") {
+        if (currentCells.length >= Math.max(0, headerCount - 1)) {
+          q = false;
+          continue;
+        }
+        cur += '"';
+        continue;
+      }
+      cur += '"';
+      continue;
+    }
+    if (ch === delim && !q) {
+      currentCells.push(cur);
+      cur = "";
+      continue;
+    }
+    if (ch === "\n" && !q) {
+      pushRow();
+      continue;
+    }
+    cur += ch;
   }
+  pushRow();
+
   return { headers, rows, meta: { headerCount, rowTokenCounts, paddedRowCount, truncatedRowCount } };
 }
 

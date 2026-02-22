@@ -24,6 +24,18 @@ const normalizeHeaderLabel = (value: any) => {
   const raw = String(value ?? "").trim().replace(/\s+/g, " ");
   return raw.replace(/:+$/, "").toLowerCase();
 };
+const normalizeGuildIdentifierRaw = (value: any): string => {
+  const raw = String(value ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+  if (!raw) return "";
+  return raw.replace(/^\"(.*)\"$/, "$1").trim();
+};
+const canonicalGuildIdentifier = (value: any): string => {
+  const raw = normalizeGuildIdentifierRaw(value);
+  return raw ? raw.toLowerCase() : "";
+};
 
 function detectDelimiter(headerLine: string) {
   const c = [",",";","\t","|"];
@@ -35,34 +47,123 @@ function detectDelimiter(headerLine: string) {
   return best;
 }
 function parseCsv(text: string): { headers: string[]; rows: Row[]; delimiter: string } {
-  let t = text.replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
-  const lines = t.split("\n");
-  if (!lines.length) return { headers: [], rows: [], delimiter: "," };
-  const delim = detectDelimiter(lines[0] ?? "");
-
-  const parseLine = (line: string) => {
-    const out: string[] = []; let cur = ""; let q = false;
-    for (let i=0;i<line.length;i++){
-      const ch=line[i];
-      if (ch === '"'){ if (q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
-      else if (ch===delim && !q){ out.push(cur); cur=""; }
-      else cur+=ch;
+  const t = text.replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  if (!t) return { headers: [], rows: [], delimiter: "," };
+  const firstNl = t.indexOf("\n");
+  const headerLine = firstNl >= 0 ? t.slice(0, firstNl) : t;
+  const delim = detectDelimiter(headerLine);
+  const parseSingleLine = (line: string) => {
+    const out: string[] = [];
+    let cur = "";
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (q && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          q = !q;
+        }
+      } else if (ch === delim && !q) {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
     }
     out.push(cur);
     return out;
   };
 
-  const headerCells = lines[0] ? parseLine(lines[0]).map(norm) : [];
-  const headers = headerCells.map((h,i)=>h||`col${i}`);
+  const rawHeaderCells = parseSingleLine(headerLine).map(norm);
+  const seenHeaders = new Map<string, number>();
+  const headers = rawHeaderCells.map((h, i) => {
+    const base = h || `col${i}`;
+    const count = (seenHeaders.get(base) ?? 0) + 1;
+    seenHeaders.set(base, count);
+    return count === 1 ? base : `${base}__dup${count}`;
+  });
+
   const rows: Row[] = [];
-  for (let li=1; li<lines.length; li++){
-    if (!lines[li]) continue;
-    const cells = parseLine(lines[li]);
-    if (cells.every(c=>norm(c)==="")) continue;
-    const row: Row = {};
-    for (let ci=0; ci<headers.length; ci++) row[headers[ci]] = cells[ci]!=null ? norm(cells[ci]) : "";
-    rows.push(row);
+  const body = firstNl >= 0 ? t.slice(firstNl + 1) : "";
+  if (!body) return { headers, rows, delimiter: delim };
+
+  let row: string[] = [];
+  let cur = "";
+  let q = false;
+  const pushRow = () => {
+    if (row.length === 0 && norm(cur) === "") {
+      cur = "";
+      return;
+    }
+    row.push(cur);
+    cur = "";
+    if (row.every((c) => norm(c) === "")) {
+      row = [];
+      return;
+    }
+    const parsedRow: Row = {};
+    for (let ci = 0; ci < headers.length; ci++) parsedRow[headers[ci]] = row[ci] != null ? norm(row[ci]) : "";
+    rows.push(parsedRow);
+    row = [];
+  };
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '"') {
+      if (!q) {
+        q = true;
+        continue;
+      }
+      const next = body[i + 1];
+      if (next === '"') {
+        const afterNext = body[i + 2];
+        if (afterNext === delim || afterNext === "\n" || afterNext == null) {
+          // Some exports emit doubled quotes at field end for a literal quote + field close.
+          cur += '"';
+          q = false;
+          i++;
+          continue;
+        }
+        cur += '"';
+        i++;
+        continue;
+      }
+      if (next == null) {
+        q = false;
+        continue;
+      }
+      if (next === delim) {
+        q = false;
+        continue;
+      }
+      if (next === "\n") {
+        // Tolerate broken quotes inside multiline descriptions by only closing on row-end
+        // if this field is already the last expected column.
+        if (row.length >= Math.max(0, headers.length - 1)) {
+          q = false;
+          continue;
+        }
+        cur += '"';
+        continue;
+      }
+      cur += '"';
+      continue;
+    }
+    if (ch === delim && !q) {
+      row.push(cur);
+      cur = "";
+      continue;
+    }
+    if (ch === "\n" && !q) {
+      pushRow();
+      continue;
+    }
+    cur += ch;
   }
+  pushRow();
+
   return { headers, rows, delimiter: delim };
 }
 
@@ -118,10 +219,37 @@ const parseMemberCount = (value: any): number | null => {
   if (value == null) return null;
   const raw = String(value).trim();
   if (!raw) return null;
-  const cleaned = raw.replace(/[\s,\.]/g, "");
-  const num = Number(cleaned);
-  return Number.isFinite(num) ? num : null;
+  const digitsOnly = raw.replace(/[^0-9]/g, "");
+  if (!digitsOnly) return null;
+  const num = Number(digitsOnly);
+  if (!Number.isFinite(num)) return null;
+  // S&F guild capacity is 50; larger values usually mean column shift / dirty extraction.
+  if (num < 1 || num > 50) return null;
+  return num;
 };
+
+const runMemberCountParserSelfTest = () => {
+  const cases: Array<{ input: any; expected: number | null }> = [
+    { input: "50", expected: 50 },
+    { input: " 49 ", expected: 49 },
+    { input: "48 members", expected: 48 },
+    { input: "50\u00a0", expected: 50 },
+    { input: "200%", expected: null },
+    { input: "26 676", expected: null },
+    { input: "", expected: null },
+    { input: null, expected: null },
+  ];
+
+  for (const { input, expected } of cases) {
+    const got = parseMemberCount(input);
+    if (got !== expected) {
+      console.error("[UploadCenter] member count parser self-test failed", { input, expected, got });
+      return false;
+    }
+  }
+  return true;
+};
+let memberCountParserSelfTestDone = false;
 
 /** Dateiname → Typ; Fallback: Header-Scoring */
 function detectKindFromFilename(name: string): ImportCsvKind | "unknown" {
@@ -190,7 +318,8 @@ function slimPlayers(rows: Row[], headers: string[]): PlayerSlim[] {
   if (!hasCols(headers, [COL.PLAYERS.GUILD_IDENTIFIER])) return out;
   for (const r of rows) {
     const gid = pickByCanon(r, COL.PLAYERS.GUILD_IDENTIFIER);
-    if (!gid) continue;
+    const guildIdentifier = normalizeGuildIdentifierRaw(gid);
+    if (!guildIdentifier) continue;
     const identifierRaw = pickByCanon(r, COL.PLAYERS.IDENTIFIER);
     const identifier = identifierRaw != null ? String(identifierRaw).trim() : "";
     const serverFromIdentifier = parseServerKeyFromIdentifier(identifier);
@@ -198,7 +327,7 @@ function slimPlayers(rows: Row[], headers: string[]): PlayerSlim[] {
     const serverFallback = rawServer && String(rawServer).trim() !== "" ? String(rawServer).trim().toUpperCase() : undefined;
     const server = serverFromIdentifier ?? (!identifier ? serverFallback : undefined); // KEIN UNKNOWN
     out.push({
-      guildIdentifier: String(gid),
+      guildIdentifier,
       id: pickByCanon(r, COL.PLAYERS.IDENTIFIER) || undefined,
       name: pickByCanon(r, COL.PLAYERS.NAME) || undefined,
       own: ["1","true","✓","yes","y","ja"].includes(String(pickByCanon(r, COL.PLAYERS.OWN)).toLowerCase()),
@@ -218,10 +347,11 @@ function slimGuilds(rows: Row[], headers: string[]): GuildSlim[] {
       ? r[memberCountHeader]
       : pickByCanon(r, COL.GUILDS.GUILD_MEMBER_COUNT);
     const mc = parseMemberCount(memberRaw);
-    if (!gid || mc == null) continue;
+    const guildIdentifier = normalizeGuildIdentifierRaw(gid);
+    if (!guildIdentifier || mc == null) continue;
     const ts  = toSec(pickByCanon(r, COL.GUILDS.TIMESTAMP));
     out.push({
-      guildIdentifier: String(gid),
+      guildIdentifier,
       name: pickByCanon(r, COL.GUILDS.NAME) || undefined,
       memberCount: mc,
       tsSec: ts ?? undefined
@@ -241,6 +371,11 @@ export type CsvTextSource = {
 };
 
 export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvParsedResult {
+  if (!memberCountParserSelfTestDone && typeof window !== "undefined" && import.meta.env.DEV) {
+    memberCountParserSelfTestDone = true;
+    runMemberCountParserSelfTest();
+  }
+
   let parsedPlayers = [] as ReturnType<typeof parsePlayersCsvText>;
   let parsedGuilds = [] as ReturnType<typeof parseGuildsCsvText>;
 
@@ -254,13 +389,14 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
   const players: ParsedCsvPlayer[] = [];
   const membersByGuild = new Map<string, ParsedCsvPlayer[]>();
   const playerCountByGuildId = new Map<string, number>();
+  const playerGuildRawIdsByCanonical = new Map<string, Set<string>>();
 
   for (const p of parsedPlayers) {
     const player: ParsedCsvPlayer = {
       playerId: p.playerId,
       name: p.name ?? "",
       server: p.server,
-      guildId: p.guildIdentifier ?? undefined,
+      guildId: normalizeGuildIdentifierRaw(p.guildIdentifier) || undefined,
       level: p.level ?? undefined,
       className: p.className ?? undefined,
       scanTimestampSec: p.timestampSec,
@@ -268,40 +404,92 @@ export function buildParsedResultFromCsvSources(sources: CsvTextSource[]): CsvPa
     };
     players.push(player);
 
-    const guildId = String(p.guildIdentifier ?? "").trim();
+    const guildId = canonicalGuildIdentifier(p.guildIdentifier);
     if (guildId) {
       if (!membersByGuild.has(guildId)) membersByGuild.set(guildId, []);
       membersByGuild.get(guildId)!.push(player);
       playerCountByGuildId.set(guildId, (playerCountByGuildId.get(guildId) ?? 0) + 1);
+      const rawGuildId = normalizeGuildIdentifierRaw(p.guildIdentifier);
+      const rawSet = playerGuildRawIdsByCanonical.get(guildId) ?? new Set<string>();
+      if (rawGuildId) rawSet.add(rawGuildId);
+      playerGuildRawIdsByCanonical.set(guildId, rawSet);
     }
   }
 
   const guilds: ParsedCsvGuild[] = [];
   const guildMemberCountByGuildId = new Map<string, number>();
+  const guildRawIdsByCanonical = new Map<string, Set<string>>();
+  const invalidGuildMemberCountWarnings: Array<{ guildId: string; raw: any }> = [];
 
   for (const g of parsedGuilds) {
-    const guildId = String(g.guildIdentifier ?? "").trim();
+    const guildId = canonicalGuildIdentifier(g.guildIdentifier);
     if (!guildId) continue;
-    const memberCount = Number(g.memberCount ?? NaN);
-    if (!Number.isFinite(memberCount) || memberCount <= 0) continue;
+    const memberCount = parseMemberCount(g.memberCount);
+    if (memberCount == null) {
+      invalidGuildMemberCountWarnings.push({
+        guildId,
+        raw: g.memberCount ?? g.raw?.["Guild Member Count"] ?? null,
+      });
+      continue;
+    }
     guildMemberCountByGuildId.set(guildId, memberCount);
+    const rawGuildId = normalizeGuildIdentifierRaw(g.guildIdentifier);
+    const rawSet = guildRawIdsByCanonical.get(guildId) ?? new Set<string>();
+    if (rawGuildId) rawSet.add(rawGuildId);
+    guildRawIdsByCanonical.set(guildId, rawSet);
+  }
+
+  if (invalidGuildMemberCountWarnings.length > 0) {
+    console.warn("[UploadCenter] Ignored guild rows with invalid member count", {
+      affectedGuilds: invalidGuildMemberCountWarnings.length,
+      sample: invalidGuildMemberCountWarnings.slice(0, 5),
+    });
   }
 
   const uploadableGuildIds = new Set<string>();
   for (const [guildId, memberCount] of guildMemberCountByGuildId.entries()) {
     const playersCount = playerCountByGuildId.get(guildId) ?? 0;
-    if (playersCount === memberCount) uploadableGuildIds.add(guildId);
+    if (playersCount >= memberCount) uploadableGuildIds.add(guildId);
+  }
+
+  const unresolvedGuildLinks = Array.from(playerCountByGuildId.entries())
+    .filter(([guildId]) => !guildMemberCountByGuildId.has(guildId))
+    .map(([guildId, playersCount]) => ({ guildId, playerCount: playersCount }));
+  if (unresolvedGuildLinks.length > 0) {
+    console.warn("[UploadCenter] Player->Guild links missing in guild CSV (after normalization)", {
+      affectedGuilds: unresolvedGuildLinks.length,
+      sample: unresolvedGuildLinks.slice(0, 8),
+    });
+  }
+
+  const normalizedMatchSamples: Array<{ canonical: string; playerRaw: string[]; guildRaw: string[] }> = [];
+  for (const [canonical, guildRawSet] of guildRawIdsByCanonical.entries()) {
+    const playerRawSet = playerGuildRawIdsByCanonical.get(canonical);
+    if (!playerRawSet) continue;
+    const playerRaw = Array.from(playerRawSet);
+    const guildRaw = Array.from(guildRawSet);
+    const sameSingleRaw =
+      playerRaw.length === 1 && guildRaw.length === 1 && playerRaw[0] === guildRaw[0];
+    if (sameSingleRaw) continue;
+    normalizedMatchSamples.push({ canonical, playerRaw, guildRaw });
+    if (normalizedMatchSamples.length >= 8) break;
+  }
+  if (normalizedMatchSamples.length > 0) {
+    console.info("[UploadCenter] Guild identifier normalization resolved raw mismatches", {
+      sample: normalizedMatchSamples,
+    });
   }
 
   for (const g of parsedGuilds) {
-    const guildId = String(g.guildIdentifier ?? "").trim();
+    const guildId = canonicalGuildIdentifier(g.guildIdentifier);
     if (!uploadableGuildIds.has(guildId)) continue;
     const members = membersByGuild.get(guildId) ?? [];
+    const normalizedMemberCount = parseMemberCount(g.memberCount) ?? members.length;
     guilds.push({
       guildId,
       name: g.name ?? guildId,
       server: g.server,
-      memberCount: g.memberCount ?? members.length,
+      memberCount: normalizedMemberCount,
       scanTimestampSec: g.timestampSec,
       values: g.raw,
       members: members.map((m) => ({
@@ -364,14 +552,28 @@ function buildSummary(players: PlayerSlim[], guilds: GuildSlim[]): QuickSummary 
 
   // Gezählt: Spieler je Gilde
   const playersCountByGuild = new Map<string, number>();
-  for (const p of players) playersCountByGuild.set(p.guildIdentifier, (playersCountByGuild.get(p.guildIdentifier) ?? 0) + 1);
+  const playerDisplayGuildIdByCanonical = new Map<string, string>();
+  for (const p of players) {
+    const guildKey = canonicalGuildIdentifier(p.guildIdentifier);
+    if (!guildKey) continue;
+    playersCountByGuild.set(guildKey, (playersCountByGuild.get(guildKey) ?? 0) + 1);
+    if (!playerDisplayGuildIdByCanonical.has(guildKey)) {
+      playerDisplayGuildIdByCanonical.set(guildKey, normalizeGuildIdentifierRaw(p.guildIdentifier) || guildKey);
+    }
+  }
 
   // Deklariert + Name: aus Guilds-CSV
   const guildsSet = new Set<string>();
-  const info = new Map<string, { name: string; declared: number }>();
+  const info = new Map<string, { id: string; name: string; declared: number }>();
   for (const g of guilds) {
-    guildsSet.add(g.guildIdentifier);
-    info.set(g.guildIdentifier, { name: g.name || "", declared: g.memberCount });
+    const guildKey = canonicalGuildIdentifier(g.guildIdentifier);
+    if (!guildKey) continue;
+    guildsSet.add(guildKey);
+    info.set(guildKey, {
+      id: normalizeGuildIdentifierRaw(g.guildIdentifier) || guildKey,
+      name: g.name || "",
+      declared: g.memberCount,
+    });
   }
   for (const gid of playersCountByGuild.keys()) guildsSet.add(gid);
 
@@ -380,9 +582,15 @@ function buildSummary(players: PlayerSlim[], guilds: GuildSlim[]): QuickSummary 
   for (const gid of guildsSet) {
     const declared = info.get(gid)?.declared;
     const counted = playersCountByGuild.get(gid) ?? 0;
-    const full = declared != null && counted === declared;
+    const full = declared != null && counted >= declared;
     if (full) fullyScannedGuilds++;
-    guildsList.push({ id: gid, name: info.get(gid)?.name || "", declaredCount: declared ?? 0, playersCount: counted, full });
+    guildsList.push({
+      id: info.get(gid)?.id || playerDisplayGuildIdByCanonical.get(gid) || gid,
+      name: info.get(gid)?.name || "",
+      declaredCount: declared ?? 0,
+      playersCount: counted,
+      full,
+    });
   }
 
   if (![...info.values()].some(v => Number.isFinite(v.declared))) {

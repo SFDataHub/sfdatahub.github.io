@@ -1,7 +1,9 @@
 // tools/purge-old-playerid-docs.mts
 // Run: npx tsx tools/purge-old-playerid-docs.mts --project <id> [--limit <n>]
 // Run: npx tsx tools/purge-old-playerid-docs.mts --execute --project <id> [--limit <n>]
-// Auth: gcloud auth login (user token via REST; no ADC)
+// Auth (REST):
+//   Preferred: Service Account via GOOGLE_APPLICATION_CREDENTIALS + gcloud auth application-default print-access-token
+//   Fallback:  User token via gcloud auth print-access-token
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -131,22 +133,40 @@ const requestWithRetry = async (method: string, url: string, token: string, body
 };
 
 // ---------- Token ----------
+const runGcloudTokenCommand = async (args: string[]): Promise<string> => {
+  const isWin = process.platform === "win32";
+  const { stdout } = isWin
+    ? await execFileAsync("cmd.exe", ["/d", "/s", "/c", `gcloud ${args.join(" ")}`], {
+        windowsHide: true,
+        maxBuffer: 1024 * 1024,
+      })
+    : await execFileAsync("gcloud", args, { maxBuffer: 1024 * 1024 });
+  return stdout.trim();
+};
+
 const getUserToken = async (): Promise<string> => {
   try {
-    const isWin = process.platform === "win32";
-    const { stdout } = isWin
-      ? await execFileAsync("cmd.exe", ["/d", "/s", "/c", "gcloud auth print-access-token"], {
-          windowsHide: true,
-          maxBuffer: 1024 * 1024,
-        })
-      : await execFileAsync("gcloud", ["auth", "print-access-token"], { maxBuffer: 1024 * 1024 });
-    const token = stdout.trim();
-    if (!token) throw new Error('no token returned. Bitte "gcloud auth login".');
-    return token;
+    // Prefer service-account/ADC token (e.g. GOOGLE_APPLICATION_CREDENTIALS).
+    const adcToken = await runGcloudTokenCommand(["auth", "application-default", "print-access-token"]);
+    if (adcToken) {
+      console.log("[purge-old-playerid-docs] auth mode: application-default");
+      return adcToken;
+    }
+  } catch {
+    // Fallback below.
+  }
+
+  try {
+    const userToken = await runGcloudTokenCommand(["auth", "print-access-token"]);
+    if (!userToken) throw new Error("empty token");
+    console.log("[purge-old-playerid-docs] auth mode: user");
+    return userToken;
   } catch (err: any) {
     const msg = err?.message || String(err);
     const code = err?.code ? ` code=${err.code}` : "";
-    throw new Error(`Failed to obtain access token via gcloud (${msg}${code}). Bitte "gcloud auth login".`);
+    throw new Error(
+      `Failed to obtain access token via gcloud (${msg}${code}). Set GOOGLE_APPLICATION_CREDENTIALS for service account or run "gcloud auth login".`
+    );
   }
 };
 

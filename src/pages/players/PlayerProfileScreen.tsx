@@ -1,16 +1,8 @@
 // src/pages/players/PlayerProfileScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  collection,
-  doc,
-  documentId,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { useTranslation } from "react-i18next";
+import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
 import HeroPanel from "../../components/player-profile/HeroPanel";
 import {
   ChartsTab,
@@ -111,10 +103,15 @@ type ChartsCachePayload = {
   months: MonthlyChartEntry[];
 };
 
-export default function PlayerProfileScreen() {
+type PlayerProfileScreenProps = {
+  heroOnly?: boolean;
+};
+
+export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileScreenProps) {
   const params = useParams<Record<string, string>>();
   const routeIdentifier = params.identifier ?? "";
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -491,6 +488,36 @@ export default function PlayerProfileScreen() {
     () => (snapshot ? buildProfileView(snapshot, avatarSnapshot, chartsSeries) : null),
     [snapshot, avatarSnapshot, chartsSeries],
   );
+  const heroViewData = useMemo(() => {
+    if (!viewModel) return null;
+    if (!heroOnly) return viewModel.hero;
+    const overlayActionLabelByKey: Record<string, string> = {
+      rescan: t("profile.overlay.heroActions.openPlayerProfile", {
+        defaultValue: "Open player profile",
+      }),
+      guild: t("profile.overlay.heroActions.openGuild", {
+        defaultValue: "Open guild",
+      }),
+      share: t("profile.overlay.heroActions.share", {
+        defaultValue: "Share",
+      }),
+      "copy-link": t("profile.overlay.heroActions.copyLink", {
+        defaultValue: "Copy link",
+      }),
+    };
+    return {
+      ...viewModel.hero,
+      actions: viewModel.hero.actions.map((action) => {
+        const localized = overlayActionLabelByKey[String(action.key)];
+        if (!localized) return action;
+        return {
+          ...action,
+          label: localized,
+          title: localized,
+        };
+      }),
+    };
+  }, [heroOnly, t, viewModel]);
 
   const showFeedback = useCallback((message: string) => {
     setActionFeedback(message);
@@ -538,6 +565,14 @@ export default function PlayerProfileScreen() {
         return;
       }
       if (action === "rescan") {
+        if (heroOnly) {
+          const linkId =
+            snapshot.identifier ??
+            buildPlayerIdentifier(snapshot.server ?? null, snapshot.id) ??
+            snapshot.id;
+          navigate(`/player/${encodeURIComponent(linkId)}`);
+          return;
+        }
         showFeedback("Rescan-Queue folgt aktuell noch Platzhalter.");
         return;
       }
@@ -583,30 +618,34 @@ export default function PlayerProfileScreen() {
 
       {!loading && (!snapshot || !viewModel) && renderNotFound()}
 
-      {viewModel && (
+      {viewModel && heroViewData && (
         <>
-          <HeroPanel data={viewModel.hero} loading={loading} onAction={handleAction} />
-          <ActionFeedback message={actionFeedback} />
+          <HeroPanel data={heroViewData} loading={loading} onAction={handleAction} />
+          {!heroOnly && (
+            <>
+              <ActionFeedback message={actionFeedback} />
 
-          <div className="player-profile__tabs" role="tablist" aria-label="Spielerprofil Tabs">
-            {TABS.map((entry) => {
-              const active = tab === entry;
-              return (
-                <button
-                  key={entry}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={`player-profile__tab-button ${active ? "player-profile__tab-button--active" : ""}`}
-                  onClick={() => handleTabChange(entry)}
-                >
-                  {entry}
-                </button>
-              );
-            })}
-          </div>
+              <div className="player-profile__tabs" role="tablist" aria-label="Spielerprofil Tabs">
+                {TABS.map((entry) => {
+                  const active = tab === entry;
+                  return (
+                    <button
+                      key={entry}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`player-profile__tab-button ${active ? "player-profile__tab-button--active" : ""}`}
+                      onClick={() => handleTabChange(entry)}
+                    >
+                      {entry}
+                    </button>
+                  );
+                })}
+              </div>
 
-          {renderTabs()}
+              {renderTabs()}
+            </>
+          )}
         </>
       )}
     </div>

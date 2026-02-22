@@ -139,6 +139,7 @@ service cloud.firestore {
     // (z. B. players/*/latest/*, guilds/*/latest/*) - keine Writes.
     match /{path=**}/latest/{docId} {
       allow read: if true;
+
     }
 
     // ---------- Stats-Cache & Indizes (vom CSV-Importer beschrieben) ----------
@@ -149,6 +150,12 @@ service cloud.firestore {
     }
 
     match /stats_cache_guild_derived/{docId} {
+      allow read: if true;
+      allow create, update: if isImporter();
+      allow delete: if false;
+    }
+
+    match /stats_index_players_daily_compact/{docId} {
       allow read: if true;
       allow create, update: if isImporter();
       allow delete: if false;

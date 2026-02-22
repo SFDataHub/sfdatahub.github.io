@@ -12,7 +12,7 @@ import {
 
 const STATS_PUBLIC_ROOT = "stats_public";
 const PLAYERS_COLLECTION = "toplists_players_v1";
-const SNAPSHOT_CACHE_VERSION = "v1";
+const SNAPSHOT_CACHE_VERSION = "v2";
 const SNAPSHOT_CACHE_PREFIX = `snapshot:${SNAPSHOT_CACHE_VERSION}`;
 
 const bundleWarnedOnce = new Set<string>();
@@ -191,6 +191,7 @@ export async function loadToplistsMeta(): Promise<ToplistsMeta | null> {
 
 // Row-Daten einer Spieler-Topliste - Keys 1:1 wie columnKeysPlayers
 export type FirestoreToplistPlayerRow = {
+  identifier?: string | null;
   playerId?: string | null;
   flag: string | null;
   deltaRank: number | null;
@@ -302,7 +303,10 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
   if (!server || !name || !cls) return null;
 
   return {
-    playerId: toIdStringOrNull(raw.playerId ?? raw.id ?? raw.player_id),
+    // Some bundle variants store the canonical player identifier separately (e.g. "Identifier").
+    // Preserve it so consumers do not have to reconstruct from lossy fallback fields.
+    identifier: toStringOrNull(raw.identifier ?? raw.Identifier ?? raw.playerIdentifier ?? raw.player_identifier),
+    playerId: toIdStringOrNull(raw.playerId ?? raw.player_id ?? raw.ID ?? raw.id),
     flag: toStringOrNull(raw.flag),
     deltaRank: toNumber(raw.deltaRank),
     server,

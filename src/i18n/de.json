@@ -531,6 +531,14 @@
     }
   },
   "profile": {
+    "overlay": {
+      "heroActions": {
+        "openPlayerProfile": "Spielerprofil öffnen",
+        "openGuild": "Gilde öffnen",
+        "share": "Teilen",
+        "copyLink": "Link kopieren"
+      }
+    },
     "public": {
       "title": "Ã–ffentliches Profil",
       "subtitle": "Read-only-Ansicht dieser SFDataHub-IdentitÃ¤t",
