@@ -535,7 +535,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
             snapshot.identifier ??
             buildPlayerIdentifier(snapshot.server ?? null, snapshot.id) ??
             snapshot.id;
-          const link = `${window.location.origin}/players/profile/${encodeURIComponent(linkId)}`;
+          const link = `${window.location.origin}/#/player/${encodeURIComponent(linkId)}`;
           try {
             await navigator.clipboard.writeText(link);
             showFeedback("Profil-Link wurde kopiert.");
