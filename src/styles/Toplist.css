@@ -1,0 +1,99 @@
+.profile-overlay {
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Match app content padding (16px) + ContentShell outerPadding px-4 / py-3 */
+  padding:
+    12px
+    32px
+    calc(var(--content-bottom-pad, 20px) + 24px + env(safe-area-inset-bottom) + 12px)
+    32px;
+  background: rgba(7, 14, 24, 0.62);
+  backdrop-filter: blur(2px);
+  transition: left 0.2s ease;
+}
+
+/* Match RootLayout sidebar states exactly (desktop) */
+#app-shell[data-sidebar="collapsed"] .profile-overlay {
+  left: var(--sidebar-w);
+}
+
+#app-shell[data-sidebar="expanded"] .profile-overlay {
+  left: var(--sidebar-expanded-w);
+}
+
+/* Mobile drawer overlays content; main content starts at viewport left */
+@media (max-width: 900px) {
+  #app-shell[data-sidebar="collapsed"] .profile-overlay,
+  #app-shell[data-sidebar="expanded"] .profile-overlay {
+    left: 0;
+  }
+}
+
+.profile-overlay__panel {
+  position: relative;
+  width: min(1200px, 100%);
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.profile-overlay__close {
+  border: 1px solid rgba(92, 139, 198, 0.35);
+  background: #1b3554;
+  color: #eef5ff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.profile-overlay__close:hover {
+  background: #23446c;
+}
+
+.profile-overlay__close--overlay {
+  position: absolute;
+  top: 12px;
+  right: 32px;
+  z-index: 4;
+}
+
+.profile-overlay__content {
+  overflow: auto;
+  padding: 0;
+}
+
+.profile-overlay__content .player-profile {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .profile-overlay {
+    left: 0;
+    padding:
+      12px
+      28px
+      calc(var(--content-bottom-pad, 16px) + 20px + env(safe-area-inset-bottom) + 12px)
+      28px;
+  }
+
+  .profile-overlay__panel {
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .profile-overlay__close--overlay {
+    right: 28px;
+  }
+}

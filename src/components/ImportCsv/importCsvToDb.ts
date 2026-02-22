@@ -40,12 +40,23 @@ const collectServerHosts = (rows: Row[], target: Set<string>) => {
     if (host) target.add(host);
   }
 };
-const normalizeGuildId = (value: any) => String(value ?? "").trim();
+const normalizeGuildId = (value: any) =>
+  String(value ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/^\"(.*)\"$/, "$1")
+    .trim()
+    .toLowerCase();
 const parseMemberCount = (value: any): number | null => {
   if (value == null) return null;
   const raw = String(value).trim();
   if (!raw) return null;
-  const n = Number(raw);
+  const digitsOnly = raw.replace(/[^0-9]/g, "");
+  if (!digitsOnly) return null;
+  const n = Number(digitsOnly);
+  if (!Number.isFinite(n)) return null;
+  if (n < 1 || n > 50) return null;
   return Number.isFinite(n) ? n : null;
 };
 const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
@@ -69,7 +80,30 @@ const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
   const uploadableGuildIds = new Set<string>();
   for (const [gid, memberCount] of guildMemberCountByGuildId.entries()) {
     const playersCount = playerCountByGuildId.get(gid) ?? 0;
-    if (playersCount === memberCount) uploadableGuildIds.add(gid);
+    if (playersCount >= memberCount) uploadableGuildIds.add(gid);
+  }
+
+  const missingGuildRows = Array.from(playerCountByGuildId.entries())
+    .filter(([gid]) => !guildMemberCountByGuildId.has(gid))
+    .map(([gid, playersCount]) => ({ guildId: gid, playersCount }));
+  if (missingGuildRows.length) {
+    console.warn("[ImportSelectionToDb] Player guild identifiers without matching guild row", {
+      affectedGuilds: missingGuildRows.length,
+      sample: missingGuildRows.slice(0, 8),
+    });
+  }
+  const incompleteGuilds = Array.from(guildMemberCountByGuildId.entries())
+    .map(([gid, memberCount]) => ({
+      guildId: gid,
+      memberCount,
+      playersCount: playerCountByGuildId.get(gid) ?? 0,
+    }))
+    .filter((row) => row.playersCount < row.memberCount);
+  if (incompleteGuilds.length) {
+    console.info("[ImportSelectionToDb] Guild rows excluded because scan is incomplete", {
+      affectedGuilds: incompleteGuilds.length,
+      sample: incompleteGuilds.slice(0, 8),
+    });
   }
 
   return { uploadableGuildIds, playerCountByGuildId, guildMemberCountByGuildId };

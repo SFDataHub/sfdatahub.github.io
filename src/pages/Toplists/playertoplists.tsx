@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import html2canvas from "html2canvas";
 
 import ContentShell from "../../components/ContentShell";
+import ProfileOverlay from "../../components/ProfileOverlay/ProfileOverlay";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
 import HudFilters from "../../components/Filters/HudFilters";
 import ServerSheet from "../../components/Filters/ServerSheet";
@@ -25,6 +26,8 @@ import {
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
+import { buildPlayerIdentifier, parsePlayerIdentifier } from "../../lib/players/identifier";
+import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
   (value ?? "")
@@ -582,7 +585,6 @@ function PlayerToplistsPageContent() {
   const [exportRenderKey, setExportRenderKey] = React.useState(0);
   const [exportNonce, setExportNonce] = React.useState(0);
   const [isExportingPng, setIsExportingPng] = React.useState(false);
-
   const buildExportBaseRows = React.useCallback(
     (selection: ToplistExportSelection, selectedGuilds: string[]) => {
       if (selection !== "guilds") return exportDialogRows;
@@ -1523,6 +1525,11 @@ function TableDataView({
       : playerError
         ? "Error"
         : "Ready";
+  const [selectedPlayerProfile, setSelectedPlayerProfile] = React.useState<{
+    identifier: string;
+    name: string | null;
+    server: string | null;
+  } | null>(null);
 
   const renderToplistTable = (opts: {
     imgLoading: "lazy" | "eager";
@@ -1531,6 +1538,7 @@ function TableDataView({
     const resolveIdentifier = (row: FirestoreToplistPlayerRow) => {
       const candidates = [
         (row as any).identifier,
+        (row as any).id,
         (row as any).original?.identifier,
         (row as any).value?.identifier,
         (row as any).data?.identifier,
@@ -1539,10 +1547,28 @@ function TableDataView({
       ];
       for (const candidate of candidates) {
         if (typeof candidate === "string" && candidate.trim()) {
-          return candidate.trim();
+          const parsed = parsePlayerIdentifier(candidate);
+          if (parsed) {
+            // Keep the snapshot identifier exactly as stored (e.g. "s12_eu_p...").
+            // Rebuilding it can change the server segment format and break the doc path.
+            return candidate.trim();
+          }
         }
       }
-      return null;
+      const fallbackPlayerId =
+        (row as any).playerId ??
+        (row as any).id ??
+        (row as any).player?.id ??
+        (row as any).value?.playerId ??
+        (row as any).data?.playerId ??
+        null;
+      const fallbackServer =
+        row.server ??
+        (row as any).value?.server ??
+        (row as any).data?.server ??
+        (row as any).player?.server ??
+        null;
+      return buildPlayerIdentifier(fallbackServer, fallbackPlayerId);
     };
     return (
     <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1609,9 +1635,15 @@ function TableDataView({
               </div>
             );
           };
-          const rowOnClick = () => {
+          const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
             if (!profileIdentifier) return;
-            navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
+            setSelectedPlayerProfile({
+              identifier: profileIdentifier,
+              name: typeof r.name === "string" ? r.name : null,
+              server: typeof r.server === "string" ? r.server : null,
+            });
           };
 
           return (
@@ -1786,6 +1818,16 @@ function TableDataView({
           </div>
         </>
       )}
+      <ProfileOverlay
+        isOpen={Boolean(selectedPlayerProfile?.identifier)}
+        playerIdentifier={selectedPlayerProfile?.identifier ?? null}
+        playerName={
+          selectedPlayerProfile
+            ? [selectedPlayerProfile.name, selectedPlayerProfile.server].filter(Boolean).join(" - ")
+            : null
+        }
+        onClose={() => setSelectedPlayerProfile(null)}
+      />
     </div>
   );
 }
