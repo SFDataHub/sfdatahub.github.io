@@ -534,7 +534,11 @@ function PlayerToplistsPageContent() {
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
   const [compareMonth, setCompareMonth] = React.useState<string>(searchParams.get("compare") ?? "");
   const monthOptions = React.useMemo(
-    () => generateRecentMonths(17).filter((m) => m >= MIN_COMPARE_MONTH),
+    () => {
+      // Keep completed months, but also allow selecting the current month for freshly generated backfill snapshots.
+      const currentMonth = formatMonth(new Date());
+      return Array.from(new Set([currentMonth, ...generateRecentMonths(17)])).filter((m) => m >= MIN_COMPARE_MONTH);
+    },
     [],
   );
   const hasServersSelected = (servers?.length ?? 0) > 0;

@@ -431,16 +431,32 @@ async function getPlayerToplistSnapshotByDocId(docId: string): Promise<Firestore
   const scope = beginReadScope(sessionName);
 
   try {
-    const ref = doc(
+    const progressRef = doc(
       db,
       STATS_PUBLIC_ROOT,
       PLAYERS_COLLECTION,
       "lists",
       "latest_toplists",
-      "servers",
+      "progress",
       code
     );
-    const snap = await traceGetDoc(scope, ref, () => getDoc(ref), { label: `ToplistsPlayersCompare:${code}` });
+    let snap = await traceGetDoc(scope, progressRef, () => getDoc(progressRef), {
+      label: `ToplistsPlayersCompare:${code}:progress`,
+    });
+    if (!snap.exists()) {
+      const legacyRef = doc(
+        db,
+        STATS_PUBLIC_ROOT,
+        PLAYERS_COLLECTION,
+        "lists",
+        "latest_toplists",
+        "servers",
+        code
+      );
+      snap = await traceGetDoc(scope, legacyRef, () => getDoc(legacyRef), {
+        label: `ToplistsPlayersCompare:${code}:servers-legacy`,
+      });
+    }
     if (!snap.exists()) {
       return { ok: false, error: "not_found" };
     }
