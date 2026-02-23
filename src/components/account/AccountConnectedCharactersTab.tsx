@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import type { AuthUser, LinkedPlayer } from "../../lib/auth/types";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
+import { saveAvatarSnapshotForIdentifier } from "../../lib/firebase/avatarSnapshots";
+import { parseSfJson, type SfJsonOwnPlayer } from "../../lib/parsing";
 import accountStyles from "../../pages/Settings/AccountSettingsPage.module.css";
 import styles from "./AccountConnectedCharactersTab.module.css";
 
@@ -11,6 +13,8 @@ type AccountConnectedCharactersTabProps = {
   refreshSession: (options?: { silent?: boolean }) => Promise<boolean>;
   openHelp?: boolean;
 };
+
+const AVATAR_IMPORT_NO_OWN_PLAYER_ERROR = "SF_JSON_NO_OWN_PLAYER";
 
 const formatTimestamp = (value?: string): string => {
   if (!value) return "-";
@@ -27,6 +31,23 @@ const getCharacterName = (player: LinkedPlayer): string => {
   return "-";
 };
 
+const buildAvatarImportNoOwnPlayerMessage = (t: (key: string, defaultValue: string) => string): string =>
+  [
+    t("account.connectedCharacters.avatarImport.errors.publicExport.title", "Avatar import failed."),
+    t(
+      "account.connectedCharacters.avatarImport.errors.publicExport.exportHint",
+      'Make sure you exported your JSON from SFTools WITHOUT enabling "Export only public data ...".',
+    ),
+    t(
+      "account.connectedCharacters.avatarImport.errors.publicExport.ownHint",
+      'Your export must include your own character (an entry with "own": 1); otherwise avatar data is missing.',
+    ),
+    t(
+      "account.connectedCharacters.avatarImport.errors.publicExport.quickCheck",
+      'Quick check: search the file for "own": 1',
+    ),
+  ].join("\n");
+
 const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps> = ({
   user,
   refreshSession,
@@ -39,6 +60,12 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
   const [confirmingPlayer, setConfirmingPlayer] = useState<LinkedPlayer | null>(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(() => openHelp || linkedPlayers.length === 0);
+  const [avatarImportJson, setAvatarImportJson] = useState("");
+  const [avatarImportCandidates, setAvatarImportCandidates] = useState<SfJsonOwnPlayer[]>([]);
+  const [selectedImportIdentifier, setSelectedImportIdentifier] = useState("");
+  const [isAvatarImporting, setIsAvatarImporting] = useState(false);
+  const [avatarImportError, setAvatarImportError] = useState<string | null>(null);
+  const [avatarImportStatus, setAvatarImportStatus] = useState<string | null>(null);
   const unlinkEndpoint = useMemo(
     () => (AUTH_BASE_URL ? `${AUTH_BASE_URL}/user/unlink-character` : ""),
     [],
@@ -70,6 +97,112 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
   const handleRequestUnlink = (player: LinkedPlayer) => {
     setConfirmingPlayer(player);
     setUnlinkError(null);
+  };
+
+  const handleAvatarJsonFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      setAvatarImportJson(text);
+      setAvatarImportCandidates([]);
+      setSelectedImportIdentifier("");
+      setAvatarImportError(null);
+      setAvatarImportStatus(
+        t("account.connectedCharacters.avatarImport.fileLoaded", "JSON loaded. Click import to save the avatar."),
+      );
+    } catch (error) {
+      console.error("[Account] Failed to read avatar JSON file", error);
+      setAvatarImportStatus(null);
+      setAvatarImportError(
+        t("account.connectedCharacters.avatarImport.errors.fileRead", "Could not read the selected JSON file."),
+      );
+    }
+  };
+
+  const resolveAvatarImportSelection = (players: SfJsonOwnPlayer[]): SfJsonOwnPlayer | null => {
+    if (!players.length) return null;
+    if (!selectedImportIdentifier) return players[0];
+    return players.find((player) => player.identifier === selectedImportIdentifier) ?? players[0];
+  };
+
+  const handleImportAvatarFromJson = async () => {
+    setAvatarImportError(null);
+    setAvatarImportStatus(null);
+
+    if (!avatarImportJson.trim()) {
+      setAvatarImportError(
+        t("account.connectedCharacters.avatarImport.errors.empty", "Paste an SF JSON or choose a JSON file first."),
+      );
+      return;
+    }
+
+    try {
+      const parsed = parseSfJson(avatarImportJson);
+      const ownPlayers = parsed.ownPlayers;
+      setAvatarImportCandidates(ownPlayers);
+
+      if (!ownPlayers.length) {
+        throw new Error(AVATAR_IMPORT_NO_OWN_PLAYER_ERROR);
+      }
+
+      const currentSelectionValid = ownPlayers.some((player) => player.identifier === selectedImportIdentifier);
+      if (ownPlayers.length > 1 && !currentSelectionValid) {
+        const firstIdentifier = ownPlayers[0]?.identifier ?? "";
+        setSelectedImportIdentifier(firstIdentifier);
+        setAvatarImportStatus(
+          t(
+            "account.connectedCharacters.avatarImport.multipleFound",
+            "Multiple own characters found. Select one below, then click import again.",
+          ),
+        );
+        return;
+      }
+
+      const selectedPlayer = resolveAvatarImportSelection(ownPlayers);
+      if (!selectedPlayer) {
+        throw new Error(
+          t("account.connectedCharacters.avatarImport.errors.noSelection", "No character selected for avatar import."),
+        );
+      }
+      if (!selectedPlayer.portrait) {
+        throw new Error(
+          t(
+            "account.connectedCharacters.avatarImport.errors.noPortrait",
+            "No portrait save data was found for the selected character.",
+          ),
+        );
+      }
+
+      setIsAvatarImporting(true);
+      await saveAvatarSnapshotForIdentifier({
+        userId: user.id,
+        identifier: selectedPlayer.identifier,
+        playerId: selectedPlayer.playerId,
+        server: selectedPlayer.server,
+        source: "connectChar",
+        portrait: selectedPlayer.portrait,
+      });
+
+      setAvatarImportStatus(
+        t(
+          "account.connectedCharacters.avatarImport.success",
+          `Avatar saved for ${selectedPlayer.name || selectedPlayer.identifier} (${selectedPlayer.server}).`,
+        ),
+      );
+    } catch (error: any) {
+      if (error?.message === AVATAR_IMPORT_NO_OWN_PLAYER_ERROR) {
+        setAvatarImportError(buildAvatarImportNoOwnPlayerMessage(t));
+        return;
+      }
+      const message =
+        error?.message || t("account.connectedCharacters.avatarImport.errors.generic", "Avatar import failed.");
+      setAvatarImportError(message);
+    } finally {
+      setIsAvatarImporting(false);
+    }
   };
 
   const closeDialog = () => {
@@ -138,20 +271,16 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
   const helpSteps = useMemo(
     () => [
       t(
-        "account.connectedCharacters.help.steps.link",
-        'Link a character via the Discord bot using the "!connect char" command.',
+        "account.connectedCharacters.help.wip.steps.progress",
+        "Work in progress: character linking is still under development.",
       ),
       t(
-        "account.connectedCharacters.help.steps.verify",
-        "We match the character to your latest verified scan; keep your game data up to date.",
+        "account.connectedCharacters.help.wip.steps.avatarImport",
+        "For now, you can import your profile avatar from an SFTools JSON export below.",
       ),
       t(
-        "account.connectedCharacters.help.steps.refresh",
-        "After linking, click Refresh here to sync the latest characters from the auth service.",
-      ),
-      t(
-        "account.connectedCharacters.help.steps.unlink",
-        "You can unlink any character in the Actions column; the source column shows how it was linked.",
+        "account.connectedCharacters.help.wip.steps.publicExportWarning",
+        'Important: do NOT enable "Export only public data ..." in SFTools, otherwise your own character will not be marked as "own": 1 and avatar data will be missing.',
       ),
     ],
     [t],
@@ -168,7 +297,12 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
           aria-controls={helpContentId}
           onClick={() => setIsHelpOpen((prev) => !prev)}
         >
-          <span>{t("account.connectedCharacters.help.title", "How does linking work?")}</span>
+          <span>
+            {t(
+              "account.connectedCharacters.help.wip.title",
+              "Connected characters (Work in progress)",
+            )}
+          </span>
           <span className={styles.helpToggleAction}>
             {isHelpOpen
               ? t("account.connectedCharacters.help.hide", "Hide")
@@ -184,12 +318,99 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
             </ul>
             <p className={styles.helpFootnote}>
               {t(
-                "account.connectedCharacters.help.footnote",
-                "Tip: Click Refresh after linking or unlinking to update this table.",
+                "account.connectedCharacters.help.wip.quickCheck",
+                'Quick check: search the JSON for "own": 1.',
               )}
             </p>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderAvatarImport = () => {
+    const showSelection = avatarImportCandidates.length > 1;
+
+    return (
+      <div className={styles.avatarImportBox}>
+        <div className={styles.avatarImportHeader}>
+          <div>
+            <h3 className={styles.avatarImportTitle}>
+              {t("account.connectedCharacters.avatarImport.title", "Import avatar from SF JSON")}
+            </h3>
+            <p className={styles.avatarImportSubtitle}>
+              {t(
+                "account.connectedCharacters.avatarImport.subtitle",
+                "Paste or upload a JSON export and we store the portrait for your profile avatar.",
+              )}
+            </p>
+          </div>
+          <label className={styles.avatarImportFileButton}>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className={styles.avatarImportFileInput}
+              onChange={handleAvatarJsonFileChange}
+              disabled={isAvatarImporting}
+            />
+            {t("account.connectedCharacters.avatarImport.actions.chooseFile", "Choose JSON")}
+          </label>
+        </div>
+
+        <textarea
+          className={styles.avatarImportTextarea}
+          value={avatarImportJson}
+          onChange={(event) => {
+            setAvatarImportJson(event.target.value);
+            setAvatarImportCandidates([]);
+            setSelectedImportIdentifier("");
+            setAvatarImportError(null);
+            setAvatarImportStatus(null);
+          }}
+          placeholder={t(
+            "account.connectedCharacters.avatarImport.placeholder",
+            'Paste the full JSON here (must include "players" and an entry with "own": 1).',
+          )}
+          rows={8}
+          disabled={isAvatarImporting}
+        />
+
+        {showSelection && (
+          <div className={styles.avatarImportSelectionRow}>
+            <label htmlFor="avatar-import-character" className={styles.avatarImportLabel}>
+              {t("account.connectedCharacters.avatarImport.selectionLabel", "Character")}
+            </label>
+            <select
+              id="avatar-import-character"
+              className={styles.avatarImportSelect}
+              value={selectedImportIdentifier}
+              onChange={(event) => setSelectedImportIdentifier(event.target.value)}
+              disabled={isAvatarImporting}
+            >
+              {avatarImportCandidates.map((player) => (
+                <option key={player.identifier} value={player.identifier}>
+                  {`${player.name || player.identifier} (${player.server})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {!!avatarImportStatus && <p className={styles.avatarImportSuccess}>{avatarImportStatus}</p>}
+        {!!avatarImportError && <p className={styles.avatarImportError}>{avatarImportError}</p>}
+
+        <div className={styles.avatarImportActions}>
+          <button
+            type="button"
+            className={accountStyles.secondaryButton}
+            onClick={handleImportAvatarFromJson}
+            disabled={isAvatarImporting}
+          >
+            {isAvatarImporting
+              ? t("account.connectedCharacters.avatarImport.actions.importing", "Importing...")
+              : t("account.connectedCharacters.avatarImport.actions.import", "Import avatar")}
+          </button>
+        </div>
       </div>
     );
   };
@@ -333,17 +554,12 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
       )}
 
       {renderHelpAccordion()}
+      {renderAvatarImport()}
 
       {!isRefreshing && linkedPlayers.length === 0 && (
         <div className={styles.emptyState}>
           <p className={styles.emptyTitle}>
             {t("account.connectedCharacters.empty.title", "No characters linked yet")}
-          </p>
-          <p className={styles.emptyDescription}>
-            {t(
-              "account.connectedCharacters.empty.description",
-              'Use the "!connect char" command in Discord to link your characters, then click "Refresh" here.',
-            )}
           </p>
           <button
             type="button"

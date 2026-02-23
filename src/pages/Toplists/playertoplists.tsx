@@ -18,6 +18,7 @@ import ToplistPngExportDialog, {
 } from "../../components/export/ToplistPngExportDialog";
 
 import { ToplistsProvider, useToplistsData, type Filters, type SortSpec } from "../../context/ToplistsDataContext";
+import { useAuth } from "../../context/AuthContext";
 import GuildToplists from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
@@ -149,6 +150,37 @@ const normalizeClassList = (list: string[]) => {
 
 const normalizeGuildKey = (value: string | null | undefined) =>
   (value ?? "").toString().trim().toLowerCase();
+
+const normalizeFavoriteIdentifier = (value: unknown): string | null => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return raw || null;
+};
+
+const buildCanonicalFavoriteServerKey = (value: unknown): string | null => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (/^[a-z0-9]+_(?:eu|net)$/.test(raw)) return raw;
+
+  const euMatch = raw.match(/^s?(\d+)$/);
+  if (euMatch) return `s${euMatch[1]}_eu`;
+  const euCodeMatch = raw.match(/^eu(\d+)$/);
+  if (euCodeMatch) return `s${euCodeMatch[1]}_eu`;
+  const fusionMatch = raw.match(/^f(\d+)$/);
+  if (fusionMatch) return `f${fusionMatch[1]}_net`;
+  const amMatch = raw.match(/^am(\d+)$/);
+  if (amMatch) return `am${amMatch[1]}_net`;
+  return null;
+};
+
+const buildPlayerFavoriteIdentifierFromRow = (row: FirestoreToplistPlayerRow): string | null => {
+  const direct = normalizeFavoriteIdentifier(row.identifier);
+  if (direct) return direct;
+  const playerId = String((row as any).playerId ?? (row as any).id ?? "").trim();
+  if (!playerId) return null;
+  const serverKey = buildCanonicalFavoriteServerKey(row.server);
+  if (!serverKey) return null;
+  return `${serverKey}_p${playerId}`;
+};
 
 const listEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -531,6 +563,15 @@ function PlayerToplistsPageContent() {
   const classParam = searchParams.get("class");
   const classesParam = searchParams.get("classes");
   const tabParam = searchParams.get("tab");
+  const focusParamRaw = searchParams.get("focus");
+  const focusIdentifierParam = focusParamRaw?.trim() ? focusParamRaw.trim() : null;
+  const rankParamRaw = searchParams.get("rank");
+  const focusRankParam = React.useMemo(() => {
+    if (!rankParamRaw) return null;
+    const parsed = Number(rankParamRaw);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.max(1, Math.trunc(parsed));
+  }, [rankParamRaw]);
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
   const [compareMonth, setCompareMonth] = React.useState<string>(searchParams.get("compare") ?? "");
   const monthOptions = React.useMemo(
@@ -877,6 +918,8 @@ function PlayerToplistsPageContent() {
             range={(range ?? "all") as any}
             sortKey={sortBy ?? "level"}
             compareMonth={compareMonth}
+            focusIdentifier={focusIdentifierParam}
+            focusRank={focusRankParam}
             tableRef={tableRef}
             exportSnapshotRef={tableExportSnapshotRef}
           />
@@ -958,18 +1001,21 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMonth, tableRef, exportSnapshotRef,
+  servers, classes, range, sortKey, compareMonth, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
 }: {
   servers: string[];
   classes: string[];
   range: DaysFilter;
   sortKey: string;
   compareMonth: string;
+  focusIdentifier: string | null;
+  focusRank: number | null;
   tableRef: React.RefObject<HTMLDivElement>;
   exportSnapshotRef: React.MutableRefObject<ToplistExportSnapshot>;
 }) {
   const { t } = useTranslation();
-  const { guilds } = useFilters();
+  const { guilds, favoritesOnly } = useFilters();
+  const { user } = useAuth();
   const {
     player,
     playerRows,
@@ -1060,6 +1106,10 @@ function TableDataView({
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
   const rows = playerRows || [];
+  const favoritePlayerSet = React.useMemo(() => {
+    const keys = Object.keys(user?.favorites?.players ?? {});
+    return new Set(keys.map((key) => key.trim().toLowerCase()).filter(Boolean));
+  }, [user?.favorites?.players]);
   const selectedGuildSet = React.useMemo(() => {
     const keys = (guilds || []).map(normalizeGuildKey).filter(Boolean);
     return keys.length ? new Set(keys) : null;
@@ -1070,12 +1120,24 @@ function TableDataView({
   }, [player?.rows]);
 
   const filteredRows = React.useMemo(() => {
-    if (!selectedGuildSet || !hasGuildData) return rows;
-    return rows.filter((row) => {
-      const key = normalizeGuildKey(row.guild);
-      return key ? selectedGuildSet.has(key) : false;
-    });
-  }, [rows, selectedGuildSet, hasGuildData]);
+    let nextRows = rows;
+
+    if (selectedGuildSet && hasGuildData) {
+      nextRows = nextRows.filter((row) => {
+        const key = normalizeGuildKey(row.guild);
+        return key ? selectedGuildSet.has(key) : false;
+      });
+    }
+
+    if (favoritesOnly && user) {
+      nextRows = nextRows.filter((row) => {
+        const identifier = buildPlayerFavoriteIdentifierFromRow(row);
+        return !!(identifier && favoritePlayerSet.has(identifier));
+      });
+    }
+
+    return nextRows;
+  }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, user, favoritePlayerSet]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [compareState, setCompareState] = React.useState<{
@@ -1534,6 +1596,63 @@ function TableDataView({
     name: string | null;
     server: string | null;
   } | null>(null);
+  const [highlightedIdentifier, setHighlightedIdentifier] = React.useState<string | null>(null);
+  const focusHandledRef = React.useRef<string | null>(null);
+  const focusHighlightTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    focusHandledRef.current = null;
+    setHighlightedIdentifier(null);
+    if (focusHighlightTimeoutRef.current != null) {
+      window.clearTimeout(focusHighlightTimeoutRef.current);
+      focusHighlightTimeoutRef.current = null;
+    }
+  }, [focusIdentifier]);
+
+  React.useEffect(() => {
+    return () => {
+      if (focusHighlightTimeoutRef.current != null) {
+        window.clearTimeout(focusHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    // The current Toplists players table has no rank-page windowing. `rank` is read for future support,
+    // but focus scrolling is identifier-based and works without extra paging logic.
+    void focusRank;
+
+    if (!focusIdentifier || !hasServers || playerLoading) return;
+    if (focusHandledRef.current === focusIdentifier) return;
+
+    const root = tableRef.current;
+    if (!root) return;
+
+    const selectorValue =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(focusIdentifier)
+        : focusIdentifier.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const targetRow = root.querySelector<HTMLElement>(`[data-sfh-identifier="${selectorValue}"]`);
+
+    if (!targetRow) {
+      if (!playerLoading) {
+        focusHandledRef.current = focusIdentifier;
+      }
+      return;
+    }
+
+    focusHandledRef.current = focusIdentifier;
+    targetRow.scrollIntoView({ block: "center", behavior: "smooth" });
+    setHighlightedIdentifier(focusIdentifier);
+
+    if (focusHighlightTimeoutRef.current != null) {
+      window.clearTimeout(focusHighlightTimeoutRef.current);
+    }
+    focusHighlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedIdentifier((prev) => (prev === focusIdentifier ? null : prev));
+      focusHighlightTimeoutRef.current = null;
+    }, 2600);
+  }, [enhancedRows, focusIdentifier, focusRank, hasServers, playerLoading, tableRef]);
 
   const renderToplistTable = (opts: {
     imgLoading: "lazy" | "eager";
@@ -1621,6 +1740,7 @@ function TableDataView({
           const playerId = (r as any).playerId ?? (r as any).id ?? null;
           const profileIdentifier = resolveIdentifier(r);
           const rowKey = playerId ?? buildRowKey(r);
+          const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
           const decor = decorMap.get(rowKey);
           const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
           const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
@@ -1653,7 +1773,8 @@ function TableDataView({
           return (
             <tr
               key={`${r.name}__${r.server}__${r.class ?? ""}`}
-              className="toplists-row"
+              className={`toplists-row${isFocusedRow ? " toplists-row--focused" : ""}`}
+              data-sfh-identifier={profileIdentifier ?? undefined}
               style={{
                 borderBottom: "1px solid #2C4A73",
                 cursor: "pointer",

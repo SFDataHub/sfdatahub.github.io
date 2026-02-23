@@ -530,6 +530,13 @@
       }
     }
   },
+  "player": {
+    "profile": {
+      "cta": {
+        "showInToplist": "Show in Top List"
+      }
+    }
+  },
   "profile": {
     "overlay": {
       "heroActions": {

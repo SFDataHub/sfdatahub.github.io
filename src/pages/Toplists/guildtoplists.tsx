@@ -10,6 +10,8 @@ import {
 } from "../../lib/api/toplistsFirestore";
 import { SERVERS } from "../../data/servers";
 import i18n from "../../i18n";
+import { useFilters } from "../../components/Filters/FilterContext";
+import { useAuth } from "../../context/AuthContext";
 
 type GuildToplistsProps = {
   serverCodes?: string[];
@@ -24,7 +26,38 @@ const normalizeServerList = (list: string[]) => {
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 };
 
+const normalizeFavoriteIdentifier = (value: unknown): string | null => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return raw || null;
+};
+
+const buildCanonicalFavoriteServerKey = (value: unknown): string | null => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (/^[a-z0-9]+_(?:eu|net)$/.test(raw)) return raw;
+
+  const euMatch = raw.match(/^s?(\d+)$/);
+  if (euMatch) return `s${euMatch[1]}_eu`;
+  const euCodeMatch = raw.match(/^eu(\d+)$/);
+  if (euCodeMatch) return `s${euCodeMatch[1]}_eu`;
+  const fusionMatch = raw.match(/^f(\d+)$/);
+  if (fusionMatch) return `f${fusionMatch[1]}_net`;
+  const amMatch = raw.match(/^am(\d+)$/);
+  if (amMatch) return `am${amMatch[1]}_net`;
+  return null;
+};
+
+const buildGuildFavoriteIdentifierFromRow = (row: FirestoreToplistGuildRow): string | null => {
+  const guildId = String(row.guildId ?? "").trim();
+  if (!guildId) return null;
+  const serverKey = buildCanonicalFavoriteServerKey(row.server);
+  if (!serverKey) return null;
+  return `${serverKey}_g${guildId}`.toLowerCase();
+};
+
 export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
+  const { favoritesOnly } = useFilters();
+  const { user } = useAuth();
   const [rows, setRows] = useState<FirestoreToplistGuildRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,10 +167,21 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
     const ms = ts < 1e12 ? ts * 1000 : ts;
     return new Date(ms).toLocaleString();
   };
+  const favoriteGuildSet = useMemo(() => {
+    const keys = Object.keys(user?.favorites?.guilds ?? {});
+    return new Set(keys.map((key) => normalizeFavoriteIdentifier(key)).filter((v): v is string => !!v));
+  }, [user?.favorites?.guilds]);
 
   const displayRows = useMemo(() => {
     let list = Array.isArray(rows) ? [...rows] : [];
     if (!list.length) return list;
+
+    if (favoritesOnly && user) {
+      list = list.filter((row) => {
+        const identifier = buildGuildFavoriteIdentifierFromRow(row);
+        return !!(identifier && favoriteGuildSet.has(identifier));
+      });
+    }
 
     const compareNumber = (aVal: number | null, bVal: number | null) => {
       if (aVal == null && bVal == null) return 0;
@@ -153,7 +197,7 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
     }
 
     return list;
-  }, [rows, rowLimit]);
+  }, [rows, rowLimit, favoritesOnly, user, favoriteGuildSet]);
 
   return (
     <div style={{ display: "grid", gap: 12 }}>

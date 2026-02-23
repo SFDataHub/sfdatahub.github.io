@@ -9,8 +9,8 @@ import React, {
 } from "react";
 
 import { AUTH_BASE_URL } from "../lib/auth/config";
-import type { AuthProvider as ProviderName, AuthStatus, AuthUser } from "../lib/auth/types";
-import { fetchFirebaseToken } from "../lib/auth/client";
+import type { AuthFavoriteKind, AuthProvider as ProviderName, AuthStatus, AuthUser } from "../lib/auth/types";
+import { fetchFirebaseToken, patchFavorite } from "../lib/auth/client";
 import { auth } from "../lib/firebase";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 
@@ -18,6 +18,10 @@ type AuthContextValue = {
   user: AuthUser | null;
   status: AuthStatus;
   isLoading: boolean;
+  isFavoritePlayer: (identifier: string | null | undefined) => boolean;
+  isFavoriteGuild: (identifier: string | null | undefined) => boolean;
+  toggleFavoritePlayer: (identifier: string) => Promise<{ isFavorite: boolean }>;
+  toggleFavoriteGuild: (identifier: string) => Promise<{ isFavorite: boolean }>;
   loginWithDiscord: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
@@ -104,6 +108,50 @@ const getAllowedPopupOrigins = () => {
     }
   }
   return origins;
+};
+
+const normalizeFavoriteIdentifier = (value: string | null | undefined): string | null => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized || null;
+};
+
+const isFavoriteInUser = (
+  user: AuthUser | null,
+  bucket: "players" | "guilds",
+  identifier: string | null | undefined,
+): boolean => {
+  const normalized = normalizeFavoriteIdentifier(identifier);
+  if (!user || !normalized) return false;
+  return user.favorites?.[bucket]?.[normalized] === true;
+};
+
+const applyFavoriteToUser = (
+  user: AuthUser | null,
+  bucket: "players" | "guilds",
+  identifier: string,
+  isFavorite: boolean,
+): AuthUser | null => {
+  if (!user) return user;
+
+  const favorites = { ...(user.favorites ?? {}) };
+  const nextBucket = { ...(favorites[bucket] ?? {}) } as Record<string, true>;
+
+  if (isFavorite) {
+    nextBucket[identifier] = true;
+  } else {
+    delete nextBucket[identifier];
+  }
+
+  if (Object.keys(nextBucket).length > 0) {
+    favorites[bucket] = nextBucket;
+  } else {
+    delete favorites[bucket];
+  }
+
+  return {
+    ...user,
+    favorites,
+  };
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -440,6 +488,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [fetchSession, googleProvider, startRedirectLogin]);
 
+  const toggleFavoriteByKind = useCallback(
+    async (kind: AuthFavoriteKind, rawIdentifier: string): Promise<{ isFavorite: boolean }> => {
+      const identifier = normalizeFavoriteIdentifier(rawIdentifier);
+      if (!identifier) {
+        const error = Object.assign(new Error("Missing favorite identifier"), { code: "INVALID_IDENTIFIER" });
+        throw error;
+      }
+
+      if (!user) {
+        const error = Object.assign(new Error("Not authenticated"), { code: "AUTH_REQUIRED" });
+        throw error;
+      }
+
+      const bucket = kind === "player" ? "players" : "guilds";
+      const currentlyFavorite = isFavoriteInUser(user, bucket, identifier);
+      const nextIsFavorite = !currentlyFavorite;
+
+      setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, nextIsFavorite));
+
+      try {
+        const response = await patchFavorite({
+          kind,
+          op: nextIsFavorite ? "add" : "remove",
+          identifier,
+        });
+        setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, response.isFavorite));
+        return { isFavorite: response.isFavorite };
+      } catch (error) {
+        setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, currentlyFavorite));
+        throw error;
+      }
+    },
+    [user],
+  );
+
+  const isFavoritePlayer = useCallback(
+    (identifier: string | null | undefined) => isFavoriteInUser(user, "players", identifier),
+    [user],
+  );
+
+  const isFavoriteGuild = useCallback(
+    (identifier: string | null | undefined) => isFavoriteInUser(user, "guilds", identifier),
+    [user],
+  );
+
+  const toggleFavoritePlayer = useCallback(
+    (identifier: string) => toggleFavoriteByKind("player", identifier),
+    [toggleFavoriteByKind],
+  );
+
+  const toggleFavoriteGuild = useCallback(
+    (identifier: string) => toggleFavoriteByKind("guild", identifier),
+    [toggleFavoriteByKind],
+  );
+
   const logout = useCallback(async () => {
     await signOut(auth).catch(() => undefined);
 
@@ -476,12 +579,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       status,
       isLoading: loading,
+      isFavoritePlayer,
+      isFavoriteGuild,
+      toggleFavoritePlayer,
+      toggleFavoriteGuild,
       loginWithDiscord,
       loginWithGoogle,
       logout,
       refreshSession,
     }),
-    [user, status, loading, loginWithDiscord, loginWithGoogle, logout, refreshSession],
+    [
+      user,
+      status,
+      loading,
+      isFavoritePlayer,
+      isFavoriteGuild,
+      toggleFavoritePlayer,
+      toggleFavoriteGuild,
+      loginWithDiscord,
+      loginWithGoogle,
+      logout,
+      refreshSession,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

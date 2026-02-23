@@ -321,12 +321,19 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(45, 123, 230, 0.32), rgba(63, 241, 195, 0.18));
-  border: 1px solid var(--pp-border);
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--pp-title);
   font-weight: 800;
   font-size: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
+}
+
+.player-profile__attribute-bar-icon-image {
+  width: 28px;
+  height: 28px;
+  display: block;
+  object-fit: contain;
 }
 
 .player-profile__attribute-bar-name {

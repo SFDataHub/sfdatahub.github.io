@@ -3,7 +3,7 @@
 // Raw->Derived pipeline reference: src/lib/import/csv.ts (deriveForPlayer + buildPlayerDerivedSnapshotEntry).
 // Run example:
 //   npx tsx tools/backfill-monthly-toplists.mts --server S12 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2026-01 --topN 500 --dry-run
-//
+//npx tsx tools/backfill-monthly-toplists.mts --server F28 --from 2026-02-01T00:00:00Z --to 2026-02-07T23:59:59Z --label 2026-02 --topN 500  
 // Auth (REST, ADC-free):
 //   Default:       gcloud auth print-access-token (user token)
 //   Optional:      gcloud auth print-access-token --impersonate-service-account=<SA>
@@ -575,7 +575,6 @@ const resolveScanQueryKeyForServer = async (
   const writeKey = String(resolved.writeServerKey ?? "").trim().toUpperCase();
   if (!writeKey) return resolved.queryServerKey;
   if (isEuServerCode(writeKey)) return writeKey;
-  if (isFusionNumericCode(writeKey)) return writeKey;
 
   const candidateDocIds = Array.from(
     new Set([writeKey, writeKey.toLowerCase(), String(resolved.queryServerKey ?? "").trim(), String(resolved.queryServerKey ?? "").trim().toLowerCase()].filter(Boolean))
@@ -590,7 +589,7 @@ const resolveScanQueryKeyForServer = async (
   }
 
   const inputHadNetSuffix = Boolean(resolved.inputHadNetSuffix);
-  if (inputHadNetSuffix) {
+  if (isFusionNumericCode(writeKey) || inputHadNetSuffix) {
     return `${writeKey.toLowerCase()}_net`;
   }
 
