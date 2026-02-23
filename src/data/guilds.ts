@@ -359,7 +359,7 @@ export const DRIVE_BY_GUILD_IDENTIFIER: Record<string, GuildDriveEntry> = {
  f24_net_g9333: { fileId: "136Ki37XLzIxGv6CN2qWzoNdpIaewjue4", name: "Rising Star" },
  
   // ===== F25 =====
-
+ f25_net_g4791: { fileId: "1ZIv3a8CAH9IuyHmsABDI4ShwJH_70q3h", name: "PureHell" },
   // ===== F26 =====
 
   // ===== F27 =====

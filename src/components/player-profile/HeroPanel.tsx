@@ -36,6 +36,14 @@ type HeroPanelProps = {
   data: HeroPanelData;
   loading?: boolean;
   onAction?: (action: HeroAction["key"]) => void;
+  favoriteControl?: {
+    visible: boolean;
+    isFavorite: boolean;
+    disabled?: boolean;
+    ariaLabel: string;
+    title?: string;
+    onToggle: () => void;
+  };
 };
 
 function AvatarCircle({ label, size = 40 }: { label: string; size?: number }) {
@@ -81,7 +89,7 @@ function ClassAvatar({
   );
 }
 
-function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
+function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps) {
   const [mode, setMode] = useState<"base" | "total">("base");
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const freshness = useMemo(() => computeFreshness(data.lastScanDays), [data.lastScanDays]);
@@ -122,8 +130,55 @@ function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
       <div className="player-profile__hero-portrait">
         <div className="player-profile__identity player-profile__identity--overlay">
           <ClassAvatar className={data.className} label={data.playerName} size={48} />
-          <div>
-            <div className="player-profile__player-name">{data.playerName}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="player-profile__player-name-row"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                width: "100%",
+              }}
+            >
+              <div className="player-profile__player-name">{data.playerName}</div>
+              {favoriteControl?.visible && (
+                <button
+                  type="button"
+                  className="player-profile__favorite-star-button"
+                  onClick={favoriteControl.onToggle}
+                  disabled={loading || favoriteControl.disabled}
+                  aria-label={favoriteControl.ariaLabel}
+                  title={favoriteControl.title ?? favoriteControl.ariaLabel}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    boxShadow: "none",
+                    padding: 4,
+                    margin: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: loading || favoriteControl.disabled ? "default" : "pointer",
+                    color: favoriteControl.isFavorite ? "#facc15" : "rgba(226, 232, 240, 0.92)",
+                    opacity: loading || favoriteControl.disabled ? 0.55 : 1,
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      fontSize: 28,
+                      lineHeight: 1,
+                      filter: favoriteControl.isFavorite ? "drop-shadow(0 0 6px rgba(250, 204, 21, 0.35))" : "none",
+                    }}
+                  >
+                    {favoriteControl.isFavorite ? "\u2605" : "\u2606"}
+                  </span>
+                </button>
+              )}
+            </div>
             <div className="player-profile__player-meta">
               <span>{data.className || "Klasse ?"}</span>
               {data.guild && <span>• {data.guild}</span>}
@@ -213,3 +268,4 @@ function HeroPanel({ data, loading, onAction }: HeroPanelProps) {
 }
 
 export default React.memo(HeroPanel);
+

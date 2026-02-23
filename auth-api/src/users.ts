@@ -1,6 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 
 import { db } from "./firebase";
+import type { UserFavoritesDoc } from "./lib/favorites";
 
 export type AuthProvider = "discord" | "google";
 
@@ -56,6 +57,7 @@ export interface UserDoc {
   profile?: UserProfile;
   uploadCenter?: UploadCenterState;
   linkedPlayers?: LinkedPlayer[];
+  favorites?: UserFavoritesDoc;
 }
 
 const usersCollection = db.collection("users");

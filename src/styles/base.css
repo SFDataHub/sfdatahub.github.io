@@ -196,6 +196,25 @@ body::-webkit-scrollbar{
 .toplists-table .toplists-row:hover {
   background-color: rgba(44, 74, 115, 0.35);
 }
+.toplists-table .toplists-row--focused {
+  animation: sfh-toplist-row-focus 2.6s ease;
+  background-color: rgba(92, 139, 198, 0.24);
+}
+
+@keyframes sfh-toplist-row-focus {
+  0% {
+    background-color: rgba(63, 241, 195, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(63, 241, 195, 0.45);
+  }
+  35% {
+    background-color: rgba(92, 139, 198, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(92, 139, 198, 0.4);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
 .class-icon-toplist {
   width: 28px;
   height: 28px;

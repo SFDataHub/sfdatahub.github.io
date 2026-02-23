@@ -196,6 +196,119 @@
   color: var(--text-soft);
 }
 
+.avatarImportBox {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.avatarImportHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.avatarImportTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.avatarImportSubtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.avatarImportFileButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--tile-hover);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.avatarImportFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.avatarImportTextarea {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.avatarImportSelectionRow {
+  display: grid;
+  gap: 6px;
+}
+
+.avatarImportLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.avatarImportSelect {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+.avatarImportTextarea:disabled,
+.avatarImportSelect:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.avatarImportSuccess {
+  margin: 0;
+  font-size: 12px;
+  color: #7fffb6;
+}
+
+.avatarImportError {
+  margin: 0;
+  font-size: 12px;
+  color: #ff8686;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.avatarImportActions {
+  display: flex;
+}
+
 .confirmBackdrop {
   position: fixed;
   inset: 0;
@@ -277,4 +390,24 @@
 .confirmButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .avatarImportHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .avatarImportFileButton {
+    width: 100%;
+  }
+
+  .avatarImportActions {
+    width: 100%;
+  }
+
+  .avatarImportActions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
 }

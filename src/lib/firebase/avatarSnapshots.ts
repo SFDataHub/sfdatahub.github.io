@@ -1,4 +1,4 @@
-import { doc, getDoc, type Timestamp } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import type { PortraitOptions } from "../../components/player-profile/types";
 import { DEFAULT_PORTRAIT } from "../../components/player-profile/types";
@@ -35,6 +35,8 @@ export type AvatarSnapshot = {
   hasPortraitData: boolean;
 };
 
+export type AvatarSnapshotSource = "scanUpload" | "connectChar";
+
 const toNumber = (value: unknown, fallback = 0) => {
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : fallback;
@@ -43,86 +45,77 @@ const toNumber = (value: unknown, fallback = 0) => {
 const hasPortraitValues = (raw: any) =>
   raw && typeof raw === "object" && Object.values(raw).some((v) => v !== undefined && v !== null);
 
-const normalizeServerCandidates = (value: unknown): string[] => {
-  if (typeof value !== "string") return [];
-  const raw = value.trim();
-  if (!raw) return [];
-  const normalized = raw
-    .toLowerCase()
-    .replace(/sfgame/g, "")
-    .replace(/\./g, "_")
-    .replace(/__+/g, "_")
-    .replace(/^_|_$/g, "");
-  return normalized ? [normalized] : [];
-};
-
 const avatarCache = new Map<string, AvatarSnapshot | null>();
 const AVATAR_CACHE_PREFIX = "avatar-cache:";
 const AVATAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-export const fetchAvatarSnapshotByPlayer = async (
-  playerId: number,
-  server: string,
-  identifier?: string,
+const normalizeAvatarSnapshotIdentifier = (value: unknown): string => {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  return trimmed.split("/").filter(Boolean).pop() || "";
+};
+
+const parsePlayerIdFromIdentifier = (identifier: string): number => {
+  const match = identifier.match(/_p(\d+)$/i);
+  if (!match) return 0;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseServerFromIdentifier = (identifier: string): string => {
+  const match = identifier.match(/^(.+)_p\d+$/i);
+  return match?.[1] ?? "";
+};
+
+const readAvatarCacheFromStorage = (identifier: string): AvatarSnapshot | null => {
+  try {
+    const raw =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(`${AVATAR_CACHE_PREFIX}${identifier}`)
+        : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.data || typeof parsed.savedAt !== "number") return null;
+    const isFresh = Date.now() - parsed.savedAt < AVATAR_CACHE_TTL_MS;
+    if (!isFresh) return null;
+    return parsed.data as AvatarSnapshot;
+  } catch {
+    return null;
+  }
+};
+
+const writeAvatarCacheToStorage = (identifier: string, snapshot: AvatarSnapshot) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      `${AVATAR_CACHE_PREFIX}${identifier}`,
+      JSON.stringify({ data: snapshot, savedAt: Date.now() }),
+    );
+  } catch {
+    // ignore cache write failures
+  }
+};
+
+export const fetchAvatarSnapshotByIdentifier = async (
+  identifier: string | undefined,
   traceScope?: FirestoreTraceScope | null,
 ): Promise<AvatarSnapshot | null> => {
-  const pidNum = Number(playerId);
-  const pidStr = String(playerId ?? "").trim();
-  const primaryServer = normalizeServerCandidates(server)[0] ?? "";
-  const explicitIdentifier = typeof identifier === "string" && identifier.trim() ? identifier.trim() : "";
-
-  const normalizeIdentifier = (value: string) => {
-    if (!value) return "";
-    const trimmed = value.trim().toLowerCase();
-    if (!trimmed) return "";
-    const fromPath = trimmed.split("/").filter(Boolean).pop() || trimmed;
-    const [pidPart, ...rawServerParts] = fromPath.split("__");
-    const rawServerPart = rawServerParts.join("__");
-    if (pidPart && rawServerPart) {
-      const normalizedServer = normalizeServerCandidates(rawServerPart)[0];
-      if (normalizedServer) return `${pidPart}__${normalizedServer}`;
-    }
-    if (pidStr && primaryServer) return `${pidStr}__${primaryServer}`;
-    return fromPath
-      .replace(/sfgame/g, "")
-      .replace(/\./g, "_")
-      .replace(/__+/g, "_")
-      .replace(/^_|_$/g, "");
-  };
-
-  const identifierNormalized =
-    normalizeIdentifier(explicitIdentifier) || (pidStr && primaryServer ? `${pidStr}__${primaryServer}` : "");
-
+  const identifierNormalized = normalizeAvatarSnapshotIdentifier(identifier);
   if (!identifierNormalized) return null;
 
-  const loadCached = () => {
-    if (avatarCache.has(identifierNormalized)) {
-      return avatarCache.get(identifierNormalized) ?? null;
-    }
-    try {
-      const raw = typeof window !== "undefined" ? window.localStorage.getItem(`${AVATAR_CACHE_PREFIX}${identifierNormalized}`) : null;
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.data || typeof parsed.savedAt !== "number") return null;
-      const isFresh = Date.now() - parsed.savedAt < AVATAR_CACHE_TTL_MS;
-      if (!isFresh) return null;
-      return parsed.data as AvatarSnapshot;
-    } catch {
-      return null;
-    }
-  };
+  if (avatarCache.has(identifierNormalized)) {
+    return avatarCache.get(identifierNormalized) ?? null;
+  }
 
-  const cached = loadCached();
+  const cached = readAvatarCacheFromStorage(identifierNormalized);
   if (cached) {
     avatarCache.set(identifierNormalized, cached);
     return cached;
   }
 
-  const directDoc = await traceGetDoc(
-    traceScope ?? null,
-    doc(db, "linked_players", "avatars", "avatars", identifierNormalized),
-    () => getDoc(doc(db, "linked_players", "avatars", "avatars", identifierNormalized)),
-  );
+  const directDocRef = doc(db, "linked_players", "avatars", "avatars", identifierNormalized);
+  const directDoc = await traceGetDoc(traceScope ?? null, directDocRef, () => getDoc(directDocRef));
   if (!directDoc.exists()) {
     avatarCache.set(identifierNormalized, null);
     return null;
@@ -157,25 +150,56 @@ export const fetchAvatarSnapshotByPlayer = async (
   };
 
   const snapshot: AvatarSnapshot = {
-    playerId: toNumber(data?.playerId, pidNum),
-    server: typeof data?.server === "string" ? data.server : server,
+    playerId: toNumber(data?.playerId, parsePlayerIdFromIdentifier(identifierNormalized)),
+    server:
+      typeof data?.server === "string" && data.server.trim()
+        ? data.server
+        : parseServerFromIdentifier(identifierNormalized),
     portrait,
     updatedAt: (data?.updatedAt as Timestamp | undefined) ?? null,
     hasPortraitData,
   };
 
   avatarCache.set(identifierNormalized, snapshot);
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(
-        `${AVATAR_CACHE_PREFIX}${identifierNormalized}`,
-        JSON.stringify({ data: snapshot, savedAt: Date.now() }),
-      );
-    } catch {
-      // ignore cache write failures
-    }
-  }
+  writeAvatarCacheToStorage(identifierNormalized, snapshot);
   return snapshot;
+};
+
+export const saveAvatarSnapshotForIdentifier = async (params: {
+  userId: string;
+  identifier: string;
+  playerId: number;
+  server: string;
+  source?: AvatarSnapshotSource;
+  portrait: AvatarSnapshotPortrait;
+}): Promise<void> => {
+  const identifierNormalized = normalizeAvatarSnapshotIdentifier(params.identifier);
+  if (!identifierNormalized) {
+    throw new Error("Missing avatar identifier");
+  }
+
+  const payload = {
+    userId: String(params.userId ?? "").trim(),
+    playerId: toNumber(params.playerId),
+    server: String(params.server ?? "").trim(),
+    source: params.source ?? "connectChar",
+    portrait: params.portrait,
+    updatedAt: serverTimestamp(),
+  };
+
+  await setDoc(doc(db, "linked_players", "avatars", "avatars", identifierNormalized), payload, {
+    merge: true,
+  });
+
+  const snapshot: AvatarSnapshot = {
+    playerId: payload.playerId,
+    server: payload.server,
+    portrait: { ...params.portrait },
+    updatedAt: null,
+    hasPortraitData: true,
+  };
+  avatarCache.set(identifierNormalized, snapshot);
+  writeAvatarCacheToStorage(identifierNormalized, snapshot);
 };
 
 const mapFrameIdToName = (frameId: number): PortraitOptions["frame"] => {

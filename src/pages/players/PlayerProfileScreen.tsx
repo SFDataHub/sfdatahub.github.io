@@ -21,7 +21,7 @@ import type {
 import { createPortraitOptionsFromSaveArray, parseSaveStringToArray } from "../../lib/portraitFromSave";
 import {
   createPortraitOptionsFromAvatarSnapshot,
-  fetchAvatarSnapshotByPlayer,
+  fetchAvatarSnapshotByIdentifier,
   type AvatarSnapshot,
 } from "../../lib/firebase/avatarSnapshots";
 import { toDriveThumbProxy } from "../../lib/urls";
@@ -36,6 +36,7 @@ import {
   type FirestoreTraceScope,
 } from "../../lib/debug/firestoreReadTrace";
 import { buildPlayerIdentifier } from "../../lib/players/identifier";
+import { useAuth } from "../../context/AuthContext";
 import "./player-profile.css";
 
 const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
@@ -112,6 +113,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   const routeIdentifier = params.identifier ?? "";
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { isFavoritePlayer, toggleFavoritePlayer } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -122,6 +124,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   const [, setAvatarLoading] = useState(false);
   const [, setAvatarError] = useState<Error | null>(null);
   const [chartsSeries, setChartsSeries] = useState<TrendSeries[] | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const chartsLoadingRef = useRef(false);
   const chartsSourceRef = useRef<"monthly" | "cache" | "fallback" | null>(null);
   const chartsLoadedKeyRef = useRef<string | null>(null);
@@ -209,20 +212,11 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
         const guildJoined = typeof rawGuildJoined === "string" ? rawGuildJoined.trim() || null : null;
         const name = data.name ?? values?.Name ?? playerIdValue;
         const server = data.server ?? values?.Server ?? null;
-        const serverNormalized =
-          typeof server === "string"
-            ? server
-                .trim()
-                .toLowerCase()
-                .replace(/\./g, "_")
-            : "";
         const profileIdentifier = id || null;
         const avatarIdentifier =
-          data.avatarIdentifier ??
           data.identifier ??
-          values?.avatarIdentifier ??
           values?.identifier ??
-          (serverNormalized ? `${playerIdValue}__${serverNormalized}` : null);
+          profileIdentifier;
         const totalStats = toNum(data.totalStats ?? values?.["Total Stats"]) ?? null;
         const base = toNum(data.base ?? values?.Base ?? values?.base) ?? null;
         const con = toNum(data.con ?? values?.Con ?? values?.con) ?? null;
@@ -347,23 +341,10 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
         endReadScope(avatarScope);
         return;
       }
-      const playerIdNum = toNum(snapshot.id);
-      if (playerIdNum == null) {
-        setAvatarSnapshot(null);
-        setAvatarLoading(false);
-        setAvatarError(null);
-        endReadScope(avatarScope);
-        return;
-      }
       setAvatarLoading(true);
       setAvatarError(null);
       try {
-        const snap = await fetchAvatarSnapshotByPlayer(
-          playerIdNum,
-          snapshot.server ?? "",
-          snapshot.avatarIdentifier ?? undefined,
-          avatarScope,
-        );
+        const snap = await fetchAvatarSnapshotByIdentifier(snapshot.avatarIdentifier ?? undefined, avatarScope);
         if (!cancelled) setAvatarSnapshot(snap);
       } catch (error: any) {
         if (!cancelled) {
@@ -381,7 +362,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
     return () => {
       cancelled = true;
     };
-  }, [snapshot?.id, snapshot?.server]);
+  }, [snapshot?.avatarIdentifier, snapshot?.id]);
 
   useEffect(() => {
     if (tab !== "Charts") return;
@@ -488,9 +469,36 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
     () => (snapshot ? buildProfileView(snapshot, avatarSnapshot, chartsSeries) : null),
     [snapshot, avatarSnapshot, chartsSeries],
   );
+  const favoriteIdentifier =
+    snapshot
+      ? (snapshot.identifier ?? buildPlayerIdentifier(snapshot.server ?? null, snapshot.id))?.trim().toLowerCase() ??
+        null
+      : null;
+  const playerIsFavorite = isFavoritePlayer(favoriteIdentifier);
+  const favoriteToggleLabel = playerIsFavorite
+    ? t("profile.favorite.remove", { defaultValue: "Remove from favorites" })
+    : t("profile.favorite.add", { defaultValue: "Add to favorites" });
   const heroViewData = useMemo(() => {
     if (!viewModel) return null;
-    if (!heroOnly) return viewModel.hero;
+    const profileActionLabelByKey: Record<string, string> = {
+      rescan: t("player.profile.cta.showInToplist", {
+        defaultValue: "Show in Top List",
+      }),
+    };
+    if (!heroOnly) {
+      return {
+        ...viewModel.hero,
+        actions: viewModel.hero.actions.map((action) => {
+          const localized = profileActionLabelByKey[String(action.key)];
+          if (!localized) return action;
+          return {
+            ...action,
+            label: localized,
+            title: localized,
+          };
+        }),
+      };
+    }
     const overlayActionLabelByKey: Record<string, string> = {
       rescan: t("profile.overlay.heroActions.openPlayerProfile", {
         defaultValue: "Open player profile",
@@ -564,6 +572,37 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
         }
         return;
       }
+      if (action === "favorite") {
+        const identifier =
+          (snapshot.identifier ?? buildPlayerIdentifier(snapshot.server ?? null, snapshot.id))?.trim().toLowerCase() ??
+          null;
+        if (!identifier) {
+          showFeedback(t("profile.favorite.errorMissingIdentifier", { defaultValue: "Favorite identifier missing." }));
+          return;
+        }
+        if (favoriteBusy) return;
+
+        setFavoriteBusy(true);
+        try {
+          const result = await toggleFavoritePlayer(identifier);
+          showFeedback(
+            result.isFavorite
+              ? t("profile.favorite.added", { defaultValue: "Added to favorites." })
+              : t("profile.favorite.removed", { defaultValue: "Removed from favorites." }),
+          );
+        } catch (error: any) {
+          if (error?.code === "FAVORITES_LIMIT") {
+            showFeedback(t("profile.favorite.limit", { defaultValue: "Favorite limit reached." }));
+          } else if (error?.code === "AUTH_REQUIRED") {
+            showFeedback(t("profile.favorite.authRequired", { defaultValue: "Sign in to use favorites." }));
+          } else {
+            showFeedback(t("profile.favorite.error", { defaultValue: "Could not update favorite." }));
+          }
+        } finally {
+          setFavoriteBusy(false);
+        }
+        return;
+      }
       if (action === "rescan") {
         if (heroOnly) {
           const linkId =
@@ -573,11 +612,44 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           navigate(`/player/${encodeURIComponent(linkId)}`);
           return;
         }
-        showFeedback("Rescan-Queue folgt aktuell noch Platzhalter.");
+        const serverKey = typeof snapshot.server === "string" ? snapshot.server.trim() : "";
+        const focusIdentifier =
+          snapshot.identifier ??
+          buildPlayerIdentifier(snapshot.server ?? null, snapshot.id) ??
+          snapshot.id;
+        if (!serverKey || !focusIdentifier) {
+          showFeedback("Toplisten-Link konnte nicht erstellt werden.");
+          return;
+        }
+
+        const params = new URLSearchParams();
+        params.set("server", serverKey);
+        params.set("focus", focusIdentifier);
+
+        const hofRankKeys = [
+          "hofrank",
+          "halloffamerank",
+          "hofposition",
+          "halloffameposition",
+          "hofplatz",
+          "halloffame",
+          "hof",
+        ];
+        const lookup = buildValueLookup(snapshot.values || {});
+        const hofRankDirect = toNum(snapshot.values?.["Rank"]);
+        const hofRank = hofRankDirect ?? lookup.number(hofRankKeys);
+        if (typeof hofRank === "number" && Number.isFinite(hofRank)) {
+          params.set("rank", String(Math.max(1, Math.trunc(hofRank))));
+        }
+
+        navigate({
+          pathname: "/toplists",
+          search: `?${params.toString()}`,
+        });
         return;
       }
     },
-    [navigate, showFeedback, snapshot],
+    [favoriteBusy, heroOnly, navigate, showFeedback, snapshot, t, toggleFavoritePlayer],
   );
 
   const renderTabs = () => {
@@ -620,11 +692,28 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
 
       {viewModel && heroViewData && (
         <>
-          <HeroPanel data={heroViewData} loading={loading} onAction={handleAction} />
+          <HeroPanel
+            data={heroViewData}
+            loading={loading}
+            onAction={handleAction}
+            favoriteControl={
+              favoriteIdentifier
+                ? {
+                    visible: true,
+                    isFavorite: playerIsFavorite,
+                    disabled: favoriteBusy,
+                    ariaLabel: favoriteToggleLabel,
+                    title: favoriteToggleLabel,
+                    onToggle: () => {
+                      void handleAction("favorite");
+                    },
+                  }
+                : undefined
+            }
+          />
+          <ActionFeedback message={actionFeedback} />
           {!heroOnly && (
             <>
-              <ActionFeedback message={actionFeedback} />
-
               <div className="player-profile__tabs" role="tablist" aria-label="Spielerprofil Tabs">
                 {TABS.map((entry) => {
                   const active = tab === entry;
@@ -1305,3 +1394,4 @@ const formatHistoricDate = (daysAgo: number) => {
   const date = new Date(Date.now() - daysAgo * 86400000);
   return date.toLocaleDateString("de-DE");
 };
+

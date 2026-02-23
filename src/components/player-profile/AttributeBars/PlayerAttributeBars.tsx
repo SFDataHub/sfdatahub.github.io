@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { guideDriveIdByKey } from "../../../data/guidehub/assets";
+import { toDriveThumbProxy } from "../../../lib/urls";
 import type { BaseStatBenchmarks, BaseStatValues } from "../types";
 
 type AttributeKey = "str" | "dex" | "int" | "con" | "lck";
@@ -19,6 +21,14 @@ const ATTRIBUTES: { key: AttributeKey; label: string; name: string }[] = [
   { key: "con", label: "CON", name: "Constitution" },
   { key: "lck", label: "LCK", name: "Luck" },
 ];
+
+const STAT_ICON_ASSET_KEYS: Record<AttributeKey, string> = {
+  str: "strengthpotion",
+  dex: "dexteritypotion",
+  int: "intpotion",
+  con: "conpotion",
+  lck: "luckpotion",
+};
 
 const MIN_FILL_PX = 8;
 
@@ -43,6 +53,7 @@ export default function PlayerAttributeBars({
   const [internalMode, setInternalMode] = useState<"base" | "total">("base");
   const [animateReady, setAnimateReady] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
+  const [failedStatIcons, setFailedStatIcons] = useState<Partial<Record<AttributeKey, true>>>({});
 
   useEffect(() => {
     let frame1: number | null = null;
@@ -73,6 +84,10 @@ export default function PlayerAttributeBars({
     } else {
       setInternalMode(next);
     }
+  };
+
+  const handleStatIconError = (key: AttributeKey) => {
+    setFailedStatIcons((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
   };
 
   const activeValues = ATTRIBUTES.map((attr) => {
@@ -130,11 +145,25 @@ export default function PlayerAttributeBars({
           const targetRatio = Math.min(1, Math.max(0, playerPct / 100));
           const displayRatio = animateReady ? targetRatio : 0;
           const transitionDuration = !hasAnimated ? "500ms" : undefined;
+          const statIconId = guideDriveIdByKey(STAT_ICON_ASSET_KEYS[attr.key]);
+          const statIconUrl =
+            !failedStatIcons[attr.key] && statIconId ? toDriveThumbProxy(statIconId, 28) : undefined;
 
           return (
             <div key={attr.key} className="player-profile__attribute-bar-row">
               <div className="player-profile__attribute-bar-label" aria-hidden>
-                <span className="player-profile__attribute-bar-icon">{attr.label}</span>
+                <span className="player-profile__attribute-bar-icon">
+                  {statIconUrl ? (
+                    <img
+                      src={statIconUrl}
+                      alt={`${attr.name} icon`}
+                      className="player-profile__attribute-bar-icon-image"
+                      onError={() => handleStatIconError(attr.key)}
+                    />
+                  ) : (
+                    attr.label
+                  )}
+                </span>
                 <span className="player-profile__attribute-bar-name">{attr.name}</span>
               </div>
               <div className="player-profile__attribute-bar-track" role="presentation">

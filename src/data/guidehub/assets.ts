@@ -187,7 +187,14 @@ const DRIVE_BY_KEY: Record<string, string> = {
   step2adg: "1XD6h0xe56G4nfatc4Cs9wFnPveWwyxr8",
   step3adg: "1FBYaP5H-UhlrMiAhlfxcEyP8PGBWbPO5",
 
-  // ===== hier beliebig erweitern =====
+  // ===== Sonstige assets =====
+  // potions
+  strengthpotion: "1_q5zMtSSz8tbwjffdatm_0zNWgk8rwAT",
+  dexteritypotion: "1Q2UfpJlxHd_04pOtSrWWBtekSF4LekWS",
+  intpotion: "1vsdMHdvk7pACJ19oZbdvP17Zf5wNXEYp",
+  conpotion: "14QQYPxpmtD4Ez2G5hPoq7GAduP1ibV4Y",
+  luckpotion: "11PxBqb3fn57hUdCj1hNt__mkQbutquoA",
+  eternalpotion: "1V2-b6UIvbkE0MMY1brZk29vnTFADybCx"
   // progressionlatebanner: "DRIVE_FILE_ID_HIER",
   // underworldppsodiagram1: "DRIVE_FILE_ID_HIER",
 };

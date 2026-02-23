@@ -5,6 +5,7 @@ import { useFilters } from "./FilterContext";
 import { CLASSES } from "../../data/classes";
 import styles from "./filters.module.css";
 import { ClassIconButton } from "./atoms";
+import { useAuth } from "../../context/AuthContext";
 
 type Props = {
   compareMonth: string;
@@ -30,6 +31,7 @@ export default function HudFilters({
     classes, setClasses,
     guilds, toggleGuild, clearGuilds,
     sortBy, setSortBy,
+    favoritesOnly, setFavoritesOnly,
 
     // UI modes
     filterMode,
@@ -42,12 +44,14 @@ export default function HudFilters({
     // helper
     resetAll,
   } = useFilters();
+  const { user } = useAuth();
 
   const guildLabel = t("toplists.filters.guilds.label", "Guilds");
   const guildPlaceholder = t("toplists.filters.guilds.placeholder", "All guilds");
   const guildEmpty = t("toplists.filters.guilds.empty", "No guilds in snapshot");
   const guildClear = t("toplists.filters.guilds.clear", "Clear");
   const exportPngLabel = t("toplists.exportDialog.title", "Export PNG");
+  const favoritesChipLabel = t("nav.favorites", { defaultValue: "Favorites" });
   const guildSelection = guilds.length
     ? t("toplists.filters.guilds.selected", "{{count}} selected", { count: guilds.length })
     : guildPlaceholder;
@@ -173,6 +177,23 @@ export default function HudFilters({
 
       {/* Right Side Actions */}
       <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          className={`${styles.chip} ${favoritesOnly ? styles.isActive : ""}`.trim()}
+          aria-pressed={favoritesOnly}
+          onClick={() => {
+            if (!user) {
+              const message = t("profile.favorite.authRequired", { defaultValue: "Sign in to use favorites." });
+              if (typeof window !== "undefined") window.alert(message);
+              return;
+            }
+            setFavoritesOnly(!favoritesOnly);
+          }}
+          title={favoritesChipLabel}
+        >
+          <span aria-hidden>⭐</span>
+          <span>{favoritesChipLabel}</span>
+        </button>
         <button
           type="button"
           className={styles.hudSubBtn}
