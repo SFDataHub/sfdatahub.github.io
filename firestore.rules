@@ -122,7 +122,18 @@ service cloud.firestore {
     // Publicly readable snapshots stored under linked_players/avatars/avatars/{docId}
     match /linked_players/avatars/avatars/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isAdmin() || (
+        request.auth != null
+        && request.auth.token.userId != null
+        && request.resource.data.userId == request.auth.token.userId
+      );
+      allow update: if isAdmin() || (
+        request.auth != null
+        && request.auth.token.userId != null
+        && resource.data.userId == request.auth.token.userId
+        && request.resource.data.userId == resource.data.userId
+      );
+      allow delete: if false;
     }
 
     match /linked_players/avatars/{playerServerId} {
