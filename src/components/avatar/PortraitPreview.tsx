@@ -37,6 +37,10 @@ const statusLabel: Record<PortraitStatus, string> = {
 };
 
 const clampPositive = (value: number, max: number) => Math.min(Math.max(Math.round(value), 0), max);
+const roundSpecial = (value: number) => {
+  const rounded = Math.round(Number(value));
+  return Number.isFinite(rounded) ? rounded : 0;
+};
 
 const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
   const merged = { ...DEFAULT_PORTRAIT, ...(config || {}) };
@@ -55,7 +59,7 @@ const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
     nose: clampPositive(merged.nose, 10),
     ears: clampPositive(merged.ears, 10),
     extra: clampPositive(merged.extra, 20),
-    special: clampPositive(merged.special, 200),
+    special: roundSpecial(merged.special),
     showBorder: false,
     background: "",
     frame: "",
