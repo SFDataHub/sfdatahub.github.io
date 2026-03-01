@@ -55,6 +55,58 @@ const buildGuildFavoriteIdentifierFromRow = (row: FirestoreToplistGuildRow): str
   return `${serverKey}_g${guildId}`.toLowerCase();
 };
 
+const parseLastScanString = (value: string): number | null => {
+  const raw = value.trim();
+  if (!raw) return null;
+  const parts = raw.split(/\s+/);
+  const datePart = parts[0] ?? "";
+  const timePart = parts[1] ?? "";
+  const dateBits = datePart.split(".");
+  if (dateBits.length !== 3) return null;
+  const day = Number(dateBits[0]);
+  const month = Number(dateBits[1]);
+  const year = Number(dateBits[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null;
+  let hours = 0;
+  let minutes = 0;
+  if (timePart) {
+    const timeBits = timePart.split(":");
+    if (timeBits.length < 2) return null;
+    hours = Number(timeBits[0]);
+    minutes = Number(timeBits[1]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  }
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date.getTime();
+};
+
+const toMsFromLastScan = (value: string | number | null | undefined): number | null => {
+  if (value == null) return null;
+  if (typeof value === "number") return value < 1e12 ? value * 1000 : value;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{10,13}$/.test(raw)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    return n < 1e12 ? n * 1000 : n;
+  }
+  return parseLastScanString(raw);
+};
+
+const formatLastScanDisplay = (value: string | number | null | undefined): string => {
+  if (value == null || value === "") return "";
+  const ms = toMsFromLastScan(value);
+  if (ms == null) return String(value);
+  return new Date(ms).toLocaleString();
+};
+
 export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
   const { favoritesOnly } = useFilters();
   const { user } = useAuth();
@@ -244,7 +296,7 @@ export default function GuildToplists({ serverCodes }: GuildToplistsProps) {
                 <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(g.memberCount)}</td>
                 <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(g.avgLevel)}</td>
                 <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(g.sumAvg)}</td>
-                <td style={{ padding: "8px 6px" }}>{g.lastScan ?? ""}</td>
+                <td style={{ padding: "8px 6px" }}>{formatLastScanDisplay(g.lastScan)}</td>
               </tr>
             ))}
             {loading && displayRows.length === 0 && (

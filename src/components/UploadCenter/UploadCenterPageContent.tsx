@@ -768,7 +768,7 @@ function UploadCenterContentBody() {
               Class: p.className ?? "",
               Level: p.level ?? "",
             };
-      row.Identifier = p.playerId;
+      if (row.Identifier == null && row.ID == null) row.Identifier = p.playerId;
       row["Guild Identifier"] = p.guildId ?? "";
       row.Timestamp = p.scanTimestampSec;
       row.Server = p.server;
@@ -785,7 +785,7 @@ function UploadCenterContentBody() {
               Class: p.className ?? "",
               Level: p.level ?? "",
             };
-      row.Identifier = p.playerId;
+      if (row.Identifier == null && row.ID == null) row.Identifier = p.playerId;
       row["Guild Identifier"] = p.guildId ?? "";
       row.Timestamp = p.scanTimestampSec;
       row.Server = p.server;
@@ -1041,9 +1041,9 @@ function UploadCenterContentBody() {
         setRecordStatus(sessionId, "guild", item.key, item.status as UploadRecordStatus);
       });
 
-      if (!updatedPlayers && !updatedGuilds) {
-        selectedPlayers.forEach((p) => setRecordStatus(sessionId, "player", p.key, "created"));
-        selectedGuilds.forEach((g) => setRecordStatus(sessionId, "guild", g.key, "created"));
+      const snapshotOnly = scanWriteMode === "monthly" && guildProgress;
+      if (!snapshotOnly && !updatedPlayers && !updatedGuilds) {
+        throw new Error("No write results were returned for this upload.");
       }
 
       if (selectedPlayers.length || selectedGuilds.length) {
@@ -1069,6 +1069,13 @@ function UploadCenterContentBody() {
       }
     } catch (error) {
       console.error("[UploadCenter] Failed to upload selection", error);
+      setActionFeedback({
+        kind: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Upload failed. Please check the console for details.",
+      });
     } finally {
       setActivityStage("idle");
       setIsFinalizing(false);

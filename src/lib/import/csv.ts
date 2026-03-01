@@ -915,7 +915,7 @@ function parsePlayersFromRows(rows: Row[], headers?: string[]): PlayerParseResul
     const serverFromIdentifier = parseServerKeyFromIdentifier(identifier);
     const serverRaw = pickWithLookup(row, lookup, COL.PLAYERS.SERVER);
     const serverFallback = serverRaw && norm(serverRaw) !== "" ? up(serverRaw) : undefined;
-    const server = serverFromIdentifier ?? (!identifier ? serverFallback : undefined);
+    const server = serverFromIdentifier ?? serverFallback;
     if (!server) {
       stats.missingServer++;
       continue;
@@ -1429,71 +1429,7 @@ async function writeScansWithResults(
   };
 
   emit("prepare");
-
-  const bulkWriterFactory = (db as any).bulkWriter;
-  const bulkWriterAvailable = typeof bulkWriterFactory === "function";
-  if (bulkWriterAvailable) {
-    console.info("[ImportCsv] bulkWriter mode", {
-      kind,
-      pass: "scans",
-      bulkWriterAvailable: true,
-      bulkWriterChosen: true,
-    });
-  } else {
-    console.info("[ImportCsv] bulkWriter mode", {
-      kind,
-      pass: "scans",
-      bulkWriterAvailable: false,
-      bulkWriterChosen: false,
-      fallbackReason: "db.bulkWriter undefined",
-    });
-  }
-  if (bulkWriterAvailable) {
-    const writer = bulkWriterFactory.call(db, { throttling: true });
-    const tick = () => {
-      processed++;
-      emit("write");
-    };
-
-    for (const scan of scans) {
-      const { ref, data, key } = scan;
-      writer
-        .create(ref, data)
-        .then(() => {
-          created++;
-          recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:scansBulk" });
-          results.push({ key, status: "created" });
-          tick();
-        })
-        .catch(async (error: any) => {
-          onErrorCode?.(error);
-          const code = String(error?.code ?? "").toLowerCase();
-          if (code.includes("already") && code.includes("exist")) {
-            duplicate++;
-            if (scanWriteMode === "monthly") {
-              await backfillMissingMonthlyScanMetadata(scan);
-            }
-            results.push({ key, status: "duplicate" });
-          } else {
-            errorCount++;
-            results.push({ key, status: "error", message: String(error?.message ?? error) });
-          }
-          tick();
-        });
-    }
-
-    try {
-      await writer.close();
-    } catch (error) {
-      onErrorCode?.(error);
-      console.warn("[ImportCsv] bulkWriter close with errors", { error });
-    }
-    emit("done");
-    return results;
-  }
-
-  // Fallback: no bulkWriter available, behave like previous set/merge (statuses all "created")
-  // Use per-doc set to avoid whole-batch failures; permission-denied on existing scans is treated as duplicate.
+  // Browser client uses direct per-doc writes for scan docs.
   for (const scan of scans) {
     const { ref, data, key } = scan;
     try {
@@ -1528,46 +1464,6 @@ async function writeLatest(
   onErrorCode?: (error: unknown) => void,
 ) {
   if (!latestDocs.length) return;
-
-  const total = latestDocs.length;
-  const bulkWriterFactory = (db as any).bulkWriter;
-  const bulkWriterAvailable = typeof bulkWriterFactory === "function";
-  if (bulkWriterAvailable) {
-    console.info("[ImportCsv] bulkWriter mode", {
-      kind,
-      pass: "latest",
-      bulkWriterAvailable: true,
-      bulkWriterChosen: true,
-    });
-  } else {
-    console.info("[ImportCsv] bulkWriter mode", {
-      kind,
-      pass: "latest",
-      bulkWriterAvailable: false,
-      bulkWriterChosen: false,
-      fallbackReason: "db.bulkWriter undefined",
-    });
-  }
-
-  if (bulkWriterAvailable) {
-    const writer = bulkWriterFactory.call(db, { throttling: true });
-    onProgress?.({ phase: "prepare", current: 0, total, pass: "latest" });
-
-    for (const { ref, data } of latestDocs) writer.set(ref, data, { merge: true });
-
-    onProgress?.({ phase: "write", current: total, total, pass: "latest" });
-    try {
-      await writer.close();
-    } catch (error) {
-      onErrorCode?.(error);
-      throw error;
-    }
-    latestDocs.forEach(({ ref }) =>
-      recordWrite({ path: ref.path, op: "setDoc", docCount: 1, label: "ImportCsv:latestBulk" }),
-    );
-    onProgress?.({ phase: "done", current: 1, total: 1, pass: "latest" });
-    return;
-  }
 
   const latestBatchers: BatchWrite[] = latestDocs.map(({ ref, data }) => ({
     path: ref.path,
@@ -2129,10 +2025,6 @@ export async function importCsvToDB(
   const guildResults: ImportResultItem[] = [];
 
   if (!opts || !opts.kind) throw new Error('CSV-Typ fehlt: { kind: "players" | "guilds" }.');
-  console.info("[ImportCsv] bulkWriter capability", {
-    kind: opts.kind,
-    bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
-  });
 
   const emitProgress = opts.onProgress
     ? ((p: Parameters<NonNullable<ImportCsvOptions["onProgress"]>>[0]) =>
@@ -2205,18 +2097,6 @@ export async function importCsvToDB(
       if (!byIdentifier.has(parsed.identifier)) byIdentifier.set(parsed.identifier, []);
       byIdentifier.get(parsed.identifier)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
     }
-    console.info("[ImportCsv] bulkWriter decision", {
-      kind: "players",
-      pass: "scans",
-      scans: playerScanDocs.length,
-      bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
-      bulkWriterChosen: typeof (db as any).bulkWriter === "function" && playerScanDocs.length > 0,
-      fallbackReason:
-        typeof (db as any).bulkWriter === "function"
-          ? null
-          : "db.bulkWriter undefined",
-    });
-
     const scanResults = await writeScansWithResults(
       playerScanDocs,
       emitProgress,
@@ -2449,18 +2329,6 @@ export async function importCsvToDB(
       if (!byGid.has(parsed.guildIdentifier)) byGid.set(parsed.guildIdentifier, []);
       byGid.get(parsed.guildIdentifier)!.push({ row: parsed.raw, ts: parsed.timestampSec, parsed });
     }
-    console.info("[ImportCsv] bulkWriter decision", {
-      kind: "guilds",
-      pass: "scans",
-      scans: guildScanDocs.length,
-      bulkWriterAvailable: typeof (db as any).bulkWriter === "function",
-      bulkWriterChosen: typeof (db as any).bulkWriter === "function" && guildScanDocs.length > 0,
-      fallbackReason:
-        typeof (db as any).bulkWriter === "function"
-          ? null
-          : "db.bulkWriter undefined",
-    });
-
     const scanResults = await writeScansWithResults(
       guildScanDocs,
       emitProgress,
