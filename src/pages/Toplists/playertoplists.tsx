@@ -312,6 +312,12 @@ const toMsFromLastScan = (value: string | number | null | undefined): number | n
   }
   return parseLastScanString(raw);
 };
+const formatLastScanDisplay = (value: string | number | null | undefined): string => {
+  if (value == null || value === "") return "";
+  const ms = toMsFromLastScan(value);
+  if (ms == null) return String(value);
+  return new Date(ms).toLocaleString();
+};
 const deriveRatioMain = (main: number | null, con: number | null) => {
   const m = typeof main === "number" && Number.isFinite(main) ? main : 0;
   const c = typeof con === "number" && Number.isFinite(con) ? con : 0;
@@ -2113,6 +2119,7 @@ function TableDataView({
               ? `stats-day-chip stats-day-chip--${statsDayVariant}`
               : "stats-day-chip";
           const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
+          const lastScanLabel = formatLastScanDisplay((r as any).lastScan);
           const classKey = String(r.class ?? "").trim();
           const classIconUrl = getClassIconUrl(classKey, 48);
           const playerId = (r as any).playerId ?? (r as any).id ?? null;
@@ -2244,7 +2251,7 @@ function TableDataView({
               </td>
               <td style={{ padding: "8px 6px" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span>{r.lastScan ?? ""}</span>
+                  <span>{lastScanLabel}</span>
                   {lastScanDotColor && (
                     <span
                       aria-hidden

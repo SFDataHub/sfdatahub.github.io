@@ -39,7 +39,7 @@ type TranslateFn = (key: string, options?: any) => string;
 
 const DASH = "â€”";
 const FORTRESS_GUIDE_LINKS = {
-  overview: "/guidehub?tab=gamefeatures&sub=fortress",
+  overview: "/guidehub-v2?tab=gamefeatures&sub=fortress",
   calculator: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-calculator",
   packageSkipOrder: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-package-skip-order",
   attackDuplication: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-attack-duplication",
@@ -355,6 +355,7 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
   ];
 
   const showProgressPanel = [...raidsRows, ...xpRows].some((row) => row.value != null);
+  const showAdvancedPanel = false;
   const noDataText = t("common.noData");
   const setHoveredCompositionSource = (attrCode: string, sourceKey: AttributeCompositionSourceKey) => {
     setHoveredAttrCode(attrCode);
@@ -667,28 +668,30 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
           </section>
         )}
 
-        <section className="player-profile__stats-panel player-profile__stats-panel--full">
-          <details className="player-profile__stats-accordion">
-            <summary>
-              <div className="player-profile__stats-accordion-title">{t("playerProfile.statsTab.advanced.title")}</div>
-              <span className="player-profile__stats-accordion-count">{data.advanced.entries.length}</span>
-            </summary>
-            <div className="player-profile__stats-accordion-body">
-              {data.advanced.entries.length ? (
-                <div className="player-profile__stats-advanced-grid">
-                  {data.advanced.entries.map((entry) => (
-                    <div key={entry.key} className="player-profile__stats-advanced-item">
-                      <div className="player-profile__stats-advanced-key">{entry.key}</div>
-                      <div className="player-profile__stats-advanced-value">{formatAdvancedValue(t, entry.value)}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <PanelEmpty text={noDataText} />
-              )}
-            </div>
-          </details>
-        </section>
+        {showAdvancedPanel && (
+          <section className="player-profile__stats-panel player-profile__stats-panel--full">
+            <details className="player-profile__stats-accordion">
+              <summary>
+                <div className="player-profile__stats-accordion-title">{t("playerProfile.statsTab.advanced.title")}</div>
+                <span className="player-profile__stats-accordion-count">{data.advanced.entries.length}</span>
+              </summary>
+              <div className="player-profile__stats-accordion-body">
+                {data.advanced.entries.length ? (
+                  <div className="player-profile__stats-advanced-grid">
+                    {data.advanced.entries.map((entry) => (
+                      <div key={entry.key} className="player-profile__stats-advanced-item">
+                        <div className="player-profile__stats-advanced-key">{entry.key}</div>
+                        <div className="player-profile__stats-advanced-value">{formatAdvancedValue(t, entry.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <PanelEmpty text={noDataText} />
+                )}
+              </div>
+            </details>
+          </section>
+        )}
       </div>
     </div>
   );

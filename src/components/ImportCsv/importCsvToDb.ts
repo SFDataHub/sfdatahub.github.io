@@ -180,6 +180,14 @@ export async function importSelectionToDb(
     }
   };
   const guildProgressOnly = opts?.scanWriteMode === "monthly" && opts?.guildProgress === true;
+  console.info("[ImportSelectionToDb] options", {
+    scanWriteMode: opts?.scanWriteMode ?? null,
+    guildProgress: opts?.guildProgress === true,
+    guildProgressOnly,
+    selectedPlayersRows: payload.playersRows.length,
+    selectedGuildRows: payload.guildsRows.length,
+    connectedPlayersRows: Array.isArray(payload.connectedPlayersRows) ? payload.connectedPlayersRows.length : 0,
+  });
   const guildSnapshotPlayersBase =
     guildProgressOnly &&
     Array.isArray(payload.connectedPlayersRows) &&
@@ -379,5 +387,11 @@ export async function importSelectionToDb(
 
   reportReadSummary("ImportSelection");
   reportWriteSummary("ImportSelection");
+  if (players.some((entry) => entry.status === "error") || guilds.some((entry) => entry.status === "error")) {
+    ok = false;
+  }
+  if (reports.some((report) => Array.isArray(report.errors) && report.errors.length > 0)) {
+    ok = false;
+  }
   return { ok, players, guilds, reports };
 }
