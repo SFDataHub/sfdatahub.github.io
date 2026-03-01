@@ -3,12 +3,14 @@ import cors from "cors";
 import express from "express";
 
 import adminRouter from "./routes/admin";
+import adminStatsRouter from "./routes/adminStats";
 import authRouter from "./routes/auth";
 import adminAccessControlRouter from "./routes/adminAccessControl";
 import internalAdminRouter from "./routes/internalAdmin";
 import scanUploadsRouter from "./routes/scanUploads";
 import userUploadInboxRouter from "./routes/userUploadInbox";
 import scanUploadsPublicRouter from "./routes/scanUploadsPublic";
+import playerChartsRouter from "./routes/playerCharts";
 import { latestDiscordNewsHandler } from "./public/news/discord/latest.handler";
 import { listDiscordNewsHandler } from "./public/news/discord/list.handler";
 import { latestDiscordNewsByChannelHandler } from "./public/news/discord/latestByChannel.handler";
@@ -28,9 +30,11 @@ app.use(cookieParser());
 
 app.use("/auth", authRouter);
 app.use("/admin", adminRouter);
+app.use("/api/admin/stats", adminStatsRouter);
 app.use("/admin/access-control", adminAccessControlRouter);
 app.use("/internal", internalAdminRouter);
 app.use("/internal/scan-uploads", scanUploadsRouter);
+app.use("/api/players", playerChartsRouter);
 app.post("/internal/news/discord/refresh-snapshot", refreshDiscordNewsSnapshotHandler);
 app.use("/", scanUploadsPublicRouter);
 app.use("/user", userUploadInboxRouter);

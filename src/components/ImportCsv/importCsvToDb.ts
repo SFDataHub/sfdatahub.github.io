@@ -2,6 +2,7 @@ import { doc, getDoc } from "firebase/firestore";
 import {
   importCsvToDB,
   type ImportCsvOptions,
+  type ImportScanWriteMode,
   type ImportReport,
   type ImportResultItem,
   flushGuildDerivedSnapshotsFromAggregates,
@@ -59,7 +60,11 @@ const parseMemberCount = (value: any): number | null => {
   if (n < 1 || n > 50) return null;
   return Number.isFinite(n) ? n : null;
 };
-const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
+const buildUploadableGuildIds = (
+  playersRows: Row[],
+  guildsRows: Row[],
+  opts?: { suppressMissingGuildRowsWarning?: boolean },
+) => {
   const playerCountByGuildId = new Map<string, number>();
   const guildMemberCountByGuildId = new Map<string, number>();
 
@@ -86,10 +91,14 @@ const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
   const missingGuildRows = Array.from(playerCountByGuildId.entries())
     .filter(([gid]) => !guildMemberCountByGuildId.has(gid))
     .map(([gid, playersCount]) => ({ guildId: gid, playersCount }));
-  if (missingGuildRows.length) {
+  if (missingGuildRows.length && !opts?.suppressMissingGuildRowsWarning) {
     console.warn("[ImportSelectionToDb] Player guild identifiers without matching guild row", {
       affectedGuilds: missingGuildRows.length,
       sample: missingGuildRows.slice(0, 8),
+    });
+  } else if (missingGuildRows.length && opts?.suppressMissingGuildRowsWarning) {
+    console.info("[ImportSelectionToDb] snapshot-only ignored player rows for non-selected guilds", {
+      affectedGuilds: missingGuildRows.length,
     });
   }
   const incompleteGuilds = Array.from(guildMemberCountByGuildId.entries())
@@ -112,6 +121,8 @@ const buildUploadableGuildIds = (playersRows: Row[], guildsRows: Row[]) => {
 export type ImportSelectionPayload = {
   playersRows: Row[];
   guildsRows: Row[];
+  connectedPlayersRows?: Row[];
+  allPlayersRows?: Row[];
 };
 
 export type ImportRecordStatus = "created" | "duplicate" | "error";
@@ -142,6 +153,8 @@ export async function importSelectionToDb(
   opts?: {
     onProgress?: ImportCsvOptions["onProgress"];
     onStage?: (event: ImportSelectionStageEvent) => void;
+    scanWriteMode?: ImportScanWriteMode | null;
+    guildProgress?: boolean;
   },
 ): Promise<ImportSelectionResult> {
   startReadTraceSession("ImportSelection");
@@ -166,17 +179,31 @@ export async function importSelectionToDb(
       console.info(`[upload] stage=${stage} ms=${roundedMs}`, details);
     }
   };
-  const serverHosts = new Set<string>();
-  collectServerHosts(payload.playersRows, serverHosts);
-  collectServerHosts(payload.guildsRows, serverHosts);
-  const serverHostMap =
-    serverHosts.size > 0 ? await loadServerHostMapByHosts(Array.from(serverHosts)) : new Map<string, string>();
-  const { uploadableGuildIds } = buildUploadableGuildIds(payload.playersRows, payload.guildsRows);
+  const guildProgressOnly = opts?.scanWriteMode === "monthly" && opts?.guildProgress === true;
+  const guildSnapshotPlayersBase =
+    guildProgressOnly &&
+    Array.isArray(payload.connectedPlayersRows) &&
+    payload.connectedPlayersRows.length > 0
+      ? payload.connectedPlayersRows
+      : guildProgressOnly && Array.isArray(payload.allPlayersRows) && payload.allPlayersRows.length > 0
+        ? payload.allPlayersRows
+      : payload.playersRows;
+  let serverHostMap = new Map<string, string>();
+  if (!guildProgressOnly) {
+    const serverHosts = new Set<string>();
+    collectServerHosts(payload.playersRows, serverHosts);
+    collectServerHosts(payload.guildsRows, serverHosts);
+    serverHostMap =
+      serverHosts.size > 0 ? await loadServerHostMapByHosts(Array.from(serverHosts)) : new Map<string, string>();
+  }
+  const { uploadableGuildIds } = buildUploadableGuildIds(guildSnapshotPlayersBase, payload.guildsRows, {
+    suppressMissingGuildRowsWarning: guildProgressOnly,
+  });
   const guildsRowsFiltered = payload.guildsRows.filter((row) => {
     const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
     return gid ? uploadableGuildIds.has(gid) : false;
   });
-  const playersRowsForGuilds = payload.playersRows.filter((row) => {
+  const playersRowsForGuilds = guildSnapshotPlayersBase.filter((row) => {
     const gid = normalizeGuildId(pickByCanon(row, CANON("Guild Identifier")));
     return gid ? uploadableGuildIds.has(gid) : false;
   });
@@ -192,7 +219,7 @@ export async function importSelectionToDb(
         opts.onProgress?.({ ...p, kind })
     : undefined;
 
-  if (guildsRows.length > 0) {
+  if (!guildProgressOnly && guildsRows.length > 0) {
     try {
       const repGuilds = await runStage(
         "import:guilds",
@@ -216,25 +243,28 @@ export async function importSelectionToDb(
     }
   }
 
-  try {
-    const repPlayers = await runStage(
-      "import:players",
-      { rows: playersRows.length },
-      async () =>
-        importCsvToDB(null, {
-          kind: "players",
-          rows: playersRows,
-          onProgress: emitProgress ? (p) => emitProgress(p, "players") : undefined,
-          serverHostMap,
-        } as ImportCsvOptions),
-    );
-    reports.push(repPlayers);
-    if (Array.isArray(repPlayers.playerResults)) {
-      players = repPlayers.playerResults as ImportResultItem[];
+  if (!guildProgressOnly) {
+    try {
+      const repPlayers = await runStage(
+        "import:players",
+        { rows: playersRows.length },
+          async () =>
+            importCsvToDB(null, {
+              kind: "players",
+              rows: playersRows,
+              onProgress: emitProgress ? (p) => emitProgress(p, "players") : undefined,
+              serverHostMap,
+              scanWriteMode: opts?.scanWriteMode ?? undefined,
+            } as ImportCsvOptions),
+      );
+      reports.push(repPlayers);
+      if (Array.isArray(repPlayers.playerResults)) {
+        players = repPlayers.playerResults as ImportResultItem[];
+      }
+    } catch (error) {
+      console.error("[ImportSelectionToDb] player import error", error);
+      ok = false;
     }
-  } catch (error) {
-    console.error("[ImportSelectionToDb] player import error", error);
-    ok = false;
   }
 
   type GuildSnapshotResult = Awaited<ReturnType<typeof writeGuildSnapshotsFromRows>>;
@@ -247,7 +277,13 @@ export async function importSelectionToDb(
           playerRows: playersRowsForGuilds.length,
           guildRows: guildsRows.length,
         },
-        async () => writeGuildSnapshotsFromRows(playersRowsForGuilds, guildsRows),
+        async () =>
+          writeGuildSnapshotsFromRows(
+            playersRowsForGuilds,
+            guildsRows,
+            opts?.scanWriteMode ?? undefined,
+            guildProgressOnly,
+          ),
       );
       guildDerivedAggregates = summaryResult.aggregatesByGuildId;
     } catch (error) {
@@ -256,7 +292,7 @@ export async function importSelectionToDb(
     }
   }
 
-  if (guildDerivedAggregates && guildDerivedAggregates.size > 0) {
+  if (!guildProgressOnly && guildDerivedAggregates && guildDerivedAggregates.size > 0) {
     try {
       await runStage(
         "derived:flush",
@@ -279,65 +315,67 @@ export async function importSelectionToDb(
     if (v) gidSet.add(String(v));
   }
 
-  await runStage(
-    "monthly:rebuild",
-    { guildIds: gidSet.size },
-    async () => {
-      let latestFound = 0;
-      let ensureAttempts = 0;
-      let monthlyWriteAttempts = 0;
-      for (const guildId of gidSet) {
-        const scope: FirestoreTraceScope = beginReadScope("ImportCsv:guildLatest");
-        const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
-        let latestSnap;
-        try {
-          latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
-        } finally {
-          endReadScope(scope);
+  if (!guildProgressOnly) {
+    await runStage(
+      "monthly:rebuild",
+      { guildIds: gidSet.size },
+      async () => {
+        let latestFound = 0;
+        let ensureAttempts = 0;
+        let monthlyWriteAttempts = 0;
+        for (const guildId of gidSet) {
+          const scope: FirestoreTraceScope = beginReadScope("ImportCsv:guildLatest");
+          const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
+          let latestSnap;
+          try {
+            latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
+          } finally {
+            endReadScope(scope);
+          }
+          if (!latestSnap.exists()) continue;
+          latestFound++;
+
+          const latest = latestSnap.data() as any;
+          const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
+          const monthKey = monthKeyFromMs(latestTsMs);
+
+          let first: any = null;
+          let firstTsMs: number | null = null;
+          try {
+            ensureAttempts++;
+            const res = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
+            first = res.first;
+            firstTsMs = res.firstTsMs;
+          } catch (error) {
+            console.warn("[ImportSelectionToDb] ensureFirstOfMonth skipped", { guildId, monthKey, error });
+          }
+
+          const progress = computeProgressDoc({
+            guildId,
+            monthKey,
+            server: latest.server ?? null,
+            first,
+            firstTsMs,
+            latest,
+            latestTsMs,
+          });
+
+          try {
+            monthlyWriteAttempts++;
+            await writeMonthlyDoc(guildId, monthKey, progress);
+          } catch (error) {
+            console.warn("[ImportSelectionToDb] writeMonthlyDoc skipped", { guildId, monthKey, error });
+          }
         }
-        if (!latestSnap.exists()) continue;
-        latestFound++;
-
-        const latest = latestSnap.data() as any;
-        const latestTsMs = Number(latest.updatedAtMs ?? (latest.timestamp ? latest.timestamp * 1000 : Date.now()));
-        const monthKey = monthKeyFromMs(latestTsMs);
-
-        let first: any = null;
-        let firstTsMs: number | null = null;
-        try {
-          ensureAttempts++;
-          const res = await ensureFirstOfMonth(guildId, monthKey, latest, latestTsMs);
-          first = res.first;
-          firstTsMs = res.firstTsMs;
-        } catch (error) {
-          console.warn("[ImportSelectionToDb] ensureFirstOfMonth skipped", { guildId, monthKey, error });
-        }
-
-        const progress = computeProgressDoc({
-          guildId,
-          monthKey,
-          server: latest.server ?? null,
-          first,
-          firstTsMs,
-          latest,
-          latestTsMs,
+        console.info("[upload] stage=monthly:rebuild counts", {
+          guildIds: gidSet.size,
+          latestFound,
+          ensureAttempts,
+          monthlyWriteAttempts,
         });
-
-        try {
-          monthlyWriteAttempts++;
-          await writeMonthlyDoc(guildId, monthKey, progress);
-        } catch (error) {
-          console.warn("[ImportSelectionToDb] writeMonthlyDoc skipped", { guildId, monthKey, error });
-        }
-      }
-      console.info("[upload] stage=monthly:rebuild counts", {
-        guildIds: gidSet.size,
-        latestFound,
-        ensureAttempts,
-        monthlyWriteAttempts,
-      });
-    },
-  );
+      },
+    );
+  }
 
   reportReadSummary("ImportSelection");
   reportWriteSummary("ImportSelection");

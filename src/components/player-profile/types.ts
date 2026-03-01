@@ -1,3 +1,5 @@
+import type { LatestValuesStatsModel } from "../../lib/parsing/latestValues";
+
 export type PortraitOptions = {
   genderName: "male" | "female";
   class: number;
@@ -66,6 +68,12 @@ export type HeroMetric = {
   value: string;
   hint?: string;
   tone?: "neutral" | "success" | "warning";
+  gauge?: {
+    progress: number; // 0..1
+    centerTop: string;
+    centerBottom?: string;
+    details?: string[];
+  };
 };
 
 export type HeroBadge = HeroMetric & { icon?: string };
@@ -116,20 +124,16 @@ export type HeroPanelData = {
   baseStatBenchmarks?: BaseStatBenchmarks;
   totalStats?: BaseStatValues;
   totalStatsValue?: number | null;
+  mountRace?: string | null;
+  mountPercentValue?: number | null;
+  potionsSlots?: Array<{
+    slot: 1 | 2 | 3;
+    type: string | null;
+    size: number | null;
+  }>;
 };
 
-export type AttributeStat = {
-  label: string;
-  baseLabel: string;
-  totalLabel?: string;
-};
-
-export type StatsTabModel = {
-  summary: HeroMetric[];
-  attributes: AttributeStat[];
-  resistances: HeroMetric[];
-  resources: HeroMetric[];
-};
+export type StatsTabModel = LatestValuesStatsModel;
 
 export type ProgressTrack = {
   label: string;
@@ -142,10 +146,26 @@ export type ProgressTrack = {
 };
 
 export type TrendSeries = {
+  key?: string;
+  sectionKey?: string;
   label: string;
+  labelKey?: string;
   unit?: string;
   points: number[];
   subLabel?: string;
+  subLabelKey?: string;
+  tooltips?: string[];
+  pointMeta?: Array<{
+    label?: string;
+    scanAtSec?: number | null;
+    scanAtRaw?: string | null;
+  }>;
+  latestLabel?: string;
+  latestLabelKey?: string;
+  startLabel?: string;
+  startLabelKey?: string;
+  avgValue?: number | null;
+  showAvgMarker?: boolean;
 };
 
 export type ComparisonRow = {

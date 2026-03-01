@@ -22,7 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import GuildToplists from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
-  getPlayerToplistSnapshotByDocIdCached,
+  getPlayerToplistSnapshotByDocId,
   type FirestoreLatestToplistSnapshot,
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
@@ -58,6 +58,7 @@ const normalizeCompareServerKey = (value: string) => {
 const buildCompareDocId = (serverKey: string, month: string) =>
   `${normalizeCompareServerKey(serverKey)}__${month}`;
 type CompareSnapshotScope = "players" | "guilds";
+type ToplistsCompareMode = "off" | "progress" | "months";
 type CompareSnapshotState = {
   rows: FirestoreToplistPlayerRow[];
   baselineServers: string[];
@@ -135,6 +136,14 @@ const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => 
     // ignore storage write errors (quota/privacy mode)
   }
 };
+const mergeCompareSnapshotRows = (snapshots: FirestoreLatestToplistSnapshot[]) => {
+  const mergedRows: FirestoreToplistPlayerRow[] = [];
+  for (const snapshot of snapshots) {
+    const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    for (const row of players) mergedRows.push({ ...row, server: snapshot.server || row.server });
+  }
+  return mergedRows;
+};
 const normalizeClassList = (list: string[]) => {
   const set = new Set<string>();
   list.forEach((entry) => {
@@ -187,6 +196,22 @@ const listEqual = (a: string[], b: string[]) =>
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const formatMonth = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+const parseMonthKeyUtc = (value: string): Date | null => {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+};
+const getDaysBetweenMonthKeys = (fromMonth: string, toMonth: string): number | null => {
+  const from = parseMonthKeyUtc(fromMonth);
+  const to = parseMonthKeyUtc(toMonth);
+  if (!from || !to) return null;
+  const diffDays = Math.round(Math.abs(to.getTime() - from.getTime()) / MS_PER_DAY);
+  return Math.max(1, diffDays || 1);
+};
 
 const generateRecentMonths = (count: number) => {
   const months: string[] = [];
@@ -298,15 +323,21 @@ const computeStatsDay = (
   current: FirestoreToplistPlayerRow | null | undefined,
   baseline: FirestoreToplistPlayerRow | null | undefined,
   sumDeltaOverride?: number | null,
+  daysOverride?: number | null,
 ) => {
   if (!current || !baseline) return { days: null as number | null, perDay: null as number | null };
-  const currentMs = toMsFromLastScan((current as any).lastScan);
-  const baselineMs = toMsFromLastScan((baseline as any).lastScan);
-  if (currentMs == null || baselineMs == null) {
-    return { days: null as number | null, perDay: null as number | null };
+  let days: number | null = null;
+  if (typeof daysOverride === "number" && Number.isFinite(daysOverride) && daysOverride > 0) {
+    days = Math.max(1, Math.round(daysOverride));
+  } else {
+    const currentMs = toMsFromLastScan((current as any).lastScan);
+    const baselineMs = toMsFromLastScan((baseline as any).lastScan);
+    if (currentMs == null || baselineMs == null) {
+      return { days: null as number | null, perDay: null as number | null };
+    }
+    const daysRaw = Math.abs(currentMs - baselineMs) / MS_PER_DAY;
+    days = Math.max(1, Math.round(daysRaw));
   }
-  const daysRaw = Math.abs(currentMs - baselineMs) / MS_PER_DAY;
-  const days = Math.max(1, Math.round(daysRaw));
   let sumDelta = sumDeltaOverride;
   if (sumDelta == null) {
     const currSum = toNumberSafe((current as any).sum);
@@ -573,7 +604,16 @@ function PlayerToplistsPageContent() {
     return Math.max(1, Math.trunc(parsed));
   }, [rankParamRaw]);
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
-  const [compareMonth, setCompareMonth] = React.useState<string>(searchParams.get("compare") ?? "");
+  const initialProgressCompareMonth = searchParams.get("compare") ?? "";
+  const initialCompareModeParam = String(searchParams.get("compareMode") ?? "").trim().toLowerCase();
+  const [compareMode, setCompareMode] = React.useState<ToplistsCompareMode>(() => {
+    if (initialCompareModeParam === "months") return "months";
+    if (initialCompareModeParam === "progress") return "progress";
+    return initialProgressCompareMonth ? "progress" : "off";
+  });
+  const [progressSinceMonth, setProgressSinceMonth] = React.useState<string>(initialProgressCompareMonth);
+  const [compareFromMonth, setCompareFromMonth] = React.useState<string>(searchParams.get("compareFrom") ?? "");
+  const [compareToMonth, setCompareToMonth] = React.useState<string>(searchParams.get("compareTo") ?? "");
   const monthOptions = React.useMemo(
     () => {
       // Keep completed months, but also allow selecting the current month for freshly generated backfill snapshots.
@@ -582,6 +622,100 @@ function PlayerToplistsPageContent() {
     },
     [],
   );
+  const normalizeCompareMonthPair = React.useCallback((from: string, to: string) => {
+    const nextFrom = String(from ?? "").trim();
+    const nextTo = String(to ?? "").trim();
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      return { from: nextTo, to: nextFrom };
+    }
+    return { from: nextFrom, to: nextTo };
+  }, []);
+  const resolveDefaultCompareMonths = React.useCallback(() => {
+    const latest = monthOptions[0] ?? "";
+    if (!latest) return { from: "", to: "" };
+    const latestIdx = monthOptions.indexOf(latest);
+    const previous = latestIdx >= 0 ? (monthOptions[latestIdx + 1] ?? latest) : (monthOptions[1] ?? latest);
+    return normalizeCompareMonthPair(previous, latest);
+  }, [monthOptions, normalizeCompareMonthPair]);
+  const isValidCompareMonth = React.useCallback(
+    (value: string) => {
+      const normalized = String(value ?? "").trim();
+      return normalized.length > 0 && monthOptions.includes(normalized);
+    },
+    [monthOptions]
+  );
+  const handleCompareModeChange = React.useCallback((nextMode: ToplistsCompareMode) => {
+    setCompareMode(nextMode);
+    if (nextMode === "off") {
+      setProgressSinceMonth("");
+      setCompareFromMonth("");
+      setCompareToMonth("");
+      return;
+    }
+    if (nextMode === "progress") {
+      setCompareFromMonth("");
+      setCompareToMonth("");
+      return;
+    }
+    setProgressSinceMonth("");
+    const fallback = resolveDefaultCompareMonths();
+    const nextToCandidate = isValidCompareMonth(compareToMonth) ? compareToMonth : fallback.to;
+    const nextFromCandidate = isValidCompareMonth(compareFromMonth) ? compareFromMonth : fallback.from;
+    const normalized = normalizeCompareMonthPair(nextFromCandidate, nextToCandidate);
+    setCompareFromMonth(normalized.from);
+    setCompareToMonth(normalized.to);
+  }, [
+    compareFromMonth,
+    compareToMonth,
+    isValidCompareMonth,
+    normalizeCompareMonthPair,
+    resolveDefaultCompareMonths,
+  ]);
+  const handleProgressSinceMonthChange = React.useCallback((value: string) => {
+    const nextValue = String(value ?? "").trim();
+    setProgressSinceMonth(nextValue);
+    if (!nextValue) {
+      setCompareMode("off");
+    }
+  }, []);
+  const handleCompareFromMonthChange = React.useCallback((value: string) => {
+    const nextFromRaw = String(value ?? "").trim();
+    setCompareFromMonth((prevFrom) => {
+      void prevFrom;
+      const normalized = normalizeCompareMonthPair(nextFromRaw, compareToMonth);
+      if (normalized.to !== compareToMonth) {
+        setCompareToMonth(normalized.to);
+      }
+      return normalized.from;
+    });
+  }, [compareToMonth, normalizeCompareMonthPair]);
+  const handleCompareToMonthChange = React.useCallback((value: string) => {
+    const nextToRaw = String(value ?? "").trim();
+    setCompareToMonth((prevTo) => {
+      void prevTo;
+      const normalized = normalizeCompareMonthPair(compareFromMonth, nextToRaw);
+      if (normalized.from !== compareFromMonth) {
+        setCompareFromMonth(normalized.from);
+      }
+      return normalized.to;
+    });
+  }, [compareFromMonth, normalizeCompareMonthPair]);
+  React.useEffect(() => {
+    if (compareMode !== "months") return;
+    const fallback = resolveDefaultCompareMonths();
+    const nextToCandidate = isValidCompareMonth(compareToMonth) ? compareToMonth : fallback.to;
+    const nextFromCandidate = isValidCompareMonth(compareFromMonth) ? compareFromMonth : fallback.from;
+    const normalized = normalizeCompareMonthPair(nextFromCandidate, nextToCandidate);
+    if (normalized.from !== compareFromMonth) setCompareFromMonth(normalized.from);
+    if (normalized.to !== compareToMonth) setCompareToMonth(normalized.to);
+  }, [
+    compareMode,
+    compareFromMonth,
+    compareToMonth,
+    isValidCompareMonth,
+    normalizeCompareMonthPair,
+    resolveDefaultCompareMonths,
+  ]);
   const hasServersSelected = (servers?.length ?? 0) > 0;
   const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
   const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
@@ -895,8 +1029,14 @@ function PlayerToplistsPageContent() {
         subheader={
           filterMode === "hud" ? (
             <HudFilters
-              compareMonth={compareMonth}
-              setCompareMonth={setCompareMonth}
+              compareMode={compareMode}
+              onCompareModeChange={handleCompareModeChange}
+              progressSinceMonth={progressSinceMonth}
+              onProgressSinceMonthChange={handleProgressSinceMonthChange}
+              compareFromMonth={compareFromMonth}
+              onCompareFromMonthChange={handleCompareFromMonthChange}
+              compareToMonth={compareToMonth}
+              onCompareToMonthChange={handleCompareToMonthChange}
               monthOptions={monthOptions}
               guildOptions={guildOptions}
               onExportPng={openExportDialog}
@@ -917,7 +1057,10 @@ function PlayerToplistsPageContent() {
             classes={classes ?? []}
             range={(range ?? "all") as any}
             sortKey={sortBy ?? "level"}
-            compareMonth={compareMonth}
+            compareMode={compareMode}
+            progressSinceMonth={progressSinceMonth}
+            compareFromMonth={compareFromMonth}
+            compareToMonth={compareToMonth}
             focusIdentifier={focusIdentifierParam}
             focusRank={focusRankParam}
             tableRef={tableRef}
@@ -1001,13 +1144,16 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMonth, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
 }: {
   servers: string[];
   classes: string[];
   range: DaysFilter;
   sortKey: string;
-  compareMonth: string;
+  compareMode: ToplistsCompareMode;
+  progressSinceMonth: string;
+  compareFromMonth: string;
+  compareToMonth: string;
   focusIdentifier: string | null;
   focusRank: number | null;
   tableRef: React.RefObject<HTMLDivElement>;
@@ -1106,6 +1252,16 @@ function TableDataView({
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
   const rows = playerRows || [];
+  const isCompareMonthsMode = compareMode === "months";
+  const progressBaselineMonth = String(progressSinceMonth ?? "").trim();
+  const compareFromMonthValue = String(compareFromMonth ?? "").trim();
+  const compareToMonthValue = String(compareToMonth ?? "").trim();
+  const activeBaselineCompareMonth = compareMode === "progress"
+    ? progressBaselineMonth
+    : compareMode === "months"
+      ? compareFromMonthValue
+      : "";
+  const activeTargetCompareMonth = isCompareMonthsMode ? compareToMonthValue : "";
   const favoritePlayerSet = React.useMemo(() => {
     const keys = Object.keys(user?.favorites?.players ?? {});
     return new Set(keys.map((key) => key.trim().toLowerCase()).filter(Boolean));
@@ -1147,8 +1303,13 @@ function TableDataView({
     missingServers: string[];
     error: string | null;
   }>({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-
-  const showCompare = Boolean(compareMonth) && !compareState.loading;
+  const [compareTargetState, setCompareTargetState] = React.useState<{
+    rows: FirestoreToplistPlayerRow[];
+    loading: boolean;
+    baselineServers: string[];
+    missingServers: string[];
+    error: string | null;
+  }>({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
 
   const compareServersKey = React.useMemo(
     () => normalizeServerList(servers).join(","),
@@ -1164,25 +1325,60 @@ function TableDataView({
       .filter(Boolean);
     return new Set(normalized);
   }, [compareState.baselineServers]);
+  const compareLoading =
+    compareState.loading || (isCompareMonthsMode ? compareTargetState.loading : false);
+  const showCompare =
+    Boolean(activeBaselineCompareMonth) &&
+    (!isCompareMonthsMode || Boolean(activeTargetCompareMonth)) &&
+    !compareLoading;
 
   // persist compare selection in URL (optional param)
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
-    if (compareMonth) {
-      nextParams.set("compare", compareMonth);
+    const normalizedMode =
+      compareMode === "months"
+        ? "months"
+        : compareMode === "progress" && activeBaselineCompareMonth
+          ? "progress"
+          : "off";
+    if (normalizedMode === "progress" && activeBaselineCompareMonth) {
+      nextParams.set("compare", activeBaselineCompareMonth);
     } else {
       nextParams.delete("compare");
     }
-    const prev = searchParams.get("compare") ?? "";
-    if (prev !== compareMonth) {
+    if (normalizedMode === "months") {
+      nextParams.set("compareMode", "months");
+      if (compareFromMonthValue) nextParams.set("compareFrom", compareFromMonthValue);
+      else nextParams.delete("compareFrom");
+      if (compareToMonthValue) nextParams.set("compareTo", compareToMonthValue);
+      else nextParams.delete("compareTo");
+    } else {
+      if (normalizedMode === "progress") nextParams.set("compareMode", "progress");
+      else nextParams.delete("compareMode");
+      nextParams.delete("compareFrom");
+      nextParams.delete("compareTo");
+    }
+    if (normalizedMode === "off") {
+      nextParams.delete("compareMode");
+    }
+    const prevKey = searchParams.toString();
+    const nextKey = nextParams.toString();
+    if (prevKey !== nextKey) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [compareMonth, searchParams, setSearchParams]);
+  }, [
+    compareMode,
+    activeBaselineCompareMonth,
+    compareFromMonthValue,
+    compareToMonthValue,
+    searchParams,
+    setSearchParams,
+  ]);
 
-  // Load monthly snapshot(s) for comparison
+  // Load monthly baseline snapshot(s) for comparison
   useEffect(() => {
     let cancelled = false;
-    const normalizedCompareMonth = String(compareMonth ?? "").trim();
+    const normalizedCompareMonth = activeBaselineCompareMonth;
     const compareDisabled =
       !normalizedCompareMonth || normalizedCompareMonth.toLowerCase() === "off";
 
@@ -1217,14 +1413,6 @@ function TableDataView({
       };
     }
 
-    const mergeSnapshots = (snapshots: FirestoreLatestToplistSnapshot[]) => {
-      const mergedRows: FirestoreToplistPlayerRow[] = [];
-      for (const snapshot of snapshots) {
-        const players = Array.isArray(snapshot.players) ? snapshot.players : [];
-        for (const row of players) mergedRows.push({ ...row, server: snapshot.server || row.server });
-      }
-      return mergedRows;
-    };
     setCompareState((prev) => ({
       ...prev,
       loading: true,
@@ -1235,7 +1423,7 @@ function TableDataView({
 
     (async () => {
       const results: FirestoreLatestToplistResult[] = await Promise.all(
-        docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
+        docIds.map((docId) => getPlayerToplistSnapshotByDocId(docId))
       );
       if (cancelled) return;
 
@@ -1264,7 +1452,7 @@ function TableDataView({
         }
       });
 
-      const mergedRows = snapshots.length ? mergeSnapshots(snapshots) : [];
+      const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
       const missingKey = missingServers.length ? missingServers.join(", ") : null;
       const errorMsg = missingServers.length
         ? t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
@@ -1303,7 +1491,177 @@ function TableDataView({
     return () => {
       cancelled = true;
     };
-  }, [compareMonth, compareServersKey, t]);
+  }, [activeBaselineCompareMonth, compareServersKey, t]);
+
+  // Load compare target snapshot(s) when comparing month-to-month (visible list = "to" month)
+  useEffect(() => {
+    let cancelled = false;
+    const normalizedTargetMonth = activeTargetCompareMonth;
+    const compareDisabled =
+      !isCompareMonthsMode ||
+      !normalizedTargetMonth ||
+      normalizedTargetMonth.toLowerCase() === "off";
+
+    if (compareDisabled) {
+      setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!compareServers.length) {
+      setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const docIds = compareServers.map((s) => buildCompareDocId(s, normalizedTargetMonth));
+
+    setCompareTargetState((prev) => ({
+      ...prev,
+      loading: true,
+      baselineServers: [],
+      missingServers: [],
+      error: null,
+    }));
+
+    (async () => {
+      const results: FirestoreLatestToplistResult[] = await Promise.all(
+        docIds.map((docId) => getPlayerToplistSnapshotByDocId(docId))
+      );
+      if (cancelled) return;
+
+      const snapshots: FirestoreLatestToplistSnapshot[] = [];
+      const snapshotServers: string[] = [];
+      const missingServers: string[] = [];
+      let firstErrorCode: string | null = null;
+      let firstErrorDetail: string | null = null;
+
+      results.forEach((result: FirestoreLatestToplistResult, idx) => {
+        const docId = docIds[idx];
+        if (result.ok) {
+          const serverKey = (docId.split("__")[0] || "").trim();
+          snapshotServers.push(serverKey);
+          snapshots.push({
+            ...result.snapshot,
+            server: serverKey || result.snapshot.server,
+          });
+        } else {
+          const err: any = result;
+          missingServers.push(docId);
+          if (!firstErrorCode) {
+            firstErrorCode = err.error ?? null;
+            firstErrorDetail = err.detail ?? null;
+          }
+        }
+      });
+
+      const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
+      const missingKey = missingServers.length ? missingServers.join(", ") : null;
+      const errorMsg = missingServers.length
+        ? t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
+        : (firstErrorDetail ?? firstErrorCode ?? null);
+
+      const nextState = {
+        rows: mergedRows,
+        loading: false,
+        baselineServers: snapshotServers,
+        missingServers,
+        error: errorMsg,
+      };
+      setCompareTargetState(nextState);
+    })().catch((err) => {
+      if (cancelled) return;
+      const missingKey = docIds.join(", ");
+      const msg = t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
+      setCompareTargetState({
+        rows: [],
+        loading: false,
+        baselineServers: [],
+        missingServers: docIds,
+        error: msg,
+      });
+      console.warn("[ToplistsPlayersCompare] target snapshot fetch failed", err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTargetCompareMonth, compareServersKey, compareServers, isCompareMonthsMode, t]);
+
+  const compareMonthsTargetRows = React.useMemo(() => {
+    if (!isCompareMonthsMode) return [] as FirestoreToplistPlayerRow[];
+
+    let nextRows = Array.isArray(compareTargetState.rows) ? [...compareTargetState.rows] : [];
+    if (!nextRows.length) return nextRows;
+
+    nextRows = nextRows.map((row) => {
+      const mainRatio = deriveRatioMain(row.main, row.con);
+      const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
+      return {
+        ...row,
+        _ratioMain: mainRatio,
+        _calculatedSum: calculatedSum,
+      } as any;
+    });
+
+    nextRows = filterToplistRows(nextRows, filters);
+
+    if (selectedGuildSet && hasGuildData) {
+      nextRows = nextRows.filter((row) => {
+        const key = normalizeGuildKey(row.guild);
+        return key ? selectedGuildSet.has(key) : false;
+      });
+    }
+
+    if (favoritesOnly && user) {
+      nextRows = nextRows.filter((row) => {
+        const identifier = buildPlayerFavoriteIdentifierFromRow(row);
+        return !!(identifier && favoritePlayerSet.has(identifier));
+      });
+    }
+
+    if (sort.key !== "statsDay") {
+      sortToplistRows(nextRows, sort);
+    }
+
+    return nextRows;
+  }, [
+    isCompareMonthsMode,
+    compareTargetState.rows,
+    filters,
+    selectedGuildSet,
+    hasGuildData,
+    favoritesOnly,
+    user,
+    favoritePlayerSet,
+    sort,
+  ]);
+
+  const effectiveCompareMode: ToplistsCompareMode = React.useMemo(() => {
+    if (compareMode === "months") {
+      return activeBaselineCompareMonth && activeTargetCompareMonth ? "months" : "off";
+    }
+    if (compareMode === "progress") {
+      return activeBaselineCompareMonth ? "progress" : "off";
+    }
+    return "off";
+  }, [compareMode, activeBaselineCompareMonth, activeTargetCompareMonth]);
+  const effectiveCompareDaysOverride = React.useMemo(() => {
+    if (effectiveCompareMode !== "months") return null;
+    return getDaysBetweenMonthKeys(activeBaselineCompareMonth, activeTargetCompareMonth);
+  }, [effectiveCompareMode, activeBaselineCompareMonth, activeTargetCompareMonth]);
+  const effectiveCurrentRows = effectiveCompareMode === "months" ? compareMonthsTargetRows : filteredRows;
+  const effectiveBaselineRows = effectiveCompareMode === "off" ? [] : compareState.rows;
+  const activeCompareError =
+    effectiveCompareMode === "months"
+      ? (compareTargetState.error ?? compareState.error)
+      : compareState.error;
+  const tableLoading =
+    effectiveCompareMode === "months"
+      ? (compareTargetState.loading || compareState.loading)
+      : playerLoading;
 
   const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
     const pid = (row as any).playerId ?? (row as any).id;
@@ -1324,18 +1682,18 @@ function TableDataView({
   const baselineRowByKey = React.useMemo(() => {
     const map = new Map<string, FirestoreToplistPlayerRow>();
     if (!showCompare) return map;
-    compareState.rows.forEach((row) => {
+    effectiveBaselineRows.forEach((row) => {
       const key = buildCompareKey(row);
       if (!map.has(key)) {
         map.set(key, row);
       }
     });
     return map;
-  }, [showCompare, compareState.rows, buildCompareKey]);
+  }, [showCompare, effectiveBaselineRows, buildCompareKey]);
 
   const currentRowsWithCompare = React.useMemo(() => {
-    if (!showCompare) return filteredRows;
-    return filteredRows.map((row) => {
+    if (!showCompare) return effectiveCurrentRows;
+    return effectiveCurrentRows.map((row) => {
       const key = buildCompareKey(row);
       const past = baselineRowByKey.get(key);
       const serverKey = normalizeServerCode(String((row as any).server ?? ""));
@@ -1364,7 +1722,7 @@ function TableDataView({
       let statsDays: number | null = null;
       let statsPerDay: number | null = null;
       if (!compareMissing && past) {
-        const stats = computeStatsDay(row, past, sumDelta);
+        const stats = computeStatsDay(row, past, sumDelta, effectiveCompareDaysOverride);
         statsDays = stats.days;
         statsPerDay = stats.perDay;
       }
@@ -1389,7 +1747,14 @@ function TableDataView({
         },
       };
     });
-  }, [showCompare, filteredRows, buildCompareKey, baselineRowByKey, baselineServerSet]);
+  }, [
+    showCompare,
+    effectiveCurrentRows,
+    buildCompareKey,
+    baselineRowByKey,
+    baselineServerSet,
+    effectiveCompareDaysOverride,
+  ]);
 
   const currentRowByKey = React.useMemo(() => {
     const map = new Map<string, FirestoreToplistPlayerRow>();
@@ -1405,7 +1770,7 @@ function TableDataView({
   const baselineRowLimit = React.useMemo(() => {
     if (!showCompare) return null;
     const counts = new Map<string, number>();
-    compareState.rows.forEach((row) => {
+    effectiveBaselineRows.forEach((row) => {
       const serverKey = normalizeServerCode(String(row.server ?? ""));
       const next = (counts.get(serverKey) || 0) + 1;
       counts.set(serverKey, next);
@@ -1415,17 +1780,19 @@ function TableDataView({
       if (value > max) max = value;
     });
     return max || null;
-  }, [showCompare, compareState.rows]);
+  }, [showCompare, effectiveBaselineRows]);
 
   const baselineCombinedRows = React.useMemo(() => {
     if (!showCompare) return [];
-    let rows = Array.isArray(compareState.rows) ? [...compareState.rows] : [];
+    let rows = Array.isArray(effectiveBaselineRows) ? [...effectiveBaselineRows] : [];
     if (!rows.length) return rows;
 
     rows = rows.map((row) => {
       const mainRatio = deriveRatioMain(row.main, row.con);
       const currentMatch = currentRowByKey.get(buildCompareKey(row));
-      const stats = currentMatch ? computeStatsDay(currentMatch, row) : { days: null, perDay: null };
+      const stats = currentMatch
+        ? computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride)
+        : { days: null, perDay: null };
       const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
       return {
         ...row,
@@ -1452,7 +1819,18 @@ function TableDataView({
     }
 
     return rows;
-  }, [showCompare, compareState.rows, filters, sort, selectedGuildSet, hasGuildData, baselineRowLimit, currentRowByKey, buildCompareKey]);
+  }, [
+    showCompare,
+    effectiveBaselineRows,
+    filters,
+    sort,
+    selectedGuildSet,
+    hasGuildData,
+    baselineRowLimit,
+    currentRowByKey,
+    buildCompareKey,
+    effectiveCompareDaysOverride,
+  ]);
 
   const baselineRankByKey = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -1586,7 +1964,7 @@ function TableDataView({
   const nowMs = Date.now();
   const statusLabel = !hasServers
     ? "No server selected"
-    : playerLoading
+    : tableLoading || compareState.loading
       ? "Loading..."
       : playerError
         ? "Error"
@@ -1884,10 +2262,10 @@ function TableDataView({
             </tr>
           );
         })}
-        {playerLoading && enhancedRows.length === 0 && (
+        {tableLoading && enhancedRows.length === 0 && (
           <tr><td colSpan={15} style={{ padding: 12 }}>Loading...</td></tr>
         )}
-        {!playerLoading && !playerError && rows.length === 0 && (
+        {!tableLoading && !playerError && enhancedRows.length === 0 && (
           <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
         )}
       </tbody>
@@ -1900,9 +2278,9 @@ function TableDataView({
         <div>{statusLabel} - {enhancedRows.length} rows</div>
         <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
       </div>
-      {compareMonth && compareState.error && (
+      {(activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
         <div style={{ fontSize: 12, color: "#ffb347" }}>
-          {compareState.error}
+          {activeCompareError}
         </div>
       )}
       {playerScopeStatus && (

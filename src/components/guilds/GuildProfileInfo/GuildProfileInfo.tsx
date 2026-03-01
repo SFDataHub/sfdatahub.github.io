@@ -7,7 +7,6 @@ import TotalStatsCard from "./cards/TotalStatsCard";
 import GeneralInfoCard from "./cards/GeneralInfoCard";
 import FortressCard from "./cards/FortressCard";
 import RankingsCard from "./cards/RankingsCard";
-import ServerComparisonCard from "./cards/ServerComparisonCard";
 
 const GuildProfileInfo = memo(function GuildProfileInfo({
   guild, snapshot, emblemUrl, colors,
@@ -54,9 +53,6 @@ const GuildProfileInfo = memo(function GuildProfileInfo({
         <RankingsCard  colors={colors} />
       </div>
 
-      <div className="mt-4">
-        <ServerComparisonCard colors={colors} />
-      </div>
     </div>
   );
 });

@@ -2,13 +2,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import HeroPanel from "../../components/player-profile/HeroPanel";
 import {
   ChartsTab,
   ComparisonTab,
   HistoryTab,
-  ProgressTab,
   StatsTab,
 } from "../../components/player-profile/TabPanels";
 import type {
@@ -32,26 +31,56 @@ import {
   beginReadScope,
   endReadScope,
   traceGetDoc,
-  traceGetDocs,
   type FirestoreTraceScope,
 } from "../../lib/debug/firestoreReadTrace";
 import { buildPlayerIdentifier } from "../../lib/players/identifier";
+import { buildStatsModelFromLatestValues } from "../../lib/parsing/latestValues";
 import { useAuth } from "../../context/AuthContext";
+import {
+  buildFallbackProgressSeries,
+  usePlayerProgressSnapshots,
+} from "../../lib/player-progress/usePlayerProgressSnapshots";
 import "./player-profile.css";
 
-const TABS = ["Statistiken", "Charts", "Fortschritt", "Vergleich", "Historie"] as const;
-type TabKey = (typeof TABS)[number];
+const TAB_CONFIG = [
+  { key: "statistics", labelKey: "playerProfile.tabs.statistics", defaultLabel: "Statistics" },
+  { key: "progress", labelKey: "playerProfile.tabs.progress", defaultLabel: "Progress" },
+  { key: "compare", labelKey: "playerProfile.tabs.compare", defaultLabel: "Compare" },
+  { key: "history", labelKey: "playerProfile.tabs.history", defaultLabel: "History" },
+] as const;
+type TabKey = (typeof TAB_CONFIG)[number]["key"];
+const TAB_ALIASES: Record<string, TabKey> = {
+  statistics: "statistics",
+  stats: "statistics",
+  statistiken: "statistics",
+  progress: "progress",
+  charts: "progress",
+  chart: "progress",
+  fortschritt: "progress",
+  compare: "compare",
+  vergleich: "compare",
+  history: "history",
+  historie: "history",
+};
 
 const PROFILE_CACHE_PREFIX = "sf_profile_player__";
 const PROFILE_SERVER_INDEX_KEY = "sf_profile_player_server_index";
 const PROFILE_CACHE_TTL_MS = 60 * 60 * 1000;
-const CHARTS_CACHE_PREFIX = "playerProfile:charts:monthly3:";
-const CHARTS_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
-const CHARTS_CACHE_VERSION = 3;
-const CHARTS_RANGE_LABEL = "Last 3 months";
-const CHARTS_CACHE_SOURCE = "history_monthly";
+// Update if the game increases scrapbook sticker capacity.
+const ALBUM_ITEMS_TOTAL = 2396;
 
 const HONOR_VALUE_KEYS = ["honor", "ehre", "honour", "honorpoints", "ehrepunkte"];
+
+const resolveTabFromLocation = (): TabKey | null => {
+  if (typeof window === "undefined") return null;
+  const searchTab = new URLSearchParams(window.location.search).get("tab");
+  const hash = window.location.hash ?? "";
+  const hashQueryIndex = hash.indexOf("?");
+  const hashTab = hashQueryIndex >= 0 ? new URLSearchParams(hash.slice(hashQueryIndex + 1)).get("tab") : null;
+  const candidate = (searchTab ?? hashTab ?? "").trim().toLowerCase();
+  if (!candidate) return null;
+  return TAB_ALIASES[candidate] ?? null;
+};
 
 const BASE_STAT_CONFIG: { key: keyof BaseStatValues; label: string; base: string[]; total: string[] }[] = [
   { key: "str", label: "Stärke", base: ["Base Strength", "Stärke", "basestrength"], total: ["Strength"] },
@@ -85,25 +114,6 @@ type PlayerSnapshot = {
   saveString?: string | null;
 };
 
-type ChartMetricValues = {
-  level: number | null;
-  totalStats: number | null;
-  honor: number | null;
-};
-
-type MonthlyChartEntry = {
-  monthId: string;
-  lastTs: number | null;
-  values: ChartMetricValues;
-};
-
-type ChartsCachePayload = {
-  fetchedAt: number;
-  version: number;
-  source: string;
-  months: MonthlyChartEntry[];
-};
-
 type PlayerProfileScreenProps = {
   heroOnly?: boolean;
 };
@@ -113,23 +123,25 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   const routeIdentifier = params.identifier ?? "";
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { isFavoritePlayer, toggleFavoritePlayer } = useAuth();
+  const { user, isFavoritePlayer, toggleFavoritePlayer } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<PlayerSnapshot | null>(null);
-  const [tab, setTab] = useState<TabKey>("Statistiken");
+  const [tab, setTab] = useState<TabKey>("statistics");
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [avatarSnapshot, setAvatarSnapshot] = useState<AvatarSnapshot | null>(null);
   const [, setAvatarLoading] = useState(false);
   const [, setAvatarError] = useState<Error | null>(null);
-  const [chartsSeries, setChartsSeries] = useState<TrendSeries[] | null>(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
-  const chartsLoadingRef = useRef(false);
-  const chartsSourceRef = useRef<"monthly" | "cache" | "fallback" | null>(null);
-  const chartsLoadedKeyRef = useRef<string | null>(null);
-  const chartsSeriesRef = useRef<TrendSeries[] | null>(null);
   const feedbackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const resolvedTab = resolveTabFromLocation();
+    if (resolvedTab) {
+      setTab(resolvedTab);
+    }
+  }, [routeIdentifier]);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,17 +321,6 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
     };
   }, [routeIdentifier]);
 
-  useEffect(() => {
-    setChartsSeries(null);
-    chartsLoadingRef.current = false;
-    chartsSourceRef.current = null;
-    chartsLoadedKeyRef.current = null;
-  }, [routeIdentifier, snapshot?.server]);
-
-  useEffect(() => {
-    chartsSeriesRef.current = chartsSeries;
-  }, [chartsSeries]);
-
   const handleTabChange = (next: TabKey) => {
     setTab(next);
   };
@@ -364,164 +365,103 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
     };
   }, [snapshot?.avatarIdentifier, snapshot?.id]);
 
-  useEffect(() => {
-    if (tab !== "Charts") return;
-    if (!snapshot?.id) return;
-    const currentKey = `${normalizeServerKey(snapshot.server)}:${snapshot.id}`;
-    if (chartsLoadingRef.current) return;
-    if (
-      chartsLoadedKeyRef.current === currentKey &&
-      chartsSourceRef.current &&
-      chartsSeriesRef.current
-    ) {
-      return;
-    }
-
-    const cacheKey = buildChartsCacheKey(snapshot.id, snapshot.server);
-    const cached = loadChartsCache(cacheKey);
-    if (cached) {
-      const nextSeries = buildSeriesFromMonthly(cached.months);
-      setChartsSeries((prev) => {
-        const same = trendSeriesEqual(prev, nextSeries);
-        if (!same) {
-          console.log(`[charts] load set from cache key=${currentKey} months=${cached.months.length}`);
-        }
-        return same ? prev : nextSeries;
-      });
-      chartsSeriesRef.current = buildSeriesFromMonthly(cached.months);
-      chartsSourceRef.current = "cache";
-      chartsLoadedKeyRef.current = currentKey;
-      return;
-    }
-
-    let cancelled = false;
-    chartsLoadingRef.current = true;
-    console.log(`[charts] load start key=${currentKey} source=firestore`);
-    const scope: FirestoreTraceScope = beginReadScope("PlayerProfile:charts");
-
-    const loadMonthlyHistory = async () => {
-      try {
-        const historyIdentifier = snapshot.identifier;
-        if (!historyIdentifier) {
-          removeChartsCache(cacheKey);
-          if (!cancelled) {
-            const fallbackSeries = buildFallbackCharts(snapshot);
-            chartsSeriesRef.current = fallbackSeries;
-            chartsSourceRef.current = "fallback";
-            chartsLoadedKeyRef.current = currentKey;
-            setChartsSeries((prev) => (trendSeriesEqual(prev, fallbackSeries) ? prev : fallbackSeries));
-            console.log(`[charts] load done key=${currentKey} months=0 (missing identifier)`);
-          }
-          return;
-        }
-
-        const colRef = collection(db, `players/${historyIdentifier}/history_monthly`);
-        const q = query(colRef, orderBy(documentId(), "desc"), limit(3));
-        const snap = await traceGetDocs(scope, { path: colRef.path }, () => getDocs(q));
-        const months = snap.docs
-          .map((docSnap) => mapMonthlyDocToEntry(docSnap))
-          .filter((m): m is MonthlyChartEntry => !!m);
-        if (!months.length) {
-          removeChartsCache(cacheKey);
-          if (!cancelled) {
-            const fallbackSeries = buildFallbackCharts(snapshot);
-            chartsSeriesRef.current = fallbackSeries;
-            chartsSourceRef.current = "fallback";
-            chartsLoadedKeyRef.current = currentKey;
-            setChartsSeries((prev) => (trendSeriesEqual(prev, fallbackSeries) ? prev : fallbackSeries));
-            console.log(`[charts] load done key=${currentKey} months=0 (fallback)`);
-          }
-          return;
-        }
-
-        const series = buildSeriesFromMonthly(months);
-        if (!cancelled) {
-          chartsSeriesRef.current = series;
-          chartsSourceRef.current = "monthly";
-          chartsLoadedKeyRef.current = currentKey;
-          setChartsSeries((prev) => (trendSeriesEqual(prev, series) ? prev : series));
-          saveChartsCache(cacheKey, months);
-          console.log(`[charts] load done key=${currentKey} months=${months.length}`);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const fallbackSeries = buildFallbackCharts(snapshot);
-          chartsSeriesRef.current = fallbackSeries;
-          chartsSourceRef.current = "fallback";
-          chartsLoadedKeyRef.current = currentKey;
-          setChartsSeries((prev) => (trendSeriesEqual(prev, fallbackSeries) ? prev : fallbackSeries));
-          console.log(`[charts] load error key=${currentKey}`, error);
-        }
-      } finally {
-        chartsLoadingRef.current = false;
-        endReadScope(scope);
-      }
-    };
-
-    loadMonthlyHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tab, snapshot?.id, snapshot?.identifier, snapshot?.server]);
+  const currentHistoryIdentifier = useMemo(
+    () =>
+      snapshot
+        ? (snapshot.identifier ?? buildPlayerIdentifier(snapshot.server ?? null, snapshot.id))?.trim().toLowerCase() ?? null
+        : null,
+    [snapshot],
+  );
+  const favoritePlayerIdentifiers = useMemo(
+    () =>
+      Object.keys(user?.favorites?.players ?? {})
+        .map((identifier) => identifier.trim().toLowerCase())
+        .filter((identifier) => !!identifier),
+    [user?.favorites?.players],
+  );
+  const progressSnapshotIdentifiers = useMemo(
+    () => (currentHistoryIdentifier ? [currentHistoryIdentifier] : []),
+    [currentHistoryIdentifier],
+  );
+  const { byIdentifier: progressSnapshotsByIdentifier } = usePlayerProgressSnapshots({
+    identifiers: progressSnapshotIdentifiers,
+  });
+  const chartsSeries = useMemo<TrendSeries[] | null>(() => {
+    if (!snapshot) return null;
+    if (!currentHistoryIdentifier) return buildFallbackProgressSeries();
+    return progressSnapshotsByIdentifier[currentHistoryIdentifier]?.series ?? buildFallbackProgressSeries();
+  }, [currentHistoryIdentifier, progressSnapshotsByIdentifier, snapshot]);
 
   const viewModel = useMemo<PlayerProfileViewModel | null>(
     () => (snapshot ? buildProfileView(snapshot, avatarSnapshot, chartsSeries) : null),
     [snapshot, avatarSnapshot, chartsSeries],
   );
-  const favoriteIdentifier =
-    snapshot
-      ? (snapshot.identifier ?? buildPlayerIdentifier(snapshot.server ?? null, snapshot.id))?.trim().toLowerCase() ??
-        null
-      : null;
+  const favoriteIdentifier = currentHistoryIdentifier;
   const playerIsFavorite = isFavoritePlayer(favoriteIdentifier);
   const favoriteToggleLabel = playerIsFavorite
-    ? t("profile.favorite.remove", { defaultValue: "Remove from favorites" })
-    : t("profile.favorite.add", { defaultValue: "Add to favorites" });
+    ? t("playerProfile.heroPanel.actions.favorite.remove", { defaultValue: "Remove from favorites" })
+    : t("playerProfile.heroPanel.actions.favorite.add", { defaultValue: "Add to favorites" });
   const heroViewData = useMemo(() => {
     if (!viewModel) return null;
-    const profileActionLabelByKey: Record<string, string> = {
-      rescan: t("player.profile.cta.showInToplist", {
-        defaultValue: "Show in Top List",
-      }),
+    const metricLabelByRaw: Record<string, string> = {
+      Mount: t("playerProfile.heroPanel.stats.mount", { defaultValue: "Mount" }),
+      Level: t("playerProfile.heroPanel.stats.level", { defaultValue: "Level" }),
+      Scrapbook: t("playerProfile.heroPanel.stats.scrapbook", { defaultValue: "Scrapbook" }),
+      "Total Base Stats": t("playerProfile.heroPanel.stats.totalBaseStats", { defaultValue: "Total Base Stats" }),
     };
-    if (!heroOnly) {
-      return {
-        ...viewModel.hero,
-        actions: viewModel.hero.actions.map((action) => {
-          const localized = profileActionLabelByKey[String(action.key)];
-          if (!localized) return action;
-          return {
-            ...action,
-            label: localized,
-            title: localized,
-          };
-        }),
-      };
-    }
-    const overlayActionLabelByKey: Record<string, string> = {
-      rescan: t("profile.overlay.heroActions.openPlayerProfile", {
-        defaultValue: "Open player profile",
-      }),
-      guild: t("profile.overlay.heroActions.openGuild", {
-        defaultValue: "Open guild",
-      }),
-      share: t("profile.overlay.heroActions.share", {
-        defaultValue: "Share",
-      }),
-      "copy-link": t("profile.overlay.heroActions.copyLink", {
-        defaultValue: "Copy link",
-      }),
+    const badgeLabelByRaw: Record<string, string> = {
+      Mount: t("playerProfile.heroPanel.stats.mount", { defaultValue: "Mount" }),
+      Honor: t("playerProfile.heroPanel.stats.honor", { defaultValue: "Honor" }),
+      Gildenrolle: t("playerProfile.heroPanel.stats.guildRole", { defaultValue: "Guild role" }),
+      HoF: t("playerProfile.heroPanel.stats.hof", { defaultValue: "HoF" }),
     };
+    const actionLabelByKey: Record<string, string> = heroOnly
+      ? {
+          rescan: t("playerProfile.heroPanel.actions.openPlayerProfile", {
+            defaultValue: "Open player profile",
+          }),
+          guild: t("playerProfile.heroPanel.actions.openGuild", { defaultValue: "Open guild" }),
+          share: t("playerProfile.heroPanel.actions.share", { defaultValue: "Share" }),
+          "copy-link": t("playerProfile.heroPanel.actions.copyLink", { defaultValue: "Copy link" }),
+        }
+      : {
+          rescan: t("playerProfile.heroPanel.actions.showInTopList", {
+            defaultValue: "Show in Top List",
+          }),
+          guild: t("playerProfile.heroPanel.actions.openGuild", { defaultValue: "Open guild" }),
+          share: t("playerProfile.heroPanel.actions.share", { defaultValue: "Share" }),
+          "copy-link": t("playerProfile.heroPanel.actions.copyLink", { defaultValue: "Copy link" }),
+        };
     return {
       ...viewModel.hero,
+      metrics: viewModel.hero.metrics.map((metric) => ({
+        ...metric,
+        label: metricLabelByRaw[metric.label] ?? metric.label,
+      })),
+      badges: viewModel.hero.badges.map((badge) => ({
+        ...badge,
+        label: badgeLabelByRaw[badge.label] ?? badge.label,
+      })),
       actions: viewModel.hero.actions.map((action) => {
-        const localized = overlayActionLabelByKey[String(action.key)];
+        const actionKey = String(action.key);
+        const localized = actionLabelByKey[actionKey];
         if (!localized) return action;
+        let localizedTitle = action.title;
+        if (actionKey === "guild" && action.disabled) {
+          localizedTitle = t("playerProfile.heroPanel.tooltips.noGuildLinked", {
+            defaultValue: "No guild linked in latest scan.",
+          });
+        } else if (actionKey === "share") {
+          localizedTitle = t("playerProfile.heroPanel.tooltips.shareSystemShareSheet", {
+            defaultValue: "System Share Sheet",
+          });
+        } else if (heroOnly || actionKey === "rescan") {
+          localizedTitle = localized;
+        }
         return {
           ...action,
           label: localized,
-          title: localized,
+          title: localizedTitle,
         };
       }),
     };
@@ -655,15 +595,20 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   const renderTabs = () => {
     if (!viewModel) return null;
     switch (tab) {
-      case "Statistiken":
+      case "statistics":
         return <StatsTab data={viewModel.stats} />;
-      case "Charts":
+      case "progress":
         return <ChartsTab series={viewModel.charts} />;
-      case "Fortschritt":
-        return <ProgressTab items={viewModel.progress} />;
-      case "Vergleich":
-        return <ComparisonTab rows={viewModel.comparison} />;
-      case "Historie":
+      case "compare":
+        return (
+          <ComparisonTab
+            rows={viewModel.comparison}
+            currentIdentifier={currentHistoryIdentifier}
+            currentPlayerLabel={snapshot?.name ?? currentHistoryIdentifier ?? null}
+            favoriteIdentifiers={favoritePlayerIdentifiers}
+          />
+        );
+      case "history":
         return <HistoryTab entries={viewModel.history} />;
       default:
         return null;
@@ -714,19 +659,23 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           <ActionFeedback message={actionFeedback} />
           {!heroOnly && (
             <>
-              <div className="player-profile__tabs" role="tablist" aria-label="Spielerprofil Tabs">
-                {TABS.map((entry) => {
-                  const active = tab === entry;
+              <div
+                className="player-profile__tabs"
+                role="tablist"
+                aria-label={t("playerProfile.tabs.ariaLabel", { defaultValue: "Player profile tabs" })}
+              >
+                {TAB_CONFIG.map((entry) => {
+                  const active = tab === entry.key;
                   return (
                     <button
-                      key={entry}
+                      key={entry.key}
                       type="button"
                       role="tab"
                       aria-selected={active}
                       className={`player-profile__tab-button ${active ? "player-profile__tab-button--active" : ""}`}
-                      onClick={() => handleTabChange(entry)}
+                      onClick={() => handleTabChange(entry.key)}
                     >
-                      {entry}
+                      {t(entry.labelKey, { defaultValue: entry.defaultLabel })}
                     </button>
                   );
                 })}
@@ -807,178 +756,6 @@ const buildValueLookup = (values: Record<string, any>) => {
       return fallback;
     },
   };
-};
-
-const normalizeServerKey = (server?: string | null) => {
-  if (typeof server !== "string") return "unknown";
-  const normalized = server.trim().toLowerCase().replace(/\./g, "_");
-  return normalized || "unknown";
-};
-
-const buildChartsCacheKey = (playerId: string, server?: string | null) =>
-  `${CHARTS_CACHE_PREFIX}${normalizeServerKey(server)}:${playerId}`;
-
-const toChartNumber = (value: number | null | undefined) =>
-  typeof value === "number" && Number.isFinite(value) ? value : 0;
-
-const ensurePointCount = (points: number[], desired = 3) => {
-  const normalized = points.map((p) => (Number.isFinite(p) ? p : 0));
-  if (!normalized.length) normalized.push(0);
-  while (normalized.length < desired) normalized.unshift(normalized[0] ?? 0);
-  return normalized.slice(-desired);
-};
-
-const createChartsSeries = (levelPoints: number[], totalStatsPoints: number[], honorPoints: number[]): TrendSeries[] => [
-  { label: "Level Verlauf", points: ensurePointCount(levelPoints), unit: "", subLabel: CHARTS_RANGE_LABEL },
-  { label: "Total Stats", points: ensurePointCount(totalStatsPoints), unit: "", subLabel: CHARTS_RANGE_LABEL },
-  { label: "Honor", points: ensurePointCount(honorPoints), unit: "", subLabel: CHARTS_RANGE_LABEL },
-];
-
-const extractChartMetrics = (values: Record<string, any>): ChartMetricValues => {
-  const lookup = buildValueLookup(values || {});
-  const level = lookup.number(["level"]);
-  const honor = lookup.number(HONOR_VALUE_KEYS);
-  const totalStatsDirect = lookup.number(["totalstats", "stats"]);
-  let totalStats = totalStatsDirect;
-
-  if (totalStats == null) {
-    let sum = 0;
-    let count = 0;
-    BASE_STAT_CONFIG.forEach((entry) => {
-      const val = lookup.number(entry.total) ?? lookup.number(entry.base);
-      if (val != null) {
-        sum += val;
-        count++;
-      }
-    });
-    totalStats = count ? sum : null;
-  }
-
-  return { level, totalStats, honor };
-};
-
-const buildSeriesFromMonthly = (months: MonthlyChartEntry[]): TrendSeries[] => {
-  if (!months.length) return createChartsSeries([], [], []);
-  const sorted = [...months].sort((a, b) => a.monthId.localeCompare(b.monthId));
-  const levelPoints = sorted.map((m) => toChartNumber(m.values.level));
-  const totalStatsPoints = sorted.map((m) => toChartNumber(m.values.totalStats));
-  const honorPoints = sorted.map((m) => toChartNumber(m.values.honor));
-  return createChartsSeries(levelPoints, totalStatsPoints, honorPoints);
-};
-
-const trendSeriesEqual = (a: TrendSeries[] | null, b: TrendSeries[] | null) => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].label !== b[i].label || a[i].unit !== b[i].unit || a[i].subLabel !== b[i].subLabel) return false;
-    if (a[i].points.length !== b[i].points.length) return false;
-    for (let j = 0; j < a[i].points.length; j++) {
-      if (a[i].points[j] !== b[i].points[j]) return false;
-    }
-  }
-  return true;
-};
-
-const mapMonthlyDocToEntry = (docSnap: any): MonthlyChartEntry | null => {
-  const data = (typeof docSnap.data === "function" ? docSnap.data() : {}) as any;
-  const values = (data?.values && typeof data.values === "object" ? data.values : {}) as Record<string, any>;
-  const monthId = typeof data?.monthId === "string" && data.monthId ? data.monthId : docSnap.id;
-  if (!monthId) return null;
-  return {
-    monthId,
-    lastTs: toNum(data?.lastTs ?? data?.lastTimestamp ?? data?.lastTimestampRaw) ?? null,
-    values: extractChartMetrics(values),
-  };
-};
-
-const removeChartsCache = (key: string) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-};
-
-const loadChartsCache = (key: string): ChartsCachePayload | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ChartsCachePayload;
-    const isValidSource = parsed?.source === CHARTS_CACHE_SOURCE;
-    const hasFreshTimestamps = typeof parsed.fetchedAt === "number" && parsed.version === CHARTS_CACHE_VERSION;
-    const isFresh = hasFreshTimestamps && Date.now() - parsed.fetchedAt <= CHARTS_CACHE_TTL_MS;
-    const monthsRaw = Array.isArray(parsed.months) ? parsed.months : null;
-
-    if (!isValidSource || !hasFreshTimestamps || !isFresh || !monthsRaw) {
-      removeChartsCache(key);
-      return null;
-    }
-
-    const months: MonthlyChartEntry[] = monthsRaw
-      .map((m: any) => {
-        if (!m || typeof m.monthId !== "string") return null;
-        return {
-          monthId: m.monthId,
-          lastTs: typeof m.lastTs === "number" ? m.lastTs : null,
-          values: {
-            level: toNum(m.values?.level) ?? null,
-            totalStats: toNum(m.values?.totalStats) ?? null,
-            honor: toNum(m.values?.honor) ?? null,
-          },
-        };
-      })
-      .filter((m): m is MonthlyChartEntry => !!m);
-
-    if (months.length < 1) {
-      removeChartsCache(key);
-      return null;
-    }
-
-    return { fetchedAt: parsed.fetchedAt, version: parsed.version, source: CHARTS_CACHE_SOURCE, months };
-  } catch {
-    removeChartsCache(key);
-    return null;
-  }
-};
-
-const saveChartsCache = (key: string, months: MonthlyChartEntry[]) => {
-  if (typeof window === "undefined" || months.length < 1) return;
-  const payload: ChartsCachePayload = {
-    fetchedAt: Date.now(),
-    version: CHARTS_CACHE_VERSION,
-    source: CHARTS_CACHE_SOURCE,
-    months: months.map((m) => ({
-      monthId: m.monthId,
-      lastTs: m.lastTs,
-      values: {
-        level: m.values.level ?? null,
-        totalStats: m.values.totalStats ?? null,
-        honor: m.values.honor ?? null,
-      },
-    })),
-  };
-  try {
-    window.localStorage.setItem(key, JSON.stringify(payload));
-  } catch {
-    // ignore cache write errors
-  }
-};
-
-const buildFallbackCharts = (snapshot: PlayerSnapshot): TrendSeries[] => {
-  const metrics = extractChartMetrics(snapshot.values || {});
-  const values: ChartMetricValues = {
-    level: metrics.level ?? snapshot.level ?? null,
-    totalStats: metrics.totalStats ?? snapshot.totalStats ?? null,
-    honor: metrics.honor ?? null,
-  };
-  return createChartsSeries(
-    [toChartNumber(values.level)],
-    [toChartNumber(values.totalStats)],
-    [toChartNumber(values.honor)],
-  );
 };
 
 const createSeededRandom = (seed: string) => {
@@ -1138,6 +915,8 @@ const buildProfileView = (
       ? mountNameRaw
       : null;
   const mountPercentRaw =
+    values?.Mount ??
+    values?.mount ??
     values?.["Mount %"] ??
     values?.["mount %"] ??
     values?.MountPct ??
@@ -1147,6 +926,7 @@ const buildProfileView = (
   const mountPercent = toNum(mountPercentRaw) ?? lookup.number(mountPercentKeys);
   const mountPercentFromName = mountName ? toNum((mountName.match(/(\d+)\s*%/) || [])[1]) : null;
   const mountPercentResolved = mountPercent ?? mountPercentFromName;
+  const mountRace = typeof values?.Race === "string" ? values.Race : null;
   let mountLabel = "-";
   if (mountName) {
     mountLabel = mountPercentResolved != null && !/%/.test(mountName)
@@ -1166,14 +946,47 @@ const buildProfileView = (
       : lastScanRaw ?? formatDateTimeFromSeconds(timestampSeconds) ?? "-";
   const scanAgeDays = snapshot.lastScanDays ?? (timestampSeconds != null ? daysSince(timestampSeconds) : null);
 
+  const xpValue = lookup.number(["xp"]) ?? toNum(values?.XP);
+  const xpRequiredValue = lookup.number(["xprequired", "xpnext", "xptonextlevel"]) ?? toNum(values?.["XP Required"]);
+  const levelXpRemaining =
+    xpValue != null && xpRequiredValue != null ? Math.max(0, xpRequiredValue - xpValue) : null;
+  const levelGaugeProgress =
+    xpValue != null && xpRequiredValue != null && xpRequiredValue > 0 ? Math.min(1, Math.max(0, xpValue / xpRequiredValue)) : 0;
+  const albumItemsValue =
+    lookup.number(["albumitems", "albumstickers", "stickercount", "scrapbookitems"]) ??
+    toNum(values?.["Album Items"]);
+  const scrapbookGaugeProgress =
+    albumItemsValue != null ? Math.min(1, Math.max(0, albumItemsValue / ALBUM_ITEMS_TOTAL)) : 0;
+  const scrapbookGaugePercent = `${(scrapbookGaugeProgress * 100).toFixed(2)}%`;
   const heroMetrics = [
-    { label: "Last Scan", value: lastScanDisplay },
-    { label: "Level", value: level != null ? `Lvl ${formatNumber(level)}` : "-" },
-    { label: "Scrapbook", value: formatPercent(scrapbookProgress) },
+    { label: "Mount", value: mountLabel ?? "-" },
+    {
+      label: "Level",
+      value: level != null ? `Lvl ${formatNumber(level)}` : "Lvl -",
+      gauge: {
+        progress: levelGaugeProgress,
+        centerTop: level != null ? `Lvl ${formatNumber(level)}` : "Lvl -",
+        centerBottom: `${Math.round(levelGaugeProgress * 100)}%`,
+        details: [
+          `XP: ${formatNumber(xpValue)}`,
+          `XP Required: ${formatNumber(xpRequiredValue)}`,
+          ...(levelXpRemaining != null ? [`XP Remaining: ${formatNumber(levelXpRemaining)}`] : []),
+        ],
+      },
+    },
+    {
+      label: "Scrapbook",
+      value: scrapbookGaugePercent,
+      gauge: {
+        progress: scrapbookGaugeProgress,
+        centerTop: scrapbookGaugePercent,
+        centerBottom: `${formatNumber(albumItemsValue)} / ${ALBUM_ITEMS_TOTAL}`,
+        details: [`${formatNumber(albumItemsValue)} / ${ALBUM_ITEMS_TOTAL}`],
+      },
+    },
     { label: "Total Base Stats", value: calculatedTotalBaseStats != null ? formatNumber(calculatedTotalBaseStats) : "-" },
   ];
   const heroBadges = [
-    { label: "Mount", value: mountLabel ?? "-", tone: "neutral" as const },
     { label: "Honor", value: formatNumber(honor), tone: "success" as const },
     { label: "Gildenrolle", value: guildRole ?? "-", tone: "warning" as const },
     { label: "HoF", value: hofRank != null ? `#${formatNumber(hofRank)}` : "-", tone: "neutral" as const },
@@ -1181,6 +994,7 @@ const buildProfileView = (
 
   const heroBaseStats = hasBaseStats ? baseStats : undefined;
 
+  const statsTab = buildStatsModelFromLatestValues(values);
   const hero = {
     playerName: snapshot.name,
     className: snapshot.className,
@@ -1213,32 +1027,9 @@ const buildProfileView = (
     baseStats: heroBaseStats,
     totalStats: hasTotalStats ? totalStatsDetail : undefined,
     totalStatsValue: calculatedTotalStats,
-  };
-
-  const statsTab = {
-    summary: [
-      { label: "Power Score", value: formatNumber(powerScore), hint: "Level * SumBase" },
-      { label: "Honor", value: formatNumber(honor) },
-      { label: "HoF Platz", value: hofRank ? `#${formatNumber(hofRank)}` : "-" },
-      { label: "Letzter Scan", value: formatDaysAgo(scanAgeDays) ?? "-" },
-    ],
-    attributes: baseStatConfig.map((a) => ({
-      label: a.label,
-      baseLabel: formatNumber(lookup.number(a.base)),
-      totalLabel: lookup.number(a.total) != null ? `Gesamt ${formatNumber(lookup.number(a.total))}` : undefined,
-    })),
-    resistances: [
-      { label: "Feuer", value: `${Math.round(rand() * 40 + 40)}%` },
-      { label: "Schatten", value: `${Math.round(rand() * 40 + 35)}%` },
-      { label: "Frost", value: `${Math.round(rand() * 30 + 30)}%` },
-      { label: "Licht", value: `${Math.round(rand() * 20 + 30)}%` },
-    ],
-    resources: [
-      { label: "Gold/h", value: `${formatNumber(Math.round((level ?? 1) * (rand() * 8 + 3)))}k` },
-      { label: "XP/h", value: `${formatNumber(Math.round((level ?? 1) * (rand() * 5 + 2)))}k` },
-      { label: "Mount Bonus", value: mountLabel },
-      { label: "Quest Slots", value: `${Math.round(rand() * 2) + 3}` },
-    ],
+    mountRace: mountRace ?? null,
+    mountPercentValue: mountPercentResolved ?? null,
+    potionsSlots: statsTab.potions.slots,
   };
 
   const progressTab = [
@@ -1280,13 +1071,7 @@ const buildProfileView = (
     },
   ];
 
-  const charts =
-    chartsOverride ??
-    createChartsSeries(
-      [toChartNumber(level)],
-      [toChartNumber(totalStats)],
-      [toChartNumber(honor)],
-    );
+  const charts = chartsOverride ?? buildFallbackProgressSeries();
 
   const comparisonRows: import("../../components/player-profile/types").ComparisonRow[] = [
     {
