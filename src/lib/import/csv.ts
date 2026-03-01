@@ -31,6 +31,7 @@ import {
 
 /** ---- Public types ---- */
 export type ImportCsvKind = "players" | "guilds";
+export type ImportScanWriteMode = "user" | "monthly";
 
 export type ImportProgress = {
   phase: "prepare" | "write" | "done";
@@ -50,6 +51,7 @@ export type ImportCsvOptions = {
   onProgress?: (p: ImportProgress) => void;
   serverHostMap?: Map<string, string>;
   skipGuildDerived?: boolean;
+  scanWriteMode?: ImportScanWriteMode;
 };
 
 export type ImportRecordStatus = "created" | "duplicate" | "error";
@@ -472,13 +474,13 @@ function toSecFlexible(v: any): number | null {
   const s = String(v).trim();
   if (/^\d{13}$/.test(s)) return Math.floor(Number(s) / 1000);
   if (/^\d{10}$/.test(s)) return Number(s);
-  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const dd = Number(m[1]);
     const MM = Number(m[2]) - 1;
     const yyyy = Number(m[3]);
-    const hh = Number(m[4]);
-    const mm = Number(m[5]);
+    const hh = m[4] ? Number(m[4]) : 0;
+    const mm = m[5] ? Number(m[5]) : 0;
     const ss = m[6] ? Number(m[6]) : 0;
     const d = new Date(yyyy, MM, dd, hh, mm, ss);
     if (!Number.isNaN(d.getTime())) return Math.floor(d.getTime() / 1000);
@@ -515,6 +517,13 @@ function monthIdFromSec(sec: number): string {
   const d = new Date(sec * 1000);
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function monthKeyUtcFromSec(sec: number): string {
+  const d = new Date(sec * 1000);
+  const y = d.getUTCFullYear();
+  const m = (d.getUTCMonth() + 1).toString().padStart(2, "0");
   return `${y}-${m}`;
 }
 
@@ -1345,13 +1354,58 @@ async function commitBatched(
   onProgress?.({ phase: "done", current: 1, total: 1, pass: passName });
 }
 
-type ScanDoc = { ref: ReturnType<typeof doc>; data: any; key: string };
+type ScanDoc = {
+  ref: ReturnType<typeof doc>;
+  data: any;
+  key: string;
+  monthlyMeta?: {
+    monthlyKey: string;
+  };
+};
+
+async function backfillMissingMonthlyScanMetadata(scan: ScanDoc): Promise<boolean> {
+  if (!scan.monthlyMeta) return false;
+  try {
+    const snap = await traceGetDoc(null, scan.ref, () => getDoc(scan.ref), {
+      label: "ImportCsv:scansDuplicateRead",
+    });
+    if (!snap.exists()) return false;
+    const data = snap.data() as Record<string, unknown>;
+    const patch: Record<string, string> = {};
+    const scanKind =
+      typeof data?.scanKind === "string" ? data.scanKind.trim() : "";
+    const monthlyKey =
+      typeof data?.monthlyKey === "string" ? data.monthlyKey.trim() : "";
+
+    if (!scanKind) patch.scanKind = "monthly";
+    if (!monthlyKey) patch.monthlyKey = scan.monthlyMeta.monthlyKey;
+
+    if (!Object.keys(patch).length) return false;
+    await traceSetDoc(scan.ref, () => setDoc(scan.ref, patch, { merge: true }), {
+      label: "ImportCsv:scansDuplicateMonthlyBackfill",
+    });
+    recordWrite({
+      path: scan.ref.path,
+      op: "setDoc",
+      docCount: 1,
+      label: "ImportCsv:scansDuplicateMonthlyBackfill",
+    });
+    return true;
+  } catch (error) {
+    console.warn("[ImportCsv] Failed monthly scan metadata backfill on duplicate", {
+      path: scan.ref.path,
+      error,
+    });
+    return false;
+  }
+}
 
 async function writeScansWithResults(
   scans: ScanDoc[],
   onProgress?: ImportCsvOptions["onProgress"],
   kind?: ImportCsvKind,
   onErrorCode?: (error: unknown) => void,
+  scanWriteMode?: ImportScanWriteMode,
 ): Promise<ImportResultItem[]> {
   const results: ImportResultItem[] = [];
   if (!scans.length) return results;
@@ -1401,7 +1455,8 @@ async function writeScansWithResults(
       emit("write");
     };
 
-    for (const { ref, data, key } of scans) {
+    for (const scan of scans) {
+      const { ref, data, key } = scan;
       writer
         .create(ref, data)
         .then(() => {
@@ -1410,11 +1465,14 @@ async function writeScansWithResults(
           results.push({ key, status: "created" });
           tick();
         })
-        .catch((error: any) => {
+        .catch(async (error: any) => {
           onErrorCode?.(error);
           const code = String(error?.code ?? "").toLowerCase();
           if (code.includes("already") && code.includes("exist")) {
             duplicate++;
+            if (scanWriteMode === "monthly") {
+              await backfillMissingMonthlyScanMetadata(scan);
+            }
             results.push({ key, status: "duplicate" });
           } else {
             errorCount++;
@@ -1436,7 +1494,8 @@ async function writeScansWithResults(
 
   // Fallback: no bulkWriter available, behave like previous set/merge (statuses all "created")
   // Use per-doc set to avoid whole-batch failures; permission-denied on existing scans is treated as duplicate.
-  for (const { ref, data, key } of scans) {
+  for (const scan of scans) {
+    const { ref, data, key } = scan;
     try {
       await traceSetDoc(ref, () => setDoc(ref, data), { label: "ImportCsv:scansFallback" });
       created++;
@@ -1445,6 +1504,9 @@ async function writeScansWithResults(
       onErrorCode?.(error);
       const code = String(error?.code ?? "").toLowerCase();
       if (code.includes("permission") || code.includes("already")) {
+        if (scanWriteMode === "monthly") {
+          await backfillMissingMonthlyScanMetadata(scan);
+        }
         duplicate++;
         results.push({ key, status: "duplicate", message: String(error?.message ?? error) });
       } else {
@@ -2124,7 +2186,20 @@ export async function importCsvToDB(
           name: parsed.name,
           values: parsed.raw,
           createdAt: serverTimestamp(),
+          ...(opts.scanWriteMode === "monthly"
+            ? {
+                scanKind: "monthly" as const,
+                monthlyKey: monthKeyUtcFromSec(parsed.timestampSec),
+              }
+            : {}),
         },
+        ...(opts.scanWriteMode === "monthly"
+          ? {
+              monthlyMeta: {
+                monthlyKey: monthKeyUtcFromSec(parsed.timestampSec),
+              },
+            }
+          : {}),
       });
 
       if (!byIdentifier.has(parsed.identifier)) byIdentifier.set(parsed.identifier, []);
@@ -2147,6 +2222,7 @@ export async function importCsvToDB(
       emitProgress,
       "players",
       trackFirestoreErrorCode,
+      opts.scanWriteMode,
     );
     playerResults.push(...scanResults);
     counts.writtenScanPlayers = scanResults.filter((r) => r.status === "created").length;
@@ -2268,84 +2344,7 @@ export async function importCsvToDB(
         pendingDerivedByServer.get(snapshotServerKey)!.push(snapshotEntry);
       }
 
-      // buckets
-      const weekly = new Map<string, PlayerRowMeta[]>();
-      const monthly = new Map<string, PlayerRowMeta[]>();
-
-      for (const m of metas) {
-        const w = weekIdFromSec(m.ts);
-        const ym = monthIdFromSec(m.ts);
-        if (!weekly.has(w)) weekly.set(w, []);
-        if (!monthly.has(ym)) monthly.set(ym, []);
-        weekly.get(w)!.push(m);
-        monthly.get(ym)!.push(m);
-      }
-
-      for (const [wid, list] of weekly) {
-        list.sort((a, b) => a.ts - b.ts);
-        const aggr = aggregateValues(list, ALL_HEADERS);
-        const bounds = weekBoundsFromSec(list[list.length - 1].ts);
-        const lastM = list[list.length - 1];
-
-        const ref = doc(db, `players/${identifier}/history_weekly/${wid}`);
-        putHistory.push({
-          path: ref.path,
-          op: "setDoc",
-          label: "ImportCsv:historyWeekly",
-          apply: (batch) => {
-            batch.set(
-              ref,
-              {
-                playerId: pid,
-                weekId: wid,
-                periodStartSec: bounds.start,
-                periodEndSec: bounds.end,
-                lastTs: lastM.ts,
-                lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
-                server: lastM.parsed.server,
-                name: lastM.parsed.name,
-                values: aggr,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true }
-            );
-          },
-        });
-        counts.writtenWeeklyPlayers!++;
-      }
-
-      for (const [ym, list] of monthly) {
-        list.sort((a, b) => a.ts - b.ts);
-        const aggr = aggregateValues(list, ALL_HEADERS);
-        const bounds = monthBoundsFromSec(list[list.length - 1].ts);
-        const lastM = list[list.length - 1];
-
-        const ref = doc(db, `players/${identifier}/history_monthly/${ym}`);
-        putHistory.push({
-          path: ref.path,
-          op: "setDoc",
-          label: "ImportCsv:historyMonthly",
-          apply: (batch) => {
-            batch.set(
-              ref,
-              {
-                playerId: pid,
-                monthId: ym,
-                periodStartSec: bounds.start,
-                periodEndSec: bounds.end,
-                lastTs: lastM.ts,
-                lastTimestampRaw: pickByCanon(lastM.row, COL.PLAYERS.TIMESTAMP),
-                server: lastM.parsed.server,
-                name: lastM.parsed.name,
-                values: aggr,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true }
-            );
-          },
-        });
-        counts.writtenMonthlyPlayers!++;
-      }
+      // NOTE: Player history (weekly/monthly) writes disabled. History is now derived on-demand from scans.
     }
 
     await writeLatest(latestDocs, emitProgress, "players", trackFirestoreErrorCode);
@@ -2394,12 +2393,7 @@ export async function importCsvToDB(
         });
       }
     }
-    try {
-      await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
-    } catch (error) {
-      trackFirestoreErrorCode(error);
-      throw error;
-    }
+    // Player history writes intentionally removed. Do not commit "history" batch for players.
   }
 
   // ---------- GUILDS ----------
@@ -2472,6 +2466,7 @@ export async function importCsvToDB(
       emitProgress,
       "guilds",
       trackFirestoreErrorCode,
+      undefined,
     );
     guildResults.push(...scanResults);
     counts.writtenScanGuilds = scanResults.filter((r) => r.status === "created").length;

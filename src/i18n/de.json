@@ -1,4 +1,7 @@
 ﻿{
+  "common": {
+    "noData": "Keine Daten"
+  },
   "nav": {
     "home": "Start",
     "dashboard": "Dashboard",
@@ -33,6 +36,7 @@
     "errorLog": "Fehlerprotokoll",
     "feedback": "Feedback",
     "users": "Nutzer",
+    "uploadCenter": "Upload Center",
     "profile": "Profil",
     "account": "Account",
     "appearance": "Darstellung",
@@ -495,7 +499,11 @@
     }
   },
   "toplists": {
+    "compareMode": "Compare Mode",
     "compareMonth": "Fortschritt seit",
+    "compareMonths": "Compare months",
+    "compareFrom": "Von",
+    "compareTo": "Bis",
     "compareOff": "Aus",
     "compareMissingSnapshot": "Keine Basisdaten für {{key}}.",
     "deltaNew": "NEU",
@@ -534,6 +542,290 @@
     "profile": {
       "cta": {
         "showInToplist": "In Topliste anzeigen"
+      }
+    }
+  },
+  "playerProfile": {
+    "heroPanel": {
+      "actions": {
+        "favorite": {
+          "add": "Zu Favoriten hinzufügen",
+          "remove": "Aus Favoriten entfernen"
+        },
+        "showInTopList": "In Topliste anzeigen",
+        "openPlayerProfile": "Spielerprofil öffnen",
+        "openGuild": "Gilde öffnen",
+        "share": "Teilen",
+        "copyLink": "Link kopieren"
+      },
+      "tooltips": {
+        "lastScanAt": "Letzter Scan: {{value}}",
+        "noGuildLinked": "Keine Gilde im letzten Scan verknüpft.",
+        "shareSystemShareSheet": "System-Share-Sheet",
+        "age": {
+          "label": "Alter: {{value}}",
+          "today": "heute",
+          "oneDayAgo": "vor 1 Tag",
+          "daysAgo": "vor {{days}} Tagen"
+        }
+      },
+      "stats": {
+        "lastScan": "Letzter Scan",
+        "level": "Level",
+        "scrapbook": "Scrapbook",
+        "totalBaseStats": "Basiswerte gesamt",
+        "totalStats": "Werte gesamt",
+        "mount": "Reittier",
+        "honor": "Ehre",
+        "guildRole": "Gildenrolle",
+        "hof": "HoF",
+        "attributeBars": {
+          "baseStats": "Basiswerte",
+          "totalStats": "Gesamtwerte",
+          "viewModeAriaLabel": "Attributansicht",
+          "modeBase": "Basis",
+          "modeTotal": "Gesamt",
+          "server": "Server",
+          "guild": "Gilde",
+          "iconAlt": "{{name}}-Symbol",
+          "attributes": {
+            "str": "Stärke",
+            "dex": "Geschick",
+            "int": "Intelligenz",
+            "con": "Ausdauer",
+            "lck": "Glück"
+          }
+        },
+        "potions": {
+          "ariaLabel": "Trank-Slots",
+          "activeLabel": "Aktive Tränke:",
+          "slot1": "Trank 1",
+          "slot2": "Trank 2",
+          "slot3": "Trank 3",
+          "size": "Größe"
+        }
+      },
+      "meta": {
+        "classUnknown": "Klasse ?",
+        "lastScanned": "Zuletzt gescannt"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Unbekannt",
+            "hint": "Scan-Verlauf nicht verfügbar"
+          },
+          "scannedToday": {
+            "label": "Heute gescannt",
+            "hint": "Kein Rescan nötig"
+          },
+          "veryFresh": {
+            "label": "Sehr frisch",
+            "hint": "Kein Rescan nötig"
+          },
+          "fresh": {
+            "label": "Frisch",
+            "hint": "Kein Rescan nötig"
+          },
+          "recent": {
+            "label": "Kürzlich",
+            "hint": "Rescan empfohlen"
+          },
+          "aging": {
+            "label": "Älter",
+            "hint": "Rescan empfohlen"
+          },
+          "outdated": {
+            "label": "Veraltet",
+            "hint": "Rescan dringend empfohlen"
+          },
+          "stale": {
+            "label": "Stark veraltet",
+            "hint": "Rescan dringend empfohlen"
+          }
+        }
+      },
+      "portrait": {
+        "canvasAriaLabel": "Porträt von {{label}}",
+        "status": {
+          "idle": "Porträt lädt ...",
+          "loading": "PortraitMaker wird initialisiert ...",
+          "ready": "PortraitMaker bereit",
+          "error": "PortraitMaker konnte nicht geladen werden"
+        }
+      }
+    },
+    "tabs": {
+      "ariaLabel": "Spielerprofil-Tabs",
+      "statistics": "Statistiken",
+      "progress": "Fortschritt",
+      "compare": "Vergleich",
+      "history": "Historie"
+    },
+    "chartsTab": {
+      "sections": {
+        "coreProgress": "Kernfortschritt",
+        "attributesBase": "Attribute (Basis)",
+        "attributesTotals": "Attribute (Gesamt)",
+        "economy": "Wirtschaft",
+        "experience": "Erfahrung"
+      },
+      "labels": {
+        "monthlyHistory": "Monatlicher Verlauf",
+        "latest": "{{metric}} (aktuell)",
+        "start": "{{metric}} (Start)",
+        "scanAt": "Scan",
+        "avgMarker": "Linie + Durchschnittsmarker"
+      },
+      "metrics": {
+        "level": "Level",
+        "totalStats": "Werte gesamt",
+        "honor": "Ehre",
+        "main": "Hauptattribut",
+        "con": "Ausdauer (Con)",
+        "sum": "Summe",
+        "mainTotal": "Hauptattribut gesamt",
+        "conTotal": "Con gesamt",
+        "sumTotal": "Summe gesamt",
+        "mine": "Mine",
+        "treasury": "Schatzkammer",
+        "xpTotal": "XP Gesamt",
+        "xpProgress": "XP Fortschritt"
+      }
+    },
+    "statsTab": {
+      "common": {
+        "yes": "Ja",
+        "no": "Nein"
+      },
+      "combat": {
+        "title": "Kampf-Snapshot",
+        "armor": "Ruestung",
+        "health": "Leben",
+        "damageMin": "Schaden Min",
+        "damageMax": "Schaden Max",
+        "damageAvg": "Schaden Avg",
+        "weaponDamageMultiplier": "Waffenschaden-Multiplikator",
+        "maximumDamageReduction": "Max Schadensreduktion"
+      },
+      "potions": {
+        "title": "Traenke & Aktive Effekte",
+        "slot1": "Trank 1",
+        "slot2": "Trank 2",
+        "slot3": "Trank 3",
+        "size": "Groesse",
+        "lifePotion": "Lebens-Trank"
+      },
+      "attrComposition": {
+        "title": "Attribut-Zusammensetzung",
+        "subtitle": "Gestapelte Anteile aus latest.values",
+        "bonus": "Bonus",
+        "attributes": {
+          "str": "Staerke",
+          "dex": "Geschick",
+          "int": "Intelligenz",
+          "con": "Ausdauer",
+          "lck": "Glueck"
+        },
+        "breakdown": {
+          "base": "Basis",
+          "baseItems": "Basis-Items",
+          "upgrades": "Upgrades",
+          "equipment": "Ausrüstung",
+          "gems": "Edelsteine",
+          "pet": "Pet-Bonus",
+          "potion": "Trank",
+          "items": "Items",
+          "petBonus": "Pet-Anzahl",
+          "other": "Sonstiges"
+        }
+      },
+      "runesResists": {
+        "title": "Runen & Resistenzen"
+      },
+      "runes": {
+        "title": "Runen",
+        "gold": "Rune Gold",
+        "xp": "Rune XP",
+        "chance": "Rune Chance",
+        "quality": "Rune Quality",
+        "health": "Rune Health",
+        "damage": "Rune Damage",
+        "resist": "Rune Resist"
+      },
+      "resistances": {
+        "title": "Resistenzen",
+        "elementalDamage": "Elementarschaden",
+        "fire": "Feuerresist",
+        "cold": "Kalteresist",
+        "lightning": "Blitzresist",
+        "fireDamage": "Feuerschaden",
+        "coldDamage": "Kalteschaden",
+        "lightningDamage": "Blitzschaden"
+      },
+      "fortress": {
+        "title": "Festungs-Matrix",
+        "guide": "Guide",
+        "guideFortress": "Festungs-Guide öffnen",
+        "guideBuilding": "Guide für {{building}}",
+        "groups": {
+          "economy": "Oekonomie",
+          "combat": "Kampf",
+          "utility": "Utility"
+        },
+        "labels": {
+          "fortress": "Festung",
+          "upgrades": "Upgrades",
+          "fortifications": "Befestigungen",
+          "wall": "Mauer",
+          "space": "Platz",
+          "quarters": "Unterkunft",
+          "portal": "Portal",
+          "woodcutter": "Holzfaeller",
+          "quarry": "Steinbruch",
+          "gemMine": "Edelsteinmine",
+          "academy": "Akademie",
+          "smithy": "Schmiede",
+          "treasury": "Schatzkammer",
+          "barracks": "Kasernen",
+          "mageTower": "Magierturm",
+          "archeryGuild": "Schuetzengilde",
+          "rank": "Festungsrang",
+          "honor": "Festungsehre"
+        }
+      },
+      "guild": {
+        "title": "Gilden-Meta",
+        "guild": "Gilde",
+        "guildIdentifier": "Gilden-Identifier",
+        "role": "Rolle",
+        "joined": "Gilde beigetreten",
+        "portal": "Gilden-Portal"
+      },
+      "progress": {
+        "title": "Raids & XP",
+        "raidsSection": "Raids",
+        "xpSection": "XP",
+        "raids": "Raids",
+        "raidHonor": "Raid-Ehre",
+        "raidWood": "Raid-Holz",
+        "raidStone": "Raid-Stein",
+        "xp": "XP",
+        "xpRequired": "XP benoetigt",
+        "xpTotal": "XP gesamt"
+      },
+      "badges": {
+        "title": "Meilensteine",
+        "fortressLevel": "Festung L{{level}}",
+        "fortressMaxed": "Festung Max",
+        "runesEconomy": "Oekonomie-Runen",
+        "runesCombat": "Kampf-Runen",
+        "resists": "Elementar-Resistenzen",
+        "potions": "Trank-Trio",
+        "raider": "Raider: {{value}}"
+      },
+      "advanced": {
+        "title": "Erweitert"
       }
     }
   },

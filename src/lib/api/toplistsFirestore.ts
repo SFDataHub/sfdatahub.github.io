@@ -420,7 +420,7 @@ export async function getLatestPlayerToplistSnapshot(serverCode: string): Promis
   }
 }
 
-async function getPlayerToplistSnapshotByDocId(docId: string): Promise<FirestoreLatestToplistResult> {
+async function getPlayerToplistSnapshotByDocIdNoCache(docId: string): Promise<FirestoreLatestToplistResult> {
   const code = (docId || "").trim();
   if (!code) {
     return { ok: false, error: "decode_error", detail: "missing doc id" };
@@ -495,6 +495,58 @@ async function getPlayerToplistSnapshotByDocId(docId: string): Promise<Firestore
   }
 }
 
+export async function getPlayerToplistSnapshotByDocId(
+  docId: string,
+  opts?: { cache?: "localStorage" | "none" }
+): Promise<FirestoreLatestToplistResult> {
+  const code = (docId || "").trim();
+  if (!code) {
+    return { ok: false, error: "decode_error", detail: "missing doc id" };
+  }
+
+  const cacheMode = opts?.cache ?? "localStorage";
+  const useLocalStorageCache = cacheMode !== "none";
+  const cacheKey = getProgressSnapshotLSKey(code);
+
+  if (useLocalStorageCache) {
+    const cached = readLS<Partial<CachedProgressSnapshot>>(cacheKey);
+    if (
+      cached &&
+      cached.v === 1 &&
+      typeof cached.savedAt === "number" &&
+      cached.data &&
+      typeof cached.data === "object" &&
+      !snapshotHasInvalidRatio(cached.data as FirestoreLatestToplistSnapshot)
+    ) {
+      return { ok: true, snapshot: cached.data as FirestoreLatestToplistSnapshot };
+    }
+  }
+
+  const inFlightKey = `${code}::${cacheMode}`;
+  const existing = progressSnapshotInFlight.get(inFlightKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const result = await getPlayerToplistSnapshotByDocIdNoCache(code);
+    if (useLocalStorageCache && result.ok && !snapshotHasInvalidRatio(result.snapshot)) {
+      const entry: CachedProgressSnapshot = {
+        v: 1,
+        savedAt: Date.now(),
+        data: result.snapshot,
+      };
+      writeLS(cacheKey, entry);
+    }
+    return result;
+  })();
+
+  progressSnapshotInFlight.set(inFlightKey, promise);
+  try {
+    return await promise;
+  } finally {
+    progressSnapshotInFlight.delete(inFlightKey);
+  }
+}
+
 type SnapshotCacheEntry<T> = {
   snapshot: T;
   fetchedAt: number;
@@ -506,6 +558,16 @@ const getSnapshotCacheKey = (type: "players" | "guilds", serverCode: string) =>
 
 const getCompareSnapshotCacheKey = (docId: string) => `toplists:compare:${docId}`;
 const compareInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+const PROGRESS_SNAPSHOT_LS_PREFIX = "sfh:toplists:players:progress:";
+const MAX_PROGRESS_SNAPSHOTS = 10;
+type CachedProgressSnapshot = {
+  v: 1;
+  savedAt: number;
+  data: FirestoreLatestToplistSnapshot;
+};
+const progressSnapshotInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+
+const getProgressSnapshotLSKey = (docId: string) => `${PROGRESS_SNAPSHOT_LS_PREFIX}${docId}`;
 
 const nextFullHour = (nowMs: number) => {
   const d = new Date(nowMs);
@@ -514,6 +576,97 @@ const nextFullHour = (nowMs: number) => {
     d.setHours(d.getHours() + 1);
   }
   return d.getTime();
+};
+
+const readLS = <T,>(key: string): T | null => {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const isQuotaExceededError = (err: unknown) => {
+  const anyErr = err as any;
+  return Boolean(
+    anyErr &&
+    (anyErr.name === "QuotaExceededError" ||
+      anyErr.code === 22 ||
+      anyErr.code === 1014)
+  );
+};
+
+const listProgressSnapshotCacheKeysByAge = () => {
+  try {
+    if (typeof localStorage === "undefined") return [] as { key: string; savedAt: number }[];
+    const entries: { key: string; savedAt: number }[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(PROGRESS_SNAPSHOT_LS_PREFIX)) continue;
+      const cached = readLS<Partial<CachedProgressSnapshot>>(key);
+      const savedAt =
+        cached && typeof cached.savedAt === "number" && Number.isFinite(cached.savedAt)
+          ? cached.savedAt
+          : 0;
+      entries.push({ key, savedAt });
+    }
+    entries.sort((a, b) => a.savedAt - b.savedAt || a.key.localeCompare(b.key));
+    return entries;
+  } catch {
+    return [] as { key: string; savedAt: number }[];
+  }
+};
+
+const removeLSKey = (key: string) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+};
+
+const pruneProgressSnapshotCacheToCap = (maxEntries = MAX_PROGRESS_SNAPSHOTS) => {
+  const entries = listProgressSnapshotCacheKeysByAge();
+  if (entries.length <= maxEntries) return;
+  const removeCount = entries.length - maxEntries;
+  for (let i = 0; i < removeCount; i += 1) {
+    const key = entries[i]?.key;
+    if (key) removeLSKey(key);
+  }
+};
+
+const writeLS = (key: string, value: unknown): void => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const serialized = JSON.stringify(value);
+    try {
+      localStorage.setItem(key, serialized);
+      pruneProgressSnapshotCacheToCap();
+      return;
+    } catch (err) {
+      if (!isQuotaExceededError(err)) return;
+    }
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const entries = listProgressSnapshotCacheKeysByAge().filter((entry) => entry.key !== key);
+      const oldest = entries[0];
+      if (!oldest) break;
+      removeLSKey(oldest.key);
+      try {
+        localStorage.setItem(key, serialized);
+        pruneProgressSnapshotCacheToCap();
+        return;
+      } catch (err) {
+        if (!isQuotaExceededError(err)) return;
+      }
+    }
+  } catch {
+    // ignore cache write errors (privacy mode, quota, serialization)
+  }
 };
 
 const readSnapshotCache = <T,>(key: string): SnapshotCacheEntry<T> | null => {

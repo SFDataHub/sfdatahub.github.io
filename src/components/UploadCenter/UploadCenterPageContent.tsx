@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ContentShell from "../ContentShell";
 import ImportCsv, { buildParsedResultFromCsvSources, type CsvTextSource } from "../ImportCsv/ImportCsv";
-import type { UploadRecordKey, UploadRecordStatus } from "./uploadCenterTypes";
+import type { UploadRecordKey, UploadRecordStatus, UploadSession } from "./uploadCenterTypes";
 import type { UploadSessionId } from "./uploadCenterTypes";
 import { buildUploadSessionFromCsv, type CsvParsedResult } from "./uploadCenterCsvMapping";
 import { useUploadCenterSessions } from "./UploadCenterSessionsContext";
@@ -11,7 +11,7 @@ import {
   type ImportSelectionPayload,
   type ImportSelectionStageEvent,
 } from "../ImportCsv/importCsvToDb";
-import type { ImportProgress } from "../../lib/import/csv";
+import type { ImportProgress, ImportScanWriteMode } from "../../lib/import/csv";
 import {
   DEFAULT_UPLOAD_QUOTA,
   fetchUploadQuotaSnapshot,
@@ -32,6 +32,7 @@ import {
   persistUploadQuotaToStorage,
   readStoredUploadQuota,
 } from "../../lib/uploadQuotaStorage";
+import { AUTH_BASE_URL } from "../../lib/auth/config";
 
 type UploadCenterQuotaState = {
   config: UploadQuotaConfig;
@@ -107,6 +108,309 @@ const ClassIcon = ({ className }: { className?: string | null }) => {
   );
 };
 
+type UploadCenterScanMode = ImportScanWriteMode | "server_overview";
+
+type ServerOverviewServerSnapshot = {
+  players?: {
+    sampleCount: number;
+    avgLevel?: number;
+    avgHonor?: number;
+    avgTotalStats?: number;
+    classCounts: Record<string, number>;
+    classPercents?: Record<string, number>;
+  };
+  guilds?: {
+    guildCount: number;
+    avgMemberCount?: number;
+  };
+};
+
+type ServerOverviewBuildPayload = {
+  schemaVersion: 1;
+  monthKey?: string;
+  servers: Record<string, ServerOverviewServerSnapshot>;
+};
+
+const SERVER_OVERVIEW_HONOR_KEYS = [
+  "Honor",
+  "honor",
+  "Ehre",
+  "ehre",
+  "Honour",
+  "honour",
+  "Honor Points",
+  "HonorPoints",
+  "Ehrepunkte",
+] as const;
+
+const SERVER_OVERVIEW_TOTAL_STATS_KEYS = [
+  "Total Stats",
+  "TotalStats",
+  "totalStats",
+  "Base Stats",
+  "BaseStats",
+] as const;
+
+const canonValueKey = (value: string) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/:+$/, "")
+    .replace(/[\s_\u00a0]+/g, "");
+
+const pickRowValueByAliases = (
+  values: Record<string, any> | undefined,
+  aliases: readonly string[],
+): unknown => {
+  if (!values || typeof values !== "object") return undefined;
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(values, alias)) {
+      return values[alias];
+    }
+  }
+  const aliasSet = new Set(aliases.map((alias) => canonValueKey(alias)));
+  for (const key of Object.keys(values)) {
+    if (aliasSet.has(canonValueKey(key))) {
+      return values[key];
+    }
+  }
+  return undefined;
+};
+
+const toFiniteCsvNumber = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/[\s\u00a0,]/g, "");
+  const direct = Number(normalized);
+  if (Number.isFinite(direct)) return direct;
+  const digitsOnly = normalized.replace(/[^0-9.-]/g, "");
+  if (!digitsOnly || digitsOnly === "-" || digitsOnly === "." || digitsOnly === "-.") return null;
+  const fallback = Number(digitsOnly);
+  return Number.isFinite(fallback) ? fallback : null;
+};
+
+const roundMetric = (value: number): number => Math.round(value * 100) / 100;
+const roundPercent = (value: number): number => Math.round(value * 10000) / 10000;
+
+const buildServerOverviewPayloadFromSession = (
+  session: UploadSession,
+): {
+  payload: ServerOverviewBuildPayload;
+  selectedPlayers: number;
+  selectedGuilds: number;
+  serverCount: number;
+} => {
+  const selectedPlayers = session.players.filter((player) => player.selected);
+  const selectedGuilds = session.guilds.filter((guild) => guild.selected);
+  const servers = new Map<
+    string,
+    {
+      players: {
+        seenIds: Set<string>;
+        fallbackRowCount: number;
+        classCounts: Map<string, number>;
+        levelSum: number;
+        levelCount: number;
+        honorSum: number;
+        honorCount: number;
+        totalStatsSum: number;
+        totalStatsCount: number;
+      };
+      guilds: {
+        seenIds: Set<string>;
+        fallbackRowCount: number;
+        memberCountSum: number;
+        memberCountCount: number;
+      };
+    }
+  >();
+
+  for (const player of selectedPlayers) {
+    const serverKey = String(player.server ?? "").trim().toUpperCase();
+    if (!serverKey) continue;
+    if (!servers.has(serverKey)) {
+      servers.set(serverKey, {
+        players: {
+          seenIds: new Set<string>(),
+          fallbackRowCount: 0,
+          classCounts: new Map<string, number>(),
+          levelSum: 0,
+          levelCount: 0,
+          honorSum: 0,
+          honorCount: 0,
+          totalStatsSum: 0,
+          totalStatsCount: 0,
+        },
+        guilds: {
+          seenIds: new Set<string>(),
+          fallbackRowCount: 0,
+          memberCountSum: 0,
+          memberCountCount: 0,
+        },
+      });
+    }
+    const bucket = servers.get(serverKey)!;
+    bucket.players.fallbackRowCount += 1;
+
+    const playerId = String(player.playerId ?? "").trim();
+    if (playerId) bucket.players.seenIds.add(playerId);
+
+    const classKey = String(player.className ?? "").trim();
+    if (classKey) {
+      bucket.players.classCounts.set(classKey, (bucket.players.classCounts.get(classKey) ?? 0) + 1);
+    }
+
+    if (typeof player.level === "number" && Number.isFinite(player.level)) {
+      bucket.players.levelSum += player.level;
+      bucket.players.levelCount += 1;
+    }
+
+    const honor = toFiniteCsvNumber(
+      pickRowValueByAliases(player.values as Record<string, any> | undefined, SERVER_OVERVIEW_HONOR_KEYS),
+    );
+    if (honor != null) {
+      bucket.players.honorSum += honor;
+      bucket.players.honorCount += 1;
+    }
+
+    const totalStats = toFiniteCsvNumber(
+      pickRowValueByAliases(
+        player.values as Record<string, any> | undefined,
+        SERVER_OVERVIEW_TOTAL_STATS_KEYS,
+      ),
+    );
+    if (totalStats != null) {
+      bucket.players.totalStatsSum += totalStats;
+      bucket.players.totalStatsCount += 1;
+    }
+  }
+
+  for (const guild of selectedGuilds) {
+    const serverKey = String(guild.server ?? "").trim().toUpperCase();
+    if (!serverKey) continue;
+    if (!servers.has(serverKey)) {
+      servers.set(serverKey, {
+        players: {
+          seenIds: new Set<string>(),
+          fallbackRowCount: 0,
+          classCounts: new Map<string, number>(),
+          levelSum: 0,
+          levelCount: 0,
+          honorSum: 0,
+          honorCount: 0,
+          totalStatsSum: 0,
+          totalStatsCount: 0,
+        },
+        guilds: {
+          seenIds: new Set<string>(),
+          fallbackRowCount: 0,
+          memberCountSum: 0,
+          memberCountCount: 0,
+        },
+      });
+    }
+
+    const bucket = servers.get(serverKey)!;
+    bucket.guilds.fallbackRowCount += 1;
+
+    const guildId = String(guild.guildId ?? "").trim();
+    if (guildId) bucket.guilds.seenIds.add(guildId);
+
+    if (typeof guild.memberCount === "number" && Number.isFinite(guild.memberCount)) {
+      bucket.guilds.memberCountSum += guild.memberCount;
+      bucket.guilds.memberCountCount += 1;
+    }
+  }
+
+  const serverSnapshots: Record<string, ServerOverviewServerSnapshot> = {};
+  for (const [serverKey, bucket] of servers.entries()) {
+    const snapshot: ServerOverviewServerSnapshot = {};
+
+    if (bucket.players.fallbackRowCount > 0) {
+      const sampleCount = bucket.players.seenIds.size || bucket.players.fallbackRowCount;
+      const classCounts = Object.fromEntries(bucket.players.classCounts.entries());
+      const playersSnapshot: NonNullable<ServerOverviewServerSnapshot["players"]> = {
+        sampleCount,
+        classCounts,
+      };
+      if (bucket.players.levelCount > 0) {
+        playersSnapshot.avgLevel = roundMetric(bucket.players.levelSum / bucket.players.levelCount);
+      }
+      if (bucket.players.honorCount > 0) {
+        playersSnapshot.avgHonor = roundMetric(bucket.players.honorSum / bucket.players.honorCount);
+      }
+      if (bucket.players.totalStatsCount > 0) {
+        playersSnapshot.avgTotalStats = roundMetric(
+          bucket.players.totalStatsSum / bucket.players.totalStatsCount,
+        );
+      }
+      if (sampleCount > 0 && bucket.players.classCounts.size > 0) {
+        playersSnapshot.classPercents = Object.fromEntries(
+          Array.from(bucket.players.classCounts.entries()).map(([classKey, count]) => [
+            classKey,
+            roundPercent(count / sampleCount),
+          ]),
+        );
+      }
+      snapshot.players = playersSnapshot;
+    }
+
+    if (bucket.guilds.fallbackRowCount > 0) {
+      const guildCount = bucket.guilds.seenIds.size || bucket.guilds.fallbackRowCount;
+      const guildsSnapshot: NonNullable<ServerOverviewServerSnapshot["guilds"]> = {
+        guildCount,
+      };
+      if (bucket.guilds.memberCountCount > 0) {
+        guildsSnapshot.avgMemberCount = roundMetric(
+          bucket.guilds.memberCountSum / bucket.guilds.memberCountCount,
+        );
+      }
+      snapshot.guilds = guildsSnapshot;
+    }
+
+    serverSnapshots[serverKey] = snapshot;
+  }
+
+  return {
+    payload: { schemaVersion: 1, servers: serverSnapshots },
+    selectedPlayers: selectedPlayers.length,
+    selectedGuilds: selectedGuilds.length,
+    serverCount: Object.keys(serverSnapshots).length,
+  };
+};
+
+const postServerOverviewSnapshot = async (payload: ServerOverviewBuildPayload) => {
+  if (!AUTH_BASE_URL) {
+    throw new Error("Auth API base URL missing (set VITE_AUTH_BASE_URL).");
+  }
+  const endpoint = `${AUTH_BASE_URL}/api/admin/stats/server-overview/build`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const json = (await response.json()) as { error?: string };
+      if (json?.error) message = json.error;
+    } catch {
+      // Keep fallback message when body is not JSON.
+    }
+    throw new Error(message);
+  }
+
+  return response.json().catch(() => ({ ok: true }));
+};
+
 export default function UploadCenterPageContent() {
   return (
     <ContentShell
@@ -174,6 +478,9 @@ function UploadCenterContentBody() {
     buildQuotaState(DEFAULT_UPLOAD_QUOTA, { date: null, guilds: 0, players: 0 }, formatTodayString()),
   );
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [scanWriteMode, setScanWriteMode] = useState<UploadCenterScanMode | null>(null);
+  const [guildProgress, setGuildProgress] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [activityStage, setActivityStage] = useState<string>("idle");
   const [isFinalizing, setIsFinalizing] = useState<boolean>(false);
   const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
@@ -241,6 +548,12 @@ function UploadCenterContentBody() {
     user?.uploadCenter?.usage?.players,
     applyQuotaState,
   ]);
+
+  useEffect(() => {
+    if (scanWriteMode !== "monthly" && guildProgress) {
+      setGuildProgress(false);
+    }
+  }, [scanWriteMode, guildProgress]);
 
   const handleBuildSessionFromCsv = useCallback((parsed: CsvParsedResult) => {
     const sessionId: UploadSessionId = `csv_${Date.now()}`;
@@ -410,6 +723,15 @@ function UploadCenterContentBody() {
     const hasGuilds = activeSession.guilds.some((g) => g.selected);
     return hasPlayers || hasGuilds;
   }, [activeSession]);
+  const hasSelectedPlayers = useMemo(
+    () => Boolean(activeSession?.players.some((player) => player.selected)),
+    [activeSession],
+  );
+  const hasSelectedGuilds = useMemo(
+    () => Boolean(activeSession?.guilds.some((guild) => guild.selected)),
+    [activeSession],
+  );
+  const hasSelectedServerOverviewRows = hasSelectedPlayers || hasSelectedGuilds;
   const isUploadBusy =
     uploadProgress.phase === "uploading" || uploadProgress.phase === "finalizing";
   const getNowMs = () =>
@@ -439,48 +761,56 @@ function UploadCenterContentBody() {
     if (!selectedPlayers.length && !selectedGuilds.length) return null;
 
     const playersRows = selectedPlayers.map((p) => {
-      if (p.values && typeof p.values === "object") {
-        const row = { ...(p.values as Record<string, any>) };
-        if (row.Identifier == null && row.ID == null) row.Identifier = p.playerId;
-        if (row["Guild Identifier"] == null) row["Guild Identifier"] = p.guildId ?? "";
-        if (row.Timestamp == null) row.Timestamp = p.scanTimestampSec;
-        if (row.Server == null) row.Server = p.server;
-        if (row.Name == null) row.Name = p.name;
-        if (row.Class == null) row.Class = p.className ?? "";
-        if (row.Level == null) row.Level = p.level ?? "";
-        return row;
-      }
-      return {
-        Identifier: p.playerId,
-        "Guild Identifier": p.guildId ?? "",
-        Timestamp: p.scanTimestampSec,
-        Server: p.server,
-        Name: p.name,
-        Class: p.className ?? "",
-        Level: p.level ?? "",
-      };
+      const row: Record<string, any> =
+        p.values && typeof p.values === "object"
+          ? { ...(p.values as Record<string, any>) }
+          : {
+              Class: p.className ?? "",
+              Level: p.level ?? "",
+            };
+      row.Identifier = p.playerId;
+      row["Guild Identifier"] = p.guildId ?? "";
+      row.Timestamp = p.scanTimestampSec;
+      row.Server = p.server;
+      row.Name = p.name;
+      if (row.Class == null) row.Class = p.className ?? "";
+      if (row.Level == null) row.Level = p.level ?? "";
+      return row;
+    });
+    const connectedPlayersRows = activeSession.players.map((p) => {
+      const row: Record<string, any> =
+        p.values && typeof p.values === "object"
+          ? { ...(p.values as Record<string, any>) }
+          : {
+              Class: p.className ?? "",
+              Level: p.level ?? "",
+            };
+      row.Identifier = p.playerId;
+      row["Guild Identifier"] = p.guildId ?? "";
+      row.Timestamp = p.scanTimestampSec;
+      row.Server = p.server;
+      row.Name = p.name;
+      if (row.Class == null) row.Class = p.className ?? "";
+      if (row.Level == null) row.Level = p.level ?? "";
+      return row;
     });
 
     const guildsRows = selectedGuilds.map((g) => {
-      if (g.values && typeof g.values === "object") {
-        const row = { ...(g.values as Record<string, any>) };
-        if (row["Guild Identifier"] == null) row["Guild Identifier"] = g.guildId;
-        if (row["Guild Member Count"] == null) row["Guild Member Count"] = g.memberCount ?? g.members.length;
-        if (row.Timestamp == null) row.Timestamp = g.scanTimestampSec;
-        if (row.Server == null) row.Server = g.server;
-        if (row.Name == null) row.Name = g.name;
-        return row;
-      }
-      return {
-        "Guild Identifier": g.guildId,
-        "Guild Member Count": g.memberCount ?? g.members.length,
-        Timestamp: g.scanTimestampSec,
-        Name: g.name,
-        Server: g.server,
-      };
+      const row: Record<string, any> =
+        g.values && typeof g.values === "object"
+          ? { ...(g.values as Record<string, any>) }
+          : {
+              "Guild Member Count": g.memberCount ?? g.members.length,
+            };
+      row["Guild Identifier"] = g.guildId;
+      row["Guild Member Count"] = g.memberCount ?? g.members.length;
+      row.Timestamp = g.scanTimestampSec;
+      row.Server = g.server;
+      row.Name = g.name;
+      return row;
     });
 
-    return { playersRows, guildsRows };
+    return { playersRows, guildsRows, connectedPlayersRows };
   };
 
   const updateQuotaUsage = useCallback((deltaGuilds: number, deltaPlayers: number) => {
@@ -531,6 +861,63 @@ function UploadCenterContentBody() {
 
   const handleUploadSelectionToDb = async () => {
     if (!activeSession) return;
+    if (!scanWriteMode) return;
+    setActionFeedback(null);
+
+    if (scanWriteMode === "server_overview") {
+      if (!hasSelectedServerOverviewRows) {
+        setActionFeedback({
+          kind: "error",
+          message: "Select at least one player or guild row to build a server overview snapshot.",
+        });
+        return;
+      }
+
+      const startNow = getNowMs();
+      setUploadProgress({
+        phase: "uploading",
+        processed: 0,
+        total: 0,
+        created: 0,
+        duplicate: 0,
+        error: 0,
+      });
+      setActivityStage("server-overview:aggregate");
+      setIsFinalizing(false);
+      setActivityStartedAt(startNow);
+      setActivityLastTickAt(startNow);
+      setActivityNow(startNow);
+
+      try {
+        const { payload, selectedPlayers, selectedGuilds, serverCount } =
+          buildServerOverviewPayloadFromSession(activeSession);
+        setActivityStage("server-overview:api");
+        setActivityLastTickAt(getNowMs());
+        await postServerOverviewSnapshot(payload);
+        setActionFeedback({
+          kind: "success",
+          message: `Server overview snapshot updated (${serverCount} servers, ${selectedPlayers} player rows, ${selectedGuilds} guild rows).`,
+        });
+      } catch (error) {
+        console.error("[UploadCenter] Failed to build server overview snapshot", error);
+        setActionFeedback({
+          kind: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to build server overview snapshot.",
+        });
+      } finally {
+        setActivityStage("idle");
+        setIsFinalizing(false);
+        setActivityStartedAt(null);
+        setActivityLastTickAt(null);
+        setUploadProgress((prev) => ({ ...prev, phase: "done" }));
+      }
+
+      return;
+    }
+
     const payload = buildPayloadFromActiveSession();
     if (!payload) return;
     const selectedPlayers = activeSession.players.filter((p) => p.selected);
@@ -563,7 +950,7 @@ function UploadCenterContentBody() {
       error: 0,
     });
     const playerProgress = { processed: 0, created: 0, duplicate: 0, error: 0 };
-    const guildProgress = { processed: 0, created: 0, duplicate: 0, error: 0 };
+    const guildProgressTotals = { processed: 0, created: 0, duplicate: 0, error: 0 };
     const startNow = getNowMs();
     setActivityStage("scans");
     setIsFinalizing(false);
@@ -597,23 +984,23 @@ function UploadCenterContentBody() {
       console.info(`[upload] stage=${event.stage} done${msPart}`, event.details ?? {});
     };
     const updateTotals = () => {
-      const processed = Math.min(playerProgress.processed + guildProgress.processed, totalSelected);
+      const processed = Math.min(playerProgress.processed + guildProgressTotals.processed, totalSelected);
       const phase: UploadPhase = processed >= totalSelected && totalSelected > 0 ? "finalizing" : "uploading";
       setIsFinalizing(phase === "finalizing");
       setUploadProgress({
         phase,
         processed,
         total: totalSelected,
-        created: playerProgress.created + guildProgress.created,
-        duplicate: playerProgress.duplicate + guildProgress.duplicate,
-        error: playerProgress.error + guildProgress.error,
+        created: playerProgress.created + guildProgressTotals.created,
+        duplicate: playerProgress.duplicate + guildProgressTotals.duplicate,
+        error: playerProgress.error + guildProgressTotals.error,
       });
     };
     const handleProgress = (kind: "players" | "guilds") => (p: ImportProgress) => {
       if (p?.pass !== "scans") return;
       setActivityStage(`scans:${kind}`);
       setActivityLastTickAt(nowMs());
-      const target = kind === "players" ? playerProgress : guildProgress;
+      const target = kind === "players" ? playerProgress : guildProgressTotals;
       if (typeof p.current === "number") target.processed = Math.min(p.current, p.total ?? p.current);
       if (typeof p.created === "number") target.created = p.created;
       if (typeof p.duplicate === "number") target.duplicate = p.duplicate;
@@ -632,6 +1019,8 @@ function UploadCenterContentBody() {
           else if (p?.kind === "guilds") handleProgress("guilds")(p);
         },
         onStage: handleImportStage,
+        scanWriteMode,
+        guildProgress,
       });
 
       const sessionId = activeSession.id;
@@ -927,6 +1316,81 @@ function UploadCenterContentBody() {
                 Use these previews to decide what to keep. Tables will support filters, sorting, and selection before committing.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="w-full rounded-xl border border-slate-700/80 bg-slate-800/40 px-3 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                    {t("uploadCenter.scanMode.label", { defaultValue: "Scan type" })}
+                  </div>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-100">
+                      <input
+                        type="radio"
+                        name="upload-center-scan-mode"
+                        className="h-4 w-4 accent-emerald-400"
+                        checked={scanWriteMode === "user"}
+                        onChange={() => setScanWriteMode("user")}
+                        disabled={isUploadBusy}
+                      />
+                      <span>{t("uploadCenter.scanMode.user", { defaultValue: "User scan" })}</span>
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-100">
+                      <input
+                        type="radio"
+                        name="upload-center-scan-mode"
+                        className="h-4 w-4 accent-emerald-400"
+                        checked={scanWriteMode === "monthly"}
+                        onChange={() => setScanWriteMode("monthly")}
+                        disabled={isUploadBusy}
+                      />
+                      <span>{t("uploadCenter.scanMode.monthly", { defaultValue: "Monthly scan" })}</span>
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-100">
+                      <input
+                        type="radio"
+                        name="upload-center-scan-mode"
+                        className="h-4 w-4 accent-emerald-400"
+                        checked={scanWriteMode === "server_overview"}
+                        onChange={() => setScanWriteMode("server_overview")}
+                        disabled={isUploadBusy}
+                      />
+                      <span>
+                        {t("uploadCenter.scanMode.serverOverview", {
+                          defaultValue: "Server overview",
+                        })}
+                      </span>
+                    </label>
+                  </div>
+                  {scanWriteMode === "monthly" && (
+                    <div className="mt-3 flex flex-col gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 py-2">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-100">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-emerald-400"
+                          checked={guildProgress}
+                          onChange={(event) => setGuildProgress(event.target.checked)}
+                          disabled={isUploadBusy}
+                        />
+                        <span>
+                          {t("uploadCenter.guildProgress.label", {
+                            defaultValue: "Guild Progress",
+                          })}
+                        </span>
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        {t("uploadCenter.guildProgress.help", {
+                          defaultValue:
+                            "Snapshot-only backfill: writes monthly guild snapshot without overwriting current data.",
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {!scanWriteMode && (
+                    <div className="mt-2 text-xs text-amber-200/90">
+                      {t("uploadCenter.scanMode.required", {
+                        defaultValue: "Select a mode to enable the action.",
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-[0_10px_30px_-12px_rgba(16,185,129,0.8)] transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
@@ -934,15 +1398,33 @@ function UploadCenterContentBody() {
                   disabled={
                     isUploadBusy ||
                     !activeSession ||
-                    !selectionExists
+                    !scanWriteMode ||
+                    (scanWriteMode === "server_overview"
+                      ? !hasSelectedServerOverviewRows
+                      : !selectionExists)
                   }
                 >
                   {uploadProgress.phase === "uploading"
-                    ? "Uploading..."
+                    ? scanWriteMode === "server_overview"
+                      ? "Building..."
+                      : "Uploading..."
                     : uploadProgress.phase === "finalizing"
                       ? "Finalizing..."
-                      : "Upload selected to DB"}
+                      : scanWriteMode === "server_overview"
+                        ? "Build snapshot"
+                        : "Upload selected to DB"}
                 </button>
+                {actionFeedback && (
+                  <div
+                    className={
+                      actionFeedback.kind === "error"
+                        ? "rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-100"
+                        : "rounded-xl border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100"
+                    }
+                  >
+                    {actionFeedback.message}
+                  </div>
+                )}
                 {quotaError && (
                   <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
                     {quotaError}

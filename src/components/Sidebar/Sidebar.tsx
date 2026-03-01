@@ -73,9 +73,7 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/discover/favorites", labelKey: "nav.favorites" },
   ],
   "/admin": [
-    { to: "/admin",        labelKey: "nav.overview" },
-    { to: "/admin/errors", labelKey: "nav.errorLog" },
-    { to: "/admin/feedback", labelKey: "nav.feedback" },
+    { to: "/upload-center", labelKey: "nav.uploadCenter", minRole: "mod" },
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],
   "/settings": [

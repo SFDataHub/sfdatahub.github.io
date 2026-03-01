@@ -4,6 +4,8 @@
 // Kein Eingriff in players/guilds Importpfade.
 
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { toNumber } from "../../../tools/playerDerivedHelpers";
+import type { ImportScanWriteMode } from "./csv";
 import { db } from "../firebase";
 import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
 
@@ -68,10 +70,12 @@ function toSecFlexible(v: any): number | null {
   const s = String(v).trim();
   if (/^\d{13}$/.test(s)) return Math.floor(Number(s) / 1000);
   if (/^\d{10}$/.test(s)) return Number(s);
-  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m) {
     const dd = Number(m[1]), MM = Number(m[2]) - 1, yyyy = Number(m[3]);
-    const hh = Number(m[4]), mm = Number(m[5]), ss = m[6] ? Number(m[6]) : 0;
+    const hh = m[4] ? Number(m[4]) : 0;
+    const mm = m[5] ? Number(m[5]) : 0;
+    const ss = m[6] ? Number(m[6]) : 0;
     const d = new Date(yyyy, MM, dd, hh, mm, ss);
     if (!Number.isNaN(d.getTime())) return Math.floor(d.getTime() / 1000);
   }
@@ -142,6 +146,22 @@ const P = {
 
   ATTR_TOT: [CANON("Attribute"), CANON("Attr Total"), CANON("Attribut"), CANON("Attribut Gesamt")],
   CON_TOT:  [CANON("Constitution"), CANON("Constitution Total"), CANON("Konstitution"), CANON("Konstitution Gesamt")],
+  XP: [CANON("XP")],
+  XP_TOTAL: [CANON("XP Total")],
+  HONOR: [CANON("Honor"), CANON("Fortress Honor"), CANON("Honor Points")],
+  SCRAPBOOK: [
+    CANON("Scrapbook"),
+    CANON("Scrapbook %"),
+    CANON("ScrapbookPct"),
+    CANON("ScrapbookPercent"),
+    CANON("Album"),
+    CANON("Album %"),
+    CANON("AlbumPct"),
+    CANON("AlbumPercent"),
+    CANON("Album Percentage"),
+    CANON("AlbumCompletion"),
+    CANON("AlbumProgress"),
+  ],
   LAST_ACTIVE: [CANON("Last Active"), CANON("LastActivity"), CANON("Letzte Aktivität")],
 
   // optional: Guild Joined (wie in deinem Screenshot)
@@ -173,6 +193,14 @@ type MemberSummary = {
   baseMain: number | null;       // CSV "Base"
   conBase: number | null;        // CSV "Base Constitution"
   sumBaseTotal: number | null;   // exakt: baseMain + conBase | null
+  main: number | null;           // alias of baseMain for charts
+  con: number | null;            // alias of conBase for charts
+  sum: number | null;            // alias of sumBaseTotal for charts
+  mainTotal: number | null;      // alias of attrTotal for charts
+  sumTotal: number | null;       // mainTotal + conTotal
+  honor: number | null;
+  scrapbook: number | null;
+  album: number | null;
 
   attrTotal: number | null;
   conTotal: number | null;
@@ -187,6 +215,8 @@ type MemberSummary = {
   // optional: Gildenbeitritt (für UI)
   guildJoined: string | null;
   guildJoinedMs: number | null;
+  xpProgress: number | null;
+  xpTotal: number | null;
 };
 
 // ---------- Helpers ----------
@@ -214,6 +244,17 @@ function buildGuildNameMap(guildRows: CSVRow[]): Map<string, string> {
   }
   return map;
 }
+
+const toNumberOrNull = (value: any): number | null => {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const n = toNumber(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
+const monthKeyFromMs = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
+
 function toMemberSummary(row: CSVRow): MemberSummary {
   const tsRaw = pickByCanon(row, P.TIMESTAMP);
   const tsSec = toSecFlexible(tsRaw);
@@ -243,10 +284,16 @@ function toMemberSummary(row: CSVRow): MemberSummary {
   const conBase  = toNumberLoose(pickAnyByCanon(row, P.CON_BASE));
   const attrTot  = toNumberLoose(pickAnyByCanon(row, P.ATTR_TOT));
   const conTot   = toNumberLoose(pickAnyByCanon(row, P.CON_TOT));
+  const xpProgress = toNumberOrNull(pickAnyByCanon(row, P.XP));
+  const xpTotal = toNumberOrNull(pickAnyByCanon(row, P.XP_TOTAL));
+  const honor = toNumberOrNull(pickAnyByCanon(row, P.HONOR));
+  const scrapbook = toNumberOrNull(pickAnyByCanon(row, P.SCRAPBOOK));
+  const album = scrapbook != null ? scrapbook : null;
 
   // Regeln:
   const sumBaseTotal = baseMain != null && conBase != null ? baseMain + conBase : null;
   const totalStats   = attrTot  != null && conTot  != null ? attrTot  + conTot  : null;
+  const sumTotal     = attrTot  != null && conTot  != null ? attrTot  + conTot  : null;
 
   const name = ((): string | null => {
     const v = pickByCanon(row, P.NAME);
@@ -264,6 +311,14 @@ function toMemberSummary(row: CSVRow): MemberSummary {
     baseMain,
     conBase,
     sumBaseTotal,
+    main: baseMain,
+    con: conBase,
+    sum: sumBaseTotal,
+    mainTotal: attrTot,
+    sumTotal,
+    honor,
+    scrapbook,
+    album,
     attrTotal: attrTot,
     conTotal: conTot,
     totalStats,
@@ -275,6 +330,9 @@ function toMemberSummary(row: CSVRow): MemberSummary {
 
     guildJoined: joinedRaw != null ? String(joinedRaw) : null,
     guildJoinedMs: joinedSec != null ? joinedSec * 1000 : null,
+
+    xpProgress,
+    xpTotal,
   };
 }
 function avgOf(m: MemberSummary[], key: keyof MemberSummary): number | null {
@@ -341,7 +399,12 @@ async function readPrevSnapshotSec(gid: string): Promise<number> {
  * Überschreibt nur, wenn dieser Timestamp neuer ist als der bestehende Snapshot.
  * Fallback gid via (Server+Guild-Name) anhand Guilds-CSV.
  */
-export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsRows: CSVRow[]) {
+export async function writeGuildSnapshotsFromRows(
+  playersRows: CSVRow[],
+  guildsRows: CSVRow[],
+  scanWriteMode?: ImportScanWriteMode,
+  guildProgress?: boolean,
+) {
   const guildNameMap = buildGuildNameMap(guildsRows || []);
   const aggregatesByGuildId = new Map<string, GuildDerivedAggregate>();
 
@@ -381,13 +444,26 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
   let fatalError: unknown = null;
 
   for (const gid of allGids) {
-    // maßgeblichen Timestamp der Gilde aus latest holen
-    const { sec: guildTsSec, raw: guildTsRaw, values: latestValues } = await readGuildLatestTimeSecAndRaw(gid);
+    // Snapshot-only nutzt bewusst den selektierten Guild-CSV-Timestamp (connected source), nicht latest/latest.
+    let guildTsSec: number | null = null;
+    let guildTsRaw: string | null = null;
+    let latestValues: Record<string, any> | null = null;
+    if (guildProgress) {
+      const latestGuildRow = latestGuildRowById.get(gid)?.row ?? null;
+      const rowTsRaw = latestGuildRow ? pickByCanon(latestGuildRow, G.TIMESTAMP) : null;
+      guildTsSec = toSecFlexible(rowTsRaw);
+      guildTsRaw = rowTsRaw != null ? String(rowTsRaw).trim() : null;
+    } else {
+      const latest = await readGuildLatestTimeSecAndRaw(gid);
+      guildTsSec = latest.sec;
+      guildTsRaw = latest.raw;
+      latestValues = latest.values;
+    }
     const latestMeta = readGuildLatestMeta(latestValues);
     if (guildTsSec == null) continue;
 
     // nur schreiben, wenn neuer als vorhandener Snapshot
-    const prevSec = await readPrevSnapshotSec(gid);
+    const prevSec = guildProgress ? 0 : await readPrevSnapshotSec(gid);
     const shouldWriteSnapshot = guildTsSec > prevSec;
 
     // Spielerzeilen mit exakt diesem Timestamp und passender Gilde einsammeln
@@ -436,6 +512,14 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
     const avgConTotal     = avgOf(members, "conTotal");
     const avgTotalStats   = avgOf(members, "totalStats");
 
+    if (guildProgress) {
+      console.info("[ImportSelectionToDb] snapshot-only guild match", {
+        selectedGuildId: gid,
+        connectedPlayersTotal: playersRows.length,
+        membersForSelectedGuild: members.length,
+      });
+    }
+
     const hashBasis = JSON.stringify({
       gid,
       tsSec: guildTsSec,
@@ -443,35 +527,79 @@ export async function writeGuildSnapshotsFromRows(playersRows: CSVRow[], guildsR
         id: m.id, name: m.name ?? "", class: m.class ?? "", role: m.role ?? "",
         level: m.level ?? null, treasury: m.treasury ?? null, mine: m.mine ?? null,
         baseMain: m.baseMain ?? null, conBase: m.conBase ?? null, sumBaseTotal: m.sumBaseTotal ?? null,
+        main: m.main ?? null, con: m.con ?? null, sum: m.sum ?? null,
+        mainTotal: m.mainTotal ?? null, sumTotal: m.sumTotal ?? null,
+        honor: m.honor ?? null, scrapbook: m.scrapbook ?? null, album: m.album ?? null,
         attrTotal: m.attrTotal ?? null, conTotal: m.conTotal ?? null, totalStats: m.totalStats ?? null,
+        xpProgress: m.xpProgress ?? null, xpTotal: m.xpTotal ?? null,
         guildJoinedMs: m.guildJoinedMs ?? null,
       })),
     });
     const hash = djb2HashString(hashBasis);
 
-    if (shouldWriteSnapshot) {
-      const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
+    const shouldWriteCurrent = shouldWriteSnapshot && !guildProgress;
+    const shouldWriteMonthly = scanWriteMode === "monthly" && (guildProgress || shouldWriteSnapshot);
+
+    if (shouldWriteCurrent || shouldWriteMonthly) {
+      const snapshotPayload = {
+        guildId: gid,
+        count: members.length,
+        updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
+        updatedAtMs: guildTsSec * 1000,              // intern als ms
+        hash,
+
+        avgLevel,
+        avgTreasury,
+        avgMine,
+        avgBaseMain,
+        avgConBase,
+        avgSumBaseTotal,
+        avgAttrTotal,
+        avgConTotal,
+        avgTotalStats,
+
+        members,
+        updatedAtServer: serverTimestamp(),
+      };
       try {
-        await traceSetDoc(ref, () => setDoc(ref, {
-          guildId: gid,
-          count: members.length,
-          updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
-          updatedAtMs: guildTsSec * 1000,              // intern als ms
-          hash,
+        if (shouldWriteCurrent) {
+          const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
+          await traceSetDoc(ref, () => setDoc(ref, snapshotPayload, { merge: true }), {
+            label: "ImportGuildSnapshots:summary",
+          });
+        }
 
-          avgLevel,
-          avgTreasury,
-          avgMine,
-          avgBaseMain,
-          avgConBase,
-          avgSumBaseTotal,
-          avgAttrTotal,
-          avgConTotal,
-          avgTotalStats,
-
-          members,
-          updatedAtServer: serverTimestamp(),
-        }, { merge: true }), { label: "ImportGuildSnapshots:summary" });
+        if (shouldWriteMonthly) {
+          if (guildProgress && members.length === 0) {
+            console.warn("[ImportSelectionToDb] No members found for selected guildId; skipping monthly snapshot", {
+              selectedGuildId: gid,
+            });
+            continue;
+          }
+          const memberScanMs = members
+            .map((m) => m.lastScanMs)
+            .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+          if (guildProgress && memberScanMs.length === 0) {
+            console.warn("[ImportSelectionToDb] skip monthly guild snapshot without member timestamps", { gid });
+            continue;
+          }
+          let capturedAtMs = memberScanMs.length ? Math.max(...memberScanMs) : guildTsSec * 1000;
+          if (!Number.isFinite(capturedAtMs) || capturedAtMs <= 0) {
+            if (guildProgress) {
+              console.warn("[ImportSelectionToDb] skip monthly guild snapshot with invalid capturedAtMs", {
+                gid,
+                capturedAtMs,
+              });
+              continue;
+            }
+            capturedAtMs = guildTsSec * 1000;
+          }
+          const monthKey = monthKeyFromMs(capturedAtMs);
+          const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
+          await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
+            label: "ImportGuildSnapshots:summaryMonthly",
+          });
+        }
 
         snapshotsWritten++;
       } catch (error) {

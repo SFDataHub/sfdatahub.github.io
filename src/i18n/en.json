@@ -1,4 +1,7 @@
 ﻿{
+  "common": {
+    "noData": "No data"
+  },
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
@@ -33,6 +36,7 @@
     "errorLog": "Error log",
     "feedback": "Feedback",
     "users": "Users",
+    "uploadCenter": "Upload Center",
     "profile": "Profile",
     "account": "Account",
     "appearance": "Appearance",
@@ -495,7 +499,11 @@
     }
   },
   "toplists": {
+    "compareMode": "Compare Mode",
     "compareMonth": "Progress since",
+    "compareMonths": "Compare months",
+    "compareFrom": "From",
+    "compareTo": "To",
     "compareOff": "Off",
     "compareMissingSnapshot": "No baseline data for {{key}}.",
     "deltaNew": "NEW",
@@ -534,6 +542,290 @@
     "profile": {
       "cta": {
         "showInToplist": "Show in Top List"
+      }
+    }
+  },
+  "playerProfile": {
+    "heroPanel": {
+      "actions": {
+        "favorite": {
+          "add": "Add to favorites",
+          "remove": "Remove from favorites"
+        },
+        "showInTopList": "Show in Top List",
+        "openPlayerProfile": "Open player profile",
+        "openGuild": "Open guild",
+        "share": "Share",
+        "copyLink": "Copy link"
+      },
+      "tooltips": {
+        "lastScanAt": "Last scan: {{value}}",
+        "noGuildLinked": "No guild linked in latest scan.",
+        "shareSystemShareSheet": "System Share Sheet",
+        "age": {
+          "label": "Age: {{value}}",
+          "today": "today",
+          "oneDayAgo": "1 day ago",
+          "daysAgo": "{{days}} days ago"
+        }
+      },
+      "stats": {
+        "lastScan": "Last Scan",
+        "level": "Level",
+        "scrapbook": "Scrapbook",
+        "totalBaseStats": "Total Base Stats",
+        "totalStats": "Total Stats",
+        "mount": "Mount",
+        "honor": "Honor",
+        "guildRole": "Guild role",
+        "hof": "HoF",
+        "attributeBars": {
+          "baseStats": "Base Stats",
+          "totalStats": "Total Stats",
+          "viewModeAriaLabel": "Attribute view",
+          "modeBase": "Base",
+          "modeTotal": "Total",
+          "server": "Server",
+          "guild": "Guild",
+          "iconAlt": "{{name}} icon",
+          "attributes": {
+            "str": "Strength",
+            "dex": "Dexterity",
+            "int": "Intelligence",
+            "con": "Constitution",
+            "lck": "Luck"
+          }
+        },
+        "potions": {
+          "ariaLabel": "Potion slots",
+          "activeLabel": "Active potions:",
+          "slot1": "Potion 1",
+          "slot2": "Potion 2",
+          "slot3": "Potion 3",
+          "size": "Size"
+        }
+      },
+      "meta": {
+        "classUnknown": "Class ?",
+        "lastScanned": "Last scanned"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Unknown",
+            "hint": "Scan history unavailable"
+          },
+          "scannedToday": {
+            "label": "Scanned today",
+            "hint": "No rescan needed"
+          },
+          "veryFresh": {
+            "label": "Very fresh",
+            "hint": "No rescan needed"
+          },
+          "fresh": {
+            "label": "Fresh",
+            "hint": "No rescan needed"
+          },
+          "recent": {
+            "label": "Recent",
+            "hint": "Rescan recommended"
+          },
+          "aging": {
+            "label": "Aging",
+            "hint": "Rescan recommended"
+          },
+          "outdated": {
+            "label": "Outdated",
+            "hint": "Rescan strongly recommended"
+          },
+          "stale": {
+            "label": "Stale",
+            "hint": "Rescan strongly recommended"
+          }
+        }
+      },
+      "portrait": {
+        "canvasAriaLabel": "Portrait of {{label}}",
+        "status": {
+          "idle": "Portrait loading ...",
+          "loading": "PortraitMaker is initializing ...",
+          "ready": "PortraitMaker ready",
+          "error": "PortraitMaker could not be loaded"
+        }
+      }
+    },
+    "tabs": {
+      "ariaLabel": "Player profile tabs",
+      "statistics": "Statistics",
+      "progress": "Progress",
+      "compare": "Compare",
+      "history": "History"
+    },
+    "chartsTab": {
+      "sections": {
+        "coreProgress": "Core Progress",
+        "attributesBase": "Attributes (Base)",
+        "attributesTotals": "Attributes (Totals)",
+        "economy": "Economy",
+        "experience": "Experience"
+      },
+      "labels": {
+        "monthlyHistory": "Monthly history",
+        "latest": "{{metric}} (latest)",
+        "start": "{{metric}} (start)",
+        "scanAt": "Scan",
+        "avgMarker": "Line + Avg marker"
+      },
+      "metrics": {
+        "level": "Level",
+        "totalStats": "Total Stats",
+        "honor": "Honor",
+        "main": "Main",
+        "con": "Constitution (Con)",
+        "sum": "Sum",
+        "mainTotal": "Main Total",
+        "conTotal": "Con Total",
+        "sumTotal": "Sum Total",
+        "mine": "Mine",
+        "treasury": "Treasury",
+        "xpTotal": "XP Total",
+        "xpProgress": "XP Progress"
+      }
+    },
+    "statsTab": {
+      "common": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "combat": {
+        "title": "Combat Snapshot",
+        "armor": "Armor",
+        "health": "Health",
+        "damageMin": "Damage Min",
+        "damageMax": "Damage Max",
+        "damageAvg": "Damage Avg",
+        "weaponDamageMultiplier": "Weapon Damage Multiplier",
+        "maximumDamageReduction": "Max Damage Reduction"
+      },
+      "potions": {
+        "title": "Potions & Active Effects",
+        "slot1": "Potion 1",
+        "slot2": "Potion 2",
+        "slot3": "Potion 3",
+        "size": "Size",
+        "lifePotion": "Life Potion"
+      },
+      "attrComposition": {
+        "title": "Attribute Composition",
+        "subtitle": "Stacked contribution breakdown from latest.values",
+        "bonus": "Bonus",
+        "attributes": {
+          "str": "Strength",
+          "dex": "Dexterity",
+          "int": "Intelligence",
+          "con": "Constitution",
+          "lck": "Luck"
+        },
+        "breakdown": {
+          "base": "Base",
+          "baseItems": "Base Items",
+          "upgrades": "Upgrades",
+          "equipment": "Equipment",
+          "gems": "Gems",
+          "pet": "Pet Bonus",
+          "potion": "Potion",
+          "items": "Items",
+          "petBonus": "Pet Count",
+          "other": "Other"
+        }
+      },
+      "runesResists": {
+        "title": "Runes & Resistances"
+      },
+      "runes": {
+        "title": "Runes",
+        "gold": "Rune Gold",
+        "xp": "Rune XP",
+        "chance": "Rune Chance",
+        "quality": "Rune Quality",
+        "health": "Rune Health",
+        "damage": "Rune Damage",
+        "resist": "Rune Resist"
+      },
+      "resistances": {
+        "title": "Resistances",
+        "elementalDamage": "Elemental Damage",
+        "fire": "Fire Resist",
+        "cold": "Cold Resist",
+        "lightning": "Lightning Resist",
+        "fireDamage": "Fire Damage",
+        "coldDamage": "Cold Damage",
+        "lightningDamage": "Lightning Damage"
+      },
+      "fortress": {
+        "title": "Fortress Matrix",
+        "guide": "Guide",
+        "guideFortress": "Open fortress guide",
+        "guideBuilding": "Guide for {{building}}",
+        "groups": {
+          "economy": "Economy",
+          "combat": "Combat",
+          "utility": "Utility"
+        },
+        "labels": {
+          "fortress": "Fortress",
+          "upgrades": "Upgrades",
+          "fortifications": "Fortifications",
+          "wall": "Wall",
+          "space": "Space",
+          "quarters": "Quarters",
+          "portal": "Portal",
+          "woodcutter": "Woodcutter",
+          "quarry": "Quarry",
+          "gemMine": "Gem Mine",
+          "academy": "Academy",
+          "smithy": "Smithy",
+          "treasury": "Treasury",
+          "barracks": "Barracks",
+          "mageTower": "Mage Tower",
+          "archeryGuild": "Archery Guild",
+          "rank": "Fortress Rank",
+          "honor": "Fortress Honor"
+        }
+      },
+      "guild": {
+        "title": "Guild Meta",
+        "guild": "Guild",
+        "guildIdentifier": "Guild Identifier",
+        "role": "Role",
+        "joined": "Guild Joined",
+        "portal": "Guild Portal"
+      },
+      "progress": {
+        "title": "Raids & XP",
+        "raidsSection": "Raids",
+        "xpSection": "XP",
+        "raids": "Raids",
+        "raidHonor": "Raid Honor",
+        "raidWood": "Raid Wood",
+        "raidStone": "Raid Stone",
+        "xp": "XP",
+        "xpRequired": "XP Required",
+        "xpTotal": "XP Total"
+      },
+      "badges": {
+        "title": "Milestones",
+        "fortressLevel": "Fortress L{{level}}",
+        "fortressMaxed": "Fortress Maxed",
+        "runesEconomy": "Economy Runes",
+        "runesCombat": "Combat Runes",
+        "resists": "Elemental Resists",
+        "potions": "Potion Trio",
+        "raider": "Raider: {{value}}"
+      },
+      "advanced": {
+        "title": "Advanced"
       }
     }
   },
@@ -671,6 +963,12 @@
     }
   },
   "uploadCenter": {
+    "scanMode": {
+      "label": "Scan type",
+      "user": "User scan",
+      "monthly": "Monthly scan",
+      "required": "Select a scan type to enable the upload."
+    },
     "quota": {
       "unlimited": "No limit"
     }

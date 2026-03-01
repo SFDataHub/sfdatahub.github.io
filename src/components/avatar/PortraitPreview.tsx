@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.31.js";
+import { useTranslation } from "react-i18next";
+import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-latest.min.js";
 import type { PortraitOptions } from "../player-profile/types";
 import "./PortraitPreview.css";
 
@@ -28,13 +29,6 @@ const DEFAULT_PORTRAIT: PortraitOptions = {
 };
 
 type PortraitStatus = "idle" | "loading" | "ready" | "error";
-
-const statusLabel: Record<PortraitStatus, string> = {
-  idle: "Portrait l\u00E4dt ...",
-  loading: "PortraitMaker wird initialisiert ...",
-  ready: "PortraitMaker bereit",
-  error: "PortraitMaker konnte nicht geladen werden",
-};
 
 const clampPositive = (value: number, max: number) => Math.min(Math.max(Math.round(value), 0), max);
 const roundSpecial = (value: number) => {
@@ -79,6 +73,7 @@ export default function PortraitPreview({
   fallbackImage?: string;
   fallbackLabel?: string;
 }) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const instanceRef = useRef<{ dispose?: () => void } | null>(null);
   const [status, setStatus] = useState<PortraitStatus>("idle");
@@ -120,7 +115,19 @@ export default function PortraitPreview({
     };
   }, [libraryConfig]);
 
-  const statusMessage = libraryConfig && status !== "ready" ? statusLabel[status] : null;
+  const statusMessage =
+    libraryConfig && status !== "ready"
+      ? {
+          idle: t("playerProfile.heroPanel.portrait.status.idle", { defaultValue: "Portrait loading ..." }),
+          loading: t("playerProfile.heroPanel.portrait.status.loading", {
+            defaultValue: "PortraitMaker is initializing ...",
+          }),
+          ready: t("playerProfile.heroPanel.portrait.status.ready", { defaultValue: "PortraitMaker ready" }),
+          error: t("playerProfile.heroPanel.portrait.status.error", {
+            defaultValue: "PortraitMaker could not be loaded",
+          }),
+        }[status]
+      : null;
   const placeholderSrc = fallbackImage || NEUTRAL_PLACEHOLDER;
   const placeholderAlt = fallbackLabel || label;
   const showFallback = !libraryConfig || status === "error";
@@ -135,7 +142,10 @@ export default function PortraitPreview({
             width={526}
             height={526}
             className="avatar-portrait__canvas avatar-portrait__canvas--popout"
-            aria-label={`Portrait von ${label}`}
+            aria-label={t("playerProfile.heroPanel.portrait.canvasAriaLabel", {
+              label,
+              defaultValue: "Portrait of {{label}}",
+            })}
           />
         )}
         {showFallback && (

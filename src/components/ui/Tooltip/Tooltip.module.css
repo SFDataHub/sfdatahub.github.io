@@ -25,11 +25,11 @@
 .bubble {
   position: absolute;
   bottom: calc(100% + 12px);
-  left: 0;
+  left: 50%;
   display: flex;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(6px);
+  transform: translate(-50%, 6px);
   transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
   pointer-events: none;
   z-index: 20;
@@ -39,7 +39,7 @@
 .tooltipWrapper:hover .bubble {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 
 .card {
@@ -57,12 +57,12 @@
 
 .tail {
   position: absolute;
-  left: 14px;
+  left: 50%;
   bottom: -6px;
   width: 10px;
   height: 10px;
   background: #1d2f4a;
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  transform: rotate(45deg);
+  transform: translateX(-50%) rotate(45deg);
 }

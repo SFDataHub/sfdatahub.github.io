@@ -32,6 +32,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const SESSION_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/session` : "";
 const LOGOUT_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/logout` : "";
+const AUTH_USER_CACHE_KEY = "sfh:auth:user";
+const AUTH_USER_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 type RefreshOptions = {
   silent?: boolean;
@@ -154,8 +156,49 @@ const applyFavoriteToUser = (
   };
 };
 
+type AuthUserCachePayload = {
+  cachedAt: number;
+  data: AuthUser;
+};
+
+const readCachedAuthUser = (): AuthUser | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_USER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthUserCachePayload> | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.cachedAt !== "number") return null;
+    if (Date.now() - parsed.cachedAt > AUTH_USER_CACHE_TTL_MS) return null;
+    const data = parsed.data;
+    if (!data || typeof data !== "object") return null;
+    if (typeof (data as any).id !== "string" || !(data as any).id.trim()) return null;
+    return data as AuthUser;
+  } catch (error) {
+    console.warn("[Auth] Failed to read cached auth user", error);
+    return null;
+  }
+};
+
+const writeCachedAuthUser = (user: AuthUser | null) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (!user) {
+      window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      return;
+    }
+    const payload: AuthUserCachePayload = {
+      cachedAt: Date.now(),
+      data: user,
+    };
+    window.localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn("[Auth] Failed to write cached auth user", error);
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => readCachedAuthUser());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const firebaseSyncRef = useRef<{ tried: boolean }>({ tried: false });
   const discordLoginInFlight = useRef(false);
@@ -171,13 +214,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleSessionResponse = useCallback((payload: any) => {
     if (payload?.authenticated && payload.user) {
-      setUser(payload.user as AuthUser);
+      const nextUser = payload.user as AuthUser;
+      setUser(nextUser);
+      writeCachedAuthUser(nextUser);
       setStatus("authenticated");
     } else {
       setUser(null);
+      writeCachedAuthUser(null);
       setStatus("unauthenticated");
     }
   }, []);
+
+  useEffect(() => {
+    writeCachedAuthUser(user);
+  }, [user]);
 
   const fetchSession = useCallback(async (options?: RefreshOptions): Promise<boolean> => {
     if (!options?.silent) {
@@ -505,7 +555,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const currentlyFavorite = isFavoriteInUser(user, bucket, identifier);
       const nextIsFavorite = !currentlyFavorite;
 
-      setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, nextIsFavorite));
+      setUser((prev) => {
+        const next = applyFavoriteToUser(prev, bucket, identifier, nextIsFavorite);
+        writeCachedAuthUser(next);
+        return next;
+      });
 
       try {
         const response = await patchFavorite({
@@ -513,10 +567,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           op: nextIsFavorite ? "add" : "remove",
           identifier,
         });
-        setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, response.isFavorite));
+        setUser((prev) => {
+          const next = applyFavoriteToUser(prev, bucket, identifier, response.isFavorite);
+          writeCachedAuthUser(next);
+          return next;
+        });
         return { isFavorite: response.isFavorite };
       } catch (error) {
-        setUser((prev) => applyFavoriteToUser(prev, bucket, identifier, currentlyFavorite));
+        setUser((prev) => {
+          const next = applyFavoriteToUser(prev, bucket, identifier, currentlyFavorite);
+          writeCachedAuthUser(next);
+          return next;
+        });
         throw error;
       }
     },
@@ -549,6 +611,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!LOGOUT_ENDPOINT) {
       console.warn("[Auth] AUTH_BASE_URL is not configured. Clearing local session only.");
       setUser(null);
+      writeCachedAuthUser(null);
       setStatus("unauthenticated");
       return;
     }
@@ -566,6 +629,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("[Auth] Failed to logout. Clearing local session anyway.", error);
     } finally {
       setUser(null);
+      writeCachedAuthUser(null);
       setStatus("unauthenticated");
     }
   }, []);

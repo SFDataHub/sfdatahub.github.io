@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { guideDriveIdByKey } from "../../../data/guidehub/assets";
 import { toDriveThumbProxy } from "../../../lib/urls";
 import type { BaseStatBenchmarks, BaseStatValues } from "../types";
+import { getPlayerStatAccentColor } from "../statAccents";
 
 type AttributeKey = "str" | "dex" | "int" | "con" | "lck";
 type AttributeValues = Partial<BaseStatValues>;
@@ -14,20 +16,20 @@ type Props = {
   onModeChange?: (mode: "base" | "total") => void;
 };
 
-const ATTRIBUTES: { key: AttributeKey; label: string; name: string }[] = [
-  { key: "str", label: "STR", name: "Strength" },
-  { key: "dex", label: "DEX", name: "Dexterity" },
-  { key: "int", label: "INT", name: "Intelligence" },
-  { key: "con", label: "CON", name: "Constitution" },
-  { key: "lck", label: "LCK", name: "Luck" },
+const ATTRIBUTES: { key: AttributeKey; label: string }[] = [
+  { key: "str", label: "STR" },
+  { key: "dex", label: "DEX" },
+  { key: "int", label: "INT" },
+  { key: "con", label: "CON" },
+  { key: "lck", label: "LCK" },
 ];
 
 const STAT_ICON_ASSET_KEYS: Record<AttributeKey, string> = {
-  str: "strengthpotion",
-  dex: "dexteritypotion",
-  int: "intpotion",
-  con: "conpotion",
-  lck: "luckpotion",
+  str: "strengthbig",
+  dex: "dexteritybig",
+  int: "intbig",
+  con: "conbig",
+  lck: "luckpotbig",
 };
 
 const MIN_FILL_PX = 8;
@@ -50,6 +52,7 @@ export default function PlayerAttributeBars({
   mode,
   onModeChange,
 }: Props) {
+  const { t } = useTranslation();
   const [internalMode, setInternalMode] = useState<"base" | "total">("base");
   const [animateReady, setAnimateReady] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -98,20 +101,29 @@ export default function PlayerAttributeBars({
   const rawMax = Math.max(...activeValues, 0);
   const blockScaleMax = rawMax > 0 ? rawMax * 1.05 : 1;
   const showBenchmarks = activeMode === "base";
-  const label = activeMode === "base" ? "Base Stats" : "Total Stats";
+  const label =
+    activeMode === "base"
+      ? t("playerProfile.heroPanel.stats.attributeBars.baseStats", { defaultValue: "Base Stats" })
+      : t("playerProfile.heroPanel.stats.attributeBars.totalStats", { defaultValue: "Total Stats" });
 
   return (
     <div className="player-profile__attribute-bars">
       <div className="player-profile__attribute-bars-head">
         <div className="player-profile__card-label">{label}</div>
-        <div className="player-profile__attribute-toggle" role="group" aria-label="Attribute Ansicht">
+        <div
+          className="player-profile__attribute-toggle"
+          role="group"
+          aria-label={t("playerProfile.heroPanel.stats.attributeBars.viewModeAriaLabel", {
+            defaultValue: "Attribute view",
+          })}
+        >
           <button
             type="button"
             className={`player-profile__attribute-toggle-btn${activeMode === "base" ? " player-profile__attribute-toggle-btn--active" : ""}`}
             aria-pressed={activeMode === "base"}
             onClick={() => handleModeChange("base")}
           >
-            Base
+            {t("playerProfile.heroPanel.stats.attributeBars.modeBase", { defaultValue: "Base" })}
           </button>
           <button
             type="button"
@@ -120,12 +132,24 @@ export default function PlayerAttributeBars({
             onClick={() => handleModeChange("total")}
             disabled={!hasTotalStats}
           >
-            Total
+            {t("playerProfile.heroPanel.stats.attributeBars.modeTotal", { defaultValue: "Total" })}
           </button>
         </div>
       </div>
       <div className="player-profile__attribute-bars-list">
         {ATTRIBUTES.map((attr) => {
+          const attrName = t(`playerProfile.heroPanel.stats.attributeBars.attributes.${attr.key}`, {
+            defaultValue:
+              attr.key === "str"
+                ? "Strength"
+                : attr.key === "dex"
+                ? "Dexterity"
+                : attr.key === "int"
+                ? "Intelligence"
+                : attr.key === "con"
+                ? "Constitution"
+                : "Luck",
+          });
           const source = activeMode === "total" ? totalStats : baseStats;
           const playerValue = Number(source?.[attr.key]) || 0;
           const serverAvg = showBenchmarks ? benchmarks?.serverAvg?.[attr.key] : undefined;
@@ -148,23 +172,31 @@ export default function PlayerAttributeBars({
           const statIconId = guideDriveIdByKey(STAT_ICON_ASSET_KEYS[attr.key]);
           const statIconUrl =
             !failedStatIcons[attr.key] && statIconId ? toDriveThumbProxy(statIconId, 28) : undefined;
+          const rowStatAccent = getPlayerStatAccentColor(attr.key);
 
           return (
-            <div key={attr.key} className="player-profile__attribute-bar-row">
+            <div
+              key={attr.key}
+              className="player-profile__attribute-bar-row"
+              style={{ ["--pp-stat-accent" as const]: rowStatAccent } as React.CSSProperties}
+            >
               <div className="player-profile__attribute-bar-label" aria-hidden>
                 <span className="player-profile__attribute-bar-icon">
                   {statIconUrl ? (
                     <img
                       src={statIconUrl}
-                      alt={`${attr.name} icon`}
+                      alt={t("playerProfile.heroPanel.stats.attributeBars.iconAlt", {
+                        name: attrName,
+                        defaultValue: "{{name}} icon",
+                      })}
                       className="player-profile__attribute-bar-icon-image"
                       onError={() => handleStatIconError(attr.key)}
                     />
                   ) : (
-                    attr.label
+                    <span aria-hidden />
                   )}
                 </span>
-                <span className="player-profile__attribute-bar-name">{attr.name}</span>
+                <span className="player-profile__attribute-bar-name">{attrName}</span>
               </div>
               <div className="player-profile__attribute-bar-track" role="presentation">
                 <div
@@ -195,12 +227,14 @@ export default function PlayerAttributeBars({
                 <div className="player-profile__attribute-bar-value">{formatNumber(playerValue)}</div>
                 {Number.isFinite(serverAvg as number) && (
                   <div className="player-profile__attribute-bar-subvalue">
-                    Server {formatNumber(serverAvg as number)}
+                    {t("playerProfile.heroPanel.stats.attributeBars.server", { defaultValue: "Server" })}{" "}
+                    {formatNumber(serverAvg as number)}
                   </div>
                 )}
                 {Number.isFinite(guildAvg as number) && (
                   <div className="player-profile__attribute-bar-subvalue">
-                    Gilde {formatNumber(guildAvg as number)}
+                    {t("playerProfile.heroPanel.stats.attributeBars.guild", { defaultValue: "Guild" })}{" "}
+                    {formatNumber(guildAvg as number)}
                   </div>
                 )}
               </div>

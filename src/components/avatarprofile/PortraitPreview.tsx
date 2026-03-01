@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-1.31.js";
+import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-latest.min.js";
 import type { PortraitOptions } from "../player-profile/types";
 import "./PortraitPreview.css";
 

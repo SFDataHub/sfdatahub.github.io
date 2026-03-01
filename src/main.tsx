@@ -86,8 +86,6 @@ import GuildHubRoles from "./pages/GuildHub/Roles";
 import GuildHubSettings from "./pages/GuildHub/Settings";
 
 // Admin
-import AdminIndex from "./pages/Admin/Index";
-import AdminErrorLog from "./pages/Admin/ErrorLog";
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
@@ -405,11 +403,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* Admin */}
                 <Route
                   path="/admin"
-                  element={withFeatureGate("main.admin", "/admin", <AdminIndex />)}
-                />
-                <Route
-                  path="/admin/errors"
-                  element={withFeatureGate("main.admin", "/admin", <AdminErrorLog />)}
+                  element={withFeatureGate("main.admin", "/admin", <Navigate to="/upload-center" replace />)}
                 />
                 <Route
                   path="/admin/scans-uploaded"

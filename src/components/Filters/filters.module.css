@@ -9,8 +9,12 @@
 .hudSubBtn:hover{ background:var(--hover); }
 .iconRow{ display:flex; align-items:center; gap:.5rem; overflow:auto; padding-right:.25rem; }
 .segmented{ display:inline-flex; gap:4px; background:#14273E; border:1px solid var(--border); padding:4px; border-radius:12px; }
-.segmented > button{ padding:.4rem .6rem; border-radius:10px; border:1px solid transparent; color:var(--text); }
+.segmented > button{ background:transparent; cursor:pointer; padding:.4rem .6rem; border-radius:10px; border:1px solid transparent; color:var(--text); }
 .segmented > button[aria-pressed="true"]{ background: var(--hover); border-color: var(--icon); }
+.compareBlock{ display:grid; gap:.35rem; align-items:start; padding:.15rem .2rem; border:1px solid rgba(43,76,115,.65); border-radius:.8rem; background:rgba(20,39,62,.35); }
+.compareBlockTitle{ color:var(--text2); font-size:12px; line-height:1; }
+.compareInputsRow{ display:flex; flex-wrap:wrap; gap:.5rem; padding-left:.35rem; }
+.compareField{ display:inline-flex; align-items:center; gap:.35rem; }
 .sortLabel{ display:inline-flex; align-items:center; gap:.5rem; color:var(--text2); }
 .sortSelect{ background:#14273E; color:var(--text); border:1px solid var(--border); padding:.4rem .6rem; border-radius:.5rem; }
 .chip{ background:#14273E; color:var(--text); border:1px solid var(--border); padding:.35rem .6rem; border-radius:999px; display:inline-flex; align-items:center; gap:.25rem; }

@@ -34,7 +34,7 @@ service cloud.firestore {
     }
 
     // ---------- Players ----------
-    match /players/{pid} {
+    match /players/{identifier} {
       allow read: if true;
       allow create, update: if isImporter();
       allow delete: if false;
@@ -43,6 +43,11 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isImporter();
         allow update, delete: if false;
+      }
+      match /charts/{docId} {
+        allow read: if true;
+        allow create, update: if isImporter();
+        allow delete: if false;
       }
       match /latest/{docId} {
         allow read: if true;
