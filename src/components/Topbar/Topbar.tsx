@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Bell, Star, Upload, Globe, Search } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle2, Globe, Loader2, Search, Star, StarOff, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import styles from "./Topbar.module.css";
 import AccountMenu from "./AccountMenu";
@@ -10,6 +10,7 @@ import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
 
 /** Neue Suche */
 import UniversalSearch from "../search/UniversalSearch";
+import { useNotifications } from "../../context/NotificationsContext";
 
 /** Klassen-Icons / Mapping */
 import { getClassIconUrl } from "../ui/shared/classIcons";
@@ -40,6 +41,18 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
   const navItems = React.useMemo(
     () => TOPBAR_ITEMS.filter((item) => !item.featureId || isVisibleInTopbar(item.featureId)),
     [isVisibleInTopbar],
+  );
+  const { jobs, activityEvents, hasUnread, hasRunning, markAllRead, cleanupExpired } = useNotifications();
+  const notificationRootRef = React.useRef<HTMLDivElement | null>(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
+  const showNotificationBadge = hasUnread || hasRunning;
+  const notificationJobs = React.useMemo(
+    () => [...jobs].sort((left, right) => right.updatedAt - left.updatedAt),
+    [jobs],
+  );
+  const sortedActivityEvents = React.useMemo(
+    () => [...activityEvents].sort((left, right) => right.createdAtMs - left.createdAtMs),
+    [activityEvents],
   );
 
   const onUploadClick = () => {
@@ -91,6 +104,47 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
     return () => window.cancelAnimationFrame(id);
   }, [isMobileSearchOpen]);
 
+  React.useEffect(() => {
+    if (!isNotificationsOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!notificationRootRef.current) return;
+      const target = event.target as Node | null;
+      if (target && !notificationRootRef.current.contains(target)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsNotificationsOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isNotificationsOpen]);
+
+  const toggleNotifications = React.useCallback(() => {
+    setIsNotificationsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        cleanupExpired();
+        markAllRead();
+      }
+      return next;
+    });
+  }, [cleanupExpired, markAllRead]);
+
+  const formatActivityAge = React.useCallback((createdAtMs: number) => {
+    const diffMs = Date.now() - createdAtMs;
+    if (diffMs < 60_000) return "just now";
+    const diffMinutes = Math.floor(diffMs / 60_000);
+    if (diffMinutes === 1) return "1 min ago";
+    return `${diffMinutes} min ago`;
+  }, []);
+
   const openSearchLabel = t("search.open", { defaultValue: "Open search" });
 
   return (
@@ -98,9 +152,88 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
       <header className={styles.topbar}>
         {/* LINKS */}
         <div className={styles.topbarLeft}>
-          <button className={styles.btnIco} aria-label={t("nav.notifications", { defaultValue: "Notifications" })}>
-            <Bell className={styles.ico} />
-          </button>
+          <div className={styles.notificationsRoot} ref={notificationRootRef}>
+            <button
+              className={styles.btnIco}
+              type="button"
+              aria-label={t("nav.notifications", { defaultValue: "Notifications" })}
+              aria-haspopup="dialog"
+              aria-expanded={isNotificationsOpen}
+              onClick={toggleNotifications}
+            >
+              <Bell className={styles.ico} />
+              {showNotificationBadge ? <span className={styles.notificationBadge} aria-hidden /> : null}
+            </button>
+            {isNotificationsOpen ? (
+              <div
+                className={styles.notificationsDropdown}
+                role="dialog"
+                aria-label={t("nav.notifications", { defaultValue: "Notifications" })}
+              >
+                <div className={styles.notificationsHeader}>
+                  {t("nav.notifications", { defaultValue: "Notifications" })}
+                </div>
+                <div className={styles.notificationsSectionTitle}>System</div>
+                <div className={styles.notificationsList}>
+                  {notificationJobs.length === 0 ? (
+                    <p className={styles.notificationsEmpty}>No system jobs.</p>
+                  ) : (
+                    notificationJobs.map((job) => (
+                      <div key={job.id} className={styles.notificationItem}>
+                        <span className={styles.notificationStatusIcon} aria-hidden>
+                          {job.status === "running" ? (
+                            <Loader2 className={`${styles.notificationStatusGlyph} ${styles.notificationStatusSpin}`} />
+                          ) : job.status === "success" ? (
+                            <CheckCircle2 className={`${styles.notificationStatusGlyph} ${styles.notificationStatusSuccess}`} />
+                          ) : (
+                            <AlertCircle className={`${styles.notificationStatusGlyph} ${styles.notificationStatusError}`} />
+                          )}
+                        </span>
+                        <div className={styles.notificationBody}>
+                          <p className={styles.notificationTitle}>{job.title}</p>
+                          <p className={styles.notificationDetail}>
+                            {job.status === "running"
+                              ? "Updating favorites..."
+                              : job.status === "success"
+                              ? "Favorites updated"
+                              : "Favorites update failed"}
+                          </p>
+                        </div>
+                        {job.progress ? (
+                          <span className={styles.notificationProgress}>
+                            {job.progress.current}/{job.progress.total}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className={styles.notificationsSectionTitle}>Activity</div>
+                <div className={styles.notificationsList}>
+                  {sortedActivityEvents.length === 0 ? (
+                    <p className={styles.notificationsEmpty}>No recent activity.</p>
+                  ) : (
+                    sortedActivityEvents.map((event) => (
+                      <div key={event.id} className={styles.notificationItem}>
+                        <span className={styles.notificationStatusIcon} aria-hidden>
+                          {event.kind === "favorite_added" ? (
+                            <Star className={`${styles.notificationStatusGlyph} ${styles.notificationStatusActivityAdd}`} />
+                          ) : (
+                            <StarOff className={`${styles.notificationStatusGlyph} ${styles.notificationStatusActivityRemove}`} />
+                          )}
+                        </span>
+                        <div className={styles.notificationBody}>
+                          <p className={styles.notificationTitle}>{event.title}</p>
+                          <p className={styles.notificationDetail}>{event.message}</p>
+                        </div>
+                        <span className={styles.notificationAge}>{formatActivityAge(event.createdAtMs)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button className={styles.btnIco} aria-label={t("nav.favorites", { defaultValue: "Favorites" })}>
             <Star className={styles.ico} />
           </button>

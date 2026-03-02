@@ -9,10 +9,20 @@ import React, {
 } from "react";
 
 import { AUTH_BASE_URL } from "../lib/auth/config";
-import type { AuthFavoriteKind, AuthProvider as ProviderName, AuthStatus, AuthUser } from "../lib/auth/types";
+import type {
+  AuthFavoriteKind,
+  AuthFavoritePlayerV2,
+  AuthFavoritePlayerValue,
+  AuthProvider as ProviderName,
+  AuthStatus,
+  AuthUser,
+} from "../lib/auth/types";
 import { fetchFirebaseToken, patchFavorite } from "../lib/auth/client";
-import { auth } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
+import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
+import { CLASSES } from "../data/classes";
+import { useNotifications } from "./NotificationsContext";
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -20,7 +30,10 @@ type AuthContextValue = {
   isLoading: boolean;
   isFavoritePlayer: (identifier: string | null | undefined) => boolean;
   isFavoriteGuild: (identifier: string | null | undefined) => boolean;
-  toggleFavoritePlayer: (identifier: string) => Promise<{ isFavorite: boolean }>;
+  toggleFavoritePlayer: (
+    identifier: string,
+    options?: { name?: string | null; class?: string | null; className?: string | null },
+  ) => Promise<{ isFavorite: boolean }>;
   toggleFavoriteGuild: (identifier: string) => Promise<{ isFavorite: boolean }>;
   loginWithDiscord: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -47,6 +60,258 @@ const POPUP_FALLBACK_CODES = new Set([
   "auth/cancelled-popup-request",
   "auth/operation-not-supported-in-this-environment",
 ]);
+const FAVORITES_SCHEMA_V2 = 2;
+const FAVORITES_MIGRATION_READ_CONCURRENCY = 6;
+const FAVORITES_MIGRATION_JOB_ID = "favorites_v2_migration";
+
+const canonicalizeClassToken = (value: unknown): string =>
+  String(value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+const FAVORITE_CLASS_ALIAS_TO_KEY = (() => {
+  const map = new Map<string, string>();
+  for (const cls of CLASSES) {
+    const key = canonicalizeClassToken(cls.key);
+    const label = canonicalizeClassToken(cls.label);
+    if (key) map.set(key, cls.key);
+    if (label) map.set(label, cls.key);
+  }
+  const extraAliases: Record<string, string> = {
+    war: "warrior",
+    krieger: "warrior",
+    magier: "mage",
+    jaeger: "scout",
+    jager: "scout",
+    assa: "assassin",
+    meuchelmoerder: "assassin",
+    meuchelmorder: "assassin",
+    demonhunter: "demon-hunter",
+    dh: "demon-hunter",
+    daemonenjaeger: "demon-hunter",
+    damonenjager: "demon-hunter",
+    zerker: "berserker",
+    battlemage: "battle-mage",
+    kampfmagier: "battle-mage",
+    bm: "battle-mage",
+    druide: "druid",
+    barde: "bard",
+    necro: "necromancer",
+    nekromant: "necromancer",
+    pala: "paladin",
+    plaguedoctor: "plague-doctor",
+  };
+  Object.entries(extraAliases).forEach(([alias, key]) => {
+    const normalized = canonicalizeClassToken(alias);
+    if (normalized) map.set(normalized, key);
+  });
+  return map;
+})();
+
+const resolveFavoritePlayerClassKey = (value: unknown): string => {
+  const normalized = canonicalizeClassToken(value);
+  if (!normalized) return "";
+  const exact = FAVORITE_CLASS_ALIAS_TO_KEY.get(normalized);
+  if (exact) return exact;
+  for (const [alias, key] of FAVORITE_CLASS_ALIAS_TO_KEY.entries()) {
+    if (alias.startsWith(normalized) || normalized.startsWith(alias)) {
+      return key;
+    }
+  }
+  return "";
+};
+
+const createFavoritePlayerV2Value = (identifier: string, value: unknown): AuthFavoritePlayerV2 => {
+  const raw = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const name =
+    typeof raw.name === "string" && raw.name.trim()
+      ? raw.name.trim()
+      : typeof raw.displayName === "string" && raw.displayName.trim()
+      ? raw.displayName.trim()
+      : identifier;
+  const classKey =
+    typeof raw.class === "string"
+      ? resolveFavoritePlayerClassKey(raw.class)
+      : typeof raw.className === "string"
+      ? resolveFavoritePlayerClassKey(raw.className)
+      : "";
+  return {
+    name,
+    class: classKey,
+  };
+};
+
+const createFavoritePlayerV2ValueFromInput = (
+  identifier: string,
+  input?: { name?: string | null; class?: string | null; className?: string | null } | null,
+): AuthFavoritePlayerV2 => {
+  return createFavoritePlayerV2Value(identifier, {
+    name: input?.name ?? undefined,
+    class: input?.class ?? input?.className ?? undefined,
+  });
+};
+
+const isFavoritePlayerV2Value = (value: unknown): value is AuthFavoritePlayerV2 =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
+const getLatestFavoritePlayerValue = async (identifier: string): Promise<AuthFavoritePlayerV2> => {
+  const fallback = { name: identifier, class: "" };
+  try {
+    const latestRef = doc(db, "players", identifier, "latest", "latest");
+    const latestDoc = await getDoc(latestRef);
+    if (!latestDoc.exists()) return fallback;
+    const raw = latestDoc.data() as Record<string, unknown> | null;
+    const values =
+      raw?.values && typeof raw.values === "object" && !Array.isArray(raw.values)
+        ? (raw.values as Record<string, unknown>)
+        : null;
+    const name =
+      (typeof raw?.name === "string" && raw.name.trim()) ||
+      (typeof values?.Name === "string" && values.Name.trim()) ||
+      identifier;
+    const classKey = resolveFavoritePlayerClassKey(
+      raw?.class ?? raw?.className ?? values?.class ?? values?.className ?? values?.Class,
+    );
+    return { name, class: classKey };
+  } catch (error) {
+    console.warn("[Auth] favorites v2 migration latest read failed", { identifier, error });
+    return fallback;
+  }
+};
+
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> => {
+  const safeLimit = Math.max(1, Math.min(limit, items.length || 1));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) return;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  };
+  await Promise.all(Array.from({ length: safeLimit }, () => worker()));
+  return results;
+};
+
+type FavoritesMigrationProgressCallbacks = {
+  onStart?: (total: number) => void;
+  onProgress?: (current: number, total: number) => void;
+};
+
+const migrateFavoritesPlayersV2 = async (params: {
+  uid: string;
+  userDocData: AuthUser;
+  getLatestByIdentifier: (identifier: string) => Promise<AuthFavoritePlayerV2>;
+  onProgress?: FavoritesMigrationProgressCallbacks;
+}): Promise<{
+  migrated: boolean;
+  nextFavoritesPlayers: Record<string, AuthFavoritePlayerValue>;
+  schemaVersion: number;
+}> => {
+  const { uid, userDocData, getLatestByIdentifier, onProgress } = params;
+  const userRef = doc(db, "users", uid);
+  let favorites: Record<string, unknown> = (userDocData.favorites as Record<string, unknown>) ?? {};
+  try {
+    const userDocSnapshot = await getDoc(userRef);
+    const rawUserData =
+      userDocSnapshot.exists() && typeof userDocSnapshot.data === "function"
+        ? (userDocSnapshot.data() as Record<string, unknown> | null)
+        : null;
+    const rawFavorites =
+      rawUserData?.favorites && typeof rawUserData.favorites === "object" && !Array.isArray(rawUserData.favorites)
+        ? (rawUserData.favorites as Record<string, unknown>)
+        : null;
+    if (rawFavorites) {
+      favorites = rawFavorites;
+    }
+  } catch (error) {
+    console.warn("[Auth] favorites v2 migration user doc read failed; falling back to session payload", { uid, error });
+  }
+
+  const playersRaw =
+    favorites.players && typeof favorites.players === "object" ? (favorites.players as Record<string, unknown>) : {};
+  const entries = Object.entries(playersRaw);
+  const legacyIds = entries
+    .filter(([, value]) => value === true)
+    .map(([identifier]) => normalizeFavoriteIdentifier(identifier))
+    .filter((identifier): identifier is string => !!identifier);
+  const hasLegacyEntries = legacyIds.length > 0;
+  const schemaVersion = typeof favorites.schemaVersion === "number" ? favorites.schemaVersion : 0;
+  const shouldMigrate = hasLegacyEntries || schemaVersion !== FAVORITES_SCHEMA_V2;
+  if (!shouldMigrate) {
+    const stablePlayers: Record<string, AuthFavoritePlayerValue> = {};
+    for (const [identifier, value] of entries) {
+      const normalizedIdentifier = normalizeFavoriteIdentifier(identifier);
+      if (!normalizedIdentifier) continue;
+      if (value === true) {
+        stablePlayers[normalizedIdentifier] = true;
+      } else if (isFavoritePlayerV2Value(value)) {
+        stablePlayers[normalizedIdentifier] = createFavoritePlayerV2Value(normalizedIdentifier, value);
+      }
+    }
+    return {
+      migrated: false,
+      nextFavoritesPlayers: stablePlayers,
+      schemaVersion,
+    };
+  }
+
+  const nextFavoritesPlayers: Record<string, AuthFavoritePlayerValue> = {};
+  for (const [identifier, value] of entries) {
+    const normalizedIdentifier = normalizeFavoriteIdentifier(identifier);
+    if (!normalizedIdentifier) continue;
+    if (value === true) continue;
+    if (!isFavoritePlayerV2Value(value)) continue;
+    nextFavoritesPlayers[normalizedIdentifier] = createFavoritePlayerV2Value(normalizedIdentifier, value);
+  }
+
+  const uniqueLegacyIds = hasLegacyEntries ? Array.from(new Set(legacyIds)) : [];
+  onProgress?.onStart?.(uniqueLegacyIds.length);
+
+  if (hasLegacyEntries) {
+    let processedLegacy = 0;
+    const legacyTotal = uniqueLegacyIds.length;
+    const resolved = await mapWithConcurrency(
+      uniqueLegacyIds,
+      FAVORITES_MIGRATION_READ_CONCURRENCY,
+      async (identifier) => {
+        const latest = await getLatestByIdentifier(identifier);
+        processedLegacy += 1;
+        onProgress?.onProgress?.(processedLegacy, legacyTotal);
+        return { identifier, latest };
+      },
+    );
+    resolved.forEach(({ identifier, latest }) => {
+      nextFavoritesPlayers[identifier] = {
+        name: latest?.name?.trim() ? latest.name.trim() : identifier,
+        class: typeof latest?.class === "string" ? latest.class : "",
+      };
+    });
+  }
+
+  const updatePayload: Record<string, any> = {
+    "favorites.schemaVersion": FAVORITES_SCHEMA_V2,
+  };
+  Object.entries(nextFavoritesPlayers).forEach(([identifier, value]) => {
+    updatePayload[`favorites.players.${identifier}`] = value;
+  });
+  await updateDoc(userRef, updatePayload);
+
+  return {
+    migrated: true,
+    nextFavoritesPlayers,
+    schemaVersion: FAVORITES_SCHEMA_V2,
+  };
+};
 
 const isAuthDebugEnabled = () => {
   const fallback = import.meta.env.DEV;
@@ -117,6 +382,25 @@ const normalizeFavoriteIdentifier = (value: string | null | undefined): string |
   return normalized || null;
 };
 
+const getFavoriteServerKey = (identifier: string): string => {
+  const normalized = normalizeFavoriteIdentifier(identifier) ?? identifier.trim().toLowerCase();
+  const playerSplitIndex = normalized.indexOf("_p");
+  if (playerSplitIndex > 0) {
+    return normalized.slice(0, playerSplitIndex);
+  }
+  return normalized;
+};
+
+const buildFavoriteActivityMessage = (
+  identifier: string,
+  playerMeta?: { name?: string | null } | null,
+): string => {
+  const rawName = typeof playerMeta?.name === "string" ? playerMeta.name.trim() : "";
+  const serverKey = getFavoriteServerKey(identifier);
+  const label = rawName || identifier;
+  return `${label} (${serverKey})`;
+};
+
 const isFavoriteInUser = (
   user: AuthUser | null,
   bucket: "players" | "guilds",
@@ -124,7 +408,11 @@ const isFavoriteInUser = (
 ): boolean => {
   const normalized = normalizeFavoriteIdentifier(identifier);
   if (!user || !normalized) return false;
-  return user.favorites?.[bucket]?.[normalized] === true;
+  const value = user.favorites?.[bucket]?.[normalized] as unknown;
+  if (bucket === "players") {
+    return value === true || isFavoritePlayerV2Value(value);
+  }
+  return value === true;
 };
 
 const applyFavoriteToUser = (
@@ -132,22 +420,36 @@ const applyFavoriteToUser = (
   bucket: "players" | "guilds",
   identifier: string,
   isFavorite: boolean,
+  options?: { playerMeta?: AuthFavoritePlayerV2 | null },
 ): AuthUser | null => {
   if (!user) return user;
 
   const favorites = { ...(user.favorites ?? {}) };
-  const nextBucket = { ...(favorites[bucket] ?? {}) } as Record<string, true>;
-
-  if (isFavorite) {
-    nextBucket[identifier] = true;
+  if (bucket === "players") {
+    const nextPlayers = { ...(favorites.players ?? {}) };
+    if (isFavorite) {
+      const nextMeta = options?.playerMeta ?? createFavoritePlayerV2Value(identifier, nextPlayers[identifier]);
+      nextPlayers[identifier] = nextMeta;
+    } else {
+      delete nextPlayers[identifier];
+    }
+    if (Object.keys(nextPlayers).length > 0) {
+      favorites.players = nextPlayers;
+    } else {
+      delete favorites.players;
+    }
   } else {
-    delete nextBucket[identifier];
-  }
-
-  if (Object.keys(nextBucket).length > 0) {
-    favorites[bucket] = nextBucket;
-  } else {
-    delete favorites[bucket];
+    const nextGuilds = { ...(favorites.guilds ?? {}) };
+    if (isFavorite) {
+      nextGuilds[identifier] = true;
+    } else {
+      delete nextGuilds[identifier];
+    }
+    if (Object.keys(nextGuilds).length > 0) {
+      favorites.guilds = nextGuilds;
+    } else {
+      delete favorites.guilds;
+    }
   }
 
   return {
@@ -198,11 +500,16 @@ const writeCachedAuthUser = (user: AuthUser | null) => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { upsertJob, pushActivityEvent } = useNotifications();
   const [user, setUser] = useState<AuthUser | null>(() => readCachedAuthUser());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const firebaseSyncRef = useRef<{ tried: boolean }>({ tried: false });
   const discordLoginInFlight = useRef(false);
   const discordPopupMessageReceived = useRef(false);
+  const favoritesMigrationRef = useRef<{ uid: string | null; attempted: boolean }>({
+    uid: null,
+    attempted: false,
+  });
   const googleProvider = useMemo<GoogleAuthProvider | null>(() => {
     try {
       return new GoogleAuthProvider();
@@ -261,6 +568,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [handleSessionResponse]);
 
+  const runFavoritesPlayersV2Migration = useCallback(
+    async (sessionUser: AuthUser) => {
+      const uid = String(sessionUser?.id ?? "").trim();
+      if (!uid) return;
+
+      if (favoritesMigrationRef.current.uid !== uid) {
+        favoritesMigrationRef.current = { uid, attempted: false };
+      }
+      if (favoritesMigrationRef.current.attempted) return;
+      favoritesMigrationRef.current.attempted = true;
+
+      let didCreateJob = false;
+      let progressTotal = 0;
+      let progressCurrent = 0;
+      const reportRunning = (current: number, total: number) => {
+        didCreateJob = true;
+        progressTotal = Math.max(0, total);
+        progressCurrent = Math.max(0, current);
+        upsertJob({
+          id: FAVORITES_MIGRATION_JOB_ID,
+          title: "Updating favorites...",
+          status: "running",
+          progress: progressTotal > 0 ? { current: progressCurrent, total: progressTotal } : undefined,
+        });
+      };
+
+      try {
+        const result = await migrateFavoritesPlayersV2({
+          uid,
+          userDocData: sessionUser,
+          getLatestByIdentifier: getLatestFavoritePlayerValue,
+          onProgress: {
+            onStart: (total) => {
+              reportRunning(0, total);
+            },
+            onProgress: (current, total) => {
+              reportRunning(current, total);
+            },
+          },
+        });
+        const shouldPatchState =
+          result.migrated || result.schemaVersion === FAVORITES_SCHEMA_V2 || Object.keys(result.nextFavoritesPlayers).length > 0;
+        if (!shouldPatchState) return;
+
+        setUser((prev) => {
+          if (!prev || prev.id !== uid) return prev;
+          const nextUser: AuthUser = {
+            ...prev,
+            favorites: {
+              ...(prev.favorites ?? {}),
+              schemaVersion: result.schemaVersion || FAVORITES_SCHEMA_V2,
+              players: result.nextFavoritesPlayers,
+            },
+          };
+          writeCachedAuthUser(nextUser);
+          return nextUser;
+        });
+        if (didCreateJob) {
+          upsertJob({
+            id: FAVORITES_MIGRATION_JOB_ID,
+            title: "Favorites updated",
+            status: "success",
+            progress: progressTotal > 0 ? { current: progressTotal, total: progressTotal } : undefined,
+          });
+        }
+      } catch (error) {
+        console.warn("[Auth] favorites v2 migration failed", { uid, error });
+        if (didCreateJob) {
+          upsertJob({
+            id: FAVORITES_MIGRATION_JOB_ID,
+            title: "Favorites update failed",
+            status: "error",
+            detail:
+              error instanceof Error
+                ? error.message.slice(0, 140)
+                : "Favorites migration failed unexpectedly.",
+            progress: progressTotal > 0 ? { current: progressCurrent, total: progressTotal } : undefined,
+          });
+        }
+      }
+    },
+    [upsertJob],
+  );
+
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
@@ -289,6 +680,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!user) {
       firebaseSyncRef.current.tried = false;
+      favoritesMigrationRef.current = { uid: null, attempted: false };
       return;
     }
     if (firebaseSyncRef.current.tried) {
@@ -301,11 +693,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = await fetchFirebaseToken();
         await signInWithCustomToken(auth, token);
         console.log("[AuthDebug] signed in to Firebase with custom token");
+        await runFavoritesPlayersV2Migration(user);
       } catch (err) {
         console.error("[AuthDebug] failed to sign in to Firebase", err);
       }
     })();
-  }, [user]);
+  }, [runFavoritesPlayersV2Migration, user]);
 
   const startRedirectLogin = useCallback((provider: ProviderName) => {
     if (!AUTH_BASE_URL) {
@@ -539,7 +932,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchSession, googleProvider, startRedirectLogin]);
 
   const toggleFavoriteByKind = useCallback(
-    async (kind: AuthFavoriteKind, rawIdentifier: string): Promise<{ isFavorite: boolean }> => {
+    async (
+      kind: AuthFavoriteKind,
+      rawIdentifier: string,
+      options?: { playerMeta?: { name?: string | null; class?: string | null; className?: string | null } },
+    ): Promise<{ isFavorite: boolean }> => {
       const identifier = normalizeFavoriteIdentifier(rawIdentifier);
       if (!identifier) {
         const error = Object.assign(new Error("Missing favorite identifier"), { code: "INVALID_IDENTIFIER" });
@@ -554,35 +951,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const bucket = kind === "player" ? "players" : "guilds";
       const currentlyFavorite = isFavoriteInUser(user, bucket, identifier);
       const nextIsFavorite = !currentlyFavorite;
+      const currentPlayerValue = user.favorites?.players?.[identifier];
+      const currentPlayerMeta =
+        kind === "player" && currentPlayerValue && isFavoritePlayerV2Value(currentPlayerValue)
+          ? createFavoritePlayerV2Value(identifier, currentPlayerValue)
+          : null;
+      const nextPlayerMeta =
+        kind === "player"
+          ? createFavoritePlayerV2ValueFromInput(identifier, options?.playerMeta ?? undefined)
+          : null;
 
       setUser((prev) => {
-        const next = applyFavoriteToUser(prev, bucket, identifier, nextIsFavorite);
+        const next = applyFavoriteToUser(prev, bucket, identifier, nextIsFavorite, {
+          playerMeta: nextPlayerMeta,
+        });
         writeCachedAuthUser(next);
         return next;
       });
 
       try {
-        const response = await patchFavorite({
-          kind,
-          op: nextIsFavorite ? "add" : "remove",
-          identifier,
-        });
+        let resolvedIsFavorite = nextIsFavorite;
+        if (kind === "player") {
+          const userRef = doc(db, "users", user.id);
+          if (nextIsFavorite) {
+            await updateDoc(userRef, {
+              [`favorites.players.${identifier}`]: nextPlayerMeta,
+              "favorites.schemaVersion": FAVORITES_SCHEMA_V2,
+            });
+            resolvedIsFavorite = true;
+          } else {
+            await updateDoc(userRef, {
+              [`favorites.players.${identifier}`]: deleteField(),
+            });
+            resolvedIsFavorite = false;
+          }
+        } else {
+          const response = await patchFavorite({
+            kind,
+            op: nextIsFavorite ? "add" : "remove",
+            identifier,
+          });
+          resolvedIsFavorite = response.isFavorite;
+        }
+
         setUser((prev) => {
-          const next = applyFavoriteToUser(prev, bucket, identifier, response.isFavorite);
+          const next = applyFavoriteToUser(prev, bucket, identifier, resolvedIsFavorite, {
+            playerMeta: nextPlayerMeta,
+          });
           writeCachedAuthUser(next);
           return next;
         });
-        return { isFavorite: response.isFavorite };
+        if (kind === "player") {
+          const isAdded = resolvedIsFavorite;
+          const eventMeta = isAdded ? nextPlayerMeta : currentPlayerMeta;
+          pushActivityEvent({
+            kind: isAdded ? "favorite_added" : "favorite_removed",
+            title: isAdded ? "Favorite added" : "Favorite removed",
+            message: buildFavoriteActivityMessage(identifier, eventMeta),
+          });
+        }
+        return { isFavorite: resolvedIsFavorite };
       } catch (error) {
         setUser((prev) => {
-          const next = applyFavoriteToUser(prev, bucket, identifier, currentlyFavorite);
+          const next = applyFavoriteToUser(prev, bucket, identifier, currentlyFavorite, {
+            playerMeta: currentPlayerMeta,
+          });
           writeCachedAuthUser(next);
           return next;
         });
         throw error;
       }
     },
-    [user],
+    [pushActivityEvent, user],
   );
 
   const isFavoritePlayer = useCallback(
@@ -596,7 +1036,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const toggleFavoritePlayer = useCallback(
-    (identifier: string) => toggleFavoriteByKind("player", identifier),
+    (
+      identifier: string,
+      options?: { name?: string | null; class?: string | null; className?: string | null },
+    ) => toggleFavoriteByKind("player", identifier, { playerMeta: options }),
     [toggleFavoriteByKind],
   );
 

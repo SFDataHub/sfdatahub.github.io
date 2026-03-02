@@ -4,8 +4,16 @@ export const MAX_FAVORITE_GUILDS = 250;
 export type FavoriteKind = "player" | "guild";
 export type FavoriteBucket = "players" | "guilds";
 
+export type UserFavoritePlayerV2 = {
+  name: string;
+  class: string;
+};
+
+export type UserFavoritePlayerValue = true | UserFavoritePlayerV2;
+
 export type UserFavoritesDoc = {
-  players?: Record<string, true>;
+  schemaVersion?: number;
+  players?: Record<string, UserFavoritePlayerValue>;
   guilds?: Record<string, true>;
 };
 
@@ -23,18 +31,51 @@ export const isValidFavoriteIdentifier = (kind: FavoriteKind, identifier: string
   return GUILD_FAVORITE_IDENTIFIER_REGEX.test(identifier);
 };
 
-const sanitizeFavoriteMap = (value: unknown): Record<string, true> | undefined => {
+const sanitizeFavoriteGuildMap = (value: unknown): Record<string, true> | undefined => {
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>).filter(([, flag]) => flag === true);
   if (!entries.length) return undefined;
   return Object.fromEntries(entries) as Record<string, true>;
 };
 
+const sanitizeFavoritePlayerMap = (value: unknown): Record<string, UserFavoritePlayerValue> | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const out: Record<string, UserFavoritePlayerValue> = {};
+  Object.entries(value as Record<string, unknown>).forEach(([identifier, favoriteValue]) => {
+    if (!identifier) return;
+    if (favoriteValue === true) {
+      out[identifier] = true;
+      return;
+    }
+    if (!favoriteValue || typeof favoriteValue !== "object" || Array.isArray(favoriteValue)) return;
+    const raw = favoriteValue as Record<string, unknown>;
+    const nameCandidate =
+      typeof raw.name === "string" && raw.name.trim()
+        ? raw.name.trim()
+        : typeof raw.displayName === "string" && raw.displayName.trim()
+        ? raw.displayName.trim()
+        : identifier;
+    const classCandidate =
+      typeof raw.class === "string"
+        ? raw.class.trim()
+        : typeof raw.className === "string"
+        ? raw.className.trim()
+        : "";
+    out[identifier] = {
+      name: nameCandidate || identifier,
+      class: classCandidate || "",
+    };
+  });
+  if (!Object.keys(out).length) return undefined;
+  return out;
+};
+
 export const sanitizeUserFavorites = (value: unknown): UserFavoritesDoc => {
   const raw = value && typeof value === "object" ? (value as UserFavoritesDoc) : {};
-  const players = sanitizeFavoriteMap(raw.players);
-  const guilds = sanitizeFavoriteMap(raw.guilds);
+  const players = sanitizeFavoritePlayerMap(raw.players);
+  const guilds = sanitizeFavoriteGuildMap(raw.guilds);
   const out: UserFavoritesDoc = {};
+  if (typeof raw.schemaVersion === "number") out.schemaVersion = raw.schemaVersion;
   if (players) out.players = players;
   if (guilds) out.guilds = guilds;
   return out;
@@ -44,7 +85,7 @@ export const countFavoriteMap = (value: unknown): number => {
   if (!value || typeof value !== "object") return 0;
   let count = 0;
   for (const flag of Object.values(value as Record<string, unknown>)) {
-    if (flag === true) count += 1;
+    if (flag === true || (!!flag && typeof flag === "object" && !Array.isArray(flag))) count += 1;
   }
   return count;
 };

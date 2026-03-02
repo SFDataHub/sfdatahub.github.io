@@ -12,6 +12,7 @@
     "sync:creators": "tsx tools/creators/sync.mts"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.19",
     "firebase": "^10.14.1",
     "firebase-admin": "^13.5.0",
     "framer-motion": "^11.18.2",

@@ -302,6 +302,14 @@ const getMaxMonthKey = (months: Record<string, SnapshotMonthEntry>): string | nu
   return keys.length ? keys[keys.length - 1] : null;
 };
 
+const getEffectiveBuiltThrough = (
+  builtThrough: string | null,
+  maxMonthKey: string | null,
+): string | null => {
+  if (!builtThrough || !maxMonthKey) return null;
+  return builtThrough <= maxMonthKey ? builtThrough : maxMonthKey;
+};
+
 const isIndexOrQuerySupportError = (error: unknown): boolean => {
   const code = typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "";
   const msg = error instanceof Error ? error.message.toLowerCase() : "";
@@ -470,9 +478,10 @@ playerChartsRouter.post("/:identifier/charts/monthly_v1/build", async (req: Requ
     const needsUpgrade = snapshotSchemaVersion < REQUIRED_SCHEMA || latestHasMissingRequiredValues || latestHasMissingScanTime;
     const upgradeMonthKeys = needsUpgrade ? rawSnapshotMonthKeys : [];
     const upgradeMonthKeySet = new Set(upgradeMonthKeys);
-    const builtThrough =
+    const rawBuiltThrough =
       snapshotData?.builtThrough && isMonthKey(snapshotData.builtThrough) ? snapshotData.builtThrough : null;
     const maxMonthKey = getMaxMonthKey(months);
+    const builtThrough = getEffectiveBuiltThrough(rawBuiltThrough, maxMonthKey);
 
     let startMonthKey: string | null = null;
     if (builtThrough && builtThrough < nowMonthKey) {
@@ -531,12 +540,13 @@ playerChartsRouter.post("/:identifier/charts/monthly_v1/build", async (req: Requ
     }
 
     const nextMaxMonthKey = getMaxMonthKey(months);
+    const nextBuiltThrough = nextMaxMonthKey;
 
     await chartsDocRef.set(
       {
         schemaVersion: REQUIRED_SCHEMA,
         months,
-        builtThrough: nowMonthKey,
+        builtThrough: nextBuiltThrough,
         maxMonthKey: nextMaxMonthKey,
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -548,7 +558,7 @@ playerChartsRouter.post("/:identifier/charts/monthly_v1/build", async (req: Requ
       identifier,
       processedMonths,
       updatedMonths,
-      builtThrough: nowMonthKey,
+      builtThrough: nextBuiltThrough,
       maxMonthKey: nextMaxMonthKey,
       monthsCount: Object.keys(months).length,
     });

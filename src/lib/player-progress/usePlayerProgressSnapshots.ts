@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import type { TrendSeries } from "../../components/player-profile/types";
 import { db } from "../firebase";
@@ -180,6 +180,14 @@ type MonthlyChartsSnapshotDocPayload = {
   months?: Record<string, MonthlyChartsSnapshotMonthPayload | null | undefined> | null;
 };
 
+type PlayerLatestDocPayload = {
+  timestamp?: unknown;
+  timestampRaw?: unknown;
+  latestScanAtSec?: unknown;
+  lastScan?: unknown;
+  values?: Record<string, unknown> | null;
+};
+
 type SnapshotSource = "snapshot" | "fallback";
 
 type LoadedProgressSnapshot = {
@@ -201,15 +209,24 @@ export type PlayerProgressSnapshotResult = {
 
 type UsePlayerProgressSnapshotsInput = {
   identifiers: string[];
+  desiredThroughMonth?: string | null;
 };
 
 type UsePlayerProgressSnapshotsResult = {
   byIdentifier: Record<string, PlayerProgressSnapshotResult>;
+  ensureProgressSnapshot: (identifier: string) => Promise<void>;
 };
 
-const snapshotCache = new Map<string, LoadedProgressSnapshot>();
+type SnapshotCacheEntry = {
+  loaded: LoadedProgressSnapshot;
+  expiresAtMs: number | null;
+};
+
+const snapshotCache = new Map<string, SnapshotCacheEntry>();
 const inFlightSnapshotLoads = new Map<string, Promise<LoadedProgressSnapshot>>();
-const buildAttempts = new Set<string>();
+const buildAttemptCooldownUntil = new Map<string, number>();
+const BUILD_ATTEMPT_COOLDOWN_MS = 3 * 60 * 1000;
+const NEEDS_BUILD_TRANSIENT_CACHE_MS = 5_000;
 
 const toNum = (value: any): number | null => {
   if (value == null || value === "") return null;
@@ -303,9 +320,124 @@ export const buildFallbackProgressSeries = (): TrendSeries[] =>
 const isUtcMonthKey = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}$/.test(value);
 
+const toMonthKeyUTC = (tsSec: number): string => {
+  const date = new Date(tsSec * 1000);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
 const currentUtcMonthKey = () => {
   const now = new Date();
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
+const normalizeEpochSec = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value > 9_999_999_999 ? Math.floor(value / 1000) : Math.floor(value);
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || !/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed > 9_999_999_999 ? Math.floor(parsed / 1000) : Math.floor(parsed);
+};
+
+const parseCsvScanStringToSec = (value: unknown): number | null => {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^\d{13}$/.test(raw)) return Math.floor(Number(raw) / 1000);
+  if (/^\d{10}$/.test(raw)) return Number(raw);
+  const localMatch = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (localMatch) {
+    const day = Number(localMatch[1]);
+    const month = Number(localMatch[2]) - 1;
+    const year = Number(localMatch[3]);
+    const hours = localMatch[4] ? Number(localMatch[4]) : 0;
+    const minutes = localMatch[5] ? Number(localMatch[5]) : 0;
+    const seconds = localMatch[6] ? Number(localMatch[6]) : 0;
+    const date = new Date(year, month, day, hours, minutes, seconds);
+    if (!Number.isNaN(date.getTime())) return Math.floor(date.getTime() / 1000);
+  }
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) return Math.floor(parsed / 1000);
+  return null;
+};
+
+const canonicalizeFieldKey = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const readRecordValue = (
+  record: Record<string, unknown> | null | undefined,
+  keys: readonly string[],
+): unknown => {
+  if (!record) return undefined;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) return record[key];
+  }
+  const wanted = new Set(keys.map(canonicalizeFieldKey));
+  for (const [key, value] of Object.entries(record)) {
+    if (wanted.has(canonicalizeFieldKey(key))) return value;
+  }
+  return undefined;
+};
+
+const resolveCsvScanSecFromLatestDoc = (payload: PlayerLatestDocPayload | null): number | null => {
+  if (!payload || typeof payload !== "object") return null;
+  const values =
+    payload.values && typeof payload.values === "object" && !Array.isArray(payload.values)
+      ? (payload.values as Record<string, unknown>)
+      : null;
+
+  const numericCandidates = [
+    readRecordValue(values, ["latestScanAtSec", "latestScanAt", "timestamp", "timestampSec", "tsSec", "ts"]),
+    readRecordValue(payload as unknown as Record<string, unknown>, [
+      "latestScanAtSec",
+      "latestScanAt",
+      "timestamp",
+      "timestampSec",
+      "tsSec",
+      "ts",
+    ]),
+  ];
+  for (const candidate of numericCandidates) {
+    const sec = normalizeEpochSec(candidate);
+    if (sec != null) return sec;
+  }
+
+  const rawCandidates = [
+    readRecordValue(values, ["lastScan", "timestampRaw", "Timestamp", "timestamp"]),
+    readRecordValue(payload as unknown as Record<string, unknown>, ["lastScan", "timestampRaw", "Timestamp"]),
+  ];
+  for (const candidate of rawCandidates) {
+    const sec = normalizeEpochSec(candidate) ?? parseCsvScanStringToSec(candidate);
+    if (sec != null) return sec;
+  }
+
+  return null;
+};
+
+const resolveDesiredThroughMonthForIdentifier = async (
+  scope: FirestoreTraceScope,
+  normalizedIdentifier: string,
+  desiredThroughMonthInput: string | null | undefined,
+): Promise<string> => {
+  if (isUtcMonthKey(desiredThroughMonthInput)) return desiredThroughMonthInput;
+  const fallback = currentUtcMonthKey();
+  const latestRef = doc(db, "players", normalizedIdentifier, "latest", "latest");
+  try {
+    const latestDoc = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
+    if (!latestDoc?.exists?.()) return fallback;
+    const payload = (typeof latestDoc.data === "function" ? latestDoc.data() : null) as PlayerLatestDocPayload | null;
+    const csvScanSec = resolveCsvScanSecFromLatestDoc(payload);
+    return csvScanSec != null ? toMonthKeyUTC(csvScanSec) : fallback;
+  } catch (error) {
+    console.warn("[progress] failed to resolve desiredThroughMonth from latest scan", {
+      identifier: normalizedIdentifier,
+      error,
+    });
+    return fallback;
+  }
 };
 
 const mapMonthlyChartsSnapshotDocToEntries = (docSnap: any): MonthlyChartEntry[] => {
@@ -347,7 +479,16 @@ const mapMonthlyChartsSnapshotDocToEntries = (docSnap: any): MonthlyChartEntry[]
     .sort((a, b) => a.monthId.localeCompare(b.monthId));
 };
 
-const shouldBuildMonthlyChartsSnapshot = (docSnap: any, currentMonthKey: string) => {
+const hasDesiredMonthEntry = (
+  rawMonths: Record<string, unknown> | null,
+  desiredThroughMonth: string,
+): boolean => {
+  if (!rawMonths) return false;
+  const rawEntry = rawMonths[desiredThroughMonth];
+  return !!rawEntry && typeof rawEntry === "object" && !Array.isArray(rawEntry);
+};
+
+const shouldBuildMonthlyChartsSnapshot = (docSnap: any, desiredThroughMonth: string) => {
   if (!docSnap?.exists?.()) return true;
   const data = (typeof docSnap.data === "function" ? docSnap.data() : null) as MonthlyChartsSnapshotDocPayload | null;
   const rawMonths =
@@ -382,17 +523,28 @@ const shouldBuildMonthlyChartsSnapshot = (docSnap: any, currentMonthKey: string)
     }
   }
   const builtThrough = isUtcMonthKey(data?.builtThrough) ? data?.builtThrough : null;
-  if (builtThrough && builtThrough >= currentMonthKey) return false;
-  if (rawMonths) {
-    const monthRow = rawMonths[currentMonthKey];
-    if (monthRow && typeof monthRow === "object") return false;
-  }
-  return true;
+  if (!builtThrough) return true;
+  if (builtThrough < desiredThroughMonth) return true;
+  return !hasDesiredMonthEntry(rawMonths, desiredThroughMonth);
 };
 
-const buildMonthlyChartsSnapshot = async (identifier: string) => {
+const hasReachedDesiredThroughMonth = (docSnap: any, desiredThroughMonth: string): boolean => {
+  if (!docSnap?.exists?.()) return false;
+  const data = (typeof docSnap.data === "function" ? docSnap.data() : null) as MonthlyChartsSnapshotDocPayload | null;
+  const rawMonths =
+    data?.months && typeof data.months === "object" && !Array.isArray(data.months)
+      ? (data.months as Record<string, unknown>)
+      : null;
+  const builtThrough = isUtcMonthKey(data?.builtThrough) ? data?.builtThrough : null;
+  return !!builtThrough && builtThrough >= desiredThroughMonth && hasDesiredMonthEntry(rawMonths, desiredThroughMonth);
+};
+
+const buildMonthlyChartsSnapshot = async (identifier: string, throughMonth: string) => {
   if (!AUTH_BASE_URL) return false;
-  const endpoint = `${AUTH_BASE_URL}/api/players/${encodeURIComponent(identifier)}/charts/monthly_v1/build`;
+  const endpointBase = `${AUTH_BASE_URL}/api/players/${encodeURIComponent(identifier)}/charts/monthly_v1/build`;
+  const endpoint = isUtcMonthKey(throughMonth)
+    ? `${endpointBase}?throughMonth=${encodeURIComponent(throughMonth)}`
+    : endpointBase;
   const response = await fetch(endpoint, {
     method: "POST",
     cache: "no-store",
@@ -418,47 +570,97 @@ const buildMonthlyChartsSnapshot = async (identifier: string) => {
 
 const normalizeIdentifier = (value: string): string => value.trim().toLowerCase();
 
-const loadProgressSnapshot = async (identifier: string, currentMonthKey: string): Promise<LoadedProgressSnapshot> => {
-  const normalizedIdentifier = normalizeIdentifier(identifier);
-  const cacheKey = `${normalizedIdentifier}:${currentMonthKey}`;
+const readSnapshotCache = (cacheKey: string): LoadedProgressSnapshot | null => {
   const cached = snapshotCache.get(cacheKey);
-  if (cached) return cached;
+  if (!cached) return null;
+  if (cached.expiresAtMs != null && cached.expiresAtMs <= Date.now()) {
+    snapshotCache.delete(cacheKey);
+    return null;
+  }
+  return cached.loaded;
+};
 
-  const existing = inFlightSnapshotLoads.get(cacheKey);
+const loadProgressSnapshot = async (
+  identifier: string,
+  desiredThroughMonthInput: string | null | undefined,
+): Promise<LoadedProgressSnapshot> => {
+  const normalizedIdentifier = normalizeIdentifier(identifier);
+  const inFlightKey = `${normalizedIdentifier}:${isUtcMonthKey(desiredThroughMonthInput) ? desiredThroughMonthInput : "auto"}`;
+
+  const existing = inFlightSnapshotLoads.get(inFlightKey);
   if (existing) return existing;
 
   const promise = (async () => {
     const scope: FirestoreTraceScope = beginReadScope("PlayerProgressSnapshots:load");
     try {
+      const desiredThroughMonth = await resolveDesiredThroughMonthForIdentifier(
+        scope,
+        normalizedIdentifier,
+        desiredThroughMonthInput,
+      );
+      const cacheKey = `${normalizedIdentifier}:${desiredThroughMonth}`;
+      const cached = readSnapshotCache(cacheKey);
+      if (cached) return cached;
+
       const snapshotRef = doc(db, "players", normalizedIdentifier, "charts", "monthly_v1");
       let snapshotDoc = await traceGetDoc(scope, snapshotRef, () => getDoc(snapshotRef));
       let snapshotMonths = mapMonthlyChartsSnapshotDocToEntries(snapshotDoc);
 
-      const needsBuild = shouldBuildMonthlyChartsSnapshot(snapshotDoc, currentMonthKey);
-      const buildAttemptKey = `${normalizedIdentifier}:${currentMonthKey}:s${CHART_SNAPSHOT_REQUIRED_SCHEMA}`;
-      if (needsBuild && !buildAttempts.has(buildAttemptKey)) {
-        buildAttempts.add(buildAttemptKey);
-        const didTriggerBuild = await buildMonthlyChartsSnapshot(normalizedIdentifier);
-        if (didTriggerBuild) {
-          snapshotDoc = await traceGetDoc(scope, snapshotRef, () => getDoc(snapshotRef));
-          snapshotMonths = mapMonthlyChartsSnapshotDocToEntries(snapshotDoc);
-        }
-      } else if (needsBuild && !AUTH_BASE_URL) {
+      const needsBuild = shouldBuildMonthlyChartsSnapshot(snapshotDoc, desiredThroughMonth);
+      const buildAttemptKey = `${normalizedIdentifier}:${desiredThroughMonth}:s${CHART_SNAPSHOT_REQUIRED_SCHEMA}`;
+      const now = Date.now();
+      const cooldownUntil = buildAttemptCooldownUntil.get(buildAttemptKey) ?? 0;
+      if (needsBuild && !AUTH_BASE_URL) {
         console.warn("[charts] AUTH_BASE_URL missing, cannot build monthly snapshot", { historyIdentifier: normalizedIdentifier });
+      } else if (needsBuild && cooldownUntil <= now) {
+        if (import.meta.env.DEV) {
+          console.info("[progress] build triggered", {
+            identifier: normalizedIdentifier,
+            desiredThroughMonth,
+          });
+        }
+        try {
+          const didTriggerBuild = await buildMonthlyChartsSnapshot(normalizedIdentifier, desiredThroughMonth);
+          if (didTriggerBuild) {
+            snapshotDoc = await traceGetDoc(scope, snapshotRef, () => getDoc(snapshotRef));
+            snapshotMonths = mapMonthlyChartsSnapshotDocToEntries(snapshotDoc);
+          }
+          if (hasReachedDesiredThroughMonth(snapshotDoc, desiredThroughMonth)) {
+            buildAttemptCooldownUntil.delete(buildAttemptKey);
+          } else {
+            buildAttemptCooldownUntil.set(buildAttemptKey, Date.now() + BUILD_ATTEMPT_COOLDOWN_MS);
+          }
+        } catch (error) {
+          buildAttemptCooldownUntil.set(buildAttemptKey, Date.now() + BUILD_ATTEMPT_COOLDOWN_MS);
+          console.warn("[progress] monthly snapshot build failed", {
+            identifier: normalizedIdentifier,
+            desiredThroughMonth,
+            error,
+          });
+        }
       }
 
       const loaded: LoadedProgressSnapshot = snapshotMonths.length
         ? { months: snapshotMonths, series: buildSeriesFromMonthly(snapshotMonths), source: "snapshot" }
         : { months: [], series: buildFallbackProgressSeries(), source: "fallback" };
-      snapshotCache.set(cacheKey, loaded);
+      const stillNeedsBuild = shouldBuildMonthlyChartsSnapshot(snapshotDoc, desiredThroughMonth);
+      if (!stillNeedsBuild) {
+        snapshotCache.set(cacheKey, { loaded, expiresAtMs: null });
+      } else {
+        const nowMs = Date.now();
+        const cooldownUntil = buildAttemptCooldownUntil.get(buildAttemptKey) ?? 0;
+        const expiresAtMs =
+          cooldownUntil > nowMs ? cooldownUntil : nowMs + NEEDS_BUILD_TRANSIENT_CACHE_MS;
+        snapshotCache.set(cacheKey, { loaded, expiresAtMs });
+      }
       return loaded;
     } finally {
       endReadScope(scope);
-      inFlightSnapshotLoads.delete(cacheKey);
+      inFlightSnapshotLoads.delete(inFlightKey);
     }
   })();
 
-  inFlightSnapshotLoads.set(cacheKey, promise);
+  inFlightSnapshotLoads.set(inFlightKey, promise);
   return promise;
 };
 
@@ -471,7 +673,10 @@ const createIdleResult = (identifier: string): PlayerProgressSnapshotResult => (
   error: null,
 });
 
-export function usePlayerProgressSnapshots({ identifiers }: UsePlayerProgressSnapshotsInput): UsePlayerProgressSnapshotsResult {
+export function usePlayerProgressSnapshots({
+  identifiers,
+  desiredThroughMonth: desiredThroughMonthInput,
+}: UsePlayerProgressSnapshotsInput): UsePlayerProgressSnapshotsResult {
   const normalizedIdentifiers = useMemo(
     () => Array.from(new Set(identifiers.map((id) => normalizeIdentifier(id)).filter(Boolean))),
     [identifiers],
@@ -481,8 +686,31 @@ export function usePlayerProgressSnapshots({ identifiers }: UsePlayerProgressSna
     () => (normalizedIdentifiersKey ? normalizedIdentifiersKey.split("|").filter(Boolean) : []),
     [normalizedIdentifiersKey],
   );
-  const currentMonthKey = currentUtcMonthKey();
+  const desiredThroughMonth = isUtcMonthKey(desiredThroughMonthInput)
+    ? desiredThroughMonthInput
+    : null;
   const [byIdentifier, setByIdentifier] = useState<Record<string, PlayerProgressSnapshotResult>>({});
+  const ensureInFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+
+  const ensureProgressSnapshot = useCallback(
+    async (identifier: string) => {
+      const normalizedIdentifier = normalizeIdentifier(identifier);
+      if (!normalizedIdentifier) return;
+      const ensureKey = `${normalizedIdentifier}:monthly_v1:${desiredThroughMonth ?? "auto"}:s${CHART_SNAPSHOT_REQUIRED_SCHEMA}`;
+      const existing = ensureInFlightRef.current.get(ensureKey);
+      if (existing) return existing;
+
+      const promise = loadProgressSnapshot(normalizedIdentifier, desiredThroughMonth)
+        .then(() => undefined)
+        .finally(() => {
+          ensureInFlightRef.current.delete(ensureKey);
+        });
+
+      ensureInFlightRef.current.set(ensureKey, promise);
+      return promise;
+    },
+    [desiredThroughMonth],
+  );
 
   useEffect(() => {
     setByIdentifier((prev) => {
@@ -522,7 +750,7 @@ export function usePlayerProgressSnapshots({ identifiers }: UsePlayerProgressSna
         };
       });
 
-      void loadProgressSnapshot(identifier, currentMonthKey)
+      void loadProgressSnapshot(identifier, desiredThroughMonth)
         .then((loaded) => {
           if (cancelled) return;
           setByIdentifier((prev) => ({
@@ -557,7 +785,7 @@ export function usePlayerProgressSnapshots({ identifiers }: UsePlayerProgressSna
     return () => {
       cancelled = true;
     };
-  }, [currentMonthKey, normalizedIdentifiersKey, stableIdentifiers]);
+  }, [desiredThroughMonth, normalizedIdentifiersKey, stableIdentifiers]);
 
-  return { byIdentifier };
+  return { byIdentifier, ensureProgressSnapshot };
 }

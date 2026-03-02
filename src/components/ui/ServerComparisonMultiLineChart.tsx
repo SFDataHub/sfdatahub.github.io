@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 // @ts-ignore Recharts is expected in the app dependency set where this component is mounted.
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import styles from "./ServerComparisonMultiLineChart.module.css";
+import { getClassIconUrl } from "./shared/classIcons";
 
 type AxisId = "left" | "right";
 type RangeMonths = 6 | 12;
@@ -21,6 +22,7 @@ interface MetricDefinition {
 interface EntityDefinition {
   key: string;
   label: string;
+  className?: string;
   baseline: boolean;
   kind: EntityKind;
   lightnessShift: number;
@@ -39,6 +41,7 @@ interface SeriesDescriptor {
   yAxisId: AxisId;
   stroke: string;
   dashed: boolean;
+  isPlayer: boolean;
 }
 
 interface TooltipPayloadItem {
@@ -51,6 +54,7 @@ interface ChartTooltipProps {
   label?: string;
   payload?: TooltipPayloadItem[];
   lineByKey: Record<string, SeriesDescriptor>;
+  hiddenLineKeys?: Set<string>;
   normalize: boolean;
   monthScanLabels?: Record<string, string>;
 }
@@ -68,6 +72,7 @@ export interface ServerComparisonExternalMetric {
 export interface ServerComparisonExternalEntity {
   key: string;
   label: string;
+  className?: string | null;
   kind: EntityKind;
   baseline?: boolean;
   metricValues: Record<string, Array<number | null>>;
@@ -85,9 +90,11 @@ export interface ServerComparisonExternalData {
 
 interface ServerComparisonMultiLineChartProps {
   externalData?: ServerComparisonExternalData;
+  isLoading?: boolean;
   selectedFavoriteKeys?: string[];
   onSelectedFavoriteKeysChange?: (next: string[]) => void;
   availableFavoriteKeys?: string[];
+  onFavoriteAdded?: (favoriteKey: string) => void | Promise<void>;
 }
 
 const MOCK_METRICS: MetricDefinition[] = [
@@ -212,14 +219,54 @@ function metricValueLabel(metric: MetricDefinition, value: number, normalize: bo
   return `${formatInteger.format(value)}${metric.unit ?? ""}`;
 }
 
-function strokeColor(metric: MetricDefinition, entity: EntityDefinition): string {
-  const hue = (metric.hue + entity.lightnessShift) % 360;
-  const saturation = entity.baseline ? 58 : 72;
-  const lightness = entity.baseline ? 68 : 54;
-  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+const PLAYER_COLOR = "#4da3ff";
+const ENTITY_COLOR_PALETTE = [
+  "#f97316",
+  "#22c55e",
+  "#eab308",
+  "#a855f7",
+  "#ec4899",
+  "#14b8a6",
+  "#f43f5e",
+  "#84cc16",
+  "#38bdf8",
+  "#f59e0b",
+  "#c084fc",
+  "#f472b6",
+];
+const CHART_ANIM = {
+  isAnimationActive: true,
+  animationDuration: 750,
+  animationEasing: "ease-in-out",
+  animationBegin: 0,
+} as const;
+
+function serverKeyFromIdentifier(identifier: string): string {
+  const index = identifier.indexOf("_p");
+  if (index <= 0) return "";
+  return identifier.slice(0, index);
 }
 
-function ChartTooltip({ active, label, payload, lineByKey, normalize, monthScanLabels }: ChartTooltipProps) {
+function toEntityDisplayName(identifier: string, label: string): string {
+  const displayName = label || identifier;
+  const serverTag = serverKeyFromIdentifier(identifier);
+  if (!serverTag) return displayName;
+  return `${displayName} (${serverTag})`;
+}
+
+function colorForIdentifier(identifier: string, isPlayer: boolean): string {
+  if (isPlayer) return PLAYER_COLOR;
+  const index = hashSeed(identifier) % ENTITY_COLOR_PALETTE.length;
+  return ENTITY_COLOR_PALETTE[index];
+}
+
+function buildSeriesLabel(entity: EntityDefinition, metric: MetricDefinition): string {
+  const identifier = entity.key;
+  const nameWithServer = toEntityDisplayName(identifier, entity.label || identifier);
+  return `${nameWithServer} - ${metric.label}`;
+}
+
+function ChartTooltip({ active, label, payload, lineByKey, hiddenLineKeys, normalize, monthScanLabels }: ChartTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
   const scanAt = label ? monthScanLabels?.[label] : undefined;
   const labelWithScan = scanAt ? `${label} | Scan: ${scanAt}` : label;
@@ -230,6 +277,7 @@ function ChartTooltip({ active, label, payload, lineByKey, normalize, monthScanL
       <div className={styles.tooltipRows}>
         {payload.map((item) => {
           if (!item.dataKey) return null;
+          if (hiddenLineKeys?.has(item.dataKey)) return null;
           const descriptor = lineByKey[item.dataKey];
           if (!descriptor) return null;
 
@@ -258,9 +306,11 @@ function ChartTooltip({ active, label, payload, lineByKey, normalize, monthScanL
 
 export default function ServerComparisonMultiLineChart({
   externalData,
+  isLoading = false,
   selectedFavoriteKeys,
   onSelectedFavoriteKeysChange,
   availableFavoriteKeys,
+  onFavoriteAdded,
 }: ServerComparisonMultiLineChartProps) {
   const [rangeMonths, setRangeMonths] = useState<RangeMonths>(12);
   const [normalize, setNormalize] = useState(false);
@@ -292,6 +342,7 @@ export default function ServerComparisonMultiLineChart({
         ? externalData.entities.map((entity, index) => ({
             key: entity.key,
             label: entity.label,
+            className: typeof entity.className === "string" ? entity.className : undefined,
             kind: entity.kind,
             baseline: entity.baseline === true || entity.kind === "baseline",
             lightnessShift: (index * 8) % 30,
@@ -329,7 +380,12 @@ export default function ServerComparisonMultiLineChart({
   };
 
   useEffect(() => {
-    setComparePlayers(comparePlayers.filter((key) => favoriteEntityKeys.includes(key)));
+    const filtered = comparePlayers.filter((key) => favoriteEntityKeys.includes(key));
+    const unchanged =
+      filtered.length === comparePlayers.length &&
+      filtered.every((key, index) => key === comparePlayers[index]);
+    if (unchanged) return;
+    setComparePlayers(filtered);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favoriteEntityKeys.join("|")]);
 
@@ -338,6 +394,24 @@ export default function ServerComparisonMultiLineChart({
     const fromProps = availableFavoriteKeys ?? favoriteEntityKeys;
     return fromProps.filter((favoriteKey) => !selected.has(favoriteKey) && !!entityByKey[favoriteKey]);
   }, [availableFavoriteKeys, comparePlayers, entityByKey, favoriteEntityKeys]);
+
+  const classIconByEntityKey = useMemo(
+    () =>
+      entityDefs.reduce<Record<string, string | undefined>>((acc, entity) => {
+        acc[entity.key] = getClassIconUrl(entity.className, 32);
+        return acc;
+      }, {}),
+    [entityDefs],
+  );
+
+  const displayLabelByEntityKey = useMemo(
+    () =>
+      entityDefs.reduce<Record<string, string>>((acc, entity) => {
+        acc[entity.key] = toEntityDisplayName(entity.key, entity.label || entity.key);
+        return acc;
+      }, {}),
+    [entityDefs],
+  );
 
   useEffect(() => {
     if (!availableFavorites.length) return;
@@ -375,22 +449,40 @@ export default function ServerComparisonMultiLineChart({
   }, [metricDefs, overviewDefaultMetrics]);
 
   const selectedMetricSet = useMemo(() => new Set(selectedMetrics), [selectedMetrics]);
-  const activeMetricDefs = useMemo(
-    () => metricDefs.filter((metric) => selectedMetricSet.has(metric.key)),
-    [metricDefs, selectedMetricSet],
-  );
-
-  const activeEntities = useMemo(() => {
+  const allChartEntities = useMemo(() => {
     const entities: EntityDefinition[] = [];
     if (entityByKey[playerEntityKey]) entities.push(entityByKey[playerEntityKey]);
-    comparePlayers.forEach((key) => {
+    favoriteEntityKeys.forEach((key) => {
       if (entityByKey[key]) entities.push(entityByKey[key]);
     });
-    if (showServerAvg && serverBaselineAvailable && serverBaselineKey && entityByKey[serverBaselineKey]) {
+    if (serverBaselineAvailable && serverBaselineKey && entityByKey[serverBaselineKey]) {
       entities.push(entityByKey[serverBaselineKey]);
     }
-    if (showGuildAvg && guildBaselineKey && entityByKey[guildBaselineKey]) entities.push(entityByKey[guildBaselineKey]);
+    if (guildBaselineAvailable && guildBaselineKey && entityByKey[guildBaselineKey]) {
+      entities.push(entityByKey[guildBaselineKey]);
+    }
     return entities;
+  }, [
+    entityByKey,
+    favoriteEntityKeys,
+    guildBaselineAvailable,
+    guildBaselineKey,
+    playerEntityKey,
+    serverBaselineAvailable,
+    serverBaselineKey,
+  ]);
+
+  const visibleEntitySet = useMemo(() => {
+    const visible = new Set<string>();
+    if (entityByKey[playerEntityKey]) visible.add(playerEntityKey);
+    comparePlayers.forEach((key) => {
+      if (entityByKey[key]) visible.add(key);
+    });
+    if (showServerAvg && serverBaselineAvailable && serverBaselineKey && entityByKey[serverBaselineKey]) {
+      visible.add(serverBaselineKey);
+    }
+    if (showGuildAvg && guildBaselineKey && entityByKey[guildBaselineKey]) visible.add(guildBaselineKey);
+    return visible;
   }, [comparePlayers, entityByKey, guildBaselineKey, playerEntityKey, serverBaselineKey, showGuildAvg, showServerAvg]);
 
   const allMonths = useMemo(() => (externalData ? externalData.months : buildRangeLabels(rangeMonths)), [externalData, rangeMonths]);
@@ -409,8 +501,8 @@ export default function ServerComparisonMultiLineChart({
 
   const seriesByKey = useMemo<Record<string, Array<number | null>>>(() => {
     const nextSeries: Record<string, Array<number | null>> = {};
-    activeMetricDefs.forEach((metric) => {
-      activeEntities.forEach((entity) => {
+    metricDefs.forEach((metric) => {
+      allChartEntities.forEach((entity) => {
         const key = toSeriesKey(entity.key, metric.key);
         const values = externalData
           ? visibleMonths.map((_, localIndex) => {
@@ -423,25 +515,27 @@ export default function ServerComparisonMultiLineChart({
       });
     });
     return nextSeries;
-  }, [activeEntities, activeMetricDefs, externalData, externalMetricValuesByEntity, normalize, visibleMonths, visibleStartIndex]);
+  }, [allChartEntities, externalData, externalMetricValuesByEntity, metricDefs, normalize, visibleMonths, visibleStartIndex]);
 
   const lineDescriptors = useMemo<SeriesDescriptor[]>(() => {
     const lines: SeriesDescriptor[] = [];
-    activeMetricDefs.forEach((metric) => {
-      activeEntities.forEach((entity) => {
+    metricDefs.forEach((metric) => {
+      allChartEntities.forEach((entity) => {
+        const isPlayer = entity.key === playerEntityKey;
         lines.push({
           dataKey: toSeriesKey(entity.key, metric.key),
-          label: `${entity.label} - ${metric.label}`,
+          label: buildSeriesLabel(entity, metric),
           metric,
           entity,
           yAxisId: metric.axis,
-          stroke: strokeColor(metric, entity),
+          stroke: colorForIdentifier(entity.key, isPlayer),
           dashed: entity.baseline,
+          isPlayer,
         });
       });
     });
     return lines;
-  }, [activeEntities, activeMetricDefs]);
+  }, [allChartEntities, metricDefs, playerEntityKey]);
 
   const lineByKey = useMemo<Record<string, SeriesDescriptor>>(
     () =>
@@ -465,10 +559,34 @@ export default function ServerComparisonMultiLineChart({
     [seriesByKey, visibleMonths],
   );
 
-  const hasRightAxisMetric = useMemo(
-    () => activeMetricDefs.some((metric) => metric.axis === "right"),
-    [activeMetricDefs],
+  const hiddenLineKeys = useMemo(() => {
+    const hidden = new Set<string>();
+    lineDescriptors.forEach((descriptor) => {
+      const metricVisible = selectedMetricSet.has(descriptor.metric.key);
+      const entityVisible = visibleEntitySet.has(descriptor.entity.key);
+      if (!metricVisible || !entityVisible) {
+        hidden.add(descriptor.dataKey);
+      }
+    });
+    return hidden;
+  }, [lineDescriptors, selectedMetricSet, visibleEntitySet]);
+
+  const visibleLineDescriptors = useMemo(
+    () => lineDescriptors.filter((descriptor) => !hiddenLineKeys.has(descriptor.dataKey)),
+    [hiddenLineKeys, lineDescriptors],
   );
+
+  const hasRightAxisMetric = useMemo(
+    () => metricDefs.some((metric) => metric.axis === "right"),
+    [metricDefs],
+  );
+
+  const chartOverlayMessage =
+    selectedMetrics.length === 0
+      ? "Select at least one metric to render the chart."
+      : visibleMonths.length === 0
+        ? "No history available yet."
+        : null;
 
   const applyPreset = (preset: "overview" | "groupA" | "groupB" | "clear") => {
     switch (preset) {
@@ -500,6 +618,10 @@ export default function ServerComparisonMultiLineChart({
 
   const addFavorite = () => {
     if (!nextFavorite || comparePlayers.includes(nextFavorite)) return;
+    if (onFavoriteAdded) {
+      void onFavoriteAdded(nextFavorite);
+      return;
+    }
     setComparePlayers([...comparePlayers, nextFavorite]);
   };
 
@@ -509,6 +631,25 @@ export default function ServerComparisonMultiLineChart({
 
   const hasPreset = (keys: string[]) =>
     keys.length === selectedMetrics.length && keys.every((key) => selectedMetricSet.has(key));
+
+  const renderEntityLabel = (entityKey: string) => {
+    const iconUrl = classIconByEntityKey[entityKey];
+    const label = displayLabelByEntityKey[entityKey] ?? entityByKey[entityKey]?.label ?? entityKey;
+    return (
+      <span className={styles.compareEntityLabel}>
+        {iconUrl ? (
+          <img
+            src={iconUrl}
+            alt=""
+            className={styles.compareEntityIcon}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : null}
+        <span className={styles.compareEntityText}>{label}</span>
+      </span>
+    );
+  };
 
   const controls = (
     <div className={styles.controlsPanel}>
@@ -576,7 +717,7 @@ export default function ServerComparisonMultiLineChart({
             {availableFavorites.length > 0 ? (
               availableFavorites.map((favoriteKey) => (
                 <option key={favoriteKey} value={favoriteKey}>
-                  {entityByKey[favoriteKey]?.label ?? favoriteKey}
+                  {displayLabelByEntityKey[favoriteKey] ?? entityByKey[favoriteKey]?.label ?? favoriteKey}
                 </option>
               ))
             ) : (
@@ -587,7 +728,15 @@ export default function ServerComparisonMultiLineChart({
             Add
           </button>
         </div>
+        {availableFavorites.length > 0 && nextFavorite ? (
+          <div className={styles.compareSelectPreview}>{renderEntityLabel(nextFavorite)}</div>
+        ) : null}
         <div className={styles.compareList}>
+          {entityByKey[playerEntityKey] ? (
+            <div className={`${styles.compareChip} ${styles.compareChipCurrent}`.trim()}>
+              {renderEntityLabel(playerEntityKey)}
+            </div>
+          ) : null}
           {comparePlayers.length === 0 ? (
             <p className={styles.muted}>No favorites selected.</p>
           ) : (
@@ -598,8 +747,8 @@ export default function ServerComparisonMultiLineChart({
                 className={styles.compareChip}
                 onClick={() => removeFavorite(favoriteKey)}
               >
-                {entityByKey[favoriteKey]?.label ?? favoriteKey}
-                <span>Remove</span>
+                {renderEntityLabel(favoriteKey)}
+                <span className={styles.compareChipTag}>Remove</span>
               </button>
             ))
           )}
@@ -687,93 +836,113 @@ export default function ServerComparisonMultiLineChart({
             <span>{normalize ? "Indexed view" : "Absolute values"}</span>
           </div>
 
-          {lineDescriptors.length > 0 ? (
-            <>
-              <div className={styles.legendWrap}>
+          <div className={styles.legendWrap}>
+            {visibleLineDescriptors.length > 0 ? (
+              visibleLineDescriptors.map((descriptor) => (
+                <div key={descriptor.dataKey} className={styles.legendItem}>
+                  <span
+                    className={styles.legendSwatch}
+                    style={{
+                      borderTopStyle: descriptor.dashed ? "dashed" : "solid",
+                      borderTopColor: descriptor.stroke,
+                    }}
+                  />
+                  <span>{descriptor.label}</span>
+                </div>
+              ))
+            ) : (
+              <p className={styles.muted}>No visible series.</p>
+            )}
+          </div>
+
+          <div className={styles.chartBody}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartRows} margin={{ top: 14, right: 20, left: 6, bottom: 6 }}>
+                <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="4 4" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
+                  axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                  tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  width={72}
+                  tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
+                  axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                  tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                  tickFormatter={(value: number | string) =>
+                    typeof value === "number"
+                      ? normalize
+                        ? value.toFixed(0)
+                        : formatInteger.format(value)
+                      : String(value)
+                  }
+                />
+                {hasRightAxisMetric ? (
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    width={56}
+                    domain={normalize ? ["auto", "auto"] : [0, 100]}
+                    tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                    tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
+                    tickFormatter={(value: number | string) =>
+                      typeof value === "number"
+                        ? normalize
+                          ? value.toFixed(0)
+                          : `${value.toFixed(0)}%`
+                        : String(value)
+                    }
+                  />
+                ) : null}
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      lineByKey={lineByKey}
+                      hiddenLineKeys={hiddenLineKeys}
+                      normalize={normalize}
+                      monthScanLabels={monthScanLabels}
+                    />
+                  }
+                />
+
                 {lineDescriptors.map((descriptor) => (
-                  <div key={descriptor.dataKey} className={styles.legendItem}>
-                    <span
-                      className={styles.legendSwatch}
-                      style={{
-                        borderTopStyle: descriptor.dashed ? "dashed" : "solid",
-                        borderTopColor: descriptor.stroke,
-                      }}
-                    />
-                    <span>{descriptor.label}</span>
-                  </div>
+                  <Line
+                    key={descriptor.dataKey}
+                    yAxisId={descriptor.yAxisId}
+                    type="monotone"
+                    dataKey={descriptor.dataKey}
+                    name={descriptor.label}
+                    hide={hiddenLineKeys.has(descriptor.dataKey)}
+                    stroke={descriptor.stroke}
+                    strokeWidth={descriptor.entity.baseline ? 1.6 : descriptor.isPlayer ? 2.8 : 2.1}
+                    strokeOpacity={descriptor.isPlayer ? 1 : descriptor.entity.baseline ? 0.55 : 0.8}
+                    strokeDasharray={descriptor.dashed ? "6 4" : undefined}
+                    dot={false}
+                    connectNulls
+                    isAnimationActive={CHART_ANIM.isAnimationActive}
+                    animationDuration={CHART_ANIM.animationDuration}
+                    animationEasing={CHART_ANIM.animationEasing}
+                    animationBegin={CHART_ANIM.animationBegin}
+                    animateNewValues={false}
+                  />
                 ))}
+              </LineChart>
+            </ResponsiveContainer>
+            {chartOverlayMessage ? (
+              <div className={styles.emptyState}>
+                <p>{chartOverlayMessage}</p>
               </div>
-
-              <div className={styles.chartBody}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartRows} margin={{ top: 14, right: 20, left: 6, bottom: 6 }}>
-                    <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="4 4" />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
-                      axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                      tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      width={72}
-                      tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
-                      axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                      tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                      tickFormatter={(value: number | string) =>
-                        typeof value === "number"
-                          ? normalize
-                            ? value.toFixed(0)
-                            : formatInteger.format(value)
-                          : String(value)
-                      }
-                    />
-                    {hasRightAxisMetric ? (
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        width={56}
-                        domain={normalize ? ["auto", "auto"] : [0, 100]}
-                        tick={{ fill: "rgba(222, 234, 255, 0.9)", fontSize: 11 }}
-                        axisLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                        tickLine={{ stroke: "rgba(148, 163, 184, 0.25)" }}
-                        tickFormatter={(value: number | string) =>
-                          typeof value === "number"
-                            ? normalize
-                              ? value.toFixed(0)
-                              : `${value.toFixed(0)}%`
-                            : String(value)
-                        }
-                      />
-                    ) : null}
-                    <Tooltip
-                      content={<ChartTooltip lineByKey={lineByKey} normalize={normalize} monthScanLabels={monthScanLabels} />}
-                    />
-
-                    {lineDescriptors.map((descriptor) => (
-                      <Line
-                        key={descriptor.dataKey}
-                        yAxisId={descriptor.yAxisId}
-                        type="monotone"
-                        dataKey={descriptor.dataKey}
-                        name={descriptor.label}
-                        stroke={descriptor.stroke}
-                        strokeWidth={descriptor.entity.baseline ? 1.8 : 2.2}
-                        strokeDasharray={descriptor.dashed ? "6 4" : undefined}
-                        dot={false}
-                        connectNulls
-                        isAnimationActive={false}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+            ) : null}
+            {isLoading ? (
+              <div className={styles.loadingOverlay}>
+                <div className={styles.loadingSpinner} aria-hidden="true" />
+                <p className={styles.loadingText}>Loading series...</p>
               </div>
-            </>
-          ) : (
-            <div className={styles.emptyState}>
-              <p>Select at least one metric to render the chart.</p>
-            </div>
-          )}
+            ) : null}
+          </div>
         </article>
       </div>
     </section>

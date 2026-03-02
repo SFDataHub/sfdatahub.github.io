@@ -172,6 +172,7 @@ import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterCont
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCenterSessionsContext";
 import { AuthProvider } from "./context/AuthContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
 import UploadCenterPage from "./pages/UploadCenter/Index";
@@ -203,13 +204,14 @@ const withFeatureGate = (
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <FeatureAccessProvider>
-        <UploadCenterProvider>
-          <UploadCenterSessionsProvider>
-            <HashRouter>
-              <Routes>
-                <Route element={<RootLayout />}>
+    <NotificationsProvider>
+      <AuthProvider>
+        <FeatureAccessProvider>
+          <UploadCenterProvider>
+            <UploadCenterSessionsProvider>
+              <HashRouter>
+                <Routes>
+                  <Route element={<RootLayout />}>
                 {/* Home */}
                 <Route
                   path="/"
@@ -529,15 +531,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          </HashRouter>
+                  </Route>
+                </Routes>
+              </HashRouter>
 
-          {/* Modal am Root */}
-          <UploadCenterModal />
-        </UploadCenterSessionsProvider>
-      </UploadCenterProvider>
-    </FeatureAccessProvider>
-    </AuthProvider>
+              {/* Modal am Root */}
+              <UploadCenterModal />
+            </UploadCenterSessionsProvider>
+          </UploadCenterProvider>
+        </FeatureAccessProvider>
+      </AuthProvider>
+    </NotificationsProvider>
   </React.StrictMode>
 );

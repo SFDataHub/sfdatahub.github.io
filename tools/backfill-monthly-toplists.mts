@@ -4,6 +4,7 @@
 // Run example:
 //   npx tsx tools/backfill-monthly-toplists.mts --server S12 --from 2026-01-01T00:00:00Z --to 2026-01-03T23:59:59Z --label 2026-01 --topN 500 --dry-run
 //npx tsx tools/backfill-monthly-toplists.mts --server F28 --from 2026-02-01T00:00:00Z --to 2026-02-07T23:59:59Z --label 2026-02 --topN 500  
+// npx tsx tools/backfill-monthly-toplists.mts --server F28 --from 2026-03-01T00:00:00Z --to 2026-03-01T23:59:59Z --label 2026-03 --topN 500
 // Auth (REST, ADC-free):
 //   Default:       gcloud auth print-access-token (user token)
 //   Optional:      gcloud auth print-access-token --impersonate-service-account=<SA>
@@ -278,47 +279,43 @@ const parseLabel = (value: string): string => {
 
 type ResolvedServerKeys = {
   input: string;
-  queryServerKey: string;
-  fallbackServerKey?: string;
-  writeServerKey: string;
-  inputHadNetSuffix?: boolean;
+  canonicalShortKey: string;
+  queryKey: string;
+  writeKey: string;
+  longValueServer: string;
+};
+
+const normalizeServerShortKey = (input: string): string => {
+  const raw = String(input ?? "").trim();
+  if (!raw) throw new Error("Missing required --server");
+
+  // Accept short codes, host values and legacy *_net style input.
+  let token = raw.toUpperCase();
+  token = token.replace(/^[A-Z]+:\/\//, ""); // tolerate accidental protocol prefix
+  token = token.split("/")[0] ?? token;
+  token = token.trim();
+  token = token.replace(/_NET$/i, "");
+  token = token.replace(/\.NET$/i, "");
+  if (token.includes(".")) token = token.split(".")[0] ?? token;
+  token = token.trim();
+
+  // Legacy compatibility: S12 maps to EU12 in this dataset.
+  const legacyEu = token.match(/^S(\d+)$/i);
+  if (legacyEu) return `EU${legacyEu[1]}`;
+
+  if (!token) throw new Error(`Invalid --server value: ${input}`);
+  return token;
 };
 
 const resolveServerKeys = (input: string): ResolvedServerKeys => {
-  const upperInput = input.trim().toUpperCase();
-  const inputHadNetSuffix = /\s*\.\s*NET\s*$/.test(upperInput);
-  const upper = upperInput.replace(/\s*\.\s*(NET|EU)\s*$/, "").trim();
-  let match = upper.match(/^S(\d+)$/);
-  if (match) {
-    const num = match[1];
-    return {
-      input: upperInput,
-      queryServerKey: `EU${num}`,
-      writeServerKey: `EU${num}`,
-      inputHadNetSuffix,
-    };
-  }
-  match = upper.match(/^EU(\d+)$/);
-  if (match) {
-    const num = match[1];
-    return {
-      input: upperInput,
-      queryServerKey: `EU${num}`,
-      writeServerKey: `EU${num}`,
-      inputHadNetSuffix,
-    };
-  }
-  match = upper.match(/^F(\d+)$/);
-  if (match) {
-    const num = match[1];
-    return {
-      input: upperInput,
-      queryServerKey: `F${num}`,
-      writeServerKey: `F${num}`,
-      inputHadNetSuffix,
-    };
-  }
-  return { input: upperInput, queryServerKey: upper, writeServerKey: upper, inputHadNetSuffix };
+  const canonicalShortKey = normalizeServerShortKey(input);
+  return {
+    input: String(input ?? "").trim(),
+    canonicalShortKey,
+    queryKey: canonicalShortKey,
+    writeKey: canonicalShortKey,
+    longValueServer: `${canonicalShortKey.toLowerCase()}.sfgame.net`,
+  };
 };
 
 type FirestoreCursor = { ts: number; name: string } | null;
@@ -409,7 +406,13 @@ const resolveProjectId = async (): Promise<string> => {
   throw new Error("Missing project ID. Pass --project <id> or set GOOGLE_CLOUD_PROJECT / gcloud config project.");
 };
 
-const buildScansRunQueryBody = (serverKey: string, fromSec: number, toSec: number, cursor: FirestoreCursor): string => {
+const buildScansRunQueryBody = (
+  serverFieldPath: "server" | "values.server",
+  serverValue: string,
+  fromSec: number,
+  toSec: number,
+  cursor: FirestoreCursor
+): string => {
   const structuredQuery: any = {
     from: [{ collectionId: "scans", allDescendants: true }],
     where: {
@@ -418,10 +421,9 @@ const buildScansRunQueryBody = (serverKey: string, fromSec: number, toSec: numbe
         filters: [
           {
             fieldFilter: {
-              // Query on the short normalized key (e.g. EU14), not payload value.server.
-              field: { fieldPath: "server" },
+              field: { fieldPath: serverFieldPath },
               op: "EQUAL",
-              value: { stringValue: serverKey },
+              value: { stringValue: serverValue },
             },
           },
           {
@@ -492,12 +494,13 @@ const buildDebugScansWindowQueryBody = (fromSec: number, toSec: number): string 
 const runScansQueryPage = async (
   baseDocsUrl: string,
   accessToken: string,
-  serverKey: string,
+  serverFieldPath: "server" | "values.server",
+  serverValue: string,
   fromSec: number,
   toSec: number,
   cursor: FirestoreCursor
 ): Promise<{ rows: FirestoreDocRow[]; nextCursor: FirestoreCursor; rawRows: number }> => {
-  const body = buildScansRunQueryBody(serverKey, fromSec, toSec, cursor);
+  const body = buildScansRunQueryBody(serverFieldPath, serverValue, fromSec, toSec, cursor);
   const json = await requestWithRetry("POST", `${baseDocsUrl}:runQuery`, accessToken, body);
   const res = Array.isArray(json) ? json : [];
 
@@ -539,61 +542,6 @@ const runDebugScansWindowSample = async (
     });
   }
   return rows;
-};
-
-const getFirestoreDocument = async (
-  baseDocsUrl: string,
-  accessToken: string,
-  docPath: string
-): Promise<any | null> => {
-  const url = `${baseDocsUrl}/${docPath}`;
-  try {
-    return await requestWithRetry("GET", url, accessToken);
-  } catch (err: any) {
-    const status = err?.status;
-    if (status === 404) return null;
-    throw err;
-  }
-};
-
-const isEuServerCode = (code: string) => /^EU\d+$/i.test(code);
-const isFusionNumericCode = (code: string) => /^F\d+$/i.test(code);
-
-const deriveNetQueryKeyFromHost = (hostValue: unknown): string | null => {
-  const host = String(hostValue ?? "").trim().toLowerCase();
-  if (!host || !host.includes(".") || !host.endsWith(".net")) return null;
-  const hostPrefix = host.split(".")[0]?.trim();
-  if (!hostPrefix) return null;
-  return `${hostPrefix}_net`;
-};
-
-const resolveScanQueryKeyForServer = async (
-  baseDocsUrl: string,
-  accessToken: string,
-  resolved: ResolvedServerKeys
-): Promise<string> => {
-  const writeKey = String(resolved.writeServerKey ?? "").trim().toUpperCase();
-  if (!writeKey) return resolved.queryServerKey;
-  if (isEuServerCode(writeKey)) return writeKey;
-
-  const candidateDocIds = Array.from(
-    new Set([writeKey, writeKey.toLowerCase(), String(resolved.queryServerKey ?? "").trim(), String(resolved.queryServerKey ?? "").trim().toLowerCase()].filter(Boolean))
-  );
-  for (const docId of candidateDocIds) {
-    const serverDoc = await getFirestoreDocument(baseDocsUrl, accessToken, `servers/${docId}`);
-    if (!serverDoc) continue;
-    const data = parseFirestoreDocumentFields(serverDoc);
-    const host = data?.host ?? data?.hostname ?? null;
-    const netQueryKey = deriveNetQueryKeyFromHost(host);
-    if (netQueryKey) return netQueryKey;
-  }
-
-  const inputHadNetSuffix = Boolean(resolved.inputHadNetSuffix);
-  if (isFusionNumericCode(writeKey) || inputHadNetSuffix) {
-    return `${writeKey.toLowerCase()}_net`;
-  }
-
-  return resolved.queryServerKey;
 };
 
 const writeProgressSnapshotDoc = async (
@@ -648,26 +596,18 @@ const run = async () => {
   if (!Number.isFinite(topN) || topN <= 0) throw new Error(`Invalid --topN: ${topNArg}`);
 
   const dryRun = args.get("dry-run") === "true";
-  const baseResolvedServer = resolveServerKeys(serverArg);
-  const resolvedServer = {
-    ...baseResolvedServer,
-    queryServerKey: await resolveScanQueryKeyForServer(baseDocsUrl, accessToken, baseResolvedServer),
-  };
-  const serverCode = resolvedServer.writeServerKey;
+  const resolvedServer = resolveServerKeys(serverArg);
+  const serverCode = resolvedServer.writeKey;
   const docId = `${serverCode}__${label}`;
   const targetPath = `${STATS_PUBLIC_LATEST}/${docId}`;
 
   console.log(
-    `[monthly-toplists] Resolved server: input=${resolvedServer.input} query=${resolvedServer.queryServerKey} write=${serverCode} label=${label}`
+    `[monthly-toplists] Resolved server: input=${resolvedServer.input} canonical=${resolvedServer.canonicalShortKey} scanFilterField=server scanFilterValue=${resolvedServer.queryKey} writeKey=${serverCode} label=${label}`
   );
-  if (resolvedServer.queryServerKey !== serverCode) {
-    console.log(
-      `[monthly-toplists] query/write key mismatch active (scan field uses query key, progress doc uses canonical write key)`
-    );
-  }
+  console.log(`[monthly-toplists] values.server example candidate=${resolvedServer.longValueServer}`);
   console.log(`[monthly-toplists] Target path (progress): ${targetPath}`);
 
-  const scanForServer = async (serverKey: string) => {
+  const scanForServer = async (serverFieldPath: "server" | "values.server", serverValue: string) => {
     let scansInWindow = 0;
     let skippedNonPlayerPath = 0;
     let skippedLegacyPlayerIdNamespace = 0;
@@ -678,7 +618,15 @@ const run = async () => {
     try {
       let cursor: FirestoreCursor = null;
       for (;;) {
-        const { rows, nextCursor } = await runScansQueryPage(baseDocsUrl, accessToken, serverKey, fromSec, toSec, cursor);
+        const { rows, nextCursor } = await runScansQueryPage(
+          baseDocsUrl,
+          accessToken,
+          serverFieldPath,
+          serverValue,
+          fromSec,
+          toSec,
+          cursor
+        );
         if (rows.length === 0) break;
 
         for (const doc of rows) {
@@ -756,8 +704,10 @@ const run = async () => {
     };
   };
 
-  const logZeroResultDebugSample = async (serverKey: string) => {
-    console.warn(`[monthly-toplists] No scans found for server=${serverKey}. Debug sample follows...`);
+  const logZeroResultDebugSample = async (serverFieldPath: "server" | "values.server", serverValue: string) => {
+    console.warn(
+      `[monthly-toplists] No scans found for ${serverFieldPath}=${serverValue}. Debug sample follows (player-only samples)...`
+    );
     try {
       const sampleRows = await runDebugScansWindowSample(baseDocsUrl, accessToken, fromSec, toSec);
       if (sampleRows.length === 0) {
@@ -786,7 +736,15 @@ const run = async () => {
       }
 
       console.warn(`[monthly-toplists] Debug sample size: ${sampleRows.length} (window-only query, limit=20)`);
-      sampleRows.slice(0, 5).forEach((row, idx) => {
+      const playerOnlyRows = sampleRows.filter((row) => {
+        const path = String(row.name).split("/documents/")[1] ?? "";
+        return /^players\/[^/]+\/scans\/[^/]+$/.test(path);
+      });
+      if (playerOnlyRows.length === 0) {
+        console.warn("[monthly-toplists] Debug sample has no player scan docs in current window.");
+      }
+
+      playerOnlyRows.slice(0, 5).forEach((row, idx) => {
         const path = String(row.name).split("/documents/")[1] ?? row.name;
         const shortServer = row.data?.server ?? null;
         const longServer = row.data?.value?.server ?? row.data?.values?.server ?? null;
@@ -810,18 +768,20 @@ const run = async () => {
     }
   };
 
-  let activeQueryServer = resolvedServer.queryServerKey;
-  let scanResult = await scanForServer(activeQueryServer);
-  if (scanResult.scansInWindow === 0 && resolvedServer.fallbackServerKey) {
-    await logZeroResultDebugSample(activeQueryServer);
+  let activeServerField: "server" | "values.server" = "server";
+  let activeServerValue = resolvedServer.queryKey;
+  let scanResult = await scanForServer(activeServerField, activeServerValue);
+  if (scanResult.scansInWindow === 0) {
+    await logZeroResultDebugSample(activeServerField, activeServerValue);
     console.warn(
-      `[monthly-toplists] No scans found for ${resolvedServer.queryServerKey}. Retrying with ${resolvedServer.fallbackServerKey}.`
+      `[monthly-toplists] Primary scan query returned 0 docs. Retrying fallback with values.server=${resolvedServer.longValueServer}.`
     );
-    activeQueryServer = resolvedServer.fallbackServerKey;
-    scanResult = await scanForServer(activeQueryServer);
+    activeServerField = "values.server";
+    activeServerValue = resolvedServer.longValueServer;
+    scanResult = await scanForServer(activeServerField, activeServerValue);
   }
-  if (scanResult.scansInWindow === 0 && !resolvedServer.fallbackServerKey) {
-    await logZeroResultDebugSample(activeQueryServer);
+  if (scanResult.scansInWindow === 0) {
+    await logZeroResultDebugSample(activeServerField, activeServerValue);
   }
 
   const {
