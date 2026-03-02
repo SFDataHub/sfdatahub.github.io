@@ -379,6 +379,23 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
         .filter((identifier) => !!identifier),
     [user?.favorites?.players],
   );
+  const favoritePlayerMetaByIdentifier = useMemo(() => {
+    const map: Record<string, { name?: string; className?: string }> = {};
+    const favoritesPlayers = user?.favorites?.players ?? {};
+    Object.entries(favoritesPlayers).forEach(([identifier, value]) => {
+      const normalizedIdentifier = identifier.trim().toLowerCase();
+      if (!normalizedIdentifier) return;
+      if (!value || typeof value !== "object") return;
+      const name = typeof (value as any).name === "string" ? (value as any).name.trim() : "";
+      const className = typeof (value as any).class === "string" ? (value as any).class.trim() : "";
+      if (!name && !className) return;
+      map[normalizedIdentifier] = {
+        ...(name ? { name } : {}),
+        ...(className ? { className } : {}),
+      };
+    });
+    return map;
+  }, [user?.favorites?.players]);
   const progressSnapshotIdentifiers = useMemo(
     () => (currentHistoryIdentifier ? [currentHistoryIdentifier] : []),
     [currentHistoryIdentifier],
@@ -524,7 +541,10 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
 
         setFavoriteBusy(true);
         try {
-          const result = await toggleFavoritePlayer(identifier);
+          const result = await toggleFavoritePlayer(identifier, {
+            name: snapshot.name ?? identifier,
+            className: snapshot.className ?? undefined,
+          });
           showFeedback(
             result.isFavorite
               ? t("profile.favorite.added", { defaultValue: "Added to favorites." })
@@ -605,7 +625,9 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
             rows={viewModel.comparison}
             currentIdentifier={currentHistoryIdentifier}
             currentPlayerLabel={snapshot?.name ?? currentHistoryIdentifier ?? null}
+            currentPlayerClassName={snapshot?.className ?? null}
             favoriteIdentifiers={favoritePlayerIdentifiers}
+            favoriteMetaByIdentifier={favoritePlayerMetaByIdentifier}
           />
         );
       case "history":

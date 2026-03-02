@@ -87,6 +87,147 @@
 .btnIco:hover{ background: var(--tile-hover); transform: translateY(-1px); }
 .btnIco:active{ transform: none; }
 
+.notificationsRoot{
+  position: relative;
+  display: inline-flex;
+}
+
+.notificationBadge{
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px var(--tile);
+}
+
+.notificationsDropdown{
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  max-width: min(80vw, 360px);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--tile);
+  box-shadow:
+    0 16px 32px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  color: var(--text);
+  z-index: 120;
+  padding: 10px 10px 8px;
+}
+
+.notificationsHeader{
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.notificationsSectionTitle{
+  margin: 10px 6px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.notificationsList{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notificationsEmpty{
+  margin: 0;
+  padding: 10px 8px 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.notificationItem{
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--tile-hover);
+  border: 1px solid var(--line);
+}
+
+.notificationStatusIcon{
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.notificationStatusGlyph{
+  width: 16px;
+  height: 16px;
+}
+
+.notificationStatusSpin{
+  animation: topbarSpinner 0.9s linear infinite;
+  color: #9ec7ff;
+}
+
+.notificationStatusSuccess{
+  color: #43c07d;
+}
+
+.notificationStatusError{
+  color: #ef6f6f;
+}
+
+.notificationStatusActivityAdd{
+  color: #f5c76a;
+}
+
+.notificationStatusActivityRemove{
+  color: #9aa6bb;
+}
+
+.notificationBody{
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.notificationTitle{
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.notificationDetail{
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.notificationProgress{
+  margin-left: 8px;
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  flex: 0 0 auto;
+}
+
+.notificationAge{
+  margin-left: 8px;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-soft);
+  flex: 0 0 auto;
+}
+
 /* Pill-Link (optional sichtbar) */
 .pill{
   display: inline-flex;

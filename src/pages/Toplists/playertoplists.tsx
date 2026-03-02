@@ -2,7 +2,7 @@
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import html2canvas from "html2canvas";
-
+import { useVirtualizer } from "@tanstack/react-virtual";
 import ContentShell from "../../components/ContentShell";
 import ProfileOverlay from "../../components/ProfileOverlay/ProfileOverlay";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
@@ -27,7 +27,7 @@ import {
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
-import { buildPlayerIdentifier, parsePlayerIdentifier } from "../../lib/players/identifier";
+import { parsePlayerIdentifier } from "../../lib/players/identifier";
 import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
@@ -165,30 +165,26 @@ const normalizeFavoriteIdentifier = (value: unknown): string | null => {
   return raw || null;
 };
 
-const buildCanonicalFavoriteServerKey = (value: unknown): string | null => {
-  const raw = String(value ?? "").trim().toLowerCase();
-  if (!raw) return null;
-  if (/^[a-z0-9]+_(?:eu|net)$/.test(raw)) return raw;
-
-  const euMatch = raw.match(/^s?(\d+)$/);
-  if (euMatch) return `s${euMatch[1]}_eu`;
-  const euCodeMatch = raw.match(/^eu(\d+)$/);
-  if (euCodeMatch) return `s${euCodeMatch[1]}_eu`;
-  const fusionMatch = raw.match(/^f(\d+)$/);
-  if (fusionMatch) return `f${fusionMatch[1]}_net`;
-  const amMatch = raw.match(/^am(\d+)$/);
-  if (amMatch) return `am${amMatch[1]}_net`;
+const resolveToplistRowIdentifier = (row: FirestoreToplistPlayerRow): string | null => {
+  const candidates = [
+    row.identifier,
+    (row as any).original?.identifier,
+    (row as any).value?.identifier,
+    (row as any).data?.identifier,
+    (row as any).player?.identifier,
+    (row as any).value?.player?.identifier,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+    if (parsePlayerIdentifier(trimmed)) return trimmed;
+  }
   return null;
 };
 
 const buildPlayerFavoriteIdentifierFromRow = (row: FirestoreToplistPlayerRow): string | null => {
-  const direct = normalizeFavoriteIdentifier(row.identifier);
-  if (direct) return direct;
-  const playerId = String((row as any).playerId ?? (row as any).id ?? "").trim();
-  if (!playerId) return null;
-  const serverKey = buildCanonicalFavoriteServerKey(row.server);
-  if (!serverKey) return null;
-  return `${serverKey}_p${playerId}`;
+  return normalizeFavoriteIdentifier(resolveToplistRowIdentifier(row));
 };
 
 const listEqual = (a: string[], b: string[]) =>
@@ -357,8 +353,8 @@ const computeStatsDay = (
 };
 const buildTieKey = (row: FirestoreToplistPlayerRow) => {
   const serverKey = normalizeServerCode(String(row.server ?? ""));
-  const pid = (row as any).playerId ?? (row as any).id ?? null;
-  const idKey = String(pid ?? row.name ?? "").trim();
+  const identifier = resolveToplistRowIdentifier(row);
+  const idKey = String(identifier ?? row.name ?? "").trim();
   const classKey = String(row.class ?? "").trim();
   return `${serverKey}__${idKey}__${classKey}`;
 };
@@ -1669,19 +1665,18 @@ function TableDataView({
       ? (compareTargetState.loading || compareState.loading)
       : playerLoading;
 
-  const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
-    const pid = (row as any).playerId ?? (row as any).id;
-    if (pid) return `id:${pid}`;
-    return `${row.server || "ALL"}:${row.name}:${row.class || ""}`;
-  }, []);
-  const buildCompareKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
+  const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow, fallbackIndex?: number) => {
+    const identifier = resolveToplistRowIdentifier(row);
+    if (identifier) return identifier;
     const serverKey = normalizeServerCode(String(row.server ?? ""));
-    const pid = (row as any).playerId ?? (row as any).id;
-    const pidKey = pid != null ? String(pid).trim() : "";
-    if (serverKey && pidKey) return `${serverKey}__${pidKey}`;
     const nameKey = String(row.name ?? "").trim();
     const classKey = String(row.class ?? "").trim();
-    if (serverKey || nameKey || classKey) return `${serverKey}__${nameKey}__${classKey}`;
+    const suffix = fallbackIndex != null ? String(fallbackIndex) : "na";
+    return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
+  }, []);
+  const buildCompareKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
+    const identifier = resolveToplistRowIdentifier(row);
+    if (identifier) return identifier;
     return buildRowKey(row);
   }, [buildRowKey]);
 
@@ -1918,8 +1913,7 @@ function TableDataView({
   const decorMap = React.useMemo(() => {
     const map = new Map<string, CellDecor>();
     const rows = enhancedRows;
-    const keyFor = (row: FirestoreToplistPlayerRow) =>
-      (row as any).playerId ?? (row as any).id ?? buildRowKey(row);
+    const keyFor = (row: FirestoreToplistPlayerRow) => buildCompareKey(row);
 
     const ensure = (row: FirestoreToplistPlayerRow) => {
       const key = keyFor(row);
@@ -1965,7 +1959,7 @@ function TableDataView({
     });
 
     return map;
-  }, [enhancedRows, buildRowKey]);
+  }, [enhancedRows, buildCompareKey]);
 
   const nowMs = Date.now();
   const statusLabel = !hasServers
@@ -1983,6 +1977,29 @@ function TableDataView({
   const [highlightedIdentifier, setHighlightedIdentifier] = React.useState<string | null>(null);
   const focusHandledRef = React.useRef<string | null>(null);
   const focusHighlightTimeoutRef = React.useRef<number | null>(null);
+  const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const [tableScrollbarWidth, setTableScrollbarWidth] = React.useState(0);
+  const virtualRowHeight = showCompare ? 72 : 56;
+  const virtualRowKeys = React.useMemo(
+    () => enhancedRows.map((row) => resolveToplistRowIdentifier(row)),
+    [enhancedRows]
+  );
+  const rowIndexByIdentifier = React.useMemo(() => {
+    const indexMap = new Map<string, number>();
+    enhancedRows.forEach((row, idx) => {
+      const identifier = resolveToplistRowIdentifier(row);
+      if (!identifier || indexMap.has(identifier)) return;
+      indexMap.set(identifier, idx);
+    });
+    return indexMap;
+  }, [enhancedRows]);
+  const rowVirtualizer = useVirtualizer({
+    count: enhancedRows.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => virtualRowHeight,
+    overscan: 14,
+    getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
+  });
 
   React.useEffect(() => {
     focusHandledRef.current = null;
@@ -2002,31 +2019,32 @@ function TableDataView({
   }, []);
 
   React.useEffect(() => {
-    // The current Toplists players table has no rank-page windowing. `rank` is read for future support,
-    // but focus scrolling is identifier-based and works without extra paging logic.
+    const scrollEl = tableScrollRef.current;
+    if (!scrollEl) return;
+
+    const updateScrollbarWidth = () => {
+      const nextWidth = Math.max(0, scrollEl.offsetWidth - scrollEl.clientWidth);
+      setTableScrollbarWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
+    };
+
+    updateScrollbarWidth();
+    const resizeObserver = new ResizeObserver(updateScrollbarWidth);
+    resizeObserver.observe(scrollEl);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [hasServers, enhancedRows.length, showCompare]);
+
+  React.useEffect(() => {
     void focusRank;
 
     if (!focusIdentifier || !hasServers || playerLoading) return;
     if (focusHandledRef.current === focusIdentifier) return;
-
-    const root = tableRef.current;
-    if (!root) return;
-
-    const selectorValue =
-      typeof CSS !== "undefined" && typeof CSS.escape === "function"
-        ? CSS.escape(focusIdentifier)
-        : focusIdentifier.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const targetRow = root.querySelector<HTMLElement>(`[data-sfh-identifier="${selectorValue}"]`);
-
-    if (!targetRow) {
-      if (!playerLoading) {
-        focusHandledRef.current = focusIdentifier;
-      }
-      return;
-    }
-
+    const targetIndex = rowIndexByIdentifier.get(focusIdentifier);
+    if (targetIndex == null) return;
     focusHandledRef.current = focusIdentifier;
-    targetRow.scrollIntoView({ block: "center", behavior: "smooth" });
+    rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "smooth" });
     setHighlightedIdentifier(focusIdentifier);
 
     if (focusHighlightTimeoutRef.current != null) {
@@ -2036,56 +2054,38 @@ function TableDataView({
       setHighlightedIdentifier((prev) => (prev === focusIdentifier ? null : prev));
       focusHighlightTimeoutRef.current = null;
     }, 2600);
-  }, [enhancedRows, focusIdentifier, focusRank, hasServers, playerLoading, tableRef]);
+  }, [focusIdentifier, focusRank, hasServers, playerLoading, rowIndexByIdentifier, rowVirtualizer]);
 
-  const renderToplistTable = (opts: {
-    imgLoading: "lazy" | "eager";
-  }) => {
-    const rows = enhancedRows;
-    const resolveIdentifier = (row: FirestoreToplistPlayerRow) => {
-      const candidates = [
-        (row as any).identifier,
-        (row as any).id,
-        (row as any).original?.identifier,
-        (row as any).value?.identifier,
-        (row as any).data?.identifier,
-        (row as any).player?.identifier,
-        (row as any).value?.player?.identifier,
-      ];
-      for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) {
-          const parsed = parsePlayerIdentifier(candidate);
-          if (parsed) {
-            // Keep the snapshot identifier exactly as stored (e.g. "s12_eu_p...").
-            // Rebuilding it can change the server segment format and break the doc path.
-            return candidate.trim();
-          }
-        }
-      }
-      const fallbackPlayerId =
-        (row as any).playerId ??
-        (row as any).id ??
-        (row as any).player?.id ??
-        (row as any).value?.playerId ??
-        (row as any).data?.playerId ??
-        null;
-      const fallbackServer =
-        row.server ??
-        (row as any).value?.server ??
-        (row as any).data?.server ??
-        (row as any).player?.server ??
-        null;
-      return buildPlayerIdentifier(fallbackServer, fallbackPlayerId);
-    };
-    return (
-    <table className="toplists-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+  const renderToplistColGroup = () => (
+    <colgroup>
+      <col />
+      <col />
+      <col />
+      <col />
+      <col style={{ width: 60 }} />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+      <col />
+    </colgroup>
+  );
+
+  const renderToplistHeader = () => (
+    <table className="toplists-table toplists-table--header" style={{ width: "100%", borderCollapse: "collapse" }}>
+      {renderToplistColGroup()}
       <thead>
         <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
           <th style={{ padding: "8px 6px" }}>#</th>
           <th style={{ padding: "8px 6px" }}>Δ Rank</th>
           <th style={{ padding: "8px 6px" }}>Server</th>
           <th style={{ padding: "8px 6px" }}>Name</th>
-          <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
+          <th style={{ padding: "8px 6px", textAlign: "center" }}>Class</th>
           <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
           <th style={{ padding: "8px 6px" }}>Guild</th>
           <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
@@ -2098,8 +2098,31 @@ function TableDataView({
           <th style={{ padding: "8px 6px" }}>Last Scan</th>
         </tr>
       </thead>
+    </table>
+  );
+
+  const renderToplistTableBody = (opts: {
+    imgLoading: "lazy" | "eager";
+  }) => {
+    const rows = enhancedRows;
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const topSpacerHeight = virtualItems.length ? virtualItems[0].start : 0;
+    const bottomSpacerHeight = virtualItems.length
+      ? Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end)
+      : 0;
+    return (
+    <table className="toplists-table toplists-table--body" style={{ width: "100%", borderCollapse: "collapse" }}>
+      {renderToplistColGroup()}
       <tbody>
-        {rows.map((r, i) => {
+        {rows.length > 0 && topSpacerHeight > 0 && (
+          <tr aria-hidden>
+            <td colSpan={15} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
+          </tr>
+        )}
+        {virtualItems.map((virtualRow) => {
+          const i = virtualRow.index;
+          const r = rows[i];
+          if (!r) return null;
           const rankDelta = showCompare ? (r as any)._rankDelta : null;
           const deltas = (r as any)._delta || {};
           const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
@@ -2122,11 +2145,10 @@ function TableDataView({
           const lastScanLabel = formatLastScanDisplay((r as any).lastScan);
           const classKey = String(r.class ?? "").trim();
           const classIconUrl = getClassIconUrl(classKey, 48);
-          const playerId = (r as any).playerId ?? (r as any).id ?? null;
-          const profileIdentifier = resolveIdentifier(r);
-          const rowKey = playerId ?? buildRowKey(r);
+          const profileIdentifier = resolveToplistRowIdentifier(r);
+          const rowKey = profileIdentifier ?? `missing-identifier-row-${i}`;
           const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
-          const decor = decorMap.get(rowKey);
+          const decor = decorMap.get(buildCompareKey(r));
           const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
           const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
           const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
@@ -2157,13 +2179,14 @@ function TableDataView({
 
           return (
             <tr
-              key={`${r.name}__${r.server}__${r.class ?? ""}`}
+              key={rowKey}
               className={`toplists-row${isFocusedRow ? " toplists-row--focused" : ""}`}
               data-sfh-identifier={profileIdentifier ?? undefined}
               style={{
                 borderBottom: "1px solid #2C4A73",
                 cursor: "pointer",
                 userSelect: "none",
+                height: virtualRowHeight,
               }}
               onClick={rowOnClick}
             >
@@ -2275,6 +2298,11 @@ function TableDataView({
         {!tableLoading && !playerError && enhancedRows.length === 0 && (
           <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
         )}
+        {rows.length > 0 && bottomSpacerHeight > 0 && (
+          <tr aria-hidden>
+            <td colSpan={15} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
+          </tr>
+        )}
       </tbody>
     </table>
     );
@@ -2324,7 +2352,12 @@ function TableDataView({
       ) : (
         <>
           <div ref={tableRef} className="toplists-table-viewport">
-            {renderToplistTable({ imgLoading: "lazy" })}
+            <div className="toplists-table-header" style={{ paddingRight: tableScrollbarWidth }}>
+              {renderToplistHeader()}
+            </div>
+            <div ref={tableScrollRef} className="toplists-table-scroll">
+              {renderToplistTableBody({ imgLoading: "lazy" })}
+            </div>
           </div>
         </>
       )}
@@ -2388,9 +2421,6 @@ function TopTab({
     </button>
   );
 }
-
-
-
 
 
 

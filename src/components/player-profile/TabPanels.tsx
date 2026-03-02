@@ -1120,12 +1120,16 @@ export function ComparisonTab({
   rows: _rows,
   currentIdentifier,
   currentPlayerLabel,
+  currentPlayerClassName,
   favoriteIdentifiers,
+  favoriteMetaByIdentifier,
 }: {
   rows: ComparisonRow[];
   currentIdentifier: string | null;
   currentPlayerLabel: string | null;
+  currentPlayerClassName?: string | null;
   favoriteIdentifiers: string[];
+  favoriteMetaByIdentifier?: Record<string, { name?: string; className?: string }>;
 }) {
   const { t } = useTranslation();
   const normalizedCurrentIdentifier = currentIdentifier ? normalizeIdentifier(currentIdentifier) : null;
@@ -1147,9 +1151,17 @@ export function ComparisonTab({
     () => (normalizedCurrentIdentifier ? [normalizedCurrentIdentifier, ...selectedCompareIds] : selectedCompareIds),
     [normalizedCurrentIdentifier, selectedCompareIdsKey],
   );
-  const { byIdentifier } = usePlayerProgressSnapshots({
+  const { byIdentifier, ensureProgressSnapshot } = usePlayerProgressSnapshots({
     identifiers: snapshotIdentifiers,
   });
+  const isComparisonLoading = React.useMemo(
+    () =>
+      snapshotIdentifiers.some((identifier) => {
+        const status = byIdentifier[identifier]?.status;
+        return status === "idle" || status === "loading";
+      }),
+    [byIdentifier, snapshotIdentifiers],
+  );
 
   React.useEffect(() => {
     setSelectedCompareIds((current) => {
@@ -1161,12 +1173,28 @@ export function ComparisonTab({
     });
   }, [compareCandidates]);
 
+  const handleCompareFavoriteAdded = React.useCallback(
+    (identifier: string) => {
+      const normalizedIdentifier = normalizeIdentifier(identifier);
+      if (!normalizedIdentifier) return;
+      setSelectedCompareIds((current) =>
+        current.includes(normalizedIdentifier) ? current : [...current, normalizedIdentifier],
+      );
+      void ensureProgressSnapshot(normalizedIdentifier).catch((error) => {
+        console.warn("[comparison] failed to ensure progress snapshot for favorite", {
+          identifier: normalizedIdentifier,
+          error,
+        });
+      });
+    },
+    [ensureProgressSnapshot],
+  );
+
   const externalData = React.useMemo<ServerComparisonExternalData | null>(() => {
     if (!normalizedCurrentIdentifier) return null;
     const currentSnapshot = byIdentifier[normalizedCurrentIdentifier];
     const currentMonths = currentSnapshot?.months ?? [];
     const monthKeys = currentMonths.map((entry) => entry.monthId);
-    if (!monthKeys.length) return null;
     const monthScanLabels: Record<string, string> = {};
     currentMonths.forEach((entry) => {
       const scanAtRaw = typeof entry.scanAtRaw === "string" ? entry.scanAtRaw.trim() : "";
@@ -1206,9 +1234,13 @@ export function ComparisonTab({
       PLAYER_PROGRESS_CHART_METRIC_CONFIG.forEach((metric) => {
         metricValues[metric.key] = extractMetricSeries(monthKeys, metricLookup, metric.key);
       });
+      const favoriteMeta = favoriteMetaByIdentifier?.[identifier];
+      const labelFromFavorites = typeof favoriteMeta?.name === "string" ? favoriteMeta.name.trim() : "";
+      const classNameFromFavorites = typeof favoriteMeta?.className === "string" ? favoriteMeta.className.trim() : "";
       return {
         key: identifier,
-        label: identifier,
+        label: labelFromFavorites || identifier,
+        className: classNameFromFavorites || undefined,
         kind: "favorite" as const,
         baseline: false,
         metricValues,
@@ -1232,8 +1264,9 @@ export function ComparisonTab({
       }),
       entities: [
         {
-          key: "player",
+          key: normalizedCurrentIdentifier,
           label: currentPlayerLabel?.trim() || normalizedCurrentIdentifier,
+          className: currentPlayerClassName?.trim() || undefined,
           kind: "player",
           baseline: false,
           metricValues: PLAYER_PROGRESS_CHART_METRIC_CONFIG.reduce<Record<string, Array<number | null>>>((acc, metric) => {
@@ -1243,11 +1276,11 @@ export function ComparisonTab({
         },
         ...favoriteEntities,
       ],
-      playerKey: "player",
+      playerKey: normalizedCurrentIdentifier,
       serverBaselineKey: null,
       guildBaselineKey: null,
     };
-  }, [byIdentifier, compareCandidates, currentPlayerLabel, normalizedCurrentIdentifier, selectedCompareIds, t]);
+  }, [byIdentifier, compareCandidates, currentPlayerClassName, currentPlayerLabel, favoriteMetaByIdentifier, normalizedCurrentIdentifier, t]);
 
   return (
     <div className="player-profile__tab-panel">
@@ -1257,9 +1290,11 @@ export function ComparisonTab({
       <div className="player-profile__comparison-wrapper">
         <ServerComparisonMultiLineChart
           externalData={externalData ?? undefined}
+          isLoading={isComparisonLoading}
           selectedFavoriteKeys={selectedCompareIds}
           onSelectedFavoriteKeysChange={setSelectedCompareIds}
           availableFavoriteKeys={availableCompareIds}
+          onFavoriteAdded={handleCompareFavoriteAdded}
         />
       </div>
     </div>

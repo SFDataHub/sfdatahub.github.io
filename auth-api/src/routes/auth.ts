@@ -19,6 +19,7 @@ import {
   isValidFavoriteIdentifier,
   sanitizeUserFavorites,
   type FavoriteKind,
+  type UserFavoritePlayerV2,
 } from "../lib/favorites";
 import { createFirebaseCustomToken } from "../lib/firebaseAuth";
 import {
@@ -136,6 +137,26 @@ class FavoritesLimitError extends Error {
     this.name = "FavoritesLimitError";
   }
 }
+
+const createPlayerFavoriteValue = (
+  identifier: string,
+  input?: { name?: unknown; class?: unknown; className?: unknown } | null,
+): UserFavoritePlayerV2 => {
+  const name =
+    typeof input?.name === "string" && input.name.trim()
+      ? input.name.trim()
+      : identifier;
+  const classKey =
+    typeof input?.class === "string"
+      ? input.class.trim()
+      : typeof input?.className === "string"
+      ? input.className.trim()
+      : "";
+  return {
+    name,
+    class: classKey || "",
+  };
+};
 
 const getSessionUser = async (token?: string | null): Promise<UserDoc | null> => {
   if (!token) return null;
@@ -291,6 +312,16 @@ authRouter.patch("/me/favorites", async (req, res) => {
 
   const userRef = db.collection("users").doc(payload.userId);
   const fieldPath = buildFavoriteFieldPath(kind, identifier);
+  const playerFavoriteInput =
+    kind === "player"
+      ? {
+          name: req.body?.name ?? req.body?.meta?.name,
+          class: req.body?.class ?? req.body?.meta?.class,
+          className: req.body?.className ?? req.body?.meta?.className,
+        }
+      : null;
+  const playerFavoriteValue =
+    kind === "player" && op === "add" ? createPlayerFavoriteValue(identifier, playerFavoriteInput) : null;
 
   try {
     if (op === "remove") {
@@ -303,7 +334,7 @@ authRouter.patch("/me/favorites", async (req, res) => {
       const favorites = sanitizeUserFavorites(userDoc.favorites);
       const bucket = getFavoriteBucket(kind);
       const counts = countFavorites(favorites);
-      const existed = favorites[bucket]?.[identifier] === true;
+      const existed = !!favorites[bucket]?.[identifier];
 
       await userRef.update({
         [fieldPath]: admin.firestore.FieldValue.delete(),
@@ -336,7 +367,7 @@ authRouter.patch("/me/favorites", async (req, res) => {
       const favorites = sanitizeUserFavorites(userDoc.favorites);
       const bucket = getFavoriteBucket(kind);
       const counts = countFavorites(favorites);
-      const alreadyFavorite = favorites[bucket]?.[identifier] === true;
+      const alreadyFavorite = !!favorites[bucket]?.[identifier];
 
       if (!alreadyFavorite) {
         const limit = getFavoriteLimit(kind);
@@ -344,7 +375,14 @@ authRouter.patch("/me/favorites", async (req, res) => {
         if (bucketCount >= limit) {
           throw new FavoritesLimitError();
         }
-        tx.update(userRef, { [fieldPath]: true });
+        if (kind === "player") {
+          tx.update(userRef, {
+            [fieldPath]: playerFavoriteValue ?? createPlayerFavoriteValue(identifier),
+            "favorites.schemaVersion": 2,
+          });
+        } else {
+          tx.update(userRef, { [fieldPath]: true });
+        }
         if (bucket === "players") {
           counts.players += 1;
         } else {

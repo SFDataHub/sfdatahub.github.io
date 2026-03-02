@@ -4,8 +4,16 @@ export type AuthStatus = "idle" | "loading" | "authenticated" | "unauthenticated
 
 export type AuthFavoriteKind = "player" | "guild";
 
+export type AuthFavoritePlayerV2 = {
+  name: string;
+  class: string;
+};
+
+export type AuthFavoritePlayerValue = true | AuthFavoritePlayerV2;
+
 export type AuthFavorites = {
-  players?: Record<string, true>;
+  schemaVersion?: number;
+  players?: Record<string, AuthFavoritePlayerValue>;
   guilds?: Record<string, true>;
 };
 

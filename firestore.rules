@@ -189,8 +189,11 @@ service cloud.firestore {
       allow read: if request.auth != null
         && request.auth.token.userId == userId;
 
-      // Keine Client-Writes; Updates laufen ueber auth-api/Admin SDK.
-      allow write: if false;
+      // Client darf nur favorites im eigenen UserDoc updaten.
+      allow update: if request.auth != null
+        && request.auth.token.userId == userId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['favorites']);
+      allow create, delete: if false;
     }
 
     // ---------- User settings (per-user) ----------

@@ -174,6 +174,15 @@
   cursor: not-allowed;
 }
 
+.compareSelectPreview {
+  border: 1px solid #355577;
+  border-radius: 10px;
+  background: #112338;
+  color: #d9e9ff;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+}
+
 .compareList {
   display: grid;
   gap: 6px;
@@ -194,9 +203,37 @@
   cursor: pointer;
 }
 
-.compareChip span {
+.compareChipCurrent {
+  cursor: default;
+  background: #152d46;
+  border-color: #3e5e82;
+}
+
+.compareEntityLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compareEntityIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.compareEntityText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compareChipTag {
   color: #a9c2e7;
   font-size: 0.75rem;
+  flex: 0 0 auto;
 }
 
 .muted {
@@ -262,18 +299,59 @@
 }
 
 .chartBody {
+  position: relative;
   min-height: 360px;
   width: 100%;
 }
 
 .emptyState {
-  min-height: 360px;
+  position: absolute;
+  inset: 0;
   border: 1px dashed #3b5f8d;
   border-radius: 12px;
   display: grid;
   place-items: center;
+  background: rgba(12, 22, 35, 0.62);
   color: #9eb3d2;
   font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.emptyState p {
+  margin: 0;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  background: rgba(7, 14, 23, 0.45);
+  pointer-events: none;
+}
+
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(157, 183, 219, 0.35);
+  border-top-color: rgba(190, 217, 255, 0.95);
+  border-radius: 50%;
+  animation: chartSpin 0.9s linear infinite;
+}
+
+.loadingText {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #cfdef5;
+}
+
+@keyframes chartSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tooltipCard {
@@ -338,7 +416,7 @@
   }
 
   .chartBody,
-  .emptyState {
+  .chartBody {
     min-height: 320px;
   }
 }
