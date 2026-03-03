@@ -28,6 +28,7 @@ import {
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
 import { parsePlayerIdentifier } from "../../lib/players/identifier";
+import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
@@ -187,6 +188,127 @@ const buildPlayerFavoriteIdentifierFromRow = (row: FirestoreToplistPlayerRow): s
   return normalizeFavoriteIdentifier(resolveToplistRowIdentifier(row));
 };
 
+type ToplistColumnKey =
+  | "rank"
+  | "rankDelta"
+  | "server"
+  | "name"
+  | "class"
+  | "level"
+  | "guild"
+  | "main"
+  | "con"
+  | "sum"
+  | "statsPerDay"
+  | "ratio"
+  | "mine"
+  | "treasury"
+  | "lastScan";
+
+type ToplistColumnAlign = "left" | "center" | "right";
+
+type ToplistColumnDef = {
+  key: ToplistColumnKey;
+  label: string;
+  width: string;
+  align: ToplistColumnAlign;
+};
+
+const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
+  { key: "rank", label: "#", width: "4%", align: "right" },
+  { key: "rankDelta", label: "Δ Rank", width: "6%", align: "center" },
+  { key: "server", label: "Server", width: "7%", align: "left" },
+  { key: "name", label: "Name", width: "12%", align: "left" },
+  { key: "class", label: "Class", width: "5%", align: "center" },
+  { key: "level", label: "Level", width: "6%", align: "right" },
+  { key: "guild", label: "Guild", width: "11%", align: "left" },
+  { key: "main", label: "Main", width: "6%", align: "right" },
+  { key: "con", label: "Con", width: "6%", align: "right" },
+  { key: "sum", label: "Sum", width: "6%", align: "right" },
+  { key: "statsPerDay", label: "Stats/Day", width: "7%", align: "right" },
+  { key: "ratio", label: "Ratio", width: "6%", align: "center" },
+  { key: "mine", label: "Mine", width: "5%", align: "right" },
+  { key: "treasury", label: "Treasury", width: "6%", align: "right" },
+  { key: "lastScan", label: "Last Scan", width: "7%", align: "right" },
+];
+
+const TOPLIST_TABLE_COL_SPAN = TOPLIST_COLUMNS.length;
+
+const TOPLIST_TABLE_STYLE: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  tableLayout: "fixed",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const TOPLIST_HEADER_ROW_STYLE: React.CSSProperties = {
+  borderBottom: "1px solid #2C4A73",
+};
+
+const TOPLIST_CELL_BASE_STYLE: React.CSSProperties = {
+  padding: "8px 8px",
+  verticalAlign: "middle",
+  lineHeight: 1.25,
+};
+
+const TOPLIST_HEADER_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
+  display: "block",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const TOPLIST_ICON_CELL_CONTENT_STYLE: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%",
+  height: "100%",
+};
+
+const TOPLIST_FLEX_COLUMN_RIGHT_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+};
+
+const TOPLIST_FLEX_COLUMN_CENTER_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+};
+
+const TOPLIST_DELTA_SUBTEXT_STYLE: React.CSSProperties = {
+  fontSize: 11,
+  opacity: 0.8,
+};
+
+const TOPLIST_LAST_SCAN_CONTENT_STYLE: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 6,
+};
+
+const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const TOPLIST_CELL_STYLE_BY_KEY = TOPLIST_COLUMNS.reduce((acc, column) => {
+  acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: column.align };
+  return acc;
+}, {} as Record<ToplistColumnKey, React.CSSProperties>);
+
 const listEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -309,10 +431,7 @@ const toMsFromLastScan = (value: string | number | null | undefined): number | n
   return parseLastScanString(raw);
 };
 const formatLastScanDisplay = (value: string | number | null | undefined): string => {
-  if (value == null || value === "") return "";
-  const ms = toMsFromLastScan(value);
-  if (ms == null) return String(value);
-  return new Date(ms).toLocaleString();
+  return formatScanDateTimeLabel(value);
 };
 const deriveRatioMain = (main: number | null, con: number | null) => {
   const m = typeof main === "number" && Number.isFinite(main) ? main : 0;
@@ -510,6 +629,12 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
     default:              return { key: "level",    dir: "desc" };
   }
 }
+
+const DEFAULT_GUILD_SORT = "guildAvgLevel";
+const GUILD_SORT_KEYS = new Set(["guildMembers", "guildAvgLevel", "guildAvgSum", "guildLastScan"]);
+const resolveGuildSort = (value: string | null | undefined) =>
+  GUILD_SORT_KEYS.has(String(value ?? "").trim()) ? String(value).trim() : DEFAULT_GUILD_SORT;
+
 function deriveGroupFromServers(servers: string[]): string {
   const first = (servers[0] || "").toUpperCase();
   if (first.startsWith("EU")) return "EU";
@@ -587,6 +712,7 @@ function PlayerToplistsPageContent() {
     setGuilds,
     range,
     sortBy,
+    setSortBy,
   } = f;
   const { serverGroups, player } = useToplistsData();
   const navigate = useNavigate();
@@ -606,6 +732,7 @@ function PlayerToplistsPageContent() {
     return Math.max(1, Math.trunc(parsed));
   }, [rankParamRaw]);
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
+  const [guildSortBy, setGuildSortBy] = React.useState<string>(DEFAULT_GUILD_SORT);
   const initialProgressCompareMonth = searchParams.get("compare") ?? "";
   const initialCompareModeParam = String(searchParams.get("compareMode") ?? "").trim().toLowerCase();
   const [compareMode, setCompareMode] = React.useState<ToplistsCompareMode>(() => {
@@ -1020,6 +1147,10 @@ function PlayerToplistsPageContent() {
     );
   }, [player?.rows, normalizedServers]);
 
+  React.useEffect(() => {
+    setGuildSortBy((prev) => resolveGuildSort(prev));
+  }, []);
+
   return (
     <>
       <ContentShell
@@ -1031,6 +1162,9 @@ function PlayerToplistsPageContent() {
         subheader={
           filterMode === "hud" ? (
             <HudFilters
+              mode={activeTab}
+              sortValue={activeTab === "guilds" ? guildSortBy : (sortBy ?? "level")}
+              onSortValueChange={activeTab === "guilds" ? setGuildSortBy : setSortBy}
               compareMode={compareMode}
               onCompareModeChange={handleCompareModeChange}
               progressSinceMonth={progressSinceMonth}
@@ -1042,7 +1176,7 @@ function PlayerToplistsPageContent() {
               monthOptions={monthOptions}
               guildOptions={guildOptions}
               onExportPng={openExportDialog}
-              exportDisabled={!hasServersSelected || activeTab !== "players" || listView !== "table"}
+              exportDisabled={!hasServersSelected || (activeTab === "players" && listView !== "table")}
             />
           ) : null
         }
@@ -1069,7 +1203,14 @@ function PlayerToplistsPageContent() {
             exportSnapshotRef={tableExportSnapshotRef}
           />
         )}
-        {activeTab === "guilds" && <GuildToplists serverCodes={servers ?? []} />}
+        {activeTab === "guilds" && (
+          <GuildToplists
+            serverCodes={servers ?? []}
+            sortKey={resolveGuildSort(guildSortBy)}
+            tableRef={tableRef}
+            exportSnapshotRef={tableExportSnapshotRef}
+          />
+        )}
       </ContentShell>
 
       <ServerSheet
@@ -1247,9 +1388,7 @@ function TableDataView({
     return "neg3";
   };
   const fmtDate = (ts: number | null | undefined) => {
-    if (ts == null) return null;
-    const ms = ts < 1e12 ? ts * 1000 : ts;
-    return new Date(ms).toLocaleString();
+    return formatScanDateTimeLabel(ts);
   };
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
@@ -1600,9 +1739,16 @@ function TableDataView({
 
     nextRows = nextRows.map((row) => {
       const mainRatio = deriveRatioMain(row.main, row.con);
+      const existingRatioLabelRaw = typeof row.ratio === "string" ? row.ratio.trim() : "";
+      const existingRatioLabel = existingRatioLabelRaw && existingRatioLabelRaw.includes("/")
+        ? existingRatioLabelRaw
+        : null;
+      const ratioLabel = existingRatioLabel ?? (mainRatio == null ? "-" : `${mainRatio}/${100 - mainRatio}`);
       const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
       return {
         ...row,
+        ratio: ratioLabel,
+        _ratioLabel: ratioLabel,
         _ratioMain: mainRatio,
         _calculatedSum: calculatedSum,
       } as any;
@@ -2058,44 +2204,22 @@ function TableDataView({
 
   const renderToplistColGroup = () => (
     <colgroup>
-      <col />
-      <col />
-      <col />
-      <col />
-      <col style={{ width: 60 }} />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
-      <col />
+      {TOPLIST_COLUMNS.map((column) => (
+        <col key={column.key} style={{ width: column.width }} />
+      ))}
     </colgroup>
   );
 
   const renderToplistHeader = () => (
-    <table className="toplists-table toplists-table--header" style={{ width: "100%", borderCollapse: "collapse" }}>
+    <table className="toplists-table toplists-table--header" style={TOPLIST_TABLE_STYLE}>
       {renderToplistColGroup()}
       <thead>
-        <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
-          <th style={{ padding: "8px 6px" }}>#</th>
-          <th style={{ padding: "8px 6px" }}>Δ Rank</th>
-          <th style={{ padding: "8px 6px" }}>Server</th>
-          <th style={{ padding: "8px 6px" }}>Name</th>
-          <th style={{ padding: "8px 6px", textAlign: "center" }}>Class</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
-          <th style={{ padding: "8px 6px" }}>Guild</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Stats/Day</th>
-          <th style={{ padding: "8px 6px" }}>Ratio</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
-          <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
-          <th style={{ padding: "8px 6px" }}>Last Scan</th>
+        <tr style={TOPLIST_HEADER_ROW_STYLE}>
+          {TOPLIST_COLUMNS.map((column) => (
+            <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
+              <span style={TOPLIST_HEADER_LABEL_STYLE}>{column.label}</span>
+            </th>
+          ))}
         </tr>
       </thead>
     </table>
@@ -2111,12 +2235,12 @@ function TableDataView({
       ? Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end)
       : 0;
     return (
-    <table className="toplists-table toplists-table--body" style={{ width: "100%", borderCollapse: "collapse" }}>
+    <table className="toplists-table toplists-table--body" style={TOPLIST_TABLE_STYLE}>
       {renderToplistColGroup()}
       <tbody>
         {rows.length > 0 && topSpacerHeight > 0 && (
           <tr aria-hidden>
-            <td colSpan={15} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
+            <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
           </tr>
         )}
         {virtualItems.map((virtualRow) => {
@@ -2157,11 +2281,11 @@ function TableDataView({
           const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
             if (!showCompare) return null;
             if (missing) {
-              return <div style={{ fontSize: 11, opacity: 0.8 }}>-</div>;
+              return <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>-</div>;
             }
             if (value == null && hideIfNull) return null;
             return (
-              <div style={{ fontSize: 11, opacity: 0.8 }}>
+              <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>
                 {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
               </div>
             );
@@ -2190,26 +2314,24 @@ function TableDataView({
               }}
               onClick={rowOnClick}
             >
-              <td style={{ padding: "8px 6px" }}>{i + 1}</td>
-              <td style={{ padding: "8px 6px" }}>
-                {rankDeltaDisplay ? (
-                  <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
-                    {rankDeltaDisplay.text}
-                  </span>
-                ) : ""}
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.rank}>{i + 1}</td>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.rankDelta}>
+                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>
+                  {rankDeltaDisplay ? (
+                    <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
+                      {rankDeltaDisplay.text}
+                    </span>
+                  ) : ""}
+                </span>
               </td>
-              <td style={{ padding: "8px 6px" }}>{r.server}</td>
-              <td style={{ padding: "8px 6px" }}>{r.name}</td>
-              <td style={{ padding: "8px 6px", textAlign: "center" }}>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "100%",
-                  }}
-                >
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.server}>
+                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.server}</span>
+              </td>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.name}>
+                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.name}</span>
+              </td>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.class}>
+                <span style={TOPLIST_ICON_CELL_CONTENT_STYLE}>
                   {classIconUrl ? (
                     <img
                       src={classIconUrl}
@@ -2223,58 +2345,60 @@ function TableDataView({
                   )}
                 </span>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.level}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
                   {renderDelta(deltas.level ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px" }}>{r.guild ?? ""}</td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.guild}>
+                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.guild ?? ""}</span>
+              </td>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(mainTone)}>{fmtNum(r.main)}</span>
                   {renderDelta(deltas.main ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(conTone)}>{fmtNum(r.con)}</span>
                   {renderDelta(deltas.con ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.sum}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span>{fmtNum(calculatedSum)}</span>
                   {renderDelta(deltas.sum ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.statsPerDay}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span className={statsDayClassName}>{statsPerDayText}</span>
-                  <div style={{ fontSize: 11, opacity: 0.8 }}>{statsDaysText}</div>
+                  <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>{statsDaysText}</div>
                 </div>
               </td>
-              <td style={{ padding: "8px 6px" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                  <span>{(r as any)._ratioLabel ?? r.ratio ?? "�"}</span>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.ratio}>
+                <div style={TOPLIST_FLEX_COLUMN_CENTER_STYLE}>
+                  <span>{(r as any)._ratioLabel ?? r.ratio ?? "-"}</span>
                   {renderDelta(deltas.ratio ?? null, compareMissing, true)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.mine}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
                   {renderDelta(deltas.mine ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px", textAlign: "right" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.treasury}>
+                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span>{fmtNum(r.treasury)}</span>
                   {renderDelta(deltas.treasury ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={{ padding: "8px 6px" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span>{lastScanLabel}</span>
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
+                <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>
+                  <span style={TOPLIST_LAST_SCAN_LABEL_STYLE}>{lastScanLabel}</span>
                   {lastScanDotColor && (
                     <span
                       aria-hidden
@@ -2293,14 +2417,14 @@ function TableDataView({
           );
         })}
         {tableLoading && enhancedRows.length === 0 && (
-          <tr><td colSpan={15} style={{ padding: 12 }}>Loading...</td></tr>
+          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>Loading...</td></tr>
         )}
         {!tableLoading && !playerError && enhancedRows.length === 0 && (
-          <tr><td colSpan={15} style={{ padding: 12 }}>No results</td></tr>
+          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>No results</td></tr>
         )}
         {rows.length > 0 && bottomSpacerHeight > 0 && (
           <tr aria-hidden>
-            <td colSpan={15} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
+            <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
           </tr>
         )}
       </tbody>

@@ -466,8 +466,9 @@ export async function writeGuildSnapshotsFromRows(
     const prevSec = guildProgress ? 0 : await readPrevSnapshotSec(gid);
     const shouldWriteSnapshot = guildTsSec > prevSec;
 
-    // Spielerzeilen mit exakt diesem Timestamp und passender Gilde einsammeln
-    const byPid = new Map<string, CSVRow>();
+    // Parsed CSV rows are the source of truth for members_summary.
+    // Collect all rows for this guild from the current CSV session and de-dupe by player id.
+    const byPid = new Map<string, { row: CSVRow; tsSec: number | null }>();
     for (const r of playersRows || []) {
       const server = pickByCanon(r, P.SERVER);
       let rowGid = String(pickByCanon(r, P.GUILD_IDENTIFIER) ?? "").trim();
@@ -482,15 +483,20 @@ export async function writeGuildSnapshotsFromRows(
       if (rowGid !== gid) continue;
 
       const tsSec = toSecFlexible(pickByCanon(r, P.TIMESTAMP));
-      if (tsSec == null || tsSec !== guildTsSec) continue;
-
       const pid = String((r as any)?.["ID"] ?? (r as any)?.["Identifier"] ?? "").trim();
       if (!pid) continue;
 
-      if (!byPid.has(pid)) byPid.set(pid, r);
+      const prev = byPid.get(pid);
+      if (!prev) {
+        byPid.set(pid, { row: r, tsSec });
+        continue;
+      }
+      const prevTs = prev.tsSec ?? Number.NEGATIVE_INFINITY;
+      const nextTs = tsSec ?? Number.NEGATIVE_INFINITY;
+      if (nextTs > prevTs) byPid.set(pid, { row: r, tsSec });
     }
 
-    const rows = Array.from(byPid.values());
+    const rows = Array.from(byPid.values(), (entry) => entry.row);
 
     // MemberSummary + Averages berechnen
     const members: MemberSummary[] = [];
@@ -541,6 +547,14 @@ export async function writeGuildSnapshotsFromRows(
     const shouldWriteMonthly = scanWriteMode === "monthly" && (guildProgress || shouldWriteSnapshot);
 
     if (shouldWriteCurrent || shouldWriteMonthly) {
+      if (members.length === 0) {
+        console.warn("[ImportSelectionToDb] No members parsed for guild; skipping members_summary write", {
+          gid,
+          guildTsSec,
+          guildTsRaw,
+        });
+        continue;
+      }
       const snapshotPayload = {
         guildId: gid,
         count: members.length,

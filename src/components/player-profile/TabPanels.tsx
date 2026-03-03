@@ -18,6 +18,7 @@ import {
   PLAYER_PROGRESS_CHART_SECTION_ORDER,
   usePlayerProgressSnapshots,
 } from "../../lib/player-progress/usePlayerProgressSnapshots";
+import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import {
   ATTRIBUTE_COMPOSITION_SHADE_ACCENT_WEIGHTS,
   ATTRIBUTE_COMPOSITION_SHADE_MIX_BG,
@@ -1199,14 +1200,18 @@ export function ComparisonTab({
     currentMonths.forEach((entry) => {
       const scanAtRaw = typeof entry.scanAtRaw === "string" ? entry.scanAtRaw.trim() : "";
       if (scanAtRaw) {
-        monthScanLabels[entry.monthId] = scanAtRaw;
-        return;
+        const formattedRaw = formatScanDateTimeLabel(scanAtRaw);
+        if (formattedRaw !== "—") {
+          monthScanLabels[entry.monthId] = formattedRaw;
+          return;
+        }
       }
       if (typeof entry.scanAtSec === "number" && Number.isFinite(entry.scanAtSec)) {
-        const dt = new Date(entry.scanAtSec * 1000);
-        if (!Number.isNaN(dt.getTime())) {
-          monthScanLabels[entry.monthId] = dt.toLocaleString();
+        const formattedSec = formatScanDateTimeLabel(entry.scanAtSec);
+        if (formattedSec !== "—") {
+          monthScanLabels[entry.monthId] = formattedSec;
         }
+        return;
       }
     });
 

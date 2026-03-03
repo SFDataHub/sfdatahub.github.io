@@ -10,6 +10,9 @@ import { useAuth } from "../../context/AuthContext";
 type CompareMode = "off" | "progress" | "months";
 
 type Props = {
+  mode: "players" | "guilds";
+  sortValue: string;
+  onSortValueChange: (value: string) => void;
   compareMode: CompareMode;
   onCompareModeChange: (mode: CompareMode) => void;
   progressSinceMonth: string;
@@ -25,6 +28,9 @@ type Props = {
 };
 
 export default function HudFilters({
+  mode,
+  sortValue,
+  onSortValueChange,
   compareMode,
   onCompareModeChange,
   progressSinceMonth,
@@ -40,26 +46,23 @@ export default function HudFilters({
 }: Props) {
   const { t } = useTranslation();
   const {
-    // Filter states
-    servers, // nur für den Counter/Label genutzt
-    classes, setClasses,
-    guilds, toggleGuild, clearGuilds,
-    sortBy, setSortBy,
-    favoritesOnly, setFavoritesOnly,
-
-    // UI modes
+    servers,
+    classes,
+    setClasses,
+    guilds,
+    toggleGuild,
+    clearGuilds,
+    favoritesOnly,
+    setFavoritesOnly,
     filterMode,
-
-    // SEPARATE Sheets
-    setBottomFilterOpen,       // allgemeiner Bottom-Filter
-    serverSheetOpen,           // NUR Server-Picker (lesen für aria)
-    setServerSheetOpen,        // NUR Server-Picker (öffnen/schließen)
-
-    // helper
+    setBottomFilterOpen,
+    serverSheetOpen,
+    setServerSheetOpen,
     resetAll,
   } = useFilters();
   const { user } = useAuth();
 
+  const isGuildMode = mode === "guilds";
   const guildLabel = t("toplists.filters.guilds.label", "Guilds");
   const guildPlaceholder = t("toplists.filters.guilds.placeholder", "All guilds");
   const guildEmpty = t("toplists.filters.guilds.empty", "No guilds in snapshot");
@@ -72,7 +75,6 @@ export default function HudFilters({
 
   return (
     <div className={styles.hudWrap}>
-      {/* Server Picker (öffnet den separaten Server-Picker, NICHT den Bottom-Filter) */}
       <button
         type="button"
         className={styles.hudBtn}
@@ -89,96 +91,100 @@ export default function HudFilters({
         🌐 Servers {servers.length ? `(${servers.length})` : ""}
       </button>
 
-      {/* Klassen: NUR Icon als Button (transparent) */}
-      <div className={styles.iconRow}>
-        {CLASSES.map((c) => (
-          <ClassIconButton
-            key={c.key}
-            active={classes.includes(c.key)}
-            title={c.label}
-            iconUrl={c.iconUrl}   // Drive-/Asset-URL aus deinem CLASSES-Katalog
-            fallback={c.fallback} // Emoji-Fallback falls Bild fehlschlägt
-            size={40}
-            onClick={() =>
-              setClasses((prev) =>
-                prev.includes(c.key) ? prev.filter((k) => k !== c.key) : [...prev, c.key]
-              )
-            }
-          />
-        ))}
-        <button type="button" className={styles.hudSubBtn} onClick={() => setClasses(CLASSES.map((c) => c.key))}>
-          All
-        </button>
-        <button type="button" className={styles.hudSubBtn} onClick={() => setClasses([])}>
-          None
-        </button>
+      {!isGuildMode && (
+        <div className={styles.iconRow}>
+          {CLASSES.map((c) => (
+            <ClassIconButton
+              key={c.key}
+              active={classes.includes(c.key)}
+              title={c.label}
+              iconUrl={c.iconUrl}
+              fallback={c.fallback}
+              size={40}
+              onClick={() =>
+                setClasses((prev) =>
+                  prev.includes(c.key) ? prev.filter((k) => k !== c.key) : [...prev, c.key]
+                )
+              }
+            />
+          ))}
+          <button type="button" className={styles.hudSubBtn} onClick={() => setClasses(CLASSES.map((c) => c.key))}>
+            All
+          </button>
+          <button type="button" className={styles.hudSubBtn} onClick={() => setClasses([])}>
+            None
+          </button>
+        </div>
+      )}
+
+      {!isGuildMode && (
+        <div className={styles.guildField}>
+          <span className={styles.guildLabel}>{guildLabel}</span>
+          {guildOptions.length ? (
+            <details className={styles.guildSelect}>
+              <summary className={styles.guildSummary} aria-label={guildLabel}>
+                <span className={styles.guildSummaryText}>{guildSelection}</span>
+                <span className={styles.guildCaret} aria-hidden="true">v</span>
+              </summary>
+              <div className={styles.guildDropdown}>
+                {guildOptions.map((option) => {
+                  const checked = guilds.includes(option.value);
+                  return (
+                    <label key={option.value} className={styles.guildOption}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleGuild(option.value)} />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+                {guilds.length > 0 && (
+                  <button type="button" className={styles.guildClear} onClick={clearGuilds}>
+                    {guildClear}
+                  </button>
+                )}
+              </div>
+            </details>
+          ) : (
+            <span className={styles.guildEmptyText}>{guildEmpty}</span>
+          )}
+        </div>
+      )}
+
+      <div className={styles.sortField}>
+        <label className={styles.sortLabel} htmlFor="toplists-sort">
+          Sort.
+        </label>
+        <select
+          id="toplists-sort"
+          name="toplists-sort"
+          value={sortValue}
+          onChange={(e) => onSortValueChange(e.target.value)}
+          className={styles.sortSelect}
+          aria-label="Sort"
+        >
+          {isGuildMode ? (
+            <>
+              <option value="guildMembers">Members</option>
+              <option value="guildAvgLevel">Avg Lv</option>
+              <option value="guildAvgSum">Avg Sum</option>
+              <option value="guildLastScan">Last Scan</option>
+            </>
+          ) : (
+            <>
+              <option value="main">Main</option>
+              <option value="constitution">Constitution</option>
+              <option value="sum">Base Stats</option>
+              <option value="statsDay">Stats/Day</option>
+              <option value="level">Level</option>
+              <option value="mine">Mine</option>
+            </>
+          )}
+        </select>
       </div>
-
-      <div className={styles.guildField}>
-        <span className={styles.guildLabel}>{guildLabel}</span>
-        {guildOptions.length ? (
-          <details className={styles.guildSelect}>
-            <summary className={styles.guildSummary} aria-label={guildLabel}>
-              <span className={styles.guildSummaryText}>{guildSelection}</span>
-              <span className={styles.guildCaret} aria-hidden="true">v</span>
-            </summary>
-            <div className={styles.guildDropdown}>
-              {guildOptions.map((option) => {
-                const checked = guilds.includes(option.value);
-                return (
-                  <label key={option.value} className={styles.guildOption}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleGuild(option.value)}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                );
-              })}
-              {guilds.length > 0 && (
-                <button type="button" className={styles.guildClear} onClick={clearGuilds}>
-                  {guildClear}
-                </button>
-              )}
-            </div>
-          </details>
-        ) : (
-          <span className={styles.guildEmptyText}>{guildEmpty}</span>
-        )}
-      </div>
-
-
-      {/* Sort (mit id/name + Labelbindung) */}
-      <label className={styles.sortLabel} htmlFor="toplists-sort">
-        Sort.
-      </label>
-      <select
-        id="toplists-sort"
-        name="toplists-sort"
-        value={sortBy}
-        onChange={(e) => setSortBy(e.target.value as any)}
-        className={styles.sortSelect}
-        aria-label="Sort"
-      >
-        <option value="main">Main</option>
-        <option value="constitution">Constitution</option>
-        <option value="sum">Base Stats</option>
-        <option value="statsDay">Stats/Day</option>
-        <option value="level">Level</option>
-        <option value="mine">Mine</option>
-      </select>
 
       <div className={styles.compareBlock}>
-        <span className={styles.compareBlockTitle}>
-          {t("toplists.compareMode", "Compare Mode")}
-        </span>
+        <span className={styles.compareBlockTitle}>{t("toplists.compareMode", "Compare Mode")}</span>
         <div className={styles.segmented} role="group" aria-label={t("toplists.compareMode", "Compare Mode")}>
-          <button
-            type="button"
-            aria-pressed={compareMode === "off"}
-            onClick={() => onCompareModeChange("off")}
-          >
+          <button type="button" aria-pressed={compareMode === "off"} onClick={() => onCompareModeChange("off")}>
             {t("toplists.compareOff", "Off")}
           </button>
           <button
@@ -188,11 +194,7 @@ export default function HudFilters({
           >
             {t("toplists.compareMonth", "Progress since")}
           </button>
-          <button
-            type="button"
-            aria-pressed={compareMode === "months"}
-            onClick={() => onCompareModeChange("months")}
-          >
+          <button type="button" aria-pressed={compareMode === "months"} onClick={() => onCompareModeChange("months")}>
             {t("toplists.compareMonths", "Compare months")}
           </button>
         </div>
@@ -261,7 +263,6 @@ export default function HudFilters({
         )}
       </div>
 
-      {/* Right Side Actions */}
       <div className="ml-auto flex items-center gap-2">
         <button
           type="button"
@@ -293,7 +294,6 @@ export default function HudFilters({
           Reset
         </button>
 
-        {/* Der allgemeine Bottom-Filter bleibt separat und wird nur hier geöffnet */}
         {filterMode === "sheet" && (
           <button
             type="button"

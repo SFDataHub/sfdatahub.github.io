@@ -40,6 +40,7 @@ import {
   buildFallbackProgressSeries,
   usePlayerProgressSnapshots,
 } from "../../lib/player-progress/usePlayerProgressSnapshots";
+import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import "./player-profile.css";
 
 const TAB_CONFIG = [
@@ -813,16 +814,6 @@ const formatDaysAgo = (days?: number | null) => {
   return `${days} Tag${days === 1 ? "" : "e"} her`;
 };
 
-const formatDateTimeFromSeconds = (timestamp?: number | null) => {
-  if (timestamp == null) return null;
-  const date = new Date(timestamp * 1000);
-  if (Number.isNaN(date.getTime())) return null;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(
-    date.getMinutes()
-  )}`;
-};
-
 const buildPortraitConfig = (
   snapshot: PlayerSnapshot,
   avatarSnapshot?: AvatarSnapshot | null,
@@ -962,10 +953,9 @@ const buildProfileView = (
   const hofRank = hofRankDirect ?? lookup.number(hofKeys);
   const lastScanRaw = lookup.text(["timestampraw"]);
   const timestampSeconds = lookup.number(["timestamp"]);
-  const lastScanDisplay =
-    lastScanRaw && /^\s*\d+\s*$/.test(lastScanRaw)
-      ? formatDateTimeFromSeconds(toNum(lastScanRaw)) ?? lastScanRaw
-      : lastScanRaw ?? formatDateTimeFromSeconds(timestampSeconds) ?? "-";
+  const scanValueForDisplay = lastScanRaw && lastScanRaw.trim() ? lastScanRaw : (timestampSeconds ?? null);
+  const formattedScanDisplay = formatScanDateTimeLabel(scanValueForDisplay);
+  const lastScanDisplay = formattedScanDisplay === "—" ? "-" : formattedScanDisplay;
   const scanAgeDays = snapshot.lastScanDays ?? (timestampSeconds != null ? daysSince(timestampSeconds) : null);
 
   const xpValue = lookup.number(["xp"]) ?? toNum(values?.XP);

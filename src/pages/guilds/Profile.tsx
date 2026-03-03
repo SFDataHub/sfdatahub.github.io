@@ -15,32 +15,22 @@ import {
 // Mitglieder-Browser
 import { GuildMemberBrowser } from "../../components/guilds/guild-tabs/guild-members";
 
-// Broadcast-Tile
-import GuildBaseStatsBroadcastTile from "../../components/guilds/GuildBaseStatsBroadcastTile";
-
 // Neuer Container-Tab (Firebase-verdrahtet)
 import GuildMonthlyProgressTabContainer from "../../components/guilds/guild-tabs/GuildMonthlyProgressTab/GuildMonthlyProgressTabContainer";
 
-// Mittel-Block (ausgelagert)
-import GuildProfileInfo from "../../components/guilds/GuildProfileInfo/GuildProfileInfo";
 import type {
   MembersSnapshotLike,
   GuildLike,
   MemberSummaryLike,
 } from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
+import GuildHeroPanel, { type GuildHeroPanelData } from "../../components/guilds/GuildHeroPanel";
 import type { Member as GuildMember } from "../../components/guilds/guild-tabs/guild-members/types";
-
-// Right-Rail: einzelne Views (nicht veraendern)
-import ClassCrestGrid from "../../components/guilds/GuildClassOverview/ClassCrestGrid";
-import ClassDonut from "../../components/guilds/GuildClassOverview/ClassDonut";
 
 // Utils exakt wie im Container genutzt
 import { adaptClassMeta } from "../../components/guilds/GuildClassOverview/utils";
 import { CLASSES } from "../../data/classes";
-
-// Globale HUD-Tabs (nur Seitencode)
-import HudLabel from "../../components/ui/hud/HudLabel";
 import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
+import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 
 const C = {
   tile: "#152A42",
@@ -58,6 +48,9 @@ type MembersSnapshot = MembersSnapshotLike;
 type GuildProfileLoadResult = {
   guild: Guild;
   snapshot: MembersSnapshot | null;
+};
+type GuildProfileProps = {
+  heroOnly?: boolean;
 };
 type GuildProfileCacheValue = { cachedAt: number; data: GuildProfileLoadResult };
 const guildProfileInFlight = new Map<string, Promise<GuildProfileLoadResult>>();
@@ -133,72 +126,7 @@ function Section({
   );
 }
 
-function StatRow({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between text-sm py-1">
-      <span className="opacity-80">{k}</span>
-      <span className="font-semibold" style={{ color: C.title }}>
-        {v}
-      </span>
-    </div>
-  );
-}
-
-function LeftRail({ guild }: { guild: Guild }) {
-  const emblemUrl = guildIconUrlByIdentifier(guild.id, 800);
-  return (
-    <div className="space-y-4">
-      <div
-        className="rounded-2xl border p-3"
-        style={{ borderColor: "transparent", background: "transparent" }}
-      >
-        <div
-          className="w-full mx-auto max-w-[480px]"
-          style={{
-            aspectRatio: "3 / 4",
-            borderRadius: 14,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "transparent",
-            border: "1px solid transparent",
-            overflow: "hidden",
-          }}
-        >
-          {emblemUrl ? (
-            <img
-              src={emblemUrl}
-              alt=""
-              className="max-h-full max-w-full"
-              style={{
-                maxHeight: "115%",
-                maxWidth: "115%",
-                objectFit: "contain",
-                filter:
-                  "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 8px 16px rgba(0,0,0,.35))",
-              }}
-              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-            />
-          ) : (
-            <div className="text-6xl">🏰</div>
-          )}
-        </div>
-      </div>
-
-      <Section title="GILDEN INFO">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <StatRow k="Mitglieder" v={guild.memberCount ?? "-"} />
-          <StatRow k="HoF-Rang" v={guild.hofRank != null ? `#${guild.hofRank}` : "-"} />
-          <StatRow k="Server" v={guild.server ?? "-"} />
-          <StatRow k="Inaktiv" v="0" />
-          <StatRow k="Aktivitaet" v="100%" />
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-export default function GuildProfile() {
+export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const params = useParams<Record<string, string>>();
   const guildId = params.id || params.gid || params.guildId || params.guild || "";
   const navigate = useNavigate();
@@ -207,9 +135,6 @@ export default function GuildProfile() {
   const [err, setErr] = useState<string | null>(null);
   const [guild, setGuild] = useState<Guild | null>(null);
   const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
-
-  // Right-Rail Umschalter (Tabs)
-  const [rightView, setRightView] = useState<"grid" | "donut">("grid");
 
   // WICHTIG: classMeta wie im Container erstellen
   const safeMeta = useMemo(
@@ -385,18 +310,54 @@ export default function GuildProfile() {
     () => (snapshot?.members ?? []).map((m) => normalizeMember(m)),
     [snapshot]
   );
+  const top3Stats = useMemo(() => {
+    const members = snapshot?.members ?? [];
+    const topN = (key: "baseMain" | "conBase" | "sumBaseTotal" | "attrTotal" | "conTotal" | "totalStats") =>
+      [...members]
+        .filter((m) => typeof (m as any)[key] === "number")
+        .sort((a, b) => ((b as any)[key] ?? 0) - ((a as any)[key] ?? 0))
+        .slice(0, 3)
+        .map((m) => ({
+          name: m.name ?? "—",
+          classLabel: m.class ?? null,
+          value: ((m as any)[key] as number | null | undefined) ?? null,
+        }));
+
+    return {
+      base: {
+        main: topN("baseMain"),
+        con: topN("conBase"),
+        sum: topN("sumBaseTotal"),
+      },
+      total: {
+        main: topN("attrTotal"),
+        con: topN("conTotal"),
+        total: topN("totalStats"),
+      },
+    };
+  }, [snapshot?.members]);
 
   if (loading) {
+    if (heroOnly) {
+      return <div className="text-sm" style={{ color: C.soft, padding: 16 }}>Loading guild profile...</div>;
+    }
     return (
-      <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed>
+      <ContentShell centerFramed>
         <div className="text-sm" style={{ color: C.soft }}>Lade Gildenprofil...</div>
       </ContentShell>
     );
   }
 
   if (!guild) {
+    if (heroOnly) {
+      return (
+        <div className="text-sm" style={{ color: C.soft, padding: 16 }}>
+          {err ?? "Unknown error."}
+        </div>
+      );
+    }
     return (
-      <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed>
+      <ContentShell centerFramed>
         <div className="text-sm" style={{ color: C.soft }}>
           {err ?? "Unbekannter Fehler."}
           <div className="mt-3">
@@ -413,91 +374,66 @@ export default function GuildProfile() {
     );
   }
 
-  const SecondHeader = (
-    <div className="mt-2">
-      <div className="px-6">
-        <div
-          className="flex items-center justify-between gap-3"
-          style={{
-            paddingTop: 10,
-            paddingBottom: 10,
-            borderTop: `1px solid ${C.line}`,
-            position: "relative",
-            zIndex: 2,
-          }}
-        >
-          <div className="min-w-[120px]">
-            <span
-              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-              style={{ background: C.tile, border: `1px solid ${C.line}`, color: C.title }}
-            >
-              {guild.server ?? "S?.EU"}
-            </span>
-          </div>
-          <div className="flex-1 text-center">
-            <div className="font-extrabold" style={{ color: C.title, fontSize: 26, lineHeight: 1.15 }}>
-              {guild.name}
-            </div>
-          </div>
-          <div className="min-w-[220px] text-right text-xs" style={{ color: C.soft }}>
-            Zuletzt aktualisiert:&nbsp;
-            {snapshot?.updatedAt ? snapshot.updatedAt : "-"}{" "}
-            <span className="inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#4CAF50" }} />
-          </div>
-        </div>
-        <div
-          style={{
-            height: 1,
-            background: C.line,
-            opacity: 0.9,
-            marginTop: 4,
-            marginBottom: 20,
-            position: "relative",
-            zIndex: 2,
-          }}
-        />
-      </div>
-    </div>
-  );
+  const updatedScanLabel = formatScanDateTimeLabel(snapshot?.updatedAtMs ?? snapshot?.updatedAt ?? null);
+  const hasUpdatedScanLabel = updatedScanLabel !== "—";
+  const emblemUrl = guildIconUrlByIdentifier(guild.id, 512) || undefined;
+  const handleHeroAction = (actionKey: string) => {
+    if (actionKey !== "open_guild") return;
+    navigate(`/guilds/profile/${encodeURIComponent(guild.id)}`);
+  };
+  const heroPanelData: GuildHeroPanelData | null = guild.name
+    ? {
+        guildName: guild.name,
+        server: guild.server ?? undefined,
+        memberCount: guild.memberCount ?? null,
+        hofRank: guild.hofRank ?? null,
+        emblemUrl: emblemUrl ?? null,
+        lastScanAtLabel: hasUpdatedScanLabel ? updatedScanLabel : null,
+        lastScanDays: guild.lastScanDays ?? null,
+        averageStats: {
+          base: {
+            main: snapshot?.avgBaseMain ?? null,
+            con: snapshot?.avgConBase ?? null,
+            sum: snapshot?.avgSumBaseTotal ?? null,
+          },
+          total: {
+            main: snapshot?.avgAttrTotal ?? null,
+            con: snapshot?.avgConTotal ?? null,
+            total: snapshot?.avgTotalStats ?? null,
+          },
+        },
+        activityPct: 100,
+        metrics: [],
+        actions: [
+          {
+            key: "open_guild",
+            label: "Open guild",
+          },
+        ],
+        top3: top3Stats,
+        classTabs: {
+          data: membersForList,
+          classMeta: safeMeta as any,
+          onPickClass: (id) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("tab", "Uebersicht");
+            url.searchParams.set("class", id);
+            window.location.href = url.toString();
+          },
+        },
+      }
+    : null;
+
+  if (heroOnly) {
+    return heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} /> : null;
+  }
 
   return (
-    <ContentShell title="Gildenprofil" subtitle="Gilde, KPIs & Verlauf" centerFramed={false}>
-      {SecondHeader}
-
+    <ContentShell centerFramed={false}>
       <div className="px-6 pb-8">
         <div className="grid grid-cols-12 gap-4">
-          {/* LEFT RAIL */}
-          <div className="col-span-12 md:col-span-3">
-            <LeftRail guild={guild} />
-          </div>
-
-          {/* MITTELSPALTE */}
-          <div className="col-span-12 md:col-span-6 space-y-4">
-            <GuildProfileInfo
-              guild={guild}
-              snapshot={snapshot}
-              emblemUrl={guildIconUrlByIdentifier(guild.id, 512) || undefined}
-              colors={C}
-            />
-
-            <div className="flex justify-center">
-              <div className="w-full max-w-[980px]">
-                <GuildBaseStatsBroadcastTile
-                  guildName={guild.name}
-                  server={guild.server ?? "-"}
-                  emblemUrl={guildIconUrlByIdentifier(guild.id, 512) || undefined}
-                  lastScanISO={snapshot?.updatedAtMs ? new Date(snapshot.updatedAtMs).toISOString() : undefined}
-                  members={guild.memberCount ?? 0}
-                  avgLevel={snapshot?.avgLevel ?? 0}
-                  totalPower={snapshot?.avgTotalStats ?? undefined}
-                  tickerItems={
-                    snapshot?.updatedAt
-                      ? [`Updated ${snapshot.updatedAt}`, `Members ${guild.memberCount ?? 0}`]
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
+          <div className="col-span-12 space-y-4">
+            {heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} /> : null}
 
             <Tabs
               members={membersForList}
@@ -506,36 +442,6 @@ export default function GuildProfile() {
               guildServer={guild.server}
             />
           </div>
-
-          {/* RIGHT RAIL */}
-          <div className="col-span-12 md:col-span-3">
-            {/* Tabs (nur Buttons ueber der ersten Komponente) */}
-            <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setRightView("grid")} aria-label="Klassenuebersicht">
-                <HudLabel text="Klassenuebersicht" tone={rightView === "grid" ? "accent" : "default"} />
-              </button>
-              <button onClick={() => setRightView("donut")} aria-label="Klassenverteilung">
-                <HudLabel text="Klassenverteilung" tone={rightView === "donut" ? "accent" : "default"} />
-              </button>
-            </div>
-
-            {/* Umschalten zwischen den zwei vorhandenen Komponenten - ohne Extra-Container */}
-            {rightView === "grid" ? (
-              <ClassCrestGrid
-                data={membersForList}
-                classMeta={safeMeta as any}
-                onPickClass={(id) => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("tab", "Uebersicht");
-                  url.searchParams.set("class", id);
-                  window.location.href = url.toString();
-                }}
-              />
-            ) : (
-              <ClassDonut data={membersForList} classMeta={safeMeta as any} />
-            )}
-          </div>
-          {/* /RIGHT RAIL */}
         </div>
       </div>
     </ContentShell>
@@ -610,4 +516,5 @@ function Tabs({
     </div>
   );
 }
+
 

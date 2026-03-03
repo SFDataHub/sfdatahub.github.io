@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import AnchoredLineChart from "./AnchoredLineChart";
 import type { TrendSeries } from "../../player-profile/types";
+import { formatScanDateTimeLabel } from "../../../lib/ui/formatScanDateTimeLabel";
 
 type AnchoredLineCardProps = {
   title: string;
@@ -64,13 +65,11 @@ export default function AnchoredLineCard({
       const meta = series.pointMeta?.[idx];
       const scanAtSec = typeof meta?.scanAtSec === "number" ? meta.scanAtSec : null;
       const scanAtRaw = typeof meta?.scanAtRaw === "string" ? meta.scanAtRaw.trim() : "";
-      if (scanAtSec != null && Number.isFinite(scanAtSec)) {
-        const dt = new Date(scanAtSec * 1000);
-        if (!Number.isNaN(dt.getTime())) {
-          return `${baseTooltip} | ${scanLabel}: ${dt.toLocaleString(locale)}`;
-        }
+      const scanSource = scanAtSec ?? (scanAtRaw || null);
+      const scanDisplay = formatScanDateTimeLabel(scanSource);
+      if (scanDisplay !== "—") {
+        return `${baseTooltip} | ${scanLabel}: ${scanDisplay}`;
       }
-      if (scanAtRaw) return `${baseTooltip} | ${scanLabel}: ${scanAtRaw}`;
       return baseTooltip;
     });
   }, [locale, scanLabel, series.pointMeta, series.points, series.tooltips]);
