@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./GuildMonthlyProgressTab.module.css";
+import { formatScanDateTimeLabel } from "../../../../lib/ui/formatScanDateTimeLabel";
 import type {
   GuildMonthlyProgressData,
   TableBlock,
@@ -25,10 +26,8 @@ function formatNum(n: number | string | null | undefined) {
   return v.toLocaleString("en-US");
 }
 
-function fmtDate(dISO: string, locale = "de-DE") {
-  const d = new Date(dISO);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" });
+function fmtDate(dISO: string) {
+  return formatScanDateTimeLabel(dISO);
 }
 
 /* ====================== Reusable UI ====================== */

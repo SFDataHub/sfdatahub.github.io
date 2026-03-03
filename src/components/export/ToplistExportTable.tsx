@@ -1,4 +1,5 @@
 import type { FirestoreToplistPlayerRow } from "../../lib/api/toplistsFirestore";
+import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { getClassIconUrl } from "../ui/shared/classIcons";
 
 export type ToplistExportRow = FirestoreToplistPlayerRow & {
@@ -209,7 +210,7 @@ export default function ToplistExportTable({ rows, showCompare, width, exportNon
                 <td style={{ padding: "8px 6px", textAlign: "right" }}>{fmtNum(row.treasury)}</td>
                 <td style={{ padding: "8px 6px" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <span>{row.lastScan ?? ""}</span>
+                    <span>{formatScanDateTimeLabel(row.lastScan)}</span>
                     {lastScanDotColor && (
                       <span
                         aria-hidden

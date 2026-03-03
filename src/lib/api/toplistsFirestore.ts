@@ -239,8 +239,14 @@ export type FirestoreToplistGuildRow = {
   guildId: string;
   server: string;
   name: string;
+  honor: number | null;
+  raids: number | null;
+  portalFloor: number | null;
+  hydra: number | null;
+  instructor: number | null;
   memberCount: number | null;
   hofRank: number | null;
+  latestScanAtSec: number | null;
   lastScan: string | null;
   sumAvg: number | null;
   avgLevel: number | null;
@@ -340,14 +346,26 @@ const mapGuildRow = (raw: any): FirestoreToplistGuildRow | null => {
   if (!server || !name || !guildId) return null;
 
   const sumAvg = toNumber(raw.sumAvg ?? raw.avgSumBaseTotal ?? raw.sum);
+  const lastScanValue =
+    typeof raw.lastScan === "string"
+      ? raw.lastScan
+      : typeof raw.lastScan === "number" && Number.isFinite(raw.lastScan)
+        ? String(raw.lastScan)
+        : null;
 
   return {
     guildId,
     server,
     name,
+    honor: toNumber(raw.honor),
+    raids: toNumber(raw.raids),
+    portalFloor: toNumber(raw.portalFloor),
+    hydra: toNumber(raw.hydra),
+    instructor: toNumber(raw.instructor),
     memberCount: toNumber(raw.memberCount),
     hofRank: toNumber(raw.hofRank),
-    lastScan: toStringOrNull(raw.lastScan),
+    latestScanAtSec: toNumber(raw.latestScanAtSec),
+    lastScan: lastScanValue,
     sumAvg,
     avgLevel: toNumber(raw.avgLevel),
     avgTreasury: toNumber(raw.avgTreasury),
