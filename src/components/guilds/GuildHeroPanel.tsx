@@ -253,7 +253,10 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
   const { t } = useTranslation();
   const [statsMode, setStatsMode] = useState<"base" | "total">("base");
   const [activeClassTab, setActiveClassTab] = useState<"overview" | "distribution">("overview");
-  const [isThreeColumnDesktop, setIsThreeColumnDesktop] = useState(false);
+  const [isThreeColumnDesktop, setIsThreeColumnDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(THREE_COLUMN_MEDIA_QUERY).matches;
+  });
   const [rightColumnCapHeight, setRightColumnCapHeight] = useState<number | null>(null);
   const leftRef = useRef<HTMLDivElement | null>(null);
   const middleRef = useRef<HTMLDivElement | null>(null);
@@ -311,6 +314,8 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     hasClassTabs && isThreeColumnDesktop && rightColumnCapHeight && rightColumnCapHeight > 0
       ? { maxHeight: rightColumnCapHeight }
       : undefined;
+  const shouldLockRightColumnScroll =
+    isOverlayContext && hasClassTabs && isThreeColumnDesktop && rightColumnCapHeight == null;
   const shellClassName = isOverlayContext
     ? "rounded-2xl border p-3 md:p-4 shadow-lg"
     : "rounded-2xl border p-4 md:p-5 shadow-lg";
@@ -878,7 +883,11 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
                 </button>
               </div>
 
-                <div className="sfdatahub-scrollbar min-h-0 flex-1 overflow-y-auto">
+                <div
+                  className={`sfdatahub-scrollbar min-h-0 flex-1 ${
+                    shouldLockRightColumnScroll ? "overflow-y-hidden" : "overflow-y-auto"
+                  }`}
+                >
                   {activeClassTab === "overview" ? (
                     <ClassCrestGrid
                       data={classTabs.data}
