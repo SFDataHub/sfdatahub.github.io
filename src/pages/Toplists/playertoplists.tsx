@@ -318,7 +318,7 @@ const TOPLIST_NAME_CELL_LAYOUT_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "flex-start",
-  gap: 0,
+  gap: 12,
   width: "100%",
   minWidth: 0,
 };
@@ -2782,7 +2782,7 @@ function TableDataView({
               <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(mainTone)}>
-                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={playerAvgMode} />
+                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={playerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(mainDeltaValue, compareMissing)}
                 </div>
@@ -2790,7 +2790,7 @@ function TableDataView({
               <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span style={getFrameStyle(conTone)}>
-                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={playerAvgMode} />
+                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={playerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(conDeltaValue, compareMissing)}
                 </div>
