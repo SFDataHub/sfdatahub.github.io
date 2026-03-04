@@ -171,15 +171,25 @@ export default function HudFilters({
           ) : (
             <>
               <option value="main">Main</option>
+              <option value="mainTotal">Main (Total)</option>
               <option value="constitution">Constitution</option>
+              <option value="conTotal">Con (Total)</option>
               <option value="sum">Base Stats</option>
               <option value="statsDay">Stats/Day</option>
+              <option value="sumTotal">Sum Total</option>
+              <option value="statsDayTotal">Total Stats/day</option>
               <option value="level">Level</option>
               <option value="mine">Mine</option>
             </>
           )}
         </select>
       </div>
+
+      {isGuildMode ? (
+        <div id="guild-avg-mode-slot" className={styles.sortField} />
+      ) : (
+        <div id="player-avg-mode-slot" className={styles.sortField} />
+      )}
 
       <div className={styles.compareBlock}>
         <span className={styles.compareBlockTitle}>{t("toplists.compareMode", "Compare Mode")}</span>

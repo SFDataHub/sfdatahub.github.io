@@ -11,12 +11,14 @@
   /* Match app content padding (16px) + ContentShell outerPadding px-4 / py-3 */
   padding:
     12px
-    32px
-    calc(var(--content-bottom-pad, 20px) + 24px + env(safe-area-inset-bottom) + 12px)
-    32px;
+    28px
+    calc(12px + env(safe-area-inset-bottom))
+    28px;
   background: rgba(7, 14, 24, 0.62);
   backdrop-filter: blur(2px);
   transition: left 0.2s ease;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Match RootLayout sidebar states exactly (desktop) */
@@ -40,13 +42,14 @@
   position: relative;
   width: min(1200px, 100%);
   max-height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .profile-overlay__close {
@@ -70,8 +73,10 @@
 }
 
 .profile-overlay__content {
+  min-height: 0;
   overflow: auto;
   padding: 0;
+  overscroll-behavior: contain;
 }
 
 .profile-overlay__content .player-profile {
@@ -83,9 +88,9 @@
     left: 0;
     padding:
       12px
-      28px
-      calc(var(--content-bottom-pad, 16px) + 20px + env(safe-area-inset-bottom) + 12px)
-      28px;
+      20px
+      calc(12px + env(safe-area-inset-bottom))
+      20px;
   }
 
   .profile-overlay__panel {

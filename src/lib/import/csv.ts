@@ -101,6 +101,12 @@ export type ImportReport = {
 /** ---- utilities ---- */
 type Row = Record<string, any>;
 type RowMeta = { row: Row; ts: number };
+type FirestoreOpDetail = { op?: string; path?: string | null };
+type FirestoreErrorContext = {
+  op?: string;
+  path?: string | null;
+  ops?: FirestoreOpDetail[];
+};
 
 export type ParsedPlayerCsvRow = {
   playerId: string;
@@ -1325,7 +1331,8 @@ async function commitBatched(
   docs: BatchWrite[],
   limit: number,
   passName: "scans" | "latest" | "history",
-  onProgress?: ImportCsvOptions["onProgress"]
+  onProgress?: ImportCsvOptions["onProgress"],
+  onErrorCode?: (error: unknown, context?: FirestoreErrorContext) => void,
 ) {
   onProgress?.({ phase: "prepare", current: 0, total: docs.length, pass: passName });
   for (let i = 0; i < docs.length; i += limit) {
@@ -1340,7 +1347,14 @@ async function commitBatched(
       pass: passName,
     });
 
-    await traceBatchCommit(() => batch.commit(), { label: `ImportCsv:${passName}`, path: `batch:${passName}` });
+    try {
+      await traceBatchCommit(() => batch.commit(), { label: `ImportCsv:${passName}`, path: `batch:${passName}` });
+    } catch (error) {
+      onErrorCode?.(error, {
+        ops: slice.map((put) => ({ op: put.op ?? "setDoc", path: put.path })),
+      });
+      throw error;
+    }
     slice.forEach((put) => {
       recordWrite({
         path: put.path,
@@ -1404,7 +1418,7 @@ async function writeScansWithResults(
   scans: ScanDoc[],
   onProgress?: ImportCsvOptions["onProgress"],
   kind?: ImportCsvKind,
-  onErrorCode?: (error: unknown) => void,
+  onErrorCode?: (error: unknown, context?: FirestoreErrorContext) => void,
   scanWriteMode?: ImportScanWriteMode,
 ): Promise<ImportResultItem[]> {
   const results: ImportResultItem[] = [];
@@ -1437,7 +1451,7 @@ async function writeScansWithResults(
       created++;
       results.push({ key, status: "created" });
     } catch (error: any) {
-      onErrorCode?.(error);
+      onErrorCode?.(error, { op: "setDoc", path: ref.path });
       const code = String(error?.code ?? "").toLowerCase();
       if (code.includes("permission") || code.includes("already")) {
         if (scanWriteMode === "monthly") {
@@ -1461,7 +1475,7 @@ async function writeLatest(
   latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
   onProgress?: ImportCsvOptions["onProgress"],
   kind?: ImportCsvKind,
-  onErrorCode?: (error: unknown) => void,
+  onErrorCode?: (error: unknown, context?: FirestoreErrorContext) => void,
 ) {
   if (!latestDocs.length) return;
 
@@ -1472,7 +1486,7 @@ async function writeLatest(
     apply: (b) => b.set(ref, data, { merge: true }),
   }));
 
-  await commitBatched(latestBatchers, BATCH_LATEST, "latest", onProgress);
+  await commitBatched(latestBatchers, BATCH_LATEST, "latest", onProgress, onErrorCode);
 }
 
 async function upsertPlayerDerivedServerSnapshot(
@@ -2016,10 +2030,31 @@ export async function importCsvToDB(
     skippedMissingNameGuild: 0,
   };
   const errorCodeCounts = new Map<string, number>();
-  const trackFirestoreErrorCode = (error: unknown) => {
+  const permissionDeniedOps: Array<{ op: string; path: string }> = [];
+  const permissionDeniedOpSeen = new Set<string>();
+  const trackFirestoreErrorCode = (error: unknown, context?: FirestoreErrorContext) => {
     const code = extractFirestoreErrorCode(error);
     if (!code) return;
     errorCodeCounts.set(code, (errorCodeCounts.get(code) ?? 0) + 1);
+    if (code !== "permission-denied") return;
+
+    const pushPath = (opRaw: string | undefined, pathRaw: string | null | undefined) => {
+      const path = String(pathRaw ?? "").trim();
+      if (!path) return;
+      const op = String(opRaw ?? "unknown").trim() || "unknown";
+      const dedupeKey = `${op}::${path}`;
+      if (permissionDeniedOpSeen.has(dedupeKey)) return;
+      permissionDeniedOpSeen.add(dedupeKey);
+      permissionDeniedOps.push({ op, path });
+    };
+
+    if (Array.isArray(context?.ops) && context.ops.length > 0) {
+      for (const entry of context.ops) {
+        pushPath(entry.op ?? context.op, entry.path ?? context.path ?? null);
+      }
+      return;
+    }
+    pushPath(context?.op, context?.path ?? null);
   };
   const playerResults: ImportResultItem[] = [];
   const guildResults: ImportResultItem[] = [];
@@ -2252,7 +2287,10 @@ export async function importCsvToDB(
         missingTsPlayers += res.skippedMissingTs;
         if (res.wrote) flushedDocIds.push(toSnapshotDocId(serverKey));
       } catch (error) {
-        trackFirestoreErrorCode(error);
+        trackFirestoreErrorCode(error, {
+          op: "transaction",
+          path: `${PLAYER_DERIVED_COL}/${toSnapshotDocId(serverKey)}`,
+        });
         console.warn("[ImportCsv] Derived snapshot upsert failed", { serverKey, error });
       }
     }
@@ -2529,9 +2567,8 @@ export async function importCsvToDB(
     }
 
     try {
-      await commitBatched(putLatest, BATCH_LATEST, "latest", emitProgress);
+      await commitBatched(putLatest, BATCH_LATEST, "latest", emitProgress, trackFirestoreErrorCode);
     } catch (error) {
-      trackFirestoreErrorCode(error);
       if (isPermissionDuplicateError(error)) {
         console.warn("[ImportCsv] guild latest write skipped (duplicate/permission)", { error });
       } else {
@@ -2539,9 +2576,8 @@ export async function importCsvToDB(
       }
     }
     try {
-      await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress);
+      await commitBatched(putHistory, BATCH_HISTORY, "history", emitProgress, trackFirestoreErrorCode);
     } catch (error) {
-      trackFirestoreErrorCode(error);
       if (isPermissionDuplicateError(error)) {
         console.warn("[ImportCsv] guild history write skipped (duplicate/permission)", { error });
       } else {
@@ -2574,7 +2610,10 @@ export async function importCsvToDB(
           missingTsGuilds += res.skippedMissingTs;
           if (res.wrote) flushedDocIds.push(toGuildSnapshotDocId(serverKey));
         } catch (error) {
-          trackFirestoreErrorCode(error);
+          trackFirestoreErrorCode(error, {
+            op: "transaction",
+            path: `${GUILD_DERIVED_COL}/${toGuildSnapshotDocId(serverKey)}`,
+          });
           console.warn("[ImportCsv] Guild derived snapshot upsert failed", { serverKey, error });
         }
       }
@@ -2614,6 +2653,14 @@ export async function importCsvToDB(
       totalOperations: totalOps,
       errorCounts: Object.fromEntries(errorCodeCounts.entries()),
     });
+    const permissionDeniedCount = errorCodeCounts.get("permission-denied") ?? 0;
+    if (permissionDeniedCount > 0) {
+      console.warn(`[ImportCsv] permission-denied paths (${opts.kind})`, {
+        kind: opts.kind,
+        count: permissionDeniedOps.length,
+        sample: permissionDeniedOps.slice(0, 5),
+      });
+    }
   }
   return {
     detectedType: opts.kind,

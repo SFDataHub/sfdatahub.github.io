@@ -47,3 +47,18 @@
     column-gap: 28px;
   }
 }
+
+.freshnessTooltipCard.freshnessTooltipCard {
+  min-width: 220px;
+  max-width: 320px;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+}
+
+.freshnessTooltipLines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

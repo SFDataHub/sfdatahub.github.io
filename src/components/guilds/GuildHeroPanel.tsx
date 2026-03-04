@@ -98,6 +98,7 @@ export type GuildHeroPanelProps = {
   loading?: boolean;
   colors?: Partial<PaletteColors>;
   onAction?: (action: GuildHeroAction["key"]) => void;
+  context?: "profile" | "overlay";
 };
 
 const DEFAULT_COLORS: PaletteColors = {
@@ -247,6 +248,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
   loading = false,
   colors,
   onAction,
+  context = "overlay",
 }: GuildHeroPanelProps) {
   const { t } = useTranslation();
   const [statsMode, setStatsMode] = useState<"base" | "total">("base");
@@ -265,9 +267,9 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     [data.lastScanDays, t],
   );
   const freshnessTooltip = useMemo(() => {
-    const parts: string[] = [];
+    const lines: string[] = [];
     if (data.lastScanAtLabel) {
-      parts.push(
+      lines.push(
         t("guildProfile.heroPanel.tooltips.lastScanAt", {
           value: data.lastScanAtLabel,
           defaultValue: "Last scan: {{value}}",
@@ -276,27 +278,48 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     }
     const ageLabel = formatAgeLabel(t, data.lastScanDays);
     if (ageLabel) {
-      parts.push(
+      lines.push(
         t("guildProfile.heroPanel.tooltips.age.label", {
           value: ageLabel,
           defaultValue: "Age: {{value}}",
         }),
       );
     }
-    if (freshness.hint) parts.push(freshness.hint);
-    return parts.join(" | ");
+    if (freshness.hint) lines.push(freshness.hint);
+    if (!lines.length) return null;
+    return (
+      <div className={guildProfileInfoStyles.freshnessTooltipLines}>
+        {lines.map((line, index) => (
+          <div key={`${line}-${index}`}>{line}</div>
+        ))}
+      </div>
+    );
   }, [data.lastScanAtLabel, data.lastScanDays, freshness.hint, t]);
 
   const localizedLastScanLabel = formatAgeLabel(t, data.lastScanDays) ?? data.lastScanLabel;
   const metrics = data.metrics ?? [];
   const badges = data.badges ?? [];
   const actions = data.actions ?? [];
+  const openGuildLabel = t("guildProfile.heroPanel.actions.openGuild", { defaultValue: "Open guild" });
+  const showInTopListLabel = t("playerProfile.heroPanel.actions.showInTopList", {
+    defaultValue: "Show in Top List",
+  });
   const classTabs = data.classTabs;
   const hasClassTabs = Boolean(classTabs);
+  const isOverlayContext = context === "overlay";
   const rightColumnHeightStyle =
     hasClassTabs && isThreeColumnDesktop && rightColumnCapHeight && rightColumnCapHeight > 0
       ? { maxHeight: rightColumnCapHeight }
       : undefined;
+  const shellClassName = isOverlayContext
+    ? "rounded-2xl border p-3 md:p-4 shadow-lg"
+    : "rounded-2xl border p-4 md:p-5 shadow-lg";
+  const stackClassName = isOverlayContext ? "space-y-3" : "space-y-4";
+  const contentGridClassName = hasClassTabs
+    ? isOverlayContext
+      ? "grid items-start gap-3 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_minmax(0,340px)]"
+      : "grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_minmax(0,340px)]"
+    : "grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]";
   const metricsToRender: GuildHeroMetric[] =
     metrics.length > 0
       ? metrics
@@ -333,26 +356,66 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             value: "--",
           },
         ];
-  const actionsToRender: GuildHeroAction[] =
-    actions.length > 0
-      ? actions
-      : [
-          {
-            key: "placeholder_open_guild",
-            label: t("guildProfile.heroPanel.actions.openGuild", { defaultValue: "Open guild" }),
-            disabled: true,
-          },
-          {
-            key: "placeholder_share",
-            label: t("guildProfile.heroPanel.actions.share", { defaultValue: "Share" }),
-            disabled: true,
-          },
-          {
-            key: "placeholder_copy_link",
-            label: t("guildProfile.heroPanel.actions.copyLink", { defaultValue: "Copy link" }),
-            disabled: true,
-          },
-        ];
+  const actionsToRender: GuildHeroAction[] = useMemo(() => {
+    const defaultActions: GuildHeroAction[] =
+      context === "profile"
+        ? [
+            {
+              key: "placeholder_show_in_top_list",
+              label: showInTopListLabel,
+              disabled: true,
+            },
+            {
+              key: "placeholder_share",
+              label: t("guildProfile.heroPanel.actions.share", { defaultValue: "Share" }),
+              disabled: true,
+            },
+            {
+              key: "placeholder_copy_link",
+              label: t("guildProfile.heroPanel.actions.copyLink", { defaultValue: "Copy link" }),
+              disabled: true,
+            },
+          ]
+        : [
+            {
+              key: "placeholder_open_guild",
+              label: openGuildLabel,
+              disabled: true,
+            },
+            {
+              key: "placeholder_share",
+              label: t("guildProfile.heroPanel.actions.share", { defaultValue: "Share" }),
+              disabled: true,
+            },
+            {
+              key: "placeholder_copy_link",
+              label: t("guildProfile.heroPanel.actions.copyLink", { defaultValue: "Copy link" }),
+              disabled: true,
+            },
+          ];
+    const source = actions.length > 0 ? actions : defaultActions;
+    if (context !== "profile") return source;
+    return source.map((action) => {
+      if (action.key === "open_guild") {
+        return {
+          ...action,
+          key: "show_in_top_list",
+          label: showInTopListLabel,
+          title: action.title ?? showInTopListLabel,
+        };
+      }
+      if (action.key === "placeholder_open_guild") {
+        return {
+          ...action,
+          key: "placeholder_show_in_top_list",
+          label: showInTopListLabel,
+          disabled: true,
+          title: action.title ?? showInTopListLabel,
+        };
+      }
+      return action;
+    });
+  }, [actions, context, openGuildLabel, showInTopListLabel, t]);
   const averageRows = useMemo(
     () =>
       statsMode === "base"
@@ -455,15 +518,18 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
 
   return (
     <section
-      className="rounded-2xl border p-4 md:p-5 shadow-lg"
+      className={shellClassName}
       style={{
         background: "linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95))",
         borderColor: palette.line,
-        boxShadow: "0 30px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+        boxShadow:
+          context === "overlay"
+            ? "0 12px 28px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.04)"
+            : "0 30px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
       }}
       aria-busy={loading}
     >
-      <div className="space-y-4">
+      <div className={stackClassName}>
         <div className={guildProfileInfoStyles.sectionDivider}>
           <div
             className={guildProfileInfoStyles.sectionStripe}
@@ -478,17 +544,11 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
           />
         </div>
 
-        <div
-          className={
-            hasClassTabs
-              ? "grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_minmax(0,340px)]"
-              : "grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]"
-          }
-        >
+        <div className={contentGridClassName}>
           <div className="min-w-0">
-            <div ref={leftRef} className="h-fit self-start space-y-4">
+            <div ref={leftRef} className={`h-fit self-start ${isOverlayContext ? "space-y-3" : "space-y-4"}`}>
               <div
-                className="rounded-2xl border p-3"
+                className={`rounded-2xl border ${isOverlayContext ? "p-2" : "p-3"}`}
                 style={{ borderColor: "transparent", background: "transparent" }}
               >
                 <div
@@ -525,7 +585,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
               </div>
 
               <div
-                className="rounded-2xl border p-4"
+                className={`rounded-2xl border ${isOverlayContext ? "p-3" : "p-4"}`}
                 style={{ borderColor: palette.line, background: "rgba(2, 17, 40, 0.55)" }}
               >
                 <div className="truncate text-3xl font-extrabold" style={{ color: palette.title }}>
@@ -560,7 +620,10 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
                     {localizedLastScanLabel}
                   </div>
                 ) : null}
-                <Tooltip content={freshnessTooltip}>
+                <Tooltip
+                  content={freshnessTooltip}
+                  contentClassName={guildProfileInfoStyles.freshnessTooltipCard}
+                >
                   <div
                     className="mt-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs"
                     style={{ borderColor: palette.line, color: palette.soft, background: "rgba(15, 23, 42, 0.22)" }}
@@ -578,8 +641,8 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
           </div>
 
           <div className="min-w-0">
-            <div ref={middleRef} className="h-fit self-start min-w-0 space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div ref={middleRef} className={`h-fit self-start min-w-0 ${isOverlayContext ? "space-y-3" : "space-y-4"}`}>
+              <div className={`grid grid-cols-1 ${isOverlayContext ? "gap-2.5" : "gap-3"} sm:grid-cols-2 xl:grid-cols-3`}>
             {metricsToRender.map((metric, index) => {
             if (metric.gauge) {
               const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
@@ -601,7 +664,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
               return (
                 <div
                   key={`${metric.label}-${index}`}
-                  className="flex min-h-[132px] items-center justify-center rounded-xl border p-3"
+                  className={`flex items-center justify-center rounded-xl border ${isOverlayContext ? "min-h-[120px] p-2.5" : "min-h-[132px] p-3"}`}
                   style={{ borderColor: "transparent", background: "transparent" }}
                 >
                   <HexGauge
@@ -638,7 +701,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
           </div>
 
           <div
-            className="rounded-2xl border p-4 md:p-5"
+            className={`rounded-2xl border ${isOverlayContext ? "p-3 md:p-4" : "p-4 md:p-5"}`}
             style={{ borderColor: palette.line, background: "rgba(2, 17, 40, 0.5)" }}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -683,7 +746,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             </div>
 
             <div
-              className="mt-4 rounded-xl border p-4"
+              className={`rounded-xl border ${isOverlayContext ? "mt-3 p-3" : "mt-4 p-4"}`}
               style={{
                 borderColor: palette.line,
                 background: "linear-gradient(180deg, rgba(20,39,62,0.4), rgba(20,39,62,0.15))",
@@ -718,7 +781,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <div className={`grid grid-cols-1 ${isOverlayContext ? "gap-2.5" : "gap-3"} xl:grid-cols-3`}>
             {top3Panels.map((panel) => (
               <div
                 key={`${statsMode}-${panel.key}`}

@@ -3,8 +3,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import html2canvas from "html2canvas";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { createPortal } from "react-dom";
 import ContentShell from "../../components/ContentShell";
 import ProfileOverlay from "../../components/ProfileOverlay/ProfileOverlay";
+import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
 import HudFilters from "../../components/Filters/HudFilters";
 import ServerSheet from "../../components/Filters/ServerSheet";
@@ -16,6 +18,7 @@ import ToplistPngExportDialog, {
   type ToplistExportAmount,
   type ToplistExportSelection,
 } from "../../components/export/ToplistPngExportDialog";
+import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
 import { ToplistsProvider, useToplistsData, type Filters, type SortSpec } from "../../context/ToplistsDataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -27,7 +30,7 @@ import {
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
-import { parsePlayerIdentifier } from "../../lib/players/identifier";
+import { normalizeServerKeyFromInput, parsePlayerIdentifier } from "../../lib/players/identifier";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import "../../styles/Toplist.css";
 
@@ -161,6 +164,40 @@ const normalizeClassList = (list: string[]) => {
 const normalizeGuildKey = (value: string | null | undefined) =>
   (value ?? "").toString().trim().toLowerCase();
 
+const normalizeGuildIdentifierServer = (value: unknown): string => {
+  const raw = String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  if (!raw) return "";
+  const withoutSuffix = raw.replace(/\.(eu|net)$/, "");
+  const hostMatch = withoutSuffix.match(/^s(\d+)$/);
+  if (hostMatch) return `eu${hostMatch[1]}`;
+  return withoutSuffix;
+};
+
+const buildGuildToplistIdentifier = (server: unknown, guildId: unknown): string | null => {
+  const normalizedServer = normalizeGuildIdentifierServer(server);
+  const normalizedGuildId = String(guildId ?? "").trim().toLowerCase();
+  if (!normalizedServer || !normalizedGuildId) return null;
+  return `${normalizedServer}__${normalizedGuildId}`;
+};
+
+const resolveDirectGuildIdFromPlayerRow = (row: FirestoreToplistPlayerRow): string | null => {
+  const candidates = [
+    (row as any).guildId,
+    (row as any).guild_id,
+    (row as any).guildIdentifier,
+    (row as any).guild_identifier,
+    (row as any).guild?.id,
+    (row as any).value?.guildId,
+    (row as any).value?.guild?.id,
+    (row as any).data?.guildId,
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? "").trim();
+    if (value) return value;
+  }
+  return null;
+};
+
 const normalizeFavoriteIdentifier = (value: unknown): string | null => {
   const raw = String(value ?? "").trim().toLowerCase();
   return raw || null;
@@ -212,16 +249,17 @@ type ToplistColumnDef = {
   label: string;
   width: string;
   align: ToplistColumnAlign;
+  hidden?: boolean;
 };
 
 const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
   { key: "rank", label: "#", width: "4%", align: "right" },
   { key: "rankDelta", label: "Δ Rank", width: "6%", align: "center" },
-  { key: "server", label: "Server", width: "7%", align: "left" },
-  { key: "name", label: "Name", width: "12%", align: "left" },
-  { key: "class", label: "Class", width: "5%", align: "center" },
-  { key: "level", label: "Level", width: "6%", align: "right" },
+  { key: "server", label: "Server", width: "7%", align: "left", hidden: true },
+  { key: "name", label: "Player", width: "22%", align: "left" },
+  { key: "class", label: "Class", width: "5%", align: "center", hidden: true },
   { key: "guild", label: "Guild", width: "11%", align: "left" },
+  { key: "level", label: "Level", width: "6%", align: "right" },
   { key: "main", label: "Main", width: "6%", align: "right" },
   { key: "con", label: "Con", width: "6%", align: "right" },
   { key: "sum", label: "Sum", width: "6%", align: "right" },
@@ -229,10 +267,11 @@ const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
   { key: "ratio", label: "Ratio", width: "6%", align: "center" },
   { key: "mine", label: "Mine", width: "5%", align: "right" },
   { key: "treasury", label: "Treasury", width: "6%", align: "right" },
-  { key: "lastScan", label: "Last Scan", width: "7%", align: "right" },
+  { key: "lastScan", label: "Last Scan", width: "9%", align: "right" },
 ];
 
-const TOPLIST_TABLE_COL_SPAN = TOPLIST_COLUMNS.length;
+const TOPLIST_VISIBLE_COLUMNS = TOPLIST_COLUMNS.filter((column) => !column.hidden);
+const TOPLIST_TABLE_COL_SPAN = TOPLIST_VISIBLE_COLUMNS.length;
 
 const TOPLIST_TABLE_STYLE: React.CSSProperties = {
   width: "100%",
@@ -265,12 +304,39 @@ const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const TOPLIST_ICON_CELL_CONTENT_STYLE: React.CSSProperties = {
+const TOPLIST_NAME_CELL_STACK_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  justifyContent: "center",
+  flex: "0 1 auto",
+  maxWidth: "calc(100% - 30px)",
+  minWidth: 0,
+};
+
+const TOPLIST_NAME_CELL_LAYOUT_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "center",
+  justifyContent: "flex-start",
+  gap: 0,
   width: "100%",
-  height: "100%",
+  minWidth: 0,
+};
+
+const TOPLIST_NAME_CELL_ICON_CONTENT_STYLE: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flex: "0 0 30px",
+  minWidth: 30,
+};
+
+const TOPLIST_SECONDARY_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
+  ...TOPLIST_TEXT_CELL_CONTENT_STYLE,
+  marginTop: 2,
+  fontSize: 11,
+  lineHeight: 1.15,
+  color: "var(--text-soft)",
 };
 
 const TOPLIST_FLEX_COLUMN_RIGHT_STYLE: React.CSSProperties = {
@@ -445,6 +511,7 @@ const computeStatsDay = (
   baseline: FirestoreToplistPlayerRow | null | undefined,
   sumDeltaOverride?: number | null,
   daysOverride?: number | null,
+  sumField: "sum" | "sumTotal" = "sum",
 ) => {
   if (!current || !baseline) return { days: null as number | null, perDay: null as number | null };
   let days: number | null = null;
@@ -461,8 +528,8 @@ const computeStatsDay = (
   }
   let sumDelta = sumDeltaOverride;
   if (sumDelta == null) {
-    const currSum = toNumberSafe((current as any).sum);
-    const prevSum = toNumberSafe((baseline as any).sum);
+    const currSum = toNumberSafe((current as any)[sumField]);
+    const prevSum = toNumberSafe((baseline as any)[sumField]);
     if (prevSum != null) {
       sumDelta = (currSum ?? 0) - prevSum;
     }
@@ -541,7 +608,10 @@ const sortToplistRows = (rows: FirestoreToplistPlayerRow[], sort: SortSpec) => {
         result = compareNumber((a as any)._calculatedSum, (b as any)._calculatedSum);
         break;
       case "statsDay":
-        result = compareNumber((a as any)._statsPerDay, (b as any)._statsPerDay);
+        result = compareNumber((a as any)._statsPerDayBase ?? (a as any)._statsPerDay, (b as any)._statsPerDayBase ?? (b as any)._statsPerDay);
+        break;
+      case "statsDayTotal":
+        result = compareNumber((a as any)._statsPerDayTotal, (b as any)._statsPerDayTotal);
         break;
       case "ratio":
         result = compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
@@ -609,6 +679,151 @@ const getFrameStyle = (color?: string | null): React.CSSProperties | undefined =
       }
     : undefined;
 
+function ValueCrossfade({
+  value,
+  fadeKey,
+  durationMs = 200,
+  minWidthCh = 9,
+}: {
+  value: string | number;
+  fadeKey: string;
+  durationMs?: number;
+  minWidthCh?: number;
+}) {
+  const nextText = String(value ?? "");
+  const [prevText, setPrevText] = React.useState<string | null>(null);
+  const [showNext, setShowNext] = React.useState(true);
+  const lastTextRef = React.useRef(nextText);
+  const lastFadeKeyRef = React.useRef(fadeKey);
+  const transitionSeqRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (lastTextRef.current === nextText && lastFadeKeyRef.current === fadeKey) return;
+
+    const seq = transitionSeqRef.current + 1;
+    transitionSeqRef.current = seq;
+    setPrevText(lastTextRef.current);
+    lastTextRef.current = nextText;
+    lastFadeKeyRef.current = fadeKey;
+    setShowNext(false);
+
+    const rafId = window.requestAnimationFrame(() => {
+      if (transitionSeqRef.current !== seq) return;
+      setShowNext(true);
+    });
+    const timeoutId = window.setTimeout(() => {
+      if (transitionSeqRef.current !== seq) return;
+      setPrevText(null);
+    }, durationMs);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [nextText, fadeKey, durationMs]);
+
+  if (prevText == null) {
+    return (
+      <span style={{ display: "inline-block", minWidth: `${minWidthCh}ch`, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {nextText}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-block",
+        minWidth: `${minWidthCh}ch`,
+        textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ visibility: "hidden" }}>{nextText}</span>
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: showNext ? 0 : 1,
+          transition: `opacity ${durationMs}ms ease`,
+        }}
+      >
+        {prevText}
+      </span>
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: showNext ? 1 : 0,
+          transition: `opacity ${durationMs}ms ease`,
+        }}
+      >
+        {nextText}
+      </span>
+    </span>
+  );
+}
+
+function PlayerAvgModeControls({
+  mode,
+  updating,
+  onChange,
+}: {
+  mode: "base" | "total";
+  updating: boolean;
+  onChange: (nextMode: "base" | "total") => void;
+}) {
+  return (
+    <>
+      <span style={{ color: "#B0C4D9", fontSize: 12 }}>Values</span>
+      <div
+        role="group"
+        aria-label="Player average mode"
+        style={{ display: "inline-flex", gap: 4, background: "#14273E", border: "1px solid #2B4C73", padding: 4, borderRadius: 12 }}
+      >
+        <button
+          type="button"
+          aria-pressed={mode === "base"}
+          onClick={() => onChange("base")}
+          style={{
+            background: mode === "base" ? "#25456B" : "transparent",
+            border: `1px solid ${mode === "base" ? "#5C8BC6" : "transparent"}`,
+            color: "#F5F9FF",
+            borderRadius: 10,
+            padding: "6px 10px",
+            cursor: "pointer",
+          }}
+        >
+          Base
+        </button>
+        <button
+          type="button"
+          aria-pressed={mode === "total"}
+          onClick={() => onChange("total")}
+          style={{
+            background: mode === "total" ? "#25456B" : "transparent",
+            border: `1px solid ${mode === "total" ? "#5C8BC6" : "transparent"}`,
+            color: "#F5F9FF",
+            borderRadius: 10,
+            padding: "6px 10px",
+            cursor: "pointer",
+          }}
+        >
+          Total
+        </button>
+      </div>
+      {updating && (
+        <span style={{ color: "#B0C4D9", fontSize: 12 }} aria-live="polite">
+          Updating...
+        </span>
+      )}
+    </>
+  );
+}
+
 // HUD -> Provider Sort mapping
 function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
   switch (sortBy) {
@@ -621,6 +836,7 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
     case "mainTotal":    return { key: "mainTotal", dir: "desc" };
     case "conTotal":     return { key: "conTotal",  dir: "desc" };
     case "sumTotal":     return { key: "sumTotal",  dir: "desc" };
+    case "statsDayTotal":return { key: "statsDayTotal", dir: "desc" };
     case "xpProgress":   return { key: "xpProgress", dir: "desc" };
     case "xpTotal":      return { key: "xpTotal",   dir: "desc" };
     case "lastActivity": // solange nicht vorhanden -> Last Scan
@@ -634,6 +850,7 @@ const DEFAULT_GUILD_SORT = "guildAvgLevel";
 const GUILD_SORT_KEYS = new Set(["guildMembers", "guildAvgLevel", "guildAvgSum", "guildLastScan"]);
 const resolveGuildSort = (value: string | null | undefined) =>
   GUILD_SORT_KEYS.has(String(value ?? "").trim()) ? String(value).trim() : DEFAULT_GUILD_SORT;
+let PLAYER_AVG_MODE_CACHE: "base" | "total" = "base";
 
 function deriveGroupFromServers(servers: string[]): string {
   const first = (servers[0] || "").toUpperCase();
@@ -1150,7 +1367,7 @@ function PlayerToplistsPageContent() {
   React.useEffect(() => {
     setGuildSortBy((prev) => resolveGuildSort(prev));
   }, []);
-
+  const resolvedGuildSortBy = React.useMemo(() => resolveGuildSort(guildSortBy), [guildSortBy]);
   return (
     <>
       <ContentShell
@@ -1206,7 +1423,7 @@ function PlayerToplistsPageContent() {
         {activeTab === "guilds" && (
           <GuildToplists
             serverCodes={servers ?? []}
-            sortKey={resolveGuildSort(guildSortBy)}
+            sortKey={resolvedGuildSortBy}
             tableRef={tableRef}
             exportSnapshotRef={tableExportSnapshotRef}
           />
@@ -1313,14 +1530,88 @@ function TableDataView({
     playerLastUpdatedAt,
     playerScopeStatus,
     filters,
-    sort,
     setFilters,
     setSort,
+    getGuildToplistSnapshotCached,
   } = useToplistsData();
   const navigate = useNavigate();
   const location = useLocation();
 
   const hasServers = (servers?.length ?? 0) > 0;
+  const [playerAvgMode, setPlayerAvgMode] = React.useState<"base" | "total">(() => PLAYER_AVG_MODE_CACHE);
+  const [isPlayerAvgModePending, startPlayerAvgModeTransition] = React.useTransition();
+  const [showPlayerUpdating, setShowPlayerUpdating] = React.useState(false);
+  const [playerAvgModeSlot, setPlayerAvgModeSlot] = React.useState<HTMLElement | null>(null);
+  const playerPendingStartedAtRef = React.useRef<number | null>(null);
+  const playerPendingHideTimeoutRef = React.useRef<number | null>(null);
+  const playerPendingPrevRef = React.useRef(false);
+  const playerSortSensitiveRef = React.useRef(new Set(["main", "constitution", "sum"]));
+
+  const handlePlayerAvgModeChange = React.useCallback((nextMode: "base" | "total") => {
+    if (nextMode === playerAvgMode) return;
+    PLAYER_AVG_MODE_CACHE = nextMode;
+    if (playerSortSensitiveRef.current.has(sortKey)) {
+      startPlayerAvgModeTransition(() => {
+        setPlayerAvgMode(nextMode);
+      });
+      return;
+    }
+    setPlayerAvgMode(nextMode);
+  }, [playerAvgMode, sortKey, startPlayerAvgModeTransition]);
+  React.useEffect(() => {
+    playerSortSensitiveRef.current = new Set(["main", "constitution", "sum", "statsDay"]);
+  }, []);
+
+  React.useEffect(() => {
+    PLAYER_AVG_MODE_CACHE = playerAvgMode;
+  }, [playerAvgMode]);
+
+  React.useEffect(() => {
+    if (isPlayerAvgModePending && !playerPendingPrevRef.current) {
+      if (playerPendingHideTimeoutRef.current != null) {
+        window.clearTimeout(playerPendingHideTimeoutRef.current);
+        playerPendingHideTimeoutRef.current = null;
+      }
+      playerPendingStartedAtRef.current = Date.now();
+      setShowPlayerUpdating(true);
+    }
+
+    if (!isPlayerAvgModePending && playerPendingPrevRef.current) {
+      const startedAt = playerPendingStartedAtRef.current ?? Date.now();
+      const elapsed = Date.now() - startedAt;
+      const remainingMs = Math.max(0, 300 - elapsed);
+      playerPendingHideTimeoutRef.current = window.setTimeout(() => {
+        setShowPlayerUpdating(false);
+        playerPendingStartedAtRef.current = null;
+        playerPendingHideTimeoutRef.current = null;
+      }, remainingMs);
+    }
+
+    playerPendingPrevRef.current = isPlayerAvgModePending;
+  }, [isPlayerAvgModePending]);
+
+  React.useEffect(() => {
+    return () => {
+      if (playerPendingHideTimeoutRef.current != null) {
+        window.clearTimeout(playerPendingHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const resolveSlot = () => {
+      const el = document.getElementById("player-avg-mode-slot");
+      setPlayerAvgModeSlot((prev) => (prev === el ? prev : el));
+    };
+    resolveSlot();
+    const observer = new MutationObserver(resolveSlot);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   // HUD-Filter -> Provider
   useEffect(() => {
     const providerRange =
@@ -1340,6 +1631,10 @@ function TableDataView({
     const s = mapSort(sortKey);
     setSort(s);
   }, [sortKey, setSort]);
+  const effectiveSort = React.useMemo(
+    () => mapSort(sortKey),
+    [sortKey]
+  );
 
   const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("en").format(n));
   const fmtDelta = (n: number | null | undefined) => {
@@ -1770,8 +2065,8 @@ function TableDataView({
       });
     }
 
-    if (sort.key !== "statsDay") {
-      sortToplistRows(nextRows, sort);
+    if (effectiveSort.key !== "statsDay" && effectiveSort.key !== "statsDayTotal") {
+      sortToplistRows(nextRows, effectiveSort);
     }
 
     return nextRows;
@@ -1784,7 +2079,7 @@ function TableDataView({
     favoritesOnly,
     user,
     favoritePlayerSet,
-    sort,
+    effectiveSort,
   ]);
 
   const effectiveCompareMode: ToplistsCompareMode = React.useMemo(() => {
@@ -1868,16 +2163,34 @@ function TableDataView({
       const treasuryDelta = delta("treasury");
       let statsDays: number | null = null;
       let statsPerDay: number | null = null;
+      let statsDaysBase: number | null = null;
+      let statsPerDayBase: number | null = null;
+      let statsDaysTotal: number | null = null;
+      let statsPerDayTotal: number | null = null;
       if (!compareMissing && past) {
-        const stats = computeStatsDay(row, past, sumDelta, effectiveCompareDaysOverride);
-        statsDays = stats.days;
-        statsPerDay = stats.perDay;
+        const statsBase = computeStatsDay(row, past, sumDelta, effectiveCompareDaysOverride, "sum");
+        const statsTotal = computeStatsDay(row, past, sumTotalDelta, effectiveCompareDaysOverride, "sumTotal");
+        statsDaysBase = statsBase.days;
+        statsPerDayBase = statsBase.perDay;
+        statsDaysTotal = statsTotal.days;
+        statsPerDayTotal = statsTotal.perDay;
+        if (playerAvgMode === "total") {
+          statsDays = statsDaysTotal;
+          statsPerDay = statsPerDayTotal;
+        } else {
+          statsDays = statsDaysBase;
+          statsPerDay = statsPerDayBase;
+        }
       }
       return {
         ...row,
         _compareMissing: compareMissing,
         _statsPerDay: statsPerDay,
         _statsDays: statsDays,
+        _statsPerDayBase: statsPerDayBase,
+        _statsDaysBase: statsDaysBase,
+        _statsPerDayTotal: statsPerDayTotal,
+        _statsDaysTotal: statsDaysTotal,
         _delta: {
           level: levelDelta,
           main: mainDelta,
@@ -1901,6 +2214,7 @@ function TableDataView({
     baselineRowByKey,
     baselineServerSet,
     effectiveCompareDaysOverride,
+    playerAvgMode,
   ]);
 
   const currentRowByKey = React.useMemo(() => {
@@ -1938,21 +2252,28 @@ function TableDataView({
       const mainRatio = deriveRatioMain(row.main, row.con);
       const currentMatch = currentRowByKey.get(buildCompareKey(row));
       const stats = currentMatch
-        ? computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride)
-        : { days: null, perDay: null };
+        ? {
+            base: computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride, "sum"),
+            total: computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride, "sumTotal"),
+          }
+        : { base: { days: null, perDay: null }, total: { days: null, perDay: null } };
       const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
       return {
         ...row,
         _ratioMain: mainRatio,
-        _statsPerDay: stats.perDay,
-        _statsDays: stats.days,
+        _statsPerDay: playerAvgMode === "total" ? stats.total.perDay : stats.base.perDay,
+        _statsDays: playerAvgMode === "total" ? stats.total.days : stats.base.days,
+        _statsPerDayBase: stats.base.perDay,
+        _statsDaysBase: stats.base.days,
+        _statsPerDayTotal: stats.total.perDay,
+        _statsDaysTotal: stats.total.days,
         _calculatedSum: calculatedSum,
       } as any;
     });
 
     rows = filterToplistRows(rows, filters);
 
-    rows = sortToplistRows(rows, sort);
+    rows = sortToplistRows(rows, effectiveSort);
 
     if (baselineRowLimit != null && baselineRowLimit > 0 && rows.length > baselineRowLimit) {
       rows = rows.slice(0, baselineRowLimit);
@@ -1970,13 +2291,14 @@ function TableDataView({
     showCompare,
     effectiveBaselineRows,
     filters,
-    sort,
+    effectiveSort,
     selectedGuildSet,
     hasGuildData,
     baselineRowLimit,
     currentRowByKey,
     buildCompareKey,
     effectiveCompareDaysOverride,
+    playerAvgMode,
   ]);
 
   const baselineRankByKey = React.useMemo(() => {
@@ -1992,11 +2314,13 @@ function TableDataView({
   }, [showCompare, baselineCombinedRows, buildCompareKey]);
 
   const currentSortedRows = React.useMemo(() => {
-    if (!showCompare || sort.key !== "statsDay") return currentRowsWithCompare;
+    if (!showCompare || (effectiveSort.key !== "statsDay" && effectiveSort.key !== "statsDayTotal")) {
+      return currentRowsWithCompare;
+    }
     const next = [...currentRowsWithCompare];
-    sortToplistRows(next, sort);
+    sortToplistRows(next, effectiveSort);
     return next;
-  }, [showCompare, currentRowsWithCompare, sort]);
+  }, [showCompare, currentRowsWithCompare, effectiveSort]);
 
   const currentRankByKey = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -2088,8 +2412,14 @@ function TableDataView({
       });
     };
 
-    rankBy((row) => toNumberSafe(row.main), "mainRank");
-    rankBy((row) => toNumberSafe(row.con), "conRank");
+    rankBy(
+      (row) => toNumberSafe(playerAvgMode === "total" ? row.mainTotal : row.main),
+      "mainRank"
+    );
+    rankBy(
+      (row) => toNumberSafe(playerAvgMode === "total" ? row.conTotal : row.con),
+      "conRank"
+    );
     rankBy((row) => toNumberSafe(row.level), "levelRank");
 
     rows.forEach((row) => {
@@ -2105,7 +2435,7 @@ function TableDataView({
     });
 
     return map;
-  }, [enhancedRows, buildCompareKey]);
+  }, [enhancedRows, buildCompareKey, playerAvgMode]);
 
   const nowMs = Date.now();
   const statusLabel = !hasServers
@@ -2120,12 +2450,19 @@ function TableDataView({
     name: string | null;
     server: string | null;
   } | null>(null);
+  const [selectedGuildProfile, setSelectedGuildProfile] = React.useState<{
+    identifier: string;
+    guildId: string;
+    name: string | null;
+    server: string | null;
+  } | null>(null);
   const [highlightedIdentifier, setHighlightedIdentifier] = React.useState<string | null>(null);
   const focusHandledRef = React.useRef<string | null>(null);
   const focusHighlightTimeoutRef = React.useRef<number | null>(null);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const guildLookupCacheRef = React.useRef<Map<string, string | null>>(new Map());
   const [tableScrollbarWidth, setTableScrollbarWidth] = React.useState(0);
-  const virtualRowHeight = showCompare ? 72 : 56;
+  const virtualRowHeight = showCompare ? 72 : 64;
   const virtualRowKeys = React.useMemo(
     () => enhancedRows.map((row) => resolveToplistRowIdentifier(row)),
     [enhancedRows]
@@ -2146,6 +2483,63 @@ function TableDataView({
     overscan: 14,
     getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
   });
+
+  const resolveGuildOverlayTarget = React.useCallback(
+    async (row: FirestoreToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
+      const directGuildId = resolveDirectGuildIdFromPlayerRow(row);
+      const serverCode = normalizeServerKeyFromInput(row.server) ?? "";
+      if (directGuildId) {
+        return { guildId: directGuildId, serverCode };
+      }
+
+      const guildName = String(row.guild ?? "").trim();
+      if (!guildName || !serverCode) return null;
+
+      const cacheKey = `${serverCode.toLowerCase()}::${normalizeGuildKey(guildName)}`;
+      if (guildLookupCacheRef.current.has(cacheKey)) {
+        const cached = guildLookupCacheRef.current.get(cacheKey);
+        if (!cached) return null;
+        return { guildId: cached, serverCode };
+      }
+
+      try {
+        const result = await getGuildToplistSnapshotCached(serverCode);
+        if (!result.ok) {
+          guildLookupCacheRef.current.set(cacheKey, null);
+          return null;
+        }
+
+        const guildNameKey = normalizeGuildKey(guildName);
+        const match = result.snapshot.guilds.find((guildRow) => normalizeGuildKey(guildRow.name) === guildNameKey);
+        const guildId = String(match?.guildId ?? "").trim();
+        guildLookupCacheRef.current.set(cacheKey, guildId || null);
+        if (!guildId) return null;
+        return { guildId, serverCode };
+      } catch {
+        guildLookupCacheRef.current.set(cacheKey, null);
+        return null;
+      }
+    },
+    [getGuildToplistSnapshotCached]
+  );
+
+  const handleGuildCellClick = React.useCallback(
+    async (row: FirestoreToplistPlayerRow) => {
+      const guildName = String(row.guild ?? "").trim();
+      if (!guildName) return;
+
+      const resolved = await resolveGuildOverlayTarget(row);
+      if (!resolved) return;
+
+      setSelectedGuildProfile({
+        identifier: buildGuildToplistIdentifier(resolved.serverCode || row.server, resolved.guildId) ?? resolved.guildId,
+        guildId: resolved.guildId,
+        name: guildName,
+        server: typeof row.server === "string" ? row.server : resolved.serverCode || null,
+      });
+    },
+    [resolveGuildOverlayTarget]
+  );
 
   React.useEffect(() => {
     focusHandledRef.current = null;
@@ -2204,7 +2598,7 @@ function TableDataView({
 
   const renderToplistColGroup = () => (
     <colgroup>
-      {TOPLIST_COLUMNS.map((column) => (
+      {TOPLIST_VISIBLE_COLUMNS.map((column) => (
         <col key={column.key} style={{ width: column.width }} />
       ))}
     </colgroup>
@@ -2215,9 +2609,13 @@ function TableDataView({
       {renderToplistColGroup()}
       <thead>
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
-          {TOPLIST_COLUMNS.map((column) => (
+          {TOPLIST_VISIBLE_COLUMNS.map((column) => (
             <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
-              <span style={TOPLIST_HEADER_LABEL_STYLE}>{column.label}</span>
+              <span style={TOPLIST_HEADER_LABEL_STYLE}>
+                {column.key === "name"
+                  ? t("toplists.columns.player", "Player")
+                  : column.label}
+              </span>
             </th>
           ))}
         </tr>
@@ -2269,6 +2667,8 @@ function TableDataView({
           const lastScanLabel = formatLastScanDisplay((r as any).lastScan);
           const classKey = String(r.class ?? "").trim();
           const classIconUrl = getClassIconUrl(classKey, 48);
+          const sublineServer = String(r.server ?? "").trim();
+          const sublineText = sublineServer;
           const profileIdentifier = resolveToplistRowIdentifier(r);
           const rowKey = profileIdentifier ?? `missing-identifier-row-${i}`;
           const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
@@ -2278,6 +2678,12 @@ function TableDataView({
           const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
           const mineTone = getMineTone(decor?.mineTier);
           const calculatedSum = (r as any)._calculatedSum ?? 0;
+          const displayMain = playerAvgMode === "total" ? r.mainTotal : r.main;
+          const displayCon = playerAvgMode === "total" ? r.conTotal : r.con;
+          const displaySum = playerAvgMode === "total" ? r.sumTotal : calculatedSum;
+          const mainDeltaValue = playerAvgMode === "total" ? (deltas.mainTotal ?? null) : (deltas.main ?? null);
+          const conDeltaValue = playerAvgMode === "total" ? (deltas.conTotal ?? null) : (deltas.con ?? null);
+          const sumDeltaValue = playerAvgMode === "total" ? (deltas.sumTotal ?? null) : (deltas.sum ?? null);
           const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
             if (!showCompare) return null;
             if (missing) {
@@ -2324,26 +2730,48 @@ function TableDataView({
                   ) : ""}
                 </span>
               </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.server}>
-                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.server}</span>
-              </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.name}>
-                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.name}</span>
+                <div style={TOPLIST_NAME_CELL_LAYOUT_STYLE}>
+                  <span style={TOPLIST_NAME_CELL_ICON_CONTENT_STYLE}>
+                    {classIconUrl ? (
+                      <img
+                        src={classIconUrl}
+                        alt={classKey || "class"}
+                        loading={opts.imgLoading}
+                        className="class-icon-toplist"
+                        style={{ display: "block", objectFit: "contain", width: 24, height: 24 }}
+                      />
+                    ) : (
+                      <span>{classKey}</span>
+                    )}
+                  </span>
+                  <div style={TOPLIST_NAME_CELL_STACK_STYLE}>
+                    <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.name}</span>
+                    <span style={TOPLIST_SECONDARY_TEXT_CELL_CONTENT_STYLE}>{sublineText}</span>
+                  </div>
+                </div>
               </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.class}>
-                <span style={TOPLIST_ICON_CELL_CONTENT_STYLE}>
-                  {classIconUrl ? (
-                    <img
-                      src={classIconUrl}
-                      alt={classKey || "class"}
-                      loading={opts.imgLoading}
-                      className="class-icon-toplist"
-                      style={{ display: "block", objectFit: "contain" }}
+              <td style={TOPLIST_CELL_STYLE_BY_KEY.guild}>
+                {String(r.guild ?? "").trim() ? (
+                  <span
+                    style={{ display: "block", width: "100%", minWidth: 0 }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                    }}
+                  >
+                    <NeonCoreButton
+                      onClick={() => {
+                        void handleGuildCellClick(r);
+                      }}
+                      title={String(r.guild ?? "")}
+                      label={String(r.guild ?? "")}
+                      icon={null}
+                      className="w-full justify-start rounded-lg px-2 py-1 text-xs font-medium"
                     />
-                  ) : (
-                    <span>{classKey}</span>
-                  )}
-                </span>
+                  </span>
+                ) : (
+                  <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.guild ?? ""}</span>
+                )}
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.level}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
@@ -2351,25 +2779,28 @@ function TableDataView({
                   {renderDelta(deltas.level ?? null, compareMissing)}
                 </div>
               </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.guild}>
-                <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.guild ?? ""}</span>
-              </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                  <span style={getFrameStyle(mainTone)}>{fmtNum(r.main)}</span>
-                  {renderDelta(deltas.main ?? null, compareMissing)}
+                  <span style={getFrameStyle(mainTone)}>
+                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={playerAvgMode} />
+                  </span>
+                  {renderDelta(mainDeltaValue, compareMissing)}
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                  <span style={getFrameStyle(conTone)}>{fmtNum(r.con)}</span>
-                  {renderDelta(deltas.con ?? null, compareMissing)}
+                  <span style={getFrameStyle(conTone)}>
+                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={playerAvgMode} />
+                  </span>
+                  {renderDelta(conDeltaValue, compareMissing)}
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.sum}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                  <span>{fmtNum(calculatedSum)}</span>
-                  {renderDelta(deltas.sum ?? null, compareMissing)}
+                  <span>
+                    <ValueCrossfade value={fmtNum(displaySum)} fadeKey={playerAvgMode} />
+                  </span>
+                  {renderDelta(sumDeltaValue, compareMissing)}
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.statsPerDay}>
@@ -2437,6 +2868,16 @@ function TableDataView({
         <div>{statusLabel} - {enhancedRows.length} rows</div>
         <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
       </div>
+      {!playerAvgModeSlot && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
+          <PlayerAvgModeControls mode={playerAvgMode} updating={showPlayerUpdating} onChange={handlePlayerAvgModeChange} />
+        </div>
+      )}
+      {playerAvgModeSlot &&
+        createPortal(
+          <PlayerAvgModeControls mode={playerAvgMode} updating={showPlayerUpdating} onChange={handlePlayerAvgModeChange} />,
+          playerAvgModeSlot
+        )}
       {(activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
         <div style={{ fontSize: 12, color: "#ffb347" }}>
           {activeCompareError}
@@ -2495,6 +2936,16 @@ function TableDataView({
         }
         onClose={() => setSelectedPlayerProfile(null)}
       />
+      <GuildProfileOverlay
+        isOpen={Boolean(selectedGuildProfile?.guildId)}
+        guildId={selectedGuildProfile?.guildId ?? null}
+        guildName={
+          selectedGuildProfile
+            ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
+            : null
+        }
+        onClose={() => setSelectedGuildProfile(null)}
+      />
     </div>
   );
 }
@@ -2545,20 +2996,3 @@ function TopTab({
     </button>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -148,9 +148,9 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const freshness = useMemo(() => computeFreshness(t, data.lastScanDays), [data.lastScanDays, t]);
   const freshnessTooltip = useMemo(() => {
-    const parts: string[] = [];
+    const lines: string[] = [];
     if (data.lastScanAtLabel) {
-      parts.push(
+      lines.push(
         t("playerProfile.heroPanel.tooltips.lastScanAt", {
           value: data.lastScanAtLabel,
           defaultValue: "Last scan: {{value}}",
@@ -159,15 +159,22 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
     }
     const ageLabel = formatAgeLabel(t, data.lastScanDays);
     if (ageLabel) {
-      parts.push(
+      lines.push(
         t("playerProfile.heroPanel.tooltips.age.label", {
           value: ageLabel,
           defaultValue: "Age: {{value}}",
         }),
       );
     }
-    if (freshness.hint) parts.push(freshness.hint);
-    return parts.join(" | ");
+    if (freshness.hint) lines.push(freshness.hint);
+    if (!lines.length) return null;
+    return (
+      <div className="player-profile__freshness-tooltip-lines">
+        {lines.map((line, index) => (
+          <div key={`${line}-${index}`}>{line}</div>
+        ))}
+      </div>
+    );
   }, [data.lastScanAtLabel, data.lastScanDays, freshness.hint, t]);
   const classMeta =
     CLASSES.find((item) => normalize(item.label) === normalize(data.className || "")) ||
@@ -312,7 +319,7 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
                 {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
               </div>
             )}
-            <Tooltip content={freshnessTooltip}>
+            <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
               <div className="player-profile__freshness">
                 <span
                   aria-hidden

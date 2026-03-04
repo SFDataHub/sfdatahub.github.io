@@ -1,6 +1,7 @@
 ﻿// src/lib/api/toplistsFirestore.ts
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { normalizeServerKeyFromInput } from "../players/identifier";
 import {
   beginReadScope,
   endReadScope,
@@ -12,8 +13,10 @@ import {
 
 const STATS_PUBLIC_ROOT = "stats_public";
 const PLAYERS_COLLECTION = "toplists_players_v1";
-const SNAPSHOT_CACHE_VERSION = "v2";
-const SNAPSHOT_CACHE_PREFIX = `snapshot:${SNAPSHOT_CACHE_VERSION}`;
+const TOPLIST_SNAPSHOT_CACHE_VERSION = "v1";
+const TOPLIST_SNAPSHOT_CACHE_PREFIX = `sfdatahub:toplists:snapshot:${TOPLIST_SNAPSHOT_CACHE_VERSION}`;
+export const TOPLIST_SNAPSHOT_TTL_MS = 60 * 60 * 1000;
+export const TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS = 15 * 60 * 1000;
 
 const bundleWarnedOnce = new Set<string>();
 
@@ -380,7 +383,7 @@ const mapGuildRow = (raw: any): FirestoreToplistGuildRow | null => {
 };
 
 export async function getLatestPlayerToplistSnapshot(serverCode: string): Promise<FirestoreLatestToplistResult> {
-  const code = (serverCode || "").trim().toUpperCase();
+  const code = normalizeToplistServerCode(serverCode);
   if (!code) {
     return { ok: false, error: "decode_error", detail: "missing server code" };
   }
@@ -571,11 +574,33 @@ type SnapshotCacheEntry<T> = {
   expiresAt: number;
 };
 
-const getSnapshotCacheKey = (type: "players" | "guilds", serverCode: string) =>
-  `${SNAPSHOT_CACHE_PREFIX}:${type}:${serverCode}`;
+type LatestToplistErrorCode = "not_found" | "decode_error" | "firestore_error";
+
+type LatestToplistSnapshotCacheEntry<T> = {
+  cachedAtMs: number;
+  expiresAtMs: number;
+} & (
+  | { ok: true; data: T }
+  | { ok: false; error: LatestToplistErrorCode; detail?: string }
+);
+
+type LatestToplistMemoryEntry<R> = {
+  cachedAtMs: number;
+  expiresAtMs: number;
+  result: R;
+};
+
+const normalizeToplistServerCode = (value: unknown): string => normalizeServerKeyFromInput(value) ?? "";
+
+const getLatestToplistSnapshotCacheKey = (entity: "player" | "guild", serverCode: string) =>
+  `${TOPLIST_SNAPSHOT_CACHE_PREFIX}:${entity}:${normalizeToplistServerCode(serverCode)}`;
 
 const getCompareSnapshotCacheKey = (docId: string) => `toplists:compare:${docId}`;
 const compareInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+const latestPlayerSnapshotInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+const latestGuildSnapshotInFlight = new Map<string, Promise<FirestoreLatestGuildToplistResult>>();
+const latestPlayerSnapshotMemory = new Map<string, LatestToplistMemoryEntry<FirestoreLatestToplistResult>>();
+const latestGuildSnapshotMemory = new Map<string, LatestToplistMemoryEntry<FirestoreLatestGuildToplistResult>>();
 const PROGRESS_SNAPSHOT_LS_PREFIX = "sfh:toplists:players:progress:";
 const MAX_PROGRESS_SNAPSHOTS = 10;
 type CachedProgressSnapshot = {
@@ -729,33 +754,122 @@ const clearSnapshotCache = (key: string) => {
   }
 };
 
+const isLatestToplistErrorCode = (value: unknown): value is LatestToplistErrorCode =>
+  value === "not_found" || value === "decode_error" || value === "firestore_error";
+
+const readLatestToplistSnapshotCache = <T,>(key: string): LatestToplistSnapshotCacheEntry<T> | null => {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as
+      | (Partial<LatestToplistSnapshotCacheEntry<T>> & { data?: T; error?: unknown; detail?: unknown })
+      | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.cachedAtMs !== "number" || !Number.isFinite(parsed.cachedAtMs)) return null;
+    const cachedAtMs = parsed.cachedAtMs;
+    const expiresAtMs =
+      typeof parsed.expiresAtMs === "number" && Number.isFinite(parsed.expiresAtMs)
+        ? parsed.expiresAtMs
+        : null;
+
+    // legacy + current positive cache shape
+    if ("data" in parsed && parsed.data !== undefined) {
+      return {
+        ok: true,
+        cachedAtMs,
+        expiresAtMs: expiresAtMs ?? cachedAtMs + TOPLIST_SNAPSHOT_TTL_MS,
+        data: parsed.data as T,
+      };
+    }
+
+    // negative cache shape
+    if (!isLatestToplistErrorCode(parsed.error)) return null;
+    return {
+      ok: false,
+      cachedAtMs,
+      expiresAtMs: expiresAtMs ?? cachedAtMs + TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS,
+      error: parsed.error,
+      detail: typeof parsed.detail === "string" ? parsed.detail : undefined,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeLatestToplistSnapshotCache = <T,>(key: string, entry: LatestToplistSnapshotCacheEntry<T>) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // ignore cache write errors (quota, privacy mode, etc.)
+  }
+};
+
+const readLiveToplistMemoryEntry = <R,>(
+  map: Map<string, LatestToplistMemoryEntry<R>>,
+  code: string,
+  nowMs: number,
+): R | null => {
+  const cached = map.get(code);
+  if (!cached) return null;
+  if (nowMs < cached.expiresAtMs) return cached.result;
+  map.delete(code);
+  return null;
+};
+
 export async function getLatestPlayerToplistSnapshotCached(
   serverCode: string
 ): Promise<FirestoreLatestToplistResult> {
-  const code = (serverCode || "").trim().toUpperCase();
+  const code = normalizeToplistServerCode(serverCode);
   if (!code) {
     return { ok: false, error: "decode_error", detail: "missing server code" };
   }
 
-  const key = getSnapshotCacheKey("players", code);
+  const key = getLatestToplistSnapshotCacheKey("player", code);
   const now = Date.now();
-  const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
+  const memoryHit = readLiveToplistMemoryEntry(latestPlayerSnapshotMemory, code, now);
+  if (memoryHit) return memoryHit;
+
+  const cached = readLatestToplistSnapshotCache<FirestoreLatestToplistSnapshot>(key);
   if (cached) {
-    if (now < cached.expiresAt && !snapshotHasInvalidRatio(cached.snapshot)) {
-      return { ok: true, snapshot: cached.snapshot };
+    if (now < cached.expiresAtMs) {
+      const result: FirestoreLatestToplistResult = cached.ok
+        ? { ok: true, snapshot: cached.data }
+        : { ok: false, error: cached.error, detail: cached.detail };
+      latestPlayerSnapshotMemory.set(code, {
+        cachedAtMs: cached.cachedAtMs,
+        expiresAtMs: cached.expiresAtMs,
+        result,
+      });
+      return result;
     }
     clearSnapshotCache(key);
+    latestPlayerSnapshotMemory.delete(code);
   }
 
-  const result = await getLatestPlayerToplistSnapshot(code);
-  if (result.ok) {
-    writeSnapshotCache(key, {
-      snapshot: result.snapshot,
-      fetchedAt: now,
-      expiresAt: nextFullHour(now),
-    });
+  const existing = latestPlayerSnapshotInFlight.get(code);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const result = await getLatestPlayerToplistSnapshot(code);
+    const cachedAtMs = Date.now();
+    const ttlMs = result.ok ? TOPLIST_SNAPSHOT_TTL_MS : TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
+    const expiresAtMs = cachedAtMs + ttlMs;
+    const cacheEntry: LatestToplistSnapshotCacheEntry<FirestoreLatestToplistSnapshot> = result.ok
+      ? { ok: true, cachedAtMs, expiresAtMs, data: result.snapshot }
+      : { ok: false, cachedAtMs, expiresAtMs, error: result.error, detail: result.detail };
+    writeLatestToplistSnapshotCache(key, cacheEntry);
+    latestPlayerSnapshotMemory.set(code, { cachedAtMs, expiresAtMs, result });
+    return result;
+  })();
+
+  latestPlayerSnapshotInFlight.set(code, promise);
+  try {
+    return await promise;
+  } finally {
+    latestPlayerSnapshotInFlight.delete(code);
   }
-  return result;
 }
 
 export async function getPlayerToplistSnapshotByDocIdCached(
@@ -804,7 +918,7 @@ export async function getPlayerToplistSnapshotByDocIdCached(
 export async function getLatestGuildToplistSnapshot(
   serverCode: string
 ): Promise<FirestoreLatestGuildToplistResult> {
-  const code = (serverCode || "").trim().toUpperCase();
+  const code = normalizeToplistServerCode(serverCode);
   if (!code) {
     return { ok: false, error: "decode_error", detail: "missing server code" };
   }
@@ -865,28 +979,53 @@ export async function getLatestGuildToplistSnapshot(
 export async function getLatestGuildToplistSnapshotCached(
   serverCode: string
 ): Promise<FirestoreLatestGuildToplistResult> {
-  const code = (serverCode || "").trim().toUpperCase();
+  const code = normalizeToplistServerCode(serverCode);
   if (!code) {
     return { ok: false, error: "decode_error", detail: "missing server code" };
   }
 
-  const key = getSnapshotCacheKey("guilds", code);
+  const key = getLatestToplistSnapshotCacheKey("guild", code);
   const now = Date.now();
-  const cached = readSnapshotCache<FirestoreLatestGuildToplistSnapshot>(key);
+  const memoryHit = readLiveToplistMemoryEntry(latestGuildSnapshotMemory, code, now);
+  if (memoryHit) return memoryHit;
+
+  const cached = readLatestToplistSnapshotCache<FirestoreLatestGuildToplistSnapshot>(key);
   if (cached) {
-    if (now < cached.expiresAt) {
-      return { ok: true, snapshot: cached.snapshot };
+    if (now < cached.expiresAtMs) {
+      const result: FirestoreLatestGuildToplistResult = cached.ok
+        ? { ok: true, snapshot: cached.data }
+        : { ok: false, error: cached.error, detail: cached.detail };
+      latestGuildSnapshotMemory.set(code, {
+        cachedAtMs: cached.cachedAtMs,
+        expiresAtMs: cached.expiresAtMs,
+        result,
+      });
+      return result;
     }
     clearSnapshotCache(key);
+    latestGuildSnapshotMemory.delete(code);
   }
 
-  const result = await getLatestGuildToplistSnapshot(code);
-  if (result.ok) {
-    writeSnapshotCache(key, {
-      snapshot: result.snapshot,
-      fetchedAt: now,
-      expiresAt: nextFullHour(now),
-    });
+  const existing = latestGuildSnapshotInFlight.get(code);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const result = await getLatestGuildToplistSnapshot(code);
+    const cachedAtMs = Date.now();
+    const ttlMs = result.ok ? TOPLIST_SNAPSHOT_TTL_MS : TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
+    const expiresAtMs = cachedAtMs + ttlMs;
+    const cacheEntry: LatestToplistSnapshotCacheEntry<FirestoreLatestGuildToplistSnapshot> = result.ok
+      ? { ok: true, cachedAtMs, expiresAtMs, data: result.snapshot }
+      : { ok: false, cachedAtMs, expiresAtMs, error: result.error, detail: result.detail };
+    writeLatestToplistSnapshotCache(key, cacheEntry);
+    latestGuildSnapshotMemory.set(code, { cachedAtMs, expiresAtMs, result });
+    return result;
+  })();
+
+  latestGuildSnapshotInFlight.set(code, promise);
+  try {
+    return await promise;
+  } finally {
+    latestGuildSnapshotInFlight.delete(code);
   }
-  return result;
 }
