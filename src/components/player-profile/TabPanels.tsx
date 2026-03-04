@@ -251,8 +251,6 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
     { labelKey: "playerProfile.statsTab.runes.chance", value: data.runes.chance, icon: { placeholder: "%", assetKey: "singlerune" } },
     { labelKey: "playerProfile.statsTab.runes.quality", value: data.runes.quality, icon: { placeholder: "Q", assetKey: "itemqualrune" } },
     { labelKey: "playerProfile.statsTab.runes.health", value: data.runes.health, icon: { placeholder: "HP", assetKey: "healthrune" } },
-    { labelKey: "playerProfile.statsTab.runes.damage", value: data.runes.damage, icon: { placeholder: "DMG", assetKey: "doublerune" } },
-    { labelKey: "playerProfile.statsTab.runes.resist", value: data.runes.resist, icon: { placeholder: "RES", assetKey: "totalresrune" } },
   ];
 
   const resistanceRows: Array<{

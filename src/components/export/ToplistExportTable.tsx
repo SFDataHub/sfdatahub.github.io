@@ -1,6 +1,7 @@
 import type { FirestoreToplistPlayerRow } from "../../lib/api/toplistsFirestore";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { getClassIconUrl } from "../ui/shared/classIcons";
+import { useTranslation } from "react-i18next";
 
 export type ToplistExportRow = FirestoreToplistPlayerRow & {
   _rankDelta?: number | null;
@@ -120,6 +121,7 @@ const resolveExportRowKey = (row: ToplistExportRow, index: number) => {
 };
 
 export default function ToplistExportTable({ rows, showCompare, width, exportNonce }: Props) {
+  const { t } = useTranslation();
   const nowMs = Date.now();
   return (
     <div
@@ -138,7 +140,7 @@ export default function ToplistExportTable({ rows, showCompare, width, exportNon
             <th style={{ padding: "8px 6px" }}>#</th>
             <th style={{ padding: "8px 6px" }}>{"\u0394 Rank"}</th>
             <th style={{ padding: "8px 6px" }}>Server</th>
-            <th style={{ padding: "8px 6px" }}>Name</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.player", "Player")}</th>
             <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
             <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
             <th style={{ padding: "8px 6px" }}>Guild</th>

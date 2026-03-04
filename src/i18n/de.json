@@ -507,6 +507,9 @@
     "compareOff": "Aus",
     "compareMissingSnapshot": "Keine Basisdaten für {{key}}.",
     "deltaNew": "NEU",
+    "columns": {
+      "player": "Spieler"
+    },
     "exportDialog": {
       "title": "PNG exportieren",
       "amount": "Menge",
@@ -748,7 +751,7 @@
         "gold": "Rune Gold",
         "xp": "Rune XP",
         "chance": "Rune Chance",
-        "quality": "Rune Quality",
+        "quality": "Rune Item Quality",
         "health": "Rune Health",
         "damage": "Rune Damage",
         "resist": "Rune Resist"

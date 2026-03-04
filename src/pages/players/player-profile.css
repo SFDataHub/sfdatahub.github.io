@@ -278,6 +278,21 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.player-profile__freshness-tooltip-card.player-profile__freshness-tooltip-card {
+  min-width: 220px;
+  max-width: 320px;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+}
+
+.player-profile__freshness-tooltip-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .player-profile__hero-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

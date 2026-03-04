@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
+import { useTranslation } from "react-i18next";
 import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
 import { guildIconUrlByIdentifier } from "../../data/guilds";
@@ -96,6 +97,15 @@ const daysSince = (tsSec?: number | null) => {
   return Math.floor(diff / 86400);
 };
 
+const normalizeToplistServerCode = (value: string | null | undefined): string => {
+  const raw = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!raw) return "";
+  const withoutSuffix = raw.replace(/\.(EU|NET)$/, "");
+  const hostMatch = withoutSuffix.match(/^S(\d+)$/);
+  if (hostMatch) return `EU${hostMatch[1]}`;
+  return withoutSuffix;
+};
+
 function Section({
   title,
   right,
@@ -130,6 +140,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const params = useParams<Record<string, string>>();
   const guildId = params.id || params.gid || params.guildId || params.guild || "";
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -378,8 +389,26 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const hasUpdatedScanLabel = updatedScanLabel !== "—";
   const emblemUrl = guildIconUrlByIdentifier(guild.id, 512) || undefined;
   const handleHeroAction = (actionKey: string) => {
-    if (actionKey !== "open_guild") return;
-    navigate(`/guilds/profile/${encodeURIComponent(guild.id)}`);
+    if (actionKey === "open_guild") {
+      navigate(`/guilds/profile/${encodeURIComponent(guild.id)}`);
+      return;
+    }
+    if (actionKey !== "show_in_top_list") return;
+    const serverKey = normalizeToplistServerCode(guild.server);
+    const guildIdentifier = String(guild.id ?? "").trim().toLowerCase();
+    const focusIdentifier = `${serverKey.toLowerCase()}__${guildIdentifier}`;
+    if (!serverKey || !guildIdentifier) return;
+    const params = new URLSearchParams();
+    params.set("tab", "guilds");
+    params.set("server", serverKey);
+    params.set("focus", focusIdentifier);
+    if (typeof guild.hofRank === "number" && Number.isFinite(guild.hofRank)) {
+      params.set("rank", String(Math.max(1, Math.trunc(guild.hofRank))));
+    }
+    navigate({
+      pathname: "/toplists",
+      search: `?${params.toString()}`,
+    });
   };
   const heroPanelData: GuildHeroPanelData | null = guild.name
     ? {
@@ -406,8 +435,10 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         metrics: [],
         actions: [
           {
-            key: "open_guild",
-            label: "Open guild",
+            key: heroOnly ? "open_guild" : "show_in_top_list",
+            label: heroOnly
+              ? t("playerProfile.heroPanel.actions.openGuild", { defaultValue: "Open guild" })
+              : t("playerProfile.heroPanel.actions.showInTopList", { defaultValue: "Show in Top List" }),
           },
         ],
         top3: top3Stats,
@@ -425,7 +456,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
     : null;
 
   if (heroOnly) {
-    return heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} /> : null;
+    return heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} context="overlay" /> : null;
   }
 
   return (
@@ -433,7 +464,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
       <div className="px-6 pb-8">
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 space-y-4">
-            {heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} /> : null}
+            {heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} context="profile" /> : null}
 
             <Tabs
               members={membersForList}

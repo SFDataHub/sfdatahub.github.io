@@ -6,6 +6,7 @@ type TooltipProps = {
   content?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
   placement?: "top" | "bottom";
 };
 
@@ -13,6 +14,7 @@ const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
   className,
+  contentClassName,
   placement = "top",
 }) => {
   if (!content) {
@@ -29,7 +31,7 @@ const Tooltip: React.FC<TooltipProps> = ({
     >
       <div className={styles.trigger}>{children}</div>
       <div className={styles.bubble} role="tooltip">
-        <div className={styles.card}>{content}</div>
+        <div className={`${styles.card}${contentClassName ? ` ${contentClassName}` : ""}`}>{content}</div>
         <div className={styles.tail} />
       </div>
     </div>

@@ -11,13 +11,18 @@ import React, {
 
 import {
   loadToplistServersFromBundle,
+  getLatestGuildToplistSnapshotCached,
   getLatestPlayerToplistSnapshotCached,
+  TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS,
+  TOPLIST_SNAPSHOT_TTL_MS,
+  type FirestoreLatestGuildToplistResult,
   type FirestoreLatestToplistSnapshot,
   type FirestoreToplistPlayerRow,
 } from "../lib/api/toplistsFirestore";
 import { buildServerGroupsFromCodes, type ServerGroupsByRegion } from "../components/Filters/serverGroups";
 import { SERVERS } from "../data/servers";
 import i18n from "../i18n";
+import { normalizeServerKeyFromInput } from "../lib/players/identifier";
 
 const DEFAULT_GROUP = "EU";
 const FALLBACK_SERVER_GROUPS = buildServerGroupsFromCodes(
@@ -52,6 +57,12 @@ type CachedPlayerToplist = {
   cachedAt: number;
 };
 
+type CachedGuildToplist = {
+  result: FirestoreLatestGuildToplistResult;
+  cachedAt: number;
+  expiresAtMs: number;
+};
+
 export type PlayerScopeStatus = {
   scopeId: string;
   lastRebuildAt: Date | null;
@@ -74,6 +85,7 @@ type Ctx = {
   serverGroups: ServerGroupsByRegion;
   filters: Filters;
   sort: SortSpec;
+  getGuildToplistSnapshotCached: (serverCode: string) => Promise<FirestoreLatestGuildToplistResult>;
   setFilters: (next: Partial<Filters> | ((prev: Filters) => Filters)) => void;
   setSort: (next: SortSpec | ((prev: SortSpec) => SortSpec)) => void;
 };
@@ -128,7 +140,9 @@ const normalizeClassList = (list: string[] | null | undefined) => {
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 };
-
+
+const normalizeToplistServerCode = (value: unknown): string => normalizeServerKeyFromInput(value) ?? "";
+
 
 const toMsFromLastScan = (value: string | number | null | undefined): number | null => {
   if (value == null) return null;
@@ -196,12 +210,39 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
   });
 
   const playerCacheRef = useRef<Map<string, CachedPlayerToplist>>(new Map());
+  const guildCacheRef = useRef<Map<string, CachedGuildToplist>>(new Map());
   const playerScopeStatus: PlayerScopeStatus | null = null;
   const [serverGroups, setServerGroups] = useState<ServerGroupsByRegion>(FALLBACK_SERVER_GROUPS);
   const normalizedServers = useMemo(() => normalizeServerList(filters.servers), [filters.servers]);
   const normalizedClasses = useMemo(() => normalizeClassList(filters.classes), [filters.classes]);
   const resolvedServers = useMemo(() => normalizedServers, [normalizedServers]);
   const resolvedServerKey = useMemo(() => resolvedServers.join(","), [resolvedServers]);
+
+  const getGuildToplistSnapshotCached = useCallback(async (serverCode: string): Promise<FirestoreLatestGuildToplistResult> => {
+    const code = normalizeToplistServerCode(serverCode);
+    if (!code) {
+      return { ok: false, error: "decode_error", detail: "missing server code" };
+    }
+
+    const now = Date.now();
+    const cached = guildCacheRef.current.get(code);
+    if (cached && now < cached.expiresAtMs) {
+      return cached.result;
+    }
+    if (cached) {
+      guildCacheRef.current.delete(code);
+    }
+
+    const result = await getLatestGuildToplistSnapshotCached(code);
+    const cachedAt = Date.now();
+    const ttlMs = result.ok ? TOPLIST_SNAPSHOT_TTL_MS : TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
+    guildCacheRef.current.set(code, {
+      result,
+      cachedAt,
+      expiresAtMs: cachedAt + ttlMs,
+    });
+    return result;
+  }, []);
 
   // Setter nur updaten, wenn sich wirklich etwas aendert
   const setFilters = useCallback(
@@ -546,10 +587,11 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       serverGroups,
       filters,
       sort,
+      getGuildToplistSnapshotCached,
       setFilters,
       setSort,
     }),
-    [playerState, playerRows, filters, sort, serverGroups, setFilters, setSort, playerScopeStatus]
+    [playerState, playerRows, filters, sort, serverGroups, setFilters, setSort, playerScopeStatus, getGuildToplistSnapshotCached]
   );
 
   return <ToplistsCtx.Provider value={value}>{children}</ToplistsCtx.Provider>;

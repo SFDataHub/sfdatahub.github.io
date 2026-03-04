@@ -23,6 +23,7 @@ export const SERVERS: Server[] = [
   { id: "eu23", label: "EU 23", region: "EU", active: true },
   { id: "eu24", label: "EU 24", region: "EU", active: true },
   { id: "eu25", label: "EU 25", region: "EU", active: true },
+  { id: "eu26", label: "EU 26", region: "EU", active: true },
   { id: "f6", label: "F 6", region: "Fusion", active: true },
   { id: "f7", label: "F 7", region: "Fusion", active: true },
   { id: "f8", label: "F 8", region: "Fusion", active: true },

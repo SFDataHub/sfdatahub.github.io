@@ -1,13 +1,13 @@
 // src/lib/import/importer.ts
 // Schreibt NUR die Guild-Snapshots unter:
-//   guilds/{gid}/snapshots/members_summary
+//   guilds/{gid}/snapshots/members_summary(+__YYYY-MM)
 // Kein Eingriff in players/guilds Importpfade.
 
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toNumber } from "../../../tools/playerDerivedHelpers";
 import type { ImportScanWriteMode } from "./csv";
 import { db } from "../firebase";
-import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
+import { traceSetDoc } from "../debug/firestoreReadTrace";
 
 export type CSVRow = Record<string, any>;
 export type GuildDerivedAggregate = {
@@ -348,56 +348,13 @@ const isDuplicatePermissionError = (error: unknown): boolean => {
   return c === "permission-denied" || c === "already-exists" || c === "failed-precondition";
 };
 
-// ---- NEU (nur für dein gewünschtes Verhalten): helper zum Lesen ----
-async function readGuildLatestTimeSecAndRaw(
-  gid: string
-): Promise<{ sec: number | null; raw: string | null; values: Record<string, any> | null }> {
-  const ref = doc(db, `guilds/${gid}/latest/latest`);
-  const snap = await traceGetDoc(
-    null,
-    ref,
-    () => getDoc(ref),
-    { label: "ImportGuildSnapshots:latest" },
-  );
-  if (!snap.exists()) return { sec: null, raw: null, values: null };
-  const d: any = snap.data() || {};
-  const raw: string | null = d.timestampRaw ?? d.values?.Timestamp ?? null;
-  const values = d.values && typeof d.values === "object" ? d.values : null;
 
-  let sec: number | null = null;
-  if (typeof d.timestamp === "number") {
-    sec = d.timestamp > 9_999_999_999 ? Math.floor(d.timestamp / 1000) : d.timestamp;
-  } else if (raw) {
-    sec = toSecFlexible(raw);
-  }
-  return { sec, raw, values };
-}
-
-async function readPrevSnapshotSec(gid: string): Promise<number> {
-  const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-  const snap = await traceGetDoc(
-    null,
-    ref,
-    () => getDoc(ref),
-    { label: "ImportGuildSnapshots:prevSnapshot" },
-  );
-  if (!snap.exists()) return 0;
-  const d: any = snap.data() || {};
-  if (typeof d.updatedAtMs === "number") return Math.floor(d.updatedAtMs / 1000);
-  if (typeof d.updatedAt === "string") {
-    const s = toSecFlexible(d.updatedAt);
-    if (s != null) return s;
-  }
-  return 0;
-}
 
 // ---------- Hauptfunktion ----------
 /**
- * Schreibt pro Gilde genau EIN Dokument:
+ * Schreibt pro Gilde deterministisch aus geparsten CSV-Zeilen:
  *   guilds/{gid}/snapshots/members_summary
- * Basis: Spieler-CSV-Zeilen mit exakt dem Timestamp aus guilds/{gid}/latest/latest.
- * Überschreibt nur, wenn dieser Timestamp neuer ist als der bestehende Snapshot.
- * Fallback gid via (Server+Guild-Name) anhand Guilds-CSV.
+ *   guilds/{gid}/snapshots/members_summary__YYYY-MM
  */
 export async function writeGuildSnapshotsFromRows(
   playersRows: CSVRow[],
@@ -409,13 +366,11 @@ export async function writeGuildSnapshotsFromRows(
   const aggregatesByGuildId = new Map<string, GuildDerivedAggregate>();
 
   const latestGuildRowById = new Map<string, { row: CSVRow; tsSec: number }>();
-  const guildRowByIdAndTs = new Map<string, CSVRow>();
   for (const r of guildsRows || []) {
     const gid = String(pickByCanon(r, G.GUILD_IDENTIFIER) ?? "").trim();
     if (!gid) continue;
     const tsSec = toSecFlexible(pickByCanon(r, G.TIMESTAMP));
     if (tsSec == null) continue;
-    guildRowByIdAndTs.set(`${gid}__${tsSec}`, r);
     const prev = latestGuildRowById.get(gid);
     if (!prev || tsSec > prev.tsSec) latestGuildRowById.set(gid, { row: r, tsSec });
   }
@@ -444,44 +399,28 @@ export async function writeGuildSnapshotsFromRows(
   let fatalError: unknown = null;
 
   for (const gid of allGids) {
-    // Snapshot-only nutzt bewusst den selektierten Guild-CSV-Timestamp (connected source), nicht latest/latest.
-    let guildTsSec: number | null = null;
-    let guildTsRaw: string | null = null;
-    let latestValues: Record<string, any> | null = null;
-    if (guildProgress) {
-      const latestGuildRow = latestGuildRowById.get(gid)?.row ?? null;
-      const rowTsRaw = latestGuildRow ? pickByCanon(latestGuildRow, G.TIMESTAMP) : null;
-      guildTsSec = toSecFlexible(rowTsRaw);
-      guildTsRaw = rowTsRaw != null ? String(rowTsRaw).trim() : null;
-    } else {
-      const latest = await readGuildLatestTimeSecAndRaw(gid);
-      guildTsSec = latest.sec;
-      guildTsRaw = latest.raw;
-      latestValues = latest.values;
-    }
-    const latestMeta = readGuildLatestMeta(latestValues);
-    if (guildTsSec == null) continue;
-
-    // nur schreiben, wenn neuer als vorhandener Snapshot
-    const prevSec = guildProgress ? 0 : await readPrevSnapshotSec(gid);
-    const shouldWriteSnapshot = guildTsSec > prevSec;
+    const latestGuildRow = latestGuildRowById.get(gid)?.row ?? null;
+    const guildTsRawValue = latestGuildRow ? pickByCanon(latestGuildRow, G.TIMESTAMP) : null;
+    const guildTsRaw = guildTsRawValue != null ? String(guildTsRawValue).trim() : null;
+    const guildTsSecFromRow = toSecFlexible(guildTsRawValue);
 
     // Parsed CSV rows are the source of truth for members_summary.
     // Collect all rows for this guild from the current CSV session and de-dupe by player id.
-    const byPid = new Map<string, { row: CSVRow; tsSec: number | null }>();
+    const matchedRows: CSVRow[] = [];
     for (const r of playersRows || []) {
-      const server = pickByCanon(r, P.SERVER);
-      let rowGid = String(pickByCanon(r, P.GUILD_IDENTIFIER) ?? "").trim();
-      if (!rowGid) {
-        const guildName = pickByCanon(r, P.GUILD) ?? (r as any)["Guild"];
-        if (guildName && server) {
-          const key = `${up(server)}__${toFold(String(guildName))}`;
-          const mapped = guildNameMap.get(key);
-          if (mapped) rowGid = mapped;
-        }
-      }
-      if (rowGid !== gid) continue;
+      const rowGid = String(pickByCanon(r, P.GUILD_IDENTIFIER) ?? "").trim();
+      if (rowGid === gid) matchedRows.push(r);
+    }
+    console.info("[ImportSelectionToDb] members_summary csv match", {
+      guildId: gid,
+      csvPlayerRows: playersRows.length,
+      matchedMembers: matchedRows.length,
+      scanWriteMode: scanWriteMode ?? null,
+      guildProgress: guildProgress === true,
+    });
 
+    const byPid = new Map<string, { row: CSVRow; tsSec: number | null }>();
+    for (const r of matchedRows) {
       const tsSec = toSecFlexible(pickByCanon(r, P.TIMESTAMP));
       const pid = String((r as any)?.["ID"] ?? (r as any)?.["Identifier"] ?? "").trim();
       if (!pid) continue;
@@ -517,18 +456,53 @@ export async function writeGuildSnapshotsFromRows(
     const avgAttrTotal    = avgOf(members, "attrTotal");
     const avgConTotal     = avgOf(members, "conTotal");
     const avgTotalStats   = avgOf(members, "totalStats");
+    const allAveragesNull =
+      avgLevel == null &&
+      avgTreasury == null &&
+      avgMine == null &&
+      avgBaseMain == null &&
+      avgConBase == null &&
+      avgSumBaseTotal == null &&
+      avgAttrTotal == null &&
+      avgConTotal == null &&
+      avgTotalStats == null;
 
-    if (guildProgress) {
-      console.info("[ImportSelectionToDb] snapshot-only guild match", {
-        selectedGuildId: gid,
-        connectedPlayersTotal: playersRows.length,
-        membersForSelectedGuild: members.length,
-      });
+    if (matchedRows.length === 0) {
+      continue;
     }
+
+    if (matchedRows.length > 0 && (members.length === 0 || allAveragesNull)) {
+      console.warn("[ImportSelectionToDb] members_summary hard-guard skip (empty payload from non-empty csv match)", {
+        guildId: gid,
+        matchedMembers: matchedRows.length,
+        dedupedMembers: members.length,
+        allAveragesNull,
+      });
+      continue;
+    }
+
+    const memberScanMs = members
+      .map((m) => m.lastScanMs)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    const memberActivityMs = members
+      .map((m) => m.lastActivityMs)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    let capturedAtMs =
+      memberScanMs.length > 0
+        ? Math.max(...memberScanMs)
+        : memberActivityMs.length > 0
+          ? Math.max(...memberActivityMs)
+          : guildTsSecFromRow != null
+            ? guildTsSecFromRow * 1000
+            : Date.now();
+    if (!Number.isFinite(capturedAtMs) || capturedAtMs <= 0) capturedAtMs = Date.now();
+    const capturedAtSec = Math.floor(capturedAtMs / 1000);
+    const monthKey = monthKeyFromMs(capturedAtMs);
+    const updatedAt = guildTsRaw ?? new Date(capturedAtMs).toISOString();
 
     const hashBasis = JSON.stringify({
       gid,
-      tsSec: guildTsSec,
+      tsSec: capturedAtSec,
       members: members.map(m => ({
         id: m.id, name: m.name ?? "", class: m.class ?? "", role: m.role ?? "",
         level: m.level ?? null, treasury: m.treasury ?? null, mine: m.mine ?? null,
@@ -543,100 +517,58 @@ export async function writeGuildSnapshotsFromRows(
     });
     const hash = djb2HashString(hashBasis);
 
-    const shouldWriteCurrent = shouldWriteSnapshot && !guildProgress;
-    const shouldWriteMonthly = scanWriteMode === "monthly" && (guildProgress || shouldWriteSnapshot);
+    const snapshotPayload = {
+      guildId: gid,
+      count: members.length,
+      updatedAt,
+      updatedAtMs: capturedAtMs,
+      hash,
 
-    if (shouldWriteCurrent || shouldWriteMonthly) {
-      if (members.length === 0) {
-        console.warn("[ImportSelectionToDb] No members parsed for guild; skipping members_summary write", {
-          gid,
-          guildTsSec,
-          guildTsRaw,
-        });
+      avgLevel,
+      avgTreasury,
+      avgMine,
+      avgBaseMain,
+      avgConBase,
+      avgSumBaseTotal,
+      avgAttrTotal,
+      avgConTotal,
+      avgTotalStats,
+
+      members,
+      updatedAtServer: serverTimestamp(),
+    };
+    try {
+      const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
+      await traceSetDoc(ref, () => setDoc(ref, snapshotPayload, { merge: true }), {
+        label: "ImportGuildSnapshots:summary",
+      });
+
+      const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
+      await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
+        label: "ImportGuildSnapshots:summaryMonthly",
+      });
+
+      snapshotsWritten++;
+    } catch (error) {
+      if (isDuplicatePermissionError(error)) {
+        console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
         continue;
       }
-      const snapshotPayload = {
-        guildId: gid,
-        count: members.length,
-        updatedAt: guildTsRaw ?? String(guildTsSec), // Rohanzeige aus latest oder Sek.-Fallback
-        updatedAtMs: guildTsSec * 1000,              // intern als ms
-        hash,
-
-        avgLevel,
-        avgTreasury,
-        avgMine,
-        avgBaseMain,
-        avgConBase,
-        avgSumBaseTotal,
-        avgAttrTotal,
-        avgConTotal,
-        avgTotalStats,
-
-        members,
-        updatedAtServer: serverTimestamp(),
-      };
-      try {
-        if (shouldWriteCurrent) {
-          const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-          await traceSetDoc(ref, () => setDoc(ref, snapshotPayload, { merge: true }), {
-            label: "ImportGuildSnapshots:summary",
-          });
-        }
-
-        if (shouldWriteMonthly) {
-          if (guildProgress && members.length === 0) {
-            console.warn("[ImportSelectionToDb] No members found for selected guildId; skipping monthly snapshot", {
-              selectedGuildId: gid,
-            });
-            continue;
-          }
-          const memberScanMs = members
-            .map((m) => m.lastScanMs)
-            .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-          if (guildProgress && memberScanMs.length === 0) {
-            console.warn("[ImportSelectionToDb] skip monthly guild snapshot without member timestamps", { gid });
-            continue;
-          }
-          let capturedAtMs = memberScanMs.length ? Math.max(...memberScanMs) : guildTsSec * 1000;
-          if (!Number.isFinite(capturedAtMs) || capturedAtMs <= 0) {
-            if (guildProgress) {
-              console.warn("[ImportSelectionToDb] skip monthly guild snapshot with invalid capturedAtMs", {
-                gid,
-                capturedAtMs,
-              });
-              continue;
-            }
-            capturedAtMs = guildTsSec * 1000;
-          }
-          const monthKey = monthKeyFromMs(capturedAtMs);
-          const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
-          await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
-            label: "ImportGuildSnapshots:summaryMonthly",
-          });
-        }
-
-        snapshotsWritten++;
-      } catch (error) {
-        if (isDuplicatePermissionError(error)) {
-          console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
-          continue;
-        }
-        console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
-        fatalError = fatalError || error;
-        continue;
-      }
+      console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
+      fatalError = fatalError || error;
+      continue;
     }
 
-    const metaRow =
-      guildRowByIdAndTs.get(`${gid}__${guildTsSec}`) ?? latestGuildRowById.get(gid)?.row ?? null;
+    const metaRow = latestGuildRow;
+    const latestMeta = readGuildLatestMeta(metaRow as Record<string, any> | null | undefined);
     const serverRaw = metaRow ? pickByCanon(metaRow, G.SERVER) : null;
     const nameRaw = metaRow ? pickByCanon(metaRow, G.NAME) : null;
     const memberCountRaw = metaRow ? pickByCanon(metaRow, G.MEMBER_COUNT) : null;
     const hofRankRaw = metaRow
       ? pickAnyByCanon(metaRow, [G.HOF, G.HOF_ALT, G.RANK, G.GUILD_RANK])
       : null;
-    const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : guildTsRaw;
-    const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : guildTsRaw ?? String(guildTsSec);
+    const lastScanRaw = metaRow ? pickByCanon(metaRow, G.TIMESTAMP) : updatedAt;
+    const lastScan = lastScanRaw != null ? String(lastScanRaw).trim() : updatedAt;
     const memberCountFallback = toNumberLoose(memberCountRaw);
     const memberCount =
       latestMeta.memberCount > 0
@@ -660,7 +592,7 @@ export async function writeGuildSnapshotsFromRows(
       raids: latestMeta.raids,
       treasury: latestMeta.treasury,
       lastScan: lastScan ? lastScan : null,
-      timestampSec: guildTsSec,
+      timestampSec: capturedAtSec,
       count: members.length,
       avgLevel,
       avgTreasury,
