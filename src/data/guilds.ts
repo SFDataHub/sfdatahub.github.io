@@ -190,7 +190,7 @@ export const DRIVE_BY_GUILD_IDENTIFIER: Record<string, GuildDriveEntry> = {
 
 
   // ===== EU17 =====
- s17_eu_g186: { fileId: "1pbTCsZ3bU3MEljLOxo3WjIdWsfJ4qAKd", name: "The Magazine" },
+ s17_eu_g186: { fileId: "1ej4BdwBJ793_-LHO0BL81jTghfOjlXrb", name: "The Magazine" },
  s17_eu_g107: { fileId: "1nm_E-nXt0e7ty1YdJ6WHbCx9nEQjNGu9", name: "Czarne Wasy" },
  s17_eu_g154: { fileId: "1BvPABQR-Bm6rY_AHqke1dlEY7ZtHNW_P", name: "DragonHunters" },
  s17_eu_g9: { fileId: "1D1YtTiTfMbvM2_HUWHi-R-n4lBexQY4_", name: "The Holy Order" },
