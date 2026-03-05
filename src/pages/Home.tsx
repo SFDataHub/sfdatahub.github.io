@@ -581,40 +581,44 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
         </span>
         <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
       </header>
-      {live.items.map((item) => {
-        const displayName = item.channel.displayName || item.channel.login;
-        const streamTitle = item.stream.title ? clampText(item.stream.title, 80) : "";
-        return (
-          <div className={styles.liveCard} key={item.channel.login}>
-            {item.stream.thumbnailUrl ? (
-              <img src={item.stream.thumbnailUrl} alt="" className={styles.liveAvatar} />
-            ) : (
-              <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
-            )}
-            <div className={styles.liveInfo}>
-              <div className={styles.liveName}>{displayName}</div>
-              <div className={styles.liveMeta}>
-                <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
-                {typeof item.stream.viewerCount === "number" && (
-                  <span className={styles.liveViewers}>
-                    {t("home.live.viewers", { viewers: item.stream.viewerCount.toLocaleString() })}
-                  </span>
+      <div className={styles.liveList}>
+        {live.items.map((item) => {
+          const displayName = item.channel.displayName || item.channel.login;
+          const streamTitle = String(item.stream.title ?? "").trim();
+          return (
+            <div className={styles.liveCard} key={item.channel.login}>
+              <div className={styles.liveTop}>
+                {item.stream.thumbnailUrl ? (
+                  <img src={item.stream.thumbnailUrl} alt="" className={styles.liveAvatar} />
+                ) : (
+                  <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
                 )}
+                <div className={styles.liveInfo}>
+                  <div className={styles.liveName}>{displayName}</div>
+                  <div className={styles.liveMeta}>
+                    <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
+                    {typeof item.stream.viewerCount === "number" && (
+                      <span className={styles.liveViewers}>
+                        {t("home.live.viewers", { viewers: item.stream.viewerCount.toLocaleString() })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <a
+                  href={item.channel.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`${styles.primaryBtn} ${styles.liveOpenBtn}`}
+                  data-i18n="home.live.open_on_twitch"
+                >
+                  {t("home.live.open_on_twitch")}
+                </a>
               </div>
-              {streamTitle && <div className={styles.liveMeta}>{streamTitle}</div>}
+              {streamTitle && <div className={styles.liveDescription}>{streamTitle}</div>}
             </div>
-            <a
-              href={item.channel.url}
-              target="_blank"
-              rel="noreferrer"
-              className={styles.primaryBtn}
-              data-i18n="home.live.open_on_twitch"
-            >
-              {t("home.live.open_on_twitch")}
-            </a>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </section>
   );
 };

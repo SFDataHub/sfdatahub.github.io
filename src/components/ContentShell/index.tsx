@@ -39,6 +39,10 @@ type Props = {
 
 const SURFACE: CSS = { borderColor: "#2B4C73", background: "#1A2F4A" };
 const RAIL: CSS    = { borderColor: "#2B4C73", background: "#152A42" };
+const SUBHEADER_SURFACE: CSS = {
+  borderColor: "#2B4C73",
+  background: "linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95))",
+};
 
 export default function ContentShell({
   hex,
@@ -117,7 +121,7 @@ export default function ContentShell({
           ].join(" ")}
           style={{
             ...(stickySubheader ? { top: stickyTopbar ? `${topbarHeight}px` : 0 } : {}),
-            ...SURFACE,
+            ...SUBHEADER_SURFACE,
           }}
         >
           {subheader}

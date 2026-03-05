@@ -354,13 +354,18 @@
 .slideCaption { font-size: 13px; padding: 6px 8px; color: #E7F1FF; }
 
 /* ---------- Live Now ---------- */
-.liveCard { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
+.liveList { display: grid; gap: 6px; }
+.liveCard { display: grid; gap: 8px; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
+.liveTop { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
 .liveAvatar { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
 .liveAvatarFallback { width: 48px; height: 48px; border-radius: 10px; background: #254364; display: grid; place-items: center; font-weight: 700; }
+.liveInfo { min-width: 0; }
 .liveName { font-weight: 600; color: #F5F9FF; }
 .liveMeta { display: flex; gap: 8px; font-size: 12px; color: #B0C4D9; }
 .liveBadge { background: #e02b2b; color: white; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; }
 .liveViewers { color: #B0C4D9; }
+.liveOpenBtn { align-self: start; }
+.liveDescription { grid-column: 1 / -1; font-size: 12px; color: #B0C4D9; line-height: 1.35; }
 
 /* ---------- Modal (Schedule) ---------- */
 .modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; z-index: 1000; }

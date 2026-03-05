@@ -168,6 +168,10 @@ body::-webkit-scrollbar{
 
 /* Toplists table row hover */
 .toplists-table-viewport {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   isolation: isolate;
 }
@@ -177,8 +181,8 @@ body::-webkit-scrollbar{
   background: inherit;
 }
 .toplists-table-viewport .toplists-table-scroll {
-  height: min(68vh, calc(100vh - 260px));
-  max-height: min(68vh, calc(100vh - 260px));
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
