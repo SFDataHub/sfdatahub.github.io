@@ -31,14 +31,3 @@
 .navBtn:hover { background: #2B4C73; }
 .navBtn:disabled { opacity: 0.5; cursor: default; }
 
-@media (min-width: 560px) {
-  .track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (min-width: 768px) {
-  .track { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (min-width: 1024px) {
-  .track { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}

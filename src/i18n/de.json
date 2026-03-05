@@ -3,7 +3,7 @@
     "noData": "Keine Daten"
   },
   "nav": {
-    "home": "Start",
+    "home": "Startseite",
     "dashboard": "Dashboard",
     "players": "Spieler",
     "guilds": "Gilden",
@@ -47,6 +47,7 @@
   },
   "home": {
     "title": "Start",
+    "headerLabel": "Startseite",
     "subtitle": "Willkommen zurueck",
     "historybook": {
       "title": "Historybook",
@@ -97,7 +98,7 @@
     "live": {
       "title": "Jetzt live",
       "none": "Niemand ist gerade live.",
-      "open_on_twitch": "Auf Twitch oeffnen",
+      "open_on_twitch": "Auf Twitch öffnen",
       "badge": "LIVE",
       "viewers": "{{viewers}} Zuschauer",
       "prev": "Vorheriger Stream",
@@ -306,8 +307,8 @@
   "sidebar": {
     "navigation": "Navigation",
     "categories": "Kategorien",
-    "login": "Login",
-    "logout": "Logout",
+    "login": "Anmelden",
+    "logout": "Abmelden",
     "pin": "Pin",
     "unpin": "Unpin",
     "languagePreference": "Sidebar-Sprache",
