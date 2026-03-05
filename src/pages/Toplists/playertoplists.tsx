@@ -952,6 +952,11 @@ function PlayerToplistsPageContent() {
     return Math.max(1, Math.trunc(parsed));
   }, [rankParamRaw]);
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
+  const setActiveTab = React.useCallback((next: "players" | "guilds") => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", next);
+    setSearchParams(nextParams);
+  }, [searchParams, setSearchParams]);
   const [guildSortBy, setGuildSortBy] = React.useState<string>(DEFAULT_GUILD_SORT);
   const initialProgressCompareMonth = searchParams.get("compare") ?? "";
   const initialCompareModeParam = String(searchParams.get("compareMode") ?? "").trim().toLowerCase();
@@ -1398,20 +1403,46 @@ function PlayerToplistsPageContent() {
           filterMode === "hud" ? (
             <>
               <SectionDividerHeader title={t("toplists.headerLabel", "Toplists")} />
-              <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                <TopTabs />
+              <div className="mt-2 pb-3 grid grid-cols-[auto_auto_auto] justify-center items-center gap-6">
+                <TopTab active={activeTab === "players"} onClick={() => setActiveTab("players")} label={t("nav.players", "Players")} />
                 <button
                   type="button"
-                  className="rounded-lg px-3 py-1.5 text-sm text-white border"
-                  style={{ borderColor: "#2B4C73", background: "#14273E" }}
+                  className="flex flex-col items-center justify-center gap-0.5 py-1 px-2"
+                  style={{ transform: "translateY(50%)" }}
                   onClick={() => setFiltersCollapsed((prev) => !prev)}
                   aria-expanded={!filtersCollapsed}
                   aria-controls="toplists-hud-filters"
+                  aria-label={
+                    filtersCollapsed
+                      ? t("toplists.filters.showHud", "Show filters")
+                      : t("toplists.filters.hideHud", "Hide filters")
+                  }
                 >
-                  {filtersCollapsed
-                    ? t("toplists.filters.showHud", "Show filters")
-                    : t("toplists.filters.hideHud", "Hide filters")}
+                  <span style={{ color: "#B0C4D9", fontSize: 11, lineHeight: 1 }}>
+                    {filtersCollapsed
+                      ? t("toplists.filters.showHud", "Show filters")
+                      : t("toplists.filters.hideHud", "Hide filters")}
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className="h-4 w-4 transition-transform duration-200"
+                    style={{
+                      color: "#B0C4D9",
+                      transform: filtersCollapsed ? "rotate(0deg)" : "rotate(180deg)",
+                    }}
+                  >
+                    <path
+                      d="M6 9l6 6 6-6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
+                <TopTab active={activeTab === "guilds"} onClick={() => setActiveTab("guilds")} label={t("nav.guilds", "Guilds")} />
               </div>
               {!filtersCollapsed && (
                 <div id="toplists-hud-filters" className="mt-2">
@@ -2988,31 +3019,6 @@ function TableDataView({
   );
 }
 
-function TopTabs({ className }: { className?: string }) {
-  const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const activeTab = tabParam === "guilds" ? "guilds" : "players";
-
-  const setTab = (next: "players" | "guilds") => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", next);
-    setSearchParams(nextParams);
-  };
-
-  return (
-    <div className={`flex items-center justify-start gap-2 flex-wrap ${className ?? ""}`.trim()}>
-      <nav
-        className="inline-flex gap-1 rounded-xl border p-1"
-        style={{ borderColor: "#2B4C73", background: "#14273E" }}
-        aria-label="Toplist Tabs"
-      >
-        <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label={t("nav.players", "Players")} />
-        <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label={t("nav.guilds", "Guilds")} />
-      </nav>
-    </div>
-  );
-}
 function TopTab({
   active,
   onClick,
