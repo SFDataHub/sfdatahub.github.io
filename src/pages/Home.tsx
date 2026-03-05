@@ -205,6 +205,17 @@ const TileGrid: React.FC = () => {
   );
 };
 
+const TwitchHeaderLogo: React.FC = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M4 1 1 4v15h5v4l4-4h4l8-8V1H4Zm16 9-4 4h-4l-4 4v-4H3V3h17v7Z"
+      fill="currentColor"
+    />
+    <rect x="9" y="6" width="2" height="5" fill="currentColor" />
+    <rect x="14" y="6" width="2" height="5" fill="currentColor" />
+  </svg>
+);
+
 const NewsFeed: React.FC = () => {
   const { t } = useTranslation();
   const [index, setIndex] = useState<number>(0);
@@ -546,7 +557,10 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
   if(!live || !live.live || !Array.isArray(live.items) || live.items.length === 0){
     return (
       <section className={styles.card} data-i18n-scope="home.live">
-        <header className={styles.header}>
+        <header className={`${styles.header} ${styles.liveHeader}`}>
+          <span className={styles.liveHeaderIcon} aria-hidden="true">
+            <TwitchHeaderLogo />
+          </span>
           <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
         </header>
         <div className={styles.empty} data-i18n="home.live.none">{t("home.live.none")}</div>
@@ -561,7 +575,10 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
 
   return (
     <section className={styles.card} data-i18n-scope="home.live">
-      <header className={styles.header}>
+      <header className={`${styles.header} ${styles.liveHeader}`}>
+        <span className={styles.liveHeaderIcon} aria-hidden="true">
+          <TwitchHeaderLogo />
+        </span>
         <span className={styles.title} data-i18n="home.live.title">{t("home.live.title")}</span>
       </header>
       {live.items.map((item) => {
@@ -731,7 +748,24 @@ const Home: React.FC = () => {
   const { t } = useTranslation();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   return (
-    <ContentShell title={t("home.title")} subtitle={t("home.subtitle")}>
+    <ContentShell
+      headerTransparent
+      headerContent={
+        <div className={styles.homeSectionDivider}>
+          <div
+            className={styles.homeSectionStripe}
+            style={{ background: "linear-gradient(90deg, transparent, #5C8BC6, transparent)" }}
+          />
+          <div className={styles.homeSectionTitle} style={{ color: "#B0C4D9" }} data-i18n="home.headerLabel">
+            {t("home.headerLabel")}
+          </div>
+          <div
+            className={styles.homeSectionStripe}
+            style={{ background: "linear-gradient(90deg, transparent, #5C8BC6, transparent)" }}
+          />
+        </div>
+      }
+    >
       <div className={styles.homeLayout}>
         <div className={styles.homeMain}>
           {/* Row 1 - Community News */}
@@ -743,18 +777,16 @@ const Home: React.FC = () => {
           <div className={styles.homeIcons}>
             <FeaturedPreviewRow>
               <FeaturedPreviewCard
-                href={GUIDEHUB_ROUTE}
-                title={t("home.guidehub.title")}
-                subtitle={t("home.guidehub.subtitle")}
-                previewImageSrc={guideHubLogo}
-                previewAlt={t("home.guidehub.previewAlt")}
-                className={featuredPreviewCardStyles.guidehubScale}
-                i18nScope="home.guidehub"
-                titleI18nKey="home.guidehub.title"
-                subtitleI18nKey="home.guidehub.subtitle"
-                previewAltI18nKey="home.guidehub.previewAlt"
-                linkAriaLabel={t("home.guidehub.open")}
-                linkAriaI18nKey="home.guidehub.open"
+                href={DISCORD_INVITE_URL}
+                title={t("home.taverndiscord.title")}
+                subtitle={t("home.taverndiscord.subtitle")}
+                previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
+                previewAlt={t("home.taverndiscord.previewAlt")}
+                previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
+                i18nScope="home.taverndiscord"
+                titleI18nKey="home.taverndiscord.title"
+                subtitleI18nKey="home.taverndiscord.subtitle"
+                previewAltI18nKey="home.taverndiscord.previewAlt"
               />
               <FeaturedPreviewCard
                 href="https://sftools.mar21.eu/"
@@ -769,16 +801,18 @@ const Home: React.FC = () => {
                 previewAltI18nKey="home.sftools.previewAlt"
               />
               <FeaturedPreviewCard
-                href={DISCORD_INVITE_URL}
-                title={t("home.taverndiscord.title")}
-                subtitle={t("home.taverndiscord.subtitle")}
-                previewImageSrc={SFTAVERN_DISCORD_PREVIEW}
-                previewAlt={t("home.taverndiscord.previewAlt")}
-                previewHeightOverride={FEATURED_PREVIEW_COMPACT_HEIGHT}
-                i18nScope="home.taverndiscord"
-                titleI18nKey="home.taverndiscord.title"
-                subtitleI18nKey="home.taverndiscord.subtitle"
-                previewAltI18nKey="home.taverndiscord.previewAlt"
+                href={GUIDEHUB_ROUTE}
+                title={t("home.guidehub.title")}
+                subtitle={t("home.guidehub.subtitle")}
+                previewImageSrc={guideHubLogo}
+                previewAlt={t("home.guidehub.previewAlt")}
+                className={featuredPreviewCardStyles.guidehubScale}
+                i18nScope="home.guidehub"
+                titleI18nKey="home.guidehub.title"
+                subtitleI18nKey="home.guidehub.subtitle"
+                previewAltI18nKey="home.guidehub.previewAlt"
+                linkAriaLabel={t("home.guidehub.open")}
+                linkAriaI18nKey="home.guidehub.open"
               />
             </FeaturedPreviewRow>
           </div>
@@ -799,4 +833,3 @@ const Home: React.FC = () => {
 };
 
 export default Home;
-

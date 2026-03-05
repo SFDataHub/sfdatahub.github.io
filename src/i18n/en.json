@@ -47,6 +47,7 @@
   },
   "home": {
     "title": "Home",
+    "headerLabel": "Home",
     "subtitle": "Welcome back",
     "historybook": {
       "title": "Historybook",
@@ -306,8 +307,8 @@
   "sidebar": {
     "navigation": "Navigation",
     "categories": "Categories",
-    "login": "Login",
-    "logout": "Logout",
+    "login": "Log in",
+    "logout": "Log out",
     "pin": "Pin",
     "unpin": "Unpin",
     "languagePreference": "Sidebar language preference",

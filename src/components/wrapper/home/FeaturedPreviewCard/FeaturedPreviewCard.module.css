@@ -10,13 +10,14 @@
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 10px;
 }
 
 .headerGroup {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-width: 0;
 }
@@ -24,8 +25,10 @@
 .headerText {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
   min-width: 0;
+  text-align: center;
 }
 
 .headerIcon {
@@ -112,7 +115,10 @@
 
 .previewSurface:hover,
 .previewSurface:focus-visible {
-  filter: drop-shadow(0 8px 11px rgba(7, 18, 33, 0.55)) drop-shadow(0 3px 6px rgba(7, 18, 33, 0.35));
+  filter:
+    drop-shadow(0 8px 11px rgba(7, 18, 33, 0.55))
+    drop-shadow(0 3px 6px rgba(7, 18, 33, 0.35))
+    drop-shadow(0 0 14px rgba(92, 139, 198, 0.32));
   transform: translateY(-2px) scale(1.03);
 }
 

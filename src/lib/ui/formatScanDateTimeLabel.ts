@@ -2,10 +2,16 @@ const DASH = "—";
 const DIGITS_ONLY_RE = /^\d+$/;
 const LEGACY_DMY_RE =
   /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
-const SCAN_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "short",
-  timeStyle: "short",
-});
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+const formatFixedDateTime = (date: Date): string => {
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = pad2(date.getFullYear() % 100);
+  const hour = pad2(date.getHours());
+  const minute = pad2(date.getMinutes());
+  return `${day}/${month}/${year} ${hour}:${minute}`;
+};
 
 const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -112,5 +118,5 @@ export function formatScanDateTimeLabel(value: unknown): string {
   if (ms == null) return DASH;
   const date = new Date(ms);
   if (!Number.isFinite(date.getTime())) return DASH;
-  return SCAN_DATE_TIME_FORMATTER.format(date);
+  return formatFixedDateTime(date);
 }

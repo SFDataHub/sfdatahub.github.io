@@ -60,6 +60,7 @@ const guildProfileMemory = new Map<string, GuildProfileCacheValue>();
 const GUILD_CACHE_PREFIX = "sf_profile_guild__";
 const GUILD_SERVER_INDEX_KEY = "sf_profile_guild_server_index";
 const GUILD_CACHE_TTL_MS = 60 * 60 * 1000;
+const INACTIVE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
 const normalizeMember = (entry: MemberSummaryLike): MemberSummary => ({
   id: entry.id,
@@ -90,6 +91,23 @@ const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : null;
+};
+const toEpochMs = (value: unknown): number | null => {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value < 1_000_000_000_000 ? value * 1000 : value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 };
 const daysSince = (tsSec?: number | null) => {
   if (!tsSec) return null;
@@ -347,6 +365,23 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
       },
     };
   }, [snapshot?.members]);
+  const activityPct = useMemo(() => {
+    const members = snapshot?.members ?? [];
+    const totalMembers = members.length;
+    if (!totalMembers) return null;
+
+    let activeMembers = 0;
+    for (const member of members) {
+      const lastScanMs = toEpochMs(member.lastScanMs) ?? toEpochMs(member.lastScan);
+      const lastActivityMs = toEpochMs(member.lastActivityMs) ?? toEpochMs(member.lastActivity);
+      if (lastScanMs == null || lastActivityMs == null) continue;
+
+      const inactiveForTooLong = lastScanMs - lastActivityMs > INACTIVE_THRESHOLD_MS;
+      if (!inactiveForTooLong) activeMembers += 1;
+    }
+
+    return (activeMembers / totalMembers) * 100;
+  }, [snapshot?.members]);
 
   if (loading) {
     if (heroOnly) {
@@ -431,7 +466,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
             total: snapshot?.avgTotalStats ?? null,
           },
         },
-        activityPct: 100,
+        activityPct,
         metrics: [],
         actions: [
           {

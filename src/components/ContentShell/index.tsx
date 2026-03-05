@@ -7,6 +7,8 @@ type Props = {
   hex?: React.ReactNode;
   title?: string;
   subtitle?: string;
+  headerContent?: React.ReactNode;
+  headerTransparent?: boolean;
   actions?: React.ReactNode;
   subheader?: React.ReactNode;
 
@@ -42,6 +44,8 @@ export default function ContentShell({
   hex,
   title,
   subtitle,
+  headerContent,
+  headerTransparent = false,
   actions,
   subheader,
   left,
@@ -85,18 +89,22 @@ export default function ContentShell({
         </div>
       )}
 
-      {(title || subtitle || actions) && (
+      {(title || subtitle || headerContent || actions) && (
         <div
           className={[
             stickyTopbar ? "sticky top-0 z-30" : "",
             "mb-3 flex items-center justify-between rounded-2xl border px-5 py-3",
           ].join(" ")}
-          style={SURFACE}
+          style={headerTransparent ? { borderColor: "transparent", background: "transparent" } : SURFACE}
         >
-          <div className="min-w-0">
-            {title && <div className="truncate text-sm font-semibold" style={{ color: "#F5F9FF" }}>{title}</div>}
-            {subtitle && <div className="truncate text-[11px]" style={{ color: "#B0C4D9" }}>{subtitle}</div>}
-          </div>
+          {headerContent ? (
+            <div className="min-w-0 w-full">{headerContent}</div>
+          ) : (
+            <div className="min-w-0">
+              {title && <div className="truncate text-sm font-semibold" style={{ color: "#F5F9FF" }}>{title}</div>}
+              {subtitle && <div className="truncate text-[11px]" style={{ color: "#B0C4D9" }}>{subtitle}</div>}
+            </div>
+          )}
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>
       )}
