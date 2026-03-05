@@ -500,6 +500,7 @@
     }
   },
   "toplists": {
+    "headerLabel": "Toplisten",
     "compareMode": "Compare Mode",
     "compareMonth": "Fortschritt seit",
     "compareMonths": "Compare months",
@@ -533,6 +534,8 @@
       "exporting": "Exportiere..."
     },
     "filters": {
+      "showHud": "Filter anzeigen",
+      "hideHud": "Filter ausblenden",
       "guilds": {
         "label": "Gilden",
         "placeholder": "Alle Gilden",

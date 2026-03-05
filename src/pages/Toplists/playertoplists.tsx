@@ -13,6 +13,7 @@ import ServerSheet from "../../components/Filters/ServerSheet";
 import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
+import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import ToplistExportTable, { type ToplistExportRow } from "../../components/export/ToplistExportTable";
 import ToplistPngExportDialog, {
   type ToplistExportAmount,
@@ -918,6 +919,8 @@ export default function PlayerToplistsPage() {
 }
 
 function PlayerToplistsPageContent() {
+  const { t } = useTranslation();
+  const filterCollapseStorageKey = "sf_toplists_hud_filters_collapsed_v1";
   const f = useFilters(); // MUSS innerhalb FilterProvider laufen
   const {
     filterMode, setFilterMode,
@@ -960,6 +963,14 @@ function PlayerToplistsPageContent() {
   const [progressSinceMonth, setProgressSinceMonth] = React.useState<string>(initialProgressCompareMonth);
   const [compareFromMonth, setCompareFromMonth] = React.useState<string>(searchParams.get("compareFrom") ?? "");
   const [compareToMonth, setCompareToMonth] = React.useState<string>(searchParams.get("compareTo") ?? "");
+  const [filtersCollapsed, setFiltersCollapsed] = React.useState<boolean>(() => {
+    try {
+      if (typeof localStorage === "undefined") return false;
+      return localStorage.getItem(filterCollapseStorageKey) === "1";
+    } catch {
+      return false;
+    }
+  });
   const monthOptions = React.useMemo(
     () => {
       // Keep completed months, but also allow selecting the current month for freshly generated backfill snapshots.
@@ -1017,6 +1028,15 @@ function PlayerToplistsPageContent() {
     normalizeCompareMonthPair,
     resolveDefaultCompareMonths,
   ]);
+
+  React.useEffect(() => {
+    try {
+      if (typeof localStorage === "undefined") return;
+      localStorage.setItem(filterCollapseStorageKey, filtersCollapsed ? "1" : "0");
+    } catch {
+      // ignore storage write errors
+    }
+  }, [filterCollapseStorageKey, filtersCollapsed]);
   const handleProgressSinceMonthChange = React.useCallback((value: string) => {
     const nextValue = String(value ?? "").trim();
     setProgressSinceMonth(nextValue);
@@ -1372,34 +1392,54 @@ function PlayerToplistsPageContent() {
     <>
       <ContentShell
         mode="card"
-        title="Top Lists"
-        actions={<TopActions />}
         leftWidth={0}
         rightWidth={0}
         subheader={
           filterMode === "hud" ? (
-            <HudFilters
-              mode={activeTab}
-              sortValue={activeTab === "guilds" ? guildSortBy : (sortBy ?? "level")}
-              onSortValueChange={activeTab === "guilds" ? setGuildSortBy : setSortBy}
-              compareMode={compareMode}
-              onCompareModeChange={handleCompareModeChange}
-              progressSinceMonth={progressSinceMonth}
-              onProgressSinceMonthChange={handleProgressSinceMonthChange}
-              compareFromMonth={compareFromMonth}
-              onCompareFromMonthChange={handleCompareFromMonthChange}
-              compareToMonth={compareToMonth}
-              onCompareToMonthChange={handleCompareToMonthChange}
-              monthOptions={monthOptions}
-              guildOptions={guildOptions}
-              onExportPng={openExportDialog}
-              exportDisabled={!hasServersSelected || (activeTab === "players" && listView !== "table")}
-            />
+            <>
+              <SectionDividerHeader title={t("toplists.headerLabel", "Toplists")} />
+              <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+                <TopTabs />
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-1.5 text-sm text-white border"
+                  style={{ borderColor: "#2B4C73", background: "#14273E" }}
+                  onClick={() => setFiltersCollapsed((prev) => !prev)}
+                  aria-expanded={!filtersCollapsed}
+                  aria-controls="toplists-hud-filters"
+                >
+                  {filtersCollapsed
+                    ? t("toplists.filters.showHud", "Show filters")
+                    : t("toplists.filters.hideHud", "Hide filters")}
+                </button>
+              </div>
+              {!filtersCollapsed && (
+                <div id="toplists-hud-filters" className="mt-2">
+                  <HudFilters
+                    mode={activeTab}
+                    sortValue={activeTab === "guilds" ? guildSortBy : (sortBy ?? "level")}
+                    onSortValueChange={activeTab === "guilds" ? setGuildSortBy : setSortBy}
+                    compareMode={compareMode}
+                    onCompareModeChange={handleCompareModeChange}
+                    progressSinceMonth={progressSinceMonth}
+                    onProgressSinceMonthChange={handleProgressSinceMonthChange}
+                    compareFromMonth={compareFromMonth}
+                    onCompareFromMonthChange={handleCompareFromMonthChange}
+                    compareToMonth={compareToMonth}
+                    onCompareToMonthChange={handleCompareToMonthChange}
+                    monthOptions={monthOptions}
+                    guildOptions={guildOptions}
+                    onExportPng={openExportDialog}
+                    exportDisabled={!hasServersSelected || (activeTab === "players" && listView !== "table")}
+                  />
+                </div>
+              )}
+            </>
           ) : null
         }
         centerFramed={false}
         stickyTopbar
-        stickySubheader
+        stickySubheader={false}
         topbarHeight={56}
       >
         <ListSwitcher />
@@ -1414,6 +1454,7 @@ function PlayerToplistsPageContent() {
             progressSinceMonth={progressSinceMonth}
             compareFromMonth={compareFromMonth}
             compareToMonth={compareToMonth}
+            showAvgModeControl={!filtersCollapsed}
             focusIdentifier={focusIdentifierParam}
             focusRank={focusRankParam}
             tableRef={tableRef}
@@ -1424,6 +1465,7 @@ function PlayerToplistsPageContent() {
           <GuildToplists
             serverCodes={servers ?? []}
             sortKey={resolvedGuildSortBy}
+            showAvgModeControl={!filtersCollapsed}
             tableRef={tableRef}
             exportSnapshotRef={tableExportSnapshotRef}
           />
@@ -1504,7 +1546,7 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
 }: {
   servers: string[];
   classes: string[];
@@ -1514,6 +1556,7 @@ function TableDataView({
   progressSinceMonth: string;
   compareFromMonth: string;
   compareToMonth: string;
+  showAvgModeControl: boolean;
   focusIdentifier: string | null;
   focusRank: number | null;
   tableRef: React.RefObject<HTMLDivElement>;
@@ -2863,17 +2906,12 @@ function TableDataView({
     );
   };
   return (
-    <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
         <div>{statusLabel} - {enhancedRows.length} rows</div>
         <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
       </div>
-      {!playerAvgModeSlot && (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
-          <PlayerAvgModeControls mode={playerAvgMode} updating={showPlayerUpdating} onChange={handlePlayerAvgModeChange} />
-        </div>
-      )}
-      {playerAvgModeSlot &&
+      {showAvgModeControl && playerAvgModeSlot &&
         createPortal(
           <PlayerAvgModeControls mode={playerAvgMode} updating={showPlayerUpdating} onChange={handlePlayerAvgModeChange} />,
           playerAvgModeSlot
@@ -2916,7 +2954,7 @@ function TableDataView({
         </div>
       ) : (
         <>
-          <div ref={tableRef} className="toplists-table-viewport">
+          <div ref={tableRef} className="toplists-table-viewport" style={{ flex: "1 1 auto", minHeight: 0 }}>
             <div className="toplists-table-header" style={{ paddingRight: tableScrollbarWidth }}>
               {renderToplistHeader()}
             </div>
@@ -2950,7 +2988,8 @@ function TableDataView({
   );
 }
 
-function TopActions() {
+function TopTabs({ className }: { className?: string }) {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "guilds" ? "guilds" : "players";
@@ -2962,14 +3001,14 @@ function TopActions() {
   };
 
   return (
-    <div className="flex items-center justify-end gap-2 flex-wrap">
+    <div className={`flex items-center justify-start gap-2 flex-wrap ${className ?? ""}`.trim()}>
       <nav
         className="inline-flex gap-1 rounded-xl border p-1"
         style={{ borderColor: "#2B4C73", background: "#14273E" }}
         aria-label="Toplist Tabs"
       >
-        <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label="Players" />
-        <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label="Guilds" />
+        <TopTab active={activeTab === "players"} onClick={() => setTab("players")} label={t("nav.players", "Players")} />
+        <TopTab active={activeTab === "guilds"} onClick={() => setTab("guilds")} label={t("nav.guilds", "Guilds")} />
       </nav>
     </div>
   );

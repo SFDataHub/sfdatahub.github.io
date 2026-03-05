@@ -21,6 +21,7 @@ import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOve
 type GuildToplistsProps = {
   serverCodes?: string[];
   sortKey?: string;
+  showAvgModeControl?: boolean;
   tableRef?: React.RefObject<HTMLDivElement>;
   exportSnapshotRef?: React.MutableRefObject<{
     rows: ToplistExportRow[];
@@ -481,7 +482,13 @@ const buildGuildExportRows = (rows: FirestoreToplistGuildRow[]): ToplistExportRo
 
 const formatLastScanDisplay = (value: unknown): string => formatScanDateTimeLabel(value);
 
-export default function GuildToplists({ serverCodes, sortKey, tableRef, exportSnapshotRef }: GuildToplistsProps) {
+export default function GuildToplists({
+  serverCodes,
+  sortKey,
+  showAvgModeControl = true,
+  tableRef,
+  exportSnapshotRef,
+}: GuildToplistsProps) {
   const { favoritesOnly } = useFilters();
   const { user } = useAuth();
   const { getGuildToplistSnapshotCached } = useToplistsData();
@@ -969,7 +976,7 @@ export default function GuildToplists({ serverCodes, sortKey, tableRef, exportSn
   };
 
   return (
-    <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         Guilds - snapshots (latest){resolvedServers.length ? ` - ${resolvedServers.join(", ")}` : ""}
       </div>
@@ -977,12 +984,12 @@ export default function GuildToplists({ serverCodes, sortKey, tableRef, exportSn
         <div>{loading ? "Loading..." : error ? "Error" : "Ready"} - {displayRows.length} rows</div>
         <div>{updatedAt ? `Updated: ${fmtDate(updatedAt)}` : null}</div>
       </div>
-      {!guildAvgModeSlot && (
+      {showAvgModeControl && !guildAvgModeSlot && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
           <GuildAvgModeControls mode={activeGuildAvgMode} updating={showGuildUpdating} onChange={handleGuildAvgModeChange} />
         </div>
       )}
-      {guildAvgModeSlot &&
+      {showAvgModeControl && guildAvgModeSlot &&
         createPortal(
           <GuildAvgModeControls mode={activeGuildAvgMode} updating={showGuildUpdating} onChange={handleGuildAvgModeChange} />,
           guildAvgModeSlot
@@ -998,7 +1005,7 @@ export default function GuildToplists({ serverCodes, sortKey, tableRef, exportSn
         </div>
       )}
 
-      <div ref={tableRef} className="toplists-table-viewport">
+      <div ref={tableRef} className="toplists-table-viewport" style={{ flex: "1 1 auto", minHeight: 0 }}>
         <div className="toplists-table-header" style={{ paddingRight: tableScrollbarWidth }}>
           <GuildToplistHeader />
         </div>

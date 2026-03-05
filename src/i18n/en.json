@@ -500,6 +500,7 @@
     }
   },
   "toplists": {
+    "headerLabel": "Toplists",
     "compareMode": "Compare Mode",
     "compareMonth": "Progress since",
     "compareMonths": "Compare months",
@@ -533,6 +534,8 @@
       "exporting": "Exporting..."
     },
     "filters": {
+      "showHud": "Show filters",
+      "hideHud": "Hide filters",
       "guilds": {
         "label": "Guilds",
         "placeholder": "All guilds",
