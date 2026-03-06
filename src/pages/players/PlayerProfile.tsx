@@ -4,7 +4,7 @@ import PlayerProfileScreen from "./PlayerProfileScreen";
 
 export default function PlayerProfile() {
   return (
-    <ContentShell title="Spielerprofil" subtitle="Charakter, KPIs & Verlauf" centerFramed={false} padded>
+    <ContentShell centerFramed={false} padded>
       <PlayerProfileScreen />
     </ContentShell>
   );

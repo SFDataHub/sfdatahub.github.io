@@ -8,6 +8,7 @@ import { guideAssetByKey } from "../../data/guidehub/assets";
 import PlayerAttributeBars from "./AttributeBars/PlayerAttributeBars";
 import Tooltip from "../ui/Tooltip/Tooltip";
 import { HexGauge } from "../ui/HexGauge";
+import SectionDividerHeader from "../ui/shared/SectionDividerHeader";
 
 type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
 type TranslateFn = (key: string, options?: any) => string;
@@ -257,90 +258,92 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
 
   return (
     <section className="player-profile__hero" aria-busy={loading}>
-      <div className="player-profile__hero-portrait">
-        <div className="player-profile__identity player-profile__identity--overlay">
-          <ClassAvatar className={data.className} label={data.playerName} size={48} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              className="player-profile__player-name-row"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                width: "100%",
-              }}
-            >
-              <div className="player-profile__player-name">{data.playerName}</div>
-              {favoriteControl?.visible && (
-                <button
-                  type="button"
-                  className="player-profile__favorite-star-button"
-                  onClick={favoriteControl.onToggle}
-                  disabled={loading || favoriteControl.disabled}
-                  aria-label={favoriteControl.ariaLabel}
-                  title={favoriteControl.title ?? favoriteControl.ariaLabel}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    boxShadow: "none",
-                    padding: 4,
-                    margin: 0,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: loading || favoriteControl.disabled ? "default" : "pointer",
-                    color: favoriteControl.isFavorite ? "#facc15" : "rgba(226, 232, 240, 0.92)",
-                    opacity: loading || favoriteControl.disabled ? 0.55 : 1,
-                    lineHeight: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    aria-hidden
+      <SectionDividerHeader title={t("playerProfile.heroPanel.headerLabel", "PLAYER OVERVIEW")} />
+      <div className="player-profile__hero-content">
+        <div className="player-profile__hero-portrait">
+          <div className="player-profile__identity player-profile__identity--overlay">
+            <ClassAvatar className={data.className} label={data.playerName} size={48} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                className="player-profile__player-name-row"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  width: "100%",
+                }}
+              >
+                <div className="player-profile__player-name">{data.playerName}</div>
+                {favoriteControl?.visible && (
+                  <button
+                    type="button"
+                    className="player-profile__favorite-star-button"
+                    onClick={favoriteControl.onToggle}
+                    disabled={loading || favoriteControl.disabled}
+                    aria-label={favoriteControl.ariaLabel}
+                    title={favoriteControl.title ?? favoriteControl.ariaLabel}
                     style={{
-                      fontSize: 28,
+                      background: "transparent",
+                      border: "none",
+                      boxShadow: "none",
+                      padding: 4,
+                      margin: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: loading || favoriteControl.disabled ? "default" : "pointer",
+                      color: favoriteControl.isFavorite ? "#facc15" : "rgba(226, 232, 240, 0.92)",
+                      opacity: loading || favoriteControl.disabled ? 0.55 : 1,
                       lineHeight: 1,
-                      filter: favoriteControl.isFavorite ? "drop-shadow(0 0 6px rgba(250, 204, 21, 0.35))" : "none",
+                      flexShrink: 0,
                     }}
                   >
-                    {favoriteControl.isFavorite ? "\u2605" : "\u2606"}
-                  </span>
-                </button>
+                    <span
+                      aria-hidden
+                      style={{
+                        fontSize: 28,
+                        lineHeight: 1,
+                        filter: favoriteControl.isFavorite ? "drop-shadow(0 0 6px rgba(250, 204, 21, 0.35))" : "none",
+                      }}
+                    >
+                      {favoriteControl.isFavorite ? "\u2605" : "\u2606"}
+                    </span>
+                  </button>
+                )}
+              </div>
+              <div className="player-profile__player-meta">
+                <span>{data.className || t("playerProfile.heroPanel.meta.classUnknown", { defaultValue: "Class ?" })}</span>
+                {data.guild && <span>• {data.guild}</span>}
+                {data.server && <span>• {data.server}</span>}
+              </div>
+              {localizedLastScanLabel && (
+                <div className="player-profile__player-meta player-profile__player-meta--soft">
+                  {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
+                </div>
               )}
+              <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
+                <div className="player-profile__freshness">
+                  <span
+                    aria-hidden
+                    className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
+                  />
+                  <span className="player-profile__freshness-label">{freshness.label}</span>
+                  <span aria-hidden className="player-profile__freshness-info">ⓘ</span>
+                </div>
+              </Tooltip>
             </div>
-            <div className="player-profile__player-meta">
-              <span>{data.className || t("playerProfile.heroPanel.meta.classUnknown", { defaultValue: "Class ?" })}</span>
-              {data.guild && <span>• {data.guild}</span>}
-              {data.server && <span>• {data.server}</span>}
-            </div>
-            {localizedLastScanLabel && (
-              <div className="player-profile__player-meta player-profile__player-meta--soft">
-                {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
-              </div>
-            )}
-            <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
-              <div className="player-profile__freshness">
-                <span
-                  aria-hidden
-                  className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
-                />
-                <span className="player-profile__freshness-label">{freshness.label}</span>
-                <span aria-hidden className="player-profile__freshness-info">ⓘ</span>
-              </div>
-            </Tooltip>
           </div>
+          <PortraitPreview
+            config={portraitConfig}
+            label={data.playerName}
+            fallbackImage={portraitFallbackUrl}
+            fallbackLabel={portraitFallbackLabel}
+          />
         </div>
-        <PortraitPreview
-          config={portraitConfig}
-          label={data.playerName}
-          fallbackImage={portraitFallbackUrl}
-          fallbackLabel={portraitFallbackLabel}
-        />
-      </div>
-      <div className="player-profile__hero-body">
+        <div className="player-profile__hero-body">
 
-        <div className="player-profile__hero-metrics">
+          <div className="player-profile__hero-metrics">
           {heroMetrics.map((metric, metricIndex) => {
             if (metric.gauge) {
               const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
@@ -413,8 +416,8 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
           />
         )}
 
-        {(data.badges.length > 0 || potionSlots.length > 0) && (
-          <div className="player-profile__hero-meta-row">
+          {(data.badges.length > 0 || potionSlots.length > 0) && (
+            <div className="player-profile__hero-meta-row">
             {potionSlots.length > 0 && (
               <div className="player-profile__hero-potions-inline">
                 <span className="player-profile__hero-potion-label">
@@ -472,11 +475,11 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
                 ))}
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {data.actions.length > 0 && (
-          <div className="player-profile__hero-actions">
+          {data.actions.length > 0 && (
+            <div className="player-profile__hero-actions">
             {data.actions.map((action) => (
               <button
                 key={action.key}
@@ -489,12 +492,12 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
                 {action.label}
               </button>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
 }
 
 export default React.memo(HeroPanel);
-

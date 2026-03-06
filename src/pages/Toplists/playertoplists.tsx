@@ -15,6 +15,7 @@ import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import ToplistExportTable, { type ToplistExportRow } from "../../components/export/ToplistExportTable";
+import GuildToplistExportTable from "../../components/export/GuildToplistExportTable";
 import ToplistPngExportDialog, {
   type ToplistExportAmount,
   type ToplistExportSelection,
@@ -70,11 +71,14 @@ type CompareSnapshotState = {
   missingServers: string[];
   error: string | null;
 };
+type ToplistExportKind = "players" | "guilds";
 type ToplistExportSnapshot = {
+  kind: ToplistExportKind;
   rows: ToplistExportRow[];
   showCompare: boolean;
 };
 type ToplistExportRenderState = {
+  kind: ToplistExportKind;
   rows: ToplistExportRow[];
   showCompare: boolean;
   width: number;
@@ -848,7 +852,15 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
 }
 
 const DEFAULT_GUILD_SORT = "guildAvgLevel";
-const GUILD_SORT_KEYS = new Set(["guildMembers", "guildAvgLevel", "guildAvgSum", "guildLastScan"]);
+const GUILD_SORT_KEYS = new Set([
+  "guildMembers",
+  "guildAvgLevel",
+  "guildAvgMain",
+  "guildAvgCon",
+  "guildAvgSum",
+  "guildRaids",
+  "guildHydra",
+]);
 const resolveGuildSort = (value: string | null | undefined) =>
   GUILD_SORT_KEYS.has(String(value ?? "").trim()) ? String(value).trim() : DEFAULT_GUILD_SORT;
 let PLAYER_AVG_MODE_CACHE: "base" | "total" = "base";
@@ -1115,8 +1127,10 @@ function PlayerToplistsPageContent() {
   const setServersRef = React.useRef(setServers);
   const setClassesRef = React.useRef(setClasses);
   const lastUrlWriteRef = React.useRef<string | null>(null);
+  const prevUrlSyncedServersKeyRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
   const tableExportSnapshotRef = React.useRef<ToplistExportSnapshot>({
+    kind: "players",
     rows: [],
     showCompare: false,
   });
@@ -1128,6 +1142,7 @@ function PlayerToplistsPageContent() {
   const [exportRangeEnabled, setExportRangeEnabled] = React.useState(false);
   const [exportRangeFrom, setExportRangeFrom] = React.useState(1);
   const [exportRangeTo, setExportRangeTo] = React.useState(50);
+  const [exportDialogKind, setExportDialogKind] = React.useState<ToplistExportKind>("players");
   const [exportDialogRows, setExportDialogRows] = React.useState<ToplistExportRow[]>([]);
   const [exportDialogShowCompare, setExportDialogShowCompare] = React.useState(false);
   const [exportGuildOptions, setExportGuildOptions] = React.useState<string[]>([]);
@@ -1167,6 +1182,7 @@ function PlayerToplistsPageContent() {
   const openExportDialog = () => {
     const snapshot = tableExportSnapshotRef.current;
     const snapshotRows = Array.isArray(snapshot.rows) ? [...snapshot.rows] : [];
+    setExportDialogKind(snapshot.kind);
     setExportDialogRows(snapshotRows);
     setExportDialogShowCompare(Boolean(snapshot.showCompare));
     setExportGuildOptions(deriveExportGuildNames(snapshotRows));
@@ -1244,6 +1260,7 @@ function PlayerToplistsPageContent() {
     setExportNonce(nextExportNonce);
     setExportRenderKey(nextExportRenderKey);
     setExportRenderState({
+      kind: exportDialogKind,
       rows: rowsForExport,
       showCompare: exportDialogShowCompare,
       width,
@@ -1345,6 +1362,9 @@ function PlayerToplistsPageContent() {
     const nextParams = new URLSearchParams(searchParams);
     const nextServers = normalizedServersKey;
     const nextClasses = normalizedClassesKey;
+    const prevServersKey = prevUrlSyncedServersKeyRef.current;
+    const serverSelectionChanged = prevServersKey != null && prevServersKey !== nextServers;
+    prevUrlSyncedServersKeyRef.current = nextServers;
 
     if (nextServers) {
       nextParams.set("server", nextServers);
@@ -1359,6 +1379,12 @@ function PlayerToplistsPageContent() {
       nextParams.delete("class");
     }
     nextParams.delete("classes");
+
+    // Focus deep-link should apply once. When server selection changes, clear it to avoid repeated re-highlighting.
+    if (serverSelectionChanged) {
+      nextParams.delete("focus");
+      nextParams.delete("rank");
+    }
 
     const nextKey = nextParams.toString();
     if (nextKey !== searchKey) {
@@ -1562,13 +1588,21 @@ function PlayerToplistsPageContent() {
           }}
         >
           <div ref={exportNodeRef}>
-            <ToplistExportTable
-              key={exportRenderKey}
-              rows={exportRenderState.rows}
-              showCompare={exportRenderState.showCompare}
-              width={exportRenderState.width}
-              exportNonce={exportNonce}
-            />
+            {exportRenderState.kind === "guilds" ? (
+              <GuildToplistExportTable
+                key={exportRenderKey}
+                rows={exportRenderState.rows}
+                width={exportRenderState.width}
+              />
+            ) : (
+              <ToplistExportTable
+                key={exportRenderKey}
+                rows={exportRenderState.rows}
+                showCompare={exportRenderState.showCompare}
+                width={exportRenderState.width}
+                exportNonce={exportNonce}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1710,7 +1744,15 @@ function TableDataView({
     [sortKey]
   );
 
-  const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("en").format(n));
+  const formatDeWithSpaceGrouping = (value: number, options?: Intl.NumberFormatOptions) =>
+    new Intl.NumberFormat("de-DE", options)
+      .formatToParts(value)
+      .map((part) => (part.type === "group" ? " " : part.value))
+      .join("");
+  const fmtNum = (n: number | null | undefined) => {
+    if (n == null || !Number.isFinite(n)) return "";
+    return formatDeWithSpaceGrouping(n);
+  };
   const fmtDelta = (n: number | null | undefined) => {
     if (n == null) return "";
     const formatted = fmtNum(Math.abs(n));
@@ -2424,6 +2466,7 @@ function TableDataView({
     });
   }, [showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
   exportSnapshotRef.current = {
+    kind: "players",
     rows: enhancedRows as ToplistExportRow[],
     showCompare,
   };

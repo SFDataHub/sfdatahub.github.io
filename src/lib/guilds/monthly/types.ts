@@ -5,6 +5,8 @@ export type Member = {
   name?: string | null;
   class?: string | null;
   level?: number | null;
+  xpProgress?: number | null;
+  xpTotal?: number | null;
   baseMain?: number | null;
   conBase?: number | null;
   sumBaseTotal?: number | null;

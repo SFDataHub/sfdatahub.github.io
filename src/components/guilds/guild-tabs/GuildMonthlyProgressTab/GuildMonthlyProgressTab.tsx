@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styles from "./GuildMonthlyProgressTab.module.css";
 import { formatScanDateTimeLabel } from "../../../../lib/ui/formatScanDateTimeLabel";
+import GuildMonthlyProgressPngExportButton from "./GuildMonthlyProgressPngExportButton";
+import GuildMonthlyProgressExportView from "./GuildMonthlyProgressExportView";
+import GuildMonthlyProgressHudBarList from "./GuildMonthlyProgressHudBarList";
 import type {
   GuildMonthlyProgressData,
-  TableBlock,
-  TableColumn,
-  TableRow,
   MonthOption,
+  TableBlock,
 } from "./GuildMonthlyProgressTab.types";
 
 type Props = {
@@ -14,23 +15,9 @@ type Props = {
   onMonthChange?: (monthKey: string) => void;
 };
 
-/* ====================== Helpers ====================== */
-
-function formatNum(n: number | string | null | undefined) {
-  if (n === null || n === undefined || n === "") return "—";
-  const v = typeof n === "number" ? n : Number(String(n).replace(/[^\d.-]/g, ""));
-  if (!isFinite(v)) return String(n);
-  if (Math.abs(v) >= 1_000_000_000) return (v / 1_000_000_000).toFixed(2) + "B";
-  if (Math.abs(v) >= 1_000_000) return (v / 1_000_000).toFixed(2) + "M";
-  if (Math.abs(v) >= 1_000) return (v / 1_000).toFixed(2) + "K";
-  return v.toLocaleString("en-US");
-}
-
 function fmtDate(dISO: string) {
   return formatScanDateTimeLabel(dISO);
 }
-
-/* ====================== Reusable UI ====================== */
 
 const BlockCard: React.FC<{
   title?: string;
@@ -53,54 +40,40 @@ const BlockCard: React.FC<{
 );
 
 const DataTable: React.FC<{ block: TableBlock }> = ({ block }) => {
-  const cols = block.columns;
-  const rows = block.rows ?? [];
+  const groups = (block.groups ?? []).filter((group) => (group.rows ?? []).length > 0);
+  const hasRows = (block.rows ?? []).length > 0;
+  const scopeBase = block.title ?? "hud";
   return (
     <div className={styles.tableWrap} role="region" aria-label={block.title ?? "table"}>
-      {block.title && <div className={styles.tableTitle}>{block.title}</div>}
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            {cols.map((c: TableColumn) => (
-              <th key={c.key} className={styles.th} style={{ width: c.width }}>
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td className={styles.tdEmpty} colSpan={cols.length}>
-                No data
-              </td>
-            </tr>
-          ) : (
-            rows.map((r: TableRow, i: number) => (
-              <tr key={r.id ?? i}>
-                {cols.map((c) => {
-                  const raw = r[c.key];
-                  const val =
-                    typeof raw === "number" || typeof raw === "string" ? raw : "";
-                  const display =
-                    c.format === "num" ? formatNum(val as any) : (val as any);
-                  return (
-                    <td key={c.key} className={styles.td} data-align={c.align ?? "left"}>
-                      {c.render ? c.render(r) : display}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {groups.length > 0 ? (
+        <div className={styles.groupList}>
+          {groups.map((group) => (
+            <section key={group.key} className={styles.groupBlock}>
+              <header className={styles.groupHeader}>
+                <span className={styles.groupTitle}>{group.label}</span>
+                {group.subtitle ? <span className={styles.groupSubtitle}>{group.subtitle}</span> : null}
+              </header>
+              <GuildMonthlyProgressHudBarList
+                columns={block.columns}
+                rows={group.rows ?? []}
+                scopeKey={`${scopeBase}-${group.key}`}
+              />
+            </section>
+          ))}
+        </div>
+      ) : hasRows ? (
+        <GuildMonthlyProgressHudBarList
+          columns={block.columns}
+          rows={block.rows ?? []}
+          scopeKey={scopeBase}
+        />
+      ) : (
+        <div className={styles.hudNoData}>No data</div>
+      )}
       {block.footer && <div className={styles.tableFooter}>{block.footer}</div>}
     </div>
   );
 };
-
-/* ====================== Custom Dropdown ====================== */
 
 const useClickOutside = (ref: React.RefObject<HTMLElement>, onClose: () => void) => {
   useEffect(() => {
@@ -119,14 +92,19 @@ const MonthDropdown: React.FC<{
   onChange?: (k: string) => void;
   fallbackDate?: string;
 }> = ({ months, currentKey, onChange, fallbackDate }) => {
-  const hasList = Array.isArray(months) && months.length > 0 && currentKey;
-  if (!hasList) return <div className={styles.bannerSub}>{fallbackDate ?? ""}</div>;
-
   const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   useClickOutside(anchorRef, () => setOpen(false));
+  const list = months ?? [];
+  const hasList = Boolean(currentKey && list.length > 0);
 
-  const current = months!.find((m) => m.key === currentKey);
+  useEffect(() => {
+    if (!hasList && open) setOpen(false);
+  }, [hasList, open]);
+
+  if (!hasList) return <div className={styles.bannerSub}>{fallbackDate ?? ""}</div>;
+
+  const current = list.find((m) => m.key === currentKey);
   const badge = current
     ? `${fmtDate(current.fromISO)}–${fmtDate(current.toISO)} • ${current.daysSpan}d${
         current.available ? "" : " • n/a"
@@ -146,20 +124,14 @@ const MonthDropdown: React.FC<{
           aria-expanded={open}
         >
           <span className={styles.monthButtonText}>{current?.label ?? "—"}</span>
-          <svg
-            className={styles.chev}
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
+          <svg className={styles.chev} width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="currentColor" d="M7 10l5 5 5-5z" />
           </svg>
         </button>
 
         {open && (
           <ul className={styles.monthList} role="listbox">
-            {months!.map((m) => (
+            {list.map((m) => (
               <li key={m.key}>
                 <button
                   type="button"
@@ -184,9 +156,6 @@ const MonthDropdown: React.FC<{
   );
 };
 
-/* ====================== Banner & Layout ====================== */
-
-/** Banner: Zeile 1 = Titel mit Linien links/rechts, Zeile 2 = Dropdown darunter */
 const Banner: React.FC<{
   title: string;
   monthRange?: string;
@@ -211,33 +180,26 @@ const Banner: React.FC<{
   </div>
 );
 
-const EmblemPanel: React.FC<{ emblemUrl?: string; caption?: string }> = ({
-  emblemUrl,
-  caption,
-}) => (
+const EmblemPanel: React.FC<{ emblemUrl?: string }> = ({ emblemUrl }) => (
   <div className={styles.emblemPanel}>
     <div className={styles.emblemFrame}>
       {emblemUrl ? (
-        <img src={emblemUrl} alt="Guild Emblem" className={styles.emblemImg} />
+        <img
+          src={emblemUrl}
+          alt="Guild Emblem"
+          className={styles.emblemImg}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+          loading="eager"
+          decoding="sync"
+        />
       ) : (
         <div className={styles.emblemPlaceholder}>Emblem</div>
       )}
       <div className={styles.emblemShimmer} />
     </div>
-    {caption && <div className={styles.emblemCaption}>{caption}</div>}
   </div>
 );
-
-const SideImage: React.FC<{ imgUrl?: string; alt?: string }> = ({ imgUrl, alt }) => (
-  <div className={styles.sideImage}>
-    {imgUrl ? <img src={imgUrl} alt={alt ?? "side"} /> : <div className={styles.sideImagePh}>Image</div>}
-  </div>
-);
-
-const GridRow: React.FC<{ children: React.ReactNode; className?: string }> = ({
-  children,
-  className,
-}) => <div className={`${styles.gridRow} ${className ?? ""}`}>{children}</div>;
 
 const SectionDivider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className={styles.sectionDivider}>
@@ -247,44 +209,64 @@ const SectionDivider: React.FC<{ children: React.ReactNode }> = ({ children }) =
   </div>
 );
 
-/* ====================== Main ====================== */
-
 const GuildMonthlyProgressTab: React.FC<Props> = ({ data, onMonthChange }) => {
-  const { header, panels, tablesTop, tablesBottom } = data;
+  const { header, topRow, sections } = data;
+  const exportCardRef = useRef<HTMLDivElement>(null);
+  const exportRootIdRef = useRef(`monthly-progress-export-${Math.random().toString(36).slice(2, 10)}`);
+  const exportRootId = exportRootIdRef.current;
 
   return (
-    <div className={styles.wrap}>
-      <Banner
-        title={header.title}
-        monthRange={header.monthRange}
-        months={header.months}
-        currentMonthKey={header.currentMonthKey}
-        onMonthChange={onMonthChange}
-      />
+    <div className={styles.exportShell}>
+      <div className={styles.exportToolbar}>
+        <GuildMonthlyProgressPngExportButton
+          targetRef={exportCardRef}
+          fileBaseName={`${header.title ?? "guild-monthly-progress"}-${header.currentMonthKey ?? "latest"}`}
+          exportRootId={exportRootId}
+        />
+      </div>
 
-      <GridRow>
-        <SideImage imgUrl={panels?.leftImageUrl} alt="left" />
-        <EmblemPanel emblemUrl={header.emblemUrl} caption={header.centerCaption} />
-        <SideImage imgUrl={panels?.rightImageUrl} alt="right" />
-      </GridRow>
+      <GuildMonthlyProgressExportView exportRef={exportCardRef} exportRootId={exportRootId}>
+        <Banner
+          title={header.title}
+          monthRange={header.monthRange}
+          months={header.months}
+          currentMonthKey={header.currentMonthKey}
+          onMonthChange={onMonthChange}
+        />
 
-      <GridRow>
-        {tablesTop.map((block, idx) => (
-          <BlockCard key={idx} title={block.title} subtitle={block.subtitle}>
-            <DataTable block={block} />
+        <div className={styles.topRow}>
+          <BlockCard title={topRow.xpBlock.title} subtitle={topRow.xpBlock.subtitle}>
+            <DataTable block={topRow.xpBlock} />
           </BlockCard>
-        ))}
-      </GridRow>
 
-      <SectionDivider>Guild Overview</SectionDivider>
+          <EmblemPanel emblemUrl={header.emblemUrl} />
 
-      <GridRow className={styles.gridRowBottom}>
-        {tablesBottom.map((block, idx) => (
-          <BlockCard key={idx} title={block.title} subtitle={block.subtitle}>
-            <DataTable block={block} />
+          <BlockCard
+            title={topRow.rightPlaceholder?.title}
+            subtitle={topRow.rightPlaceholder?.subtitle}
+          >
+            <div className={styles.placeholderPanel}>{topRow.rightPlaceholder?.body ?? " "}</div>
           </BlockCard>
-        ))}
-      </GridRow>
+        </div>
+
+        <SectionDivider>Most Base Stats gained</SectionDivider>
+        <div className={styles.sectionGrid}>
+          {sections.mostBaseStatsGained.map((block, idx) => (
+            <BlockCard key={`most-${idx}`} title={block.title} subtitle={block.subtitle}>
+              <DataTable block={block} />
+            </BlockCard>
+          ))}
+        </div>
+
+        <SectionDivider>Highest Base Stats</SectionDivider>
+        <div className={styles.sectionGrid}>
+          {sections.highestBaseStats.map((block, idx) => (
+            <BlockCard key={`high-${idx}`} title={block.title} subtitle={block.subtitle}>
+              <DataTable block={block} />
+            </BlockCard>
+          ))}
+        </div>
+      </GuildMonthlyProgressExportView>
     </div>
   );
 };

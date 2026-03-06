@@ -914,6 +914,102 @@
       }
     }
   },
+  "guildProfile": {
+    "heroPanel": {
+      "actions": {
+        "openGuild": "Gilde oeffnen",
+        "share": "Teilen",
+        "copyLink": "Link kopieren"
+      },
+      "tooltips": {
+        "lastScanAt": "Letzter Scan: {{value}}",
+        "age": {
+          "label": "Alter: {{value}}",
+          "today": "heute",
+          "oneDayAgo": "vor 1 Tag",
+          "daysAgo": "vor {{days}} Tagen"
+        }
+      },
+      "meta": {
+        "server": "Server",
+        "members": "Mitglieder",
+        "hofRank": "HoF-Rang",
+        "lastScanned": "Zuletzt gescannt"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Unbekannt",
+            "hint": "Scan-Verlauf nicht verfuegbar"
+          },
+          "scannedToday": {
+            "label": "Heute gescannt",
+            "hint": "Kein Rescan noetig"
+          },
+          "veryFresh": {
+            "label": "Sehr frisch",
+            "hint": "Kein Rescan noetig"
+          },
+          "fresh": {
+            "label": "Frisch",
+            "hint": "Kein Rescan noetig"
+          },
+          "recent": {
+            "label": "Kuerzlich",
+            "hint": "Rescan empfohlen"
+          },
+          "aging": {
+            "label": "Aelter",
+            "hint": "Rescan empfohlen"
+          },
+          "outdated": {
+            "label": "Veraltet",
+            "hint": "Rescan dringend empfohlen"
+          },
+          "stale": {
+            "label": "Stark veraltet",
+            "hint": "Rescan dringend empfohlen"
+          }
+        }
+      },
+      "sections": {
+        "guildOverview": "Gildenuebersicht",
+        "averagePlayerStats": "Durchschnittliche Spielerwerte",
+        "modeToggle": "Basis oder Gesamt",
+        "base": "Basis",
+        "total": "Gesamt",
+        "classOverview": "Klassenuebersicht",
+        "classDistribution": "Klassenverteilung"
+      },
+      "metrics": {
+        "activity": "Aktivitaet",
+        "placeholder2": "Bereitschaft",
+        "placeholder3": "Basiswerte gesamt",
+        "placeholderHint": "Daten ausstehend"
+      },
+      "top3": {
+        "mainAttribute": "Hauptattribut Top 3",
+        "con": "Con Top 3",
+        "sum": "Summe Top 3",
+        "total": "Gesamt Top 3",
+        "rankLabel": "Rang {{rank}}"
+      },
+      "statsLabels": {
+        "main": "Hauptattribut",
+        "con": "Con",
+        "sum": "Summe",
+        "total": "Gesamt"
+      },
+      "transfers": {
+        "title": "Transfers",
+        "joined": "Beigetreten",
+        "left": "Verlassen",
+        "noMonthlyComparison": "Kein monatlicher Vergleichssnapshot verfuegbar",
+        "empty": "Keine Aenderungen",
+        "levelShort": "Lv"
+      }
+    }
+  },
   "help": {
     "title": "Hilfe & Ãœbersicht",
     "subtitle": "Kurzer Einstieg in den SFDataHub",

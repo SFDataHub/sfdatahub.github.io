@@ -164,9 +164,12 @@ export default function HudFilters({
           {isGuildMode ? (
             <>
               <option value="guildMembers">Members</option>
-              <option value="guildAvgLevel">Avg Lv</option>
-              <option value="guildAvgSum">Avg Sum</option>
-              <option value="guildLastScan">Last Scan</option>
+              <option value="guildAvgLevel">ø Lv</option>
+              <option value="guildAvgMain">ø Main</option>
+              <option value="guildAvgCon">ø Con</option>
+              <option value="guildAvgSum">ø Sum</option>
+              <option value="guildRaids">Raids</option>
+              <option value="guildHydra">Hydra</option>
             </>
           ) : (
             <>
