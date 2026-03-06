@@ -1,0 +1,23 @@
+.exportButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #1A2F4A;
+  border: 1px solid #2B4C73;
+  color: #F5F9FF;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.exportButton:hover:not(:disabled) {
+  background: #25456B;
+}
+
+.exportButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+}

@@ -10,6 +10,7 @@ import { getClassIconUrl } from "../ui/shared/classIcons";
 import ClassCrestGrid from "./GuildClassOverview/ClassCrestGrid";
 import ClassDonut from "./GuildClassOverview/ClassDonut";
 import type { GuildClassOverviewProps } from "./GuildClassOverview/types";
+import { getGuildClassAccent, getGuildMutedAccent } from "./classColors";
 
 type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
 type TranslateFn = (key: string, options?: any) => string;
@@ -73,6 +74,22 @@ export type GuildHeroTop3Data = {
   };
 };
 
+export type GuildHeroTransferEntry = {
+  memberId: string;
+  name: string;
+  classLabel: string;
+  level?: number | null;
+  classKey?: string;
+};
+
+export type GuildHeroTransfersData = {
+  joined?: GuildHeroTransferEntry[];
+  left?: GuildHeroTransferEntry[];
+  hasMonthlyComparison?: boolean;
+  comparisonFromLabel?: string | null;
+  comparisonToLabel?: string | null;
+};
+
 export type GuildHeroPanelData = {
   guildName: string;
   subtitle?: string | null;
@@ -90,6 +107,7 @@ export type GuildHeroPanelData = {
   averageStats?: GuildHeroAverageStats;
   activityPct?: number | null;
   top3?: GuildHeroTop3Data;
+  transfers?: GuildHeroTransfersData;
   classTabs?: Pick<GuildClassOverviewProps, "data" | "classMeta" | "onPickClass">;
 };
 
@@ -330,7 +348,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
       ? metrics
       : [
           {
-            label: "Activity",
+            label: t("guildProfile.heroPanel.metrics.activity", { defaultValue: "Activity" }),
             value:
               typeof data.activityPct === "number" && Number.isFinite(data.activityPct)
                 ? `${Math.max(0, Math.min(100, Math.round(data.activityPct)))}%`
@@ -344,7 +362,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
                 typeof data.activityPct === "number" && Number.isFinite(data.activityPct)
                   ? `${Math.max(0, Math.min(100, Math.round(data.activityPct)))}%`
                   : "--",
-              centerBottom: "Activity",
+              centerBottom: t("guildProfile.heroPanel.metrics.activity", { defaultValue: "Activity" }),
             },
           },
           {
@@ -361,6 +379,76 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             value: "--",
           },
         ];
+  const gaugeMetricsToRender = useMemo<GuildHeroMetric[]>(() => {
+    const gauges = metricsToRender.filter((metric) => Boolean(metric.gauge)).slice(0, 2);
+    if (gauges.length === 2) return gauges;
+    const fallbackGauges: GuildHeroMetric[] = [
+      {
+        label: t("guildProfile.heroPanel.metrics.activity", { defaultValue: "Activity" }),
+        value: "--",
+        gauge: {
+          progress: 0,
+          centerTop: "--",
+          centerBottom: t("guildProfile.heroPanel.metrics.activity", { defaultValue: "Activity" }),
+        },
+      },
+      {
+        label: t("guildProfile.heroPanel.metrics.placeholder2", { defaultValue: "Readiness" }),
+        value: "--",
+        gauge: {
+          progress: 0,
+          centerTop: "--",
+          centerBottom: t("guildProfile.heroPanel.metrics.placeholderHint", { defaultValue: "Pending data" }),
+        },
+      },
+    ];
+    return [...gauges, ...fallbackGauges.slice(gauges.length, 2)];
+  }, [metricsToRender, t]);
+  const hasMonthlyTransferComparison = data.transfers?.hasMonthlyComparison ?? false;
+  const transferComparisonSubtitle = useMemo(() => {
+    if (!hasMonthlyTransferComparison) return null;
+    const fromLabel = data.transfers?.comparisonFromLabel ?? null;
+    const toLabel = data.transfers?.comparisonToLabel ?? null;
+    if (!fromLabel || !toLabel) return null;
+    return t("guildProfile.heroPanel.transfers.changesRange", {
+      from: fromLabel,
+      to: toLabel,
+      defaultValue: "Changes: {{from}} → {{to}}",
+    });
+  }, [data.transfers?.comparisonFromLabel, data.transfers?.comparisonToLabel, hasMonthlyTransferComparison, t]);
+  const transferPanels = useMemo(
+    () => [
+      {
+        key: "joined",
+        label: t("guildProfile.heroPanel.transfers.joined", { defaultValue: "Joined" }),
+        entries: data.transfers?.joined ?? [],
+        tone: "#5CC689",
+        mutedTone: "rgba(92, 198, 137, 0.18)",
+        chipBorder: "rgba(92, 198, 137, 0.44)",
+        chipBackground: "linear-gradient(135deg, rgba(92, 198, 137, 0.32) 0%, rgba(92, 198, 137, 0.14) 100%)",
+        panelBackground: "linear-gradient(180deg, rgba(17, 38, 30, 0.64) 0%, rgba(8, 22, 40, 0.7) 100%)",
+        panelBorder: "rgba(92, 198, 137, 0.34)",
+        rowBorder: "rgba(176, 196, 217, 0.24)",
+        rowBackground: "rgba(8, 18, 30, 0.58)",
+        scrollbarThumb: "rgba(92, 198, 137, 0.58)",
+      },
+      {
+        key: "left",
+        label: t("guildProfile.heroPanel.transfers.left", { defaultValue: "Left" }),
+        entries: data.transfers?.left ?? [],
+        tone: "#F59E6A",
+        mutedTone: "rgba(245, 158, 106, 0.18)",
+        chipBorder: "rgba(245, 158, 106, 0.44)",
+        chipBackground: "linear-gradient(135deg, rgba(245, 158, 106, 0.32) 0%, rgba(245, 158, 106, 0.14) 100%)",
+        panelBackground: "linear-gradient(180deg, rgba(45, 30, 20, 0.64) 0%, rgba(8, 22, 40, 0.7) 100%)",
+        panelBorder: "rgba(245, 158, 106, 0.34)",
+        rowBorder: "rgba(176, 196, 217, 0.24)",
+        rowBackground: "rgba(8, 18, 30, 0.58)",
+        scrollbarThumb: "rgba(245, 158, 106, 0.58)",
+      },
+    ],
+    [data.transfers?.joined, data.transfers?.left, t],
+  );
   const actionsToRender: GuildHeroAction[] = useMemo(() => {
     const defaultActions: GuildHeroAction[] =
       context === "profile"
@@ -440,27 +528,63 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     const source =
       statsMode === "base"
         ? [
-            { key: "main", title: "MAIN Top 3", entries: data.top3?.base?.main ?? [] },
-            { key: "con", title: "CON Top 3", entries: data.top3?.base?.con ?? [] },
-            { key: "sum", title: "SUM Top 3", entries: data.top3?.base?.sum ?? [] },
+            {
+              key: "main",
+              title: t("guildProfile.heroPanel.top3.mainAttribute", { defaultValue: "Main Attribute Top 3" }),
+              entries: data.top3?.base?.main ?? [],
+            },
+            {
+              key: "con",
+              title: t("guildProfile.heroPanel.top3.con", { defaultValue: "Con Top 3" }),
+              entries: data.top3?.base?.con ?? [],
+            },
+            {
+              key: "sum",
+              title: t("guildProfile.heroPanel.top3.sum", { defaultValue: "Sum Top 3" }),
+              entries: data.top3?.base?.sum ?? [],
+            },
           ]
         : [
-            { key: "main", title: "MAIN Top 3", entries: data.top3?.total?.main ?? [] },
-            { key: "con", title: "CON Top 3", entries: data.top3?.total?.con ?? [] },
-            { key: "total", title: "TOTAL Top 3", entries: data.top3?.total?.total ?? [] },
+            {
+              key: "main",
+              title: t("guildProfile.heroPanel.top3.mainAttribute", { defaultValue: "Main Attribute Top 3" }),
+              entries: data.top3?.total?.main ?? [],
+            },
+            {
+              key: "con",
+              title: t("guildProfile.heroPanel.top3.con", { defaultValue: "Con Top 3" }),
+              entries: data.top3?.total?.con ?? [],
+            },
+            {
+              key: "total",
+              title: t("guildProfile.heroPanel.top3.total", { defaultValue: "Total Top 3" }),
+              entries: data.top3?.total?.total ?? [],
+            },
           ];
 
     return source.map((panel) => ({
       ...panel,
       entries: Array.from({ length: 3 }, (_, index) => panel.entries[index] ?? null),
     }));
-  }, [data.top3, statsMode]);
+  }, [data.top3, statsMode, t]);
+  const statLabelByKey = useMemo(
+    () => ({
+      main: t("guildProfile.heroPanel.statsLabels.main", { defaultValue: "Main" }),
+      con: t("guildProfile.heroPanel.statsLabels.con", { defaultValue: "Con" }),
+      sum: t("guildProfile.heroPanel.statsLabels.sum", { defaultValue: "Sum" }),
+      total: t("guildProfile.heroPanel.statsLabels.total", { defaultValue: "Total" }),
+    }),
+    [t],
+  );
   const classAccentByLabel = useMemo(() => {
     const meta = classTabs?.classMeta ?? [];
     const map = new Map<string, string>();
     meta.forEach((item, index) => {
       const hue = Math.round((360 / Math.max(meta.length, 1)) * index);
-      const color = `hsl(${hue} 60% 55%)`;
+      const color =
+        getGuildClassAccent(item.id) ??
+        getGuildClassAccent(item.name) ??
+        `hsl(${hue} 60% 55%)`;
       map.set(normalizeClassToken(item.name), color);
       map.set(normalizeClassToken(item.id), color);
     });
@@ -541,7 +665,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             style={{ background: `linear-gradient(90deg, transparent, ${palette.icon}, transparent)` }}
           />
           <div className={guildProfileInfoStyles.sectionTitle} style={{ color: palette.soft }}>
-            GUILD OVERVIEW
+            {t("guildProfile.heroPanel.sections.guildOverview", { defaultValue: "Guild Overview" })}
           </div>
           <div
             className={guildProfileInfoStyles.sectionStripe}
@@ -642,72 +766,60 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
                   </div>
                 </Tooltip>
               </div>
+
+              <div
+                className={`rounded-2xl border ${isOverlayContext ? "p-2.5" : "p-3"}`}
+                style={{ borderColor: palette.line, background: "rgba(2, 17, 40, 0.42)" }}
+              >
+                <div className={`grid grid-cols-2 ${isOverlayContext ? "gap-2" : "gap-2.5"}`}>
+                  {gaugeMetricsToRender.map((metric, index) => {
+                    if (!metric.gauge) return null;
+                    const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
+                    const hoverLines =
+                      metric.gauge.details && metric.gauge.details.length > 0
+                        ? metric.gauge.details
+                        : metric.gauge.centerBottom
+                          ? [metric.gauge.centerBottom]
+                          : [];
+                    const hoverDetails =
+                      hoverLines.length > 0 ? (
+                        <div className="space-y-1 text-xs">
+                          {hoverLines.map((line) => (
+                            <div key={line}>{line}</div>
+                          ))}
+                        </div>
+                      ) : undefined;
+
+                    return (
+                      <div
+                        key={`left-gauge-${metric.label}-${index}`}
+                        className={`flex items-center justify-center rounded-xl border ${isOverlayContext ? "min-h-[102px] p-1.5" : "min-h-[112px] p-2"}`}
+                        style={{ borderColor: "transparent", background: "transparent" }}
+                      >
+                        <HexGauge
+                          value={progress}
+                          size={isOverlayContext ? 104 : 112}
+                          stroke={9}
+                          center={
+                            <div className="text-sm font-semibold" style={{ color: palette.title }}>
+                              {metric.gauge.centerTop}
+                            </div>
+                          }
+                          hoverDetails={hoverDetails}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="min-w-0">
             <div ref={middleRef} className={`h-fit self-start min-w-0 ${isOverlayContext ? "space-y-3" : "space-y-4"}`}>
-              <div className={`grid grid-cols-1 ${isOverlayContext ? "gap-2.5" : "gap-3"} sm:grid-cols-2 xl:grid-cols-3`}>
-            {metricsToRender.map((metric, index) => {
-            if (metric.gauge) {
-              const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
-              const hoverLines =
-                metric.gauge.details && metric.gauge.details.length > 0
-                  ? metric.gauge.details
-                  : metric.gauge.centerBottom
-                    ? [metric.gauge.centerBottom]
-                    : [];
-              const hoverDetails =
-                hoverLines.length > 0 ? (
-                  <div className="space-y-1 text-xs">
-                    {hoverLines.map((line) => (
-                      <div key={line}>{line}</div>
-                    ))}
-                  </div>
-                ) : undefined;
-
-              return (
-                <div
-                  key={`${metric.label}-${index}`}
-                  className={`flex items-center justify-center rounded-xl border ${isOverlayContext ? "min-h-[120px] p-2.5" : "min-h-[132px] p-3"}`}
-                  style={{ borderColor: "transparent", background: "transparent" }}
-                >
-                  <HexGauge
-                    value={progress}
-                    size={124}
-                    stroke={10}
-                    center={<div className="text-sm font-semibold" style={{ color: palette.title }}>{metric.gauge.centerTop}</div>}
-                    hoverDetails={hoverDetails}
-                  />
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={`${metric.label}-${index}`}
-                className="rounded-xl border p-3"
-                style={{ borderColor: palette.line, background: palette.tileAlt }}
-              >
-                <div className="text-xs uppercase tracking-wide" style={{ color: palette.soft }}>
-                  {metric.label}
-                </div>
-                <div className="mt-1 text-lg font-bold" style={{ color: palette.title }}>
-                  {formatMetricValue(metric.value)}
-                </div>
-                {metric.hint ? (
-                  <div className="mt-0.5 text-xs" style={{ color: palette.soft }}>
-                    {metric.hint}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-          </div>
-
           <div
             className={`rounded-2xl border ${isOverlayContext ? "p-3 md:p-4" : "p-4 md:p-5"}`}
-            style={{ borderColor: palette.line, background: "rgba(2, 17, 40, 0.5)" }}
+            style={{ borderColor: "transparent", background: "transparent" }}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm uppercase tracking-wide" style={{ color: palette.soft }}>
@@ -753,82 +865,284 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             <div
               className={`rounded-xl border ${isOverlayContext ? "mt-3 p-3" : "mt-4 p-4"}`}
               style={{
-                borderColor: palette.line,
-                background: "linear-gradient(180deg, rgba(20,39,62,0.4), rgba(20,39,62,0.15))",
+                borderColor: "transparent",
+                background: "transparent",
               }}
             >
-              <div className="space-y-3">
-                {averageRows.map((row) => (
-                  <div
-                    key={`${statsMode}-${row.label}`}
-                    className="rounded-lg border px-3 py-3"
-                    style={{ borderColor: palette.line, background: "rgba(12, 27, 47, 0.5)" }}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <div
-                          className="text-xs uppercase tracking-wide"
-                          style={{ color: palette.soft }}
-                        >
-                          {row.label}
+              <div className={isOverlayContext ? "grid gap-3.5 md:grid-cols-2" : "grid gap-4 md:grid-cols-2"}>
+                {averageRows.map((row, rowIndex) => {
+                  const panel = top3Panels.find((item) => item.key === row.label);
+                  return (
+                    <div
+                      key={`${statsMode}-${row.label}`}
+                      className={`rounded-lg border px-3 py-3.5 ${rowIndex === 2 ? "md:col-span-2" : ""}`}
+                      style={{ borderColor: "transparent", background: "transparent" }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: palette.soft }}>
+                          {panel?.title}
                         </div>
-                        <div className="mt-1 text-xs" style={{ color: palette.soft }}>
-                          ø
+                        <div className="ml-auto flex min-w-0 items-center gap-3 text-right">
+                          <div>
+                            <div
+                              className="text-xs uppercase tracking-wide"
+                              style={{ color: palette.soft }}
+                            >
+                              ø {statLabelByKey[row.label as keyof typeof statLabelByKey] ?? row.label}
+                            </div>
+                          </div>
+                          <div className="text-lg font-bold leading-none" style={{ color: palette.title }}>
+                            {formatAverageValue(row.value)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-3xl font-extrabold leading-none" style={{ color: palette.title }}>
-                        {formatAverageValue(row.value)}
-                      </div>
+
+                      {panel ? (
+                        <div className="mt-2.5">
+                          <div className="space-y-2.5">
+                            {(() => {
+                              const maxValue = panel.entries.reduce((max, item) => {
+                                if (typeof item?.value === "number" && Number.isFinite(item.value)) {
+                                  return Math.max(max, item.value);
+                                }
+                                return max;
+                              }, 0);
+                              return panel.entries.map((entry, index) => {
+                                const classKey = normalizeClassToken(entry?.classLabel);
+                                const classAccent =
+                                  classAccentByLabel.get(classKey) ??
+                                  getGuildClassAccent(entry?.classLabel) ??
+                                  "hsl(212 46% 57%)";
+                                const iconUrl = entry?.classLabel ? getClassIconUrl(entry.classLabel, 256) : undefined;
+                                const rank = index + 1;
+                                const mutedLow =
+                                  getGuildMutedAccent(entry?.classLabel, 0.24) ??
+                                  getGuildMutedAccent(classAccent, 0.24) ??
+                                  "#2d4764";
+                                const mutedMid =
+                                  getGuildMutedAccent(entry?.classLabel, 0.36) ??
+                                  getGuildMutedAccent(classAccent, 0.36) ??
+                                  "#375777";
+                                const mutedHigh =
+                                  getGuildMutedAccent(entry?.classLabel, 0.48) ??
+                                  getGuildMutedAccent(classAccent, 0.48) ??
+                                  "#44698b";
+                                const value =
+                                  typeof entry?.value === "number" && Number.isFinite(entry.value) ? entry.value : null;
+                                const rel = maxValue > 0 && value != null ? Math.max(0, Math.min(1, value / maxValue)) : 0;
+                                return (
+                                  <div
+                                    key={`${statsMode}-${panel.key}-${index}`}
+                                    className="group relative overflow-hidden rounded-2xl px-3 py-1.5"
+                                    style={{
+                                      background: "rgba(0,0,0,0.16)",
+                                      boxShadow: `0 0 0 1px rgba(43, 76, 115, 0.88) inset`,
+                                    }}
+                                  >
+                                    <div
+                                      className="absolute inset-y-0 left-0"
+                                      style={{
+                                        width: `${Math.round(rel * 100)}%`,
+                                        background: `linear-gradient(90deg, ${mutedHigh}CC 0%, ${mutedMid}88 52%, ${mutedLow}00 100%)`,
+                                      }}
+                                    />
+                                    <div className="relative flex items-center gap-3">
+                                      <div className="relative h-6 w-16 shrink-0 overflow-visible">
+                                        <span
+                                          className="absolute left-0 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center overflow-visible rounded-xl"
+                                          style={{
+                                            background: "transparent",
+                                            boxShadow: `0 0 0 1px ${mutedMid}B3 inset`,
+                                            color: palette.title,
+                                          }}
+                                          title={t("guildProfile.heroPanel.top3.rankLabel", {
+                                            rank,
+                                            defaultValue: "Rank {{rank}}",
+                                          })}
+                                        >
+                                          {iconUrl ? (
+                                            <img
+                                              src={iconUrl}
+                                              alt=""
+                                              className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+                                            />
+                                          ) : null}
+                                        </span>
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div
+                                              className="truncate text-sm font-semibold"
+                                              style={{ color: palette.title }}
+                                              title={entry?.name ?? "--"}
+                                            >
+                                              {entry?.name ?? "--"}
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="text-sm font-semibold" style={{ color: palette.title }}>
+                                              {typeof value === "number" ? value.toLocaleString("de-DE") : "--"}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div
+                                      className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100"
+                                      style={{ background: `linear-gradient(100deg, ${mutedLow}14 0%, ${mutedMid}1A 100%)` }}
+                                    />
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 ${isOverlayContext ? "gap-2.5" : "gap-3"} xl:grid-cols-3`}>
-            {top3Panels.map((panel) => (
-              <div
-                key={`${statsMode}-${panel.key}`}
-                className="rounded-xl border p-3"
-                style={{
-                  borderColor: palette.line,
-                  background: "linear-gradient(180deg, rgba(20,39,62,0.45), rgba(10,24,43,0.55))",
-                }}
-              >
-                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: palette.soft }}>
-                  {panel.title}
-                </div>
-                <div className="mt-2 space-y-2">
-                  {panel.entries.map((entry, index) => {
-                    const classKey = normalizeClassToken(entry?.classLabel);
-                    const accent = classAccentByLabel.get(classKey) ?? "hsl(212 46% 57%)";
-                    const iconUrl = entry?.classLabel ? getClassIconUrl(entry.classLabel, 64) : undefined;
-                    return (
-                      <div
-                        key={`${statsMode}-${panel.key}-${index}`}
-                        className="flex items-center gap-2 rounded-lg border px-2.5 py-2"
-                        style={{
-                          borderColor: accent,
-                          background: `linear-gradient(90deg, ${accent.replace(")", " / 0.2)")}, rgba(20,39,62,0.45))`,
-                        }}
-                      >
-                        <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-md border border-black/20 bg-black/15">
-                          {iconUrl ? <img src={iconUrl} alt="" className="h-5 w-5 object-contain" /> : null}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm" style={{ color: palette.title }}>
-                          {entry?.name ?? "--"}
-                        </span>
-                        <span className="text-sm font-semibold" style={{ color: palette.title }}>
-                          {typeof entry?.value === "number" ? entry.value.toLocaleString("de-DE") : "--"}
-                        </span>
-                      </div>
-                    );
-                  })}
+              <div className={`grid grid-cols-1 ${isOverlayContext ? "gap-2.5" : "gap-3"} sm:grid-cols-2 xl:grid-cols-4`}>
+                <div
+                  className={`rounded-xl border ${isOverlayContext ? "p-3" : "p-3.5"} sm:col-span-2 xl:col-span-4`}
+                  style={{
+                    borderColor: palette.line,
+                    background: "linear-gradient(180deg, rgba(10, 24, 40, 0.56) 0%, rgba(8, 20, 34, 0.44) 100%)",
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div
+                      className="text-sm font-extrabold uppercase tracking-[0.18em] md:text-[15px]"
+                      style={{ color: palette.title }}
+                    >
+                      {t("guildProfile.heroPanel.transfers.title", { defaultValue: "Transfers" })}
+                    </div>
+                    <div className="mt-0.5 truncate text-[10px] tracking-wide" style={{ color: palette.soft }}>
+                      {transferComparisonSubtitle}
+                    </div>
+                  </div>
+                  {!hasMonthlyTransferComparison ? (
+                    <div
+                      className="mt-2 flex min-h-[80px] items-center justify-center rounded-lg border border-dashed px-3 text-center text-[11px]"
+                      style={{
+                        borderColor: "rgba(176, 196, 217, 0.3)",
+                        color: palette.soft,
+                        background: "linear-gradient(180deg, rgba(9, 21, 36, 0.62) 0%, rgba(8, 18, 30, 0.54) 100%)",
+                      }}
+                    >
+                      {t("guildProfile.heroPanel.transfers.noMonthlyComparison", {
+                        defaultValue: "No monthly comparison snapshot available",
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mt-2.5 grid min-h-0 grid-cols-2 gap-2.5">
+                      {transferPanels.map((panel) => (
+                        <div
+                          key={panel.key}
+                          className="rounded-lg border px-2.5 py-2"
+                          style={{
+                            borderColor: panel.panelBorder,
+                            background: panel.panelBackground,
+                            boxShadow: `inset 0 0 0 1px ${panel.mutedTone}`,
+                          }}
+                        >
+                          <div
+                            className="mb-1.5 flex items-center justify-between gap-2 border-b pb-1.5"
+                            style={{ borderColor: panel.mutedTone }}
+                          >
+                            <div
+                              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                              style={{
+                                color: panel.tone,
+                                borderColor: panel.chipBorder,
+                                background: panel.chipBackground,
+                              }}
+                            >
+                              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: panel.tone }} />
+                              {panel.label}
+                            </div>
+                            <span
+                              className="inline-flex h-5 min-w-[2.1rem] items-center justify-center rounded-md border px-1.5 text-[10px] font-extrabold tabular-nums shadow-[0_0_0_1px_rgba(6,12,20,0.35)_inset]"
+                              style={{
+                                color: panel.tone,
+                                borderColor: panel.chipBorder,
+                                background: "linear-gradient(180deg, rgba(9, 20, 34, 0.82) 0%, rgba(6, 14, 26, 0.74) 100%)",
+                              }}
+                            >
+                              {panel.entries.length}
+                            </span>
+                          </div>
+                          <div
+                            className="sfdatahub-scrollbar max-h-[80px] space-y-1 overflow-y-auto pr-1"
+                            style={{ scrollbarColor: `${panel.scrollbarThumb} rgba(10, 22, 36, 0.7)` }}
+                          >
+                            {panel.entries.length === 0 ? (
+                              <div
+                                className="relative flex h-6 items-center rounded-md border border-dashed px-1.5 text-[10px]"
+                                style={{
+                                  borderColor: panel.rowBorder,
+                                  color: palette.soft,
+                                  background: panel.rowBackground,
+                                }}
+                              >
+                                <span aria-hidden className="absolute inset-y-0 left-0 w-[2px]" style={{ background: panel.tone }} />
+                                {t("guildProfile.heroPanel.transfers.empty", { defaultValue: "No changes" })}
+                              </div>
+                            ) : null}
+                            {panel.entries.map((entry, entryIndex) => {
+                              const iconUrl = getClassIconUrl(entry.classKey ?? entry.classLabel, 256);
+                              return (
+                                <div
+                                  key={`${panel.key}-${entry.memberId || `${entry.name}-${entry.level ?? "na"}-${entryIndex}`}`}
+                                  className="group relative flex h-6 items-center gap-1.5 overflow-hidden rounded-md border px-1.5 text-[10px]"
+                                  style={{ borderColor: panel.rowBorder, background: panel.rowBackground }}
+                                >
+                                  <span
+                                    aria-hidden
+                                    className="absolute inset-y-0 left-0 w-[2px]"
+                                    style={{ background: panel.tone }}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate font-semibold" style={{ color: palette.title }}>
+                                    {entry.name}
+                                  </span>
+                                  {iconUrl ? (
+                                    <span
+                                      className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border"
+                                      style={{ borderColor: panel.rowBorder, background: "rgba(7, 14, 24, 0.34)" }}
+                                    >
+                                      <img
+                                        src={iconUrl}
+                                        alt=""
+                                        className="h-3 w-3 shrink-0 object-contain"
+                                        draggable={false}
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span className="shrink-0 uppercase" style={{ color: palette.soft }}>
+                                      {(entry.classLabel || "").slice(0, 3)}
+                                    </span>
+                                  )}
+                                  <span
+                                    className="shrink-0 rounded border px-1 py-0.5 font-semibold"
+                                    style={{ color: palette.soft, borderColor: panel.rowBorder, background: "rgba(7, 14, 24, 0.34)" }}
+                                  >
+                                    {t("guildProfile.heroPanel.transfers.levelShort", { defaultValue: "Lv" })}{" "}
+                                    {typeof entry.level === "number" && Number.isFinite(entry.level) ? entry.level : "--"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
 
           {badges.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -869,15 +1183,31 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
             <div className="min-w-0 lg:col-start-2 xl:col-start-auto">
               <div className="flex min-h-0 flex-col gap-3 overflow-hidden" style={rightColumnHeightStyle}>
                 <div className="flex flex-none items-center gap-2">
-                <button type="button" onClick={() => setActiveClassTab("overview")} aria-label="Klassenübersicht">
+                <button
+                  type="button"
+                  onClick={() => setActiveClassTab("overview")}
+                  aria-label={t("guildProfile.heroPanel.sections.classOverview", {
+                    defaultValue: "Class overview",
+                  })}
+                >
                   <HudLabel
-                    text="Klassenübersicht"
+                    text={t("guildProfile.heroPanel.sections.classOverview", {
+                      defaultValue: "Class overview",
+                    })}
                     tone={activeClassTab === "overview" ? "accent" : "default"}
                   />
                 </button>
-                <button type="button" onClick={() => setActiveClassTab("distribution")} aria-label="Klassenverteilung">
+                <button
+                  type="button"
+                  onClick={() => setActiveClassTab("distribution")}
+                  aria-label={t("guildProfile.heroPanel.sections.classDistribution", {
+                    defaultValue: "Class distribution",
+                  })}
+                >
                   <HudLabel
-                    text="Klassenverteilung"
+                    text={t("guildProfile.heroPanel.sections.classDistribution", {
+                      defaultValue: "Class distribution",
+                    })}
                     tone={activeClassTab === "distribution" ? "accent" : "default"}
                   />
                 </button>

@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import styles from "./styles.module.css";
 import type { ClassMeta, GuildClassOverviewProps } from "./types";
 import { normalizeData, formatPct } from "./utils";
+import { getGuildClassAccent } from "../classColors";
 
 const ClassDonut: React.FC<GuildClassOverviewProps> = ({ data, classMeta }) => {
   const safeData = Array.isArray(data) ? data : [];
@@ -33,7 +34,10 @@ const ClassDonut: React.FC<GuildClassOverviewProps> = ({ data, classMeta }) => {
             const list = safeMeta.map((m, i) => ({
               id: m.id,
               pct: shares[m.id] ?? 0,
-              color: `hsl(${Math.round((360 / Math.max(safeMeta.length, 1)) * i)} 60% 55%)`,
+              color:
+                getGuildClassAccent(m.id) ??
+                getGuildClassAccent(m.name) ??
+                `hsl(${Math.round((360 / Math.max(safeMeta.length, 1)) * i)} 60% 55%)`,
             }));
             let acc = 0;
             return list.map((seg) => {
@@ -59,12 +63,16 @@ const ClassDonut: React.FC<GuildClassOverviewProps> = ({ data, classMeta }) => {
           {safeMeta.map((m, idx) => {
             const pct = shares[m.id] ?? 0;
             const cnt = counts[m.id] ?? 0;
+            const swatchColor =
+              getGuildClassAccent(m.id) ??
+              getGuildClassAccent(m.name) ??
+              `hsl(${Math.round((360 / Math.max(safeMeta.length, 1)) * idx)} 60% 55%)`;
             return (
               <div key={m.id} className={styles.legendItem} title={`${m.name}: ${cnt} • ${formatPct(pct)}`}>
                 <span
                   className={styles.legendSwatch}
                   style={{
-                    background: `hsl(${Math.round((360 / Math.max(safeMeta.length, 1)) * idx)} 60% 55%)`,
+                    background: swatchColor,
                     borderColor: "rgba(0,0,0,0.2)",
                   }}
                 />

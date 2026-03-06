@@ -3,7 +3,7 @@
 //   guilds/{gid}/snapshots/members_summary(+__YYYY-MM)
 // Kein Eingriff in players/guilds Importpfade.
 
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toNumber } from "../../../tools/playerDerivedHelpers";
 import type { ImportScanWriteMode } from "./csv";
 import { db } from "../firebase";
@@ -254,6 +254,15 @@ const toNumberOrNull = (value: any): number | null => {
 };
 
 const monthKeyFromMs = (ms: number): string => new Date(ms).toISOString().slice(0, 7);
+
+const readSnapshotUpdatedAtMs = (value: any): number | null => {
+  if (!value || typeof value !== "object") return null;
+  const direct = Number((value as any).updatedAtMs);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const fallbackSec = toSecFlexible((value as any).updatedAt ?? (value as any).timestamp);
+  if (fallbackSec == null) return null;
+  return fallbackSec * 1000;
+};
 
 function toMemberSummary(row: CSVRow): MemberSummary {
   const tsRaw = pickByCanon(row, P.TIMESTAMP);
@@ -537,26 +546,83 @@ export async function writeGuildSnapshotsFromRows(
       members,
       updatedAtServer: serverTimestamp(),
     };
-    try {
-      const ref = doc(db, `guilds/${gid}/snapshots/members_summary`);
-      await traceSetDoc(ref, () => setDoc(ref, snapshotPayload, { merge: true }), {
-        label: "ImportGuildSnapshots:summary",
-      });
+    const latestRef = doc(db, `guilds/${gid}/snapshots/members_summary`);
+    if (guildProgress === true) {
+      let shouldWriteLatest = true;
+      let existingLatestTsMs: number | null = null;
+      try {
+        const latestSnap = await getDoc(latestRef);
+        if (latestSnap.exists()) {
+          existingLatestTsMs = readSnapshotUpdatedAtMs(latestSnap.data());
+          if (existingLatestTsMs != null && capturedAtMs < existingLatestTsMs) {
+            shouldWriteLatest = false;
+            console.info("[ImportSelectionToDb] guildProgress skip stale latest members_summary", {
+              guildId: gid,
+              incomingUpdatedAtMs: capturedAtMs,
+              existingUpdatedAtMs: existingLatestTsMs,
+            });
+          }
+        }
+      } catch (error) {
+        shouldWriteLatest = false;
+        console.warn("[ImportSelectionToDb] guildProgress latest read failed, skip latest write for safety", {
+          guildId: gid,
+          error,
+        });
+      }
 
-      const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
-      await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
-        label: "ImportGuildSnapshots:summaryMonthly",
-      });
+      if (shouldWriteLatest) {
+        try {
+          await traceSetDoc(latestRef, () => setDoc(latestRef, snapshotPayload, { merge: true }), {
+            label: "ImportGuildSnapshots:summary",
+          });
+        } catch (error) {
+          if (isDuplicatePermissionError(error)) {
+            console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows latest duplicate/permission", { gid, error });
+          } else {
+            console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows latest fatal", { gid, error });
+            fatalError = fatalError || error;
+            continue;
+          }
+        }
+      }
 
-      snapshotsWritten++;
-    } catch (error) {
-      if (isDuplicatePermissionError(error)) {
-        console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
+      try {
+        const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
+        await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
+          label: "ImportGuildSnapshots:summaryMonthly",
+        });
+        snapshotsWritten++;
+      } catch (error) {
+        if (isDuplicatePermissionError(error)) {
+          console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows monthly duplicate/permission", { gid, error });
+          continue;
+        }
+        console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows monthly fatal", { gid, error });
+        fatalError = fatalError || error;
         continue;
       }
-      console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
-      fatalError = fatalError || error;
-      continue;
+    } else {
+      try {
+        await traceSetDoc(latestRef, () => setDoc(latestRef, snapshotPayload, { merge: true }), {
+          label: "ImportGuildSnapshots:summary",
+        });
+
+        const monthlyRef = doc(db, `guilds/${gid}/snapshots/members_summary__${monthKey}`);
+        await traceSetDoc(monthlyRef, () => setDoc(monthlyRef, snapshotPayload, { merge: true }), {
+          label: "ImportGuildSnapshots:summaryMonthly",
+        });
+
+        snapshotsWritten++;
+      } catch (error) {
+        if (isDuplicatePermissionError(error)) {
+          console.warn("[ImportSelectionToDb] writeGuildSnapshotsFromRows duplicate/permission", { gid, error });
+          continue;
+        }
+        console.error("[ImportSelectionToDb] writeGuildSnapshotsFromRows fatal", { gid, error });
+        fatalError = fatalError || error;
+        continue;
+      }
     }
 
     const metaRow = latestGuildRow;

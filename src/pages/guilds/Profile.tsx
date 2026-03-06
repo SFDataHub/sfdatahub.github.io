@@ -17,14 +17,20 @@ import {
 import { GuildMemberBrowser } from "../../components/guilds/guild-tabs/guild-members";
 
 // Neuer Container-Tab (Firebase-verdrahtet)
-import GuildMonthlyProgressTabContainer from "../../components/guilds/guild-tabs/GuildMonthlyProgressTab/GuildMonthlyProgressTabContainer";
+import GuildMonthlyProgressTabContainer, {
+  type GuildMonthlyProgressSeedData,
+} from "../../components/guilds/guild-tabs/GuildMonthlyProgressTab/GuildMonthlyProgressTabContainer";
 
 import type {
   MembersSnapshotLike,
   GuildLike,
   MemberSummaryLike,
 } from "../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
-import GuildHeroPanel, { type GuildHeroPanelData } from "../../components/guilds/GuildHeroPanel";
+import GuildHeroPanel, {
+  type GuildHeroPanelData,
+  type GuildHeroTransferEntry,
+  type GuildHeroTransfersData,
+} from "../../components/guilds/GuildHeroPanel";
 import type { Member as GuildMember } from "../../components/guilds/guild-tabs/guild-members/types";
 
 // Utils exakt wie im Container genutzt
@@ -49,6 +55,8 @@ type MembersSnapshot = MembersSnapshotLike;
 type GuildProfileLoadResult = {
   guild: Guild;
   snapshot: MembersSnapshot | null;
+  transfers: GuildHeroTransfersData;
+  monthlySeed: GuildMonthlyProgressSeedData;
 };
 type GuildProfileProps = {
   heroOnly?: boolean;
@@ -61,6 +69,21 @@ const GUILD_CACHE_PREFIX = "sf_profile_guild__";
 const GUILD_SERVER_INDEX_KEY = "sf_profile_guild_server_index";
 const GUILD_CACHE_TTL_MS = 60 * 60 * 1000;
 const INACTIVE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const EMPTY_TRANSFERS: GuildHeroTransfersData = {
+  joined: [],
+  left: [],
+  hasMonthlyComparison: false,
+  comparisonFromLabel: null,
+  comparisonToLabel: null,
+};
+const EMPTY_MONTHLY_SEED: GuildMonthlyProgressSeedData = {
+  latestLatest: null,
+  latestSummary: null,
+  monthSnapshotsByKey: {},
+  latestSummaryMissing: false,
+  knownMissingMonthKeys: [],
+};
 
 const normalizeMember = (entry: MemberSummaryLike): MemberSummary => ({
   id: entry.id,
@@ -124,19 +147,194 @@ const normalizeToplistServerCode = (value: string | null | undefined): string =>
   return withoutSuffix;
 };
 
+const toMonthKey = (year: number, monthIndexZeroBased: number): string | null => {
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndexZeroBased)) return null;
+  if (monthIndexZeroBased < 0 || monthIndexZeroBased > 11) return null;
+  return `${year}-${String(monthIndexZeroBased + 1).padStart(2, "0")}`;
+};
+
+const toMonthKeyFromMs = (epochMs: number | null | undefined): string | null => {
+  if (typeof epochMs !== "number" || !Number.isFinite(epochMs) || epochMs <= 0) return null;
+  const d = new Date(epochMs);
+  if (Number.isNaN(d.getTime())) return null;
+  const monthKey = toMonthKey(d.getFullYear(), d.getMonth());
+  return monthKey && MONTH_KEY_RE.test(monthKey) ? monthKey : null;
+};
+
+const toPrevMonthKey = (monthKey: string): string | null => {
+  if (!MONTH_KEY_RE.test(monthKey)) return null;
+  const [yearRaw, monthRaw] = monthKey.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevKey = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+  return MONTH_KEY_RE.test(prevKey) ? prevKey : null;
+};
+
+const extractMonthKeyFromDateText = (value: string | null | undefined): string | null => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const yearMonth = raw.match(/^(\d{4})-(0[1-9]|1[0-2])/);
+  if (yearMonth) {
+    const key = `${yearMonth[1]}-${yearMonth[2]}`;
+    return MONTH_KEY_RE.test(key) ? key : null;
+  }
+
+  const germanDate = raw.match(/^([0-2]?\d|3[0-1])[./-](0?[1-9]|1[0-2])[./-](\d{4})/);
+  if (germanDate) {
+    const key = `${germanDate[3]}-${String(Number(germanDate[2])).padStart(2, "0")}`;
+    return MONTH_KEY_RE.test(key) ? key : null;
+  }
+
+  return null;
+};
+
+const resolveLatestSnapshotMonthKey = (snapshot: MembersSnapshot | null): string | null => {
+  if (!snapshot) return null;
+  const fromUpdatedAtText = extractMonthKeyFromDateText(snapshot.updatedAt);
+  if (fromUpdatedAtText) return fromUpdatedAtText;
+
+  const fromUpdatedAtMs = toMonthKeyFromMs(snapshot.updatedAtMs);
+  if (fromUpdatedAtMs) return fromUpdatedAtMs;
+
+  const fromUpdatedAt = toMonthKeyFromMs(toEpochMs(snapshot.updatedAt));
+  if (fromUpdatedAt) return fromUpdatedAt;
+
+  const memberScanMs = (snapshot.members ?? [])
+    .map((member) => toEpochMs((member as any)?.lastScanMs) ?? toEpochMs((member as any)?.lastScan))
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+  if (memberScanMs.length === 0) return null;
+  return toMonthKeyFromMs(Math.max(...memberScanMs));
+};
+
+const toSnapshotMemberId = (member: any): string =>
+  String(member?.id ?? member?.playerId ?? "").trim();
+
+const toTransferEntryMap = (members: any[]): Map<string, GuildHeroTransferEntry> => {
+  const map = new Map<string, GuildHeroTransferEntry>();
+  for (const member of members) {
+    const memberId = toSnapshotMemberId(member);
+    if (!memberId) continue;
+    const name = String(member?.name ?? "").trim() || memberId;
+    const classLabel = String(member?.class ?? "").trim() || "Unknown";
+    const levelRaw = Number(member?.level);
+    map.set(memberId, {
+      memberId,
+      name,
+      classLabel,
+      classKey: classLabel,
+      level: Number.isFinite(levelRaw) ? levelRaw : null,
+    });
+  }
+  return map;
+};
+
+const sortTransferEntries = (a: GuildHeroTransferEntry, b: GuildHeroTransferEntry): number => {
+  const levelA = typeof a.level === "number" && Number.isFinite(a.level) ? a.level : -1;
+  const levelB = typeof b.level === "number" && Number.isFinite(b.level) ? b.level : -1;
+  if (levelB !== levelA) return levelB - levelA;
+  return a.name.localeCompare(b.name, "de-DE", { sensitivity: "base" });
+};
+
+const buildTransfersFromMembers = (latestMembers: any[], compareMembers: any[]): GuildHeroTransfersData => {
+  const latestById = toTransferEntryMap(latestMembers);
+  const compareById = toTransferEntryMap(compareMembers);
+
+  const joined: GuildHeroTransferEntry[] = [];
+  const left: GuildHeroTransferEntry[] = [];
+
+  latestById.forEach((entry, memberId) => {
+    if (!compareById.has(memberId)) joined.push(entry);
+  });
+  compareById.forEach((entry, memberId) => {
+    if (!latestById.has(memberId)) left.push(entry);
+  });
+
+  joined.sort(sortTransferEntries);
+  left.sort(sortTransferEntries);
+
+  return {
+    joined,
+    left,
+    hasMonthlyComparison: true,
+  };
+};
+
+const normalizeTransfers = (value: any): GuildHeroTransfersData => ({
+  joined: Array.isArray(value?.joined) ? value.joined : [],
+  left: Array.isArray(value?.left) ? value.left : [],
+  hasMonthlyComparison: Boolean(value?.hasMonthlyComparison),
+  comparisonFromLabel:
+    typeof value?.comparisonFromLabel === "string" && value.comparisonFromLabel.trim().length > 0
+      ? value.comparisonFromLabel
+      : null,
+  comparisonToLabel:
+    typeof value?.comparisonToLabel === "string" && value.comparisonToLabel.trim().length > 0
+      ? value.comparisonToLabel
+      : null,
+});
+
+const normalizeLoadResult = (value: any): GuildProfileLoadResult => ({
+  guild: value?.guild as Guild,
+  snapshot: (value?.snapshot as MembersSnapshot | null) ?? null,
+  transfers: normalizeTransfers(value?.transfers),
+  monthlySeed:
+    value?.monthlySeed && typeof value.monthlySeed === "object"
+      ? {
+          latestLatest:
+            value.monthlySeed.latestLatest && typeof value.monthlySeed.latestLatest === "object"
+              ? value.monthlySeed.latestLatest
+              : null,
+          latestSummary:
+            value.monthlySeed.latestSummary && typeof value.monthlySeed.latestSummary === "object"
+              ? value.monthlySeed.latestSummary
+              : null,
+          monthSnapshotsByKey:
+            value.monthlySeed.monthSnapshotsByKey && typeof value.monthlySeed.monthSnapshotsByKey === "object"
+              ? (value.monthlySeed.monthSnapshotsByKey as Record<string, Record<string, any>>)
+              : {},
+          latestSummaryMissing: value.monthlySeed.latestSummaryMissing === true,
+          knownMissingMonthKeys: Array.isArray(value.monthlySeed.knownMissingMonthKeys)
+            ? value.monthlySeed.knownMissingMonthKeys
+                .map((entry: unknown) => String(entry ?? "").trim())
+                .filter((entry: string) => entry.length > 0)
+            : [],
+        }
+      : {
+          latestLatest: null,
+          latestSummary:
+            value?.snapshot && typeof value.snapshot === "object"
+              ? {
+                  guildId: String(value.snapshot.guildId ?? ""),
+                  updatedAt: value.snapshot.updatedAt ?? null,
+                  updatedAtMs: Number(value.snapshot.updatedAtMs ?? 0),
+                  members: Array.isArray(value.snapshot.members) ? value.snapshot.members : [],
+                }
+              : null,
+          monthSnapshotsByKey: {},
+          latestSummaryMissing: false,
+          knownMissingMonthKeys: [],
+        },
+});
+
 function Section({
   title,
   right,
   children,
+  containerStyle,
 }: {
   title?: string;
   right?: React.ReactNode;
   children?: React.ReactNode;
+  containerStyle?: React.CSSProperties;
 }) {
   return (
     <div
       className="rounded-2xl shadow-lg"
-      style={{ background: C.tile, border: `1px solid ${C.line}` }}
+      style={{ background: C.tile, border: `1px solid ${C.line}`, ...containerStyle }}
     >
       {(title || right) && (
         <div
@@ -164,6 +362,8 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const [err, setErr] = useState<string | null>(null);
   const [guild, setGuild] = useState<Guild | null>(null);
   const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
+  const [transfers, setTransfers] = useState<GuildHeroTransfersData>(EMPTY_TRANSFERS);
+  const [monthlySeed, setMonthlySeed] = useState<GuildMonthlyProgressSeedData>(EMPTY_MONTHLY_SEED);
 
   // WICHTIG: classMeta wie im Container erstellen
   const safeMeta = useMemo(
@@ -179,6 +379,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
     async function load() {
       setLoading(true);
       setErr(null);
+      setMonthlySeed(EMPTY_MONTHLY_SEED);
       const id = guildId.trim();
       if (!id) {
         setErr("Keine Gilde gewaehlt.");
@@ -208,6 +409,8 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
             if (!cancelled) {
               setGuild(mem.data.guild);
               setSnapshot(mem.data.snapshot);
+              setTransfers(normalizeTransfers(mem.data.transfers));
+              setMonthlySeed(mem.data.monthlySeed ?? EMPTY_MONTHLY_SEED);
               setLoading(false);
             }
             return;
@@ -220,11 +423,13 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
       if (cacheKey) {
         const cached = readTtlCache(cacheKey, GUILD_CACHE_TTL_MS);
         if (cached && typeof cached === "object") {
-          const data = cached as GuildProfileLoadResult;
+          const data = normalizeLoadResult(cached);
           guildProfileMemory.set(cacheKey, { cachedAt: Date.now(), data });
           if (!cancelled) {
             setGuild(data.guild);
             setSnapshot(data.snapshot);
+            setTransfers(data.transfers);
+            setMonthlySeed(data.monthlySeed ?? EMPTY_MONTHLY_SEED);
             setLoading(false);
           }
           return;
@@ -257,11 +462,20 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
           const lastScanDays = daysSince(toNum(d.timestamp));
           const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
           let nextSnapshot: MembersSnapshot | null = null;
+          let nextTransfers: GuildHeroTransfersData = EMPTY_TRANSFERS;
+          const monthlySeed: GuildMonthlyProgressSeedData = {
+            latestLatest: d && typeof d === "object" ? d : null,
+            latestSummary: null,
+            monthSnapshotsByKey: {},
+            latestSummaryMissing: false,
+            knownMissingMonthKeys: [],
+          };
 
           const refSnap = doc(db, `guilds/${id}/snapshots/members_summary`);
           const snap = await traceGetDoc(scope, refSnap, () => getDoc(refSnap));
           if (snap.exists()) {
             const sdata = snap.data() as any;
+            monthlySeed.latestSummary = sdata && typeof sdata === "object" ? sdata : null;
             nextSnapshot = {
               guildId: String(sdata.guildId ?? id),
               updatedAt: String(sdata.updatedAt ?? d.values?.Timestamp ?? ""),
@@ -281,9 +495,40 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
                 ? (sdata.members as MemberSummaryLike[])
                 : [],
             };
+          } else {
+            monthlySeed.latestSummaryMissing = true;
           }
 
-          return { guild: g, snapshot: nextSnapshot };
+          const latestMonthKey = resolveLatestSnapshotMonthKey(nextSnapshot);
+          const comparisonMonthKey = latestMonthKey ? toPrevMonthKey(latestMonthKey) : null;
+          if (nextSnapshot && comparisonMonthKey) {
+            const comparisonRef = doc(db, `guilds/${id}/snapshots/members_summary__${comparisonMonthKey}`);
+            const comparisonSnap = await traceGetDoc(scope, comparisonRef, () => getDoc(comparisonRef));
+            if (comparisonSnap.exists()) {
+              const compareData = comparisonSnap.data() as any;
+              monthlySeed.monthSnapshotsByKey = {
+                ...(monthlySeed.monthSnapshotsByKey ?? {}),
+                [comparisonMonthKey]: compareData,
+              };
+              const compareMembers = Array.isArray(compareData?.members) ? compareData.members : [];
+              const comparisonFromLabel = formatScanDateTimeLabel(compareData?.updatedAtMs ?? compareData?.updatedAt ?? null);
+              const comparisonToLabel = formatScanDateTimeLabel(
+                nextSnapshot.updatedAtMs ?? nextSnapshot.updatedAt ?? null,
+              );
+              nextTransfers = {
+                ...buildTransfersFromMembers(nextSnapshot.members ?? [], compareMembers),
+                comparisonFromLabel: comparisonFromLabel !== "—" ? comparisonFromLabel : null,
+                comparisonToLabel: comparisonToLabel !== "—" ? comparisonToLabel : null,
+              };
+            } else {
+              monthlySeed.knownMissingMonthKeys = [
+                ...(monthlySeed.knownMissingMonthKeys ?? []),
+                comparisonMonthKey,
+              ];
+            }
+          }
+
+          return { guild: g, snapshot: nextSnapshot, transfers: nextTransfers, monthlySeed };
         } finally {
           endReadScope(scope);
         }
@@ -321,6 +566,8 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         if (!cancelled) {
           setGuild(result.guild);
           setSnapshot(result.snapshot);
+          setTransfers(result.transfers);
+          setMonthlySeed(result.monthlySeed ?? EMPTY_MONTHLY_SEED);
         }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Fehler beim Laden.");
@@ -468,6 +715,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         },
         activityPct,
         metrics: [],
+        transfers,
         actions: [
           {
             key: heroOnly ? "open_guild" : "show_in_top_list",
@@ -506,6 +754,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
               guildId={guild.id}
               guildName={guild.name}
               guildServer={guild.server}
+              monthlySeed={monthlySeed}
             />
           </div>
         </div>
@@ -519,13 +768,16 @@ function Tabs({
   guildId,
   guildName,
   guildServer,
+  monthlySeed,
 }: {
   members: MemberSummary[];
   guildId: string;
   guildName: string;
   guildServer: string | null;
+  monthlySeed: GuildMonthlyProgressSeedData;
 }) {
   const [tab, setTab] = useState<"Uebersicht" | "Rankings" | "Monthly Progress" | "Historie">("Uebersicht");
+  const isMonthlyTab = tab === "Monthly Progress";
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 border-b" style={{ borderColor: C.line }} role="tablist">
@@ -550,7 +802,16 @@ function Tabs({
         })}
       </div>
 
-      <Section>
+      <Section
+        containerStyle={
+          isMonthlyTab
+            ? {
+                background: "linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95))",
+                boxShadow: "0 30px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+              }
+            : undefined
+        }
+      >
         {tab === "Uebersicht" && (
           <GuildMemberBrowser
             members={members}
@@ -570,6 +831,7 @@ function Tabs({
             guildId={guildId}
             guildName={guildName}
             guildServer={guildServer}
+            seedData={monthlySeed}
           />
         )}
 
@@ -582,5 +844,3 @@ function Tabs({
     </div>
   );
 }
-
-

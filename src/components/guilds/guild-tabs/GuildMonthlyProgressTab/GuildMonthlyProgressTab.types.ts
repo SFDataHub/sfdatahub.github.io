@@ -14,11 +14,19 @@ export type TableRow = {
   [key: string]: any;
 };
 
+export type TableGroup = {
+  key: string;
+  label: string;
+  rows: TableRow[];
+  subtitle?: string;
+};
+
 export type TableBlock = {
   title?: string;
   subtitle?: string;
   columns: TableColumn[];
   rows: TableRow[];
+  groups?: TableGroup[];
   footer?: string | React.ReactNode;
 };
 
@@ -51,10 +59,16 @@ export type GuildMonthlyProgressData = {
     months?: MonthOption[];
     currentMonthKey?: string;
   };
-  panels?: {
-    leftImageUrl?: string;
-    rightImageUrl?: string;
+  topRow: {
+    xpBlock: TableBlock;
+    rightPlaceholder?: {
+      title?: string;
+      subtitle?: string;
+      body?: string;
+    };
   };
-  tablesTop: TableBlock[];
-  tablesBottom: TableBlock[];
+  sections: {
+    mostBaseStatsGained: TableBlock[];
+    highestBaseStats: TableBlock[];
+  };
 };

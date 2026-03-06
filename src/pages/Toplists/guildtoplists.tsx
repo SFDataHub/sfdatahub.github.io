@@ -16,6 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useToplistsData } from "../../context/ToplistsDataContext";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import type { ToplistExportRow } from "../../components/export/ToplistExportTable";
+import type { GuildToplistExportRow } from "../../components/export/GuildToplistExportTable";
 import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 
 type GuildToplistsProps = {
@@ -24,6 +25,7 @@ type GuildToplistsProps = {
   showAvgModeControl?: boolean;
   tableRef?: React.RefObject<HTMLDivElement>;
   exportSnapshotRef?: React.MutableRefObject<{
+    kind: "players" | "guilds";
     rows: ToplistExportRow[];
     showCompare: boolean;
   }>;
@@ -290,8 +292,11 @@ const resolveGuildSort = (value: string | null | undefined) => {
   switch (String(value ?? "").trim()) {
     case "guildMembers":
     case "guildAvgLevel":
+    case "guildAvgMain":
+    case "guildAvgCon":
     case "guildAvgSum":
-    case "guildLastScan":
+    case "guildRaids":
+    case "guildHydra":
       return String(value).trim();
     default:
       return "guildAvgLevel";
@@ -452,7 +457,10 @@ function GuildAvgModeControls({
   );
 }
 
-const buildGuildExportRows = (rows: FirestoreToplistGuildRow[]): ToplistExportRow[] => {
+const buildGuildExportRows = (
+  rows: FirestoreToplistGuildRow[],
+  avgMode: "base" | "total"
+): GuildToplistExportRow[] => {
   return rows.map((row) => ({
     identifier: `${String(row.server ?? "").trim()}_g${String(row.guildId ?? "").trim()}`,
     playerId: String(row.guildId ?? "").trim() || null,
@@ -463,9 +471,9 @@ const buildGuildExportRows = (rows: FirestoreToplistGuildRow[]): ToplistExportRo
     class: "",
     level: row.avgLevel,
     guild: String(row.name ?? ""),
-    main: row.avgBaseMain,
-    con: row.avgConBase,
-    sum: row.avgSumBaseTotal,
+    main: getGuildAvgMain(row, avgMode),
+    con: getGuildAvgCon(row, avgMode),
+    sum: getGuildAvgSum(row, avgMode),
     ratio: null,
     mainTotal: row.avgAttrTotal,
     conTotal: row.avgConTotal,
@@ -476,7 +484,14 @@ const buildGuildExportRows = (rows: FirestoreToplistGuildRow[]): ToplistExportRo
     treasury: row.avgTreasury,
     lastScan: row.latestScanAtSec != null ? String(row.latestScanAtSec) : row.lastScan,
     deltaSum: null,
-    _calculatedSum: row.avgSumBaseTotal,
+    _calculatedSum: getGuildAvgSum(row, avgMode),
+    _guildHofRank: row.hofRank,
+    _guildHonor: row.honor,
+    _guildRaids: row.raids,
+    _guildPortal: row.portalFloor,
+    _guildHydra: row.hydra,
+    _guildPetLevel: row.instructor,
+    _guildMembers: row.memberCount,
   }));
 };
 
@@ -680,7 +695,14 @@ export default function GuildToplists({
     };
   }, []);
 
-  const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("en").format(n));
+  const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("de-DE").format(n));
+  const fmtGroupedInt = (n: number | null | undefined) => {
+    if (n == null || !Number.isFinite(n)) return "";
+    const rounded = Math.round(n);
+    return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 })
+      .format(rounded)
+      .replace(/\./g, " ");
+  };
   const fmtDate = (ts: number | null | undefined) => {
     return formatScanDateTimeLabel(ts);
   };
@@ -692,10 +714,12 @@ export default function GuildToplists({
 
   const activeSortKey = resolveGuildSort(sortKey);
   const activeGuildAvgMode = guildAvgMode === "total" ? "total" : "base";
+  const isAvgAttributeSort =
+    activeSortKey === "guildAvgMain" || activeSortKey === "guildAvgCon" || activeSortKey === "guildAvgSum";
   const avgSumSortMode: "base" | "total" = activeSortKey === "guildAvgSum" ? activeGuildAvgMode : "base";
   const handleGuildAvgModeChange = (nextMode: "base" | "total") => {
     if (nextMode === guildAvgMode) return;
-    if (activeSortKey === "guildAvgSum") {
+    if (isAvgAttributeSort) {
       startGuildAvgModeTransition(() => {
         setGuildAvgMode(nextMode);
       });
@@ -722,11 +746,20 @@ export default function GuildToplists({
         case "guildMembers":
           cmp = compareNumberDesc(a.memberCount, b.memberCount);
           break;
+        case "guildAvgMain":
+          cmp = compareNumberDesc(getGuildAvgMain(a, activeGuildAvgMode), getGuildAvgMain(b, activeGuildAvgMode));
+          break;
+        case "guildAvgCon":
+          cmp = compareNumberDesc(getGuildAvgCon(a, activeGuildAvgMode), getGuildAvgCon(b, activeGuildAvgMode));
+          break;
         case "guildAvgSum":
           cmp = compareNumberDesc(getGuildAvgSum(a, avgSumSortMode), getGuildAvgSum(b, avgSumSortMode));
           break;
-        case "guildLastScan":
-          cmp = compareNumberDesc(resolveGuildLastScanSec(a), resolveGuildLastScanSec(b));
+        case "guildRaids":
+          cmp = compareNumberDesc(a.raids, b.raids);
+          break;
+        case "guildHydra":
+          cmp = compareNumberDesc(a.hydra, b.hydra);
           break;
         case "guildAvgLevel":
         default:
@@ -741,7 +774,7 @@ export default function GuildToplists({
     });
 
     return list;
-  }, [rows, favoritesOnly, user, favoriteGuildSet, activeSortKey, avgSumSortMode]);
+  }, [rows, favoritesOnly, user, favoriteGuildSet, activeSortKey, avgSumSortMode, activeGuildAvgMode]);
 
   const rowIndexByIdentifier = useMemo(() => {
     const indexMap = new Map<string, number>();
@@ -863,11 +896,12 @@ export default function GuildToplists({
     rowVirtualizer,
   ]);
 
-  const exportRows = useMemo(() => buildGuildExportRows(displayRows), [displayRows]);
+  const exportRows = useMemo(() => buildGuildExportRows(displayRows, activeGuildAvgMode), [displayRows, activeGuildAvgMode]);
 
   useEffect(() => {
     if (!exportSnapshotRef) return;
     exportSnapshotRef.current = {
+      kind: "guilds",
       rows: exportRows,
       showCompare: false,
     };
@@ -931,7 +965,7 @@ export default function GuildToplists({
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{row.name}</span>
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.hofRank}>{fmtNum(row.hofRank)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.honor}>{fmtNum(row.honor)}</td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.honor}>{fmtGroupedInt(row.honor)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.raids}>{fmtNum(row.raids)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.portal}>{fmtNum(row.portalFloor)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.hydra}>{fmtNum(row.hydra)}</td>
@@ -939,13 +973,13 @@ export default function GuildToplists({
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.members}>{fmtNum(row.memberCount)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgLevel}>{fmtNum(row.avgLevel)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgMain}>
-                  <ValueCrossfade value={fmtNum(getGuildAvgMain(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgMain(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgCon}>
-                  <ValueCrossfade value={fmtNum(getGuildAvgCon(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgCon(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgSum}>
-                  <ValueCrossfade value={fmtNum(getGuildAvgSum(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgSum(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
                   <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>

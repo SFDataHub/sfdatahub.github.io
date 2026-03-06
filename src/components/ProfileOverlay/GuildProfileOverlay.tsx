@@ -71,7 +71,7 @@ export default function GuildProfileOverlay({
         style={{ width: "min(1400px, 96vw)", maxHeight: "100%" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="profile-overlay__content">
+        <div className="profile-overlay__content sfdatahub-scrollbar">
           <Routes key={guildId} location={overlayPath}>
             <Route path="_overlay-guild/:guildId" element={<GuildProfile heroOnly />} />
           </Routes>

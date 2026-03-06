@@ -914,6 +914,102 @@
       }
     }
   },
+  "guildProfile": {
+    "heroPanel": {
+      "actions": {
+        "openGuild": "Open guild",
+        "share": "Share",
+        "copyLink": "Copy link"
+      },
+      "tooltips": {
+        "lastScanAt": "Last scan: {{value}}",
+        "age": {
+          "label": "Age: {{value}}",
+          "today": "today",
+          "oneDayAgo": "1 day ago",
+          "daysAgo": "{{days}} days ago"
+        }
+      },
+      "meta": {
+        "server": "Server",
+        "members": "Members",
+        "hofRank": "HoF Rank",
+        "lastScanned": "Last scanned"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Unknown",
+            "hint": "Scan history unavailable"
+          },
+          "scannedToday": {
+            "label": "Scanned today",
+            "hint": "No rescan needed"
+          },
+          "veryFresh": {
+            "label": "Very fresh",
+            "hint": "No rescan needed"
+          },
+          "fresh": {
+            "label": "Fresh",
+            "hint": "No rescan needed"
+          },
+          "recent": {
+            "label": "Recent",
+            "hint": "Rescan recommended"
+          },
+          "aging": {
+            "label": "Aging",
+            "hint": "Rescan recommended"
+          },
+          "outdated": {
+            "label": "Outdated",
+            "hint": "Rescan strongly recommended"
+          },
+          "stale": {
+            "label": "Stale",
+            "hint": "Rescan strongly recommended"
+          }
+        }
+      },
+      "sections": {
+        "guildOverview": "Guild Overview",
+        "averagePlayerStats": "Average Player Stats",
+        "modeToggle": "Base or Total",
+        "base": "Base",
+        "total": "Total",
+        "classOverview": "Class overview",
+        "classDistribution": "Class distribution"
+      },
+      "metrics": {
+        "activity": "Activity",
+        "placeholder2": "Readiness",
+        "placeholder3": "Total Base Stats",
+        "placeholderHint": "Pending data"
+      },
+      "top3": {
+        "mainAttribute": "Main Attribute Top 3",
+        "con": "Con Top 3",
+        "sum": "Sum Top 3",
+        "total": "Total Top 3",
+        "rankLabel": "Rank {{rank}}"
+      },
+      "statsLabels": {
+        "main": "Main",
+        "con": "Con",
+        "sum": "Sum",
+        "total": "Total"
+      },
+      "transfers": {
+        "title": "Transfers",
+        "joined": "Joined",
+        "left": "Left",
+        "noMonthlyComparison": "No monthly comparison snapshot available",
+        "empty": "No changes",
+        "levelShort": "Lv"
+      }
+    }
+  },
   "help": {
     "title": "Help & Overview",
     "subtitle": "Quick guide to SFDataHub",

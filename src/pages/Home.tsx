@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import FeaturedPreviewCard from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard";
 import FeaturedPreviewRow from "../components/wrapper/home/FeaturedPreviewRow/FeaturedPreviewRow";
+import LatestCommunityRecordsCard from "../components/home/LatestCommunityRecordsCard";
 import featuredPreviewCardStyles from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard.module.css";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
@@ -822,6 +823,9 @@ const Home: React.FC = () => {
           </div>
 
           {/* Row 3 - YouTube */}
+          <div className={styles.homeCommunityRecords}>
+            <LatestCommunityRecordsCard />
+          </div>
           <div className={styles.homeYouTube}>
             <YouTubeCarousel />
           </div>

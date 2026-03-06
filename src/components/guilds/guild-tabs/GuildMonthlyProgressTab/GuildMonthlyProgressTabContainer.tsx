@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
 import {
   beginReadScope,
   endReadScope,
   traceGetDoc,
-  traceGetDocs,
   type FirestoreTraceScope,
 } from "../../../../lib/debug/firestoreReadTrace";
 import GuildMonthlyProgressTab from "./GuildMonthlyProgressTab";
@@ -13,23 +12,55 @@ import type {
   GuildMonthlyProgressData,
   MonthOption,
   TableBlock,
+  TableGroup,
+  TableRow,
 } from "./GuildMonthlyProgressTab.types";
 import { guildIconUrlByIdentifier } from "../../../../data/guilds";
 import type { MembersSummaryDoc, MonthKey } from "../../../../lib/guilds/monthly/types";
+import { canonClassKey } from "../../GuildClassOverview/utils";
 
 type Props = {
   guildId: string;
   guildName: string;
   guildServer?: string | null;
+  seedData?: GuildMonthlyProgressSeedData | null;
+};
+
+export type GuildMonthlyProgressSeedData = {
+  latestLatest?: Record<string, any> | null;
+  latestSummary?: Record<string, any> | null;
+  monthSnapshotsByKey?: Record<string, Record<string, any>>;
+  latestSummaryMissing?: boolean;
+  knownMissingMonthKeys?: string[];
+};
+
+type SnapshotEndpoint = { kind: "snapshot"; key: MonthKey } | { kind: "latest" };
+
+type SnapshotCacheEntry =
+  | {
+      exists: true;
+      snapshot: MembersSummaryDoc;
+      tsMs: number | null;
+    }
+  | {
+      exists: false;
+    };
+
+type MonthComparison = {
+  monthKey: MonthKey;
+  start: { kind: "snapshot"; key: MonthKey };
+  end: SnapshotEndpoint;
+  fromTsMs: number;
+  toTsMs: number;
 };
 
 type GuildMonthlyLoadResult = {
   opts: MonthOption[];
-  snapshotsByMonth: Record<string, MembersSummaryDoc | null>;
+  comparisonsByMonth: Record<string, MonthComparison>;
 };
 
 const guildMonthlyLoadInFlight = new Map<string, Promise<GuildMonthlyLoadResult>>();
-const guildMonthlyLoadCache = new Map<string, GuildMonthlyLoadResult>();
+const guildMonthlySnapshotCache = new Map<string, Record<string, SnapshotCacheEntry>>();
 
 /**
  * Container: holt Monats-Snapshots aus Firestore
@@ -39,74 +70,90 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
   guildId,
   guildName,
   guildServer,
+  seedData,
 }) => {
-  const [loading, setLoading] = useState(true);
   const [months, setMonths] = useState<MonthOption[] | null>(null);
-  const [currentMonthKey, setCurrentMonthKey] = useState<string | undefined>(undefined);
 
-  // Cache: Snapshot-Dokumente pro Monat
-  const snapshotCache = useRef<Record<string, MembersSummaryDoc | null>>({});
+  const comparisonCache = useRef<Record<string, MonthComparison>>({});
+  const snapshotCache = useRef<Record<string, SnapshotCacheEntry>>({});
+  const renderTokenRef = useRef(0);
 
   const [uiData, setUiData] = useState<GuildMonthlyProgressData>(() =>
     emptyUiData(guildId, guildName, guildServer)
   );
 
+  async function renderComparisonForMonth(
+    key: string,
+    monthOptions: MonthOption[] | null | undefined,
+  ): Promise<void> {
+    const token = ++renderTokenRef.current;
+    const comparison = comparisonCache.current[key];
+    if (!comparison) {
+      setUiData(
+        emptyUiData(guildId, guildName, guildServer, {
+          currentMonthKey: key,
+          months: monthOptions ?? undefined,
+        })
+      );
+      return;
+    }
+
+    const [startEntry, endEntry] = await Promise.all([
+      loadSnapshotEntryByEndpoint(guildId, comparison.start, snapshotCache),
+      loadSnapshotEntryByEndpoint(guildId, comparison.end, snapshotCache),
+    ]);
+    if (token !== renderTokenRef.current) return;
+
+    const startSnapshot = startEntry.exists ? startEntry.snapshot : null;
+    const endSnapshot = endEntry.exists ? endEntry.snapshot : null;
+    if (!startSnapshot || !endSnapshot) {
+      setUiData(
+        emptyUiData(guildId, guildName, guildServer, {
+          currentMonthKey: key,
+          months: monthOptions ?? undefined,
+        })
+      );
+      return;
+    }
+
+    const progress = buildProgressFromSnapshots(comparison.monthKey, startSnapshot, endSnapshot, guildServer);
+    setUiData(
+      progressToUiData(progress, {
+        guildId,
+        guildName,
+        guildServer,
+        currentMonthKey: key,
+        months: monthOptions ?? undefined,
+      })
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
     const guildKey = guildId.trim().toLowerCase();
+    renderTokenRef.current += 1;
+    comparisonCache.current = {};
+    const rememberedSnapshotCache = guildKey ? guildMonthlySnapshotCache.get(guildKey) ?? {} : {};
+    const seededSnapshotCache = { ...rememberedSnapshotCache };
+    mergeSeedDataIntoSnapshotCache(seededSnapshotCache, seedData ?? undefined);
+    snapshotCache.current = seededSnapshotCache;
+    if (guildKey) guildMonthlySnapshotCache.set(guildKey, snapshotCache.current);
 
     const applyLoadedResult = (result: GuildMonthlyLoadResult) => {
-      snapshotCache.current = { ...result.snapshotsByMonth };
+      comparisonCache.current = { ...result.comparisonsByMonth };
       const opts = result.opts;
       if (!opts.length) {
         setMonths(null);
-        setCurrentMonthKey(undefined);
         setUiData(emptyUiData(guildId, guildName, guildServer));
         return;
       }
       setMonths(opts);
       const firstKey = opts[0].key;
-      setCurrentMonthKey(firstKey);
-      const currentSnapshot = snapshotCache.current[firstKey] ?? null;
-      const prevKey = getPrevMonthKey(firstKey);
-      const prevSnapshot = prevKey ? snapshotCache.current[prevKey] ?? null : null;
-      const progress = currentSnapshot
-        ? buildProgressFromSnapshots(firstKey as MonthKey, currentSnapshot, prevSnapshot, guildServer)
-        : null;
-      setUiData(
-        progressToUiData(progress, {
-          guildId,
-          guildName,
-          guildServer,
-          currentMonthKey: firstKey,
-          months: opts,
-        })
-      );
+      void renderComparisonForMonth(firstKey, opts);
     };
 
     const fetchMonths = async (): Promise<GuildMonthlyLoadResult> => {
-      const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:months");
-      setLoading(true);
-      try {
-        const monthCol = collection(db, `guilds/${guildId}/snapshots`);
-        const monthSnaps = await traceGetDocs(scope, { path: monthCol.path }, () => getDocs(monthCol));
-        const opts: MonthOption[] = [];
-        const snapshotsByMonth: Record<string, MembersSummaryDoc | null> = {};
-        for (const mDoc of monthSnaps.docs) {
-          const key = extractMonthKey(mDoc.id);
-          if (!key) continue;
-          const raw = mDoc.data() as any;
-          if (!raw) continue;
-          const snapshot = normalizeSnapshot(raw);
-          snapshotsByMonth[key] = snapshot;
-          const option = buildMonthOption(key, snapshot);
-          opts.push(option);
-        }
-        opts.sort((a, b) => (a.key < b.key ? 1 : -1));
-        return { opts, snapshotsByMonth };
-      } finally {
-        endReadScope(scope);
-      }
+      return loadMonthComparisonsForGuild(guildId, snapshotCache);
     };
 
     async function loadMonthsAndMaybeProgress() {
@@ -114,16 +161,7 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
       try {
         if (!guildKey) {
           setMonths(null);
-          setCurrentMonthKey(undefined);
           setUiData(emptyUiData(guildId, guildName, guildServer));
-          setLoading(false);
-          return;
-        }
-
-        const cached = guildMonthlyLoadCache.get(guildKey);
-        if (cached) {
-          if (!cancelled) applyLoadedResult(cached);
-          setLoading(false);
           return;
         }
 
@@ -132,56 +170,27 @@ const GuildMonthlyProgressTabContainer: React.FC<Props> = ({
         if (!existing) guildMonthlyLoadInFlight.set(guildKey, promise);
 
         const result = await promise;
-        guildMonthlyLoadCache.set(guildKey, result);
         if (!cancelled) applyLoadedResult(result);
       } catch (e) {
         console.error(e);
         if (!cancelled) {
           setMonths(null);
-          setCurrentMonthKey(undefined);
           setUiData(emptyUiData(guildId, guildName, guildServer));
         }
       } finally {
         if (!existing) guildMonthlyLoadInFlight.delete(guildKey);
-        if (!cancelled) setLoading(false);
       }
     }
 
     loadMonthsAndMaybeProgress();
     return () => {
       cancelled = true;
+      renderTokenRef.current += 1;
     };
-  }, [guildId, guildName, guildServer]);
+  }, [guildId, guildName, guildServer, seedData]);
 
   async function handleMonthChange(key: string) {
-    setCurrentMonthKey(key);
-
-    const currentSnapshot = await loadSnapshotForMonth(guildId, key, snapshotCache);
-    if (!currentSnapshot) {
-      // Monat existiert nicht -> leer rendern, aber Dropdown bleibt
-      setUiData(
-        emptyUiData(guildId, guildName, guildServer, {
-          currentMonthKey: key,
-          months: months ?? undefined,
-        })
-      );
-      return;
-    }
-
-    const prevKey = getPrevMonthKey(key);
-    const prevSnapshot = prevKey
-      ? await loadSnapshotForMonth(guildId, prevKey, snapshotCache)
-      : null;
-    const progress = buildProgressFromSnapshots(key as MonthKey, currentSnapshot, prevSnapshot, guildServer);
-    setUiData(
-      progressToUiData(progress, {
-        guildId,
-        guildName,
-        guildServer,
-        currentMonthKey: key,
-        months: months ?? undefined,
-      })
-    );
+    await renderComparisonForMonth(key, months);
   }
 
   // Presenter
@@ -199,11 +208,53 @@ export default GuildMonthlyProgressTabContainer;
 
 const SNAPSHOT_PREFIX = "members_summary__";
 const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+type MainBucketKey = "str" | "dex" | "int" | "other";
 
-const extractMonthKey = (docId: string): MonthKey | null => {
-  if (!docId.startsWith(SNAPSHOT_PREFIX)) return null;
-  const key = docId.slice(SNAPSHOT_PREFIX.length);
-  return MONTH_KEY_RE.test(key) ? (key as MonthKey) : null;
+type ProgressMemberRow = {
+  playerId: string;
+  name: string;
+  classLabel: string;
+  level: number | null;
+  bucket: MainBucketKey;
+  xpTotal: number | null;
+  xpDelta: number | null;
+  baseMain: number | null;
+  mainDelta: number | null;
+  conBase: number | null;
+  conDelta: number | null;
+  sumBaseTotal: number | null;
+  sumBaseDelta: number | null;
+  mainAndConTotal: number | null;
+  totalStats: number | null;
+  totalDelta: number | null;
+};
+
+type BucketRanking = {
+  key: MainBucketKey;
+  label: string;
+  rows: ProgressMemberRow[];
+};
+
+const BUCKET_ORDER: Array<{ key: MainBucketKey; label: string }> = [
+  { key: "str", label: "Strength Classes" },
+  { key: "dex", label: "Dexterity Classes" },
+  { key: "int", label: "Intelligence Classes" },
+  { key: "other", label: "Other / Unknown" },
+];
+
+const CLASS_TO_BUCKET: Record<string, MainBucketKey> = {
+  warrior: "str",
+  berserker: "str",
+  "battle-mage": "str",
+  paladin: "str",
+  scout: "dex",
+  assassin: "dex",
+  "demon-hunter": "dex",
+  "plague-doctor": "dex",
+  mage: "int",
+  druid: "int",
+  bard: "int",
+  necromancer: "int",
 };
 
 const normalizeSnapshot = (raw: any): MembersSummaryDoc => {
@@ -229,192 +280,365 @@ const getMemberScanRange = (members: any[]): { minMs: number; maxMs: number } | 
   return { minMs: Math.min(...values), maxMs: Math.max(...values) };
 };
 
-const buildMonthOption = (key: MonthKey, snapshot: MembersSummaryDoc): MonthOption => {
-  const range = getMemberScanRange(snapshot.members || []);
-  const fallbackMs = typeof snapshot.updatedAtMs === "number" ? snapshot.updatedAtMs : null;
-  const minMs = range?.minMs ?? fallbackMs;
-  const maxMs = range?.maxMs ?? fallbackMs;
-  const fromISO = minMs ? new Date(minMs).toISOString() : new Date(`${key}-01T00:00:00Z`).toISOString();
-  const toISO = maxMs ? new Date(maxMs).toISOString() : new Date(`${key}-28T00:00:00Z`).toISOString();
-  const span = minMs && maxMs ? Math.floor((maxMs - minMs) / 86400000) : 0;
-  const available = Boolean(minMs && maxMs && span <= 40);
-  const label = new Date(`${key}-01T00:00:00Z`).toLocaleString("de-DE", {
+const LATEST_DOC_ID = "members_summary";
+const LATEST_CACHE_KEY = "__latest__";
+
+const monthLabelFromKey = (key: MonthKey) =>
+  new Date(`${key}-01T00:00:00Z`).toLocaleString("de-DE", {
     month: "short",
     year: "numeric",
   });
-  return {
-    key,
-    label,
-    fromISO,
-    toISO,
-    daysSpan: span,
-    available,
-    reason: available ? undefined : minMs && maxMs ? "SPAN_GT_40D" : "INSUFFICIENT_DATA",
-  };
+
+const toSnapshotTsMsFromRaw = (raw: any): number | null => {
+  const updatedAtMs = Number(raw?.updatedAtMs);
+  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return updatedAtMs;
+
+  const timestamp = Number(raw?.timestamp);
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    return timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000;
+  }
+
+  const updatedAt = raw?.updatedAt;
+  if (updatedAt && typeof updatedAt === "object" && Number.isFinite((updatedAt as any).seconds)) {
+    return Number((updatedAt as any).seconds) * 1000;
+  }
+  if (typeof updatedAt === "string") {
+    const parsed = Date.parse(updatedAt);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
 };
 
-const getPrevMonthKey = (key: string): MonthKey | null => {
+const toSnapshotTsMs = (snapshot: MembersSummaryDoc): number | null => {
+  const rawTs = toSnapshotTsMsFromRaw(snapshot);
+  if (rawTs != null) return rawTs;
+  const range = getMemberScanRange(snapshot.members || []);
+  return range?.maxMs ?? range?.minMs ?? null;
+};
+
+const toMonthKeyFromMs = (ms: number): MonthKey => {
+  const date = new Date(ms);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}` as MonthKey;
+};
+
+const shiftMonthKey = (key: MonthKey, deltaMonths: number): MonthKey | null => {
   if (!MONTH_KEY_RE.test(key)) return null;
   const [yearRaw, monthRaw] = key.split("-");
   const year = Number(yearRaw);
   const month = Number(monthRaw);
   if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevKey = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
-  return MONTH_KEY_RE.test(prevKey) ? (prevKey as MonthKey) : null;
+  const shifted = new Date(Date.UTC(year, month - 1 + deltaMonths, 1));
+  const next = `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
+  return MONTH_KEY_RE.test(next) ? (next as MonthKey) : null;
 };
 
-const loadSnapshotForMonth = async (
-  guildId: string,
-  key: string,
-  cacheRef: React.MutableRefObject<Record<string, MembersSummaryDoc | null>>,
-): Promise<MembersSummaryDoc | null> => {
-  if (!key) return null;
-  if (Object.prototype.hasOwnProperty.call(cacheRef.current, key)) {
-    return cacheRef.current[key] ?? null;
+const getNextMonthKey = (key: MonthKey): MonthKey | null => shiftMonthKey(key, 1);
+
+const toCacheKey = (endpoint: SnapshotEndpoint): string =>
+  endpoint.kind === "latest" ? LATEST_CACHE_KEY : endpoint.key;
+
+const toSnapshotDocPath = (guildId: string, endpoint: SnapshotEndpoint): string =>
+  endpoint.kind === "latest"
+    ? `guilds/${guildId}/snapshots/${LATEST_DOC_ID}`
+    : `guilds/${guildId}/snapshots/${SNAPSHOT_PREFIX}${endpoint.key}`;
+
+const buildMonthOptionFromComparison = (comparison: MonthComparison): MonthOption => ({
+  key: comparison.monthKey,
+  label: monthLabelFromKey(comparison.monthKey),
+  fromISO: new Date(comparison.fromTsMs).toISOString(),
+  toISO: new Date(comparison.toTsMs).toISOString(),
+  daysSpan: Math.floor((comparison.toTsMs - comparison.fromTsMs) / 86400000),
+  available: true,
+});
+
+const seedSnapshotEntryFromRaw = (raw: any): SnapshotCacheEntry | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const snapshot = normalizeSnapshot(raw);
+  return {
+    exists: true,
+    snapshot,
+    tsMs: toSnapshotTsMs(snapshot),
+  };
+};
+
+const mergeSeedDataIntoSnapshotCache = (
+  cache: Record<string, SnapshotCacheEntry>,
+  seedData?: GuildMonthlyProgressSeedData,
+) => {
+  if (!seedData) return;
+  const latestSeed = seedSnapshotEntryFromRaw(seedData.latestSummary);
+  if (latestSeed) {
+    cache[LATEST_CACHE_KEY] = latestSeed;
+  } else if (seedData.latestSummaryMissing) {
+    cache[LATEST_CACHE_KEY] = { exists: false };
   }
-  const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:monthDoc");
+  const monthSnapshotsByKey = seedData.monthSnapshotsByKey ?? {};
+  for (const [monthKey, monthRaw] of Object.entries(monthSnapshotsByKey)) {
+    if (!MONTH_KEY_RE.test(monthKey)) continue;
+    const seeded = seedSnapshotEntryFromRaw(monthRaw);
+    if (!seeded) continue;
+    cache[monthKey] = seeded;
+  }
+  for (const monthKey of seedData.knownMissingMonthKeys ?? []) {
+    if (!MONTH_KEY_RE.test(monthKey)) continue;
+    if (Object.prototype.hasOwnProperty.call(cache, monthKey)) continue;
+    cache[monthKey] = { exists: false };
+  }
+};
+
+const loadSnapshotEntryByEndpoint = async (
+  guildId: string,
+  endpoint: SnapshotEndpoint,
+  cacheRef: React.MutableRefObject<Record<string, SnapshotCacheEntry>>,
+  scope?: FirestoreTraceScope,
+): Promise<SnapshotCacheEntry> => {
+  const cacheKey = toCacheKey(endpoint);
+  if (Object.prototype.hasOwnProperty.call(cacheRef.current, cacheKey)) {
+    return cacheRef.current[cacheKey];
+  }
+
+  const ownScope = scope ?? beginReadScope("GuildMonthly:snapshotDoc");
+  const path = toSnapshotDocPath(guildId, endpoint);
+  const ref = doc(db, path);
   try {
-    const ref = doc(db, `guilds/${guildId}/snapshots/${SNAPSHOT_PREFIX}${key}`);
-    const snap = await traceGetDoc(scope, ref, () => getDoc(ref));
+    const snap = await traceGetDoc(ownScope, ref, () => getDoc(ref));
     if (!snap.exists()) {
-      cacheRef.current[key] = null;
-      return null;
+      const miss: SnapshotCacheEntry = { exists: false };
+      cacheRef.current[cacheKey] = miss;
+      return miss;
     }
-    const snapshot = normalizeSnapshot(snap.data());
-    cacheRef.current[key] = snapshot;
-    return snapshot;
-  } catch (e) {
-    console.error(e);
-    cacheRef.current[key] = null;
-    return null;
+    const hit = seedSnapshotEntryFromRaw(snap.data()) ?? { exists: false as const };
+    cacheRef.current[cacheKey] = hit;
+    return hit;
+  } catch (error) {
+    console.error(error);
+    const miss: SnapshotCacheEntry = { exists: false };
+    cacheRef.current[cacheKey] = miss;
+    return miss;
+  } finally {
+    if (!scope) endReadScope(ownScope);
+  }
+};
+
+const loadMonthComparisonsForGuild = async (
+  guildId: string,
+  snapshotCacheRef: React.MutableRefObject<Record<string, SnapshotCacheEntry>>,
+): Promise<GuildMonthlyLoadResult> => {
+  const scope: FirestoreTraceScope = beginReadScope("GuildMonthly:months");
+  try {
+    const latestEntry = await loadSnapshotEntryByEndpoint(
+      guildId,
+      { kind: "latest" },
+      snapshotCacheRef,
+      scope ?? undefined,
+    );
+
+    const latestTsMs = latestEntry.exists ? latestEntry.tsMs : null;
+    const latestMonthKey = latestTsMs != null ? toMonthKeyFromMs(latestTsMs) : null;
+    if (latestMonthKey) {
+      await loadSnapshotEntryByEndpoint(
+        guildId,
+        { kind: "snapshot", key: latestMonthKey },
+        snapshotCacheRef,
+        scope ?? undefined,
+      );
+    }
+
+    const comparisonsByMonth: Record<string, MonthComparison> = {};
+    const opts: MonthOption[] = [];
+    const knownMonthKeys = Object.keys(snapshotCacheRef.current)
+      .filter((key): key is MonthKey => MONTH_KEY_RE.test(key))
+      .filter((key) => snapshotCacheRef.current[key]?.exists === true)
+      .sort();
+
+    for (const monthKey of knownMonthKeys) {
+      const startEntry = snapshotCacheRef.current[monthKey];
+      if (!startEntry?.exists || startEntry.tsMs == null) continue;
+      const startTsMs = startEntry.tsMs;
+
+      const nextKey = getNextMonthKey(monthKey);
+      let nextEntry: SnapshotCacheEntry | null = null;
+      if (nextKey) {
+        nextEntry = snapshotCacheRef.current[nextKey] ?? null;
+        if (!nextEntry) {
+          nextEntry = await loadSnapshotEntryByEndpoint(
+            guildId,
+            { kind: "snapshot", key: nextKey },
+            snapshotCacheRef,
+            scope ?? undefined,
+          );
+        }
+      }
+
+      let end: SnapshotEndpoint | null = null;
+      let endTsMs: number | null = null;
+
+      if (nextKey && nextEntry?.exists && nextEntry.tsMs != null && nextEntry.tsMs > startTsMs) {
+        end = { kind: "snapshot", key: nextKey };
+        endTsMs = nextEntry.tsMs;
+      } else if (latestTsMs != null && latestTsMs > startTsMs) {
+        end = { kind: "latest" };
+        endTsMs = latestTsMs;
+      }
+
+      if (!end || endTsMs == null || endTsMs <= startTsMs) continue;
+
+      const comparison: MonthComparison = {
+        monthKey,
+        start: { kind: "snapshot", key: monthKey },
+        end,
+        fromTsMs: startTsMs,
+        toTsMs: endTsMs,
+      };
+      comparisonsByMonth[monthKey] = comparison;
+      opts.push(buildMonthOptionFromComparison(comparison));
+    }
+
+    opts.sort((a, b) => (a.key < b.key ? 1 : -1));
+    return { opts, comparisonsByMonth };
   } finally {
     endReadScope(scope);
   }
 };
 
+const toNum = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const diffOrNull = (current: number | null, previous: number | null): number | null =>
+  current != null && previous != null ? current - previous : null;
+
+const toMainBucket = (classLabel: string | null | undefined): MainBucketKey => {
+  const key = canonClassKey(classLabel);
+  if (!key) return "other";
+  return CLASS_TO_BUCKET[key] ?? "other";
+};
+
+const topBy = (
+  rows: ProgressMemberRow[],
+  pick: (row: ProgressMemberRow) => number | null,
+  limit: number,
+): ProgressMemberRow[] =>
+  rows
+    .filter((row) => pick(row) != null)
+    .sort((a, b) => (pick(b) ?? Number.NEGATIVE_INFINITY) - (pick(a) ?? Number.NEGATIVE_INFINITY))
+    .slice(0, limit);
+
+const topPerBucket = (
+  rows: ProgressMemberRow[],
+  pick: (row: ProgressMemberRow) => number | null,
+  limitPerBucket: number,
+): BucketRanking[] =>
+  BUCKET_ORDER.map(({ key, label }) => ({
+    key,
+    label,
+    rows: topBy(
+      rows.filter((row) => row.bucket === key),
+      pick,
+      limitPerBucket,
+    ),
+  })).filter((bucket) => bucket.rows.length > 0);
+
 const buildProgressFromSnapshots = (
   monthKey: MonthKey,
-  current: MembersSummaryDoc,
-  prev: MembersSummaryDoc | null,
+  start: MembersSummaryDoc,
+  end: MembersSummaryDoc,
   guildServer?: string | null,
 ) => {
-  const range = getMemberScanRange(current.members || []);
-  const fallbackMs = typeof current.updatedAtMs === "number" ? current.updatedAtMs : null;
-  const minMs = range?.minMs ?? fallbackMs;
-  const maxMs = range?.maxMs ?? fallbackMs;
-  const spanDays = minMs && maxMs ? Math.floor((maxMs - minMs) / 86400000) : null;
-  const available = Boolean(minMs && maxMs && spanDays != null && spanDays <= 40);
+  const fromMs = toSnapshotTsMs(start);
+  const toMs = toSnapshotTsMs(end);
+  const spanDays = fromMs != null && toMs != null ? Math.floor((toMs - fromMs) / 86400000) : null;
+  const available = Boolean(fromMs != null && toMs != null && toMs > fromMs);
   const status: { available: boolean; reason?: "INSUFFICIENT_DATA" | "SPAN_GT_40D" } = { available };
   if (!available) {
-    status.reason = minMs && maxMs ? "SPAN_GT_40D" : "INSUFFICIENT_DATA";
+    status.reason = "INSUFFICIENT_DATA";
   }
 
   const base = {
     meta: {
       monthKey,
-      label: new Date(`${monthKey}-01T00:00:00Z`).toLocaleString("de-DE", {
-        month: "short",
-        year: "numeric",
-      }),
-      fromISO: minMs ? new Date(minMs).toISOString() : null,
-      toISO: maxMs ? new Date(maxMs).toISOString() : new Date().toISOString(),
-      fromTs: minMs ? Math.floor(minMs / 1000) : null,
-      toTs: maxMs ? Math.floor(maxMs / 1000) : Math.floor(Date.now() / 1000),
+      label: monthLabelFromKey(monthKey),
+      fromISO: fromMs != null ? new Date(fromMs).toISOString() : null,
+      toISO: toMs != null ? new Date(toMs).toISOString() : new Date().toISOString(),
+      fromTs: fromMs != null ? Math.floor(fromMs / 1000) : null,
+      toTs: toMs != null ? Math.floor(toMs / 1000) : Math.floor(Date.now() / 1000),
       daysSpan: spanDays,
-      guildId: current.guildId || "",
+      guildId: end.guildId || start.guildId || "",
       server: guildServer ?? null,
     },
     status,
   };
 
   const prevMap = new Map<string, any>();
-  for (const m of prev?.members || []) {
+  for (const m of start?.members || []) {
     if (!m?.playerId) continue;
     prevMap.set(m.playerId, m);
   }
 
-  const mostBaseGained: any[] = [];
-  const sumBaseStats: any[] = [];
-  const highestBaseStats: any[] = [];
-  const highestTotalStats: any[] = [];
-  const mainAndCon: any[] = [];
+  const mostBaseGained: ProgressMemberRow[] = [];
+  const sumBaseStats: ProgressMemberRow[] = [];
+  const highestBaseStats: ProgressMemberRow[] = [];
+  const highestTotalStats: ProgressMemberRow[] = [];
+  const mainAndCon: ProgressMemberRow[] = [];
 
-  for (const m of current.members || []) {
+  for (const m of end.members || []) {
     if (!m?.playerId) continue;
     const f = prevMap.get(m.playerId) || null;
 
-    const baseLatest = m.sumBaseTotal ?? null;
-    const baseFirst = f?.sumBaseTotal ?? null;
-    const baseDelta =
-      baseLatest != null && baseFirst != null ? baseLatest - baseFirst : null;
+    const baseMain = toNum(m.baseMain);
+    const conBase = toNum(m.conBase);
+    const sumBase =
+      toNum(m.sumBaseTotal) ?? (baseMain != null && conBase != null ? baseMain + conBase : null);
+    const total = toNum(m.totalStats);
+    const xpTotal = toNum(m.xpTotal);
 
-    const totalLatest = m.totalStats ?? null;
-    const totalFirst = f?.totalStats ?? null;
-    const totalDelta =
-      totalLatest != null && totalFirst != null ? totalLatest - totalFirst : null;
+    const prevBaseMain = toNum(f?.baseMain);
+    const prevConBase = toNum(f?.conBase);
+    const prevSumBase =
+      toNum(f?.sumBaseTotal) ??
+      (prevBaseMain != null && prevConBase != null ? prevBaseMain + prevConBase : null);
+    const prevTotal = toNum(f?.totalStats);
+    const prevXpTotal = toNum(f?.xpTotal);
 
-    mostBaseGained.push({
+    const row: ProgressMemberRow = {
       playerId: m.playerId,
-      name: m.name ?? null,
-      class: m.class ?? null,
-      levelLatest: m.level ?? null,
-      baseLatest,
-      baseDelta,
-    });
+      name: String(m.name ?? "-"),
+      classLabel: String(m.class ?? "—"),
+      level: toNum(m.level),
+      bucket: toMainBucket(m.class),
+      xpTotal,
+      xpDelta: diffOrNull(xpTotal, prevXpTotal),
+      baseMain,
+      mainDelta: diffOrNull(baseMain, prevBaseMain),
+      conBase,
+      conDelta: diffOrNull(conBase, prevConBase),
+      sumBaseTotal: sumBase,
+      sumBaseDelta: diffOrNull(sumBase, prevSumBase),
+      mainAndConTotal: baseMain != null && conBase != null ? baseMain + conBase : null,
+      totalStats: total,
+      totalDelta: diffOrNull(total, prevTotal),
+    };
 
-    sumBaseStats.push({
-      playerId: m.playerId,
-      name: m.name ?? null,
-      base: baseLatest,
-      stamDelta: null,
-      shoDelta: null,
-    });
-
-    highestBaseStats.push({
-      playerId: m.playerId,
-      name: m.name ?? null,
-      stats: baseLatest,
-      delta: baseDelta,
-    });
-
-    highestTotalStats.push({
-      playerId: m.playerId,
-      name: m.name ?? null,
-      total: totalLatest,
-      delta: totalDelta,
-    });
-
-    mainAndCon.push({
-      playerId: m.playerId,
-      name: m.name ?? null,
-      class: m.class ?? null,
-      stats: m.baseMain ?? null,
-      delta:
-        f?.baseMain != null && m.baseMain != null ? m.baseMain - f.baseMain : null,
-    });
+    mostBaseGained.push(row);
+    sumBaseStats.push(row);
+    highestBaseStats.push(row);
+    highestTotalStats.push(row);
+    mainAndCon.push(row);
   }
 
-  mostBaseGained.sort(
-    (a, b) => (b.baseDelta ?? -Infinity) - (a.baseDelta ?? -Infinity)
-  );
-  highestBaseStats.sort(
-    (a, b) => (b.stats ?? -Infinity) - (a.stats ?? -Infinity)
-  );
-  highestTotalStats.sort(
-    (a, b) => (b.total ?? -Infinity) - (a.total ?? -Infinity)
-  );
-  sumBaseStats.sort((a, b) => (b.base ?? -Infinity) - (a.base ?? -Infinity));
-  mainAndCon.sort((a, b) => (b.stats ?? -Infinity) - (a.stats ?? -Infinity));
+  const mostBaseGainedByBucket = topPerBucket(mostBaseGained, (row) => row.mainDelta, 5);
+  const mainAndConByBucket = topPerBucket(mainAndCon, (row) => row.mainAndConTotal, 5);
 
   return {
     ...base,
-    mostBaseGained: mostBaseGained.slice(0, 50),
-    sumBaseStats: sumBaseStats.slice(0, 50),
-    highestBaseStats: highestBaseStats.slice(0, 50),
-    highestTotalStats: highestTotalStats.slice(0, 50),
-    mainAndCon: mainAndCon.slice(0, 50),
+    xpRanking: topBy(mostBaseGained, (row) => row.xpTotal, 10),
+    mainGainedByBucket: mostBaseGainedByBucket,
+    conGained: topBy(mostBaseGained, (row) => row.conDelta, 10),
+    sumBaseGained: topBy(sumBaseStats, (row) => row.sumBaseDelta, 10),
+    mainAndConByBucket,
+    sumBaseHighest: topBy(highestBaseStats, (row) => row.sumBaseTotal, 10),
+    highestTotalStats: topBy(highestTotalStats, (row) => row.totalStats, 10),
   };
 };
 
@@ -429,25 +653,20 @@ function emptyUiData(
       title: `${guildName} - Monthly Progress`,
       monthRange: "-", // Fallback-Anzeige
       emblemUrl: guildIconUrlByIdentifier(guildId, 512) || undefined,
-      centerCaption: "Most Base Stats gained",
       currentMonthKey: extra?.currentMonthKey,
       months: extra?.months,
     },
-    panels: {
-      leftImageUrl: undefined,
-      rightImageUrl: undefined,
+    topRow: {
+      xpBlock: mkBlock("XP / Monthly XP", guildServer ? `Server ${guildServer}` : undefined),
+      rightPlaceholder: {
+        title: "Reserved",
+        subtitle: "No data configured",
+      },
     },
-    tablesTop: [
-      mkBlock("Most Base Stats gained", guildServer ? `Server ${guildServer}` : undefined),
-      mkBlock("Sum Base Stats"),
-      mkBlock("Highest Base Stats"),
-    ],
-    tablesBottom: [
-      mkBlock("Main & Con"),
-      mkBlock("Sum Base Stats"),
-      mkBlock("Highest Base Stats"),
-      mkBlock("Highest Total Stats"),
-    ],
+    sections: {
+      mostBaseStatsGained: [mkBlock("Main"), mkBlock("Con"), mkBlock("Sum Base Stats")],
+      highestBaseStats: [mkBlock("Main & Con"), mkBlock("Sum Base Stats"), mkBlock("Highest Total Stats")],
+    },
   };
 }
 
@@ -455,17 +674,17 @@ function mkBlock(title: string, subtitle?: string): TableBlock {
   return {
     title,
     subtitle,
-    columns: [], // Presenter zeigt "No data", wenn rows leer bleiben
+    columns: [
+      { key: "rank", label: "#", width: 36, align: "right" },
+      { key: "name", label: "Name" },
+    ],
     rows: [],
   };
 }
 
 /**
  * Mappt das gespeicherte Monatsdokument auf die Presenter-Struktur.
- * Erwartete Felder (optional):
- * - meta: { fromISO, toISO, daysSpan, label }
- * - status: { available, reason? }
- * - mostBaseGained[], sumBaseStats[], highestBaseStats[], highestTotalStats[], mainAndCon[]
+ * Erwartet die lokal abgeleiteten Rankings aus buildProgressFromSnapshots.
  */
 function progressToUiData(
   progress: any,
@@ -477,12 +696,10 @@ function progressToUiData(
     months?: MonthOption[];
   }
 ): GuildMonthlyProgressData {
-  const meta = progress?.meta ?? {};
   const header: GuildMonthlyProgressData["header"] = {
     title: `${ctx.guildName} - Monthly Progress`,
     monthRange: undefined, // Dropdown uebernimmt
     emblemUrl: guildIconUrlByIdentifier(ctx.guildId, 512) || undefined,
-    centerCaption: "Most Base Stats gained",
     months: ctx.months,
     currentMonthKey: ctx.currentMonthKey,
   };
@@ -492,133 +709,153 @@ function progressToUiData(
     { key: "name", label: "Name" },
   ];
 
-  const topBlocks: TableBlock[] = [
+  const toRows = (
+    rows: ProgressMemberRow[],
+    map: (row: ProgressMemberRow, index: number) => TableRow,
+  ): TableRow[] => rows.map((row, index) => ({ id: row.playerId ?? index, rank: index + 1, ...map(row, index) }));
+
+  const toGroups = (
+    groups: BucketRanking[] | undefined,
+    map: (row: ProgressMemberRow, index: number) => TableRow,
+  ): TableGroup[] =>
+    (groups ?? []).map((group) => ({
+      key: group.key,
+      label: group.label,
+      rows: toRows(group.rows, map),
+    }));
+
+  const xpBlock: TableBlock = {
+    title: "XP / Monthly XP",
+    subtitle: ctx.guildServer ? `Server ${ctx.guildServer}` : undefined,
+    columns: [
+      ...colRankName,
+      { key: "level", label: "Lvl", width: 54, align: "right", format: "num" as const },
+      { key: "xp", label: "XP", width: 110, align: "right", format: "num" as const },
+      { key: "delta", label: "+XP", width: 84, align: "right", format: "num" as const },
+    ],
+    rows: toRows(progress?.xpRanking ?? [], (r) => ({
+      name: r.name,
+      class: r.classLabel,
+      level: r.level,
+      xp: r.xpTotal,
+      delta: r.xpDelta,
+    })),
+  };
+
+  const mostBaseStatsGained: TableBlock[] = [
     {
-      title: "Most Base Stats gained",
-      subtitle: ctx.guildServer ? `Server ${ctx.guildServer}` : undefined,
+      title: "Main",
+      subtitle: "Top 5 per Main-Stat bucket",
       columns: [
         ...colRankName,
-        { key: "level", label: "Level", width: 70, align: "right", format: "num" as const },
-        { key: "base", label: "Base", width: 80, align: "right", format: "num" as const },
-        { key: "delta", label: "Delta", width: 70, align: "right", format: "num" as const },
+        { key: "main", label: "Main", width: 92, align: "right", format: "num" as const },
+        { key: "delta", label: "+Main", width: 84, align: "right", format: "num" as const },
       ],
-      rows: (progress?.mostBaseGained ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        level: r.levelLatest ?? r.level ?? null,
-        base: r.baseLatest ?? r.base ?? null,
-        delta: r.baseDelta ?? r.delta ?? null,
+      rows: [],
+      groups: toGroups(progress?.mainGainedByBucket, (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        main: r.baseMain,
+        delta: r.mainDelta,
+      })),
+    },
+    {
+      title: "Con",
+      subtitle: "Top 10",
+      columns: [
+        ...colRankName,
+        { key: "con", label: "Con", width: 92, align: "right", format: "num" as const },
+        { key: "delta", label: "+Con", width: 84, align: "right", format: "num" as const },
+      ],
+      rows: toRows(progress?.conGained ?? [], (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        con: r.conBase,
+        delta: r.conDelta,
       })),
     },
     {
       title: "Sum Base Stats",
+      subtitle: "Top 10",
       columns: [
         ...colRankName,
-        { key: "base", label: "Base", width: 100, align: "right", format: "num" as const },
-        { key: "stam", label: "Stam Delta", width: 90, align: "right", format: "num" as const },
-        { key: "sho", label: "Sho Delta", width: 90, align: "right", format: "num" as const },
+        { key: "level", label: "Lvl", width: 54, align: "right", format: "num" as const },
+        { key: "sum", label: "Sum", width: 104, align: "right", format: "num" as const },
+        { key: "delta", label: "+Sum", width: 84, align: "right", format: "num" as const },
       ],
-      rows: (progress?.sumBaseStats ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        base: r.base ?? null,
-        stam: r.stamDelta ?? r.staminaDelta ?? null,
-        sho: r.shoDelta ?? r.shootingDelta ?? null,
-      })),
-    },
-    {
-      title: "Highest Base Stats",
-      columns: [
-        ...colRankName,
-        { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
-      ],
-      rows: (progress?.highestBaseStats ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        stats: r.stats ?? r.base ?? null,
-        delta: r.delta ?? null,
+      rows: toRows(progress?.sumBaseGained ?? [], (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        level: r.level,
+        sum: r.sumBaseTotal,
+        delta: r.sumBaseDelta,
       })),
     },
   ];
 
-  const bottomBlocks: TableBlock[] = [
+  const highestBaseStats: TableBlock[] = [
     {
       title: "Main & Con",
+      subtitle: "Top 5 per Main-Stat bucket",
       columns: [
         ...colRankName,
-        { key: "class", label: "Class", width: 72, align: "center" as const },
-        { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
+        { key: "main", label: "Main", width: 88, align: "right", format: "num" as const },
+        { key: "con", label: "Con", width: 88, align: "right", format: "num" as const },
       ],
-      rows: (progress?.mainAndCon ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        class: r.class ?? r.className ?? "",
-        stats: r.stats ?? null,
-        delta: r.delta ?? null,
+      rows: [],
+      groups: toGroups(progress?.mainAndConByBucket, (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        main: r.baseMain,
+        con: r.conBase,
       })),
     },
     {
       title: "Sum Base Stats",
+      subtitle: "Top 10",
       columns: [
         ...colRankName,
-        { key: "base", label: "Base", width: 100, align: "right", format: "num" as const },
-        { key: "stam", label: "Stam Delta", width: 90, align: "right", format: "num" as const },
-        { key: "sho", label: "Sho Delta", width: 90, align: "right", format: "num" as const },
+        { key: "level", label: "Lvl", width: 54, align: "right", format: "num" as const },
+        { key: "sum", label: "Sum", width: 110, align: "right", format: "num" as const },
       ],
-      rows: (progress?.sumBaseStats ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        base: r.base ?? null,
-        stam: r.stamDelta ?? null,
-        sho: r.shoDelta ?? null,
-      })),
-    },
-    {
-      title: "Highest Base Stats",
-      columns: [
-        ...colRankName,
-        { key: "stats", label: "Stats", width: 100, align: "right", format: "num" as const },
-        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
-      ],
-      rows: (progress?.highestBaseStats ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        stats: r.stats ?? null,
-        delta: r.delta ?? null,
+      rows: toRows(progress?.sumBaseHighest ?? [], (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        level: r.level,
+        sum: r.sumBaseTotal,
       })),
     },
     {
       title: "Highest Total Stats",
+      subtitle: "Top 10",
       columns: [
         ...colRankName,
-        { key: "total", label: "Total Stats", width: 120, align: "right", format: "num" as const },
-        { key: "delta", label: "Delta", width: 80, align: "right", format: "num" as const },
+        { key: "level", label: "Lvl", width: 54, align: "right", format: "num" as const },
+        { key: "total", label: "Total", width: 110, align: "right", format: "num" as const },
+        { key: "delta", label: "+Total", width: 84, align: "right", format: "num" as const },
       ],
-      rows: (progress?.highestTotalStats ?? []).map((r: any, i: number) => ({
-        id: r.playerId ?? i,
-        rank: i + 1,
-        name: r.name ?? "-",
-        total: r.total ?? null,
-        delta: r.delta ?? null,
+      rows: toRows(progress?.highestTotalStats ?? [], (r) => ({
+        name: r.name,
+        class: r.classLabel,
+        level: r.level,
+        total: r.totalStats,
+        delta: r.totalDelta,
       })),
     },
   ];
 
   return {
     header,
-    panels: {
-      leftImageUrl: undefined,
-      rightImageUrl: undefined,
+    topRow: {
+      xpBlock,
+      rightPlaceholder: {
+        title: "Reserved",
+        subtitle: "Placeholder",
+      },
     },
-    tablesTop: topBlocks,
-    tablesBottom: bottomBlocks,
+    sections: {
+      mostBaseStatsGained,
+      highestBaseStats,
+    },
   };
 }
