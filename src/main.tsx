@@ -172,6 +172,7 @@ import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterCont
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCenterSessionsContext";
 import { AuthProvider } from "./context/AuthContext";
+import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
@@ -206,12 +207,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <NotificationsProvider>
       <AuthProvider>
-        <FeatureAccessProvider>
-          <UploadCenterProvider>
-            <UploadCenterSessionsProvider>
-              <HashRouter>
-                <Routes>
-                  <Route element={<RootLayout />}>
+        <LocalePreferencesProvider>
+          <FeatureAccessProvider>
+            <UploadCenterProvider>
+              <UploadCenterSessionsProvider>
+                <HashRouter>
+                  <Routes>
+                    <Route element={<RootLayout />}>
                 {/* Home */}
                 <Route
                   path="/"
@@ -531,15 +533,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
-                  </Route>
-                </Routes>
-              </HashRouter>
+                    </Route>
+                  </Routes>
+                </HashRouter>
 
-              {/* Modal am Root */}
-              <UploadCenterModal />
-            </UploadCenterSessionsProvider>
-          </UploadCenterProvider>
-        </FeatureAccessProvider>
+                {/* Modal am Root */}
+                <UploadCenterModal />
+              </UploadCenterSessionsProvider>
+            </UploadCenterProvider>
+          </FeatureAccessProvider>
+        </LocalePreferencesProvider>
       </AuthProvider>
     </NotificationsProvider>
   </React.StrictMode>

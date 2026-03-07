@@ -324,6 +324,7 @@
     "languagePreference": "Sidebar-Sprache",
     "languageSwitchEn": "Sprache auf Englisch wechseln",
     "languageSwitchDe": "Sprache auf Deutsch wechseln",
+    "languageSwitchToLocale": "Sprache auf {{language}} wechseln",
     "connectedCharacters": {
       "title": "Verknuepfte Charaktere",
       "empty": "Noch keine Charaktere verknuepft. Verknuepfe einen Charakter in deinem Account, damit er hier erscheint.",
@@ -464,6 +465,13 @@
       "guestSubtitle": "Mit Discord anmelden",
       "guestHint": "Nutze Discord oder Google auf der Login-Seite.",
       "signInCta": "Anmelden",
+      "languageSettingsCta": "Spracheinstellungen",
+      "languageSettingsTitle": "Einstellungen",
+      "languageSettingsSubtitle": "Waehle deine Oberflaechensprache.",
+      "languageFieldLabel": "Sprache",
+      "languageSaving": "Spracheinstellungen werden gespeichert...",
+      "languageSaveError": "Spracheinstellungen konnten nicht gespeichert werden.",
+      "closeLanguageSettings": "Einstellungen schliessen",
       "signedInVia": "Angemeldet via {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
@@ -538,7 +546,9 @@
     "theme_dark": "Dunkel",
     "language": "Sprache",
     "lang_en": "English",
-    "lang_de": "Deutsch"
+    "lang_de": "Deutsch",
+    "lang_hu": "Hungarian",
+    "lang_cs": "Czech"
   },
   "toplistsPage": {
     "errors": {

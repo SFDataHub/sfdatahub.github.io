@@ -656,25 +656,27 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
                   <div className={styles.liveAvatarFallback} aria-hidden>{displayName.slice(0,2).toUpperCase()}</div>
                 )}
                 <div className={styles.liveInfo}>
-                  <div className={styles.liveName}>{displayName}</div>
-                  <div className={styles.liveMeta}>
+                  <div className={styles.liveNameRow}>
+                    <div className={styles.liveName}>{displayName}</div>
                     <span className={styles.liveBadge} data-i18n="home.live.badge">{t("home.live.badge")}</span>
+                  </div>
+                  <div className={styles.liveViewRow}>
                     {typeof item.stream.viewerCount === "number" && (
                       <span className={styles.liveViewers}>
                         {t("home.live.viewers", { viewers: item.stream.viewerCount.toLocaleString() })}
                       </span>
                     )}
+                    <a
+                      href={item.channel.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`${styles.primaryBtn} ${styles.liveOpenBtn}`}
+                      data-i18n="home.live.open_on_twitch"
+                    >
+                      {t("home.live.open_on_twitch")}
+                    </a>
                   </div>
                 </div>
-                <a
-                  href={item.channel.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`${styles.primaryBtn} ${styles.liveOpenBtn}`}
-                  data-i18n="home.live.open_on_twitch"
-                >
-                  {t("home.live.open_on_twitch")}
-                </a>
               </div>
               {streamTitle && <div className={styles.liveDescription}>{streamTitle}</div>}
             </div>

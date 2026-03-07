@@ -1,0 +1,1017 @@
+{
+  "common": {
+    "noData": "Nincs adat"
+  },
+  "nav": {
+    "home": "Kezdolap",
+    "dashboard": "Irányítópult",
+    "players": "Játékosok",
+    "guilds": "Céhek",
+    "servers": "Szerverek",
+    "toplists": "Toplisták",
+    "oldscans": "Régi szkenek",
+    "favorites": "Kedvencek",
+    "notifications": "Értesítések",
+    "imprint": "Impresszum",
+    "privacy": "Adatvédelem",
+    "license": "Licenc",
+    "help": "Súgó",
+    "tools": "Eszközök",
+    "community": "Közösség",
+    "creatorHub": "Creator Hub",
+    "settings": "Beállítások",
+    "discover": "Felfedezés",
+    "guildHub": "Guild Hub",
+    "admin": "Admin",
+    "playground": "Playground",
+    "guideHub": "Guide Hub",
+    "scans": "Szkenek",
+    "overview": "Áttekintés",
+    "guildPlanner": "Guild Planner",
+    "fusionPlanner": "Fusion Planner",
+    "guildCompare": "Céh-összehasonlítás",
+    "waitlist": "Várólista",
+    "sfMagazine": "SFMagazine",
+    "historyBook": "History Book",
+    "errorLog": "Hibanapló",
+    "feedback": "Visszajelzés",
+    "users": "Felhasználók",
+    "uploadCenter": "Upload Center",
+    "profile": "Profil",
+    "account": "Fiók",
+    "appearance": "Megjelenés",
+    "listViews": "Lista nézetek",
+    "rescanWidget": "Rescan Widget",
+    "uploadSimulator": "Upload Simulator",
+    "hudGameButtons": "HUD · Game Buttons"
+  },
+  "home": {
+    "title": "Kezdolap",
+    "headerLabel": "Kezdolap",
+    "subtitle": "Üdv újra",
+    "historybook": {
+      "title": "Historybook",
+      "credit": "Historybook - készítette: Resist 2 Exist & DonMuErte",
+      "logoAlt": "Historybook logó",
+      "coverAlt": "Historybook borító",
+      "open": "Historybook megnyitása"
+    },
+    "guidehub": {
+      "title": "GuideHub",
+      "subtitle": "Útmutatók és kalkulátorok",
+      "logoAlt": "GuideHub logó",
+      "previewAlt": "GuideHub előnézet",
+      "open": "GuideHub megnyitása"
+    },
+    "sftools": {
+      "title": "SFTools",
+      "subtitle": "Eszközök és források",
+      "previewAlt": "SFTools előnézet"
+    },
+    "taverndiscord": {
+      "title": "Tavern Discord",
+      "subtitle": "Közösségi Discord",
+      "previewAlt": "Tavern Discord előnézet"
+    },
+    "discordBanner": {
+      "title": "JOIN OUR DISCORD",
+      "subtitle": "CSATLAKOZZ ITT",
+      "linkLabel": "Meghívó",
+      "linkValue": "discord.gg/2FqSvXC3",
+      "aria": "SFDataHub Discord meghívó megnyitása",
+      "logoAlt": "Discord logó"
+    },
+    "news": {
+      "title": "Közösségi hírek",
+      "empty": "Még nincs hír.",
+      "emptyChannel": "Ebben a csatornában nincs friss hír.",
+      "openOnDiscord": "Megnyitás Discordon",
+      "prev": "Előző csatorna",
+      "next": "Következő csatorna"
+    },
+    "records": {
+      "title": "Legfrissebb közösségi rekordok",
+      "subtitle": "Élő pillanatkép",
+      "fallbackTitle": "Rekord bejelentés",
+      "fallbackAuthor": "Discord",
+      "fallbackChannel": "Rekordok",
+      "previous": "Előző: {{holder}} • {{days}}n",
+      "daysLabel": "nap",
+      "empty": "Még nincs rekordbejelentés."
+    },
+    "youtube": {
+      "title": "YouTube",
+      "prev": "Előző videó",
+      "next": "Következő videó",
+      "empty": "Nincs videó"
+    },
+    "live": {
+      "title": "Most élő",
+      "none": "Jelenleg senki sem élő.",
+      "open_on_twitch": "Megnyitás Twitchen",
+      "badge": "LIVE",
+      "viewers": "{{viewers}} néző",
+      "prev": "Előző stream",
+      "next": "Következő stream"
+    },
+    "schedule": {
+      "open": "Streaming menetrend megjelenítése",
+      "title": "Streaming menetrend",
+      "close": "Bezárás",
+      "platform": "Platform",
+      "platformAll": "Összes",
+      "platformTwitch": "Twitch",
+      "platformYouTube": "YouTube",
+      "search": "Keresés",
+      "searchPlaceholder": "Streamer / Cím",
+      "today": "Csak ma",
+      "columns": {
+        "weekday": "Hét napja",
+        "start": "Kezdés (UTC)",
+        "end": "Vége (UTC)",
+        "timezone": "Időzóna",
+        "platform": "Platform",
+        "channel": "Csatorna URL",
+        "streamer": "Streamer",
+        "title": "Cím"
+      },
+      "empty": "Még nincs menetrend.",
+      "link": "Link"
+    }
+  },
+  "sidebar": {
+    "navigation": "Navigáció",
+    "categories": "Kategóriák",
+    "login": "Bejelentkezés",
+    "logout": "Kijelentkezés",
+    "pin": "Rögzítés",
+    "unpin": "Feloldás",
+    "languagePreference": "Oldalsáv nyelve",
+    "languageSwitchEn": "Nyelv váltása angolra",
+    "languageSwitchDe": "Nyelv váltása németre",
+    "languageSwitchToLocale": "Nyelv váltása erre: {{language}}",
+    "connectedCharacters": {
+      "title": "Összekapcsolt karakterek",
+      "empty": "Még nincs összekapcsolt karakter. Kösd össze a karaktert a fiókodban, hogy itt megjelenjen.",
+      "loginPrompt": "Jelentkezz be az összekapcsolt karakterek megtekintéséhez.",
+      "ctaGuest": "Kezdő útmutató megnyitása",
+      "ctaAuthed": "Ugrás a fiók fülre",
+      "chip": {
+        "server": "Szerver",
+        "class": "Kaszt"
+      }
+    }
+  },
+  "account": {
+    "settings": {
+      "title": "Beállítások",
+      "subtitle": "Személyes beállításaid kezelése.",
+      "loading": "Beállítások betöltése...",
+      "error": "A beállítások betöltése sikertelen.",
+      "retry": "Újra",
+      "language": {
+        "label": "Előnyben részesített nyelv"
+      },
+      "defaultSection": {
+        "label": "Alapértelmezett szekció"
+      },
+      "compactTables": {
+        "label": "Kompakt táblázatnézet használata"
+      },
+      "experimental": {
+        "label": "Kísérleti funkciók engedélyezése"
+      },
+      "save": "Beállítások mentése",
+      "saved": "Beállítások elmentve.",
+      "noChanges": "Nincs menthető módosítás.",
+      "saving": "Mentés...",
+      "saveError": "A beállítások mentése sikertelen. Próbáld újra."
+    },
+    "tools": {
+      "title": "Eszközbeállítások",
+      "subtitle": "Állítsd be, hogyan működjenek az eszközök a fiókodban.",
+      "loading": "Eszközbeállítások betöltése...",
+      "loadError": "Az eszközbeállítások betöltése sikertelen.",
+      "defaultSet": {
+        "label": "Alapértelmezett set ID",
+        "placeholder": "Add meg az alapértelmezett set ID-t"
+      },
+      "showIntro": {
+        "label": "Eszköz bemutató megjelenítése"
+      },
+      "experimental": {
+        "label": "Kísérleti eszközök engedélyezése"
+      },
+      "save": {
+        "cta": "Beállítások mentése",
+        "saving": "Mentés...",
+        "success": "Beállítások elmentve.",
+        "noChanges": "Nincs menthető módosítás.",
+        "error": "A beállítások mentése sikertelen. Próbáld újra."
+      }
+    },
+    "connectedCharacters": {
+      "title": "Összekapcsolt karakterek",
+      "subtitle": "Ezek a játékkarakterek a SFDataHub fiókodhoz vannak kapcsolva.",
+      "loading": "Karakterek frissítése...",
+      "empty": {
+        "title": "Még nincs összekapcsolt karakter",
+        "description": "Használd a \"!connect char\" parancsot Discordon, majd kattints itt a \"Frissítés\" gombra.",
+        "cta": "Kattints ide az összekapcsolás működéséhez"
+      },
+      "actions": {
+        "refresh": "Frissítés",
+        "refreshing": "Frissítés...",
+        "unlink": "Karakter leválasztása"
+      },
+      "confirmation": {
+        "title": "Biztosan leválasztod ezt a karaktert?",
+        "cancel": "Mégse",
+        "confirm": "Igen, leválasztás",
+        "confirming": "Leválasztás..."
+      },
+      "errors": {
+        "serviceUnavailable": "Az auth szolgáltatás nincs beállítva leválasztásra.",
+        "unlink": "A karakter leválasztása sikertelen."
+      },
+      "columns": {
+        "character": "Karakter",
+        "server": "Szerver",
+        "playerId": "Player ID",
+        "class": "Kaszt",
+        "level": "Szint",
+        "guild": "Céh",
+        "lastVerified": "Legutóbb összekapcsolva",
+        "source": "Forrás",
+        "actions": "Műveletek"
+      },
+      "method": {
+        "discord": "Discord bot"
+      },
+      "help": {
+        "title": "Hogyan működik az összekapcsolás?",
+        "show": "Megjelenítés",
+        "hide": "Elrejtés",
+        "steps": {
+          "link": "Kapcsold össze a karaktert a Discord bot \"!connect char\" parancsával.",
+          "verify": "A karaktert a legutóbbi ellenőrzött szkeneddel párosítjuk; tartsd naprakészen az adataid.",
+          "refresh": "Összekapcsolás után kattints a Frissítés gombra a lista frissítéséhez.",
+          "unlink": "A Műveletek oszlopban bármely karakter leválasztható; a Forrás oszlop mutatja, hogyan lett kapcsolva."
+        },
+        "footnote": "Tipp: Összekapcsolás vagy leválasztás után mindig nyomj egy Frissítést."
+      }
+    },
+    "loginOverlay": {
+      "modalAriaLabel": "Bejelentkezés",
+      "logoAlt": "SFDataHub logó",
+      "title": "Bejelentkezés",
+      "subtitle": "Válassz módszert a SFDataHub eléréséhez.",
+      "discordCta": "Bejelentkezés Discorddal",
+      "loading": "Munkamenet ellenőrzése...",
+      "authedStatus": "Bejelentkezve mint {{name}}.",
+      "logout": "Kijelentkezés",
+      "backToDashboard": "Vissza az irányítópultra",
+      "disclaimer": "Csak a SFDataHub felhasználói azonosítódat, megjelenített nevedet, avatarodat és szerepeidet tároljuk a személyre szabáshoz.",
+      "errors": {
+        "unknownHost": "ismeretlen host",
+        "unauthorizedDomain": "Ez a domain nincs engedélyezve bejelentkezésre. Add hozzá a(z) \"{{host}}\" domaint a Firebase Auth engedélyezett domainekhez vagy használd a megfelelő környezetet.",
+        "popupBlocked": "A bejelentkezési popup blokkolva lett. Engedélyezd a popupokat ezen az oldalon vagy használd az átirányításos folyamatot.",
+        "popupClosed": "A bejelentkezési popup bezárult a folyamat befejezése előtt. Próbáld újra.",
+        "default": "A bejelentkezés sikertelen. Próbáld újra.",
+        "codeLabel": "kód"
+      }
+    },
+    "menu": {
+      "fallbackAuthedName": "Játékos",
+      "fallbackGuestName": "Vendég",
+      "loadingSession": "Munkamenet ellenőrzése...",
+      "loadingLoginStatus": "Bejelentkezési állapot ellenőrzése",
+      "guestTitle": "Vendég mód",
+      "guestSubtitle": "Bejelentkezés Discorddal",
+      "guestHint": "Használd a Discordot vagy a Google-t a bejelentkezési oldalon.",
+      "signInCta": "Bejelentkezés",
+      "languageSettingsCta": "Nyelvi beállítások",
+      "languageSettingsTitle": "Beállítások",
+      "languageSettingsSubtitle": "Válaszd ki a felület nyelvét.",
+      "languageFieldLabel": "Nyelv",
+      "languageSaving": "Nyelvi beállítások mentése...",
+      "languageSaveError": "A nyelvi beállítások mentése sikertelen.",
+      "closeLanguageSettings": "Beállítások bezárása",
+      "signedInVia": "Bejelentkezve ezzel: {{provider}}",
+      "providerGoogle": "Google",
+      "providerDiscord": "Discord",
+      "accountAndProfile": "Fiók és profil",
+      "consolePanel": "Konzol panel",
+      "logout": "Kijelentkezés"
+    }
+  },
+  "topbar": {
+    "quickAccess": "Gyorselérés",
+    "upload": "Szken feltöltése",
+    "officialGameSite": "Hivatalos játékoldal megnyitása",
+    "search": "Keresés /",
+    "settings": "Beállítások",
+    "profile": "Profil",
+    "signout": "Kijelentkezés",
+    "notifications": "Értesítések",
+    "help": "Súgó",
+    "theme": "Téma",
+    "theme_light": "Világos",
+    "theme_dark": "Sötét",
+    "language": "Nyelv",
+    "lang_en": "English",
+    "lang_de": "Deutsch",
+    "lang_hu": "Hungarian",
+    "lang_cs": "Czech"
+  },
+  "toplistsPage": {
+    "errors": {
+      "noSnapshot": "Ehhez a szerverhez még nincs snapshot.",
+      "firestore": "Firestore hiba",
+      "decode": "Az adatokat nem sikerült dekódolni",
+      "unexpectedLoad": "Váratlan hiba történt betöltés közben"
+    }
+  },
+  "toplists": {
+    "headerLabel": "Toplisták",
+    "compareMode": "Összehasonlítás mód",
+    "compareMonth": "Fejlődés ettől",
+    "compareMonths": "Hónapok összehasonlítása",
+    "compareFrom": "Ettől",
+    "compareTo": "Eddig",
+    "compareOff": "Ki",
+    "compareMissingSnapshot": "Nincs alapadat ehhez: {{key}}.",
+    "deltaNew": "ÚJ",
+    "columns": {
+      "rank": "#",
+      "rankDelta": "Δ Rang",
+      "server": "Szerver",
+      "player": "Játékos",
+      "name": "Név",
+      "class": "Kaszt",
+      "guild": "Céh",
+      "level": "Szint",
+      "main": "Fő",
+      "con": "Con",
+      "sum": "Összeg",
+      "statsPerDay": "Stat/Nap",
+      "ratio": "Arány",
+      "mine": "Bánya",
+      "treasury": "Kincstár",
+      "lastScan": "Utolsó szken",
+      "hofRank": "HoF rang",
+      "honor": "Becsület",
+      "raids": "Raidek",
+      "portal": "Portál",
+      "hydra": "Hydra",
+      "petLevel": "Pet szint",
+      "members": "Tagok",
+      "avgLevel": "Ø Szint",
+      "avgMain": "Ø Fő",
+      "avgCon": "Ø Con",
+      "avgSum": "Ø Összeg"
+    },
+    "status": {
+      "noServerSelected": "Nincs kiválasztott szerver",
+      "loading": "Betöltés...",
+      "error": "Hiba",
+      "ready": "Kész",
+      "rows": "sor",
+      "updated": "Frissítve: {{value}}"
+    },
+    "table": {
+      "loading": "Betöltés...",
+      "noResults": "Nincs találat"
+    },
+    "actions": {
+      "retry": "Újra"
+    },
+    "players": {
+      "avgMode": {
+        "label": "Értékek",
+        "aria": "Játékos átlag mód",
+        "base": "Alap",
+        "total": "Összes",
+        "updating": "Frissítés..."
+      },
+      "selectServerHint": "Válassz legalább egy szervert.",
+      "scope": {
+        "summary": "Scope {{scopeId}} - {{changes}}/{{minChanges}} változás az utolsó rebuild óta",
+        "autoRebuild": "Automatikus rebuild {{minChanges}} változásnál vagy {{maxAgeDays}} nap után",
+        "lastRebuild": "Utolsó rebuild: {{value}}"
+      }
+    },
+    "guilds": {
+      "snapshotStatus": "Céhek - snapshotok (legfrissebb)",
+      "avgMode": {
+        "label": "Értékek",
+        "aria": "Céh átlag mód",
+        "base": "Alap",
+        "total": "Összes",
+        "updating": "Frissítés..."
+      }
+    },
+    "exportDialog": {
+      "title": "PNG export",
+      "amount": "Mennyiség",
+      "selection": "Kijelölés",
+      "currentView": "Aktuális nézet",
+      "guilds": "Céhek",
+      "guildsSummary": "Céhek: {{list}}",
+      "guildsPlaceholder": "Céhek: nincs kiválasztva",
+      "guildsEmpty": "Nincs elérhető céh",
+      "range": {
+        "title": "Rangtartomány",
+        "enable": "Rangtartomány használata",
+        "from": "Ettől",
+        "to": "Eddig",
+        "max": "Max: {{count}}",
+        "oneBased": "A rangok 1-től kezdődnek"
+      },
+      "cancel": "Mégse",
+      "export": "Export",
+      "exporting": "Exportálás..."
+    },
+    "filters": {
+      "showHud": "Szűrők megjelenítése",
+      "hideHud": "Szűrők elrejtése",
+      "sort": {
+        "label": "Rend.",
+        "aria": "Rendezés",
+        "playerOptions": {
+          "main": "Fő",
+          "mainTotal": "Fő (Összes)",
+          "constitution": "Állóképesség",
+          "conTotal": "Con (Összes)",
+          "sum": "Alap statok",
+          "statsDay": "Stat/Nap",
+          "sumTotal": "Összeg összes",
+          "statsDayTotal": "Összes stat/nap",
+          "level": "Szint",
+          "mine": "Bánya"
+        },
+        "guildOptions": {
+          "guildMembers": "Tagok",
+          "guildAvgLevel": "ø Szint",
+          "guildAvgMain": "ø Fő",
+          "guildAvgCon": "ø Con",
+          "guildAvgSum": "ø Összeg",
+          "guildRaids": "Raidek",
+          "guildHydra": "Hydra"
+        }
+      },
+      "guilds": {
+        "label": "Céhek",
+        "placeholder": "Összes céh",
+        "empty": "Nincs céh a snapshotban.",
+        "clear": "Törlés",
+        "selected": "{{count}} kiválasztva"
+      }
+    }
+  },
+  "player": {
+    "profile": {
+      "cta": {
+        "showInToplist": "Megjelenítés a toplistában"
+      }
+    }
+  },
+  "playerProfile": {
+    "heroPanel": {
+      "actions": {
+        "favorite": {
+          "add": "Hozzáadás a kedvencekhez",
+          "remove": "Eltávolítás a kedvencek közül"
+        },
+        "showInTopList": "Megjelenítés a toplistában",
+        "openPlayerProfile": "Játékosprofil megnyitása",
+        "openGuild": "Céh megnyitása",
+        "share": "Megosztás",
+        "copyLink": "Link másolása"
+      },
+      "tooltips": {
+        "lastScanAt": "Utolsó szken: {{value}}",
+        "noGuildLinked": "A legutóbbi szkenben nincs kapcsolt céh.",
+        "shareSystemShareSheet": "Rendszer megosztási panel",
+        "age": {
+          "label": "Kor: {{value}}",
+          "today": "ma",
+          "oneDayAgo": "1 napja",
+          "daysAgo": "{{days}} napja"
+        }
+      },
+      "stats": {
+        "lastScan": "Utolsó szken",
+        "level": "Szint",
+        "scrapbook": "Scrapbook",
+        "totalBaseStats": "Összes alap stat",
+        "totalStats": "Összes stat",
+        "mount": "Hátas",
+        "honor": "Becsület",
+        "guildRole": "Céhes szerep",
+        "hof": "HoF",
+        "attributeBars": {
+          "baseStats": "Alap statok",
+          "totalStats": "Összes stat",
+          "viewModeAriaLabel": "Attribútum nézet",
+          "modeBase": "Alap",
+          "modeTotal": "Összes",
+          "server": "Szerver",
+          "guild": "Céh",
+          "iconAlt": "{{name}} ikon",
+          "attributes": {
+            "str": "Erő",
+            "dex": "Ügyesség",
+            "int": "Intelligencia",
+            "con": "Állóképesség",
+            "lck": "Szerencse"
+          }
+        },
+        "potions": {
+          "ariaLabel": "Ital slotok",
+          "activeLabel": "Aktív italok:",
+          "slot1": "Ital 1",
+          "slot2": "Ital 2",
+          "slot3": "Ital 3",
+          "size": "Méret"
+        }
+      },
+      "meta": {
+        "classUnknown": "Kaszt ?",
+        "lastScanned": "Utoljára szkennelve"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Ismeretlen",
+            "hint": "Szken előzmény nem elérhető"
+          },
+          "scannedToday": {
+            "label": "Ma szkennelve",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "veryFresh": {
+            "label": "Nagyon friss",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "fresh": {
+            "label": "Friss",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "recent": {
+            "label": "Nemrég",
+            "hint": "Újraszkennelés javasolt"
+          },
+          "aging": {
+            "label": "Öregedő",
+            "hint": "Újraszkennelés javasolt"
+          },
+          "outdated": {
+            "label": "Elavult",
+            "hint": "Újraszkennelés erősen javasolt"
+          },
+          "stale": {
+            "label": "Nagyon elavult",
+            "hint": "Újraszkennelés erősen javasolt"
+          }
+        }
+      },
+      "portrait": {
+        "canvasAriaLabel": "{{label}} portréja",
+        "status": {
+          "idle": "Portré betöltése ...",
+          "loading": "PortraitMaker inicializálása ...",
+          "ready": "PortraitMaker kész",
+          "error": "A PortraitMaker nem tölthető be"
+        }
+      }
+    },
+    "tabs": {
+      "ariaLabel": "Játékosprofil fülek",
+      "statistics": "Statisztika",
+      "progress": "Fejlődés",
+      "compare": "Összehasonlítás",
+      "history": "Történet"
+    },
+    "chartsTab": {
+      "sections": {
+        "coreProgress": "Fő fejlődés",
+        "attributesBase": "Attribútumok (Alap)",
+        "attributesTotals": "Attribútumok (Összes)",
+        "economy": "Gazdaság",
+        "experience": "Tapasztalat"
+      },
+      "labels": {
+        "monthlyHistory": "Havi előzmények",
+        "latest": "{{metric}} (aktuális)",
+        "start": "{{metric}} (kezdet)",
+        "scanAt": "Szken",
+        "avgMarker": "Vonal + átlag jelölő"
+      },
+      "metrics": {
+        "level": "Szint",
+        "totalStats": "Összes stat",
+        "honor": "Becsület",
+        "main": "Fő attribútum",
+        "con": "Állóképesség (Con)",
+        "sum": "Összeg",
+        "mainTotal": "Fő attribútum összes",
+        "conTotal": "Con összes",
+        "sumTotal": "Összeg összes",
+        "mine": "Bánya",
+        "treasury": "Kincstár",
+        "xpTotal": "XP összes",
+        "xpProgress": "XP fejlődés"
+      }
+    },
+    "statsTab": {
+      "common": {
+        "yes": "Igen",
+        "no": "Nem"
+      },
+      "combat": {
+        "title": "Harci snapshot",
+        "armor": "Páncél",
+        "health": "Élet",
+        "damageMin": "Sebzés Min",
+        "damageMax": "Sebzés Max",
+        "damageAvg": "Sebzés Átl",
+        "weaponDamageMultiplier": "Fegyversebzés szorzó",
+        "maximumDamageReduction": "Max sebzéscsökkentés"
+      },
+      "potions": {
+        "title": "Italok és aktív hatások",
+        "slot1": "Ital 1",
+        "slot2": "Ital 2",
+        "slot3": "Ital 3",
+        "size": "Méret",
+        "lifePotion": "Élet ital"
+      },
+      "attrComposition": {
+        "title": "Attribútum összetétel",
+        "subtitle": "Összetevők bontása a latest.values alapján",
+        "bonus": "Bónusz",
+        "attributes": {
+          "str": "Erő",
+          "dex": "Ügyesség",
+          "int": "Intelligencia",
+          "con": "Állóképesség",
+          "lck": "Szerencse"
+        },
+        "breakdown": {
+          "base": "Alap",
+          "baseItems": "Alap tárgyak",
+          "upgrades": "Fejlesztések",
+          "equipment": "Felszerelés",
+          "gems": "Drágakövek",
+          "pet": "Pet bónusz",
+          "potion": "Ital",
+          "items": "Tárgyak",
+          "petBonus": "Pet darabszám",
+          "other": "Egyéb"
+        }
+      },
+      "runesResists": {
+        "title": "Rúnák és ellenállások"
+      },
+      "runes": {
+        "title": "Rúnák",
+        "gold": "Arany rúna",
+        "xp": "XP rúna",
+        "chance": "Esély rúna",
+        "quality": "Tárgy minőség rúna",
+        "health": "Élet rúna",
+        "damage": "Sebzés rúna",
+        "resist": "Ellenállás rúna"
+      },
+      "resistances": {
+        "title": "Ellenállások",
+        "elementalDamage": "Elemi sebzés",
+        "fire": "Tűz ellenállás",
+        "cold": "Jég ellenállás",
+        "lightning": "Villám ellenállás",
+        "fireDamage": "Tűz sebzés",
+        "coldDamage": "Jég sebzés",
+        "lightningDamage": "Villám sebzés"
+      },
+      "fortress": {
+        "title": "Erőd mátrix",
+        "guide": "Útmutató",
+        "guideFortress": "Erőd útmutató megnyitása",
+        "guideBuilding": "Útmutató ehhez: {{building}}",
+        "groups": {
+          "economy": "Gazdaság",
+          "combat": "Harc",
+          "utility": "Utility"
+        },
+        "labels": {
+          "fortress": "Erőd",
+          "upgrades": "Fejlesztések",
+          "fortifications": "Megerősítések",
+          "wall": "Fal",
+          "space": "Hely",
+          "quarters": "Szállás",
+          "portal": "Portál",
+          "woodcutter": "Favágó",
+          "quarry": "Kőfejtő",
+          "gemMine": "Drágakő bánya",
+          "academy": "Akadémia",
+          "smithy": "Kovács",
+          "treasury": "Kincstár",
+          "barracks": "Laktanya",
+          "mageTower": "Mágus torony",
+          "archeryGuild": "Íjász céh",
+          "rank": "Erőd rang",
+          "honor": "Erőd becsület"
+        }
+      },
+      "guild": {
+        "title": "Céh meta",
+        "guild": "Céh",
+        "guildIdentifier": "Céh azonosító",
+        "role": "Szerep",
+        "joined": "Céhhez csatlakozva",
+        "portal": "Céh portál"
+      },
+      "progress": {
+        "title": "Raidek és XP",
+        "raidsSection": "Raidek",
+        "xpSection": "XP",
+        "raids": "Raidek",
+        "raidHonor": "Raid becsület",
+        "raidWood": "Raid fa",
+        "raidStone": "Raid kő",
+        "xp": "XP",
+        "xpRequired": "Szükséges XP",
+        "xpTotal": "XP összes"
+      },
+      "badges": {
+        "title": "Mérföldkövek",
+        "fortressLevel": "Erőd L{{level}}",
+        "fortressMaxed": "Erőd maxolva",
+        "runesEconomy": "Gazdasági rúnák",
+        "runesCombat": "Harci rúnák",
+        "resists": "Elemi ellenállások",
+        "potions": "Ital trió",
+        "raider": "Raider: {{value}}"
+      },
+      "advanced": {
+        "title": "Haladó"
+      }
+    }
+  },
+  "profile": {
+    "overlay": {
+      "heroActions": {
+        "openPlayerProfile": "Játékosprofil megnyitása",
+        "openGuild": "Céh megnyitása",
+        "share": "Megosztás",
+        "copyLink": "Link másolása"
+      }
+    },
+    "public": {
+      "title": "Nyilvános profil",
+      "subtitle": "Ennek a SFDataHub identitásnak írásvédett nézete",
+      "identity": {
+        "profileIdLabel": "Profil ID",
+        "unknownValue": "Ismeretlen",
+        "lastScanLabel": "Utolsó szken",
+        "lastScanToday": "ma",
+        "daysAgoSuffix": "napja",
+        "dateUnknown": "Nincs adat",
+        "mainCharacterLabel": "Fő karakter",
+        "levelShort": "Sz.",
+        "serverLabel": "Szerver",
+        "guildLabel": "Céh",
+        "portraitPlaceholder": "Portré helyőrző"
+      },
+      "bio": {
+        "title": "A játékosról",
+        "empty": "Ehhez a játékoshoz még nincs bio megadva.",
+        "languagesLabel": "Nyelvek",
+        "rolesLabel": "Szerepek"
+      },
+      "showcase": {
+        "title": "Karakter bemutató",
+        "subtitle": "Kurált lista a legutóbbi ellenőrzött szkenekből",
+        "empty": "Még nincs karakter kiválasztva a bemutatóhoz.",
+        "scrapbookLabel": "Scrapbook",
+        "highlightLabel": "Kiemelt",
+        "tags": {
+          "main": "Main",
+          "alt": "Alt",
+          "archive": "Archívum",
+          "event": "Event"
+        }
+      },
+      "stats": {
+        "title": "SFDataHub aktivitás",
+        "totalScans": "Összes szken",
+        "uniquePlayers": "Egyedi játékosok",
+        "uniqueGuilds": "Egyedi céhek",
+        "last30d": "Szkenek (30n)",
+        "topServersLabel": "Top szerverek",
+        "firstScanLabel": "Első szken",
+        "empty": "Még nincs szken adat."
+      },
+      "records": {
+        "title": "Rekordok és mérföldkövek",
+        "empty": "Még nincs rögzített rekord vagy mérföldkő.",
+        "type": {
+          "record": "Rekord",
+          "milestone": "Mérföldkő"
+        }
+      },
+      "achievements": {
+        "title": "Eredmények és badge-ek",
+        "highlights": "Kiemelt eredmények",
+        "empty": "Még nincs feloldott eredmény.",
+        "tiers": {
+          "gold": "Arany",
+          "silver": "Ezüst",
+          "bronze": "Bronz"
+        }
+      },
+      "roles": {
+        "guildleader": "Céhvezető",
+        "tryhard": "Tryhard"
+      }
+    }
+  },
+  "guildProfile": {
+    "heroPanel": {
+      "actions": {
+        "openGuild": "Céh megnyitása",
+        "share": "Megosztás",
+        "copyLink": "Link másolása"
+      },
+      "tooltips": {
+        "lastScanAt": "Utolsó szken: {{value}}",
+        "age": {
+          "label": "Kor: {{value}}",
+          "today": "ma",
+          "oneDayAgo": "1 napja",
+          "daysAgo": "{{days}} napja"
+        }
+      },
+      "meta": {
+        "server": "Szerver",
+        "members": "Tagok",
+        "hofRank": "HoF rang",
+        "lastScanned": "Utoljára szkennelve"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Ismeretlen",
+            "hint": "A szken előzmény nem elérhető"
+          },
+          "scannedToday": {
+            "label": "Ma szkennelve",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "veryFresh": {
+            "label": "Nagyon friss",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "fresh": {
+            "label": "Friss",
+            "hint": "Nincs szükség újraszkennelésre"
+          },
+          "recent": {
+            "label": "Nemrég",
+            "hint": "Újraszkennelés javasolt"
+          },
+          "aging": {
+            "label": "Öregedő",
+            "hint": "Újraszkennelés javasolt"
+          },
+          "outdated": {
+            "label": "Elavult",
+            "hint": "Újraszkennelés erősen javasolt"
+          },
+          "stale": {
+            "label": "Nagyon elavult",
+            "hint": "Újraszkennelés erősen javasolt"
+          }
+        }
+      },
+      "sections": {
+        "guildOverview": "Céh áttekintés",
+        "averagePlayerStats": "Átlagos játékos statok",
+        "modeToggle": "Alap vagy összes",
+        "base": "Alap",
+        "total": "Összes",
+        "classOverview": "Kaszt áttekintés",
+        "classDistribution": "Kaszt eloszlás"
+      },
+      "metrics": {
+        "activity": "Aktivitás",
+        "placeholder2": "Készenlét",
+        "placeholder3": "Összes alap stat",
+        "placeholderHint": "Függő adatok"
+      },
+      "top3": {
+        "mainAttribute": "Fő attribútum top 3",
+        "con": "Con top 3",
+        "sum": "Összeg top 3",
+        "total": "Összes top 3",
+        "rankLabel": "Rang {{rank}}"
+      },
+      "statsLabels": {
+        "main": "Fő",
+        "con": "Con",
+        "sum": "Összeg",
+        "total": "Összes"
+      },
+      "transfers": {
+        "title": "Átigazolások",
+        "joined": "Csatlakozott",
+        "left": "Kilépett",
+        "noMonthlyComparison": "Nem elérhető havi összehasonlító snapshot",
+        "empty": "Nincs változás",
+        "levelShort": "Sz"
+      }
+    }
+  },
+  "help": {
+    "title": "Súgó és áttekintés",
+    "subtitle": "Rövid bevezető a SFDataHub-hoz",
+    "hero": {
+      "eyebrow": "Kezdő útmutató",
+      "heading": "Üdv a SFDataHub-ban",
+      "lead": "Nézd meg, mit tudsz itt csinálni, hogyan működik az adatok frissessége, és hol találod a beállításokat vagy jogi információkat.",
+      "freshnessLabel": "Adatfrissesség",
+      "freshnessBody": "Az adatok rendszeresen frissülnek. A pontos szken időt a toplistákban és profilokban látod."
+    },
+    "dataFreshness": {
+      "title": "Mennyire frissek az adatok?",
+      "body": "A SFDataHub közösségi szkenekre épül. Néhány szervert (például sok EU szervert) mi és pár segítő körülbelül havonta egyszer szkennelünk, időtől függően. Más szervereket (például fusion szervereket) más közösségi projektek ritkábban szkennelnek.\n\nEzért két szken között akár hetek vagy hónapok is lehetnek. A pontos állapotot mindig a \"Last scan: ...\" jelzés mutatja a toplistákban és profilokban.\n\nHa a saját profilodat naprakészen szeretnéd tartani, összekapcsolhatod a SFDataHub fiókodat és feltölthetsz saját szkeneket. Ezzel a teljes adatbázis frissességét is segíted."
+    },
+    "sections": {
+      "intro": {
+        "title": "Mi az a SFDataHub?",
+        "body1": "A SFDataHub egy közösségi projekt a Shakes & Fidget körül.",
+        "body2": "Szkenadatokat elemezhetsz, toplistákat böngészhetsz, és részletes játékos- valamint céhprofilokat nyithatsz meg. Célja egy gyors áttekintés a fejlődésről, rangsorokról és változásokról, hivatalos kapcsolat nélkül a Playa Games felé."
+      },
+      "actions": {
+        "title": "Mit csinálhatok a SFDataHub-on?",
+        "items": {
+          "toplists": "Toplisták böngészése: hasonlítsd össze a játékosokat és céheket szint vagy más mutatók alapján.",
+          "profiles": "Profilok megnyitása: nézd meg a részletes játékos- és céhprofilokat extra információkkal.",
+          "guides": "Útmutatók olvasása: használj tippeket és guide-okat a jobb tervezéshez.",
+          "tools": "Eszközök és kalkulátorok használata: például dungeon XP kalkulátor futtatása."
+        }
+      },
+      "freshness": {
+        "title": "Mennyire frissek az adatok?",
+        "body1": "A SFDataHub közösség által feltöltött vagy összekapcsolt szkenekre épül.",
+        "body2": "Sok érték mellett látható a legutóbbi szken időpontja (például \"Last scan: 2025-12-01\").",
+        "body3": "A toplisták és profilok rendszeresen frissülnek. Ha egy bejegyzést régóta nem szkenneltek, a megjelenített értékek eltérhetnek a játék aktuális állapotától."
+      },
+      "login": {
+        "title": "Bejelentkezés és beállítások",
+        "body1": "Discord fiókkal bejelentkezve extra funkciók érhetők el.",
+        "body2": "Bejelentkezés után a fejlécben láthatod a profilmenüt avatarral és névvel.",
+        "body3": "A beállításokban módosíthatod a SFDataHub fiókod alap opcióit.",
+        "body4": "A beállítások csak bejelentkezett felhasználóknak relevánsak."
+      },
+      "legal": {
+        "title": "Súgó, visszajelzés és jogi információk",
+        "body1": "Ha hibát találsz, furcsa adatot látsz vagy új feature ötleted van, örülünk a visszajelzésnek.",
+        "body2": "Elérhetőségeket és további információkat a kapcsolat vagy impresszum oldalon találsz.",
+        "body3": "Jogi részletekhez használd az alábbi oldalakat:",
+        "items": {
+          "tos": "Terms of Service (ToS)",
+          "privacy": "Adatvédelmi szabályzat",
+          "imprint": "Impresszum / Kapcsolat"
+        }
+      }
+    }
+  },
+  "search": {
+    "placeholder": "Keresés (játékos)",
+    "inputLabel": "Játékosok, céhek és szerverek keresése",
+    "loading": "Betöltés...",
+    "recents": "Legutóbbi keresések",
+    "minCharsHint": "Írj be legalább 3 karaktert...",
+    "noResults": "Nincs találat",
+    "players": "Játékosok",
+    "guilds": "Céhek",
+    "servers": "Szerverek",
+    "active": "Aktív",
+    "inactive": "Inaktív",
+    "guildMembers": "{{count}} tag",
+    "guildMembersUnknown": "Tagok ?",
+    "moreResults": "További találatok... nyomj Entert",
+    "recentLabel": "Legutóbbi"
+  },
+  "footer": {
+    "about": {
+      "title": "A SFDataHub-ról",
+      "body": "A SFDataHub egy nem kereskedelmi fan és közösségi projekt a Shakes & Fidget körül. Nincs hivatalos kapcsolata a Playa Games GmbH-val vagy a Shakes & Fidget üzemeltetőivel.\n\nMinden említett márka, logó és grafika a megfelelő tulajdonosok tulajdona, és kizárólag azonosítási célra kerül felhasználásra."
+    },
+    "shortDisclaimer": "A SFDataHub egy nem hivatalos, nem kereskedelmi rajongói projekt. Minden márka és kép a megfelelő jogtulajdonosé.",
+    "copyright": "© 2025 SFDataHub – közösségi projekt a Shakes & Fidget körül."
+  }
+}
