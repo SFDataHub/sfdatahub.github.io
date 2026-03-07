@@ -1,4 +1,9 @@
-import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry, DiscordNewsItem } from "./newsFeed.types";
+import type {
+  DiscordByChannelSnapshot,
+  DiscordNewsByChannelEntry,
+  DiscordNewsItem,
+  DiscordRecordAnnouncementItem,
+} from "./newsFeed.types";
 
 const FIRESTORE_BASE_URL = "https://firestore.googleapis.com/v1/projects";
 const SNAPSHOT_PATH = "stats_public/news_latestByChannel";
@@ -88,6 +93,35 @@ const mapEntry = (value: any): DiscordNewsByChannelEntry | null => {
   };
 };
 
+const mapRecordAnnouncementItem = (fields: Record<string, any> | null): DiscordRecordAnnouncementItem | null => {
+  if (!fields) return null;
+  const id = readStringField(fields.id);
+  const messageId = readStringField(fields.messageId) ?? id;
+  const channelId = readStringField(fields.channelId);
+  const channelName = readStringField(fields.channelName) ?? channelId;
+  const postedAt = readStringField(fields.postedAt) ?? readStringField(fields.timestamp);
+  const content = readStringField(fields.content) ?? readStringField(fields.contentText);
+  const author = readStringField(fields.author) ?? "Discord";
+  const imageUrl = readNullableStringField(fields.imageUrl);
+  const jumpUrl = readStringField(fields.jumpUrl) ?? "";
+
+  if (!messageId || !channelId || !channelName || !postedAt || !content) {
+    return null;
+  }
+
+  return {
+    id: id ?? messageId,
+    messageId,
+    channelId,
+    channelName,
+    postedAt,
+    content,
+    author,
+    imageUrl,
+    jumpUrl,
+  };
+};
+
 const buildHashFallback = (items: DiscordNewsByChannelEntry[]): string => {
   return items
     .map((entry) => `${entry.channelId}|${entry.item?.id ?? "-"}|${entry.item?.timestamp ?? "-"}`)
@@ -105,6 +139,14 @@ const mapSnapshot = (payload: any): DiscordByChannelSnapshot | null => {
     if (mapped) items.push(mapped);
   }
 
+  const latestRecordAnnouncementsFields = readMapFields(fields.latestRecordAnnouncements);
+  const recordsRaw = readArrayValues(latestRecordAnnouncementsFields?.items);
+  const recordItems: DiscordRecordAnnouncementItem[] = [];
+  for (const record of recordsRaw) {
+    const mapped = mapRecordAnnouncementItem(readMapFields(record));
+    if (mapped) recordItems.push(mapped);
+  }
+
   const updatedAt = readNumberField(fields.updatedAt);
   const nextUpdateAt = readNumberField(fields.nextUpdateAt);
   const hash = readStringField(fields.hash) ?? buildHashFallback(items);
@@ -115,6 +157,9 @@ const mapSnapshot = (payload: any): DiscordByChannelSnapshot | null => {
     nextUpdateAt,
     hash,
     items,
+    latestRecordAnnouncements: {
+      items: recordItems,
+    },
   };
 };
 

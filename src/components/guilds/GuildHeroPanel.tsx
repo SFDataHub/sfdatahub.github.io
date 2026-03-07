@@ -752,6 +752,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
                 <Tooltip
                   content={freshnessTooltip}
                   contentClassName={guildProfileInfoStyles.freshnessTooltipCard}
+                  placement={isOverlayContext ? "bottom" : "top"}
                 >
                   <div
                     className="mt-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs"
