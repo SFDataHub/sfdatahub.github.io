@@ -14,6 +14,7 @@ import { useFeatureAccess } from "../../lib/featureAccessConfig";
 import { useTranslation } from "react-i18next";
 import { buildPlayerIdentifier } from "../../lib/players/identifier";
 import discordLogo from "../../assets/discord-logo.svg";
+import SidebarLanguageSwitch from "./SidebarLanguageSwitch";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -27,12 +28,6 @@ type Item = {
   featureId?: string;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
-type LanguageCode = "en" | "de";
-
-const languageOptions: { code: LanguageCode; ariaLabelKey: string }[] = [
-  { code: "en", ariaLabelKey: "sidebar.languageSwitchEn" },
-  { code: "de", ariaLabelKey: "sidebar.languageSwitchDe" },
-];
 const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
 
 const main: Item[] = [
@@ -369,7 +364,7 @@ export default function Sidebar({
   const collapsed = !expanded;
   const allowSubmenus = pinned || (expanded && submenuArmed);
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
@@ -388,33 +383,6 @@ export default function Sidebar({
       || normalized.includes("mod")
     );
   }, [userRoles]);
-
-  const [language, setLanguage] = React.useState<LanguageCode>("en");
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storedLang = window.localStorage.getItem("sf_lang");
-    const nextLang: LanguageCode =
-      storedLang === "en" || storedLang === "de"
-        ? storedLang
-        : i18n.language?.startsWith("de")
-          ? "de"
-          : "en";
-    setLanguage(nextLang);
-    if (i18n.language !== nextLang) {
-      i18n.changeLanguage(nextLang);
-    }
-  }, [i18n]);
-
-  const handleLanguageSelect = React.useCallback((next: LanguageCode) => {
-    setLanguage(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("sf_lang", next);
-    }
-    if (i18n.language !== next) {
-      i18n.changeLanguage(next);
-    }
-  }, [i18n]);
 
   const handleFooterClick = () => {
     if (isAuthed) {
@@ -609,22 +577,7 @@ export default function Sidebar({
             </NavLink>
           </div>
           <div className={styles.footerRowCell}>
-            <div className={styles.languageSwitch} role="group" aria-label={t("sidebar.languagePreference", { defaultValue: "Sidebar language preference" })}>
-              {languageOptions.map((option) => {
-                const isActive = language === option.code;
-                const segmentClass = `${styles.languageSegment} ${option.code === "de" ? styles.languageSegmentDe : styles.languageSegmentEn} ${isActive ? styles.languageSegmentActive : styles.languageSegmentInactive}`;
-                return (
-                  <button
-                    key={option.code}
-                    type="button"
-                    className={segmentClass}
-                    onClick={() => handleLanguageSelect(option.code)}
-                    aria-pressed={isActive}
-                    aria-label={t(option.ariaLabelKey, { defaultValue: option.code === "de" ? "Switch language to German" : "Switch language to English" })}
-                  />
-                );
-              })}
-            </div>
+            <SidebarLanguageSwitch />
           </div>
         </div>
         <div className={styles.legal}>

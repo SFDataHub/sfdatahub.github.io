@@ -47,6 +47,15 @@ export type DiscordRecordAnnouncementItem = {
   author: string;
   imageUrl: string | null;
   jumpUrl: string;
+  recordLabel?: string | null;
+  holderDisplay?: string | null;
+  scopeLabel?: string | null;
+  server?: string | null;
+  days?: string | null;
+  previousHolderDisplay?: string | null;
+  previousDays?: string | null;
+  recordKey?: string | null;
+  recordFamily?: string | null;
 };
 
 export type DiscordLatestRecordAnnouncements = {

@@ -375,6 +375,17 @@
   color: var(--text-soft);
   margin: 0;
 }
+.accountGuestContent{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.accountGuestHeader{
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 0;
+}
 .accountPrimary{
   width: 100%;
   border: 0;
@@ -385,6 +396,12 @@
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 8px;
+}
+.accountGuestPrimary{
+  margin-bottom: 0;
+}
+.accountGuestDivider{
+  margin: 0;
 }
 .accountHint{
   font-size: 12px;

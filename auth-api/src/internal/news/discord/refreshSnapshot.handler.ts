@@ -29,7 +29,29 @@ type DiscordRecordAnnouncementItem = {
   author: string;
   imageUrl: string | null;
   jumpUrl: string;
+  recordLabel: string | null;
+  holderDisplay: string | null;
+  scopeLabel: string | null;
+  server: string | null;
+  days: string | null;
+  previousHolderDisplay: string | null;
+  previousDays: string | null;
+  recordKey: string | null;
+  recordFamily: string | null;
 };
+
+type ParsedRecordAnnouncementFields = Pick<
+  DiscordRecordAnnouncementItem,
+  | "recordLabel"
+  | "holderDisplay"
+  | "scopeLabel"
+  | "server"
+  | "days"
+  | "previousHolderDisplay"
+  | "previousDays"
+  | "recordKey"
+  | "recordFamily"
+>;
 
 const parseChannelIds = (value?: string): { valid: string[]; invalid: string[] } | null => {
   if (!value) return null;
@@ -180,20 +202,121 @@ const splitChannelIdsByLabels = (
   return { newsChannelIds, recordChannelIds };
 };
 
+const RECORD_ANNOUNCEMENT_PATTERN =
+  /(?:^|[.!?]\s+)(?<holderDisplay>.+?)\s+broke the record of fastest\s+(?<recordLabel>.+?)\s+with\s+(?<scopeToken>.+?)\s+class(?:\s+on\s+server\s+(?<server>.+?))?\.\s*It took\s+(?<days>\d+)\s+days(?:\.|!|$)/i;
+
+const PREVIOUS_RECORD_PATTERN =
+  /Previous record was\s+(?<previousHolderDisplay>.+?)\s+with\s+(?<previousDays>\d+)\s+days(?:\.|!|$)/i;
+
+const emptyParsedRecordAnnouncementFields = (): ParsedRecordAnnouncementFields => ({
+  recordLabel: null,
+  holderDisplay: null,
+  scopeLabel: null,
+  server: null,
+  days: null,
+  previousHolderDisplay: null,
+  previousDays: null,
+  recordKey: null,
+  recordFamily: null,
+});
+
+const cleanParsedText = (value?: string | null): string | null => {
+  if (!value) return null;
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 ? cleaned : null;
+};
+
+const normalizeRecordKeyToken = (value: string): string => {
+  return value
+    .toLowerCase()
+    .replace(/\bknighthall\b/g, "hall of knights")
+    .replace(/\bjack the hammerer\b/g, "jack the hammerer")
+    .replace(/\bstage 30 - mozone\b/g, "mozone stage 30")
+    .replace(/\bcontinues loops of idols(?:\s*stage\s*30)?\b/g, "mozone stage 30")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const inferRecordFamily = (recordLabel: string): string | null => {
+  const normalized = normalizeRecordKeyToken(recordLabel);
+  if (!normalized) return null;
+  if (normalized.startsWith("level-")) return "level";
+  if (normalized.includes("twister")) return "twister";
+  if (normalized.includes("sandstorm")) return "sandstorm";
+  if (normalized.includes("mozone")) return "mozone";
+  if (normalized.includes("demon-portal")) return "demon-portal";
+  if (normalized.includes("raid") || normalized.includes("average-guild-level")) return "guild";
+  if (
+    normalized.includes("fortress") ||
+    normalized.includes("mine") ||
+    normalized.includes("gold-pit") ||
+    normalized.includes("hall-of-knights")
+  ) {
+    return "base";
+  }
+  return null;
+};
+
+const parseRecordAnnouncementFields = (content: string): ParsedRecordAnnouncementFields => {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (!normalized) return emptyParsedRecordAnnouncementFields();
+
+  const mainMatch = normalized.match(RECORD_ANNOUNCEMENT_PATTERN);
+  if (!mainMatch?.groups) return emptyParsedRecordAnnouncementFields();
+
+  const holderDisplay = cleanParsedText(mainMatch.groups.holderDisplay);
+  const recordLabel = cleanParsedText(mainMatch.groups.recordLabel);
+  const scopeToken = cleanParsedText(mainMatch.groups.scopeToken);
+  const server = cleanParsedText(mainMatch.groups.server);
+  const days = cleanParsedText(mainMatch.groups.days);
+
+  const previousMatch = normalized.match(PREVIOUS_RECORD_PATTERN);
+  const previousHolderDisplayRaw = cleanParsedText(previousMatch?.groups?.previousHolderDisplay);
+  const previousDaysRaw = cleanParsedText(previousMatch?.groups?.previousDays);
+  const hasValidPreviousHolder =
+    Boolean(previousHolderDisplayRaw) && previousHolderDisplayRaw?.toLowerCase() !== "with";
+  const previousHolderDisplay = hasValidPreviousHolder ? previousHolderDisplayRaw : null;
+  const previousDays = hasValidPreviousHolder ? previousDaysRaw ?? null : null;
+
+  const scopeLabel = scopeToken ? `${scopeToken} class` : null;
+  const recordKeyBase = recordLabel ? normalizeRecordKeyToken(recordLabel) : "";
+  const scopeKey = scopeToken ? normalizeRecordKeyToken(scopeToken) : "";
+  const recordKey =
+    recordKeyBase && scopeKey
+      ? `${recordKeyBase}__${scopeKey}`
+      : recordKeyBase || null;
+  const recordFamily = recordLabel ? inferRecordFamily(recordLabel) : null;
+
+  return {
+    recordLabel,
+    holderDisplay,
+    scopeLabel,
+    server,
+    days,
+    previousHolderDisplay,
+    previousDays,
+    recordKey,
+    recordFamily,
+  };
+};
+
 const toRecordAnnouncementItem = (
   item: DiscordNewsItem,
   channelName: string,
 ): DiscordRecordAnnouncementItem => {
+  const content = truncateContent(item.contentText);
+  const parsed = parseRecordAnnouncementFields(content);
   return {
     id: item.id,
     messageId: item.id,
     channelId: item.channelId,
     channelName,
     postedAt: item.timestamp,
-    content: truncateContent(item.contentText),
+    content,
     author: item.author,
     imageUrl: item.imageUrl,
     jumpUrl: item.jumpUrl,
+    ...parsed,
   };
 };
 
@@ -216,7 +339,7 @@ const buildHash = (
   const recordsRaw = recordAnnouncements
     .map(
       (entry) =>
-        `${entry.channelId}|${entry.messageId}|${entry.postedAt}|${entry.content}|${entry.imageUrl ?? "-"}`,
+        `${entry.channelId}|${entry.messageId}|${entry.postedAt}|${entry.content}|${entry.imageUrl ?? "-"}|${entry.recordLabel ?? "-"}|${entry.holderDisplay ?? "-"}|${entry.scopeLabel ?? "-"}|${entry.server ?? "-"}|${entry.days ?? "-"}|${entry.previousHolderDisplay ?? "-"}|${entry.previousDays ?? "-"}|${entry.recordKey ?? "-"}|${entry.recordFamily ?? "-"}`,
     )
     .join("\n");
   return createHash("sha256").update(`${newsRaw}\n---\n${recordsRaw}`).digest("hex");

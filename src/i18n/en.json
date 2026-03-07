@@ -424,6 +424,22 @@
         },
         "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
       }
+    },
+    "menu": {
+      "fallbackAuthedName": "Player",
+      "fallbackGuestName": "Guest",
+      "loadingSession": "Checking session...",
+      "loadingLoginStatus": "Checking login status",
+      "guestTitle": "Guest Mode",
+      "guestSubtitle": "Sign in with Discord",
+      "guestHint": "Use Discord or Google on the sign-in page.",
+      "signInCta": "Sign in",
+      "signedInVia": "Signed in via {{provider}}",
+      "providerGoogle": "Google",
+      "providerDiscord": "Discord",
+      "accountAndProfile": "Account & Profile",
+      "consolePanel": "Console Panel",
+      "logout": "Logout"
     }
   },
   "tools": {

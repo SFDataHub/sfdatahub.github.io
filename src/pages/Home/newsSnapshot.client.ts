@@ -28,6 +28,13 @@ const readNullableStringField = (value: any): string | null => {
   return null;
 };
 
+const readOptionalTrimmedStringField = (value: any): string | null => {
+  const parsed = readNullableStringField(value);
+  if (parsed == null) return null;
+  const trimmed = parsed.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 const readNumberField = (value: any): number | null => {
   if (!value) return null;
   if (typeof value.integerValue === "string") {
@@ -104,6 +111,15 @@ const mapRecordAnnouncementItem = (fields: Record<string, any> | null): DiscordR
   const author = readStringField(fields.author) ?? "Discord";
   const imageUrl = readNullableStringField(fields.imageUrl);
   const jumpUrl = readStringField(fields.jumpUrl) ?? "";
+  const recordLabel = readOptionalTrimmedStringField(fields.recordLabel);
+  const holderDisplay = readOptionalTrimmedStringField(fields.holderDisplay);
+  const scopeLabel = readOptionalTrimmedStringField(fields.scopeLabel);
+  const server = readOptionalTrimmedStringField(fields.server);
+  const days = readOptionalTrimmedStringField(fields.days);
+  const previousHolderDisplay = readOptionalTrimmedStringField(fields.previousHolderDisplay);
+  const previousDays = readOptionalTrimmedStringField(fields.previousDays);
+  const recordKey = readOptionalTrimmedStringField(fields.recordKey);
+  const recordFamily = readOptionalTrimmedStringField(fields.recordFamily);
 
   if (!messageId || !channelId || !channelName || !postedAt || !content) {
     return null;
@@ -119,6 +135,15 @@ const mapRecordAnnouncementItem = (fields: Record<string, any> | null): DiscordR
     author,
     imageUrl,
     jumpUrl,
+    recordLabel,
+    holderDisplay,
+    scopeLabel,
+    server,
+    days,
+    previousHolderDisplay,
+    previousDays,
+    recordKey,
+    recordFamily,
   };
 };
 

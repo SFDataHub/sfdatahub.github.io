@@ -424,6 +424,22 @@
         },
         "footnote": "Tipp: Nach dem Verknuepfen oder Trennen immer kurz auf Refresh klicken."
       }
+    },
+    "menu": {
+      "fallbackAuthedName": "Spieler",
+      "fallbackGuestName": "Gast",
+      "loadingSession": "Sitzung wird geprueft...",
+      "loadingLoginStatus": "Login-Status wird geprueft",
+      "guestTitle": "Gastmodus",
+      "guestSubtitle": "Mit Discord anmelden",
+      "guestHint": "Nutze Discord oder Google auf der Login-Seite.",
+      "signInCta": "Anmelden",
+      "signedInVia": "Angemeldet via {{provider}}",
+      "providerGoogle": "Google",
+      "providerDiscord": "Discord",
+      "accountAndProfile": "Account & Profil",
+      "consolePanel": "Konsole",
+      "logout": "Abmelden"
     }
   },
   "tools": {

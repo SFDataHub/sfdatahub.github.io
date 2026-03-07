@@ -4,42 +4,36 @@
   align-items: center;
 }
 
-.bottom .bubble {
-  top: calc(100% + 12px);
-  bottom: auto;
-  transform: translateY(-6px);
-}
-
-.bottom .tail {
-  top: -6px;
-  bottom: auto;
-  border-bottom: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
 .trigger {
   display: inline-flex;
   align-items: center;
 }
 
 .bubble {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 50%;
+  position: fixed;
+  top: var(--tooltip-top);
+  left: var(--tooltip-left);
   display: flex;
   opacity: 0;
   visibility: hidden;
-  transform: translate(-50%, 6px);
+  transform: translateY(6px);
   transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
   pointer-events: none;
-  z-index: 20;
+  z-index: 2000;
 }
 
-.tooltipWrapper:focus-within .bubble,
-.tooltipWrapper:hover .bubble {
+.open {
   opacity: 1;
   visibility: visible;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
+}
+
+.bottom {
+  transform: translateY(-6px);
+}
+
+.bottom.open {
+  transform: translateY(0);
 }
 
 .card {
@@ -57,7 +51,7 @@
 
 .tail {
   position: absolute;
-  left: 50%;
+  left: var(--tooltip-tail-left);
   bottom: -6px;
   width: 10px;
   height: 10px;
@@ -65,4 +59,11 @@
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   transform: translateX(-50%) rotate(45deg);
+}
+
+.bottom .tail {
+  top: -6px;
+  bottom: auto;
+  border-bottom: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
