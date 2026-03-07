@@ -17,6 +17,19 @@ const SNAPSHOT_DOC = "news_latestByChannel";
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 const CONTENT_TEXT_MAX = 600;
 const CHANNEL_ID_PATTERN = /^\d{17,20}$/;
+const RECORD_ANNOUNCEMENTS_LIMIT = 5;
+
+type DiscordRecordAnnouncementItem = {
+  id: string;
+  messageId: string;
+  channelId: string;
+  channelName: string;
+  postedAt: string;
+  content: string;
+  author: string;
+  imageUrl: string | null;
+  jumpUrl: string;
+};
 
 const parseChannelIds = (value?: string): { valid: string[]; invalid: string[] } | null => {
   if (!value) return null;
@@ -139,11 +152,83 @@ const resolveLabel = (
   return fallback ?? channelId;
 };
 
-const buildHash = (items: DiscordNewsByChannelEntry[]): string => {
-  const raw = items
+const isRecordChannelLabel = (label?: string): boolean => {
+  if (!label) return false;
+  const normalized = label
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return /\brecords?\b/.test(normalized);
+};
+
+const splitChannelIdsByLabels = (
+  channelIds: string[],
+  labels: Record<string, string>,
+): { newsChannelIds: string[]; recordChannelIds: string[] } => {
+  const newsChannelIds: string[] = [];
+  const recordChannelIds: string[] = [];
+
+  for (const channelId of channelIds) {
+    if (isRecordChannelLabel(labels[channelId])) {
+      recordChannelIds.push(channelId);
+      continue;
+    }
+    newsChannelIds.push(channelId);
+  }
+
+  return { newsChannelIds, recordChannelIds };
+};
+
+const toRecordAnnouncementItem = (
+  item: DiscordNewsItem,
+  channelName: string,
+): DiscordRecordAnnouncementItem => {
+  return {
+    id: item.id,
+    messageId: item.id,
+    channelId: item.channelId,
+    channelName,
+    postedAt: item.timestamp,
+    content: truncateContent(item.contentText),
+    author: item.author,
+    imageUrl: item.imageUrl,
+    jumpUrl: item.jumpUrl,
+  };
+};
+
+const buildLatestRecordAnnouncements = (
+  entries: DiscordRecordAnnouncementItem[],
+): { items: DiscordRecordAnnouncementItem[] } => {
+  const sorted = [...entries].sort(
+    (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+  );
+  return { items: sorted.slice(0, RECORD_ANNOUNCEMENTS_LIMIT) };
+};
+
+const buildHash = (
+  items: DiscordNewsByChannelEntry[],
+  recordAnnouncements: DiscordRecordAnnouncementItem[],
+): string => {
+  const newsRaw = items
     .map((entry) => `${entry.channelId}|${entry.item?.id ?? "-"}|${entry.item?.timestamp ?? "-"}`)
     .join("\n");
-  return createHash("sha256").update(raw).digest("hex");
+  const recordsRaw = recordAnnouncements
+    .map(
+      (entry) =>
+        `${entry.channelId}|${entry.messageId}|${entry.postedAt}|${entry.content}|${entry.imageUrl ?? "-"}`,
+    )
+    .join("\n");
+  return createHash("sha256").update(`${newsRaw}\n---\n${recordsRaw}`).digest("hex");
+};
+
+const hasLatestRecordAnnouncements = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const latestRecordAnnouncements = (value as { latestRecordAnnouncements?: unknown })
+    .latestRecordAnnouncements;
+  if (!latestRecordAnnouncements || typeof latestRecordAnnouncements !== "object") return false;
+  const items = (latestRecordAnnouncements as { items?: unknown }).items;
+  return Array.isArray(items);
 };
 
 type SnapshotDiagnostics = {
@@ -199,6 +284,7 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
   }
 
   const labels = parseChannelLabels(DISCORD_NEWS_CHANNEL_LABELS);
+  const { newsChannelIds, recordChannelIds } = splitChannelIdsByLabels(parsedChannelIds.valid, labels);
 
   const invalidEntries: DiscordNewsByChannelEntry[] = parsedChannelIds.invalid.map((channelId) => {
     logSnapshotDiagnostics({
@@ -216,7 +302,7 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
   });
 
   const validEntries = await Promise.all(
-    parsedChannelIds.valid.map(async (channelId) => {
+    newsChannelIds.map(async (channelId) => {
       const result = await fetchDiscordNewsItemsForChannelWithDiagnostics(channelId, botToken);
       const latestItem = selectLatestItem(result.items);
       logSnapshotDiagnostics({
@@ -234,16 +320,34 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
 
   const items = [...invalidEntries, ...validEntries];
 
-  const hash = buildHash(items);
+  const recordAnnouncements = (
+    await Promise.all(
+      recordChannelIds.map(async (channelId) => {
+        const result = await fetchDiscordNewsItemsForChannelWithDiagnostics(channelId, botToken);
+        const latestItem = selectLatestItem(result.items);
+        logSnapshotDiagnostics({
+          ...result.diagnostics,
+          picked: latestItem?.id ?? null,
+        });
+        const channelName = labels[channelId] ?? channelId;
+        return result.items.map((item) => toRecordAnnouncementItem(item, channelName));
+      }),
+    )
+  ).flat();
+  const latestRecordAnnouncements = buildLatestRecordAnnouncements(recordAnnouncements);
+
+  const hash = buildHash(items, latestRecordAnnouncements.items);
   const docRef = db.collection(SNAPSHOT_COLLECTION).doc(SNAPSHOT_DOC);
   const existingSnap = await docRef.get();
-  const existingHash = existingSnap.exists ? (existingSnap.data() as any)?.hash : null;
-  if (existingHash && existingHash === hash) {
+  const existingData = existingSnap.exists ? existingSnap.data() : undefined;
+  const existingHash = existingData && typeof existingData.hash === "string" ? existingData.hash : null;
+  const hasRecordAnnouncements = hasLatestRecordAnnouncements(existingData);
+  if (existingHash && existingHash === hash && hasRecordAnnouncements) {
     console.info(`[news-snapshot] unchanged=true hash=${hash}`);
     return res.status(200).json({
       unchanged: true,
       hash,
-      updatedAt: (existingSnap.data() as any)?.updatedAt ?? null,
+      updatedAt: existingData && typeof existingData.updatedAt === "number" ? existingData.updatedAt : null,
     });
   }
 
@@ -254,6 +358,7 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
       nextUpdateAt: now + UPDATE_INTERVAL_MS,
       hash,
       items,
+      latestRecordAnnouncements,
     },
     { merge: false },
   );

@@ -217,7 +217,9 @@ const TwitchHeaderLogo: React.FC = () => (
   </svg>
 );
 
-const NewsFeed: React.FC = () => {
+const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapshot | null) => void }> = ({
+  onSnapshotChange,
+}) => {
   const { t } = useTranslation();
   const [index, setIndex] = useState<number>(0);
   const [data, setData] = useState<DiscordByChannelSnapshot | null>(null);
@@ -274,12 +276,14 @@ const NewsFeed: React.FC = () => {
       if (currentHash && currentHash === nextHash) {
         dataRef.current = snapshot;
         if (writeCache) writeSnapshotCache(snapshot);
+        onSnapshotChange?.(snapshot);
         return;
       }
       hashRef.current = nextHash;
       dataRef.current = snapshot;
       setData(snapshot);
       if (writeCache) writeSnapshotCache(snapshot);
+      onSnapshotChange?.(snapshot);
     };
 
     const runFetch = async () => {
@@ -338,7 +342,7 @@ const NewsFeed: React.FC = () => {
       abortRef.current?.abort();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [onSnapshotChange]);
 
   useEffect(() => {
     const items = data?.items ?? [];
@@ -752,6 +756,7 @@ const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
 const Home: React.FC = () => {
   const { t } = useTranslation();
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [newsSnapshot, setNewsSnapshot] = useState<DiscordByChannelSnapshot | null>(null);
   return (
     <ContentShell
       headerTransparent
@@ -775,7 +780,7 @@ const Home: React.FC = () => {
         <div className={styles.homeMain}>
           {/* Row 1 - Community News */}
           <div className={styles.homeNews}>
-            <NewsFeed />
+            <NewsFeed onSnapshotChange={setNewsSnapshot} />
           </div>
 
           {/* Row 2 - Icons / Featured */}
@@ -824,7 +829,7 @@ const Home: React.FC = () => {
 
           {/* Row 3 - YouTube */}
           <div className={styles.homeCommunityRecords}>
-            <LatestCommunityRecordsCard />
+            <LatestCommunityRecordsCard records={newsSnapshot?.latestRecordAnnouncements?.items ?? []} />
           </div>
           <div className={styles.homeYouTube}>
             <YouTubeCarousel />

@@ -90,6 +90,7 @@ type HeroPanelProps = {
   data: HeroPanelData;
   loading?: boolean;
   onAction?: (action: HeroAction["key"]) => void;
+  freshnessTooltipPlacement?: "top" | "bottom";
   favoriteControl?: {
     visible: boolean;
     isFavorite: boolean;
@@ -143,7 +144,13 @@ function ClassAvatar({
   );
 }
 
-function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps) {
+function HeroPanel({
+  data,
+  loading,
+  onAction,
+  favoriteControl,
+  freshnessTooltipPlacement = "top",
+}: HeroPanelProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"base" | "total">("base");
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -322,7 +329,11 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
                   {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
                 </div>
               )}
-              <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
+              <Tooltip
+                content={freshnessTooltip}
+                contentClassName="player-profile__freshness-tooltip-card"
+                placement={freshnessTooltipPlacement}
+              >
                 <div className="player-profile__freshness">
                   <span
                     aria-hidden

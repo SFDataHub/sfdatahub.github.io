@@ -664,6 +664,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
             data={heroViewData}
             loading={loading}
             onAction={handleAction}
+            freshnessTooltipPlacement={heroOnly ? "bottom" : "top"}
             favoriteControl={
               favoriteIdentifier
                 ? {
