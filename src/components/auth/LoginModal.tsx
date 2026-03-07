@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import LoginCard from "./LoginCard";
 import styles from "./LoginModal.module.css";
@@ -9,6 +10,8 @@ type LoginModalProps = {
 };
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
+
   React.useEffect(() => {
     if (!isOpen) return;
 
@@ -38,7 +41,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       className={styles.backdrop}
       role="dialog"
       aria-modal="true"
-      aria-label="Sign in"
+      aria-label={t("account.loginOverlay.modalAriaLabel")}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

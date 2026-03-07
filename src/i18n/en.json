@@ -89,6 +89,16 @@
       "prev": "Previous channel",
       "next": "Next channel"
     },
+    "records": {
+      "title": "Latest Community Records",
+      "subtitle": "Live snapshot",
+      "fallbackTitle": "Record announcement",
+      "fallbackAuthor": "Discord",
+      "fallbackChannel": "Records",
+      "previous": "Previous: {{holder}} • {{days}}d",
+      "daysLabel": "days",
+      "empty": "No record announcements yet."
+    },
     "youtube": {
       "title": "YouTube",
       "prev": "Previous video",
@@ -425,6 +435,26 @@
         "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
       }
     },
+    "loginOverlay": {
+      "modalAriaLabel": "Sign in",
+      "logoAlt": "SFDataHub logo",
+      "title": "Sign in",
+      "subtitle": "Choose a method to access SFDataHub.",
+      "discordCta": "Login with Discord",
+      "loading": "Checking session...",
+      "authedStatus": "You are logged in as {{name}}.",
+      "logout": "Logout",
+      "backToDashboard": "Back to dashboard",
+      "disclaimer": "We store only your SFDataHub user ID, display name, avatar, and roles to personalize your experience.",
+      "errors": {
+        "unknownHost": "unknown host",
+        "unauthorizedDomain": "This domain is not authorized for login. Please add \"{{host}}\" to your Firebase Auth authorized domains or use the correct environment.",
+        "popupBlocked": "The login popup was blocked. Please allow popups for this site or continue with the redirect flow.",
+        "popupClosed": "The login popup was closed before completing sign-in. Please try again.",
+        "default": "Login failed. Please try again.",
+        "codeLabel": "code"
+      }
+    },
     "menu": {
       "fallbackAuthedName": "Player",
       "fallbackGuestName": "Guest",
@@ -512,7 +542,10 @@
   },
   "toplistsPage": {
     "errors": {
-      "noSnapshot": "No snapshot yet for this server."
+      "noSnapshot": "No snapshot yet for this server.",
+      "firestore": "Firestore error",
+      "decode": "Could not decode data",
+      "unexpectedLoad": "Unexpected error while loading"
     }
   },
   "toplists": {
@@ -526,7 +559,73 @@
     "compareMissingSnapshot": "No baseline data for {{key}}.",
     "deltaNew": "NEW",
     "columns": {
-      "player": "Player"
+      "rank": "#",
+      "rankDelta": "Δ Rank",
+      "server": "Server",
+      "player": "Player",
+      "name": "Name",
+      "class": "Class",
+      "guild": "Guild",
+      "level": "Level",
+      "main": "Main",
+      "con": "Con",
+      "sum": "Sum",
+      "statsPerDay": "Stats/Day",
+      "ratio": "Ratio",
+      "mine": "Mine",
+      "treasury": "Treasury",
+      "lastScan": "Last Scan",
+      "hofRank": "HoF Rank",
+      "honor": "Honor",
+      "raids": "Raids",
+      "portal": "Portal",
+      "hydra": "Hydra",
+      "petLevel": "Pet Level",
+      "members": "Members",
+      "avgLevel": "Ø Level",
+      "avgMain": "Ø Main",
+      "avgCon": "Ø Con",
+      "avgSum": "Ø Sum"
+    },
+    "status": {
+      "noServerSelected": "No server selected",
+      "loading": "Loading...",
+      "error": "Error",
+      "ready": "Ready",
+      "rows": "rows",
+      "updated": "Updated: {{value}}"
+    },
+    "table": {
+      "loading": "Loading...",
+      "noResults": "No results"
+    },
+    "actions": {
+      "retry": "Retry"
+    },
+    "players": {
+      "avgMode": {
+        "label": "Values",
+        "aria": "Player average mode",
+        "base": "Base",
+        "total": "Total",
+        "updating": "Updating..."
+      },
+      "selectServerHint": "Please select at least one server.",
+      "scope": {
+        "summary": "Scope {{scopeId}} - {{changes}}/{{minChanges}} changes since last rebuild",
+        "autoRebuild": "Auto rebuild at {{minChanges}} changes or after {{maxAgeDays}} days",
+        "lastRebuild": "Last rebuild: {{value}}"
+      }
+    },
+    "guilds": {
+      "snapshotStatus": "Guilds - snapshots (latest)",
+      "avgMode": {
+        "label": "Values",
+        "aria": "Guild average mode",
+        "base": "Base",
+        "total": "Total",
+        "updating": "Updating..."
+      }
     },
     "exportDialog": {
       "title": "Export PNG",
@@ -552,6 +651,31 @@
     "filters": {
       "showHud": "Show filters",
       "hideHud": "Hide filters",
+      "sort": {
+        "label": "Sort.",
+        "aria": "Sort",
+        "playerOptions": {
+          "main": "Main",
+          "mainTotal": "Main (Total)",
+          "constitution": "Constitution",
+          "conTotal": "Con (Total)",
+          "sum": "Base Stats",
+          "statsDay": "Stats/Day",
+          "sumTotal": "Sum Total",
+          "statsDayTotal": "Total Stats/day",
+          "level": "Level",
+          "mine": "Mine"
+        },
+        "guildOptions": {
+          "guildMembers": "Members",
+          "guildAvgLevel": "ø Lv",
+          "guildAvgMain": "ø Main",
+          "guildAvgCon": "ø Con",
+          "guildAvgSum": "ø Sum",
+          "guildRaids": "Raids",
+          "guildHydra": "Hydra"
+        }
+      },
       "guilds": {
         "label": "Guilds",
         "placeholder": "All guilds",

@@ -12,7 +12,6 @@ import styles from "./AccountSettingsPage.module.css";
 
 const PLACEHOLDER_AVATAR = "https://i.pravatar.cc/72";
 const PROFILE_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/account/profile` : "";
-const GOOGLE_LINK_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/google/link/start` : "";
 const MIN_NAME_LENGTH = 3;
 const MAX_NAME_LENGTH = 32;
 type TabKey = "overview" | "settings" | "tools" | "connected-characters";
@@ -42,20 +41,6 @@ const AccountSettingsPage: React.FC = () => {
   const [isSavingTools, setIsSavingTools] = useState(false);
   const [toolsSaveError, setToolsSaveError] = useState<string | null>(null);
   const [toolsSaveSuccess, setToolsSaveSuccess] = useState(false);
-
-  const linkFeedback = useMemo<{ type: "success" | "error"; message: string } | null>(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("linked") === "google") {
-      return { type: "success", message: "Google successfully connected." };
-    }
-    if (params.get("error") === "google_already_linked") {
-      return {
-        type: "error",
-        message: "This Google account is already linked to another SFDataHub account.",
-      };
-    }
-    return null;
-  }, [location.search]);
 
   const isLoading = status === "loading" || status === "idle";
   const isAuthed = status === "authenticated" && !!user;
@@ -184,14 +169,6 @@ const AccountSettingsPage: React.FC = () => {
     navigate("/");
   };
 
-  const handleGoogleConnect = () => {
-    if (!GOOGLE_LINK_ENDPOINT) {
-      window.alert("Auth service is not configured for Google linking.");
-      return;
-    }
-    window.location.href = GOOGLE_LINK_ENDPOINT;
-  };
-
   const renderLoading = () => (
     <div className={styles.loadingState}>Checking session...</div>
   );
@@ -200,7 +177,7 @@ const AccountSettingsPage: React.FC = () => {
     <div className={styles.emptyState}>
       <p className={styles.emptyStateTitle}>You are not signed in.</p>
       <p className={styles.emptyStateText}>
-        Use the sign-in page to connect your Discord or Google account and unlock settings.
+        Use the sign-in page to connect your Discord account and unlock settings.
       </p>
       <button type="button" className={styles.primaryButton} onClick={handleGoToSignIn}>
         Go to sign-in
@@ -208,29 +185,10 @@ const AccountSettingsPage: React.FC = () => {
     </div>
   );
 
-  const renderLinkFeedback = () => {
-    if (!linkFeedback) return null;
-    const className =
-      linkFeedback.type === "success"
-        ? `${styles.banner} ${styles.bannerSuccess}`
-        : `${styles.banner} ${styles.bannerError}`;
-    return <div className={className}>{linkFeedback.message}</div>;
-  };
-
   const renderServicesCard = () => {
     if (!user) return null;
     const discordProvider = user.providers?.discord;
-    const googleProvider = user.providers?.google;
     const discordConnected = Boolean(discordProvider);
-    const googleConnected = Boolean(googleProvider);
-    const canLinkGoogle = Boolean(GOOGLE_LINK_ENDPOINT);
-    const googleStatus = !canLinkGoogle
-      ? "Auth service not configured"
-      : googleConnected
-        ? googleProvider?.displayName
-          ? `Connected as ${googleProvider.displayName}`
-          : "Connected"
-        : "Not connected";
     const serviceRows = [
       {
         key: "discord",
@@ -240,14 +198,6 @@ const AccountSettingsPage: React.FC = () => {
           : "Not connected",
         actionLabel: discordConnected ? "Connected" : "Connect",
         disabled: true,
-      },
-      {
-        key: "google",
-        name: "Google",
-        status: googleStatus,
-        actionLabel: googleConnected ? "Connected" : "Connect",
-        disabled: googleConnected || !canLinkGoogle,
-        onClick: googleConnected || !canLinkGoogle ? undefined : handleGoogleConnect,
       },
       {
         key: "twitch",
@@ -282,7 +232,6 @@ const AccountSettingsPage: React.FC = () => {
                 type="button"
                 className={styles.serviceAction}
                 disabled={service.disabled}
-                onClick={service.onClick}
               >
                 {service.actionLabel}
               </button>
@@ -298,11 +247,11 @@ const AccountSettingsPage: React.FC = () => {
       <h2 className={styles.cardTitle}>Security &amp; session</h2>
       <p className={styles.securityText}>
         We only store your SFDataHub user ID, display name, avatar URL and provider identifiers
-        (like your Discord ID). We never see or store your Discord or Google password.
+        (like your Discord ID). We never see or store your Discord password.
       </p>
       <p className={styles.securityNote}>
-        Logging out here only clears your SFDataHub session cookie. Your Discord or Google account
-        stays signed in separately.
+        Logging out here only clears your SFDataHub session cookie. Your Discord account stays signed in
+        separately.
       </p>
       <button type="button" className={styles.logoutButton} onClick={handleLogout}>
         Log out from this device
@@ -636,7 +585,6 @@ const AccountSettingsPage: React.FC = () => {
       centerFramed
     >
       <div className={styles.page}>
-        {renderLinkFeedback()}
         {renderContent()}
       </div>
     </ContentShell>

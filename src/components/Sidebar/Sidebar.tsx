@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench
+  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench, Info
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import homeStyles from "../../pages/Home.module.css";
@@ -554,28 +554,31 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className={`${styles.footer} ${styles.segCard} ${styles.mainNavCard}`}>
-        <button className={styles.login} type="button" onClick={handleFooterClick}>
-          <Shield className="ico" />
-          <AnimatedLabel
-            text={isAuthed ? t("sidebar.logout", { defaultValue: "Logout" }) : t("sidebar.login", { defaultValue: "Login" })}
-            isOpen={!collapsed}
-          />
-        </button>
+        <div className={styles.footerActionsRow}>
+          <button className={`${styles.login} ${styles.footerPrimaryAction}`} type="button" onClick={handleFooterClick}>
+            <Shield className="ico" />
+            <AnimatedLabel
+              text={isAuthed ? t("sidebar.logout", { defaultValue: "Logout" }) : t("sidebar.login", { defaultValue: "Login" })}
+              isOpen={!collapsed}
+            />
+          </button>
+          <NavLink
+            to="/help"
+            className={styles.footerHelpIcon}
+            onClick={onNavigate}
+            aria-label={t("nav.help", { defaultValue: "Help" })}
+            title={t("nav.help", { defaultValue: "Help" })}
+          >
+            <Info className="ico" />
+          </NavLink>
+        </div>
         {isAuthed && user?.displayName ? (
           <div className={styles.userMeta} title={user.displayName}>
             {user.displayName}
           </div>
         ) : null}
         <div className={styles.footerRow}>
-          <div className={styles.footerRowCell}>
-            <NavLink
-              to="/help"
-              className={`${styles.footerLink} ${styles.footerRowLink}`}
-              onClick={onNavigate}
-            >
-              {t("nav.help", { defaultValue: "Help" })}
-            </NavLink>
-          </div>
+          <div className={styles.footerRowCell} aria-hidden="true" />
           <div className={styles.footerRowCell}>
             <SidebarLanguageSwitch />
           </div>

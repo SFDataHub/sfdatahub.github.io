@@ -137,21 +137,21 @@ export default function ToplistExportTable({ rows, showCompare, width, exportNon
       >
         <thead>
           <tr style={{ textAlign: "left", borderBottom: "1px solid #2C4A73" }}>
-            <th style={{ padding: "8px 6px" }}>#</th>
-            <th style={{ padding: "8px 6px" }}>{"\u0394 Rank"}</th>
-            <th style={{ padding: "8px 6px" }}>Server</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.rank", "#")}</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.rankDelta", "Δ Rank")}</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.server", "Server")}</th>
             <th style={{ padding: "8px 6px" }}>{t("toplists.columns.player", "Player")}</th>
-            <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>Class</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Level</th>
-            <th style={{ padding: "8px 6px" }}>Guild</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Main</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Con</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Sum</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Stats/Day</th>
-            <th style={{ padding: "8px 6px" }}>Ratio</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Mine</th>
-            <th style={{ padding: "8px 6px", textAlign: "right" }}>Treasury</th>
-            <th style={{ padding: "8px 6px" }}>Last Scan</th>
+            <th style={{ padding: "8px 6px", textAlign: "center", width: 60 }}>{t("toplists.columns.class", "Class")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.level", "Level")}</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.guild", "Guild")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.main", "Main")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.con", "Con")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.sum", "Sum")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.statsPerDay", "Stats/Day")}</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.ratio", "Ratio")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.mine", "Mine")}</th>
+            <th style={{ padding: "8px 6px", textAlign: "right" }}>{t("toplists.columns.treasury", "Treasury")}</th>
+            <th style={{ padding: "8px 6px" }}>{t("toplists.columns.lastScan", "Last Scan")}</th>
           </tr>
         </thead>
         <tbody>
@@ -184,7 +184,7 @@ export default function ToplistExportTable({ rows, showCompare, width, exportNon
                   {classIconExportUrl ? (
                     <img
                       src={classIconExportUrl}
-                      alt={classKey || "class"}
+                      alt={classKey || t("toplists.columns.class", "Class")}
                       loading="eager"
                       decoding="sync"
                       className="class-icon-toplist"
