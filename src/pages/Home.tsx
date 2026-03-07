@@ -841,12 +841,24 @@ const Home: React.FC = () => {
     >
       <div className={styles.homeLayout}>
         <div className={styles.homeMain}>
-          {/* Row 1 - Community News */}
-          <div className={styles.homeNews}>
-            <NewsFeed onSnapshotChange={handleSnapshotChange} />
+          <div className={styles.homeCenter}>
+            {/* Row 1 - Community News */}
+            <div className={styles.homeNews}>
+              <NewsFeed onSnapshotChange={handleSnapshotChange} />
+            </div>
+
+            {/* Row 2 - Records */}
+            <div className={styles.homeCommunityRecords}>
+              <LatestCommunityRecordsCard records={recordAnnouncements} />
+            </div>
+
+            {/* Row 3 - YouTube */}
+            <div className={styles.homeYouTube}>
+              <YouTubeCarousel />
+            </div>
           </div>
 
-          {/* Row 2 - Icons / Featured */}
+          {/* Left rail - Icons / Featured */}
           <div className={styles.homeIcons}>
             <FeaturedPreviewRow>
               <FeaturedPreviewCard
@@ -888,14 +900,6 @@ const Home: React.FC = () => {
                 linkAriaI18nKey="home.guidehub.open"
               />
             </FeaturedPreviewRow>
-          </div>
-
-          {/* Row 3 - YouTube */}
-          <div className={styles.homeCommunityRecords}>
-            <LatestCommunityRecordsCard records={recordAnnouncements} />
-          </div>
-          <div className={styles.homeYouTube}>
-            <YouTubeCarousel />
           </div>
         </div>
 
