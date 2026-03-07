@@ -2,7 +2,8 @@ import React from "react";
 import styles from "./LatestCommunityRecordsCard.module.css";
 import type { DiscordRecordAnnouncementItem } from "../../pages/Home/newsFeed.types";
 
-function formatRecordDate(timestamp: string): string {
+function formatRecordDate(timestamp: string | null | undefined): string {
+  if (!timestamp) return "";
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat(undefined, {
@@ -14,8 +15,8 @@ function formatRecordDate(timestamp: string): string {
   }).format(date);
 }
 
-function clampText(value: string, maxChars: number): string {
-  const text = value.trim();
+function clampText(value: string | null | undefined, maxChars: number): string {
+  const text = String(value ?? "").trim();
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
@@ -39,8 +40,8 @@ const LatestCommunityRecordsCard: React.FC<LatestCommunityRecordsCardProps> = ({
       </header>
 
       <ul className={styles.list}>
-        {latestRecords.map((record) => (
-          <li className={styles.bar} key={record.messageId}>
+        {latestRecords.map((record, idx) => (
+          <li className={styles.bar} key={record.messageId || record.id || `${record.channelId}-${record.postedAt}-${idx}`}>
             <span className={styles.badge} aria-hidden />
 
             <div className={styles.main}>
@@ -57,12 +58,12 @@ const LatestCommunityRecordsCard: React.FC<LatestCommunityRecordsCardProps> = ({
                 <div className={styles.recordTitle}>{clampText(record.content, 84)}</div>
               )}
               <div className={styles.meta}>
-                {record.author} · {record.channelName}
+                {(record.author || "Discord")} · {(record.channelName || record.channelId || "Records")}
               </div>
             </div>
 
             <div className={styles.valueBlock}>
-              <div className={styles.value}>{record.channelName}</div>
+              <div className={styles.value}>{record.channelName || record.channelId || "Records"}</div>
               <div className={styles.date}>{formatRecordDate(record.postedAt)}</div>
             </div>
           </li>

@@ -29,7 +29,7 @@ export type DiscordByChannelSnapshot = {
   nextUpdateAt: number | null;
   hash: string;
   items: DiscordNewsByChannelEntry[];
-  latestRecordAnnouncements: DiscordLatestRecordAnnouncements;
+  latestRecordAnnouncements?: DiscordLatestRecordAnnouncements;
 };
 
 export type DiscordListResponse = {
