@@ -252,6 +252,8 @@
 }
 
 .metaItem {
+  display: flex;
+  flex-direction: column;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -259,6 +261,7 @@
 }
 
 .metaLabel {
+  display: block;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -266,6 +269,7 @@
 }
 
 .metaValue {
+  display: block;
   margin-top: 4px;
   font-size: 13px;
   color: var(--text);

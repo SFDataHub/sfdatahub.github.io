@@ -776,17 +776,27 @@ function PlayerAvgModeControls({
   mode,
   updating,
   onChange,
+  label,
+  ariaLabel,
+  baseLabel,
+  totalLabel,
+  updatingLabel,
 }: {
   mode: "base" | "total";
   updating: boolean;
   onChange: (nextMode: "base" | "total") => void;
+  label: string;
+  ariaLabel: string;
+  baseLabel: string;
+  totalLabel: string;
+  updatingLabel: string;
 }) {
   return (
     <>
-      <span style={{ color: "#B0C4D9", fontSize: 12 }}>Values</span>
+      <span style={{ color: "#B0C4D9", fontSize: 12 }}>{label}</span>
       <div
         role="group"
-        aria-label="Player average mode"
+        aria-label={ariaLabel}
         style={{ display: "inline-flex", gap: 4, background: "#14273E", border: "1px solid #2B4C73", padding: 4, borderRadius: 12 }}
       >
         <button
@@ -802,7 +812,7 @@ function PlayerAvgModeControls({
             cursor: "pointer",
           }}
         >
-          Base
+          {baseLabel}
         </button>
         <button
           type="button"
@@ -817,12 +827,12 @@ function PlayerAvgModeControls({
             cursor: "pointer",
           }}
         >
-          Total
+          {totalLabel}
         </button>
       </div>
       {updating && (
         <span style={{ color: "#B0C4D9", fontSize: 12 }} aria-live="polite">
-          Updating...
+          {updatingLabel}
         </span>
       )}
     </>
@@ -2556,12 +2566,12 @@ function TableDataView({
 
   const nowMs = Date.now();
   const statusLabel = !hasServers
-    ? "No server selected"
+    ? t("toplists.status.noServerSelected", "No server selected")
     : tableLoading || compareState.loading
-      ? "Loading..."
+      ? t("toplists.status.loading", "Loading...")
       : playerError
-        ? "Error"
-        : "Ready";
+        ? t("toplists.status.error", "Error")
+        : t("toplists.status.ready", "Ready");
   const [selectedPlayerProfile, setSelectedPlayerProfile] = React.useState<{
     identifier: string;
     name: string | null;
@@ -2731,7 +2741,7 @@ function TableDataView({
               <span style={TOPLIST_HEADER_LABEL_STYLE}>
                 {column.key === "name"
                   ? t("toplists.columns.player", "Player")
-                  : column.label}
+                  : t(`toplists.columns.${column.key}`, column.label)}
               </span>
             </th>
           ))}
@@ -2853,7 +2863,7 @@ function TableDataView({
                     {classIconUrl ? (
                       <img
                         src={classIconUrl}
-                        alt={classKey || "class"}
+                        alt={classKey || t("toplists.columns.class", "Class")}
                         loading={opts.imgLoading}
                         className="class-icon-toplist"
                         style={{ display: "block", objectFit: "contain", width: 24, height: 24 }}
@@ -2965,10 +2975,10 @@ function TableDataView({
           );
         })}
         {tableLoading && enhancedRows.length === 0 && (
-          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>Loading...</td></tr>
+          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td></tr>
         )}
         {!tableLoading && !playerError && enhancedRows.length === 0 && (
-          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>No results</td></tr>
+          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td></tr>
         )}
         {rows.length > 0 && bottomSpacerHeight > 0 && (
           <tr aria-hidden>
@@ -2982,12 +2992,21 @@ function TableDataView({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{statusLabel} - {enhancedRows.length} rows</div>
-        <div>{playerLastUpdatedAt ? `Updated: ${fmtDate(playerLastUpdatedAt)}` : null}</div>
+        <div>{statusLabel} - {enhancedRows.length} {t("toplists.status.rows", "rows")}</div>
+        <div>{playerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(playerLastUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && playerAvgModeSlot &&
         createPortal(
-          <PlayerAvgModeControls mode={playerAvgMode} updating={showPlayerUpdating} onChange={handlePlayerAvgModeChange} />,
+          <PlayerAvgModeControls
+            mode={playerAvgMode}
+            updating={showPlayerUpdating}
+            onChange={handlePlayerAvgModeChange}
+            label={t("toplists.players.avgMode.label", "Values")}
+            ariaLabel={t("toplists.players.avgMode.aria", "Player average mode")}
+            baseLabel={t("toplists.players.avgMode.base", "Base")}
+            totalLabel={t("toplists.players.avgMode.total", "Total")}
+            updatingLabel={t("toplists.players.avgMode.updating", "Updating...")}
+          />,
           playerAvgModeSlot
         )}
       {(activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
@@ -2998,33 +3017,42 @@ function TableDataView({
       {playerScopeStatus && (
         <div style={{ opacity: 0.75, fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span>
-            Scope {playerScopeStatus.scopeId} � {playerScopeStatus.changesSinceLastRebuild}/{playerScopeStatus.minChanges ?? "?"} changes since last rebuild
+            {t("toplists.players.scope.summary", "Scope {{scopeId}} - {{changes}}/{{minChanges}} changes since last rebuild", {
+              scopeId: playerScopeStatus.scopeId,
+              changes: playerScopeStatus.changesSinceLastRebuild,
+              minChanges: playerScopeStatus.minChanges ?? "?",
+            })}
           </span>
           <span>
-            Auto rebuild at {playerScopeStatus.minChanges ?? "?"} changes or after {playerScopeStatus.maxAgeDays ?? "?"} days
+            {t("toplists.players.scope.autoRebuild", "Auto rebuild at {{minChanges}} changes or after {{maxAgeDays}} days", {
+              minChanges: playerScopeStatus.minChanges ?? "?",
+              maxAgeDays: playerScopeStatus.maxAgeDays ?? "?",
+            })}
           </span>
           <span>
-            Last rebuild: {fmtDateObj(playerScopeStatus.lastRebuildAt)}
+            {t("toplists.players.scope.lastRebuild", "Last rebuild: {{value}}", {
+              value: fmtDateObj(playerScopeStatus.lastRebuildAt),
+            })}
           </span>
         </div>
       )}
 
       {hasServers && playerError && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Error</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
           <div style={{ wordBreak: "break-all" }}>{playerError}</div>
           <button
             onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)}
             style={{ marginTop: 8 }}
           >
-            Retry
+            {t("toplists.actions.retry", "Retry")}
           </button>
         </div>
       )}
 
       {!hasServers ? (
         <div style={{ padding: 12, color: "#B0C4D9" }}>
-          Please select at least one server.
+          {t("toplists.players.selectServerHint", "Please select at least one server.")}
         </div>
       ) : (
         <>

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState, useTransition } from "reac
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   type FirestoreToplistGuildRow,
@@ -10,7 +11,6 @@ import {
   type FirestoreLatestGuildToplistResult,
 } from "../../lib/api/toplistsFirestore";
 import { SERVERS } from "../../data/servers";
-import i18n from "../../i18n";
 import { useFilters } from "../../components/Filters/FilterContext";
 import { useAuth } from "../../context/AuthContext";
 import { useToplistsData } from "../../context/ToplistsDataContext";
@@ -138,6 +138,7 @@ const GuildToplistColGroup = React.memo(function GuildToplistColGroup() {
 });
 
 const GuildToplistHeader = React.memo(function GuildToplistHeader() {
+  const { t } = useTranslation();
   return (
     <table className="toplists-table toplists-table--header" style={TOPLIST_TABLE_STYLE}>
       <GuildToplistColGroup />
@@ -145,7 +146,7 @@ const GuildToplistHeader = React.memo(function GuildToplistHeader() {
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
           {GUILD_COLUMNS.map((column) => (
             <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
-              <span style={TOPLIST_HEADER_LABEL_STYLE}>{column.label}</span>
+              <span style={TOPLIST_HEADER_LABEL_STYLE}>{t(`toplists.columns.${column.key}`, column.label)}</span>
             </th>
           ))}
         </tr>
@@ -404,17 +405,27 @@ function GuildAvgModeControls({
   mode,
   updating,
   onChange,
+  label,
+  ariaLabel,
+  baseLabel,
+  totalLabel,
+  updatingLabel,
 }: {
   mode: "base" | "total";
   updating: boolean;
   onChange: (nextMode: "base" | "total") => void;
+  label: string;
+  ariaLabel: string;
+  baseLabel: string;
+  totalLabel: string;
+  updatingLabel: string;
 }) {
   return (
     <>
-      <span style={{ color: "#B0C4D9", fontSize: 12 }}>Values</span>
+      <span style={{ color: "#B0C4D9", fontSize: 12 }}>{label}</span>
       <div
         role="group"
-        aria-label="Guild average mode"
+        aria-label={ariaLabel}
         style={{ display: "inline-flex", gap: 4, background: "#14273E", border: "1px solid #2B4C73", padding: 4, borderRadius: 12 }}
       >
         <button
@@ -430,7 +441,7 @@ function GuildAvgModeControls({
             cursor: "pointer",
           }}
         >
-          Base
+          {baseLabel}
         </button>
         <button
           type="button"
@@ -445,12 +456,12 @@ function GuildAvgModeControls({
             cursor: "pointer",
           }}
         >
-          Total
+          {totalLabel}
         </button>
       </div>
       {updating && (
         <span style={{ color: "#B0C4D9", fontSize: 12 }} aria-live="polite">
-          Updating...
+          {updatingLabel}
         </span>
       )}
     </>
@@ -504,6 +515,7 @@ export default function GuildToplists({
   tableRef,
   exportSnapshotRef,
 }: GuildToplistsProps) {
+  const { t } = useTranslation();
   const { favoritesOnly } = useFilters();
   const { user } = useAuth();
   const { getGuildToplistSnapshotCached } = useToplistsData();
@@ -559,7 +571,7 @@ export default function GuildToplists({
     if (!resolvedServers.length) {
       setRows([]);
       setUpdatedAt(null);
-      setError(i18n.t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server."));
+      setError(t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server."));
       setLoading(false);
       return () => {
         active = false;
@@ -585,11 +597,11 @@ export default function GuildToplists({
 
         if (!snapshots.length) {
           const detail = firstErrorDetail ? ` (${firstErrorDetail})` : "";
-          let errorMsg = "Firestore Fehler";
+          let errorMsg = t("toplistsPage.errors.firestore", "Firestore error");
           if (firstErrorCode === "not_found") {
-            errorMsg = i18n.t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server.");
+            errorMsg = t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server.");
           } else if (firstErrorCode === "decode_error") {
-            errorMsg = "Fehler beim Lesen der Daten";
+            errorMsg = t("toplistsPage.errors.decode", "Could not decode data");
           }
           setRows([]);
           setUpdatedAt(null);
@@ -638,7 +650,7 @@ export default function GuildToplists({
         console.error("[GuildToplists] unexpected error", err);
         setRows([]);
         setUpdatedAt(null);
-        setError("Unerwarteter Fehler beim Laden");
+        setError(t("toplistsPage.errors.unexpectedLoad", "Unexpected error while loading"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -647,7 +659,7 @@ export default function GuildToplists({
     return () => {
       active = false;
     };
-  }, [resolvedServerKey, getGuildToplistSnapshotCached]);
+  }, [resolvedServerKey, getGuildToplistSnapshotCached, t]);
 
   useEffect(() => {
     if (isGuildAvgModePending && !guildPendingPrevRef.current) {
@@ -991,12 +1003,12 @@ export default function GuildToplists({
           })}
           {loading && displayRows.length === 0 && (
             <tr>
-              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>Loading...</td>
+              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td>
             </tr>
           )}
           {!loading && !error && displayRows.length === 0 && (
             <tr>
-              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>No results</td>
+              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td>
             </tr>
           )}
           {displayRows.length > 0 && bottomSpacerHeight > 0 && (
@@ -1012,29 +1024,52 @@ export default function GuildToplists({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
-        Guilds - snapshots (latest){resolvedServers.length ? ` - ${resolvedServers.join(", ")}` : ""}
+        {t("toplists.guilds.snapshotStatus", "Guilds - snapshots (latest)")}
+        {resolvedServers.length ? ` - ${resolvedServers.join(", ")}` : ""}
       </div>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{loading ? "Loading..." : error ? "Error" : "Ready"} - {displayRows.length} rows</div>
-        <div>{updatedAt ? `Updated: ${fmtDate(updatedAt)}` : null}</div>
+        <div>
+          {loading ? t("toplists.status.loading", "Loading...") : error ? t("toplists.status.error", "Error") : t("toplists.status.ready", "Ready")}
+          {" - "}
+          {displayRows.length} {t("toplists.status.rows", "rows")}
+        </div>
+        <div>{updatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(updatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && !guildAvgModeSlot && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
-          <GuildAvgModeControls mode={activeGuildAvgMode} updating={showGuildUpdating} onChange={handleGuildAvgModeChange} />
+          <GuildAvgModeControls
+            mode={activeGuildAvgMode}
+            updating={showGuildUpdating}
+            onChange={handleGuildAvgModeChange}
+            label={t("toplists.guilds.avgMode.label", "Values")}
+            ariaLabel={t("toplists.guilds.avgMode.aria", "Guild average mode")}
+            baseLabel={t("toplists.guilds.avgMode.base", "Base")}
+            totalLabel={t("toplists.guilds.avgMode.total", "Total")}
+            updatingLabel={t("toplists.guilds.avgMode.updating", "Updating...")}
+          />
         </div>
       )}
       {showAvgModeControl && guildAvgModeSlot &&
         createPortal(
-          <GuildAvgModeControls mode={activeGuildAvgMode} updating={showGuildUpdating} onChange={handleGuildAvgModeChange} />,
+          <GuildAvgModeControls
+            mode={activeGuildAvgMode}
+            updating={showGuildUpdating}
+            onChange={handleGuildAvgModeChange}
+            label={t("toplists.guilds.avgMode.label", "Values")}
+            ariaLabel={t("toplists.guilds.avgMode.aria", "Guild average mode")}
+            baseLabel={t("toplists.guilds.avgMode.base", "Base")}
+            totalLabel={t("toplists.guilds.avgMode.total", "Total")}
+            updatingLabel={t("toplists.guilds.avgMode.updating", "Updating...")}
+          />,
           guildAvgModeSlot
         )}
 
       {error && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Error</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
           <div style={{ wordBreak: "break-all" }}>{error}</div>
           <button onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)} style={{ marginTop: 8 }}>
-            Retry
+            {t("toplists.actions.retry", "Retry")}
           </button>
         </div>
       )}

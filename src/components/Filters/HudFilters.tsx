@@ -69,6 +69,8 @@ export default function HudFilters({
   const guildClear = t("toplists.filters.guilds.clear", "Clear");
   const exportPngLabel = t("toplists.exportDialog.title", "Export PNG");
   const favoritesChipLabel = t("nav.favorites", { defaultValue: "Favorites" });
+  const sortLabel = t("toplists.filters.sort.label", "Sort.");
+  const sortAriaLabel = t("toplists.filters.sort.aria", "Sort");
   const guildSelection = guilds.length
     ? t("toplists.filters.guilds.selected", "{{count}} selected", { count: guilds.length })
     : guildPlaceholder;
@@ -151,7 +153,7 @@ export default function HudFilters({
 
       <div className={styles.sortField}>
         <label className={styles.sortLabel} htmlFor="toplists-sort">
-          Sort.
+          {sortLabel}
         </label>
         <select
           id="toplists-sort"
@@ -159,30 +161,30 @@ export default function HudFilters({
           value={sortValue}
           onChange={(e) => onSortValueChange(e.target.value)}
           className={styles.sortSelect}
-          aria-label="Sort"
+          aria-label={sortAriaLabel}
         >
           {isGuildMode ? (
             <>
-              <option value="guildMembers">Members</option>
-              <option value="guildAvgLevel">ø Lv</option>
-              <option value="guildAvgMain">ø Main</option>
-              <option value="guildAvgCon">ø Con</option>
-              <option value="guildAvgSum">ø Sum</option>
-              <option value="guildRaids">Raids</option>
-              <option value="guildHydra">Hydra</option>
+              <option value="guildMembers">{t("toplists.filters.sort.guildOptions.guildMembers", "Members")}</option>
+              <option value="guildAvgLevel">{t("toplists.filters.sort.guildOptions.guildAvgLevel", "ø Lv")}</option>
+              <option value="guildAvgMain">{t("toplists.filters.sort.guildOptions.guildAvgMain", "ø Main")}</option>
+              <option value="guildAvgCon">{t("toplists.filters.sort.guildOptions.guildAvgCon", "ø Con")}</option>
+              <option value="guildAvgSum">{t("toplists.filters.sort.guildOptions.guildAvgSum", "ø Sum")}</option>
+              <option value="guildRaids">{t("toplists.filters.sort.guildOptions.guildRaids", "Raids")}</option>
+              <option value="guildHydra">{t("toplists.filters.sort.guildOptions.guildHydra", "Hydra")}</option>
             </>
           ) : (
             <>
-              <option value="main">Main</option>
-              <option value="mainTotal">Main (Total)</option>
-              <option value="constitution">Constitution</option>
-              <option value="conTotal">Con (Total)</option>
-              <option value="sum">Base Stats</option>
-              <option value="statsDay">Stats/Day</option>
-              <option value="sumTotal">Sum Total</option>
-              <option value="statsDayTotal">Total Stats/day</option>
-              <option value="level">Level</option>
-              <option value="mine">Mine</option>
+              <option value="main">{t("toplists.filters.sort.playerOptions.main", "Main")}</option>
+              <option value="mainTotal">{t("toplists.filters.sort.playerOptions.mainTotal", "Main (Total)")}</option>
+              <option value="constitution">{t("toplists.filters.sort.playerOptions.constitution", "Constitution")}</option>
+              <option value="conTotal">{t("toplists.filters.sort.playerOptions.conTotal", "Con (Total)")}</option>
+              <option value="sum">{t("toplists.filters.sort.playerOptions.sum", "Base Stats")}</option>
+              <option value="statsDay">{t("toplists.filters.sort.playerOptions.statsDay", "Stats/Day")}</option>
+              <option value="sumTotal">{t("toplists.filters.sort.playerOptions.sumTotal", "Sum Total")}</option>
+              <option value="statsDayTotal">{t("toplists.filters.sort.playerOptions.statsDayTotal", "Total Stats/day")}</option>
+              <option value="level">{t("toplists.filters.sort.playerOptions.level", "Level")}</option>
+              <option value="mine">{t("toplists.filters.sort.playerOptions.mine", "Mine")}</option>
             </>
           )}
         </select>

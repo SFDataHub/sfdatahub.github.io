@@ -89,6 +89,16 @@
       "prev": "Vorheriger Kanal",
       "next": "Naechster Kanal"
     },
+    "records": {
+      "title": "Neueste Community-Rekorde",
+      "subtitle": "Live-Snapshot",
+      "fallbackTitle": "Rekord-Ankuendigung",
+      "fallbackAuthor": "Discord",
+      "fallbackChannel": "Rekorde",
+      "previous": "Vorher: {{holder}} • {{days}}d",
+      "daysLabel": "Tage",
+      "empty": "Noch keine Rekord-Ankuendigungen."
+    },
     "youtube": {
       "title": "YouTube",
       "prev": "Vorheriges Video",
@@ -425,6 +435,26 @@
         "footnote": "Tipp: Nach dem Verknuepfen oder Trennen immer kurz auf Refresh klicken."
       }
     },
+    "loginOverlay": {
+      "modalAriaLabel": "Anmelden",
+      "logoAlt": "SFDataHub-Logo",
+      "title": "Anmelden",
+      "subtitle": "Wähle eine Methode, um auf SFDataHub zuzugreifen.",
+      "discordCta": "Mit Discord anmelden",
+      "loading": "Sitzung wird geprüft...",
+      "authedStatus": "Du bist als {{name}} angemeldet.",
+      "logout": "Abmelden",
+      "backToDashboard": "Zurück zum Dashboard",
+      "disclaimer": "Wir speichern nur deine SFDataHub-Benutzer-ID, deinen Anzeigenamen, Avatar und Rollen, um deine Nutzung zu personalisieren.",
+      "errors": {
+        "unknownHost": "unbekannter Host",
+        "unauthorizedDomain": "Diese Domain ist nicht für den Login autorisiert. Bitte füge \"{{host}}\" zu den autorisierten Firebase-Auth-Domains hinzu oder nutze die richtige Umgebung.",
+        "popupBlocked": "Das Login-Popup wurde blockiert. Bitte erlaube Popups für diese Seite oder nutze den Redirect-Flow.",
+        "popupClosed": "Das Login-Popup wurde vor Abschluss der Anmeldung geschlossen. Bitte versuche es erneut.",
+        "default": "Login fehlgeschlagen. Bitte versuche es erneut.",
+        "codeLabel": "Code"
+      }
+    },
     "menu": {
       "fallbackAuthedName": "Spieler",
       "fallbackGuestName": "Gast",
@@ -512,21 +542,90 @@
   },
   "toplistsPage": {
     "errors": {
-      "noSnapshot": "Noch kein Snapshot fuer diesen Server."
+      "noSnapshot": "Noch kein Snapshot fuer diesen Server.",
+      "firestore": "Firestore-Fehler",
+      "decode": "Daten konnten nicht gelesen werden",
+      "unexpectedLoad": "Unerwarteter Fehler beim Laden"
     }
   },
   "toplists": {
     "headerLabel": "Toplisten",
-    "compareMode": "Compare Mode",
+    "compareMode": "Vergleichsmodus",
     "compareMonth": "Fortschritt seit",
-    "compareMonths": "Compare months",
+    "compareMonths": "Monate vergleichen",
     "compareFrom": "Von",
     "compareTo": "Bis",
     "compareOff": "Aus",
     "compareMissingSnapshot": "Keine Basisdaten für {{key}}.",
     "deltaNew": "NEU",
     "columns": {
-      "player": "Spieler"
+      "rank": "#",
+      "rankDelta": "Δ Rang",
+      "server": "Server",
+      "player": "Spieler",
+      "name": "Name",
+      "class": "Klasse",
+      "guild": "Gilde",
+      "level": "Level",
+      "main": "Hauptwert",
+      "con": "Ausdauer",
+      "sum": "Summe",
+      "statsPerDay": "Stats/Tag",
+      "ratio": "Verhaeltnis",
+      "mine": "Mine",
+      "treasury": "Schatzkammer",
+      "lastScan": "Letzter Scan",
+      "hofRank": "HoF Rang",
+      "honor": "Ehre",
+      "raids": "Raids",
+      "portal": "Portal",
+      "hydra": "Hydra",
+      "petLevel": "Pet-Level",
+      "members": "Mitglieder",
+      "avgLevel": "Ø Level",
+      "avgMain": "Ø Hauptwert",
+      "avgCon": "Ø Ausdauer",
+      "avgSum": "Ø Summe"
+    },
+    "status": {
+      "noServerSelected": "Kein Server ausgewaehlt",
+      "loading": "Lade...",
+      "error": "Fehler",
+      "ready": "Bereit",
+      "rows": "Zeilen",
+      "updated": "Aktualisiert: {{value}}"
+    },
+    "table": {
+      "loading": "Lade...",
+      "noResults": "Keine Ergebnisse"
+    },
+    "actions": {
+      "retry": "Erneut versuchen"
+    },
+    "players": {
+      "avgMode": {
+        "label": "Werte",
+        "aria": "Spieler-Durchschnittsmodus",
+        "base": "Basis",
+        "total": "Gesamt",
+        "updating": "Aktualisiere..."
+      },
+      "selectServerHint": "Bitte waehle mindestens einen Server aus.",
+      "scope": {
+        "summary": "Scope {{scopeId}} - {{changes}}/{{minChanges}} Aenderungen seit dem letzten Rebuild",
+        "autoRebuild": "Auto-Rebuild bei {{minChanges}} Aenderungen oder nach {{maxAgeDays}} Tagen",
+        "lastRebuild": "Letzter Rebuild: {{value}}"
+      }
+    },
+    "guilds": {
+      "snapshotStatus": "Gilden - Snapshots (aktuell)",
+      "avgMode": {
+        "label": "Werte",
+        "aria": "Gilden-Durchschnittsmodus",
+        "base": "Basis",
+        "total": "Gesamt",
+        "updating": "Aktualisiere..."
+      }
     },
     "exportDialog": {
       "title": "PNG exportieren",
@@ -552,6 +651,31 @@
     "filters": {
       "showHud": "Filter anzeigen",
       "hideHud": "Filter ausblenden",
+      "sort": {
+        "label": "Sort.",
+        "aria": "Sortierung",
+        "playerOptions": {
+          "main": "Hauptwert",
+          "mainTotal": "Hauptwert (Gesamt)",
+          "constitution": "Ausdauer",
+          "conTotal": "Ausdauer (Gesamt)",
+          "sum": "Basiswerte",
+          "statsDay": "Stats/Tag",
+          "sumTotal": "Summe Gesamt",
+          "statsDayTotal": "Gesamtwerte/Tag",
+          "level": "Level",
+          "mine": "Mine"
+        },
+        "guildOptions": {
+          "guildMembers": "Mitglieder",
+          "guildAvgLevel": "ø Lv",
+          "guildAvgMain": "ø Haupt",
+          "guildAvgCon": "ø Ausdauer",
+          "guildAvgSum": "ø Summe",
+          "guildRaids": "Raids",
+          "guildHydra": "Hydra"
+        }
+      },
       "guilds": {
         "label": "Gilden",
         "placeholder": "Alle Gilden",

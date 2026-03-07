@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useFilters, type DaysFilter } from "./FilterContext";
 
 type Props = {
@@ -17,6 +18,7 @@ const PALETTE = {
 };
 
 export default function BottomFilterSheet({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const {
     searchText, setSearchText,
     range, setRange,
@@ -109,22 +111,24 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
 
         {/* Sort (mit id/name + Labelbindung) */}
         <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-          <label htmlFor="sheet-toplists-sort" style={{ color: PALETTE.text2, fontSize: 12 }}>Sort.</label>
+          <label htmlFor="sheet-toplists-sort" style={{ color: PALETTE.text2, fontSize: 12 }}>
+            {t("toplists.filters.sort.label", "Sort.")}
+          </label>
           <select
             id="sheet-toplists-sort"
             name="sheet-toplists-sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            aria-label="Sort"
+            aria-label={t("toplists.filters.sort.aria", "Sort")}
             autoComplete="off"
           style={select}
         >
-          <option value="main">Main</option>
-          <option value="constitution">Constitution</option>
-          <option value="sum">Base Stats</option>
-          <option value="statsDay">Stats/Day</option>
-          <option value="level">Level</option>
-          <option value="mine">Mine</option>
+          <option value="main">{t("toplists.filters.sort.playerOptions.main", "Main")}</option>
+          <option value="constitution">{t("toplists.filters.sort.playerOptions.constitution", "Constitution")}</option>
+          <option value="sum">{t("toplists.filters.sort.playerOptions.sum", "Base Stats")}</option>
+          <option value="statsDay">{t("toplists.filters.sort.playerOptions.statsDay", "Stats/Day")}</option>
+          <option value="level">{t("toplists.filters.sort.playerOptions.level", "Level")}</option>
+          <option value="mine">{t("toplists.filters.sort.playerOptions.mine", "Mine")}</option>
         </select>
         </div>
 
