@@ -1,5 +1,5 @@
 // src/pages/Home.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
@@ -9,7 +9,11 @@ import LatestCommunityRecordsCard from "../components/home/LatestCommunityRecord
 import featuredPreviewCardStyles from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard.module.css";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
-import type { DiscordByChannelSnapshot, DiscordNewsByChannelEntry } from "./Home/newsFeed.types";
+import type {
+  DiscordByChannelSnapshot,
+  DiscordNewsByChannelEntry,
+  DiscordRecordAnnouncementItem,
+} from "./Home/newsFeed.types";
 import guideHubLogo from "../assets/logo_guidehub.png";
 import { guideAssetByKey } from "../data/guidehub/assets";
 import { AUTH_BASE_URL } from "../lib/auth/config";
@@ -123,10 +127,55 @@ function readSnapshotCache(): DiscordByChannelSnapshot | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
-    return parsed as DiscordByChannelSnapshot;
+    const hash = typeof (parsed as any).hash === "string" ? (parsed as any).hash : "";
+    if (!hash) return null;
+    return {
+      ...(parsed as DiscordByChannelSnapshot),
+      items: Array.isArray((parsed as any).items) ? (parsed as any).items : [],
+      latestRecordAnnouncements: {
+        items: Array.isArray((parsed as any)?.latestRecordAnnouncements?.items)
+          ? (parsed as any).latestRecordAnnouncements.items
+          : [],
+      },
+    };
   } catch {
     return null;
   }
+}
+
+function extractRecordAnnouncements(snapshot: DiscordByChannelSnapshot | null): DiscordRecordAnnouncementItem[] {
+  const raw = snapshot?.latestRecordAnnouncements?.items;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is DiscordRecordAnnouncementItem => {
+      return Boolean(
+        entry &&
+          typeof entry === "object" &&
+          typeof entry.content === "string" &&
+          typeof entry.postedAt === "string",
+      );
+    })
+    .slice(0, 5);
+}
+
+function areSameRecordAnnouncements(
+  a: DiscordRecordAnnouncementItem[],
+  b: DiscordRecordAnnouncementItem[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i];
+    const right = b[i];
+    if (
+      left.messageId !== right.messageId ||
+      left.postedAt !== right.postedAt ||
+      left.content !== right.content ||
+      left.channelId !== right.channelId
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function writeSnapshotCache(snapshot: DiscordByChannelSnapshot): void {
@@ -276,14 +325,22 @@ const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapsho
       if (currentHash && currentHash === nextHash) {
         dataRef.current = snapshot;
         if (writeCache) writeSnapshotCache(snapshot);
-        onSnapshotChange?.(snapshot);
+        try {
+          onSnapshotChange?.(snapshot);
+        } catch {
+          // Records forwarding must never break news rendering.
+        }
         return;
       }
       hashRef.current = nextHash;
       dataRef.current = snapshot;
       setData(snapshot);
       if (writeCache) writeSnapshotCache(snapshot);
-      onSnapshotChange?.(snapshot);
+      try {
+        onSnapshotChange?.(snapshot);
+      } catch {
+        // Records forwarding must never break news rendering.
+      }
     };
 
     const runFetch = async () => {
@@ -756,7 +813,13 @@ const ScheduleModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
 const Home: React.FC = () => {
   const { t } = useTranslation();
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [newsSnapshot, setNewsSnapshot] = useState<DiscordByChannelSnapshot | null>(null);
+  const [recordAnnouncements, setRecordAnnouncements] = useState<DiscordRecordAnnouncementItem[]>([]);
+
+  const handleSnapshotChange = useCallback((snapshot: DiscordByChannelSnapshot | null) => {
+    const nextRecords = extractRecordAnnouncements(snapshot);
+    setRecordAnnouncements((prev) => (areSameRecordAnnouncements(prev, nextRecords) ? prev : nextRecords));
+  }, []);
+
   return (
     <ContentShell
       headerTransparent
@@ -780,7 +843,7 @@ const Home: React.FC = () => {
         <div className={styles.homeMain}>
           {/* Row 1 - Community News */}
           <div className={styles.homeNews}>
-            <NewsFeed onSnapshotChange={setNewsSnapshot} />
+            <NewsFeed onSnapshotChange={handleSnapshotChange} />
           </div>
 
           {/* Row 2 - Icons / Featured */}
@@ -829,7 +892,7 @@ const Home: React.FC = () => {
 
           {/* Row 3 - YouTube */}
           <div className={styles.homeCommunityRecords}>
-            <LatestCommunityRecordsCard records={newsSnapshot?.latestRecordAnnouncements?.items ?? []} />
+            <LatestCommunityRecordsCard records={recordAnnouncements} />
           </div>
           <div className={styles.homeYouTube}>
             <YouTubeCarousel />
