@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../../context/AuthContext";
+import SidebarLanguageSwitch from "../Sidebar/SidebarLanguageSwitch";
+import sidebarStyles from "../Sidebar/Sidebar.module.css";
 import styles from "./Topbar.module.css";
 
 const PLACEHOLDER_AVATAR = "https://i.pravatar.cc/72";
@@ -12,14 +15,15 @@ interface AccountMenuProps {
 
 const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   const { user, status, logout, isLoading } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const isAuthed = status === "authenticated";
   const displayName = isAuthed
-    ? user?.displayName ?? fallbackName ?? "Player"
-    : fallbackName ?? "Guest";
+    ? user?.displayName ?? fallbackName ?? t("account.menu.fallbackAuthedName", "Player")
+    : fallbackName ?? t("account.menu.fallbackGuestName", "Guest");
   const avatarUrl = isAuthed && user?.avatarUrl ? user.avatarUrl : PLACEHOLDER_AVATAR;
 
   useEffect(() => {
@@ -72,21 +76,29 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
 
   const renderDropdownContent = () => {
     if (isLoading) {
-      return <p className={styles.accountStatusText}>Checking session...</p>;
+      return <p className={styles.accountStatusText}>{t("account.menu.loadingSession", "Checking session...")}</p>;
     }
 
     if (status === "unauthenticated") {
       return (
-        <>
-          <div className={styles.accountHeader}>
-            <p className={styles.accountName}>Not signed in</p>
-            <p className={styles.accountSub}>Your scans stay synced when you log in.</p>
+        <div className={styles.accountGuestContent}>
+          <div className={`${styles.accountHeader} ${styles.accountGuestHeader}`}>
+            <p className={styles.accountName}>{t("account.menu.guestTitle")}</p>
+            <p className={styles.accountSub}>
+              {t("account.menu.guestSubtitle")}
+            </p>
           </div>
-          <button type="button" className={styles.accountPrimary} onClick={handleSignIn}>
-            Sign in
+          <button type="button" className={`${styles.accountPrimary} ${styles.accountGuestPrimary}`} onClick={handleSignIn}>
+            {t("account.menu.signInCta")}
           </button>
-          <p className={styles.accountHint}>Use Discord or Google on the sign-in page.</p>
-        </>
+          <hr className={`${styles.accountDivider} ${styles.accountGuestDivider}`} />
+          <div className={sidebarStyles.footerRow}>
+            <div className={sidebarStyles.footerRowCell} aria-hidden="true" />
+            <div className={sidebarStyles.footerRowCell}>
+              <SidebarLanguageSwitch />
+            </div>
+          </div>
+        </div>
       );
     }
 
@@ -100,12 +112,17 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
             <div>
               <p className={styles.accountName}>{displayName}</p>
               <p className={styles.accountSub}>
-                Signed in via {user?.provider === "google" ? "Google" : "Discord"}
+                {t("account.menu.signedInVia", {
+                  defaultValue: "Signed in via {{provider}}",
+                  provider: user?.provider === "google"
+                    ? t("account.menu.providerGoogle", "Google")
+                    : t("account.menu.providerDiscord", "Discord"),
+                })}
               </p>
             </div>
           </div>
           <button type="button" className={styles.accountItem} onClick={handleAccountClick}>
-            Account &amp; Profile
+            {t("account.menu.accountAndProfile", "Account & Profile")}
           </button>
           {isAdmin ? (
             <a
@@ -114,12 +131,12 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
               target="_blank"
               rel="noreferrer"
             >
-              Console Panel
+              {t("account.menu.consolePanel", "Console Panel")}
             </a>
           ) : null}
           <hr className={styles.accountDivider} />
           <button type="button" className={`${styles.accountItem} ${styles.accountLogout}`} onClick={handleLogout}>
-            Logout
+            {t("account.menu.logout", "Logout")}
           </button>
         </>
       );
@@ -135,10 +152,10 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
           className={styles.avatarSpinnerShell}
           role="status"
           aria-live="polite"
-          aria-label="Checking login status"
+          aria-label={t("account.menu.loadingLoginStatus", "Checking login status")}
         >
           <span className={styles.avatarSpinner} aria-hidden="true" />
-          <span className={styles.srOnly}>Checking login status</span>
+          <span className={styles.srOnly}>{t("account.menu.loadingLoginStatus", "Checking login status")}</span>
         </div>
       ) : (
         <button

@@ -70,6 +70,8 @@
 
 .main {
   min-width: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .recordTitle {
@@ -85,9 +87,16 @@
 }
 
 .meta {
-  margin-top: 2px;
   font-size: 11px;
   color: #A8C2DB;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.previousMeta {
+  font-size: 10px;
+  color: rgba(168, 194, 219, 0.75);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,17 +106,26 @@
   text-align: right;
   display: grid;
   justify-items: end;
-  gap: 1px;
+  gap: 0;
 }
 
 .value {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: #A6D3FF;
   line-height: 1;
 }
 
+.valueLabel {
+  font-size: 10px;
+  line-height: 1;
+  color: #8EABC7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .date {
+  margin-top: 2px;
   font-size: 11px;
   color: #8EABC7;
   line-height: 1;
