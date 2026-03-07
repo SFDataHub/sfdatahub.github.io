@@ -368,15 +368,35 @@
 /* ---------- Live Now ---------- */
 .liveList { display: grid; gap: 6px; }
 .liveCard { display: grid; gap: 8px; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }
-.liveTop { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+.liveTop { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
 .liveAvatar { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
 .liveAvatarFallback { width: 48px; height: 48px; border-radius: 10px; background: #254364; display: grid; place-items: center; font-weight: 700; }
-.liveInfo { min-width: 0; }
-.liveName { font-weight: 600; color: #F5F9FF; }
-.liveMeta { display: flex; gap: 8px; font-size: 12px; color: #B0C4D9; }
-.liveBadge { background: #e02b2b; color: white; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; }
-.liveViewers { color: #B0C4D9; }
-.liveOpenBtn { align-self: start; }
+.liveInfo { min-width: 0; display: grid; gap: 4px; align-content: start; }
+.liveNameRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.liveViewRow { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: nowrap; }
+.liveName { font-weight: 600; color: #F5F9FF; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liveBadge { background: #e02b2b; color: white; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; line-height: 1; flex: 0 0 auto; }
+.liveViewers {
+  color: #B0C4D9;
+  font-size: 11px;
+  line-height: 1.2;
+  min-width: 0;
+  flex: 1 1 auto;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.liveOpenBtn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 9px;
+}
 .liveDescription { grid-column: 1 / -1; font-size: 12px; color: #B0C4D9; line-height: 1.35; }
 
 /* ---------- Modal (Schedule) ---------- */

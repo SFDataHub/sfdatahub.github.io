@@ -324,6 +324,7 @@
     "languagePreference": "Sidebar language preference",
     "languageSwitchEn": "Switch language to English",
     "languageSwitchDe": "Switch language to German",
+    "languageSwitchToLocale": "Switch language to {{language}}",
     "connectedCharacters": {
       "title": "Connected characters",
       "empty": "No characters linked yet. Link a character in your account to see it here.",
@@ -464,6 +465,13 @@
       "guestSubtitle": "Sign in with Discord",
       "guestHint": "Use Discord or Google on the sign-in page.",
       "signInCta": "Sign in",
+      "languageSettingsCta": "Language settings",
+      "languageSettingsTitle": "Settings",
+      "languageSettingsSubtitle": "Choose your interface language.",
+      "languageFieldLabel": "Language",
+      "languageSaving": "Saving language settings...",
+      "languageSaveError": "Could not save language settings.",
+      "closeLanguageSettings": "Close settings",
       "signedInVia": "Signed in via {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
@@ -538,7 +546,9 @@
     "theme_dark": "Dark",
     "language": "Language",
     "lang_en": "English",
-    "lang_de": "Deutsch"
+    "lang_de": "Deutsch",
+    "lang_hu": "Hungarian",
+    "lang_cs": "Czech"
   },
   "toplistsPage": {
     "errors": {

@@ -297,6 +297,10 @@
   width:16px;
   height:16px;
 }
+.footerRowHelpIcon{
+  width:100%;
+  min-width:0;
+}
 .userMeta{
   margin-top:6px;
   font-size:11px;
@@ -396,13 +400,11 @@
 .languageSegmentEn{
   --clip-shape: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
   z-index:2;
-  background-image:url("/assets/flags/Flag_of_the_United_Kingdom_(3-5).svg.png");
 }
 .languageSegmentDe{
   --clip-shape: polygon(var(--slant) 0, 100% 0, 100% 100%, 0 100%);
   margin-left:calc(var(--slant) * -1);
   z-index:1;
-  background-image:url("/assets/flags/Flag_of_Germany.svg.png");
 }
 .languageSegmentActive{
   filter:brightness(1.05);

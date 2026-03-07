@@ -1,0 +1,1017 @@
+{
+  "common": {
+    "noData": "Bez dat"
+  },
+  "nav": {
+    "home": "Domu",
+    "dashboard": "Dashboard",
+    "players": "Hráči",
+    "guilds": "Cechy",
+    "servers": "Servery",
+    "toplists": "Top žebříčky",
+    "oldscans": "Staré skeny",
+    "favorites": "Oblíbené",
+    "notifications": "Oznámení",
+    "imprint": "Impressum",
+    "privacy": "Ochrana soukromí",
+    "license": "Licence",
+    "help": "Nápověda",
+    "tools": "Nástroje",
+    "community": "Komunita",
+    "creatorHub": "Creator Hub",
+    "settings": "Nastavení",
+    "discover": "Objevovat",
+    "guildHub": "Guild Hub",
+    "admin": "Admin",
+    "playground": "Playground",
+    "guideHub": "Guide Hub",
+    "scans": "Skeny",
+    "overview": "Přehled",
+    "guildPlanner": "Guild Planner",
+    "fusionPlanner": "Fusion Planner",
+    "guildCompare": "Porovnání cechů",
+    "waitlist": "Čekací listina",
+    "sfMagazine": "SFMagazine",
+    "historyBook": "History Book",
+    "errorLog": "Chybový log",
+    "feedback": "Zpětná vazba",
+    "users": "Uživatelé",
+    "uploadCenter": "Upload Center",
+    "profile": "Profil",
+    "account": "Účet",
+    "appearance": "Vzhled",
+    "listViews": "Zobrazení seznamů",
+    "rescanWidget": "Rescan Widget",
+    "uploadSimulator": "Upload Simulator",
+    "hudGameButtons": "HUD · Game Buttons"
+  },
+  "home": {
+    "title": "Domů",
+    "headerLabel": "Domů",
+    "subtitle": "Vítej zpět",
+    "historybook": {
+      "title": "Historybook",
+      "credit": "Historybook - created by Resist 2 Exist & DonMuErte",
+      "logoAlt": "Historybook logo",
+      "coverAlt": "Historybook cover",
+      "open": "Open Historybook"
+    },
+    "guidehub": {
+      "title": "GuideHub",
+      "subtitle": "Průvodci a kalkulačky",
+      "logoAlt": "GuideHub logo",
+      "previewAlt": "GuideHub preview",
+      "open": "Otevřít GuideHub"
+    },
+    "sftools": {
+      "title": "SFTools",
+      "subtitle": "Tools & resources",
+      "previewAlt": "SFTools preview"
+    },
+    "taverndiscord": {
+      "title": "Tavern Discord",
+      "subtitle": "Community Discord",
+      "previewAlt": "Tavern Discord preview"
+    },
+    "discordBanner": {
+      "title": "JOIN OUR DISCORD",
+      "subtitle": "JOIN HERE",
+      "linkLabel": "Invite",
+      "linkValue": "discord.gg/2FqSvXC3",
+      "aria": "Open the SFDataHub Discord invite",
+      "logoAlt": "Discord logo"
+    },
+    "news": {
+      "title": "Komunitní novinky",
+      "empty": "Zatím žádné novinky.",
+      "emptyChannel": "V tomto kanálu nejsou žádné nové zprávy.",
+      "openOnDiscord": "Otevřít na Discordu",
+      "prev": "Předchozí kanál",
+      "next": "Další kanál"
+    },
+    "records": {
+      "title": "Nejnovější komunitní rekordy",
+      "subtitle": "Živý snapshot",
+      "fallbackTitle": "Oznámení rekordu",
+      "fallbackAuthor": "Discord",
+      "fallbackChannel": "Rekordy",
+      "previous": "Předchozí: {{holder}} • {{days}}d",
+      "daysLabel": "dní",
+      "empty": "Zatím žádná oznámení rekordů."
+    },
+    "youtube": {
+      "title": "YouTube",
+      "prev": "Previous video",
+      "next": "Next video",
+      "empty": "No videos"
+    },
+    "live": {
+      "title": "Právě živě",
+      "none": "Nikdo právě nevysílá.",
+      "open_on_twitch": "Otevřít na Twitchi",
+      "badge": "LIVE",
+      "viewers": "{{viewers}} diváků",
+      "prev": "Předchozí stream",
+      "next": "Další stream"
+    },
+    "schedule": {
+      "open": "Zobrazit streamovací plán",
+      "title": "Streamovací plán",
+      "close": "Zavřít",
+      "platform": "Platforma",
+      "platformAll": "Vše",
+      "platformTwitch": "Twitch",
+      "platformYouTube": "YouTube",
+      "search": "Hledat",
+      "searchPlaceholder": "Streamer / Název",
+      "today": "Jen dnes",
+      "columns": {
+        "weekday": "Den v týdnu",
+        "start": "Start (UTC)",
+        "end": "Konec (UTC)",
+        "timezone": "Časové pásmo",
+        "platform": "Platforma",
+        "channel": "URL kanálu",
+        "streamer": "Streamer",
+        "title": "Název"
+      },
+      "empty": "Zatím není plán.",
+      "link": "Link"
+    }
+  },
+  "sidebar": {
+    "navigation": "Navigace",
+    "categories": "Kategorie",
+    "login": "Přihlásit",
+    "logout": "Odhlásit",
+    "pin": "Připnout",
+    "unpin": "Odepnout",
+    "languagePreference": "Jazyk postranního panelu",
+    "languageSwitchEn": "Přepnout jazyk na angličtinu",
+    "languageSwitchDe": "Přepnout jazyk na němčinu",
+    "languageSwitchToLocale": "Přepnout jazyk na {{language}}",
+    "connectedCharacters": {
+      "title": "Propojené postavy",
+      "empty": "Zatím nejsou propojené žádné postavy. Propoj postavu v účtu, aby se tu zobrazila.",
+      "loginPrompt": "Pro zobrazení propojených postav se přihlas.",
+      "ctaGuest": "Otevřít úvodní průvodce",
+      "ctaAuthed": "Otevřít průvodce propojenými postavami",
+      "chip": {
+        "server": "Server",
+        "class": "Třída"
+      }
+    }
+  },
+  "account": {
+    "settings": {
+      "title": "Nastavení",
+      "subtitle": "Nastav si osobní preference.",
+      "loading": "Načítání nastavení...",
+      "error": "Nastavení se nepodařilo načíst.",
+      "retry": "Zkusit znovu",
+      "language": {
+        "label": "Preferovaný jazyk"
+      },
+      "defaultSection": {
+        "label": "Výchozí sekce"
+      },
+      "compactTables": {
+        "label": "Používat kompaktní rozložení tabulek"
+      },
+      "experimental": {
+        "label": "Povolit experimentální funkce"
+      },
+      "save": "Uložit nastavení",
+      "saved": "Nastavení uloženo.",
+      "noChanges": "Žádné změny k uložení.",
+      "saving": "Ukládání...",
+      "saveError": "Nastavení se nepodařilo uložit. Zkus to prosím znovu."
+    },
+    "tools": {
+      "title": "Tools settings",
+      "subtitle": "Configure how tools behave for your account.",
+      "loading": "Loading tools settings...",
+      "loadError": "Could not load tools settings.",
+      "defaultSet": {
+        "label": "Default set ID",
+        "placeholder": "Enter a default set ID"
+      },
+      "showIntro": {
+        "label": "Show tools intro"
+      },
+      "experimental": {
+        "label": "Enable experimental tools"
+      },
+      "save": {
+        "cta": "Save settings",
+        "saving": "Saving...",
+        "success": "Settings saved.",
+        "noChanges": "No changes to save.",
+        "error": "Could not save settings. Please try again."
+      }
+    },
+    "connectedCharacters": {
+      "title": "Connected characters",
+      "subtitle": "These game characters are linked to your SFDataHub account.",
+      "loading": "Refreshing characters...",
+      "empty": {
+        "title": "No characters linked yet",
+        "description": "Use the \"!connect char\" command in Discord to link your characters, then click \"Refresh\" here.",
+        "cta": "Click to learn how linking works"
+      },
+      "actions": {
+        "refresh": "Refresh",
+        "refreshing": "Refreshing...",
+        "unlink": "Disconnect character"
+      },
+      "confirmation": {
+        "title": "Are you sure you want to unlink this character?",
+        "cancel": "Cancel",
+        "confirm": "Yes, unlink",
+        "confirming": "Unlinking..."
+      },
+      "errors": {
+        "serviceUnavailable": "Auth service is not configured for unlinking.",
+        "unlink": "Could not unlink character."
+      },
+      "columns": {
+        "character": "Character",
+        "server": "Server",
+        "playerId": "Player ID",
+        "class": "Class",
+        "level": "Level",
+        "guild": "Guild",
+        "lastVerified": "Last linked",
+        "source": "Source",
+        "actions": "Actions"
+      },
+      "method": {
+        "discord": "Discord bot"
+      },
+      "help": {
+        "title": "How does linking work?",
+        "show": "Show",
+        "hide": "Hide",
+        "steps": {
+          "link": "Link a character via the Discord bot using the \"!connect char\" command.",
+          "verify": "We match the character to your latest verified scan; keep your game data up to date.",
+          "refresh": "After linking, click Refresh here to sync the latest characters from the auth service.",
+          "unlink": "You can unlink any character in the Actions column; the source column shows how it was linked."
+        },
+        "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
+      }
+    },
+    "loginOverlay": {
+      "modalAriaLabel": "Sign in",
+      "logoAlt": "SFDataHub logo",
+      "title": "Sign in",
+      "subtitle": "Choose a method to access SFDataHub.",
+      "discordCta": "Login with Discord",
+      "loading": "Checking session...",
+      "authedStatus": "You are logged in as {{name}}.",
+      "logout": "Logout",
+      "backToDashboard": "Back to dashboard",
+      "disclaimer": "We store only your SFDataHub user ID, display name, avatar, and roles to personalize your experience.",
+      "errors": {
+        "unknownHost": "unknown host",
+        "unauthorizedDomain": "This domain is not authorized for login. Please add \"{{host}}\" to your Firebase Auth authorized domains or use the correct environment.",
+        "popupBlocked": "The login popup was blocked. Please allow popups for this site or continue with the redirect flow.",
+        "popupClosed": "The login popup was closed before completing sign-in. Please try again.",
+        "default": "Login failed. Please try again.",
+        "codeLabel": "code"
+      }
+    },
+    "menu": {
+      "fallbackAuthedName": "Hráč",
+      "fallbackGuestName": "Host",
+      "loadingSession": "Kontroluji relaci...",
+      "loadingLoginStatus": "Kontroluji stav přihlášení",
+      "guestTitle": "Režim hosta",
+      "guestSubtitle": "Přihlásit přes Discord",
+      "guestHint": "Použij Discord nebo Google na přihlašovací stránce.",
+      "signInCta": "Přihlásit se",
+      "languageSettingsCta": "Nastavení jazyka",
+      "languageSettingsTitle": "Nastavení",
+      "languageSettingsSubtitle": "Vyber jazyk rozhraní.",
+      "languageFieldLabel": "Jazyk",
+      "languageSaving": "Ukládám jazyk...",
+      "languageSaveError": "Nastavení jazyka se nepodařilo uložit.",
+      "closeLanguageSettings": "Zavřít nastavení",
+      "signedInVia": "Přihlášen přes {{provider}}",
+      "providerGoogle": "Google",
+      "providerDiscord": "Discord",
+      "accountAndProfile": "Účet a profil",
+      "consolePanel": "Console Panel",
+      "logout": "Odhlásit"
+    }
+  },
+  "topbar": {
+    "quickAccess": "Rychlý přístup",
+    "upload": "Nahrát sken",
+    "officialGameSite": "Navštívit oficiální web hry",
+    "search": "Hledat /",
+    "settings": "Nastavení",
+    "profile": "Profil",
+    "signout": "Odhlásit se",
+    "notifications": "Oznámení",
+    "help": "Nápověda",
+    "theme": "Motiv",
+    "theme_light": "Světlý",
+    "theme_dark": "Tmavý",
+    "language": "Jazyk",
+    "lang_en": "English",
+    "lang_de": "Deutsch",
+    "lang_hu": "Hungarian",
+    "lang_cs": "Czech"
+  },
+  "toplistsPage": {
+    "errors": {
+      "noSnapshot": "Pro tento server zatím není snapshot.",
+      "firestore": "Chyba Firestore",
+      "decode": "Data se nepodařilo dekódovat",
+      "unexpectedLoad": "Neočekávaná chyba při načítání"
+    }
+  },
+  "toplists": {
+    "headerLabel": "Top žebříčky",
+    "compareMode": "Režim porovnání",
+    "compareMonth": "Progres od",
+    "compareMonths": "Porovnat měsíce",
+    "compareFrom": "Od",
+    "compareTo": "Do",
+    "compareOff": "Vypnuto",
+    "compareMissingSnapshot": "Chybí základní data pro {{key}}.",
+    "deltaNew": "NOVÉ",
+    "columns": {
+      "rank": "#",
+      "rankDelta": "Δ Rank",
+      "server": "Server",
+      "player": "Player",
+      "name": "Name",
+      "class": "Class",
+      "guild": "Guild",
+      "level": "Level",
+      "main": "Main",
+      "con": "Con",
+      "sum": "Sum",
+      "statsPerDay": "Stats/Day",
+      "ratio": "Ratio",
+      "mine": "Mine",
+      "treasury": "Treasury",
+      "lastScan": "Last Scan",
+      "hofRank": "HoF Rank",
+      "honor": "Honor",
+      "raids": "Raids",
+      "portal": "Portal",
+      "hydra": "Hydra",
+      "petLevel": "Pet Level",
+      "members": "Members",
+      "avgLevel": "Ø Level",
+      "avgMain": "Ø Main",
+      "avgCon": "Ø Con",
+      "avgSum": "Ø Sum"
+    },
+    "status": {
+      "noServerSelected": "Není vybraný server",
+      "loading": "Načítání...",
+      "error": "Chyba",
+      "ready": "Připraveno",
+      "rows": "řádků",
+      "updated": "Aktualizováno: {{value}}"
+    },
+    "table": {
+      "loading": "Načítání...",
+      "noResults": "Žádné výsledky"
+    },
+    "actions": {
+      "retry": "Zkusit znovu"
+    },
+    "players": {
+      "avgMode": {
+        "label": "Hodnoty",
+        "aria": "Režim průměru hráčů",
+        "base": "Základ",
+        "total": "Celkem",
+        "updating": "Aktualizace..."
+      },
+      "selectServerHint": "Vyber prosím alespoň jeden server.",
+      "scope": {
+        "summary": "Scope {{scopeId}} - {{changes}}/{{minChanges}} changes since last rebuild",
+        "autoRebuild": "Auto rebuild at {{minChanges}} changes or after {{maxAgeDays}} days",
+        "lastRebuild": "Last rebuild: {{value}}"
+      }
+    },
+    "guilds": {
+      "snapshotStatus": "Cechy - snapshoty (nejnovější)",
+      "avgMode": {
+        "label": "Hodnoty",
+        "aria": "Režim průměru cechů",
+        "base": "Základ",
+        "total": "Celkem",
+        "updating": "Aktualizace..."
+      }
+    },
+    "exportDialog": {
+      "title": "Export PNG",
+      "amount": "Množství",
+      "selection": "Výběr",
+      "currentView": "Aktuální pohled",
+      "guilds": "Cechy",
+      "guildsSummary": "Cechy: {{list}}",
+      "guildsPlaceholder": "Cechy: nic vybráno",
+      "guildsEmpty": "Žádné cechy k dispozici",
+      "range": {
+        "title": "Rozsah pořadí",
+        "enable": "Použít rozsah pořadí",
+        "from": "Od",
+        "to": "Do",
+        "max": "Max: {{count}}",
+        "oneBased": "Pořadí je od 1"
+      },
+      "cancel": "Zrušit",
+      "export": "Exportovat",
+      "exporting": "Exportuji..."
+    },
+    "filters": {
+      "showHud": "Zobrazit filtry",
+      "hideHud": "Skrýt filtry",
+      "sort": {
+        "label": "Řad.",
+        "aria": "Řazení",
+        "playerOptions": {
+          "main": "Main",
+          "mainTotal": "Main (Total)",
+          "constitution": "Constitution",
+          "conTotal": "Con (Total)",
+          "sum": "Base Stats",
+          "statsDay": "Stats/Day",
+          "sumTotal": "Sum Total",
+          "statsDayTotal": "Total Stats/day",
+          "level": "Level",
+          "mine": "Mine"
+        },
+        "guildOptions": {
+          "guildMembers": "Members",
+          "guildAvgLevel": "ø Lv",
+          "guildAvgMain": "ø Main",
+          "guildAvgCon": "ø Con",
+          "guildAvgSum": "ø Sum",
+          "guildRaids": "Raids",
+          "guildHydra": "Hydra"
+        }
+      },
+      "guilds": {
+        "label": "Cechy",
+        "placeholder": "Všechny cechy",
+        "empty": "V tomto snapshotu nejsou žádné cechy.",
+        "clear": "Vymazat",
+        "selected": "Vybráno: {{count}}"
+      }
+    }
+  },
+  "player": {
+    "profile": {
+      "cta": {
+        "showInToplist": "Zobrazit v Top žebříčku"
+      }
+    }
+  },
+  "playerProfile": {
+    "heroPanel": {
+      "actions": {
+        "favorite": {
+          "add": "Přidat do oblíbených",
+          "remove": "Odebrat z oblíbených"
+        },
+        "showInTopList": "Zobrazit v Top žebříčku",
+        "openPlayerProfile": "Otevřít profil hráče",
+        "openGuild": "Otevřít cech",
+        "share": "Sdílet",
+        "copyLink": "Kopírovat odkaz"
+      },
+      "tooltips": {
+        "lastScanAt": "Poslední sken: {{value}}",
+        "noGuildLinked": "V posledním skenu není připojen cech.",
+        "shareSystemShareSheet": "Systémové sdílení",
+        "age": {
+          "label": "Stáří: {{value}}",
+          "today": "dnes",
+          "oneDayAgo": "před 1 dnem",
+          "daysAgo": "před {{days}} dny"
+        }
+      },
+      "stats": {
+        "lastScan": "Poslední sken",
+        "level": "Úroveň",
+        "scrapbook": "Scrapbook",
+        "totalBaseStats": "Základní statistiky celkem",
+        "totalStats": "Statistiky celkem",
+        "mount": "Mount",
+        "honor": "Čest",
+        "guildRole": "Role v cechu",
+        "hof": "HoF",
+        "attributeBars": {
+          "baseStats": "Základní statistiky",
+          "totalStats": "Celkové statistiky",
+          "viewModeAriaLabel": "Zobrazení atributů",
+          "modeBase": "Základ",
+          "modeTotal": "Celkem",
+          "server": "Server",
+          "guild": "Cech",
+          "iconAlt": "{{name}} icon",
+          "attributes": {
+            "str": "Síla",
+            "dex": "Obratnost",
+            "int": "Inteligence",
+            "con": "Výdrž",
+            "lck": "Štěstí"
+          }
+        },
+        "potions": {
+          "ariaLabel": "Sloty lektvarů",
+          "activeLabel": "Aktivní lektvary:",
+          "slot1": "Lektvar 1",
+          "slot2": "Lektvar 2",
+          "slot3": "Lektvar 3",
+          "size": "Velikost"
+        }
+      },
+      "meta": {
+        "classUnknown": "Třída ?",
+        "lastScanned": "Naposledy skenováno"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Neznámé",
+            "hint": "Historie skenů není dostupná"
+          },
+          "scannedToday": {
+            "label": "Skenováno dnes",
+            "hint": "Není potřeba resken"
+          },
+          "veryFresh": {
+            "label": "Velmi čerstvé",
+            "hint": "Není potřeba resken"
+          },
+          "fresh": {
+            "label": "Čerstvé",
+            "hint": "Není potřeba resken"
+          },
+          "recent": {
+            "label": "Nedávné",
+            "hint": "Resken doporučen"
+          },
+          "aging": {
+            "label": "Stárnoucí",
+            "hint": "Resken doporučen"
+          },
+          "outdated": {
+            "label": "Zastaralé",
+            "hint": "Resken silně doporučen"
+          },
+          "stale": {
+            "label": "Velmi zastaralé",
+            "hint": "Resken silně doporučen"
+          }
+        }
+      },
+      "portrait": {
+        "canvasAriaLabel": "Portrét {{label}}",
+        "status": {
+          "idle": "Portrét se načítá...",
+          "loading": "Inicializuji PortraitMaker...",
+          "ready": "PortraitMaker připraven",
+          "error": "PortraitMaker se nepodařilo načíst"
+        }
+      }
+    },
+    "tabs": {
+      "ariaLabel": "Záložky profilu hráče",
+      "statistics": "Statistiky",
+      "progress": "Progres",
+      "compare": "Porovnání",
+      "history": "Historie"
+    },
+    "chartsTab": {
+      "sections": {
+        "coreProgress": "Core Progress",
+        "attributesBase": "Attributes (Base)",
+        "attributesTotals": "Attributes (Totals)",
+        "economy": "Economy",
+        "experience": "Experience"
+      },
+      "labels": {
+        "monthlyHistory": "Monthly history",
+        "latest": "{{metric}} (latest)",
+        "start": "{{metric}} (start)",
+        "scanAt": "Scan",
+        "avgMarker": "Line + Avg marker"
+      },
+      "metrics": {
+        "level": "Level",
+        "totalStats": "Total Stats",
+        "honor": "Honor",
+        "main": "Main",
+        "con": "Constitution (Con)",
+        "sum": "Sum",
+        "mainTotal": "Main Total",
+        "conTotal": "Con Total",
+        "sumTotal": "Sum Total",
+        "mine": "Mine",
+        "treasury": "Treasury",
+        "xpTotal": "XP Total",
+        "xpProgress": "XP Progress"
+      }
+    },
+    "statsTab": {
+      "common": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "combat": {
+        "title": "Combat Snapshot",
+        "armor": "Armor",
+        "health": "Health",
+        "damageMin": "Damage Min",
+        "damageMax": "Damage Max",
+        "damageAvg": "Damage Avg",
+        "weaponDamageMultiplier": "Weapon Damage Multiplier",
+        "maximumDamageReduction": "Max Damage Reduction"
+      },
+      "potions": {
+        "title": "Potions & Active Effects",
+        "slot1": "Potion 1",
+        "slot2": "Potion 2",
+        "slot3": "Potion 3",
+        "size": "Size",
+        "lifePotion": "Life Potion"
+      },
+      "attrComposition": {
+        "title": "Attribute Composition",
+        "subtitle": "Stacked contribution breakdown from latest.values",
+        "bonus": "Bonus",
+        "attributes": {
+          "str": "Strength",
+          "dex": "Dexterity",
+          "int": "Intelligence",
+          "con": "Constitution",
+          "lck": "Luck"
+        },
+        "breakdown": {
+          "base": "Base",
+          "baseItems": "Base Items",
+          "upgrades": "Upgrades",
+          "equipment": "Equipment",
+          "gems": "Gems",
+          "pet": "Pet Bonus",
+          "potion": "Potion",
+          "items": "Items",
+          "petBonus": "Pet Count",
+          "other": "Other"
+        }
+      },
+      "runesResists": {
+        "title": "Runes & Resistances"
+      },
+      "runes": {
+        "title": "Runes",
+        "gold": "Rune Gold",
+        "xp": "Rune XP",
+        "chance": "Rune Chance",
+        "quality": "Rune Item Quality",
+        "health": "Rune Health",
+        "damage": "Rune Damage",
+        "resist": "Rune Resist"
+      },
+      "resistances": {
+        "title": "Resistances",
+        "elementalDamage": "Elemental Damage",
+        "fire": "Fire Resist",
+        "cold": "Cold Resist",
+        "lightning": "Lightning Resist",
+        "fireDamage": "Fire Damage",
+        "coldDamage": "Cold Damage",
+        "lightningDamage": "Lightning Damage"
+      },
+      "fortress": {
+        "title": "Fortress Matrix",
+        "guide": "Guide",
+        "guideFortress": "Open fortress guide",
+        "guideBuilding": "Guide for {{building}}",
+        "groups": {
+          "economy": "Economy",
+          "combat": "Combat",
+          "utility": "Utility"
+        },
+        "labels": {
+          "fortress": "Fortress",
+          "upgrades": "Upgrades",
+          "fortifications": "Fortifications",
+          "wall": "Wall",
+          "space": "Space",
+          "quarters": "Quarters",
+          "portal": "Portal",
+          "woodcutter": "Woodcutter",
+          "quarry": "Quarry",
+          "gemMine": "Gem Mine",
+          "academy": "Academy",
+          "smithy": "Smithy",
+          "treasury": "Treasury",
+          "barracks": "Barracks",
+          "mageTower": "Mage Tower",
+          "archeryGuild": "Archery Guild",
+          "rank": "Fortress Rank",
+          "honor": "Fortress Honor"
+        }
+      },
+      "guild": {
+        "title": "Guild Meta",
+        "guild": "Guild",
+        "guildIdentifier": "Guild Identifier",
+        "role": "Role",
+        "joined": "Guild Joined",
+        "portal": "Guild Portal"
+      },
+      "progress": {
+        "title": "Raids & XP",
+        "raidsSection": "Raids",
+        "xpSection": "XP",
+        "raids": "Raids",
+        "raidHonor": "Raid Honor",
+        "raidWood": "Raid Wood",
+        "raidStone": "Raid Stone",
+        "xp": "XP",
+        "xpRequired": "XP Required",
+        "xpTotal": "XP Total"
+      },
+      "badges": {
+        "title": "Milestones",
+        "fortressLevel": "Fortress L{{level}}",
+        "fortressMaxed": "Fortress Maxed",
+        "runesEconomy": "Economy Runes",
+        "runesCombat": "Combat Runes",
+        "resists": "Elemental Resists",
+        "potions": "Potion Trio",
+        "raider": "Raider: {{value}}"
+      },
+      "advanced": {
+        "title": "Advanced"
+      }
+    }
+  },
+  "profile": {
+    "overlay": {
+      "heroActions": {
+        "openPlayerProfile": "Otevřít profil hráče",
+        "openGuild": "Otevřít cech",
+        "share": "Sdílet",
+        "copyLink": "Kopírovat odkaz"
+      }
+    },
+    "public": {
+      "title": "Veřejný profil",
+      "subtitle": "Pouze pro čtení: identita SFDataHub",
+      "identity": {
+        "profileIdLabel": "ID profilu",
+        "unknownValue": "Neznámé",
+        "lastScanLabel": "Poslední sken",
+        "lastScanToday": "dnes",
+        "daysAgoSuffix": "dní zpět",
+        "dateUnknown": "Není k dispozici",
+        "mainCharacterLabel": "Hlavní postava",
+        "levelShort": "Lv.",
+        "serverLabel": "Server",
+        "guildLabel": "Cech",
+        "portraitPlaceholder": "Zástupný portrét"
+      },
+      "bio": {
+        "title": "O tomto hráči",
+        "empty": "Tento hráč zatím nemá bio.",
+        "languagesLabel": "Jazyky",
+        "rolesLabel": "Role"
+      },
+      "showcase": {
+        "title": "Přehlídka postav",
+        "subtitle": "Kurátovaný roster z posledních ověřených skenů",
+        "empty": "Zatím nejsou vybrané žádné postavy do přehlídky.",
+        "scrapbookLabel": "Scrapbook",
+        "highlightLabel": "Highlight",
+        "tags": {
+          "main": "Main",
+          "alt": "Alt",
+          "archive": "Archive",
+          "event": "Event"
+        }
+      },
+      "stats": {
+        "title": "Aktivita SFDataHub",
+        "totalScans": "Skenů celkem",
+        "uniquePlayers": "Unikátní hráči",
+        "uniqueGuilds": "Unikátní cechy",
+        "last30d": "Skeny (30d)",
+        "topServersLabel": "Top servery",
+        "firstScanLabel": "První sken",
+        "empty": "Zatím nejsou dostupná data skenů."
+      },
+      "records": {
+        "title": "Rekordy a milníky",
+        "empty": "Zatím nejsou zapsány žádné rekordy ani milníky",
+        "type": {
+          "record": "Rekord",
+          "milestone": "Milník"
+        }
+      },
+      "achievements": {
+        "title": "Úspěchy a odznaky",
+        "highlights": "Hlavní úspěchy",
+        "empty": "Zatím nebyly odemčeny žádné úspěchy",
+        "tiers": {
+          "gold": "Zlato",
+          "silver": "Stříbro",
+          "bronze": "Bronz"
+        }
+      },
+      "roles": {
+        "guildleader": "Vůdce cechu",
+        "tryhard": "Tryhard"
+      }
+    }
+  },
+  "guildProfile": {
+    "heroPanel": {
+      "actions": {
+        "openGuild": "Otevřít cech",
+        "share": "Sdílet",
+        "copyLink": "Kopírovat odkaz"
+      },
+      "tooltips": {
+        "lastScanAt": "Poslední sken: {{value}}",
+        "age": {
+          "label": "Stáří: {{value}}",
+          "today": "dnes",
+          "oneDayAgo": "před 1 dnem",
+          "daysAgo": "před {{days}} dny"
+        }
+      },
+      "meta": {
+        "server": "Server",
+        "members": "Členové",
+        "hofRank": "HoF pořadí",
+        "lastScanned": "Naposledy skenováno"
+      },
+      "states": {
+        "freshness": {
+          "unknown": {
+            "label": "Neznámé",
+            "hint": "Historie skenů není dostupná"
+          },
+          "scannedToday": {
+            "label": "Skenováno dnes",
+            "hint": "Není potřeba resken"
+          },
+          "veryFresh": {
+            "label": "Velmi čerstvé",
+            "hint": "Není potřeba resken"
+          },
+          "fresh": {
+            "label": "Čerstvé",
+            "hint": "Není potřeba resken"
+          },
+          "recent": {
+            "label": "Nedávné",
+            "hint": "Resken doporučen"
+          },
+          "aging": {
+            "label": "Stárnoucí",
+            "hint": "Resken doporučen"
+          },
+          "outdated": {
+            "label": "Zastaralé",
+            "hint": "Resken silně doporučen"
+          },
+          "stale": {
+            "label": "Velmi zastaralé",
+            "hint": "Resken silně doporučen"
+          }
+        }
+      },
+      "sections": {
+        "guildOverview": "Přehled cechu",
+        "averagePlayerStats": "Průměrné statistiky hráčů",
+        "modeToggle": "Základ nebo Celkem",
+        "base": "Základ",
+        "total": "Celkem",
+        "classOverview": "Přehled tříd",
+        "classDistribution": "Rozložení tříd"
+      },
+      "metrics": {
+        "activity": "Aktivita",
+        "placeholder2": "Připravenost",
+        "placeholder3": "Základní statistiky celkem",
+        "placeholderHint": "Data čekají"
+      },
+      "top3": {
+        "mainAttribute": "Hlavní atribut Top 3",
+        "con": "Con Top 3",
+        "sum": "Součet Top 3",
+        "total": "Celkem Top 3",
+        "rankLabel": "Pořadí {{rank}}"
+      },
+      "statsLabels": {
+        "main": "Hlavní",
+        "con": "Con",
+        "sum": "Součet",
+        "total": "Celkem"
+      },
+      "transfers": {
+        "title": "Přestupy",
+        "joined": "Připojeni",
+        "left": "Odešli",
+        "noMonthlyComparison": "Měsíční porovnávací snapshot není dostupný",
+        "empty": "Žádné změny",
+        "levelShort": "Lv"
+      }
+    }
+  },
+  "help": {
+    "title": "Nápověda a přehled",
+    "subtitle": "Rychlý průvodce SFDataHub",
+    "hero": {
+      "eyebrow": "Úvodní průvodce",
+      "heading": "Vítej na SFDataHub",
+      "lead": "Zjisti, co můžeš dělat, jak funguje čerstvost dat a kde najdeš nastavení nebo právní informace.",
+      "freshnessLabel": "Čerstvost dat",
+      "freshnessBody": "Data se pravidelně aktualizují. Přesný čas skenu uvidíš přímo v žebříčcích a profilech."
+    },
+    "dataFreshness": {
+      "title": "Jak aktuální jsou data?",
+      "body": "SFDataHub relies on community scans. Some servers (for example many EU servers) are scanned roughly once per month by us and a few helpers – depending on our free time. Other servers (for example fusion servers) are scanned by other community projects and may have longer gaps between scans.\n\nThis means there can be several weeks or even months between two scans. You can always see the exact data age from the \"Last scan: …\" hint in top lists and profiles.\n\nIf you want your own profile to be more up to date, you can link your SFDataHub account and upload your own scans. That way you keep your profile fresh and help the overall database stay more current for the whole community."
+    },
+    "sections": {
+      "intro": {
+        "title": "Co je SFDataHub?",
+        "body1": "SFDataHub is a community project around Shakes & Fidget.",
+        "body2": "You can analyse scan data, browse top lists, and open detailed player and guild profiles. The goal: a quick overview of progress, rankings, and development â€“ without any official connection to Playa Games."
+      },
+      "actions": {
+        "title": "Co můžu na SFDataHub dělat?",
+        "items": {
+          "toplists": "Browse top lists: compare players and guilds by level or other metrics.",
+          "profiles": "Open profiles: view detailed player and guild profiles with extra information.",
+          "guides": "Read guides: use guides and tips to plan your progress.",
+          "tools": "Use tools & calculators: run interactive tools such as a dungeon XP calculator."
+        }
+      },
+      "freshness": {
+        "title": "Jak aktuální jsou data?",
+        "body1": "SFDataHub is based on scans uploaded or linked by the community.",
+        "body2": "Next to many values youâ€™ll find the time of the last scan (for example â€œLast scan: 2025-12-01â€).",
+        "body3": "Top lists and profiles are updated regularly. If an entry hasnâ€™t been scanned for a while, the displayed values might differ from the current state in the game."
+      },
+      "login": {
+        "title": "Přihlášení a nastavení",
+        "body1": "You can log in with your Discord account to unlock additional features.",
+        "body2": "After logging in youâ€™ll see your profile menu with avatar and name in the header.",
+        "body3": "In the settings you can adjust basic options for your SFDataHub account.",
+        "body4": "Settings are only relevant for logged-in users â€“ without an account thereâ€™s nothing to configure."
+      },
+      "legal": {
+        "title": "Nápověda, feedback a právní informace",
+        "body1": "If you notice bugs, strange data, or have ideas for new features, weâ€™re happy to hear from you.",
+        "body2": "You can find contact options and more information on the contact or imprint page.",
+        "body3": "For legal details please use the linked pages:",
+        "items": {
+          "tos": "Terms of Service (ToS)",
+          "privacy": "Privacy Policy",
+          "imprint": "Imprint / Contact"
+        }
+      }
+    }
+  },
+  "search": {
+    "placeholder": "Hledat hráče",
+    "inputLabel": "Hledat hráče, cechy a servery",
+    "loading": "Načítání...",
+    "recents": "Nedávná hledání",
+    "minCharsHint": "Zadej alespoň 3 znaky...",
+    "noResults": "Žádné výsledky",
+    "players": "Hráči",
+    "guilds": "Cechy",
+    "servers": "Servery",
+    "active": "Aktivní",
+    "inactive": "Neaktivní",
+    "guildMembers": "{{count}} členů",
+    "guildMembersUnknown": "Členové ?",
+    "moreResults": "Další výsledky... stiskni Enter",
+    "recentLabel": "Nedávné"
+  },
+  "footer": {
+    "about": {
+      "title": "O SFDataHub",
+      "body": "SFDataHub is a non-commercial fan and community project around Shakes & Fidget. It has no official connection to Playa Games GmbH or the operators of Shakes & Fidget.\n\nAll mentioned brands, logos and graphics are the property of their respective owners and are used for identification purposes only."
+    },
+    "shortDisclaimer": "SFDataHub je neoficiální nekomerční fan projekt. Všechny ochranné známky a obrázky patří jejich vlastníkům.",
+    "copyright": "© 2025 SFDataHub – komunitní projekt kolem Shakes & Fidget."
+  }
+}

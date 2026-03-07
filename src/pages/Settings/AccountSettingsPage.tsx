@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import ContentShell from "../../components/ContentShell";
 import AccountConnectedCharactersTab from "../../components/account/AccountConnectedCharactersTab";
 import { useAuth } from "../../context/AuthContext";
+import { useLocalePreferences } from "../../context/LocalePreferencesContext";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
 import { getUserSettings, updateUserSettings, type UserSettings } from "../../lib/user/settings";
 import { getUserToolsSettings, saveUserToolsSettings, type UserToolsSettings } from "../../lib/user/toolsSettings";
@@ -27,7 +28,13 @@ const AccountSettingsPage: React.FC = () => {
   const { status, user, logout, refreshSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const {
+    activeLocale,
+    preferredSecondaryLocale,
+    localeOptions,
+    applySettingsLocaleSelection,
+  } = useLocalePreferences();
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loadedSettings, setLoadedSettings] = useState<UserSettings | null>(null);
@@ -51,12 +58,13 @@ const AccountSettingsPage: React.FC = () => {
 
   const defaultSettings: UserSettings = useMemo(
     () => ({
-      language: i18n.language === "de" ? "de" : "en",
+      language: activeLocale,
+      preferredSecondaryLocale,
       defaultSection: "home",
       compactTables: false,
       showExperimentalFeatures: false,
     }),
-    [i18n.language],
+    [activeLocale, preferredSecondaryLocale],
   );
 
   useEffect(() => {
@@ -285,8 +293,16 @@ const AccountSettingsPage: React.FC = () => {
     try {
       setSavingSettings(true);
       setSettingsError(null);
-      await updateUserSettings(uid, settings);
-      setLoadedSettings(settings);
+      const selectedLanguage = settings.language ?? defaultSettings.language ?? activeLocale;
+      const nextLocaleState = await applySettingsLocaleSelection(selectedLanguage, { persist: false });
+      const nextSettings: UserSettings = {
+        ...settings,
+        language: nextLocaleState.activeLocale,
+        preferredSecondaryLocale: nextLocaleState.preferredSecondaryLocale,
+      };
+      await updateUserSettings(uid, nextSettings);
+      setSettings(nextSettings);
+      setLoadedSettings(nextSettings);
       setSaveSuccess(true);
     } catch (error) {
       setSettingsError(t("account.settings.saveError", "Could not save settings. Please try again."));
@@ -366,8 +382,11 @@ const AccountSettingsPage: React.FC = () => {
               value={settings.language ?? defaultSettings.language}
               onChange={(event) => handleSettingsChange("language", event.target.value as UserSettings["language"])}
             >
-              <option value="en">{t("topbar.lang_en", "English")}</option>
-              <option value="de">{t("topbar.lang_de", "Deutsch")}</option>
+              {localeOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {t(option.labelKey, { defaultValue: option.defaultLabel })}
+                </option>
+              ))}
             </select>
           </div>
 

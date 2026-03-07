@@ -1,8 +1,10 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import type { LocaleCode } from "../i18n/localePreferences";
 
 export interface UserSettings {
-  language?: "en" | "de";
+  language?: LocaleCode;
+  preferredSecondaryLocale?: LocaleCode;
   defaultSection?: "home" | "toplists" | "guilds" | "tools" | "community";
   compactTables?: boolean;
   showExperimentalFeatures?: boolean;

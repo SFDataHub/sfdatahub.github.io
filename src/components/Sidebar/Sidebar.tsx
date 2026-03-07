@@ -554,31 +554,30 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className={`${styles.footer} ${styles.segCard} ${styles.mainNavCard}`}>
-        <div className={styles.footerActionsRow}>
-          <button className={`${styles.login} ${styles.footerPrimaryAction}`} type="button" onClick={handleFooterClick}>
-            <Shield className="ico" />
-            <AnimatedLabel
-              text={isAuthed ? t("sidebar.logout", { defaultValue: "Logout" }) : t("sidebar.login", { defaultValue: "Login" })}
-              isOpen={!collapsed}
-            />
-          </button>
-          <NavLink
-            to="/help"
-            className={styles.footerHelpIcon}
-            onClick={onNavigate}
-            aria-label={t("nav.help", { defaultValue: "Help" })}
-            title={t("nav.help", { defaultValue: "Help" })}
-          >
-            <Info className="ico" />
-          </NavLink>
-        </div>
+        <button className={styles.login} type="button" onClick={handleFooterClick}>
+          <Shield className="ico" />
+          <AnimatedLabel
+            text={isAuthed ? t("sidebar.logout", { defaultValue: "Logout" }) : t("sidebar.login", { defaultValue: "Login" })}
+            isOpen={!collapsed}
+          />
+        </button>
         {isAuthed && user?.displayName ? (
           <div className={styles.userMeta} title={user.displayName}>
             {user.displayName}
           </div>
         ) : null}
         <div className={styles.footerRow}>
-          <div className={styles.footerRowCell} aria-hidden="true" />
+          <div className={styles.footerRowCell}>
+            <NavLink
+              to="/help"
+              className={`${styles.footerHelpIcon} ${styles.footerRowHelpIcon}`}
+              onClick={onNavigate}
+              aria-label={t("nav.help", { defaultValue: "Help" })}
+              title={t("nav.help", { defaultValue: "Help" })}
+            >
+              <Info className="ico" />
+            </NavLink>
+          </div>
           <div className={styles.footerRowCell}>
             <SidebarLanguageSwitch />
           </div>
