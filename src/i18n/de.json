@@ -442,6 +442,7 @@
       "title": "Anmelden",
       "subtitle": "Wähle eine Methode, um auf SFDataHub zuzugreifen.",
       "discordCta": "Mit Discord anmelden",
+      "rememberMeCta": "Stay signed in for 14 days",
       "loading": "Sitzung wird geprüft...",
       "authedStatus": "Du bist als {{name}} angemeldet.",
       "logout": "Abmelden",

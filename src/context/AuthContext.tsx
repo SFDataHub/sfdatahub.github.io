@@ -35,7 +35,7 @@ type AuthContextValue = {
     options?: { name?: string | null; class?: string | null; className?: string | null },
   ) => Promise<{ isFavorite: boolean }>;
   toggleFavoriteGuild: (identifier: string) => Promise<{ isFavorite: boolean }>;
-  loginWithDiscord: () => Promise<void>;
+  loginWithDiscord: (options?: { rememberMe?: boolean }) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: (options?: RefreshOptions) => Promise<boolean>;
@@ -345,7 +345,13 @@ const createNonce = () => {
   return Math.random().toString(36).slice(2, 14);
 };
 
-const buildAuthLoginUrl = (provider: ProviderName, options?: { mode?: "popup"; nonce?: string }) => {
+type LoginUrlOptions = {
+  mode?: "popup";
+  nonce?: string;
+  rememberMe?: boolean;
+};
+
+const buildAuthLoginUrl = (provider: ProviderName, options?: LoginUrlOptions) => {
   if (!AUTH_BASE_URL) return "";
   try {
     const url = new URL(`${AUTH_BASE_URL}/auth/${provider}/login`);
@@ -354,6 +360,9 @@ const buildAuthLoginUrl = (provider: ProviderName, options?: { mode?: "popup"; n
     }
     if (options?.nonce) {
       url.searchParams.set("nonce", options.nonce);
+    }
+    if (options?.rememberMe === true) {
+      url.searchParams.set("rememberMe", "true");
     }
     return url.toString();
   } catch (error) {
@@ -700,12 +709,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })();
   }, [runFavoritesPlayersV2Migration, user]);
 
-  const startRedirectLogin = useCallback((provider: ProviderName) => {
+  const startRedirectLogin = useCallback((provider: ProviderName, options?: Pick<LoginUrlOptions, "rememberMe">) => {
     if (!AUTH_BASE_URL) {
       console.warn(`[Auth] Cannot initiate ${provider} login without AUTH_BASE_URL.`);
       return;
     }
-    window.location.href = buildAuthLoginUrl(provider);
+    window.location.href = buildAuthLoginUrl(provider, options);
   }, []);
 
   type PopupAuthResult = {
@@ -798,7 +807,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return attempt();
   }, [fetchSession]);
 
-  const loginWithDiscord = useCallback(async () => {
+  const loginWithDiscord = useCallback(async (options?: { rememberMe?: boolean }) => {
     if (discordLoginInFlight.current) {
       logAuthDebug("[Auth] Discord login already in-flight, ignoring new request");
       return;
@@ -807,7 +816,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     discordPopupMessageReceived.current = false;
     const origin = typeof window !== "undefined" ? window.location.origin : "N/A";
     const host = typeof window !== "undefined" ? window.location.host : "N/A";
-    logAuthDebug("[Auth] Starting Discord auth-api popup login", { origin, host });
+    const rememberMe = options?.rememberMe === true;
+    logAuthDebug("[Auth] Starting Discord auth-api popup login", { origin, host, rememberMe });
 
     const nonce = createNonce();
     try {
@@ -816,7 +826,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn("[Auth] Failed to persist popup nonce", error);
     }
 
-    const popupUrl = buildAuthLoginUrl("discord", { mode: "popup", nonce });
+    const popupUrl = buildAuthLoginUrl("discord", { mode: "popup", nonce, rememberMe });
     if (!popupUrl) {
       console.warn("[Auth] Missing AUTH_BASE_URL for Discord login.");
       return;
@@ -835,7 +845,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // ignore
       }
-      startRedirectLogin("discord");
+      startRedirectLogin("discord", { rememberMe });
       discordLoginInFlight.current = false;
       return;
     }
@@ -850,7 +860,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const sessionOk = await waitForSessionReady();
         if (!sessionOk) {
           logAuthDebug("[Auth] Popup login completed but session missing, redirecting for sync");
-          startRedirectLogin("discord");
+          startRedirectLogin("discord", { rememberMe });
         }
       }
     } catch (error: any) {
@@ -858,7 +868,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         code: error?.code,
         message: error?.message,
       });
-      startRedirectLogin("discord");
+      startRedirectLogin("discord", { rememberMe });
     } finally {
       try {
         window.sessionStorage?.removeItem(AUTH_POPUP_NONCE_KEY);

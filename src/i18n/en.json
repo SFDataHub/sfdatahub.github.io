@@ -442,6 +442,7 @@
       "title": "Sign in",
       "subtitle": "Choose a method to access SFDataHub.",
       "discordCta": "Login with Discord",
+      "rememberMeCta": "Stay signed in for 14 days",
       "loading": "Checking session...",
       "authedStatus": "You are logged in as {{name}}.",
       "logout": "Logout",

@@ -23,10 +23,15 @@ import {
 } from "../lib/favorites";
 import { createFirebaseCustomToken } from "../lib/firebaseAuth";
 import {
+  buildClearRefreshCookie,
   buildClearSessionCookie,
+  buildRefreshCookie,
   buildSessionCookie,
+  createRefreshToken,
   createSessionToken,
+  REFRESH_COOKIE_NAME,
   SESSION_COOKIE_NAME,
+  verifyRefreshToken,
   verifySessionToken,
 } from "../session";
 import { ensureUser } from "../users";
@@ -41,6 +46,7 @@ type StatePayload = {
   redirect?: string;
   mode?: "popup";
   nonce?: string;
+  rememberMe?: boolean;
 };
 
 const frontendHost = (() => {
@@ -91,10 +97,17 @@ const decodeState = (raw: string): StatePayload | null => {
       redirect: typeof parsed.redirect === "string" ? parsed.redirect : undefined,
       mode: parsed.mode === "popup" ? "popup" : undefined,
       nonce: typeof parsed.nonce === "string" ? parsed.nonce : undefined,
+      rememberMe: parsed.rememberMe === true,
     };
   } catch {
     return null;
   }
+};
+
+const parseRememberMe = (value: unknown): boolean => {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 };
 
 const buildAccountRedirectUrl = (params: Record<string, string>) => {
@@ -412,8 +425,29 @@ authRouter.patch("/me/favorites", async (req, res) => {
   }
 });
 
-authRouter.post("/logout", (req, res) => {
-  res.setHeader("Set-Cookie", buildClearSessionCookie());
+authRouter.post("/refresh", (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  if (!refreshToken) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const refreshPayload = verifyRefreshToken(refreshToken);
+  if (!refreshPayload) {
+    res.setHeader("Set-Cookie", [buildClearSessionCookie(), buildClearRefreshCookie()]);
+    return res.status(401).json({ error: "Invalid refresh token" });
+  }
+
+  const sessionToken = createSessionToken({
+    userId: refreshPayload.userId,
+    roles: refreshPayload.roles,
+  });
+
+  res.setHeader("Set-Cookie", buildSessionCookie(sessionToken));
+  return res.json({ ok: true });
+});
+
+authRouter.post("/logout", (_req, res) => {
+  res.setHeader("Set-Cookie", [buildClearSessionCookie(), buildClearRefreshCookie()]);
   return res.json({ ok: true });
 });
 
@@ -425,7 +459,11 @@ authRouter.get("/discord/login", (req, res) => {
   const safeRedirect = getSafeRedirect(typeof req.query.redirect === "string" ? req.query.redirect : undefined);
   const mode = req.query.mode === "popup" ? "popup" : undefined;
   const nonce = typeof req.query.nonce === "string" ? req.query.nonce : undefined;
-  const statePayload: StatePayload = { id: randomUUID(), redirect: safeRedirect, mode, nonce };
+  const rawRememberMe = Array.isArray(req.query.rememberMe)
+    ? req.query.rememberMe[0]
+    : req.query.rememberMe;
+  const rememberMe = parseRememberMe(rawRememberMe);
+  const statePayload: StatePayload = { id: randomUUID(), redirect: safeRedirect, mode, nonce, rememberMe };
   const state = encodeState(statePayload);
   const authorizeUrl = new URL("https://discord.com/oauth2/authorize");
   authorizeUrl.searchParams.set("client_id", DISCORD_CLIENT_ID);
@@ -517,8 +555,14 @@ authRouter.get("/discord/callback", async (req, res) => {
       id: userDoc.userId,
       roles: userDoc.roles,
     });
+    const rememberMe = decodedState?.rememberMe === true;
     const sessionToken = createSessionToken(userDoc);
-    const cookies = [buildSessionCookie(sessionToken), clearStateCookie()];
+    const refreshToken = createRefreshToken(userDoc, rememberMe);
+    const cookies = [
+      buildSessionCookie(sessionToken),
+      buildRefreshCookie(refreshToken, rememberMe),
+      clearStateCookie(),
+    ];
 
     res.setHeader("Set-Cookie", cookies);
     const redirectUrl =
