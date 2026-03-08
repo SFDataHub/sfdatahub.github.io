@@ -267,6 +267,7 @@
       "title": "Bejelentkezés",
       "subtitle": "Válassz módszert a SFDataHub eléréséhez.",
       "discordCta": "Bejelentkezés Discorddal",
+      "rememberMeCta": "Stay signed in for 14 days",
       "loading": "Munkamenet ellenőrzése...",
       "authedStatus": "Bejelentkezve mint {{name}}.",
       "logout": "Kijelentkezés",

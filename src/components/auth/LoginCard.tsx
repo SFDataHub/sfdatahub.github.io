@@ -11,6 +11,7 @@ const LoginCard: React.FC = () => {
   const navigate = useNavigate();
   const { status, user, loginWithDiscord, logout } = useAuth();
   const [authError, setAuthError] = React.useState<{ code?: string; message: string } | null>(null);
+  const [rememberMe, setRememberMe] = React.useState(false);
 
   const isLoading = status === "loading" || status === "idle";
   const isAuthenticated = status === "authenticated" && !!user;
@@ -42,7 +43,7 @@ const LoginCard: React.FC = () => {
     if (isLoading) return;
     setAuthError(null);
     try {
-      await loginWithDiscord();
+      await loginWithDiscord({ rememberMe });
     } catch (error: any) {
       const code = typeof error?.code === "string" ? error.code : undefined;
       const message = typeof error?.message === "string" ? error.message : undefined;
@@ -84,6 +85,16 @@ const LoginCard: React.FC = () => {
   } else {
     body = (
       <div className={styles.buttonStack}>
+        <label className={styles.rememberOption}>
+          <input
+            className={styles.rememberCheckbox}
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+            disabled={isLoading}
+          />
+          <span>{t("account.loginOverlay.rememberMeCta")}</span>
+        </label>
         <button
           className={`${styles.providerButton} ${styles.discord}`}
           type="button"
