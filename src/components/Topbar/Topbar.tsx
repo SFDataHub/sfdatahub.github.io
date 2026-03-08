@@ -4,6 +4,7 @@ import { AlertCircle, Bell, CheckCircle2, Globe, Loader2, Search, Star, StarOff,
 import { useTranslation } from "react-i18next";
 import styles from "./Topbar.module.css";
 import AccountMenu from "./AccountMenu";
+import TopbarFavoritesOverlay, { type TopbarFavoritePlayer } from "./TopbarFavoritesOverlay";
 
 /** Upload-Center */
 import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
@@ -11,6 +12,7 @@ import { useUploadCenter } from "../UploadCenter/UploadCenterContext";
 /** Neue Suche */
 import UniversalSearch from "../search/UniversalSearch";
 import { useNotifications } from "../../context/NotificationsContext";
+import { useAuth } from "../../context/AuthContext";
 
 /** Klassen-Icons / Mapping */
 import { getClassIconUrl } from "../ui/shared/classIcons";
@@ -28,9 +30,16 @@ function getClassIcon(className?: string | null, size?: number): string | undefi
   return getClassIconUrl(className, size);
 }
 
+function getServerFromFavoriteIdentifier(identifier: string): string {
+  const splitIndex = identifier.indexOf("_p");
+  if (splitIndex <= 0) return identifier;
+  return identifier.slice(0, splitIndex);
+}
+
 export default function Topbar({ user }: { user?: { name: string; role?: string } }) {
   const { open, canUse } = useUploadCenter();
   const { isVisibleInTopbar } = useFeatureAccess();
+  const { user: authUser, toggleFavoritePlayer } = useAuth();
   const { t } = useTranslation();
   const [isMobile, setIsMobile] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -45,6 +54,10 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
   const { jobs, activityEvents, hasUnread, hasRunning, markAllRead, cleanupExpired } = useNotifications();
   const notificationRootRef = React.useRef<HTMLDivElement | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
+  const [isFavoritesOpen, setIsFavoritesOpen] = React.useState(false);
+  const [favoriteRemoveBusyByIdentifier, setFavoriteRemoveBusyByIdentifier] = React.useState<Record<string, boolean>>(
+    {},
+  );
   const showNotificationBadge = hasUnread || hasRunning;
   const notificationJobs = React.useMemo(
     () => [...jobs].sort((left, right) => right.updatedAt - left.updatedAt),
@@ -54,6 +67,26 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
     () => [...activityEvents].sort((left, right) => right.createdAtMs - left.createdAtMs),
     [activityEvents],
   );
+  const favoritePlayers = React.useMemo<TopbarFavoritePlayer[]>(() => {
+    const players = authUser?.favorites?.players ?? {};
+    const rows = Object.entries(players)
+      .map(([rawIdentifier, value]) => {
+        const identifier = rawIdentifier.trim().toLowerCase();
+        if (!identifier) return null;
+        const rawMeta =
+          value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+        const name = typeof rawMeta?.name === "string" && rawMeta.name.trim() ? rawMeta.name.trim() : identifier;
+        const className = typeof rawMeta?.class === "string" ? rawMeta.class.trim() : "";
+        return {
+          identifier,
+          name,
+          className,
+          server: getServerFromFavoriteIdentifier(identifier),
+        };
+      })
+      .filter((entry): entry is TopbarFavoritePlayer => !!entry);
+    return rows.sort((left, right) => left.name.localeCompare(right.name));
+  }, [authUser?.favorites?.players]);
 
   const onUploadClick = () => {
     open({ tab: "json" });
@@ -126,6 +159,11 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
     };
   }, [isNotificationsOpen]);
 
+  React.useEffect(() => {
+    if (authUser) return;
+    setIsFavoritesOpen(false);
+  }, [authUser]);
+
   const toggleNotifications = React.useCallback(() => {
     setIsNotificationsOpen((prev) => {
       const next = !prev;
@@ -144,6 +182,49 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
     if (diffMinutes === 1) return "1 min ago";
     return `${diffMinutes} min ago`;
   }, []);
+
+  const openFavorites = React.useCallback(() => {
+    if (!authUser) {
+      const message = t("profile.favorite.authRequired", { defaultValue: "Sign in to use favorites." });
+      if (typeof window !== "undefined") window.alert(message);
+      return;
+    }
+    setIsFavoritesOpen(true);
+  }, [authUser, t]);
+
+  const closeFavorites = React.useCallback(() => {
+    setIsFavoritesOpen(false);
+  }, []);
+
+  const handleRemoveFavorite = React.useCallback(
+    async (favorite: TopbarFavoritePlayer) => {
+      const identifier = favorite.identifier;
+      const isStillFavorite = !!authUser?.favorites?.players?.[identifier];
+      if (!isStillFavorite) return;
+      setFavoriteRemoveBusyByIdentifier((prev) => ({ ...prev, [identifier]: true }));
+      try {
+        await toggleFavoritePlayer(identifier, {
+          name: favorite.name,
+          className: favorite.className || undefined,
+        });
+      } catch (error: any) {
+        if (error?.code === "AUTH_REQUIRED") {
+          const message = t("profile.favorite.authRequired", { defaultValue: "Sign in to use favorites." });
+          if (typeof window !== "undefined") window.alert(message);
+        } else {
+          const message = t("profile.favorite.error", { defaultValue: "Could not update favorite." });
+          if (typeof window !== "undefined") window.alert(message);
+        }
+      } finally {
+        setFavoriteRemoveBusyByIdentifier((prev) => {
+          const next = { ...prev };
+          delete next[identifier];
+          return next;
+        });
+      }
+    },
+    [authUser?.favorites?.players, t, toggleFavoritePlayer],
+  );
 
   const openSearchLabel = t("search.open", { defaultValue: "Open search" });
 
@@ -234,7 +315,14 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
               </div>
             ) : null}
           </div>
-          <button className={styles.btnIco} aria-label={t("nav.favorites", { defaultValue: "Favorites" })}>
+          <button
+            className={styles.btnIco}
+            type="button"
+            aria-label={t("nav.favorites", { defaultValue: "Favorites" })}
+            aria-haspopup="dialog"
+            aria-expanded={isFavoritesOpen}
+            onClick={openFavorites}
+          >
             <Star className={styles.ico} />
           </button>
           <button
@@ -321,6 +409,13 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
           </div>
         </div>
       ) : null}
+      <TopbarFavoritesOverlay
+        isOpen={isFavoritesOpen}
+        favorites={favoritePlayers}
+        removeBusyByIdentifier={favoriteRemoveBusyByIdentifier}
+        onClose={closeFavorites}
+        onRemove={handleRemoveFavorite}
+      />
     </>
   );
 }

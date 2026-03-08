@@ -30,7 +30,9 @@ export async function fetchFirebaseToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch firebase token: ${res.status}`);
+    throw new AuthApiRequestError(`Failed to fetch firebase token (${res.status})`, {
+      status: res.status,
+    });
   }
 
   const data = await res.json();
