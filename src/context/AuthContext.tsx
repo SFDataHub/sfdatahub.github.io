@@ -17,7 +17,7 @@ import type {
   AuthStatus,
   AuthUser,
 } from "../lib/auth/types";
-import { fetchFirebaseToken, patchFavorite } from "../lib/auth/client";
+import { AuthApiRequestError, fetchFirebaseToken, patchFavorite } from "../lib/auth/client";
 import { db, auth } from "../lib/firebase";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
@@ -44,12 +44,17 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const SESSION_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/session` : "";
+const REFRESH_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/refresh` : "";
 const LOGOUT_ENDPOINT = AUTH_BASE_URL ? `${AUTH_BASE_URL}/auth/logout` : "";
 const AUTH_USER_CACHE_KEY = "sfh:auth:user";
 const AUTH_USER_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const SILENT_REFRESH_DELAY_MS = 12.5 * 60 * 1000;
 
 type RefreshOptions = {
   silent?: boolean;
+};
+type FetchSessionOptions = RefreshOptions & {
+  allowRefreshRetry?: boolean;
 };
 
 const AUTH_POPUP_NONCE_KEY = "sfh:authPopupNonce";
@@ -513,6 +518,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(() => readCachedAuthUser());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const firebaseSyncRef = useRef<{ tried: boolean }>({ tried: false });
+  const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+  const silentRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discordLoginInFlight = useRef(false);
   const discordPopupMessageReceived = useRef(false);
   const favoritesMigrationRef = useRef<{ uid: string | null; attempted: boolean }>({
@@ -528,6 +535,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const clearSilentRefreshTimer = useCallback(() => {
+    if (!silentRefreshTimerRef.current) return;
+    clearTimeout(silentRefreshTimerRef.current);
+    silentRefreshTimerRef.current = null;
+  }, []);
+
+  const setUnauthenticatedState = useCallback(() => {
+    clearSilentRefreshTimer();
+    setUser(null);
+    writeCachedAuthUser(null);
+    setStatus("unauthenticated");
+  }, [clearSilentRefreshTimer]);
+
   const handleSessionResponse = useCallback((payload: any) => {
     if (payload?.authenticated && payload.user) {
       const nextUser = payload.user as AuthUser;
@@ -535,32 +555,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       writeCachedAuthUser(nextUser);
       setStatus("authenticated");
     } else {
-      setUser(null);
-      writeCachedAuthUser(null);
-      setStatus("unauthenticated");
+      setUnauthenticatedState();
     }
-  }, []);
+  }, [setUnauthenticatedState]);
 
   useEffect(() => {
     writeCachedAuthUser(user);
   }, [user]);
 
-  const fetchSession = useCallback(async (options?: RefreshOptions): Promise<boolean> => {
+  const refreshSessionCookie = useCallback(async (): Promise<boolean> => {
+    if (!REFRESH_ENDPOINT) {
+      console.warn("[Auth] AUTH_BASE_URL is not configured. Skipping refresh call.");
+      return false;
+    }
+
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+
+    const runRefresh = (async () => {
+      try {
+        const response = await fetch(REFRESH_ENDPOINT, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!response.ok) {
+          logAuthDebug("[Auth] Refresh request failed", { status: response.status });
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("[Auth] Refresh request failed", error);
+        return false;
+      }
+    })();
+
+    refreshInFlightRef.current = runRefresh;
+    try {
+      return await runRefresh;
+    } finally {
+      if (refreshInFlightRef.current === runRefresh) {
+        refreshInFlightRef.current = null;
+      }
+    }
+  }, []);
+
+  const fetchSession = useCallback(async (options?: FetchSessionOptions): Promise<boolean> => {
     if (!options?.silent) {
       setStatus("loading");
     }
+    const allowRefreshRetry = options?.allowRefreshRetry !== false;
 
     if (!SESSION_ENDPOINT) {
       console.warn("[Auth] AUTH_BASE_URL is not configured. Skipping session fetch.");
-      setUser(null);
-      setStatus("unauthenticated");
+      setUnauthenticatedState();
       return false;
     }
 
     try {
-      const response = await fetch(SESSION_ENDPOINT, {
+      let response = await fetch(SESSION_ENDPOINT, {
         credentials: "include",
       });
+      if (response.status === 401 && allowRefreshRetry) {
+        const refreshed = await refreshSessionCookie();
+        if (refreshed) {
+          response = await fetch(SESSION_ENDPOINT, {
+            credentials: "include",
+          });
+        }
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch session (${response.status})`);
@@ -571,11 +637,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return !!(data?.authenticated && data.user);
     } catch (error) {
       console.error("[Auth] Failed to refresh session.", error);
-      setUser(null);
-      setStatus("unauthenticated");
+      setUnauthenticatedState();
       return false;
     }
-  }, [handleSessionResponse]);
+  }, [handleSessionResponse, refreshSessionCookie, setUnauthenticatedState]);
+
+  const refreshAndSyncSession = useCallback(async (): Promise<boolean> => {
+    const refreshed = await refreshSessionCookie();
+    if (!refreshed) {
+      setUnauthenticatedState();
+      return false;
+    }
+    const sessionOk = await fetchSession({ silent: true, allowRefreshRetry: false });
+    if (!sessionOk) {
+      setUnauthenticatedState();
+      return false;
+    }
+    return true;
+  }, [fetchSession, refreshSessionCookie, setUnauthenticatedState]);
+
+  const fetchFirebaseTokenWithRetry = useCallback(async (): Promise<string> => {
+    try {
+      return await fetchFirebaseToken();
+    } catch (error) {
+      const isUnauthorized = error instanceof AuthApiRequestError && error.status === 401;
+      if (!isUnauthorized) {
+        throw error;
+      }
+
+      const refreshed = await refreshAndSyncSession();
+      if (!refreshed) {
+        throw error;
+      }
+      return fetchFirebaseToken();
+    }
+  }, [refreshAndSyncSession]);
 
   const runFavoritesPlayersV2Migration = useCallback(
     async (sessionUser: AuthUser) => {
@@ -699,7 +795,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     (async () => {
       try {
-        const token = await fetchFirebaseToken();
+        const token = await fetchFirebaseTokenWithRetry();
         await signInWithCustomToken(auth, token);
         console.log("[AuthDebug] signed in to Firebase with custom token");
         await runFavoritesPlayersV2Migration(user);
@@ -707,7 +803,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthDebug] failed to sign in to Firebase", err);
       }
     })();
-  }, [runFavoritesPlayersV2Migration, user]);
+  }, [fetchFirebaseTokenWithRetry, runFavoritesPlayersV2Migration, user]);
+
+  useEffect(() => {
+    clearSilentRefreshTimer();
+    if (typeof window === "undefined") return;
+    if (status !== "authenticated" || !user) return;
+
+    silentRefreshTimerRef.current = window.setTimeout(() => {
+      refreshAndSyncSession().catch((error) => {
+        console.error("[Auth] Silent refresh failed", error);
+        setUnauthenticatedState();
+      });
+    }, SILENT_REFRESH_DELAY_MS);
+
+    return () => {
+      clearSilentRefreshTimer();
+    };
+  }, [clearSilentRefreshTimer, refreshAndSyncSession, setUnauthenticatedState, status, user]);
 
   const startRedirectLogin = useCallback((provider: ProviderName, options?: Pick<LoginUrlOptions, "rememberMe">) => {
     if (!AUTH_BASE_URL) {
@@ -1059,13 +1172,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const logout = useCallback(async () => {
+    clearSilentRefreshTimer();
     await signOut(auth).catch(() => undefined);
 
     if (!LOGOUT_ENDPOINT) {
       console.warn("[Auth] AUTH_BASE_URL is not configured. Clearing local session only.");
-      setUser(null);
-      writeCachedAuthUser(null);
-      setStatus("unauthenticated");
+      setUnauthenticatedState();
       return;
     }
 
@@ -1081,13 +1193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error("[Auth] Failed to logout. Clearing local session anyway.", error);
     } finally {
-      setUser(null);
-      writeCachedAuthUser(null);
-      setStatus("unauthenticated");
+      setUnauthenticatedState();
     }
-  }, []);
+  }, [clearSilentRefreshTimer, setUnauthenticatedState]);
 
-  const refreshSession = useCallback(async (options?: RefreshOptions) => fetchSession(options), [fetchSession]);
+  const refreshSession = useCallback(async (_options?: RefreshOptions) => refreshAndSyncSession(), [refreshAndSyncSession]);
 
   const loading = status === "idle" || status === "loading";
 

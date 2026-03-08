@@ -610,6 +610,221 @@
   color: var(--danger, #ff7a7a);
 }
 
+.favoritesOverlayBackdrop{
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(3, 10, 18, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.favoritesOverlayPanel{
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 32px);
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--tile);
+  box-shadow:
+    0 18px 36px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  padding: 18px;
+  overflow: auto;
+}
+
+.favoritesOverlayHeader{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.favoritesOverlayTitle{
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.favoritesOverlaySubtitle{
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.favoritesOverlayClose{
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--tile-hover);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.favoritesOverlayClose:hover{
+  background: var(--active);
+}
+
+.favoritesOverlayCloseLabel{
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.favoritesOverlayEmpty{
+  margin: 18px 0 0;
+  font-size: 14px;
+  color: var(--text-soft);
+  background: var(--tile-hover);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.favoritesOverlayList{
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.favoritesOverlayItem{
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--tile-hover);
+  padding: 10px;
+}
+
+.favoritesOverlayItemInner{
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.favoritesOverlayHudFill{
+  position: absolute;
+  inset: 0 auto 0 0;
+  pointer-events: none;
+}
+
+.favoritesOverlayHudHover{
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity .16s ease;
+}
+
+.favoritesOverlayItem:hover .favoritesOverlayHudHover{
+  opacity: 1;
+}
+
+.favoritesOverlayItemInfo{
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.favoritesOverlayClassIcon{
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(8, 15, 24, 0.7);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.favoritesOverlayClassFallback{
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(8, 15, 24, 0.7);
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.favoritesOverlayMeta{
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.favoritesOverlayNameRow{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.favoritesOverlayName{
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favoritesOverlayServer{
+  font-size: 12px;
+  color: var(--text-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.favoritesOverlayRemove{
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(20, 32, 48, 0.85);
+  color: var(--text);
+  padding: 8px 10px;
+  min-height: 34px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.favoritesOverlayRemove:hover{
+  background: var(--active);
+}
+
+.favoritesOverlayRemove:disabled{
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Responsive: Mitte darf flexibel, rechts wird kompakter */
 @media (max-width: 920px){
   .topbar{ grid-template-columns: 1fr minmax(160px, 1fr) 1fr; }
