@@ -11,6 +11,7 @@ import type {
   SfJsonDungeons,
   SfJsonGroupTournament,
   SfJsonIdle,
+  SfJsonSaveModel,
   SfJsonModernItemSlot,
   SfJsonOwnPlayer,
   SfJsonParseResult,
@@ -53,6 +54,19 @@ const EQUIPPED_ITEM_SLOT_NAMES = [
   "Wpn2",
 ];
 const SHOP_ITEM_SLOT_NAMES = ["Slot1", "Slot2", "Slot3", "Slot4", "Slot5", "Slot6"];
+const SAVE_MODEL_ITEM_CHUNK_SIZE = 12;
+const SAVE_MODEL_ITEM_SLOT_COUNT = 10;
+const createRange = (start: number, end: number): number[] =>
+  Array.from({ length: end - start + 1 }, (_, index) => start + index);
+const SAVE_MODEL_INDEXES = [
+  1, 2, 7, 8, 9, 10, 11,
+  ...createRange(17, 39),
+  ...createRange(48, 167),
+  286, 433, 435, 438, 443, 444, 445, 447, 448, 449,
+  493, 494, 495, 499, 500, 501, 502, 517, 521,
+  ...createRange(524, 535),
+  581, 582, 583,
+];
 
 const parsePlayerIdFromIdentifier = (identifier: string): number | null => {
   const match = String(identifier ?? "").trim().match(/_p(\d+)$/i);
@@ -211,6 +225,40 @@ const parseShopItems = (value: unknown): SfJsonShopItems | undefined => {
     chunkSize: MODERN_ITEM_CHUNK_SIZE,
     slots: parsed.slots,
     remainder: parsed.remainder,
+  };
+};
+
+const parseSaveModel = (value: unknown): SfJsonSaveModel | undefined => {
+  const values = asNumberArray(value);
+  if (!values || values.length === 0) return undefined;
+
+  const modeledIndexes = SAVE_MODEL_INDEXES.filter((index) => index < values.length);
+  const fields = modeledIndexes.map((index) => ({
+    index,
+    value: toFiniteNumberWithFallback(values[index], 0),
+  }));
+
+  const itemSlots: SfJsonSaveModel["itemSlots"] = [];
+  for (let slotIndex = 0; slotIndex < SAVE_MODEL_ITEM_SLOT_COUNT; slotIndex += 1) {
+    const startIndex = 48 + slotIndex * SAVE_MODEL_ITEM_CHUNK_SIZE;
+    if (startIndex + SAVE_MODEL_ITEM_CHUNK_SIZE > values.length) break;
+
+    const chunk = values.slice(startIndex, startIndex + SAVE_MODEL_ITEM_CHUNK_SIZE);
+    const type = toFiniteNumberOrNull(chunk[0]);
+    itemSlots.push({
+      slot: slotIndex + 1,
+      startIndex,
+      values: chunk,
+      type,
+      nonEmpty: (type ?? 0) > 0,
+    });
+  }
+
+  return {
+    modeledIndexes,
+    fields,
+    itemChunkSize: SAVE_MODEL_ITEM_CHUNK_SIZE,
+    itemSlots,
   };
 };
 
@@ -682,6 +730,13 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
       : typeof raw.saveString === "string"
         ? raw.saveString
         : undefined;
+  const saveArrayFromString = !saveArray && saveString ? parseSaveStringToArray(saveString) : undefined;
+  const saveArrayForModel =
+    saveArray && saveArray.length > 0
+      ? saveArray
+      : saveArrayFromString && saveArrayFromString.length > 0
+        ? saveArrayFromString
+        : undefined;
   const name = toTrimmedString(raw.name);
   const description = typeof raw.description === "string" ? raw.description : undefined;
   const guildName =
@@ -709,15 +764,11 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
   const fortressRank = parseFiniteNumber(raw.fortressrank);
   const version = parseFiniteNumber(raw.version);
   const webshopId = parseWebshopId(raw.webshopid);
+  const saveModel = parseSaveModel(saveArrayForModel);
 
   let portrait = null;
-  if (saveArray && saveArray.length > 0) {
-    portrait = extractPortraitFromSaveArray(saveArray);
-  } else if (saveString) {
-    const parsedSave = parseSaveStringToArray(saveString);
-    if (parsedSave.length > 0) {
-      portrait = extractPortraitFromSaveArray(parsedSave);
-    }
+  if (saveArrayForModel && saveArrayForModel.length > 0) {
+    portrait = extractPortraitFromSaveArray(saveArrayForModel);
   }
 
   return {
@@ -727,6 +778,7 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
     portrait,
     saveArray,
     saveString,
+    ...(saveModel ? { saveModel } : {}),
     name,
     ...(description != null ? { description } : {}),
     guildName,

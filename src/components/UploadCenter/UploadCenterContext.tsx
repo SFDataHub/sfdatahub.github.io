@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
 
-type TabKey = "json" | "csv";
+type TabKey = "json";
 
 type UploadCenterState = {
   isOpen: boolean;
@@ -21,8 +21,7 @@ type Props = {
 export function UploadCenterProvider({ children }: Props) {
   const { canAccessFeature } = useFeatureAccess();
   const [isOpen, setOpen] = useState(false);
-  // CSV ist jetzt Standard
-  const [activeTab, setActiveTab] = useState<TabKey>("csv");
+  const [activeTab, setActiveTab] = useState<TabKey>("json");
 
   const canUse = canAccessFeature("main.uploadCenter");
 
@@ -31,8 +30,8 @@ export function UploadCenterProvider({ children }: Props) {
     if (opts?.tab) {
       setActiveTab(opts.tab);
     } else {
-      // Fallback weiterhin CSV
-      setActiveTab("csv");
+      // JSON-only modal flow
+      setActiveTab("json");
     }
     setOpen(true);
   }, [canUse]);

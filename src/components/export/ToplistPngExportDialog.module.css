@@ -11,13 +11,25 @@
 }
 
 .panel {
-  width: min(560px, 100%);
+  width: min(920px, 100%);
   background: #152a42;
   border: 1px solid #2b4c73;
   border-radius: 14px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
   color: #d6e4f7;
   padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.controls {
   display: grid;
   gap: 14px;
 }
@@ -63,86 +75,6 @@
   color: #ffffff;
 }
 
-.guildSelect {
-  border: 1px solid #2b4c73;
-  border-radius: 10px;
-  background: #102338;
-}
-
-.guildSummary {
-  list-style: none;
-  cursor: pointer;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #d6e4f7;
-}
-
-.guildSummary::-webkit-details-marker {
-  display: none;
-}
-
-.guildList {
-  padding: 0 12px 12px;
-  display: grid;
-  gap: 8px;
-  max-height: 180px;
-  overflow: auto;
-}
-
-.guildOption {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.empty {
-  color: #8fb0d4;
-  font-size: 12px;
-}
-
-.rangeToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #d6e4f7;
-}
-
-.rangeInputs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.rangeField {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  color: #b9cfe8;
-}
-
-.rangeInput {
-  appearance: none;
-  border: 1px solid #2b4c73;
-  border-radius: 8px;
-  background: #102338;
-  color: #ffffff;
-  padding: 7px 8px;
-}
-
-.rangeInput:disabled {
-  opacity: 0.55;
-}
-
-.helper {
-  font-size: 12px;
-  color: #8fb0d4;
-}
-
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -168,4 +100,10 @@
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (max-width: 840px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
 }

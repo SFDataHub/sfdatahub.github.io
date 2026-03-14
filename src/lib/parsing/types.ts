@@ -261,6 +261,26 @@ export type SfJsonWitch = {
   scrolls: SfJsonWitchScroll[];
 };
 
+export type SfJsonSaveModelField = {
+  index: number;
+  value: number;
+};
+
+export type SfJsonSaveModelItemSlot = {
+  slot: number;
+  startIndex: number;
+  values: number[];
+  type: number | null;
+  nonEmpty: boolean;
+};
+
+export type SfJsonSaveModel = {
+  modeledIndexes: number[];
+  fields: SfJsonSaveModelField[];
+  itemChunkSize: 12;
+  itemSlots: SfJsonSaveModelItemSlot[];
+};
+
 export type SfJsonOwnPlayer = {
   identifier: string;
   playerId: number;
@@ -268,6 +288,7 @@ export type SfJsonOwnPlayer = {
   portrait: SfJsonPortrait | null;
   saveArray?: number[];
   saveString?: string;
+  saveModel?: SfJsonSaveModel;
   name?: string;
   description?: string;
   guildName?: string;

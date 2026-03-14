@@ -177,6 +177,7 @@ import { NotificationsProvider } from "./context/NotificationsContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
 import UploadCenterPage from "./pages/UploadCenter/Index";
+import UploadCenterV2Page from "./pages/UploadCenter/V2";
 
 const P = (t: string) => () => (
   <div style={{ padding: 16 }}>
@@ -311,6 +312,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route
                   path="/upload-center"
                   element={withFeatureGate("main.uploadCenter", "/upload-center", <UploadCenterPage />, <Navigate to="/login" replace />)}
+                />
+                <Route
+                  path="/upload-center-v2"
+                  element={withFeatureGate("main.uploadCenter", "/upload-center-v2", <UploadCenterV2Page />, <Navigate to="/login" replace />)}
                 />
                 <Route path="/UploadCenter" element={<Navigate to="/upload-center" replace />} />
 
