@@ -15,8 +15,8 @@ import { useFilters } from "../../components/Filters/FilterContext";
 import { useAuth } from "../../context/AuthContext";
 import { useToplistsData } from "../../context/ToplistsDataContext";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
-import type { ToplistExportRow } from "../../components/export/ToplistExportTable";
-import type { GuildToplistExportRow } from "../../components/export/GuildToplistExportTable";
+import type { ToplistExportAmount } from "../../components/export/ToplistPngExportDialog";
+import type { ToplistCaptureStatus } from "../../components/export/ToplistExportController";
 import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 
 type GuildToplistsProps = {
@@ -24,11 +24,9 @@ type GuildToplistsProps = {
   sortKey?: string;
   showAvgModeControl?: boolean;
   tableRef?: React.RefObject<HTMLDivElement>;
-  exportSnapshotRef?: React.MutableRefObject<{
-    kind: "players" | "guilds";
-    rows: ToplistExportRow[];
-    showCompare: boolean;
-  }>;
+  renderMode?: "live" | "preset";
+  presetAmount?: ToplistExportAmount | null;
+  onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
 };
 
 type GuildColumnKey =
@@ -95,10 +93,22 @@ const TOPLIST_CELL_BASE_STYLE: React.CSSProperties = {
 };
 
 const TOPLIST_HEADER_LABEL_STYLE: React.CSSProperties = {
-  display: "block",
+  display: "flex",
+  alignItems: "center",
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  width: "100%",
+  minHeight: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
+  maxWidth: "100%",
+};
+
+const TOPLIST_HEADER_LABEL_ALIGN_STYLE: Record<GuildColumnAlign, Pick<React.CSSProperties, "justifyContent">> = {
+  left: { justifyContent: "flex-start" },
+  center: { justifyContent: "center" },
+  right: { justifyContent: "flex-end" },
 };
 
 const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
@@ -106,6 +116,9 @@ const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  lineHeight: 1.3,
+  minWidth: 0,
+  maxWidth: "100%",
 };
 
 const TOPLIST_LAST_SCAN_CONTENT_STYLE: React.CSSProperties = {
@@ -113,6 +126,11 @@ const TOPLIST_LAST_SCAN_CONTENT_STYLE: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "flex-end",
   gap: 6,
+  width: "100%",
+  minHeight: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
+  paddingRight: 1,
 };
 
 const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
@@ -120,6 +138,10 @@ const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  flex: "1 1 auto",
+  minWidth: 0,
+  maxWidth: "100%",
+  textAlign: "right",
 };
 
 const TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
@@ -146,7 +168,9 @@ const GuildToplistHeader = React.memo(function GuildToplistHeader() {
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
           {GUILD_COLUMNS.map((column) => (
             <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
-              <span style={TOPLIST_HEADER_LABEL_STYLE}>{t(`toplists.columns.${column.key}`, column.label)}</span>
+              <span style={{ ...TOPLIST_HEADER_LABEL_STYLE, ...TOPLIST_HEADER_LABEL_ALIGN_STYLE[column.align] }}>
+                {t(`toplists.columns.${column.key}`, column.label)}
+              </span>
             </th>
           ))}
         </tr>
@@ -468,44 +492,6 @@ function GuildAvgModeControls({
   );
 }
 
-const buildGuildExportRows = (
-  rows: FirestoreToplistGuildRow[],
-  avgMode: "base" | "total"
-): GuildToplistExportRow[] => {
-  return rows.map((row) => ({
-    identifier: `${String(row.server ?? "").trim()}_g${String(row.guildId ?? "").trim()}`,
-    playerId: String(row.guildId ?? "").trim() || null,
-    flag: null,
-    deltaRank: null,
-    server: String(row.server ?? ""),
-    name: String(row.name ?? ""),
-    class: "",
-    level: row.avgLevel,
-    guild: String(row.name ?? ""),
-    main: getGuildAvgMain(row, avgMode),
-    con: getGuildAvgCon(row, avgMode),
-    sum: getGuildAvgSum(row, avgMode),
-    ratio: null,
-    mainTotal: row.avgAttrTotal,
-    conTotal: row.avgConTotal,
-    sumTotal: row.avgTotalStats,
-    xpProgress: null,
-    xpTotal: null,
-    mine: row.avgMine,
-    treasury: row.avgTreasury,
-    lastScan: row.latestScanAtSec != null ? String(row.latestScanAtSec) : row.lastScan,
-    deltaSum: null,
-    _calculatedSum: getGuildAvgSum(row, avgMode),
-    _guildHofRank: row.hofRank,
-    _guildHonor: row.honor,
-    _guildRaids: row.raids,
-    _guildPortal: row.portalFloor,
-    _guildHydra: row.hydra,
-    _guildPetLevel: row.instructor,
-    _guildMembers: row.memberCount,
-  }));
-};
-
 const formatLastScanDisplay = (value: unknown): string => formatScanDateTimeLabel(value);
 
 export default function GuildToplists({
@@ -513,12 +499,17 @@ export default function GuildToplists({
   sortKey,
   showAvgModeControl = true,
   tableRef,
-  exportSnapshotRef,
+  renderMode = "live",
+  presetAmount = null,
+  onCaptureStatusChange,
 }: GuildToplistsProps) {
   const { t } = useTranslation();
   const { favoritesOnly } = useFilters();
   const { user } = useAuth();
   const { getGuildToplistSnapshotCached } = useToplistsData();
+  const isPresetRender = renderMode === "preset";
+  const resolvedPresetAmount = presetAmount ?? 50;
+  const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
   const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<FirestoreToplistGuildRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -787,16 +778,20 @@ export default function GuildToplists({
 
     return list;
   }, [rows, favoritesOnly, user, favoriteGuildSet, activeSortKey, avgSumSortMode, activeGuildAvgMode]);
+  const renderedRows = useMemo(
+    () => (captureRowLimit == null ? displayRows : displayRows.slice(0, captureRowLimit)),
+    [captureRowLimit, displayRows]
+  );
 
   const rowIndexByIdentifier = useMemo(() => {
     const indexMap = new Map<string, number>();
-    displayRows.forEach((row, idx) => {
+    renderedRows.forEach((row, idx) => {
       const identifier = resolveGuildIdentifier(row);
       if (!identifier || indexMap.has(identifier)) return;
       indexMap.set(identifier, idx);
     });
     return indexMap;
-  }, [displayRows]);
+  }, [renderedRows]);
 
   const focusIdentifierCandidates = useMemo(() => {
     const seen = new Set<string>();
@@ -827,12 +822,50 @@ export default function GuildToplists({
   }, [focusParamRaw, serverParamRaw, resolvedServerKey]);
 
   const rowVirtualizer = useVirtualizer({
-    count: displayRows.length,
-    getScrollElement: () => tableScrollRef.current,
+    count: renderedRows.length,
+    getScrollElement: () => (isPresetRender ? null : tableScrollRef.current),
     estimateSize: () => 56,
     overscan: 12,
-    getItemKey: (index) => resolveGuildIdentifier(displayRows[index]) ?? `guild-row-${index}`,
+    getItemKey: (index) => resolveGuildIdentifier(renderedRows[index]) ?? `guild-row-${index}`,
   });
+  const virtualTotalSize = Math.round(rowVirtualizer.getTotalSize());
+  const firstRenderedIdentifier = renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[0]) ?? "" : "";
+  const lastRenderedIdentifier =
+    renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[renderedRows.length - 1]) ?? "" : "";
+  const captureReady = !loading && renderedRows.length > 0;
+  const captureStabilityKey = [
+    renderMode,
+    loading ? "loading:1" : "loading:0",
+    `rows:${renderedRows.length}`,
+    `sort:${activeSortKey}`,
+    `avg:${activeGuildAvgMode}`,
+    "rowH:56",
+    `virt:${virtualTotalSize}`,
+    `first:${firstRenderedIdentifier}`,
+    `last:${lastRenderedIdentifier}`,
+  ].join("|");
+
+  useEffect(() => {
+    if (!onCaptureStatusChange) return;
+    onCaptureStatusChange({
+      loading,
+      rowCount: renderedRows.length,
+      ready: captureReady,
+      stabilityKey: captureStabilityKey,
+      compareLoading: false,
+      compareExpected: false,
+      showCompare: false,
+      virtualRowHeight: 56,
+      virtualTotalSize,
+    });
+  }, [
+    captureReady,
+    captureStabilityKey,
+    loading,
+    onCaptureStatusChange,
+    renderedRows.length,
+    virtualTotalSize,
+  ]);
 
   useEffect(() => {
     if (!focusParamRaw) return;
@@ -853,6 +886,7 @@ export default function GuildToplists({
   }, []);
 
   useEffect(() => {
+    if (isPresetRender) return;
     const scrollEl = tableScrollRef.current;
     if (!scrollEl) return;
 
@@ -868,10 +902,11 @@ export default function GuildToplists({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [displayRows.length]);
+  }, [isPresetRender, renderedRows.length]);
 
   useEffect(() => {
     void focusRankParam;
+    if (isPresetRender) return;
     if (!focusIdentifierCandidates.length || loading) return;
 
     const focusKey = focusIdentifierCandidates.join("|");
@@ -903,41 +938,32 @@ export default function GuildToplists({
   }, [
     focusIdentifierCandidates,
     focusRankParam,
+    isPresetRender,
     loading,
     rowIndexByIdentifier,
     rowVirtualizer,
   ]);
 
-  const exportRows = useMemo(() => buildGuildExportRows(displayRows, activeGuildAvgMode), [displayRows, activeGuildAvgMode]);
-
-  useEffect(() => {
-    if (!exportSnapshotRef) return;
-    exportSnapshotRef.current = {
-      kind: "guilds",
-      rows: exportRows,
-      showCompare: false,
-    };
-  }, [exportRows, exportSnapshotRef]);
-
   const renderGuildBody = () => {
-    const virtualItems = rowVirtualizer.getVirtualItems();
-    const topSpacerHeight = virtualItems.length ? virtualItems[0].start : 0;
-    const bottomSpacerHeight = virtualItems.length
-      ? Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end)
-      : 0;
+    const rows = renderedRows;
+    const virtualItems = isPresetRender ? [] : rowVirtualizer.getVirtualItems();
+    const rowIndices = isPresetRender ? rows.map((_, idx) => idx) : virtualItems.map((virtualRow) => virtualRow.index);
+    const topSpacerHeight = isPresetRender || !virtualItems.length ? 0 : virtualItems[0].start;
+    const bottomSpacerHeight = isPresetRender || !virtualItems.length
+      ? 0
+      : Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end);
 
     return (
       <table className="toplists-table toplists-table--body" style={TOPLIST_TABLE_STYLE}>
         <GuildToplistColGroup />
         <tbody>
-          {displayRows.length > 0 && topSpacerHeight > 0 && (
+          {!isPresetRender && rows.length > 0 && topSpacerHeight > 0 && (
             <tr aria-hidden>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
             </tr>
           )}
-          {virtualItems.map((virtualRow) => {
-            const idx = virtualRow.index;
-            const row = displayRows[idx];
+          {rowIndices.map((idx) => {
+            const row = rows[idx];
             if (!row) return null;
             const rowIdentifier = resolveGuildIdentifier(row);
             const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
@@ -946,6 +972,7 @@ export default function GuildToplists({
             const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
               event.preventDefault();
               event.stopPropagation();
+              if (isPresetRender) return;
               const guildId = String(row.guildId ?? "").trim();
               if (!guildId) return;
               setSelectedGuildProfile({
@@ -1001,17 +1028,17 @@ export default function GuildToplists({
               </tr>
             );
           })}
-          {loading && displayRows.length === 0 && (
+          {loading && rows.length === 0 && (
             <tr>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td>
             </tr>
           )}
-          {!loading && !error && displayRows.length === 0 && (
+          {!loading && !error && rows.length === 0 && (
             <tr>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td>
             </tr>
           )}
-          {displayRows.length > 0 && bottomSpacerHeight > 0 && (
+          {!isPresetRender && rows.length > 0 && bottomSpacerHeight > 0 && (
             <tr aria-hidden>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
             </tr>
@@ -1022,7 +1049,7 @@ export default function GuildToplists({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12 }}>
         {t("toplists.guilds.snapshotStatus", "Guilds - snapshots (latest)")}
         {resolvedServers.length ? ` - ${resolvedServers.join(", ")}` : ""}
@@ -1031,7 +1058,7 @@ export default function GuildToplists({
         <div>
           {loading ? t("toplists.status.loading", "Loading...") : error ? t("toplists.status.error", "Error") : t("toplists.status.ready", "Ready")}
           {" - "}
-          {displayRows.length} {t("toplists.status.rows", "rows")}
+          {renderedRows.length} {t("toplists.status.rows", "rows")}
         </div>
         <div>{updatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(updatedAt) }) : null}</div>
       </div>
@@ -1074,24 +1101,36 @@ export default function GuildToplists({
         </div>
       )}
 
-      <div ref={tableRef} className="toplists-table-viewport" style={{ flex: "1 1 auto", minHeight: 0 }}>
-        <div className="toplists-table-header" style={{ paddingRight: tableScrollbarWidth }}>
+      <div
+        ref={tableRef}
+        className="toplists-table-viewport"
+        data-toplists-export-root="true"
+        style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
+      >
+        <div className="toplists-table-header" style={{ paddingRight: isPresetRender ? 0 : tableScrollbarWidth }}>
           <GuildToplistHeader />
         </div>
-        <div ref={tableScrollRef} className="toplists-table-scroll">
+        <div
+          ref={tableScrollRef}
+          className="toplists-table-scroll"
+          data-toplists-export-scroll="true"
+          style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+        >
           {renderGuildBody()}
         </div>
       </div>
-      <GuildProfileOverlay
-        isOpen={Boolean(selectedGuildProfile?.guildId)}
-        guildId={selectedGuildProfile?.guildId ?? null}
-        guildName={
-          selectedGuildProfile
-            ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
-            : null
-        }
-        onClose={() => setSelectedGuildProfile(null)}
-      />
+      {!isPresetRender && (
+        <GuildProfileOverlay
+          isOpen={Boolean(selectedGuildProfile?.guildId)}
+          guildId={selectedGuildProfile?.guildId ?? null}
+          guildName={
+            selectedGuildProfile
+              ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
+              : null
+          }
+          onClose={() => setSelectedGuildProfile(null)}
+        />
+      )}
     </div>
   );
 }

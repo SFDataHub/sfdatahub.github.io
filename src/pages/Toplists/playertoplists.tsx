@@ -1,7 +1,6 @@
 ﻿import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import html2canvas from "html2canvas";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createPortal } from "react-dom";
 import ContentShell from "../../components/ContentShell";
@@ -14,12 +13,11 @@ import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
-import ToplistExportTable, { type ToplistExportRow } from "../../components/export/ToplistExportTable";
-import GuildToplistExportTable from "../../components/export/GuildToplistExportTable";
-import ToplistPngExportDialog, {
-  type ToplistExportAmount,
-  type ToplistExportSelection,
-} from "../../components/export/ToplistPngExportDialog";
+import type { ToplistExportAmount } from "../../components/export/ToplistPngExportDialog";
+import ToplistExportController, {
+  type ToplistCaptureStatus,
+  type ToplistExportControllerHandle,
+} from "../../components/export/ToplistExportController";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
 import { ToplistsProvider, useToplistsData, type Filters, type SortSpec } from "../../context/ToplistsDataContext";
@@ -70,19 +68,6 @@ type CompareSnapshotState = {
   baselineServers: string[];
   missingServers: string[];
   error: string | null;
-};
-type ToplistExportKind = "players" | "guilds";
-type ToplistExportSnapshot = {
-  kind: ToplistExportKind;
-  rows: ToplistExportRow[];
-  showCompare: boolean;
-};
-type ToplistExportRenderState = {
-  kind: ToplistExportKind;
-  rows: ToplistExportRow[];
-  showCompare: boolean;
-  width: number;
-  backgroundColor: string;
 };
 
 const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
@@ -296,10 +281,22 @@ const TOPLIST_CELL_BASE_STYLE: React.CSSProperties = {
 };
 
 const TOPLIST_HEADER_LABEL_STYLE: React.CSSProperties = {
-  display: "block",
+  display: "flex",
+  alignItems: "center",
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  width: "100%",
+  minHeight: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
+  maxWidth: "100%",
+};
+
+const TOPLIST_HEADER_LABEL_ALIGN_STYLE: Record<ToplistColumnAlign, Pick<React.CSSProperties, "justifyContent">> = {
+  left: { justifyContent: "flex-start" },
+  center: { justifyContent: "center" },
+  right: { justifyContent: "flex-end" },
 };
 
 const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
@@ -307,6 +304,9 @@ const TOPLIST_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  lineHeight: 1.3,
+  minWidth: 0,
+  maxWidth: "100%",
 };
 
 const TOPLIST_NAME_CELL_STACK_STYLE: React.CSSProperties = {
@@ -314,8 +314,10 @@ const TOPLIST_NAME_CELL_STACK_STYLE: React.CSSProperties = {
   flexDirection: "column",
   alignItems: "flex-start",
   justifyContent: "center",
-  flex: "0 1 auto",
-  maxWidth: "calc(100% - 30px)",
+  flex: "1 1 auto",
+  maxWidth: "none",
+  minHeight: "100%",
+  boxSizing: "border-box",
   minWidth: 0,
 };
 
@@ -325,6 +327,8 @@ const TOPLIST_NAME_CELL_LAYOUT_STYLE: React.CSSProperties = {
   justifyContent: "flex-start",
   gap: 12,
   width: "100%",
+  minHeight: "100%",
+  boxSizing: "border-box",
   minWidth: 0,
 };
 
@@ -338,9 +342,9 @@ const TOPLIST_NAME_CELL_ICON_CONTENT_STYLE: React.CSSProperties = {
 
 const TOPLIST_SECONDARY_TEXT_CELL_CONTENT_STYLE: React.CSSProperties = {
   ...TOPLIST_TEXT_CELL_CONTENT_STYLE,
-  marginTop: 2,
+  marginTop: 1,
   fontSize: 11,
-  lineHeight: 1.15,
+  lineHeight: 1.2,
   color: "var(--text-soft)",
 };
 
@@ -348,12 +352,14 @@ const TOPLIST_FLEX_COLUMN_RIGHT_STYLE: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   alignItems: "flex-end",
+  justifyContent: "center",
 };
 
 const TOPLIST_FLEX_COLUMN_CENTER_STYLE: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
+  justifyContent: "center",
 };
 
 const TOPLIST_DELTA_SUBTEXT_STYLE: React.CSSProperties = {
@@ -366,6 +372,20 @@ const TOPLIST_LAST_SCAN_CONTENT_STYLE: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "flex-end",
   gap: 6,
+  width: "100%",
+  minHeight: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
+  paddingRight: 1,
+};
+
+const TOPLIST_BADGE_CELL_CONTAINER_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  minHeight: "100%",
+  boxSizing: "border-box",
 };
 
 const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
@@ -373,6 +393,10 @@ const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  flex: "1 1 auto",
+  minWidth: 0,
+  maxWidth: "100%",
+  textAlign: "right",
 };
 
 const TOPLIST_CELL_STYLE_BY_KEY = TOPLIST_COLUMNS.reduce((acc, column) => {
@@ -676,11 +700,13 @@ const getMineTone = (tier: number | undefined) =>
 const getFrameStyle = (color?: string | null): React.CSSProperties | undefined =>
   color
     ? {
-        boxShadow: `inset 0 0 0 1px ${color}`,
+        border: `1px solid ${color}`,
         borderRadius: 6,
-        padding: "0 4px",
+        padding: "1px 3px 0",
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
       }
     : undefined;
 
@@ -883,54 +909,6 @@ function deriveGroupFromServers(servers: string[]): string {
   if (first) return "INT";
   return "EU";
 }
-
-const resolveExportBackground = (tableRoot: HTMLElement) => {
-  let node: HTMLElement | null = tableRoot;
-  while (node) {
-    const color = window.getComputedStyle(node).backgroundColor;
-    if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") {
-      return color;
-    }
-    node = node.parentElement;
-  }
-  return "#0C1C2E";
-};
-
-const waitForAnimationFrame = () =>
-  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
-const waitForImagesInNode = async (node: HTMLElement) => {
-  const images = Array.from(node.querySelectorAll<HTMLImageElement>("img"));
-  const pending = images.filter((img) => !img.complete);
-  if (!pending.length) return;
-
-  await Promise.all(
-    pending.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          const done = () => resolve();
-          img.addEventListener("load", done, { once: true });
-          img.addEventListener("error", done, { once: true });
-        })
-    )
-  );
-};
-
-const deriveExportGuildNames = (rows: ToplistExportRow[]) => {
-  const map = new Map<string, string>();
-  rows.forEach((row) => {
-    const name = String(row.guild ?? "").trim();
-    if (!name) return;
-    const key = normalizeGuildKey(name);
-    if (!key || map.has(key)) return;
-    map.set(key, name);
-  });
-  return Array.from(map.values()).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" })
-  );
-};
-
-const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export default function PlayerToplistsPage() {
   return (
@@ -1139,186 +1117,19 @@ function PlayerToplistsPageContent() {
   const lastUrlWriteRef = React.useRef<string | null>(null);
   const prevUrlSyncedServersKeyRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
-  const tableExportSnapshotRef = React.useRef<ToplistExportSnapshot>({
-    kind: "players",
-    rows: [],
-    showCompare: false,
-  });
-  const exportNodeRef = React.useRef<HTMLDivElement | null>(null);
-  const [isExportDialogOpen, setIsExportDialogOpen] = React.useState(false);
-  const [exportAmount, setExportAmount] = React.useState<ToplistExportAmount>(50);
-  const [exportSelection, setExportSelection] = React.useState<ToplistExportSelection>("current");
-  const [exportSelectedGuilds, setExportSelectedGuilds] = React.useState<string[]>([]);
-  const [exportRangeEnabled, setExportRangeEnabled] = React.useState(false);
-  const [exportRangeFrom, setExportRangeFrom] = React.useState(1);
-  const [exportRangeTo, setExportRangeTo] = React.useState(50);
-  const [exportDialogKind, setExportDialogKind] = React.useState<ToplistExportKind>("players");
-  const [exportDialogRows, setExportDialogRows] = React.useState<ToplistExportRow[]>([]);
-  const [exportDialogShowCompare, setExportDialogShowCompare] = React.useState(false);
-  const [exportGuildOptions, setExportGuildOptions] = React.useState<string[]>([]);
-  const [exportRenderState, setExportRenderState] = React.useState<ToplistExportRenderState | null>(null);
-  const [exportRenderKey, setExportRenderKey] = React.useState(0);
-  const [exportNonce, setExportNonce] = React.useState(0);
-  const [isExportingPng, setIsExportingPng] = React.useState(false);
-  const buildExportBaseRows = React.useCallback(
-    (selection: ToplistExportSelection, selectedGuilds: string[]) => {
-      if (selection !== "guilds") return exportDialogRows;
-      if (!selectedGuilds.length) return [];
-      const selectedGuildKeySet = new Set(selectedGuilds.map((entry) => normalizeGuildKey(entry)).filter(Boolean));
-      return exportDialogRows.filter((row) => {
-        const key = normalizeGuildKey(row.guild);
-        return key ? selectedGuildKeySet.has(key) : false;
-      });
-    },
-    [exportDialogRows]
-  );
-  const exportBaseRows = React.useMemo(
-    () => buildExportBaseRows(exportSelection, exportSelectedGuilds),
-    [buildExportBaseRows, exportSelection, exportSelectedGuilds]
-  );
-  const exportAvailableCount = exportBaseRows.length;
-  const exportRangeMax = Math.max(1, exportAvailableCount);
-  const exportRangeFromClamped = clampNumber(
-    Number.isFinite(exportRangeFrom) ? exportRangeFrom : 1,
-    1,
-    exportRangeMax
-  );
-  const exportRangeToClamped = clampNumber(
-    Number.isFinite(exportRangeTo) ? exportRangeTo : exportRangeFromClamped,
-    exportRangeFromClamped,
-    exportRangeMax
-  );
+  const exportControllerRef = React.useRef<ToplistExportControllerHandle | null>(null);
 
-  const openExportDialog = () => {
-    const snapshot = tableExportSnapshotRef.current;
-    const snapshotRows = Array.isArray(snapshot.rows) ? [...snapshot.rows] : [];
-    setExportDialogKind(snapshot.kind);
-    setExportDialogRows(snapshotRows);
-    setExportDialogShowCompare(Boolean(snapshot.showCompare));
-    setExportGuildOptions(deriveExportGuildNames(snapshotRows));
-    setExportAmount(50);
-    setExportSelection("current");
-    setExportSelectedGuilds([]);
-    setExportRangeEnabled(false);
-    setExportRangeFrom(1);
-    setExportRangeTo(50);
-    setIsExportDialogOpen(true);
-  };
+  const openExportDialog = React.useCallback(() => {
+    exportControllerRef.current?.open();
+  }, []);
 
-  const handleToggleExportGuild = (guildName: string) => {
-    setExportSelectedGuilds((prev) =>
-      prev.includes(guildName) ? prev.filter((entry) => entry !== guildName) : [...prev, guildName]
-    );
-  };
-  const handleExportAmountChange = (value: ToplistExportAmount) => {
-    setExportAmount(value);
-    if (!exportRangeEnabled) return;
-    const nextTo = clampNumber(exportRangeFromClamped + (value - 1), exportRangeFromClamped, exportRangeMax);
-    setExportRangeTo(nextTo);
-  };
-  const handleExportSelectionChange = (value: ToplistExportSelection) => {
-    setExportSelection(value);
-  };
-  const handleExportRangeEnabledChange = (enabled: boolean) => {
-    setExportRangeEnabled(enabled);
-    if (!enabled) return;
-    const from = exportRangeFromClamped;
-    setExportRangeFrom(from);
-    const nextTo = clampNumber(from + (exportAmount - 1), from, exportRangeMax);
-    setExportRangeTo(nextTo);
-  };
-  const handleExportRangeFromChange = (value: number) => {
-    const nextFrom = clampNumber(Number.isFinite(value) ? Math.trunc(value) : 1, 1, exportRangeMax);
-    setExportRangeFrom(nextFrom);
-    setExportRangeTo((prev) => {
-      const prevNum = Number.isFinite(prev) ? prev : nextFrom;
-      return clampNumber(prevNum, nextFrom, exportRangeMax);
-    });
-  };
-  const handleExportRangeToChange = (value: number) => {
-    const nextTo = clampNumber(
-      Number.isFinite(value) ? Math.trunc(value) : exportRangeFromClamped,
-      exportRangeFromClamped,
-      exportRangeMax
-    );
-    setExportRangeTo(nextTo);
-  };
+  const handleLivePlayerCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
+    exportControllerRef.current?.notifyLiveCaptureStatus("players", status);
+  }, []);
 
-  const handleConfirmExportPng = async () => {
-    if (typeof document === "undefined") return;
-    const tableRoot = tableRef.current;
-    if (!tableRoot || isExportingPng) return;
-    const baseRows = exportBaseRows;
-    if (baseRows.length === 0) return;
-
-    let rowsForExport: ToplistExportRow[] = [];
-    if (exportRangeEnabled) {
-      const rawFrom = Number.isFinite(exportRangeFrom) ? Math.trunc(exportRangeFrom) : 1;
-      const rawTo = Number.isFinite(exportRangeTo) ? Math.trunc(exportRangeTo) : rawFrom;
-      const from = clampNumber(rawFrom, 1, baseRows.length);
-      const to = clampNumber(rawTo, from, baseRows.length);
-      rowsForExport = baseRows.slice(from - 1, to);
-    } else {
-      rowsForExport = baseRows.slice(0, exportAmount);
-    }
-    const width = Math.max(1, Math.round(tableRoot.getBoundingClientRect().width || tableRoot.offsetWidth || 1));
-    const backgroundColor = resolveExportBackground(tableRoot);
-    const nextExportNonce = exportNonce + 1;
-    const nextExportRenderKey = exportRenderKey + 1;
-
-    setIsExportingPng(true);
-    setExportNonce(nextExportNonce);
-    setExportRenderKey(nextExportRenderKey);
-    setExportRenderState({
-      kind: exportDialogKind,
-      rows: rowsForExport,
-      showCompare: exportDialogShowCompare,
-      width,
-      backgroundColor,
-    });
-
-    try {
-      await waitForAnimationFrame();
-      await waitForAnimationFrame();
-      const exportNode = exportNodeRef.current;
-      if (!exportNode) return;
-      await waitForImagesInNode(exportNode);
-
-      const canvas = await html2canvas(exportNode, {
-        backgroundColor,
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        imageTimeout: 15000,
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              console.error("[export] Failed to create PNG blob");
-              reject(new Error("Failed to create PNG blob"));
-              return;
-            }
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.download = "sfdatahub_toplist.png";
-            link.href = url;
-            link.click();
-            URL.revokeObjectURL(url);
-            resolve();
-          },
-          "image/png",
-          1,
-        );
-      });
-      setIsExportDialogOpen(false);
-    } finally {
-      setExportRenderState(null);
-      setIsExportingPng(false);
-    }
-  };
+  const handleLiveGuildCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
+    exportControllerRef.current?.notifyLiveCaptureStatus("guilds", status);
+  }, []);
 
   React.useEffect(() => {
     normalizedServersRef.current = normalizedServers;
@@ -1525,7 +1336,8 @@ function PlayerToplistsPageContent() {
             focusIdentifier={focusIdentifierParam}
             focusRank={focusRankParam}
             tableRef={tableRef}
-            exportSnapshotRef={tableExportSnapshotRef}
+            renderMode="live"
+            onCaptureStatusChange={handleLivePlayerCaptureStatusChange}
           />
         )}
         {activeTab === "guilds" && (
@@ -1534,7 +1346,8 @@ function PlayerToplistsPageContent() {
             sortKey={resolvedGuildSortBy}
             showAvgModeControl={!filtersCollapsed}
             tableRef={tableRef}
-            exportSnapshotRef={tableExportSnapshotRef}
+            renderMode="live"
+            onCaptureStatusChange={handleLiveGuildCaptureStatusChange}
           />
         )}
       </ContentShell>
@@ -1557,71 +1370,51 @@ function PlayerToplistsPageContent() {
         onClose={() => setBottomFilterOpen(false)}
       />
 
-      <ToplistPngExportDialog
-        isOpen={isExportDialogOpen}
-        amount={exportAmount}
-        selection={exportSelection}
-        guildOptions={exportGuildOptions}
-        selectedGuilds={exportSelectedGuilds}
-        availableCount={exportAvailableCount}
-        rangeEnabled={exportRangeEnabled}
-        rangeFrom={exportRangeFromClamped}
-        rangeTo={exportRangeToClamped}
-        exporting={isExportingPng}
-        onAmountChange={handleExportAmountChange}
-        onSelectionChange={handleExportSelectionChange}
-        onToggleGuild={handleToggleExportGuild}
-        onRangeEnabledChange={handleExportRangeEnabledChange}
-        onRangeFromChange={handleExportRangeFromChange}
-        onRangeToChange={handleExportRangeToChange}
-        onCancel={() => {
-          if (isExportingPng) return;
-          setIsExportDialogOpen(false);
+      <ToplistExportController
+        ref={exportControllerRef}
+        activeKind={activeTab === "guilds" ? "guilds" : "players"}
+        liveTableRef={tableRef}
+        renderPresetContent={({ kind, amount, tableRef: presetTableRef, onCaptureStatusChange }) => {
+          if (kind === "guilds") {
+            return (
+              <GuildToplists
+                serverCodes={servers ?? []}
+                sortKey={resolvedGuildSortBy}
+                showAvgModeControl={false}
+                tableRef={presetTableRef}
+                renderMode="preset"
+                presetAmount={amount}
+                onCaptureStatusChange={onCaptureStatusChange}
+              />
+            );
+          }
+          return (
+            <TableDataView
+              servers={servers ?? []}
+              classes={classes ?? []}
+              range={(range ?? "all") as any}
+              sortKey={sortBy ?? "level"}
+              compareMode={compareMode}
+              progressSinceMonth={progressSinceMonth}
+              compareFromMonth={compareFromMonth}
+              compareToMonth={compareToMonth}
+              showAvgModeControl={false}
+              focusIdentifier={null}
+              focusRank={null}
+              tableRef={presetTableRef}
+              renderMode="preset"
+              presetAmount={amount}
+              onCaptureStatusChange={onCaptureStatusChange}
+            />
+          );
         }}
-        onExport={handleConfirmExportPng}
       />
-
-      {exportRenderState && (
-        <div
-          aria-hidden
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            transform: "translate3d(-12000px, 0, 0)",
-            opacity: 0,
-            pointerEvents: "none",
-            width: `${exportRenderState.width}px`,
-            background: exportRenderState.backgroundColor,
-            padding: 0,
-            margin: 0,
-          }}
-        >
-          <div ref={exportNodeRef}>
-            {exportRenderState.kind === "guilds" ? (
-              <GuildToplistExportTable
-                key={exportRenderKey}
-                rows={exportRenderState.rows}
-                width={exportRenderState.width}
-              />
-            ) : (
-              <ToplistExportTable
-                key={exportRenderKey}
-                rows={exportRenderState.rows}
-                showCompare={exportRenderState.showCompare}
-                width={exportRenderState.width}
-                exportNonce={exportNonce}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, exportSnapshotRef,
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange,
 }: {
   servers: string[];
   classes: string[];
@@ -1635,7 +1428,9 @@ function TableDataView({
   focusIdentifier: string | null;
   focusRank: number | null;
   tableRef: React.RefObject<HTMLDivElement>;
-  exportSnapshotRef: React.MutableRefObject<ToplistExportSnapshot>;
+  renderMode?: "live" | "preset";
+  presetAmount?: ToplistExportAmount | null;
+  onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
 }) {
   const { t } = useTranslation();
   const { guilds, favoritesOnly } = useFilters();
@@ -1654,6 +1449,9 @@ function TableDataView({
   } = useToplistsData();
   const navigate = useNavigate();
   const location = useLocation();
+  const isPresetRender = renderMode === "preset";
+  const resolvedPresetAmount = presetAmount ?? 50;
+  const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
 
   const hasServers = (servers?.length ?? 0) > 0;
   const [playerAvgMode, setPlayerAvgMode] = React.useState<"base" | "total">(() => PLAYER_AVG_MODE_CACHE);
@@ -2475,11 +2273,10 @@ function TableDataView({
       };
     });
   }, [showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
-  exportSnapshotRef.current = {
-    kind: "players",
-    rows: enhancedRows as ToplistExportRow[],
-    showCompare,
-  };
+  const renderedRows = React.useMemo(
+    () => (captureRowLimit == null ? enhancedRows : enhancedRows.slice(0, captureRowLimit)),
+    [captureRowLimit, enhancedRows]
+  );
 
   const avgTop100StatsPerDay = (() => {
     if (!showCompare) return null;
@@ -2591,25 +2388,72 @@ function TableDataView({
   const [tableScrollbarWidth, setTableScrollbarWidth] = React.useState(0);
   const virtualRowHeight = showCompare ? 72 : 64;
   const virtualRowKeys = React.useMemo(
-    () => enhancedRows.map((row) => resolveToplistRowIdentifier(row)),
-    [enhancedRows]
+    () => renderedRows.map((row) => resolveToplistRowIdentifier(row)),
+    [renderedRows]
   );
   const rowIndexByIdentifier = React.useMemo(() => {
     const indexMap = new Map<string, number>();
-    enhancedRows.forEach((row, idx) => {
+    renderedRows.forEach((row, idx) => {
       const identifier = resolveToplistRowIdentifier(row);
       if (!identifier || indexMap.has(identifier)) return;
       indexMap.set(identifier, idx);
     });
     return indexMap;
-  }, [enhancedRows]);
+  }, [renderedRows]);
   const rowVirtualizer = useVirtualizer({
-    count: enhancedRows.length,
-    getScrollElement: () => tableScrollRef.current,
+    count: renderedRows.length,
+    getScrollElement: () => (isPresetRender ? null : tableScrollRef.current),
     estimateSize: () => virtualRowHeight,
     overscan: 14,
     getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
   });
+  const compareExpected = effectiveCompareMode !== "off";
+  const virtualTotalSize = Math.round(rowVirtualizer.getTotalSize());
+  const firstRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[0]) : "";
+  const lastRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[renderedRows.length - 1]) : "";
+  const captureReady =
+    !tableLoading &&
+    renderedRows.length > 0 &&
+    (!compareExpected || (!compareLoading && showCompare && virtualRowHeight === 72));
+  const captureStabilityKey = [
+    renderMode,
+    effectiveCompareMode,
+    compareExpected ? "cmp:1" : "cmp:0",
+    compareLoading ? "cmpLoading:1" : "cmpLoading:0",
+    showCompare ? "showCompare:1" : "showCompare:0",
+    tableLoading ? "loading:1" : "loading:0",
+    `rows:${renderedRows.length}`,
+    `rowH:${virtualRowHeight}`,
+    `virt:${virtualTotalSize}`,
+    `first:${firstRenderedKey}`,
+    `last:${lastRenderedKey}`,
+  ].join("|");
+
+  React.useEffect(() => {
+    if (!onCaptureStatusChange) return;
+    onCaptureStatusChange({
+      loading: tableLoading,
+      rowCount: renderedRows.length,
+      ready: captureReady,
+      stabilityKey: captureStabilityKey,
+      compareLoading,
+      compareExpected,
+      showCompare,
+      virtualRowHeight,
+      virtualTotalSize,
+    });
+  }, [
+    captureReady,
+    captureStabilityKey,
+    compareExpected,
+    compareLoading,
+    onCaptureStatusChange,
+    renderedRows.length,
+    showCompare,
+    tableLoading,
+    virtualRowHeight,
+    virtualTotalSize,
+  ]);
 
   const resolveGuildOverlayTarget = React.useCallback(
     async (row: FirestoreToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
@@ -2686,6 +2530,7 @@ function TableDataView({
   }, []);
 
   React.useEffect(() => {
+    if (isPresetRender) return;
     const scrollEl = tableScrollRef.current;
     if (!scrollEl) return;
 
@@ -2701,11 +2546,12 @@ function TableDataView({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [hasServers, enhancedRows.length, showCompare]);
+  }, [hasServers, isPresetRender, renderedRows.length, showCompare]);
 
   React.useEffect(() => {
     void focusRank;
 
+    if (isPresetRender) return;
     if (!focusIdentifier || !hasServers || playerLoading) return;
     if (focusHandledRef.current === focusIdentifier) return;
     const targetIndex = rowIndexByIdentifier.get(focusIdentifier);
@@ -2721,7 +2567,7 @@ function TableDataView({
       setHighlightedIdentifier((prev) => (prev === focusIdentifier ? null : prev));
       focusHighlightTimeoutRef.current = null;
     }, 2600);
-  }, [focusIdentifier, focusRank, hasServers, playerLoading, rowIndexByIdentifier, rowVirtualizer]);
+  }, [focusIdentifier, focusRank, hasServers, isPresetRender, playerLoading, rowIndexByIdentifier, rowVirtualizer]);
 
   const renderToplistColGroup = () => (
     <colgroup>
@@ -2738,7 +2584,7 @@ function TableDataView({
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
           {TOPLIST_VISIBLE_COLUMNS.map((column) => (
             <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
-              <span style={TOPLIST_HEADER_LABEL_STYLE}>
+              <span style={{ ...TOPLIST_HEADER_LABEL_STYLE, ...TOPLIST_HEADER_LABEL_ALIGN_STYLE[column.align] }}>
                 {column.key === "name"
                   ? t("toplists.columns.player", "Player")
                   : t(`toplists.columns.${column.key}`, column.label)}
@@ -2753,23 +2599,23 @@ function TableDataView({
   const renderToplistTableBody = (opts: {
     imgLoading: "lazy" | "eager";
   }) => {
-    const rows = enhancedRows;
-    const virtualItems = rowVirtualizer.getVirtualItems();
-    const topSpacerHeight = virtualItems.length ? virtualItems[0].start : 0;
-    const bottomSpacerHeight = virtualItems.length
-      ? Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end)
-      : 0;
+    const rows = renderedRows;
+    const virtualItems = isPresetRender ? [] : rowVirtualizer.getVirtualItems();
+    const rowIndices = isPresetRender ? rows.map((_, idx) => idx) : virtualItems.map((virtualRow) => virtualRow.index);
+    const topSpacerHeight = isPresetRender || !virtualItems.length ? 0 : virtualItems[0].start;
+    const bottomSpacerHeight = isPresetRender || !virtualItems.length
+      ? 0
+      : Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end);
     return (
     <table className="toplists-table toplists-table--body" style={TOPLIST_TABLE_STYLE}>
       {renderToplistColGroup()}
       <tbody>
-        {rows.length > 0 && topSpacerHeight > 0 && (
+        {!isPresetRender && rows.length > 0 && topSpacerHeight > 0 && (
           <tr aria-hidden>
             <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
           </tr>
         )}
-        {virtualItems.map((virtualRow) => {
-          const i = virtualRow.index;
+        {rowIndices.map((i) => {
           const r = rows[i];
           if (!r) return null;
           const rankDelta = showCompare ? (r as any)._rankDelta : null;
@@ -2826,6 +2672,7 @@ function TableDataView({
           const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
             event.preventDefault();
             event.stopPropagation();
+            if (isPresetRender) return;
             if (!profileIdentifier) return;
             setSelectedPlayerProfile({
               identifier: profileIdentifier,
@@ -2888,12 +2735,13 @@ function TableDataView({
                   >
                     <NeonCoreButton
                       onClick={() => {
+                        if (isPresetRender) return;
                         void handleGuildCellClick(r);
                       }}
                       title={String(r.guild ?? "")}
                       label={String(r.guild ?? "")}
                       icon={null}
-                      className="w-full justify-start rounded-lg px-2 py-1 text-xs font-medium"
+                      className="w-full min-w-0 justify-start rounded-lg px-2 py-1 text-xs font-medium leading-tight"
                     />
                   </span>
                 ) : (
@@ -2901,13 +2749,13 @@ function TableDataView({
                 )}
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.level}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
                   {renderDelta(deltas.level ?? null, compareMissing)}
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(mainTone)}>
                     <ValueCrossfade value={fmtNum(displayMain)} fadeKey={playerAvgMode} minWidthCh={0} />
                   </span>
@@ -2915,7 +2763,7 @@ function TableDataView({
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(conTone)}>
                     <ValueCrossfade value={fmtNum(displayCon)} fadeKey={playerAvgMode} minWidthCh={0} />
                   </span>
@@ -2943,7 +2791,7 @@ function TableDataView({
                 </div>
               </td>
               <td style={TOPLIST_CELL_STYLE_BY_KEY.mine}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
                   {renderDelta(deltas.mine ?? null, compareMissing)}
                 </div>
@@ -2974,13 +2822,13 @@ function TableDataView({
             </tr>
           );
         })}
-        {tableLoading && enhancedRows.length === 0 && (
+        {tableLoading && rows.length === 0 && (
           <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td></tr>
         )}
-        {!tableLoading && !playerError && enhancedRows.length === 0 && (
+        {!tableLoading && !playerError && rows.length === 0 && (
           <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td></tr>
         )}
-        {rows.length > 0 && bottomSpacerHeight > 0 && (
+        {!isPresetRender && rows.length > 0 && bottomSpacerHeight > 0 && (
           <tr aria-hidden>
             <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
           </tr>
@@ -2990,9 +2838,9 @@ function TableDataView({
     );
   };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12, minHeight: 0, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{statusLabel} - {enhancedRows.length} {t("toplists.status.rows", "rows")}</div>
+        <div>{statusLabel} - {renderedRows.length} {t("toplists.status.rows", "rows")}</div>
         <div>{playerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(playerLastUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && playerAvgModeSlot &&
@@ -3056,36 +2904,50 @@ function TableDataView({
         </div>
       ) : (
         <>
-          <div ref={tableRef} className="toplists-table-viewport" style={{ flex: "1 1 auto", minHeight: 0 }}>
-            <div className="toplists-table-header" style={{ paddingRight: tableScrollbarWidth }}>
+          <div
+            ref={tableRef}
+            className="toplists-table-viewport"
+            data-toplists-export-root="true"
+            style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
+          >
+            <div className="toplists-table-header" style={{ paddingRight: isPresetRender ? 0 : tableScrollbarWidth }}>
               {renderToplistHeader()}
             </div>
-            <div ref={tableScrollRef} className="toplists-table-scroll">
-              {renderToplistTableBody({ imgLoading: "lazy" })}
+            <div
+              ref={tableScrollRef}
+              className="toplists-table-scroll"
+              data-toplists-export-scroll="true"
+              style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+            >
+              {renderToplistTableBody({ imgLoading: isPresetRender ? "eager" : "lazy" })}
             </div>
           </div>
         </>
       )}
-      <ProfileOverlay
-        isOpen={Boolean(selectedPlayerProfile?.identifier)}
-        playerIdentifier={selectedPlayerProfile?.identifier ?? null}
-        playerName={
-          selectedPlayerProfile
-            ? [selectedPlayerProfile.name, selectedPlayerProfile.server].filter(Boolean).join(" - ")
-            : null
-        }
-        onClose={() => setSelectedPlayerProfile(null)}
-      />
-      <GuildProfileOverlay
-        isOpen={Boolean(selectedGuildProfile?.guildId)}
-        guildId={selectedGuildProfile?.guildId ?? null}
-        guildName={
-          selectedGuildProfile
-            ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
-            : null
-        }
-        onClose={() => setSelectedGuildProfile(null)}
-      />
+      {!isPresetRender && (
+        <>
+          <ProfileOverlay
+            isOpen={Boolean(selectedPlayerProfile?.identifier)}
+            playerIdentifier={selectedPlayerProfile?.identifier ?? null}
+            playerName={
+              selectedPlayerProfile
+                ? [selectedPlayerProfile.name, selectedPlayerProfile.server].filter(Boolean).join(" - ")
+                : null
+            }
+            onClose={() => setSelectedPlayerProfile(null)}
+          />
+          <GuildProfileOverlay
+            isOpen={Boolean(selectedGuildProfile?.guildId)}
+            guildId={selectedGuildProfile?.guildId ?? null}
+            guildName={
+              selectedGuildProfile
+                ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
+                : null
+            }
+            onClose={() => setSelectedGuildProfile(null)}
+          />
+        </>
+      )}
     </div>
   );
 }

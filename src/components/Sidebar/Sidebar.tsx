@@ -69,6 +69,7 @@ const SUBTABS: Record<string, SubItem[]> = {
   ],
   "/admin": [
     { to: "/upload-center", labelKey: "nav.uploadCenter", minRole: "mod" },
+    { to: "/upload-center-v2", labelKey: "nav.uploadCenterV2", minRole: "mod" },
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],
   "/settings": [

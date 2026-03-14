@@ -58,6 +58,23 @@ function toNumMaybe(v: any) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function toTrimmedString(v: any): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const trimmed = v.trim();
+  return trimmed || undefined;
+}
+
+function extractGuildCoaString(o: Obj): string | undefined {
+  const save = o.save;
+  if (!Array.isArray(save) || save.length < 2) return undefined;
+  return toTrimmedString(save[1]);
+}
+
+function mapGuildJsonRecord(o: Obj): Obj {
+  const coaString = extractGuildCoaString(o);
+  return coaString ? { ...o, coaString } : o;
+}
+
 // ---------- Synonyme (aus deinen SFTools-Headern) ----------
 const PLAYER_NAME_KEYS = ["name", "player", "player_name", "nickname", "nick", "Character Name"];
 const PLAYER_ID_KEYS = ["id", "identifier", "link identifier", "player_id", "pid", "playerid", "ID", "Identifier"];
@@ -120,6 +137,21 @@ export type Parser = {
 };
 
 export const parsers: Parser[] = [
+  {
+    name: "sftools-guilds-bare",
+    detect: (json) => isObj(json) && Array.isArray(json.groups),
+    parse: async (json): Promise<DetectedPayload<GuildsPayloadT>> => {
+      const arr: Obj[] = json.groups;
+      const server =
+        up(guessServer(arr[0]) ?? guessServer(json) ?? "UNKNOWN");
+      const guilds = arr.map(mapGuildJsonRecord);
+      const wrapped = { type: "guilds", server, guilds };
+      const r = safeParse<GuildsPayloadT>(GuildsPayload, wrapped);
+      if (!r.ok) throw new Error("Invalid SFTools guilds payload (post-map)");
+      return { type: "guilds", raw: r.data! };
+    },
+  },
+
   // NEU: SFTools-Players-Export: { players: [...] } (ohne type/server)
   {
     name: "sftools-players-bare",
@@ -150,7 +182,8 @@ export const parsers: Parser[] = [
     name: "guilds-list",
     detect: (json) => isObj(json) && json.type === "guilds" && Array.isArray(json.guilds),
     parse: async (json): Promise<DetectedPayload<GuildsPayloadT>> => {
-      const r = safeParse<GuildsPayloadT>(GuildsPayload, json);
+      const wrapped = { ...json, guilds: (json.guilds as Obj[]).map(mapGuildJsonRecord) };
+      const r = safeParse<GuildsPayloadT>(GuildsPayload, wrapped);
       if (!r.ok) throw new Error("Invalid guilds payload");
       return { type: "guilds", raw: r.data! };
     },
@@ -183,7 +216,7 @@ export const parsers: Parser[] = [
       } else {
         // Guilds-Teil lassen wir vorerst wie gehabt.
         const server = up(guessServer(found.arr[0]) ?? "UNKNOWN");
-        const wrapped = { type: "guilds", server, guilds: found.arr };
+        const wrapped = { type: "guilds", server, guilds: found.arr.map(mapGuildJsonRecord) };
         const r = safeParse<GuildsPayloadT>(GuildsPayload, wrapped);
         if (r.ok) return { type: "guilds", raw: r.data! };
         throw new Error("deep guilds mapping failed");
