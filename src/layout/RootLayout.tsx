@@ -11,6 +11,14 @@ import LoginModalHost from "../components/auth/LoginModalHost";
 
 const SURFACE_STYLE = { borderColor: "#2B4C73", background: "#1A2F4A" };
 const AUTH_NEXT_STORAGE_KEY = "sfh:authNext";
+const GOATCOUNTER_RETRY_DELAYS_MS = [75, 200, 500, 1000, 2000];
+
+type GoatCounterWindow = Window & {
+  goatcounter?: {
+    count?: (payload?: { path?: string }) => void;
+  };
+  __sfhGoatcounterLastPath?: string;
+};
 
 const isSafeNextPath = (value: string | null): string | null => {
   if (!value) return null;
@@ -20,6 +28,29 @@ const isSafeNextPath = (value: string | null): string | null => {
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
   if (trimmed.toLowerCase().startsWith("/login")) return null;
   return trimmed;
+};
+
+const toAnalyticsPath = (pathname: string, search: string): string => {
+  if (pathname === "/toplists") {
+    const tab = new URLSearchParams(search).get("tab");
+    return tab === "guilds" ? "/toplists/guilds" : "/toplists/players";
+  }
+  return pathname || "/";
+};
+
+const sendGoatCounterPageview = (path: string, attempt = 0) => {
+  if (typeof window === "undefined") return;
+  const win = window as GoatCounterWindow;
+  const count = win.goatcounter?.count;
+  if (typeof count === "function") {
+    count({ path });
+    return;
+  }
+  const retryDelay = GOATCOUNTER_RETRY_DELAYS_MS[attempt];
+  if (typeof retryDelay !== "number") return;
+  window.setTimeout(() => {
+    sendGoatCounterPageview(path, attempt + 1);
+  }, retryDelay);
 };
 
 export default function RootLayout() {
@@ -70,6 +101,15 @@ export default function RootLayout() {
 
     navigate(nextPath, { replace: true });
   }, [authStatus, user, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const analyticsPath = toAnalyticsPath(location.pathname, location.search);
+    const win = window as GoatCounterWindow;
+    if (win.__sfhGoatcounterLastPath === analyticsPath) return;
+    win.__sfhGoatcounterLastPath = analyticsPath;
+    sendGoatCounterPageview(analyticsPath);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
