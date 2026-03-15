@@ -20,9 +20,9 @@ import ToplistExportController, {
 } from "../../components/export/ToplistExportController";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
-import { ToplistsProvider, useToplistsData, type Filters, type SortSpec } from "../../context/ToplistsDataContext";
+import { ToplistsProvider, useToplistsData, type Filters, type PlayerScopeStatus, type SortSpec } from "../../context/ToplistsDataContext";
 import { useAuth } from "../../context/AuthContext";
-import GuildToplists from "./guildtoplists";
+import GuildToplists, { type GuildToplistsPresetData } from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
   getPlayerToplistSnapshotByDocId,
@@ -68,6 +68,19 @@ type CompareSnapshotState = {
   baselineServers: string[];
   missingServers: string[];
   error: string | null;
+};
+
+type PlayerPresetReadOnlyData = {
+  rows: FirestoreToplistPlayerRow[];
+  tableLoading: boolean;
+  compareLoading: boolean;
+  compareExpected: boolean;
+  showCompare: boolean;
+  compareError: string | null;
+  playerError: string | null;
+  playerLastUpdatedAt: number | null;
+  playerScopeStatus: PlayerScopeStatus | null;
+  playerAvgMode: "base" | "total";
 };
 
 const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
@@ -1118,6 +1131,59 @@ function PlayerToplistsPageContent() {
   const prevUrlSyncedServersKeyRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
   const exportControllerRef = React.useRef<ToplistExportControllerHandle | null>(null);
+  const [playerPresetReadOnlyData, setPlayerPresetReadOnlyData] = React.useState<PlayerPresetReadOnlyData | null>(null);
+  const [guildPresetReadOnlyData, setGuildPresetReadOnlyData] = React.useState<GuildToplistsPresetData | null>(null);
+  const playerPresetSignatureRef = React.useRef<string>("");
+  const guildPresetSignatureRef = React.useRef<string>("");
+
+  const handlePlayerPresetReadOnlyDataChange = React.useCallback((nextData: PlayerPresetReadOnlyData) => {
+    const limitedRows = (Array.isArray(nextData.rows) ? nextData.rows : []).slice(0, 150);
+    const nextScope = nextData.playerScopeStatus;
+    const scopeSnapshot = nextScope
+      ? {
+          scopeId: nextScope.scopeId,
+          changesSinceLastRebuild: nextScope.changesSinceLastRebuild,
+          minChanges: nextScope.minChanges ?? null,
+          maxAgeDays: nextScope.maxAgeDays ?? null,
+          lastRebuildAt: nextScope.lastRebuildAt instanceof Date ? nextScope.lastRebuildAt.getTime() : null,
+        }
+      : null;
+    const signature = JSON.stringify({
+      rows: limitedRows,
+      tableLoading: nextData.tableLoading,
+      compareLoading: nextData.compareLoading,
+      compareExpected: nextData.compareExpected,
+      showCompare: nextData.showCompare,
+      compareError: nextData.compareError,
+      playerError: nextData.playerError,
+      playerLastUpdatedAt: nextData.playerLastUpdatedAt,
+      playerAvgMode: nextData.playerAvgMode,
+      scopeSnapshot,
+    });
+    if (playerPresetSignatureRef.current === signature) return;
+    playerPresetSignatureRef.current = signature;
+    setPlayerPresetReadOnlyData({
+      ...nextData,
+      rows: limitedRows,
+    });
+  }, []);
+
+  const handleGuildPresetReadOnlyDataChange = React.useCallback((nextData: GuildToplistsPresetData) => {
+    const limitedRows = (Array.isArray(nextData.rows) ? nextData.rows : []).slice(0, 150);
+    const signature = JSON.stringify({
+      rows: limitedRows,
+      loading: nextData.loading,
+      error: nextData.error,
+      updatedAt: nextData.updatedAt,
+      avgMode: nextData.avgMode,
+    });
+    if (guildPresetSignatureRef.current === signature) return;
+    guildPresetSignatureRef.current = signature;
+    setGuildPresetReadOnlyData({
+      ...nextData,
+      rows: limitedRows,
+    });
+  }, []);
 
   const openExportDialog = React.useCallback(() => {
     exportControllerRef.current?.open();
@@ -1338,6 +1404,7 @@ function PlayerToplistsPageContent() {
             tableRef={tableRef}
             renderMode="live"
             onCaptureStatusChange={handleLivePlayerCaptureStatusChange}
+            onPresetReadOnlyDataChange={handlePlayerPresetReadOnlyDataChange}
           />
         )}
         {activeTab === "guilds" && (
@@ -1348,6 +1415,7 @@ function PlayerToplistsPageContent() {
             tableRef={tableRef}
             renderMode="live"
             onCaptureStatusChange={handleLiveGuildCaptureStatusChange}
+            onPresetReadOnlyDataChange={handleGuildPresetReadOnlyDataChange}
           />
         )}
       </ContentShell>
@@ -1385,6 +1453,7 @@ function PlayerToplistsPageContent() {
                 renderMode="preset"
                 presetAmount={amount}
                 onCaptureStatusChange={onCaptureStatusChange}
+                presetReadOnlyData={guildPresetReadOnlyData}
               />
             );
           }
@@ -1405,6 +1474,7 @@ function PlayerToplistsPageContent() {
               renderMode="preset"
               presetAmount={amount}
               onCaptureStatusChange={onCaptureStatusChange}
+              presetReadOnlyData={playerPresetReadOnlyData}
             />
           );
         }}
@@ -1414,7 +1484,7 @@ function PlayerToplistsPageContent() {
 }
 
 function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange,
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPresetReadOnlyDataChange,
 }: {
   servers: string[];
   classes: string[];
@@ -1431,12 +1501,13 @@ function TableDataView({
   renderMode?: "live" | "preset";
   presetAmount?: ToplistExportAmount | null;
   onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
+  presetReadOnlyData?: PlayerPresetReadOnlyData | null;
+  onPresetReadOnlyDataChange?: (data: PlayerPresetReadOnlyData) => void;
 }) {
   const { t } = useTranslation();
   const { guilds, favoritesOnly } = useFilters();
   const { user } = useAuth();
   const {
-    player,
     playerRows,
     playerLoading,
     playerError,
@@ -1455,6 +1526,7 @@ function TableDataView({
 
   const hasServers = (servers?.length ?? 0) > 0;
   const [playerAvgMode, setPlayerAvgMode] = React.useState<"base" | "total">(() => PLAYER_AVG_MODE_CACHE);
+  const effectivePlayerAvgMode = isPresetRender ? (presetReadOnlyData?.playerAvgMode ?? playerAvgMode) : playerAvgMode;
   const [isPlayerAvgModePending, startPlayerAvgModeTransition] = React.useTransition();
   const [showPlayerUpdating, setShowPlayerUpdating] = React.useState(false);
   const [playerAvgModeSlot, setPlayerAvgModeSlot] = React.useState<HTMLElement | null>(null);
@@ -1530,6 +1602,7 @@ function TableDataView({
 
   // HUD-Filter -> Provider
   useEffect(() => {
+    if (isPresetRender) return;
     const providerRange =
       range === "all" ? "all" : range === 60 ? "30d" : `${range}d`;
     const normalized = normalizeServerList(servers);
@@ -1541,12 +1614,13 @@ function TableDataView({
       timeRange: providerRange as any,
       group,
     });
-  }, [servers, classes, range, setFilters]);
+  }, [servers, classes, isPresetRender, range, setFilters]);
 
   useEffect(() => {
+    if (isPresetRender) return;
     const s = mapSort(sortKey);
     setSort(s);
-  }, [sortKey, setSort]);
+  }, [isPresetRender, sortKey, setSort]);
   const effectiveSort = React.useMemo(
     () => mapSort(sortKey),
     [sortKey]
@@ -1611,7 +1685,7 @@ function TableDataView({
   };
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
-  const rows = playerRows || [];
+  const rows = isPresetRender ? (presetReadOnlyData?.rows ?? []) : (playerRows || []);
   const isCompareMonthsMode = compareMode === "months";
   const progressBaselineMonth = String(progressSinceMonth ?? "").trim();
   const compareFromMonthValue = String(compareFromMonth ?? "").trim();
@@ -1631,9 +1705,8 @@ function TableDataView({
     return keys.length ? new Set(keys) : null;
   }, [guilds]);
   const hasGuildData = React.useMemo(() => {
-    const rawRows = Array.isArray(player?.rows) ? player.rows : [];
-    return rawRows.some((row) => Boolean(normalizeGuildKey(row.guild)));
-  }, [player?.rows]);
+    return rows.some((row) => Boolean(normalizeGuildKey(row.guild)));
+  }, [rows]);
 
   const filteredRows = React.useMemo(() => {
     let nextRows = rows;
@@ -1685,12 +1758,14 @@ function TableDataView({
       .filter(Boolean);
     return new Set(normalized);
   }, [compareState.baselineServers]);
-  const compareLoading =
+  const derivedCompareLoading =
     compareState.loading || (isCompareMonthsMode ? compareTargetState.loading : false);
-  const showCompare =
+  const derivedShowCompare =
     Boolean(activeBaselineCompareMonth) &&
     (!isCompareMonthsMode || Boolean(activeTargetCompareMonth)) &&
-    !compareLoading;
+    !derivedCompareLoading;
+  const compareLoading = isPresetRender ? (presetReadOnlyData?.compareLoading ?? false) : derivedCompareLoading;
+  const showCompare = isPresetRender ? (presetReadOnlyData?.showCompare ?? false) : derivedShowCompare;
 
   // persist compare selection in URL (optional param)
   useEffect(() => {
@@ -1737,6 +1812,7 @@ function TableDataView({
 
   // Load monthly baseline snapshot(s) for comparison
   useEffect(() => {
+    if (isPresetRender) return;
     let cancelled = false;
     const normalizedCompareMonth = activeBaselineCompareMonth;
     const compareDisabled =
@@ -1851,10 +1927,11 @@ function TableDataView({
     return () => {
       cancelled = true;
     };
-  }, [activeBaselineCompareMonth, compareServersKey, t]);
+  }, [activeBaselineCompareMonth, compareServersKey, isPresetRender, t]);
 
   // Load compare target snapshot(s) when comparing month-to-month (visible list = "to" month)
   useEffect(() => {
+    if (isPresetRender) return;
     let cancelled = false;
     const normalizedTargetMonth = activeTargetCompareMonth;
     const compareDisabled =
@@ -1948,7 +2025,7 @@ function TableDataView({
     return () => {
       cancelled = true;
     };
-  }, [activeTargetCompareMonth, compareServersKey, compareServers, isCompareMonthsMode, t]);
+  }, [activeTargetCompareMonth, compareServersKey, compareServers, isCompareMonthsMode, isPresetRender, t]);
 
   const compareMonthsTargetRows = React.useMemo(() => {
     if (!isCompareMonthsMode) return [] as FirestoreToplistPlayerRow[];
@@ -2021,14 +2098,19 @@ function TableDataView({
   }, [effectiveCompareMode, activeBaselineCompareMonth, activeTargetCompareMonth]);
   const effectiveCurrentRows = effectiveCompareMode === "months" ? compareMonthsTargetRows : filteredRows;
   const effectiveBaselineRows = effectiveCompareMode === "off" ? [] : compareState.rows;
-  const activeCompareError =
+  const derivedActiveCompareError =
     effectiveCompareMode === "months"
       ? (compareTargetState.error ?? compareState.error)
       : compareState.error;
-  const tableLoading =
+  const derivedTableLoading =
     effectiveCompareMode === "months"
       ? (compareTargetState.loading || compareState.loading)
       : playerLoading;
+  const activeCompareError = isPresetRender ? (presetReadOnlyData?.compareError ?? null) : derivedActiveCompareError;
+  const tableLoading = isPresetRender ? (presetReadOnlyData?.tableLoading ?? false) : derivedTableLoading;
+  const effectivePlayerError = isPresetRender ? (presetReadOnlyData?.playerError ?? null) : playerError;
+  const effectivePlayerLastUpdatedAt = isPresetRender ? (presetReadOnlyData?.playerLastUpdatedAt ?? null) : playerLastUpdatedAt;
+  const effectivePlayerScopeStatus = isPresetRender ? (presetReadOnlyData?.playerScopeStatus ?? null) : playerScopeStatus;
 
   const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow, fallbackIndex?: number) => {
     const identifier = resolveToplistRowIdentifier(row);
@@ -2098,7 +2180,7 @@ function TableDataView({
         statsPerDayBase = statsBase.perDay;
         statsDaysTotal = statsTotal.days;
         statsPerDayTotal = statsTotal.perDay;
-        if (playerAvgMode === "total") {
+        if (effectivePlayerAvgMode === "total") {
           statsDays = statsDaysTotal;
           statsPerDay = statsPerDayTotal;
         } else {
@@ -2138,7 +2220,7 @@ function TableDataView({
     baselineRowByKey,
     baselineServerSet,
     effectiveCompareDaysOverride,
-    playerAvgMode,
+    effectivePlayerAvgMode,
   ]);
 
   const currentRowByKey = React.useMemo(() => {
@@ -2185,8 +2267,8 @@ function TableDataView({
       return {
         ...row,
         _ratioMain: mainRatio,
-        _statsPerDay: playerAvgMode === "total" ? stats.total.perDay : stats.base.perDay,
-        _statsDays: playerAvgMode === "total" ? stats.total.days : stats.base.days,
+        _statsPerDay: effectivePlayerAvgMode === "total" ? stats.total.perDay : stats.base.perDay,
+        _statsDays: effectivePlayerAvgMode === "total" ? stats.total.days : stats.base.days,
         _statsPerDayBase: stats.base.perDay,
         _statsDaysBase: stats.base.days,
         _statsPerDayTotal: stats.total.perDay,
@@ -2222,7 +2304,7 @@ function TableDataView({
     currentRowByKey,
     buildCompareKey,
     effectiveCompareDaysOverride,
-    playerAvgMode,
+    effectivePlayerAvgMode,
   ]);
 
   const baselineRankByKey = React.useMemo(() => {
@@ -2258,6 +2340,9 @@ function TableDataView({
   }, [currentSortedRows, buildCompareKey]);
 
   const enhancedRows = React.useMemo(() => {
+    if (isPresetRender) {
+      return presetReadOnlyData?.rows ?? [];
+    }
     return currentSortedRows.map((row, idx) => {
       if (!showCompare) {
         return { ...row, _rank: idx + 1 };
@@ -2272,7 +2357,7 @@ function TableDataView({
         _rankDelta: rankDelta,
       };
     });
-  }, [showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
+  }, [isPresetRender, presetReadOnlyData, showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
   const renderedRows = React.useMemo(
     () => (captureRowLimit == null ? enhancedRows : enhancedRows.slice(0, captureRowLimit)),
     [captureRowLimit, enhancedRows]
@@ -2337,11 +2422,11 @@ function TableDataView({
     };
 
     rankBy(
-      (row) => toNumberSafe(playerAvgMode === "total" ? row.mainTotal : row.main),
+      (row) => toNumberSafe(effectivePlayerAvgMode === "total" ? row.mainTotal : row.main),
       "mainRank"
     );
     rankBy(
-      (row) => toNumberSafe(playerAvgMode === "total" ? row.conTotal : row.con),
+      (row) => toNumberSafe(effectivePlayerAvgMode === "total" ? row.conTotal : row.con),
       "conRank"
     );
     rankBy((row) => toNumberSafe(row.level), "levelRank");
@@ -2359,14 +2444,14 @@ function TableDataView({
     });
 
     return map;
-  }, [enhancedRows, buildCompareKey, playerAvgMode]);
+  }, [enhancedRows, buildCompareKey, effectivePlayerAvgMode]);
 
   const nowMs = Date.now();
   const statusLabel = !hasServers
     ? t("toplists.status.noServerSelected", "No server selected")
-    : tableLoading || compareState.loading
+    : tableLoading
       ? t("toplists.status.loading", "Loading...")
-      : playerError
+      : effectivePlayerError
         ? t("toplists.status.error", "Error")
         : t("toplists.status.ready", "Ready");
   const [selectedPlayerProfile, setSelectedPlayerProfile] = React.useState<{
@@ -2407,7 +2492,7 @@ function TableDataView({
     overscan: 14,
     getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
   });
-  const compareExpected = effectiveCompareMode !== "off";
+  const compareExpected = isPresetRender ? (presetReadOnlyData?.compareExpected ?? false) : effectiveCompareMode !== "off";
   const virtualTotalSize = Math.round(rowVirtualizer.getTotalSize());
   const firstRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[0]) : "";
   const lastRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[renderedRows.length - 1]) : "";
@@ -2453,6 +2538,35 @@ function TableDataView({
     tableLoading,
     virtualRowHeight,
     virtualTotalSize,
+  ]);
+
+  React.useEffect(() => {
+    if (isPresetRender || !onPresetReadOnlyDataChange) return;
+    onPresetReadOnlyDataChange({
+      rows: enhancedRows,
+      tableLoading,
+      compareLoading,
+      compareExpected,
+      showCompare,
+      compareError: activeCompareError,
+      playerError: effectivePlayerError,
+      playerLastUpdatedAt: effectivePlayerLastUpdatedAt,
+      playerScopeStatus: effectivePlayerScopeStatus,
+      playerAvgMode: effectivePlayerAvgMode,
+    });
+  }, [
+    activeCompareError,
+    compareExpected,
+    compareLoading,
+    effectivePlayerAvgMode,
+    effectivePlayerError,
+    effectivePlayerLastUpdatedAt,
+    effectivePlayerScopeStatus,
+    enhancedRows,
+    isPresetRender,
+    onPresetReadOnlyDataChange,
+    showCompare,
+    tableLoading,
   ]);
 
   const resolveGuildOverlayTarget = React.useCallback(
@@ -2651,12 +2765,12 @@ function TableDataView({
           const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
           const mineTone = getMineTone(decor?.mineTier);
           const calculatedSum = (r as any)._calculatedSum ?? 0;
-          const displayMain = playerAvgMode === "total" ? r.mainTotal : r.main;
-          const displayCon = playerAvgMode === "total" ? r.conTotal : r.con;
-          const displaySum = playerAvgMode === "total" ? r.sumTotal : calculatedSum;
-          const mainDeltaValue = playerAvgMode === "total" ? (deltas.mainTotal ?? null) : (deltas.main ?? null);
-          const conDeltaValue = playerAvgMode === "total" ? (deltas.conTotal ?? null) : (deltas.con ?? null);
-          const sumDeltaValue = playerAvgMode === "total" ? (deltas.sumTotal ?? null) : (deltas.sum ?? null);
+          const displayMain = effectivePlayerAvgMode === "total" ? r.mainTotal : r.main;
+          const displayCon = effectivePlayerAvgMode === "total" ? r.conTotal : r.con;
+          const displaySum = effectivePlayerAvgMode === "total" ? r.sumTotal : calculatedSum;
+          const mainDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.mainTotal ?? null) : (deltas.main ?? null);
+          const conDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.conTotal ?? null) : (deltas.con ?? null);
+          const sumDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.sumTotal ?? null) : (deltas.sum ?? null);
           const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
             if (!showCompare) return null;
             if (missing) {
@@ -2757,7 +2871,7 @@ function TableDataView({
               <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
                 <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(mainTone)}>
-                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={playerAvgMode} minWidthCh={0} />
+                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(mainDeltaValue, compareMissing)}
                 </div>
@@ -2765,7 +2879,7 @@ function TableDataView({
               <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
                 <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
                   <span style={getFrameStyle(conTone)}>
-                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={playerAvgMode} minWidthCh={0} />
+                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(conDeltaValue, compareMissing)}
                 </div>
@@ -2773,7 +2887,7 @@ function TableDataView({
               <td style={TOPLIST_CELL_STYLE_BY_KEY.sum}>
                 <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
                   <span>
-                    <ValueCrossfade value={fmtNum(displaySum)} fadeKey={playerAvgMode} />
+                    <ValueCrossfade value={fmtNum(displaySum)} fadeKey={effectivePlayerAvgMode} />
                   </span>
                   {renderDelta(sumDeltaValue, compareMissing)}
                 </div>
@@ -2825,7 +2939,7 @@ function TableDataView({
         {tableLoading && rows.length === 0 && (
           <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td></tr>
         )}
-        {!tableLoading && !playerError && rows.length === 0 && (
+        {!tableLoading && !effectivePlayerError && rows.length === 0 && (
           <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td></tr>
         )}
         {!isPresetRender && rows.length > 0 && bottomSpacerHeight > 0 && (
@@ -2841,7 +2955,7 @@ function TableDataView({
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
         <div>{statusLabel} - {renderedRows.length} {t("toplists.status.rows", "rows")}</div>
-        <div>{playerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(playerLastUpdatedAt) }) : null}</div>
+        <div>{effectivePlayerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(effectivePlayerLastUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && playerAvgModeSlot &&
         createPortal(
@@ -2862,33 +2976,33 @@ function TableDataView({
           {activeCompareError}
         </div>
       )}
-      {playerScopeStatus && (
+      {effectivePlayerScopeStatus && (
         <div style={{ opacity: 0.75, fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span>
             {t("toplists.players.scope.summary", "Scope {{scopeId}} - {{changes}}/{{minChanges}} changes since last rebuild", {
-              scopeId: playerScopeStatus.scopeId,
-              changes: playerScopeStatus.changesSinceLastRebuild,
-              minChanges: playerScopeStatus.minChanges ?? "?",
+              scopeId: effectivePlayerScopeStatus.scopeId,
+              changes: effectivePlayerScopeStatus.changesSinceLastRebuild,
+              minChanges: effectivePlayerScopeStatus.minChanges ?? "?",
             })}
           </span>
           <span>
             {t("toplists.players.scope.autoRebuild", "Auto rebuild at {{minChanges}} changes or after {{maxAgeDays}} days", {
-              minChanges: playerScopeStatus.minChanges ?? "?",
-              maxAgeDays: playerScopeStatus.maxAgeDays ?? "?",
+              minChanges: effectivePlayerScopeStatus.minChanges ?? "?",
+              maxAgeDays: effectivePlayerScopeStatus.maxAgeDays ?? "?",
             })}
           </span>
           <span>
             {t("toplists.players.scope.lastRebuild", "Last rebuild: {{value}}", {
-              value: fmtDateObj(playerScopeStatus.lastRebuildAt),
+              value: fmtDateObj(effectivePlayerScopeStatus.lastRebuildAt),
             })}
           </span>
         </div>
       )}
 
-      {hasServers && playerError && (
+      {hasServers && effectivePlayerError && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
-          <div style={{ wordBreak: "break-all" }}>{playerError}</div>
+          <div style={{ wordBreak: "break-all" }}>{effectivePlayerError}</div>
           <button
             onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)}
             style={{ marginTop: 8 }}

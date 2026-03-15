@@ -1,0 +1,12 @@
+.guild-profile-coa-mode img[alt="Guild COA"] {
+  width: min(270px, 100%) !important;
+  height: auto !important;
+  max-width: min(270px, 100%) !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 1;
+  object-fit: contain !important;
+  filter: none !important;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+}

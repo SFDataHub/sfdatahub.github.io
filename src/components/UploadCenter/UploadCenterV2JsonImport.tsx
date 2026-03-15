@@ -5,6 +5,21 @@ import {
   type SfJsonOwnPlayer,
   type SfJsonParseResult,
 } from "../../lib/parsing";
+import PortraitPreview from "../avatar/PortraitPreview";
+import {
+  createPortraitOptionsFromAvatarSnapshot,
+  saveAvatarSnapshotForIdentifier,
+} from "../../lib/firebase/avatarSnapshots";
+import { mergeCoaStringIntoMembersSummaryLatest } from "../../lib/import/importer";
+import {
+  isFirestoreReadTraceEnabled,
+  isFirestoreWriteTraceEnabled,
+  reportReadSummary,
+  reportWriteSummary,
+  startReadTraceSession,
+} from "../../lib/debug/firestoreReadTrace";
+import { useAuth } from "../../context/AuthContext";
+import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.js";
 import styles from "./UploadCenterV2JsonImport.module.css";
 
 type FieldDefinition = {
@@ -13,6 +28,27 @@ type FieldDefinition = {
 };
 
 type TableMode = "overview" | "player" | "group";
+type ImportMode = "mapping" | "coa_import" | "avatar_import";
+type CoaPreviewCandidate = {
+  key: string;
+  source: string;
+  coaString: string;
+  guildName: string | null;
+};
+type CoaBatchTarget = {
+  guildId: string;
+  guildName: string | null;
+  coaString: string;
+  source: string;
+};
+type CoaBatchExtraction = {
+  recognizedGuilds: number;
+  recognizedGuildEntries: number;
+  duplicateGuildEntries: number;
+  skippedMissingCoa: number;
+  skippedInvalidCoa: number;
+  targets: CoaBatchTarget[];
+};
 
 const FIELD_DEFINITIONS: FieldDefinition[] = [
   { key: "identifier", label: "Identifier" },
@@ -164,6 +200,37 @@ for (let i = 0; i < 50; i += 1) {
   GROUP_SAVE_FIELD_LABELS[445 + i] = `Member ${i + 1} Action`;
 }
 
+const mapPlayerOwnToOtherFieldIndex = (ownIndex: number): number | null => {
+  if (ownIndex === 1) return 0;
+  if (ownIndex === 2) return 1;
+  if (ownIndex >= 7 && ownIndex <= 11) return ownIndex - 5;
+  if (ownIndex >= 17 && ownIndex <= 39) return ownIndex - 9;
+  if (ownIndex >= 48 && ownIndex <= 167) return ownIndex - 9;
+  if (ownIndex === 286) return 159;
+  if (ownIndex === 433) return 160;
+  if (ownIndex === 435) return 161;
+  if (ownIndex === 438) return 163;
+  if (ownIndex === 443) return 166;
+  if (ownIndex === 444) return 167;
+  if (ownIndex === 445) return 252;
+  if (ownIndex === 447) return 168;
+  if (ownIndex === 448) return 169;
+  if (ownIndex === 449) return 170;
+  if (ownIndex === 493) return 194;
+  if (ownIndex === 494) return 195;
+  if (ownIndex === 495) return 196;
+  if (ownIndex === 499) return 200;
+  if (ownIndex === 500) return 201;
+  if (ownIndex === 501) return 202;
+  if (ownIndex === 502) return 203;
+  if (ownIndex === 517) return 204;
+  if (ownIndex === 521) return 205;
+  if (ownIndex >= 524 && ownIndex <= 535) return ownIndex - 316;
+  if (ownIndex === 581) return 247;
+  if (ownIndex === 582) return 248;
+  return null;
+};
+
 const toPreviewString = (value: unknown): string => {
   if (value === undefined) return "(missing)";
   if (value === null) return "null";
@@ -202,7 +269,17 @@ const readString = (obj: Record<string, unknown>, keys: string[]): string | null
   return null;
 };
 
+const readIdentifierString = (obj: Record<string, unknown>, keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value));
+  }
+  return null;
+};
+
 const normalizeLoose = (value: string) => value.trim().toLowerCase();
+const isValidCoaString = (value: string) => value === "0" || /^[0-9a-f]{22}$/i.test(value);
 
 const toNumberArray = (value: unknown): number[] | null => {
   if (!Array.isArray(value)) return null;
@@ -275,6 +352,16 @@ const extractCoaFromGroup = (group: Record<string, unknown>): string | null => {
   return null;
 };
 
+const COA_SOURCE_KEYS = [
+  "coaString",
+  "coa",
+  "coa_string",
+  "coatOfArms",
+  "coat_of_arms",
+  "emblem",
+  "emblemString",
+] as const;
+
 const findMatchedRawGroup = (
   rawJson: unknown,
   selectedRawObj: Record<string, unknown> | null,
@@ -342,6 +429,275 @@ const extractCoaString = (
 
   return null;
 };
+
+const extractGuildName = (
+  selectedRawObj: Record<string, unknown> | null,
+  selectedGroup: Record<string, unknown> | null,
+  selectedPlayer: SfJsonOwnPlayer | null,
+): string | null => {
+  const fromGroup = selectedGroup
+    ? readString(selectedGroup, ["name", "groupname", "groupName", "guildName", "guild"])
+    : null;
+  if (fromGroup) return fromGroup;
+
+  const fromPlayer = selectedRawObj
+    ? readString(selectedRawObj, ["groupname", "groupName", "guildName", "guild"])
+    : null;
+  if (fromPlayer) return fromPlayer;
+
+  if (typeof selectedPlayer?.guildName === "string" && selectedPlayer.guildName.trim()) {
+    return selectedPlayer.guildName.trim();
+  }
+
+  return null;
+};
+
+const extractGuildNameFromRecord = (obj: Record<string, unknown> | null): string | null => {
+  if (!obj) return null;
+  return readString(obj, ["name", "groupname", "groupName", "guildName", "guild"]);
+};
+
+const collectCoaCandidatesFromObject = (
+  obj: Record<string, unknown> | null,
+  sourcePrefix: string,
+  guildName: string | null,
+): CoaPreviewCandidate[] => {
+  if (!obj) return [];
+
+  const candidates: CoaPreviewCandidate[] = [];
+  for (const key of COA_SOURCE_KEYS) {
+    const value = obj[key];
+    if (typeof value !== "string" || !value.trim()) continue;
+    const trimmed = value.trim();
+    candidates.push({
+      key: `${sourcePrefix}.${key}:${trimmed}`,
+      source: `${sourcePrefix}.${key}`,
+      coaString: trimmed,
+      guildName,
+    });
+  }
+
+  const saveValue = Array.isArray(obj.save) ? obj.save[1] : null;
+  if (typeof saveValue === "string" && saveValue.trim()) {
+    const trimmed = saveValue.trim();
+    candidates.push({
+      key: `${sourcePrefix}.save[1]:${trimmed}`,
+      source: `${sourcePrefix}.save[1]`,
+      coaString: trimmed,
+      guildName,
+    });
+  }
+
+  return candidates;
+};
+
+const extractAllCoaCandidates = (
+  rawJson: unknown,
+  selectedRawPlayer: Record<string, unknown> | null,
+  selectedGuildName: string | null,
+): CoaPreviewCandidate[] => {
+  const root = asObject(rawJson);
+  const rawGroups = root && Array.isArray(root.groups) ? root.groups : [];
+  const groups = rawGroups
+    .map((entry) => asObject(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  const playerGuildName = extractGuildNameFromRecord(selectedRawPlayer) ?? selectedGuildName;
+  const groupCandidates = groups.flatMap((group, index) => {
+    const identifier = readIdentifierString(group, [
+      "identifier",
+      "id",
+      "group",
+      "groupIdentifier",
+      "groupId",
+      "guildId",
+      "guildIdentifier",
+    ]);
+    const groupGuildName = extractGuildNameFromRecord(group) ?? selectedGuildName;
+    const sourcePrefix = identifier ? `groups[${index}] (${identifier})` : `groups[${index}]`;
+    return collectCoaCandidatesFromObject(group, sourcePrefix, groupGuildName);
+  });
+
+  const rawCandidates = [
+    ...collectCoaCandidatesFromObject(selectedRawPlayer, "player", playerGuildName),
+    ...groupCandidates,
+  ];
+
+  if (rawCandidates.length === 0) return [];
+
+  const unique = new Map<string, CoaPreviewCandidate>();
+  rawCandidates.forEach((candidate) => {
+    if (unique.has(candidate.key)) return;
+    unique.set(candidate.key, candidate);
+  });
+  return Array.from(unique.values());
+};
+
+const extractCoaBatchTargets = (rawJson: unknown, fallbackGuildName: string | null): CoaBatchExtraction => {
+  const root = asObject(rawJson);
+  const rawGroups = root && Array.isArray(root.groups) ? root.groups : [];
+  const groups = rawGroups
+    .map((entry) => asObject(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  const seenGuildIds = new Set<string>();
+  const targetsByGuildId = new Map<string, CoaBatchTarget>();
+  let recognizedGuildEntries = 0;
+  let duplicateGuildEntries = 0;
+  let skippedMissingCoa = 0;
+  let skippedInvalidCoa = 0;
+
+  groups.forEach((group, index) => {
+    const guildId = readIdentifierString(group, [
+      "identifier",
+      "id",
+      "group",
+      "groupIdentifier",
+      "groupId",
+      "guildId",
+      "guildIdentifier",
+    ]);
+    if (!guildId) return;
+
+    recognizedGuildEntries += 1;
+    if (seenGuildIds.has(guildId)) {
+      duplicateGuildEntries += 1;
+    } else {
+      seenGuildIds.add(guildId);
+    }
+
+    const guildName = extractGuildNameFromRecord(group) ?? fallbackGuildName;
+    const sourcePrefix = `groups[${index}] (${guildId})`;
+    const coaCandidates = collectCoaCandidatesFromObject(group, sourcePrefix, guildName);
+
+    if (coaCandidates.length === 0) {
+      skippedMissingCoa += 1;
+      return;
+    }
+
+    const validCandidate = coaCandidates.find((candidate) => isValidCoaString(candidate.coaString));
+    if (!validCandidate) {
+      skippedInvalidCoa += 1;
+      return;
+    }
+
+    if (!targetsByGuildId.has(guildId)) {
+      targetsByGuildId.set(guildId, {
+        guildId,
+        guildName,
+        coaString: validCandidate.coaString,
+        source: validCandidate.source,
+      });
+    }
+  });
+
+  return {
+    recognizedGuilds: seenGuildIds.size,
+    recognizedGuildEntries,
+    duplicateGuildEntries,
+    skippedMissingCoa,
+    skippedInvalidCoa,
+    targets: Array.from(targetsByGuildId.values()),
+  };
+};
+
+function CoaPreviewCanvas({
+  coaString,
+  guildName,
+}: {
+  coaString: string;
+  guildName: string | null;
+}) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const rendererRef = React.useRef<CoaRenderer | null>(null);
+  const isValid = isValidCoaString(coaString);
+
+  React.useEffect(() => {
+    return () => {
+      if (!rendererRef.current) return;
+      rendererRef.current.dispose();
+      rendererRef.current = null;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const clearCanvas = () => {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    if (!isValid) {
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
+      clearCanvas();
+      return;
+    }
+
+    let isCancelled = false;
+    const guildNameForRender = guildName ?? undefined;
+
+    const bindRendererCallbacks = (renderer: CoaRenderer) => {
+      renderer.onError = (error: Error) => {
+        if (isCancelled) return;
+        console.warn("[UploadCenterV2][COA Preview] Renderer onError", error);
+      };
+      renderer.onFinish = () => {
+        if (isCancelled) return;
+      };
+    };
+
+    if (!rendererRef.current) {
+      try {
+        const renderer = new CoaRenderer(canvas, coaString, guildNameForRender);
+        bindRendererCallbacks(renderer);
+        rendererRef.current = renderer;
+      } catch (error) {
+        console.warn("[UploadCenterV2][COA Preview] new CoaRenderer failed", error);
+        clearCanvas();
+      }
+
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    const renderer = rendererRef.current;
+    bindRendererCallbacks(renderer);
+    renderer.updateCOA(coaString, guildNameForRender).catch((error) => {
+      if (isCancelled) return;
+      console.warn("[UploadCenterV2][COA Preview] updateCOA failed", error);
+      clearCanvas();
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [coaString, guildName, isValid]);
+
+  return (
+    <>
+      {isValid ? (
+        <canvas
+          ref={canvasRef}
+          className={styles.coaPreviewCanvas}
+          width={240}
+          height={240}
+        />
+      ) : (
+        <p className={styles.coaPreviewHint}>
+          Invalid coaString. Expected "0" or a 22-character hex value.
+        </p>
+      )}
+    </>
+  );
+}
 
 const extractPlayerSaveArray = (
   selectedRawObj: Record<string, unknown> | null,
@@ -451,15 +807,23 @@ const buildParsedGroupSaveFieldValues = (
 };
 
 export default function UploadCenterV2JsonImport() {
+  const { user } = useAuth();
   const [jsonInput, setJsonInput] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [rawJson, setRawJson] = React.useState<unknown>(null);
   const [parseResult, setParseResult] = React.useState<SfJsonParseResult | null>(null);
   const [parseStatus, setParseStatus] = React.useState<string | null>(null);
   const [parseError, setParseError] = React.useState<string | null>(null);
+  const [importMode, setImportMode] = React.useState<ImportMode>("mapping");
   const [selectedIdentifier, setSelectedIdentifier] = React.useState("");
   const [tableMode, setTableMode] = React.useState<TableMode>("overview");
   const [avatarSectionOpen, setAvatarSectionOpen] = React.useState(false);
+  const [coaImportStatus, setCoaImportStatus] = React.useState<string | null>(null);
+  const [coaImportError, setCoaImportError] = React.useState<string | null>(null);
+  const [isCoaImporting, setIsCoaImporting] = React.useState(false);
+  const [avatarImportStatus, setAvatarImportStatus] = React.useState<string | null>(null);
+  const [avatarImportError, setAvatarImportError] = React.useState<string | null>(null);
+  const [isAvatarImporting, setIsAvatarImporting] = React.useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -470,6 +834,10 @@ export default function UploadCenterV2JsonImport() {
       setFileName(file.name);
       setParseStatus(`Loaded ${file.name}. Click parse to evaluate parser fields.`);
       setParseError(null);
+      setCoaImportStatus(null);
+      setCoaImportError(null);
+      setAvatarImportStatus(null);
+      setAvatarImportError(null);
     } catch (error) {
       console.error("[UploadCenterV2] Could not read JSON file", error);
       setParseError("Could not read the selected JSON file.");
@@ -493,6 +861,10 @@ export default function UploadCenterV2JsonImport() {
       setRawJson(parsedJson);
       setParseResult(parsed);
       setParseError(null);
+      setCoaImportStatus(null);
+      setCoaImportError(null);
+      setAvatarImportStatus(null);
+      setAvatarImportError(null);
 
       if (parsed.ownPlayers.length === 0) {
         setParseStatus(`Parsed ${parsed.playersCount} players. No own player found (expected \"own\": 1).`);
@@ -512,6 +884,10 @@ export default function UploadCenterV2JsonImport() {
       setRawJson(null);
       setParseResult(null);
       setSelectedIdentifier("");
+      setCoaImportStatus(null);
+      setCoaImportError(null);
+      setAvatarImportStatus(null);
+      setAvatarImportError(null);
     }
   };
 
@@ -540,6 +916,156 @@ export default function UploadCenterV2JsonImport() {
     () => findMatchedRawGroup(rawJson, selectedRawPlayer, selectedPlayer),
     [rawJson, selectedRawPlayer, selectedPlayer],
   );
+  const selectedGuildName = React.useMemo(
+    () => extractGuildName(selectedRawPlayer, selectedRawGroup, selectedPlayer),
+    [selectedRawPlayer, selectedRawGroup, selectedPlayer],
+  );
+  const coaPreviewCandidates = React.useMemo(
+    () => extractAllCoaCandidates(rawJson, selectedRawPlayer, selectedGuildName),
+    [rawJson, selectedRawPlayer, selectedGuildName],
+  );
+  const coaBatchExtraction = React.useMemo(
+    () => extractCoaBatchTargets(rawJson, selectedGuildName),
+    [rawJson, selectedGuildName],
+  );
+  const coaBatchTargets = coaBatchExtraction.targets;
+
+  const handleCoaImport = React.useCallback(async () => {
+    const traceSession = `UploadCenterV2:CoaImportBatch:${coaBatchExtraction.recognizedGuilds}`;
+    startReadTraceSession(traceSession);
+    setCoaImportStatus(null);
+    setCoaImportError(null);
+
+    if (!isFirestoreReadTraceEnabled() && !isFirestoreWriteTraceEnabled()) {
+      console.info(
+        "[UploadCenterV2][COA Import] Firestore trace disabled. Enable via localStorage keys sfh:debug:firestoreReads=1 and/or sfh:debug:firestoreWrites=1.",
+      );
+    }
+
+    if (!parseResult) {
+      setCoaImportError("Parse JSON first.");
+      reportReadSummary(traceSession);
+      reportWriteSummary(traceSession);
+      return;
+    }
+
+    if (coaBatchTargets.length === 0) {
+      setCoaImportError("No importable guild COA targets found in the loaded JSON.");
+      reportReadSummary(traceSession);
+      reportWriteSummary(traceSession);
+      return;
+    }
+
+    setIsCoaImporting(true);
+    try {
+      let updated = 0;
+      let skippedSameValue = 0;
+      let skippedMissingLatest = 0;
+      let failed = 0;
+      const failedEntries: string[] = [];
+
+      for (const target of coaBatchTargets) {
+        try {
+          const result = await mergeCoaStringIntoMembersSummaryLatest({
+            guildId: target.guildId,
+            coaString: target.coaString,
+          });
+
+          if (result.status === "updated") {
+            updated += 1;
+          } else if (result.status === "skipped_missing_latest") {
+            skippedMissingLatest += 1;
+          } else {
+            skippedSameValue += 1;
+          }
+        } catch (error: unknown) {
+          failed += 1;
+          const message = error instanceof Error ? error.message : String(error);
+          failedEntries.push(`${target.guildId}: ${message}`);
+        }
+      }
+
+      const summary = [
+        `COA batch finished.`,
+        `Guilds recognized: ${coaBatchExtraction.recognizedGuilds} (${coaBatchExtraction.recognizedGuildEntries} entries).`,
+        `Processed targets: ${coaBatchTargets.length}.`,
+        `Imported: ${updated}.`,
+        `Unchanged/skipped: ${skippedSameValue}.`,
+        `Skipped missing latest: ${skippedMissingLatest}.`,
+        `Skipped missing/invalid coaString: ${coaBatchExtraction.skippedMissingCoa + coaBatchExtraction.skippedInvalidCoa}.`,
+      ].join(" ");
+
+      setCoaImportStatus(summary);
+
+      if (failed > 0) {
+        const failedPreview = failedEntries.slice(0, 3).join(" | ");
+        const extra = failedEntries.length > 3 ? ` (+${failedEntries.length - 3} more)` : "";
+        setCoaImportError(`COA batch had ${failed} failed writes. ${failedPreview}${extra}`);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCoaImportError(`COA import failed: ${message}`);
+    } finally {
+      setIsCoaImporting(false);
+      reportReadSummary(traceSession);
+      reportWriteSummary(traceSession);
+    }
+  }, [parseResult, coaBatchExtraction, coaBatchTargets]);
+
+  const handleAvatarImport = React.useCallback(async () => {
+    setAvatarImportStatus(null);
+    setAvatarImportError(null);
+
+    if (!parseResult) {
+      setAvatarImportError("Parse JSON first.");
+      return;
+    }
+
+    if (!selectedPlayer) {
+      setAvatarImportError("No own player available in parsed JSON.");
+      return;
+    }
+
+    if (!selectedPlayer.portrait) {
+      setAvatarImportError("Selected own player has no portrait save data.");
+      return;
+    }
+
+    if (!user?.id) {
+      setAvatarImportError("Missing authenticated user id.");
+      return;
+    }
+
+    setIsAvatarImporting(true);
+    try {
+      await saveAvatarSnapshotForIdentifier({
+        userId: user.id,
+        identifier: selectedPlayer.identifier,
+        playerId: selectedPlayer.playerId,
+        server: selectedPlayer.server,
+        source: "scanUpload",
+        portrait: selectedPlayer.portrait,
+      });
+      setAvatarImportStatus(
+        `Avatar imported for ${selectedPlayer.name || selectedPlayer.identifier} (${selectedPlayer.server}).`,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAvatarImportError(`Avatar import failed: ${message}`);
+    } finally {
+      setIsAvatarImporting(false);
+    }
+  }, [parseResult, selectedPlayer, user?.id]);
+  const avatarPreviewConfig = React.useMemo(() => {
+    if (!selectedPlayer?.portrait) return null;
+    return createPortraitOptionsFromAvatarSnapshot({
+      playerId: selectedPlayer.playerId,
+      server: selectedPlayer.server,
+      portrait: selectedPlayer.portrait,
+      updatedAt: null,
+      hasPortraitData: true,
+    });
+  }, [selectedPlayer]);
 
   const parserCoveredSaveFields = React.useMemo(() => {
     const covered = new Set<number>();
@@ -569,20 +1095,22 @@ export default function UploadCenterV2JsonImport() {
     return saveArray
       .map((value, index) => {
         const label = PLAYER_SAVE_FIELD_LABELS[index] ?? `Field ${index}`;
+        const ownFieldNumber = index;
+        const otherFieldNumber = mapPlayerOwnToOtherFieldIndex(index);
         const parserCovered = parserCoveredSaveFields.has(index);
         const parsedValue = parsedValues.has(index) ? parsedValues.get(index) : undefined;
-        return { label, fieldNumber: index, value, parsedValue, parserCovered };
+        return { label, ownFieldNumber, otherFieldNumber, value, parsedValue, parserCovered };
       })
-      .filter((entry) => entry.value !== 0 || known.has(entry.fieldNumber));
+      .filter((entry) => entry.value !== 0 || known.has(entry.ownFieldNumber));
   }, [selectedRawPlayer, selectedPlayer, parserCoveredSaveFields]);
 
   const avatarRows = React.useMemo(
-    () => playerSaveRows.filter((row) => AVATAR_FIELD_INDEXES.has(row.fieldNumber)),
+    () => playerSaveRows.filter((row) => AVATAR_FIELD_INDEXES.has(row.ownFieldNumber)),
     [playerSaveRows],
   );
 
   const otherPlayerRows = React.useMemo(
-    () => playerSaveRows.filter((row) => !AVATAR_FIELD_INDEXES.has(row.fieldNumber)),
+    () => playerSaveRows.filter((row) => !AVATAR_FIELD_INDEXES.has(row.ownFieldNumber)),
     [playerSaveRows],
   );
   const groupSaveRows = React.useMemo(() => {
@@ -598,20 +1126,22 @@ export default function UploadCenterV2JsonImport() {
     return saveArray
       .map((value, index) => {
         const label = GROUP_SAVE_FIELD_LABELS[index] ?? `Field ${index}`;
+        const ownFieldNumber = index;
+        const otherFieldNumber = index;
         const parsedValue = parsedValues.has(index) ? parsedValues.get(index) : undefined;
         const parserCovered = parsedValues.has(index);
-        return { label, fieldNumber: index, value, parsedValue, parserCovered };
+        return { label, ownFieldNumber, otherFieldNumber, value, parsedValue, parserCovered };
       })
-      .filter((entry) => entry.value !== 0 || known.has(entry.fieldNumber));
+      .filter((entry) => entry.value !== 0 || known.has(entry.ownFieldNumber));
   }, [selectedRawGroup]);
 
   return (
     <section className={styles.root}>
       <div className={styles.headerRow}>
         <div>
-          <h3 className={styles.title}>Upload Center v2 - JSON Parser Preview</h3>
+          <h3 className={styles.title}>Upload Center v2 - JSON Importer</h3>
           <p className={styles.subtitle}>
-            Frontend-only import. No DB upload is triggered. The table below lists parser output fields with value previews.
+            Mapping mode keeps the existing parser preview. COA Import and Avatar Import write through existing import paths.
           </p>
         </div>
 
@@ -633,6 +1163,10 @@ export default function UploadCenterV2JsonImport() {
           setJsonInput(event.target.value);
           setParseError(null);
           setParseStatus(null);
+          setCoaImportStatus(null);
+          setCoaImportError(null);
+          setAvatarImportStatus(null);
+          setAvatarImportError(null);
         }}
         placeholder='Paste full SF JSON here (requires "players" with at least one entry where "own": 1).'
         rows={10}
@@ -643,6 +1177,30 @@ export default function UploadCenterV2JsonImport() {
           Parse JSON
         </button>
         {fileName && <span className={styles.fileName}>File: {fileName}</span>}
+      </div>
+
+      <div className={styles.modeToggleRow}>
+        <button
+          type="button"
+          className={`${styles.modeToggleBtn} ${importMode === "mapping" ? styles.modeToggleBtnActive : ""}`}
+          onClick={() => setImportMode("mapping")}
+        >
+          Mapping
+        </button>
+        <button
+          type="button"
+          className={`${styles.modeToggleBtn} ${importMode === "coa_import" ? styles.modeToggleBtnActive : ""}`}
+          onClick={() => setImportMode("coa_import")}
+        >
+          COA Import
+        </button>
+        <button
+          type="button"
+          className={`${styles.modeToggleBtn} ${importMode === "avatar_import" ? styles.modeToggleBtnActive : ""}`}
+          onClick={() => setImportMode("avatar_import")}
+        >
+          Avatar Import
+        </button>
       </div>
 
       {parseStatus && <p className={styles.statusOk}>{parseStatus}</p>}
@@ -691,121 +1249,143 @@ export default function UploadCenterV2JsonImport() {
         </div>
       )}
 
-      {selectedPlayer ? (
-        <div>
-          <div className={styles.tableToggleRow}>
-            <button
-              type="button"
-              className={`${styles.tableToggleBtn} ${tableMode === "overview" ? styles.tableToggleBtnActive : ""}`}
-              onClick={() => setTableMode("overview")}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              className={`${styles.tableToggleBtn} ${tableMode === "player" ? styles.tableToggleBtnActive : ""}`}
-              onClick={() => setTableMode("player")}
-            >
-              Player
-            </button>
-            <button
-              type="button"
-              className={`${styles.tableToggleBtn} ${tableMode === "group" ? styles.tableToggleBtnActive : ""}`}
-              onClick={() => setTableMode("group")}
-            >
-              Group
-            </button>
-          </div>
+      {importMode === "mapping" ? (
+        selectedPlayer ? (
+          <div>
+            <div className={styles.tableToggleRow}>
+              <button
+                type="button"
+                className={`${styles.tableToggleBtn} ${tableMode === "overview" ? styles.tableToggleBtnActive : ""}`}
+                onClick={() => setTableMode("overview")}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                className={`${styles.tableToggleBtn} ${tableMode === "player" ? styles.tableToggleBtnActive : ""}`}
+                onClick={() => setTableMode("player")}
+              >
+                Player
+              </button>
+              <button
+                type="button"
+                className={`${styles.tableToggleBtn} ${tableMode === "group" ? styles.tableToggleBtnActive : ""}`}
+                onClick={() => setTableMode("group")}
+              >
+                Group
+              </button>
+            </div>
 
-          <div className={styles.tableWrap}>
-            {tableMode === "overview" ? (
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Label</th>
-                    <th>Parser Key</th>
-                    <th>Status</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className={!coaString ? styles.rowMissing : undefined}>
-                    <td>COA String</td>
-                    <td className={styles.codeCell}>coaString (derived)</td>
-                    <td>
-                      <span className={!coaString ? styles.badgeMissing : styles.badgeOk}>
-                        {!coaString ? "missing" : "ok"}
-                      </span>
-                    </td>
-                    <td className={styles.valueCell}>{coaString ?? "(missing)"}</td>
-                  </tr>
-                  {FIELD_DEFINITIONS.map((field) => {
-                    const value = selectedPlayer[field.key];
-                    const isMissing = value === undefined;
-
-                    return (
-                      <tr key={String(field.key)} className={isMissing ? styles.rowMissing : undefined}>
-                        <td>{field.label}</td>
-                        <td className={styles.codeCell}>{String(field.key)}</td>
-                        <td>
-                          <span className={isMissing ? styles.badgeMissing : styles.badgeOk}>
-                            {isMissing ? "missing" : "ok"}
-                          </span>
-                        </td>
-                        <td className={styles.valueCell}>{toPreviewString(value)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : tableMode === "player" ? (
-              <table className={`${styles.table} ${styles.playerTable}`}>
-                <colgroup>
-                  <col className={styles.playerColLabel} />
-                  <col className={styles.playerColField} />
-                  <col className={styles.playerColStatus} />
-                  <col className={styles.playerColParsed} />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Label</th>
-                    <th>Field #</th>
-                    <th>Status</th>
-                    <th>Parsed</th>
-                    <th>Raw</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {playerSaveRows.length === 0 ? (
+            <div className={styles.tableWrap}>
+              {tableMode === "overview" ? (
+                <table className={styles.table}>
+                  <thead>
                     <tr>
-                      <td colSpan={5}>No player save array found.</td>
+                      <th>Label</th>
+                      <th>Parser Key</th>
+                      <th>Status</th>
+                      <th>Value</th>
                     </tr>
-                  ) : (
-                    <>
-                      <tr>
-                        <td colSpan={5} className={styles.groupCell}>
-                          <button
-                            type="button"
-                            className={styles.groupToggleBtn}
-                            onClick={() => setAvatarSectionOpen((prev) => !prev)}
-                            aria-expanded={avatarSectionOpen}
-                          >
-                            <span className={styles.groupChevron}>{avatarSectionOpen ? "▼" : "▶"}</span>
-                            <span>Avatar</span>
-                            <span className={styles.groupMeta}>{avatarRows.length} fields</span>
-                          </button>
-                        </td>
-                      </tr>
+                  </thead>
+                  <tbody>
+                    <tr className={!coaString ? styles.rowMissing : undefined}>
+                      <td>COA String</td>
+                      <td className={styles.codeCell}>coaString (derived)</td>
+                      <td>
+                        <span className={!coaString ? styles.badgeMissing : styles.badgeOk}>
+                          {!coaString ? "missing" : "ok"}
+                        </span>
+                      </td>
+                      <td className={styles.valueCell}>{coaString ?? "(missing)"}</td>
+                    </tr>
+                    {FIELD_DEFINITIONS.map((field) => {
+                      const value = selectedPlayer[field.key];
+                      const isMissing = value === undefined;
 
-                      {avatarSectionOpen &&
-                        avatarRows.map((row) => (
+                      return (
+                        <tr key={String(field.key)} className={isMissing ? styles.rowMissing : undefined}>
+                          <td>{field.label}</td>
+                          <td className={styles.codeCell}>{String(field.key)}</td>
+                          <td>
+                            <span className={isMissing ? styles.badgeMissing : styles.badgeOk}>
+                              {isMissing ? "missing" : "ok"}
+                            </span>
+                          </td>
+                          <td className={styles.valueCell}>{toPreviewString(value)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : tableMode === "player" ? (
+                <table className={`${styles.table} ${styles.playerTable}`}>
+                  <colgroup>
+                    <col className={styles.playerColLabel} />
+                    <col className={styles.playerColOwn} />
+                    <col className={styles.playerColOther} />
+                    <col className={styles.playerColStatus} />
+                    <col className={styles.playerColParsed} />
+                    <col />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Own #</th>
+                      <th>Other #</th>
+                      <th>Status</th>
+                      <th>Parsed</th>
+                      <th>Raw</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {playerSaveRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No player save array found.</td>
+                      </tr>
+                    ) : (
+                      <>
+                        <tr>
+                          <td colSpan={6} className={styles.groupCell}>
+                            <button
+                              type="button"
+                              className={styles.groupToggleBtn}
+                              onClick={() => setAvatarSectionOpen((prev) => !prev)}
+                              aria-expanded={avatarSectionOpen}
+                            >
+                              <span className={styles.groupChevron}>{avatarSectionOpen ? "▼" : "▶"}</span>
+                              <span>Avatar</span>
+                              <span className={styles.groupMeta}>{avatarRows.length} fields</span>
+                            </button>
+                          </td>
+                        </tr>
+
+                        {avatarSectionOpen &&
+                          avatarRows.map((row) => (
+                            <tr
+                              key={`player-save-avatar-${row.ownFieldNumber}`}
+                              className={!row.parserCovered ? styles.rowMissing : undefined}
+                            >
+                              <td>{row.label}</td>
+                              <td className={styles.codeCell}>{row.ownFieldNumber}</td>
+                              <td className={styles.codeCell}>{row.otherFieldNumber ?? "-"}</td>
+                              <td>
+                                <span className={row.parserCovered ? styles.badgeOk : styles.badgeMissing}>
+                                  {row.parserCovered ? "ok" : "missing"}
+                                </span>
+                              </td>
+                              <td className={styles.valueCell}>{toPreviewString(row.parsedValue)}</td>
+                              <td className={styles.valueCell}>{toPreviewString(row.value)}</td>
+                            </tr>
+                          ))}
+
+                        {otherPlayerRows.map((row) => (
                           <tr
-                            key={`player-save-avatar-${row.fieldNumber}`}
+                            key={`player-save-${row.ownFieldNumber}`}
                             className={!row.parserCovered ? styles.rowMissing : undefined}
                           >
                             <td>{row.label}</td>
-                            <td className={styles.codeCell}>{row.fieldNumber}</td>
+                            <td className={styles.codeCell}>{row.ownFieldNumber}</td>
+                            <td className={styles.codeCell}>{row.otherFieldNumber ?? "-"}</td>
                             <td>
                               <span className={row.parserCovered ? styles.badgeOk : styles.badgeMissing}>
                                 {row.parserCovered ? "ok" : "missing"}
@@ -815,14 +1395,44 @@ export default function UploadCenterV2JsonImport() {
                             <td className={styles.valueCell}>{toPreviewString(row.value)}</td>
                           </tr>
                         ))}
-
-                      {otherPlayerRows.map((row) => (
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className={`${styles.table} ${styles.playerTable}`}>
+                  <colgroup>
+                    <col className={styles.playerColLabel} />
+                    <col className={styles.playerColOwn} />
+                    <col className={styles.playerColOther} />
+                    <col className={styles.playerColStatus} />
+                    <col className={styles.playerColParsed} />
+                    <col />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Own #</th>
+                      <th>Other #</th>
+                      <th>Status</th>
+                      <th>Parsed</th>
+                      <th>Raw</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupSaveRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No group save array found.</td>
+                      </tr>
+                    ) : (
+                      groupSaveRows.map((row) => (
                         <tr
-                          key={`player-save-${row.fieldNumber}`}
+                          key={`group-save-${row.ownFieldNumber}`}
                           className={!row.parserCovered ? styles.rowMissing : undefined}
                         >
                           <td>{row.label}</td>
-                          <td className={styles.codeCell}>{row.fieldNumber}</td>
+                          <td className={styles.codeCell}>{row.ownFieldNumber}</td>
+                          <td className={styles.codeCell}>{row.otherFieldNumber}</td>
                           <td>
                             <span className={row.parserCovered ? styles.badgeOk : styles.badgeMissing}>
                               {row.parserCovered ? "ok" : "missing"}
@@ -831,63 +1441,127 @@ export default function UploadCenterV2JsonImport() {
                           <td className={styles.valueCell}>{toPreviewString(row.parsedValue)}</td>
                           <td className={styles.valueCell}>{toPreviewString(row.value)}</td>
                         </tr>
-                      ))}
-                    </>
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              <table className={`${styles.table} ${styles.playerTable}`}>
-                <colgroup>
-                  <col className={styles.playerColLabel} />
-                  <col className={styles.playerColField} />
-                  <col className={styles.playerColStatus} />
-                  <col className={styles.playerColParsed} />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Label</th>
-                    <th>Field #</th>
-                    <th>Status</th>
-                    <th>Parsed</th>
-                    <th>Raw</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupSaveRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>No group save array found.</td>
-                    </tr>
-                  ) : (
-                    groupSaveRows.map((row) => (
-                      <tr
-                        key={`group-save-${row.fieldNumber}`}
-                        className={!row.parserCovered ? styles.rowMissing : undefined}
-                      >
-                        <td>{row.label}</td>
-                        <td className={styles.codeCell}>{row.fieldNumber}</td>
-                        <td>
-                          <span className={row.parserCovered ? styles.badgeOk : styles.badgeMissing}>
-                            {row.parserCovered ? "ok" : "missing"}
-                          </span>
-                        </td>
-                        <td className={styles.valueCell}>{toPreviewString(row.parsedValue)}</td>
-                        <td className={styles.valueCell}>{toPreviewString(row.value)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        ) : (
+          parseResult && (
+            <div className={styles.emptyState}>
+              No parser field list available until at least one own player is found.
+            </div>
+          )
+        )
+      ) : importMode === "coa_import" ? (
+        parseResult ? (
+          <div className={styles.importCard}>
+            <div className={styles.importRow}>
+              <span className={styles.importLabel}>Recognized Guilds</span>
+              <span className={styles.summaryValueMono}>
+                {coaBatchExtraction.recognizedGuilds} ({coaBatchExtraction.recognizedGuildEntries} entries)
+              </span>
+            </div>
+            <div className={styles.importRow}>
+              <span className={styles.importLabel}>Importable Targets</span>
+              <span className={styles.summaryValueMono}>{coaBatchTargets.length}</span>
+            </div>
+            <div className={styles.importRow}>
+              <span className={styles.importLabel}>Skipped Before Import</span>
+              <span className={styles.summaryValueMono}>
+                missing coaString: {coaBatchExtraction.skippedMissingCoa}, invalid coaString:{" "}
+                {coaBatchExtraction.skippedInvalidCoa}, duplicate guild entries:{" "}
+                {coaBatchExtraction.duplicateGuildEntries}
+              </span>
+            </div>
+            <div className={styles.importRow}>
+              <span className={styles.importLabel}>Guild Name</span>
+              <span className={styles.summaryValue}>{selectedGuildName ?? "(missing)"}</span>
+            </div>
+            <div className={styles.importPreviewWrap}>
+              <span className={styles.importLabel}>Preview</span>
+              <div className={styles.coaPreviewBox}>
+                {coaPreviewCandidates.length === 0 ? (
+                  <p className={styles.coaPreviewHint}>
+                    No coaString candidates found in player/group fields for the selected record.
+                  </p>
+                ) : (
+                  <div className={styles.coaPreviewList}>
+                    {coaPreviewCandidates.map((candidate) => (
+                      <div key={candidate.key} className={styles.coaPreviewItem}>
+                        <div className={styles.coaPreviewSource}>{candidate.source}</div>
+                        <div className={styles.coaPreviewGuildName}>
+                          {candidate.guildName ? `Name: ${candidate.guildName}` : "Name: (missing)"}
+                        </div>
+                        <div className={styles.coaPreviewValue}>{candidate.coaString}</div>
+                        <CoaPreviewCanvas coaString={candidate.coaString} guildName={candidate.guildName} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            {!!coaImportStatus && <p className={styles.statusOk}>{coaImportStatus}</p>}
+            {!!coaImportError && <p className={styles.statusError}>{coaImportError}</p>}
+            <div className={styles.importActions}>
+              <button
+                type="button"
+                className={styles.parseButton}
+                onClick={handleCoaImport}
+                disabled={isCoaImporting || coaBatchTargets.length === 0}
+              >
+                {isCoaImporting ? "Importing..." : "Import COA for All Recognized Guilds"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.emptyState}>Parse JSON first to run COA import.</div>
+        )
+      ) : parseResult ? (
+        <div className={styles.importCard}>
+          <div className={styles.importRow}>
+            <span className={styles.importLabel}>Selected Player</span>
+            <span className={styles.summaryValue}>{selectedPlayer ? getPlayerLabel(selectedPlayer) : "(missing)"}</span>
+          </div>
+          <div className={styles.importRow}>
+            <span className={styles.importLabel}>Avatar Identifier</span>
+            <span className={styles.summaryValueMono}>{selectedPlayer?.identifier ?? "(missing)"}</span>
+          </div>
+          <div className={styles.importRow}>
+            <span className={styles.importLabel}>Portrait Data</span>
+            <span className={selectedPlayer?.portrait ? styles.badgeOk : styles.badgeMissing}>
+              {selectedPlayer?.portrait ? "ok" : "missing"}
+            </span>
+          </div>
+          {selectedPlayer?.portrait && avatarPreviewConfig && (
+            <div className={styles.importPreviewWrap}>
+              <span className={styles.importLabel}>Preview</span>
+              <div className={styles.importPreviewBox}>
+                <PortraitPreview
+                  config={avatarPreviewConfig}
+                  label={selectedPlayer.name || selectedPlayer.identifier}
+                  fallbackLabel={selectedPlayer.name || selectedPlayer.identifier}
+                />
+              </div>
+            </div>
+          )}
+          {!!avatarImportStatus && <p className={styles.statusOk}>{avatarImportStatus}</p>}
+          {!!avatarImportError && <p className={styles.statusError}>{avatarImportError}</p>}
+          <div className={styles.importActions}>
+            <button
+              type="button"
+              className={styles.parseButton}
+              onClick={handleAvatarImport}
+              disabled={isAvatarImporting || !selectedPlayer?.portrait || !selectedPlayer || !user?.id}
+            >
+              {isAvatarImporting ? "Importing..." : "Import Avatar"}
+            </button>
           </div>
         </div>
       ) : (
-        parseResult && (
-          <div className={styles.emptyState}>
-            No parser field list available until at least one own player is found.
-          </div>
-        )
+        <div className={styles.emptyState}>Parse JSON first to run avatar import.</div>
       )}
     </section>
   );

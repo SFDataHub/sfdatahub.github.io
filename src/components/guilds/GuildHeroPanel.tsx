@@ -215,31 +215,6 @@ const formatAgeLabel = (t: TranslateFn, lastScanDays?: number | null) => {
   return t("guildProfile.heroPanel.tooltips.age.daysAgo", { days, defaultValue: "{{days}} days ago" });
 };
 
-function EmblemFallback({ label, size = 96 }: { label: string; size?: number }) {
-  const initials = (label || "?")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase())
-    .slice(0, 2)
-    .join("");
-
-  return (
-    <div
-      aria-hidden
-      className="inline-flex items-center justify-center rounded-xl font-extrabold text-slate-100"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.34),
-        background: "linear-gradient(145deg, #1E3657, #152A42)",
-        border: "1px solid rgba(176, 196, 217, 0.28)",
-      }}
-    >
-      {initials || "?"}
-    </div>
-  );
-}
-
 function formatMetricValue(value: string | number) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value.toLocaleString("de-DE");
@@ -677,49 +652,30 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
           <div className="min-w-0">
             <div ref={leftRef} className={`h-fit self-start ${isOverlayContext ? "space-y-3" : "space-y-4"}`}>
               <div
-                className={`rounded-2xl border ${isOverlayContext ? "p-2" : "p-3"}`}
-                style={{ borderColor: "transparent", background: "transparent" }}
-              >
-                <div
-                  className="w-full overflow-hidden rounded-xl"
-                  style={{
-                    aspectRatio: "3 / 4",
-                    border: "1px solid transparent",
-                    background: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {data.emblemUrl ? (
-                    <img
-                      src={data.emblemUrl}
-                      alt={data.emblemAlt ?? ""}
-                      loading="lazy"
-                      decoding="async"
-                      draggable={false}
-                      className="max-h-full max-w-full"
-                      style={{
-                        maxHeight: "115%",
-                        maxWidth: "115%",
-                        objectFit: "contain",
-                        filter:
-                          "drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 8px 16px rgba(0,0,0,.35))",
-                      }}
-                    />
-                  ) : (
-                    <EmblemFallback label={data.guildName} size={180} />
-                  )}
-                </div>
-              </div>
-
-              <div
                 className={`rounded-2xl border ${isOverlayContext ? "p-3" : "p-4"}`}
                 style={{ borderColor: palette.line, background: "rgba(2, 17, 40, 0.55)" }}
               >
-                <div className="truncate text-3xl font-extrabold" style={{ color: palette.title }}>
-                  {data.guildName}
-                </div>
+                {data.emblemUrl ? (
+                  <div className="flex justify-center" style={{ marginBottom: 20 }}>
+                    <img
+                      src={data.emblemUrl}
+                      alt={data.emblemAlt ?? data.guildName}
+                      loading="lazy"
+                      decoding="async"
+                      draggable={false}
+                      className="max-w-full"
+                      style={{
+                        width: "min(270px, 100%)",
+                        height: "auto",
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="truncate text-3xl font-extrabold text-center" style={{ color: palette.title }}>
+                    {data.guildName}
+                  </div>
+                )}
                 {data.subtitle ? (
                   <div className="mt-1 text-sm" style={{ color: palette.soft }}>
                     {data.subtitle}

@@ -20,7 +20,12 @@ export default function UploadCenterV2Page() {
   }
 
   return (
-    <ContentShell title="Upload Center V2" subtitle="Frontend JSON parser preview" centerFramed={false} mode="page">
+    <ContentShell
+      title="Upload Center V2"
+      subtitle="JSON mapping preview, COA import, and avatar import"
+      centerFramed={false}
+      mode="page"
+    >
       <UploadCenterV2JsonImport />
     </ContentShell>
   );

@@ -69,6 +69,32 @@
   flex-wrap: wrap;
 }
 
+.modeToggleRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modeToggleBtn {
+  border: 1px solid #2b4c73;
+  background: #1a2f4a;
+  color: #d6e4f7;
+  border-radius: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+
+.modeToggleBtn:hover {
+  background: #25456b;
+}
+
+.modeToggleBtnActive {
+  background: #2e75f0;
+  border-color: #2e75f0;
+  color: #ffffff;
+}
+
 .parseButton {
   border: none;
   background: #2e75f0;
@@ -81,6 +107,11 @@
 
 .parseButton:hover {
   background: #3d84ff;
+}
+
+.parseButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .fileName {
@@ -197,15 +228,16 @@
 
 .playerTable {
   table-layout: fixed;
-  min-width: 980px;
+  min-width: 1080px;
 }
 
 .playerColLabel {
   width: 240px;
 }
 
-.playerColField {
-  width: 120px;
+.playerColOwn,
+.playerColOther {
+  width: 92px;
 }
 
 .playerColStatus {
@@ -312,4 +344,112 @@
   color: #c3d4e7;
   font-size: 0.9rem;
   background: #10263e;
+}
+
+.importCard {
+  border: 1px solid #2b4c73;
+  border-radius: 12px;
+  background: #10263e;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.importRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.importLabel {
+  color: #9fb6ce;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.importActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.importPreviewWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.importPreviewBox {
+  border: 1px solid #2b4c73;
+  border-radius: 12px;
+  padding: 12px;
+  background: #0f2238;
+  width: fit-content;
+}
+
+.coaPreviewBox {
+  border: 1px solid #2b4c73;
+  border-radius: 12px;
+  padding: 12px;
+  background: #0f2238;
+  width: 100%;
+}
+
+.coaPreviewList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.coaPreviewItem {
+  border: 1px solid #1f3d61;
+  border-radius: 10px;
+  background: #0c1d31;
+  padding: 8px;
+}
+
+.coaPreviewSource {
+  color: #9fb6ce;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.coaPreviewGuildName {
+  margin-top: 4px;
+  color: #d6e4f7;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.coaPreviewValue {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  color: #e8f1ff;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.coaPreviewCanvas {
+  display: block;
+  width: min(180px, 100%);
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: #0b1a2b;
+  border: 1px solid #1f3d61;
+}
+
+.coaPreviewHint {
+  margin: 8px 0 0;
+  color: #9fb6ce;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  max-width: none;
 }
