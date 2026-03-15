@@ -81,6 +81,13 @@ export default function PlaygroundIndex() {
             </NavLink>
 
             <NavLink
+              to="records-svg-icons"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Records SVG Icons
+            </NavLink>
+
+            <NavLink
               to="gamified"
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >

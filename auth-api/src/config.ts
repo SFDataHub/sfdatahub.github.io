@@ -18,6 +18,7 @@ const secrets = {
   UPLOAD_INBOX_TOKEN: defineSecret("UPLOAD_INBOX_TOKEN"),
   SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
   TWITCH_CLIENT_SECRET: defineSecret("TWITCH_CLIENT_SECRET"),
+  GOATCOUNTER_API_TOKEN: defineSecret("GOATCOUNTER_API_TOKEN"),
 } as const;
 
 const strings = {
@@ -35,6 +36,7 @@ const strings = {
   TWITCH_CHANNELS: defineString("TWITCH_CHANNELS"),
   TWITCH_GAME_ID: defineString("TWITCH_GAME_ID"),
   TWITCH_LOG_FULL_RESPONSE: defineString("TWITCH_LOG_FULL_RESPONSE"),
+  GOATCOUNTER_API_BASE_URL: defineString("GOATCOUNTER_API_BASE_URL"),
 } as const;
 
 const readRuntimeValue = (key: string, param?: Param): string | undefined => {
@@ -91,6 +93,14 @@ export const TWITCH_GAME_ID = readRuntimeValue("TWITCH_GAME_ID", strings.TWITCH_
 export const TWITCH_LOG_FULL_RESPONSE = readRuntimeValue(
   "TWITCH_LOG_FULL_RESPONSE",
   strings.TWITCH_LOG_FULL_RESPONSE,
+);
+export const GOATCOUNTER_API_BASE_URL = readRuntimeValue(
+  "GOATCOUNTER_API_BASE_URL",
+  strings.GOATCOUNTER_API_BASE_URL,
+);
+export const GOATCOUNTER_API_TOKEN = readRuntimeValue(
+  "GOATCOUNTER_API_TOKEN",
+  secrets.GOATCOUNTER_API_TOKEN,
 );
 
 const DEFAULT_DISCORD_NEWS_CORS_ORIGINS = [

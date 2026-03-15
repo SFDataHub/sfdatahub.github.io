@@ -1,0 +1,92 @@
+.page {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.categoryCard {
+  border: 1px solid var(--line);
+  background: var(--tile);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.categoryHeader {
+  margin-bottom: 10px;
+}
+
+.categoryTitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.categorySource {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.variantGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.variantChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.variantChip:hover {
+  background: var(--tile-hover);
+}
+
+.iconWrap {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.iconWrap :global(.ico) {
+  width: 20px;
+  height: 20px;
+  color: var(--text);
+  stroke-width: 2;
+}
+
+.variantMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.variantLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.variantHint {
+  font-size: 11px;
+  color: var(--text-soft);
+  line-height: 1.1;
+}

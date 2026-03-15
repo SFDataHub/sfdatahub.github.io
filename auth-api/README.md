@@ -68,6 +68,22 @@ curl -X POST "https://<auth-api-url>/internal/upload-inbox/add" \
 
 Configure `UPLOAD_INBOX_TOKEN` and `UPLOAD_INBOX_BUCKET` in your environment (see `.env.example`).
 
+### Internal Visitor Analytics Snapshot Sync
+
+The GoatCounter visitor snapshot can be refreshed via:
+
+```
+POST /internal/analytics/visitor/sync-snapshot
+Header: x-internal-token: $UPLOAD_INBOX_TOKEN
+```
+
+Required environment values:
+
+- `GOATCOUNTER_API_BASE_URL` (recommended: `https://<your-site>.goatcounter.com`; `/api/v0` is also accepted)
+- `GOATCOUNTER_API_TOKEN` (Bearer token)
+
+The endpoint writes an idempotent snapshot to Firestore at `analytics/visitor_analytics`.
+
 ### User Upload Inbox Endpoints
 
 Authenticated users can fetch their inbox entries and download CSVs:
