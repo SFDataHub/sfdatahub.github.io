@@ -89,6 +89,7 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
+import AdminVisitorAnalyticsPage from "./pages/Admin/VisitorAnalytics";
 
 // Settings
 import AccountSettingsPage from "./pages/Settings/AccountSettingsPage";
@@ -109,6 +110,7 @@ import GamifiedTab6 from "./pages/Playground/GamifiedTab6";
 import GamifiedTab7 from "./pages/Playground/GamifiedTab7";
 import GamifiedTab8 from "./pages/Playground/GamifiedTab8";
 import ListViews from "./pages/Playground/ListViews";
+import RecordsSvgIconsPage from "./pages/Playground/RecordsSvgIconsPage";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
@@ -171,7 +173,7 @@ import SearchResultsPage from "./pages/search/SearchResults";
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCenterSessionsContext";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import FeatureGate from "./components/FeatureGate";
@@ -191,6 +193,15 @@ const ToplistsLegacyRedirect = ({ tab }: { tab: "players" | "guilds" }) => {
   params.set("tab", tab);
   const query = params.toString();
   return <Navigate to={`/toplists${query ? `?${query}` : ""}`} replace />;
+};
+
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { status, user } = useAuth();
+  if (status === "loading" || status === "idle") return null;
+  if (!user?.roles?.includes("admin")) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <>{children}</>;
 };
 
 const withFeatureGate = (
@@ -426,6 +437,17 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   path="/admin/users"
                   element={withFeatureGate("main.admin", "/admin", <AdminUsersAdminPage />)}
                 />
+                <Route
+                  path="/admin/visitor-analytics"
+                  element={withFeatureGate(
+                    "main.admin",
+                    "/admin",
+                    <AdminOnlyRoute>
+                      <AdminVisitorAnalyticsPage />
+                    </AdminOnlyRoute>,
+                    <Navigate to="/admin" replace />,
+                  )}
+                />
 
                 {/* Settings */}
                 <Route
@@ -456,6 +478,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="gamified-6" element={<GamifiedTab6 />} />
                   <Route path="gamified-7" element={<GamifiedTab7 />} />
                   <Route path="gamified-8" element={<GamifiedTab8 />} />
+                  <Route path="records-svg-icons" element={<RecordsSvgIconsPage />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />

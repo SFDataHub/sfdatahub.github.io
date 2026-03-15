@@ -6,12 +6,16 @@ service cloud.firestore {
     match /metadata/{doc}         { allow read: if true; }
     match /servers/{doc}          { allow read: if true; }
     match /stats_public/{doc=**}  { allow read: if true; }
-
     // Uebergangs-Gate (bis Auth/AppCheck)
     function isImporter() { return true; }
 
     function isAdmin() {
       return request.auth != null && request.auth.token.roles != null && request.auth.token.roles.hasAny(['admin', 'owner']);
+    }
+
+    match /analytics/visitor_analytics {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Access control configuration (used by Control Panel / Access & Features)
