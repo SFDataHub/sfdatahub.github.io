@@ -27,6 +27,16 @@ type GuildToplistsProps = {
   renderMode?: "live" | "preset";
   presetAmount?: ToplistExportAmount | null;
   onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
+  presetReadOnlyData?: GuildToplistsPresetData | null;
+  onPresetReadOnlyDataChange?: (data: GuildToplistsPresetData) => void;
+};
+
+export type GuildToplistsPresetData = {
+  rows: FirestoreToplistGuildRow[];
+  loading: boolean;
+  error: string | null;
+  updatedAt: number | null;
+  avgMode: "base" | "total";
 };
 
 type GuildColumnKey =
@@ -502,6 +512,8 @@ export default function GuildToplists({
   renderMode = "live",
   presetAmount = null,
   onCaptureStatusChange,
+  presetReadOnlyData = null,
+  onPresetReadOnlyDataChange,
 }: GuildToplistsProps) {
   const { t } = useTranslation();
   const { favoritesOnly } = useFilters();
@@ -555,6 +567,7 @@ export default function GuildToplists({
   const resolvedServerKey = useMemo(() => resolvedServers.join(","), [resolvedServers]);
 
   useEffect(() => {
+    if (isPresetRender) return;
     let active = true;
     setLoading(true);
     setError(null);
@@ -650,7 +663,7 @@ export default function GuildToplists({
     return () => {
       active = false;
     };
-  }, [resolvedServerKey, getGuildToplistSnapshotCached, t]);
+  }, [isPresetRender, resolvedServerKey, getGuildToplistSnapshotCached, t]);
 
   useEffect(() => {
     if (isGuildAvgModePending && !guildPendingPrevRef.current) {
@@ -717,6 +730,10 @@ export default function GuildToplists({
 
   const activeSortKey = resolveGuildSort(sortKey);
   const activeGuildAvgMode = guildAvgMode === "total" ? "total" : "base";
+  const effectiveGuildAvgMode = isPresetRender ? (presetReadOnlyData?.avgMode ?? activeGuildAvgMode) : activeGuildAvgMode;
+  const effectiveLoading = isPresetRender ? (presetReadOnlyData?.loading ?? false) : loading;
+  const effectiveError = isPresetRender ? (presetReadOnlyData?.error ?? null) : error;
+  const effectiveUpdatedAt = isPresetRender ? (presetReadOnlyData?.updatedAt ?? null) : updatedAt;
   const isAvgAttributeSort =
     activeSortKey === "guildAvgMain" || activeSortKey === "guildAvgCon" || activeSortKey === "guildAvgSum";
   const avgSumSortMode: "base" | "total" = activeSortKey === "guildAvgSum" ? activeGuildAvgMode : "base";
@@ -732,7 +749,7 @@ export default function GuildToplists({
   };
 
 
-  const displayRows = useMemo(() => {
+  const computedDisplayRows = useMemo(() => {
     let list = Array.isArray(rows) ? [...rows] : [];
     if (!list.length) return list;
 
@@ -778,6 +795,10 @@ export default function GuildToplists({
 
     return list;
   }, [rows, favoritesOnly, user, favoriteGuildSet, activeSortKey, avgSumSortMode, activeGuildAvgMode]);
+  const displayRows = useMemo(
+    () => (isPresetRender ? (presetReadOnlyData?.rows ?? []) : computedDisplayRows),
+    [computedDisplayRows, isPresetRender, presetReadOnlyData]
+  );
   const renderedRows = useMemo(
     () => (captureRowLimit == null ? displayRows : displayRows.slice(0, captureRowLimit)),
     [captureRowLimit, displayRows]
@@ -832,13 +853,13 @@ export default function GuildToplists({
   const firstRenderedIdentifier = renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[0]) ?? "" : "";
   const lastRenderedIdentifier =
     renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[renderedRows.length - 1]) ?? "" : "";
-  const captureReady = !loading && renderedRows.length > 0;
+  const captureReady = !effectiveLoading && renderedRows.length > 0;
   const captureStabilityKey = [
     renderMode,
-    loading ? "loading:1" : "loading:0",
+    effectiveLoading ? "loading:1" : "loading:0",
     `rows:${renderedRows.length}`,
     `sort:${activeSortKey}`,
-    `avg:${activeGuildAvgMode}`,
+    `avg:${effectiveGuildAvgMode}`,
     "rowH:56",
     `virt:${virtualTotalSize}`,
     `first:${firstRenderedIdentifier}`,
@@ -848,7 +869,7 @@ export default function GuildToplists({
   useEffect(() => {
     if (!onCaptureStatusChange) return;
     onCaptureStatusChange({
-      loading,
+      loading: effectiveLoading,
       rowCount: renderedRows.length,
       ready: captureReady,
       stabilityKey: captureStabilityKey,
@@ -861,11 +882,22 @@ export default function GuildToplists({
   }, [
     captureReady,
     captureStabilityKey,
-    loading,
+    effectiveLoading,
     onCaptureStatusChange,
     renderedRows.length,
     virtualTotalSize,
   ]);
+
+  useEffect(() => {
+    if (isPresetRender || !onPresetReadOnlyDataChange) return;
+    onPresetReadOnlyDataChange({
+      rows: displayRows,
+      loading,
+      error,
+      updatedAt,
+      avgMode: activeGuildAvgMode,
+    });
+  }, [activeGuildAvgMode, displayRows, error, isPresetRender, loading, onPresetReadOnlyDataChange, updatedAt]);
 
   useEffect(() => {
     if (!focusParamRaw) return;
@@ -907,7 +939,7 @@ export default function GuildToplists({
   useEffect(() => {
     void focusRankParam;
     if (isPresetRender) return;
-    if (!focusIdentifierCandidates.length || loading) return;
+    if (!focusIdentifierCandidates.length || effectiveLoading) return;
 
     const focusKey = focusIdentifierCandidates.join("|");
     if (focusHandledRef.current === focusKey) return;
@@ -939,7 +971,7 @@ export default function GuildToplists({
     focusIdentifierCandidates,
     focusRankParam,
     isPresetRender,
-    loading,
+    effectiveLoading,
     rowIndexByIdentifier,
     rowVirtualizer,
   ]);
@@ -1012,13 +1044,13 @@ export default function GuildToplists({
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.members}>{fmtNum(row.memberCount)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgLevel}>{fmtNum(row.avgLevel)}</td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgMain}>
-                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgMain(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode))} fadeKey={effectiveGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgCon}>
-                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgCon(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode))} fadeKey={effectiveGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgSum}>
-                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgSum(row, activeGuildAvgMode))} fadeKey={activeGuildAvgMode} />
+                  <ValueCrossfade value={fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode))} fadeKey={effectiveGuildAvgMode} />
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
                   <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>
@@ -1028,12 +1060,12 @@ export default function GuildToplists({
               </tr>
             );
           })}
-          {loading && rows.length === 0 && (
+          {effectiveLoading && rows.length === 0 && (
             <tr>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td>
             </tr>
           )}
-          {!loading && !error && rows.length === 0 && (
+          {!effectiveLoading && !effectiveError && rows.length === 0 && (
             <tr>
               <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td>
             </tr>
@@ -1056,11 +1088,11 @@ export default function GuildToplists({
       </div>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
         <div>
-          {loading ? t("toplists.status.loading", "Loading...") : error ? t("toplists.status.error", "Error") : t("toplists.status.ready", "Ready")}
+          {effectiveLoading ? t("toplists.status.loading", "Loading...") : effectiveError ? t("toplists.status.error", "Error") : t("toplists.status.ready", "Ready")}
           {" - "}
           {renderedRows.length} {t("toplists.status.rows", "rows")}
         </div>
-        <div>{updatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(updatedAt) }) : null}</div>
+        <div>{effectiveUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(effectiveUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && !guildAvgModeSlot && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
@@ -1091,10 +1123,10 @@ export default function GuildToplists({
           guildAvgModeSlot
         )}
 
-      {error && (
+      {effectiveError && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
-          <div style={{ wordBreak: "break-all" }}>{error}</div>
+          <div style={{ wordBreak: "break-all" }}>{effectiveError}</div>
           <button onClick={() => navigate(`${location.pathname}${location.search}${location.hash}`)} style={{ marginTop: 8 }}>
             {t("toplists.actions.retry", "Retry")}
           </button>

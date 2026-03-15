@@ -1,4 +1,4 @@
-﻿---
+const e=`\uFEFF---
 title: "Dungeon Pause open XP Calculator"
 category: "Progression"
 status: "up_to_date"
@@ -10,3 +10,4 @@ Continious Loop of Idols clear until stage 21 is only achievable with the "Potio
 [[embed:dungeon-pause-open-xp-calculator]]
 
 
+`;export{e as default};

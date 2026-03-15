@@ -1,11 +1,13 @@
 // src/pages/guilds/Profile.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { useTranslation } from "react-i18next";
+import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.js";
 import ContentShell from "../../components/ContentShell";
 import { db } from "../../lib/firebase";
 import { guildIconUrlByIdentifier } from "../../data/guilds";
+import "./Profile.coa.css";
 import {
   beginReadScope,
   endReadScope,
@@ -51,7 +53,7 @@ const C = {
 
 type Guild = GuildLike;
 type MemberSummary = GuildMember;
-type MembersSnapshot = MembersSnapshotLike;
+type MembersSnapshot = MembersSnapshotLike & { coaString?: string };
 type GuildProfileLoadResult = {
   guild: Guild;
   snapshot: MembersSnapshot | null;
@@ -70,6 +72,7 @@ const GUILD_SERVER_INDEX_KEY = "sf_profile_guild_server_index";
 const GUILD_CACHE_TTL_MS = 60 * 60 * 1000;
 const INACTIVE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const COA_CANVAS_SIZE = 240;
 const EMPTY_TRANSFERS: GuildHeroTransfersData = {
   joined: [],
   left: [],
@@ -84,6 +87,136 @@ const EMPTY_MONTHLY_SEED: GuildMonthlyProgressSeedData = {
   latestSummaryMissing: false,
   knownMissingMonthKeys: [],
 };
+
+const isValidCoaString = (value: string) => value === "0" || /^[0-9a-f]{22}$/i.test(value);
+
+const normalizeCoaString = (value: unknown): string => String(value ?? "").trim();
+
+function useProfileCoaLogoUrl({
+  coaString,
+  guildName,
+  enabled,
+}: {
+  coaString: string | null | undefined;
+  guildName: string | null | undefined;
+  enabled: boolean;
+}): string | null {
+  const [coaLogoUrl, setCoaLogoUrl] = useState<string | null>(null);
+  const rendererRef = useRef<CoaRenderer | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const renderVersionRef = useRef(0);
+
+  const normalizedCoa = useMemo(() => normalizeCoaString(coaString), [coaString]);
+  const normalizedGuildName = useMemo(() => {
+    const raw = String(guildName ?? "").trim();
+    return raw || undefined;
+  }, [guildName]);
+  const canRenderCoa = enabled && isValidCoaString(normalizedCoa);
+
+  useEffect(() => {
+    return () => {
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
+      canvasRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    renderVersionRef.current += 1;
+    const currentVersion = renderVersionRef.current;
+
+    if (!canRenderCoa) {
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
+      setCoaLogoUrl(null);
+      return;
+    }
+
+    if (typeof document === "undefined") {
+      setCoaLogoUrl(null);
+      return;
+    }
+
+    let isCancelled = false;
+    let frameId: number | null = null;
+    const canvas = canvasRef.current ?? document.createElement("canvas");
+    canvasRef.current = canvas;
+    canvas.width = COA_CANVAS_SIZE;
+    canvas.height = COA_CANVAS_SIZE;
+
+    const clearCanvas = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    const captureCanvas = () => {
+      if (isCancelled || renderVersionRef.current !== currentVersion) return;
+      try {
+        const nextUrl = canvas.toDataURL("image/png");
+        setCoaLogoUrl((prev) => (prev === nextUrl ? prev : nextUrl));
+      } catch (error) {
+        console.warn("[GuildProfile][COA] Failed to export rendered logo", error);
+        setCoaLogoUrl(null);
+      }
+    };
+
+    const bindRendererCallbacks = (renderer: CoaRenderer) => {
+      renderer.onError = (error: Error) => {
+        if (isCancelled || renderVersionRef.current !== currentVersion) return;
+        console.warn("[GuildProfile][COA] Renderer onError", error);
+        clearCanvas();
+        setCoaLogoUrl(null);
+      };
+      renderer.onFinish = () => {
+        captureCanvas();
+      };
+    };
+
+    if (!rendererRef.current) {
+      try {
+        const renderer = new CoaRenderer(canvas, normalizedCoa, normalizedGuildName);
+        bindRendererCallbacks(renderer);
+        rendererRef.current = renderer;
+        if (typeof window !== "undefined") {
+          frameId = window.requestAnimationFrame(() => captureCanvas());
+        }
+      } catch (error) {
+        console.warn("[GuildProfile][COA] new CoaRenderer failed", error);
+        clearCanvas();
+        setCoaLogoUrl(null);
+      }
+      return () => {
+        isCancelled = true;
+        if (typeof window !== "undefined" && frameId != null) {
+          window.cancelAnimationFrame(frameId);
+        }
+      };
+    }
+
+    const renderer = rendererRef.current;
+    bindRendererCallbacks(renderer);
+    renderer.updateCOA(normalizedCoa, normalizedGuildName).then(captureCanvas).catch((error) => {
+      if (isCancelled || renderVersionRef.current !== currentVersion) return;
+      console.warn("[GuildProfile][COA] updateCOA failed", error);
+      clearCanvas();
+      setCoaLogoUrl(null);
+    });
+
+    return () => {
+      isCancelled = true;
+      if (typeof window !== "undefined" && frameId != null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [canRenderCoa, normalizedCoa, normalizedGuildName]);
+
+  return canRenderCoa ? coaLogoUrl : null;
+}
 
 const normalizeMember = (entry: MemberSummaryLike): MemberSummary => ({
   id: entry.id,
@@ -364,6 +497,11 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const [snapshot, setSnapshot] = useState<MembersSnapshot | null>(null);
   const [transfers, setTransfers] = useState<GuildHeroTransfersData>(EMPTY_TRANSFERS);
   const [monthlySeed, setMonthlySeed] = useState<GuildMonthlyProgressSeedData>(EMPTY_MONTHLY_SEED);
+  const coaEmblemUrl = useProfileCoaLogoUrl({
+    coaString: snapshot?.coaString,
+    guildName: guild?.name,
+    enabled: !heroOnly,
+  });
 
   // WICHTIG: classMeta wie im Container erstellen
   const safeMeta = useMemo(
@@ -482,6 +620,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
               updatedAtMs: Number(sdata.updatedAtMs ?? d.timestamp * 1000 ?? 0),
               count: Number(sdata.count ?? 0),
               hash: String(sdata.hash ?? ""),
+              coaString: typeof sdata.coaString === "string" ? sdata.coaString : "",
               avgLevel: sdata.avgLevel ?? null,
               avgTreasury: sdata.avgTreasury ?? null,
               avgMine: sdata.avgMine ?? null,
@@ -669,7 +808,9 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
 
   const updatedScanLabel = formatScanDateTimeLabel(snapshot?.updatedAtMs ?? snapshot?.updatedAt ?? null);
   const hasUpdatedScanLabel = updatedScanLabel !== "—";
-  const emblemUrl = guildIconUrlByIdentifier(guild.id, 512) || undefined;
+  const gdriveEmblemUrl = guildIconUrlByIdentifier(guild.id, 512) || undefined;
+  const hasCoaEmblem = Boolean(coaEmblemUrl);
+  const emblemUrl = coaEmblemUrl || gdriveEmblemUrl;
   const handleHeroAction = (actionKey: string) => {
     if (actionKey === "open_guild") {
       navigate(`/guilds/profile/${encodeURIComponent(guild.id)}`);
@@ -699,6 +840,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         memberCount: guild.memberCount ?? null,
         hofRank: guild.hofRank ?? null,
         emblemUrl: emblemUrl ?? null,
+        emblemAlt: hasCoaEmblem ? "Guild COA" : undefined,
         lastScanAtLabel: hasUpdatedScanLabel ? updatedScanLabel : null,
         lastScanDays: guild.lastScanDays ?? null,
         averageStats: {
@@ -744,7 +886,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
 
   return (
     <ContentShell centerFramed={false}>
-      <div className="px-6 pb-8">
+      <div className={`px-6 pb-8 ${hasCoaEmblem ? "guild-profile-coa-mode" : ""}`}>
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 space-y-4">
             {heroPanelData ? <GuildHeroPanel data={heroPanelData} onAction={handleHeroAction} context="profile" /> : null}

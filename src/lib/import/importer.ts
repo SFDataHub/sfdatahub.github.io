@@ -7,7 +7,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toNumber } from "../../../tools/playerDerivedHelpers";
 import type { ImportScanWriteMode } from "./csv";
 import { db } from "../firebase";
-import { traceSetDoc } from "../debug/firestoreReadTrace";
+import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
 
 export type CSVRow = Record<string, any>;
 export type GuildDerivedAggregate = {
@@ -263,6 +263,71 @@ const readSnapshotUpdatedAtMs = (value: any): number | null => {
   if (fallbackSec == null) return null;
   return fallbackSec * 1000;
 };
+
+export type CoaSummaryImportResult = {
+  guildId: string;
+  path: string;
+  status: "updated" | "skipped_missing_latest" | "skipped_same_value";
+};
+
+export async function mergeCoaStringIntoMembersSummaryLatest(params: {
+  guildId: string;
+  coaString: string;
+}): Promise<CoaSummaryImportResult> {
+  const guildId = String(params.guildId ?? "").trim();
+  const coaString = String(params.coaString ?? "").trim();
+  if (!guildId) {
+    throw new Error("Missing guild identifier.");
+  }
+  if (!coaString) {
+    throw new Error("Missing coaString.");
+  }
+
+  const latestRef = doc(db, `guilds/${guildId}/snapshots/members_summary`);
+  const latestSnap = await traceGetDoc(
+    null,
+    latestRef,
+    () => getDoc(latestRef),
+    { label: "UploadCenterV2:CoaImport:readLatestMembersSummary" },
+  );
+  if (!latestSnap.exists()) {
+    return {
+      guildId,
+      path: latestRef.path,
+      status: "skipped_missing_latest",
+    };
+  }
+
+  const existingCoaString = String((latestSnap.data() as any)?.coaString ?? "").trim();
+  if (existingCoaString && existingCoaString === coaString) {
+    return {
+      guildId,
+      path: latestRef.path,
+      status: "skipped_same_value",
+    };
+  }
+
+  await traceSetDoc(
+    latestRef,
+    () =>
+      setDoc(
+        latestRef,
+        {
+          coaString,
+          coaUpdatedAt: new Date().toISOString(),
+          coaUpdatedAtServer: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    { label: "UploadCenterV2:CoaImport:writeLatestMembersSummary" },
+  );
+
+  return {
+    guildId,
+    path: latestRef.path,
+    status: "updated",
+  };
+}
 
 function toMemberSummary(row: CSVRow): MemberSummary {
   const tsRaw = pickByCanon(row, P.TIMESTAMP);

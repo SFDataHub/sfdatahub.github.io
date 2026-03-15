@@ -31,7 +31,7 @@ function useInitialRanges() {
   dungeonPauseOpenXPData.light.forEach((r) => (light[r.key] = { from: 0, to: 0 }));
   dungeonPauseOpenXPData.shadow.forEach((r) => (shadow[r.key] = { from: 0, to: 0 }));
 
-  light.light_23_school_of_magic_express = { from: 1, to: 10 };
+  light.light_23_school_of_magic_express = { from: 9, to: 10 };
   light.light_24_nordic_gods = { from: 9, to: 10 };
   light.light_25_ash_mountain = { from: 9, to: 10 };
   light.light_26_playa_hq = { from: 7, to: 10 };
@@ -44,17 +44,17 @@ function useInitialRanges() {
   shadow.shadow_18_hemorridor = { from: 3, to: 10 };
   shadow.shadow_19_easteros = { from: 6, to: 10 };
   shadow.shadow_20_dojo_of_childhood_heroes = { from: 1, to: 10 };
-  shadow.shadow_21_tavern_of_the_dark_doppelgangers = { from: 1, to: 3 };
+  shadow.shadow_21_tavern_of_the_dark_doppelgangers = { from: 1, to: 5 };
   shadow.shadow_22_city_of_intrigues = { from: 1, to: 10 };
-  shadow.shadow_23_school_of_magic_express = { from: 1, to: 5 };
-  shadow.shadow_24_nordic_gods = { from: 1, to: 5 };
-  shadow.shadow_25_ash_mountain = { from: 1, to: 5 };
+  shadow.shadow_23_school_of_magic_express = { from: 1, to: 9 };
+  shadow.shadow_24_nordic_gods = { from: 1, to: 8 };
+  shadow.shadow_25_ash_mountain = { from: 1, to: 8 };
   shadow.shadow_26_playa_hq = { from: 1, to: 10 };
-  shadow.shadow_27_mount_olympus = { from: 1, to: 2 };
+  shadow.shadow_27_mount_olympus = { from: 1, to: 3 };
 
   dungeonPauseOpenXPData.special.forEach((r) => {
     if (r.specialType === "twister") special[r.key] = { from: 486, to: 1000 };
-    else if (r.specialType === "cloi") special[r.key] = { from: 6, to: 15 };
+    else if (r.specialType === "cloi") special[r.key] = { from: 6, to: 21 };
     else special[r.key] = { from: 0, to: 0 }; // sandstorm off
   });
 
