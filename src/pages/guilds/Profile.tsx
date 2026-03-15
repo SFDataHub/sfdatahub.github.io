@@ -500,7 +500,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   const coaEmblemUrl = useProfileCoaLogoUrl({
     coaString: snapshot?.coaString,
     guildName: guild?.name,
-    enabled: !heroOnly,
+    enabled: true,
   });
 
   // WICHTIG: classMeta wie im Container erstellen
@@ -539,19 +539,26 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
 
       const cachedServer = readServerIndex()[id];
       const cacheKey = cachedServer ? `${GUILD_CACHE_PREFIX}${cachedServer}__${id}` : null;
+      const needsFreshOverlayCoa = (data: GuildProfileLoadResult): boolean => {
+        if (!heroOnly) return false;
+        const cachedCoa = normalizeCoaString(data?.snapshot?.coaString);
+        return !isValidCoaString(cachedCoa);
+      };
 
       if (cacheKey) {
         const mem = guildProfileMemory.get(cacheKey);
         if (mem) {
           if (Date.now() - mem.cachedAt < GUILD_CACHE_TTL_MS) {
-            if (!cancelled) {
-              setGuild(mem.data.guild);
-              setSnapshot(mem.data.snapshot);
-              setTransfers(normalizeTransfers(mem.data.transfers));
-              setMonthlySeed(mem.data.monthlySeed ?? EMPTY_MONTHLY_SEED);
-              setLoading(false);
+            if (!needsFreshOverlayCoa(mem.data)) {
+              if (!cancelled) {
+                setGuild(mem.data.guild);
+                setSnapshot(mem.data.snapshot);
+                setTransfers(normalizeTransfers(mem.data.transfers));
+                setMonthlySeed(mem.data.monthlySeed ?? EMPTY_MONTHLY_SEED);
+                setLoading(false);
+              }
+              return;
             }
-            return;
           } else {
             guildProfileMemory.delete(cacheKey);
           }
@@ -562,15 +569,17 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         const cached = readTtlCache(cacheKey, GUILD_CACHE_TTL_MS);
         if (cached && typeof cached === "object") {
           const data = normalizeLoadResult(cached);
-          guildProfileMemory.set(cacheKey, { cachedAt: Date.now(), data });
-          if (!cancelled) {
-            setGuild(data.guild);
-            setSnapshot(data.snapshot);
-            setTransfers(data.transfers);
-            setMonthlySeed(data.monthlySeed ?? EMPTY_MONTHLY_SEED);
-            setLoading(false);
+          if (!needsFreshOverlayCoa(data)) {
+            guildProfileMemory.set(cacheKey, { cachedAt: Date.now(), data });
+            if (!cancelled) {
+              setGuild(data.guild);
+              setSnapshot(data.snapshot);
+              setTransfers(data.transfers);
+              setMonthlySeed(data.monthlySeed ?? EMPTY_MONTHLY_SEED);
+              setLoading(false);
+            }
+            return;
           }
-          return;
         }
       }
 
@@ -719,7 +728,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
     return () => {
       cancelled = true;
     };
-  }, [guildId]);
+  }, [guildId, heroOnly]);
 
   const membersForList = useMemo<MemberSummary[]>(
     () => (snapshot?.members ?? []).map((m) => normalizeMember(m)),
