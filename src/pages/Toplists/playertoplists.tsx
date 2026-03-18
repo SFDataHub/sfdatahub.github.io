@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createPortal } from "react-dom";
+import i18n from "../../i18n";
 import ContentShell from "../../components/ContentShell";
 import ProfileOverlay from "../../components/ProfileOverlay/ProfileOverlay";
 import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
@@ -25,7 +26,7 @@ import { useAuth } from "../../context/AuthContext";
 import GuildToplists, { type GuildToplistsPresetData } from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
-  getPlayerToplistSnapshotByDocId,
+  getPlayerToplistSnapshotByDocIdCached,
   type FirestoreLatestToplistSnapshot,
   type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
@@ -81,6 +82,10 @@ type PlayerPresetReadOnlyData = {
   playerLastUpdatedAt: number | null;
   playerScopeStatus: PlayerScopeStatus | null;
   playerAvgMode: "base" | "total";
+};
+
+type TableDataViewHandle = {
+  getPresetReadOnlyData: () => PlayerPresetReadOnlyData;
 };
 
 const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
@@ -143,6 +148,10 @@ const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => 
     // ignore storage write errors (quota/privacy mode)
   }
 };
+
+const compareSnapshotStateMemory = new Map<string, CompareSnapshotState>();
+const compareSnapshotStateInFlight = new Map<string, Promise<CompareSnapshotState>>();
+
 const mergeCompareSnapshotRows = (snapshots: FirestoreLatestToplistSnapshot[]) => {
   const mergedRows: FirestoreToplistPlayerRow[] = [];
   for (const snapshot of snapshots) {
@@ -1130,43 +1139,11 @@ function PlayerToplistsPageContent() {
   const lastUrlWriteRef = React.useRef<string | null>(null);
   const prevUrlSyncedServersKeyRef = React.useRef<string | null>(null);
   const tableRef = React.useRef<HTMLDivElement | null>(null);
+  const livePlayerTableDataRef = React.useRef<TableDataViewHandle | null>(null);
   const exportControllerRef = React.useRef<ToplistExportControllerHandle | null>(null);
   const [playerPresetReadOnlyData, setPlayerPresetReadOnlyData] = React.useState<PlayerPresetReadOnlyData | null>(null);
   const [guildPresetReadOnlyData, setGuildPresetReadOnlyData] = React.useState<GuildToplistsPresetData | null>(null);
-  const playerPresetSignatureRef = React.useRef<string>("");
   const guildPresetSignatureRef = React.useRef<string>("");
-
-  const handlePlayerPresetReadOnlyDataChange = React.useCallback((nextData: PlayerPresetReadOnlyData) => {
-    const limitedRows = (Array.isArray(nextData.rows) ? nextData.rows : []).slice(0, 150);
-    const nextScope = nextData.playerScopeStatus;
-    const scopeSnapshot = nextScope
-      ? {
-          scopeId: nextScope.scopeId,
-          changesSinceLastRebuild: nextScope.changesSinceLastRebuild,
-          minChanges: nextScope.minChanges ?? null,
-          maxAgeDays: nextScope.maxAgeDays ?? null,
-          lastRebuildAt: nextScope.lastRebuildAt instanceof Date ? nextScope.lastRebuildAt.getTime() : null,
-        }
-      : null;
-    const signature = JSON.stringify({
-      rows: limitedRows,
-      tableLoading: nextData.tableLoading,
-      compareLoading: nextData.compareLoading,
-      compareExpected: nextData.compareExpected,
-      showCompare: nextData.showCompare,
-      compareError: nextData.compareError,
-      playerError: nextData.playerError,
-      playerLastUpdatedAt: nextData.playerLastUpdatedAt,
-      playerAvgMode: nextData.playerAvgMode,
-      scopeSnapshot,
-    });
-    if (playerPresetSignatureRef.current === signature) return;
-    playerPresetSignatureRef.current = signature;
-    setPlayerPresetReadOnlyData({
-      ...nextData,
-      rows: limitedRows,
-    });
-  }, []);
 
   const handleGuildPresetReadOnlyDataChange = React.useCallback((nextData: GuildToplistsPresetData) => {
     const limitedRows = (Array.isArray(nextData.rows) ? nextData.rows : []).slice(0, 150);
@@ -1186,8 +1163,17 @@ function PlayerToplistsPageContent() {
   }, []);
 
   const openExportDialog = React.useCallback(() => {
+    if (activeTab === "players") {
+      const snapshot = livePlayerTableDataRef.current?.getPresetReadOnlyData();
+      if (snapshot) {
+        setPlayerPresetReadOnlyData({
+          ...snapshot,
+          rows: (Array.isArray(snapshot.rows) ? snapshot.rows : []).slice(0, 150),
+        });
+      }
+    }
     exportControllerRef.current?.open();
-  }, []);
+  }, [activeTab]);
 
   const handleLivePlayerCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
     exportControllerRef.current?.notifyLiveCaptureStatus("players", status);
@@ -1390,6 +1376,7 @@ function PlayerToplistsPageContent() {
 
         {activeTab === "players" && listView === "table" && (
           <TableDataView
+            ref={livePlayerTableDataRef}
             servers={servers ?? []}
             classes={classes ?? []}
             range={(range ?? "all") as any}
@@ -1404,7 +1391,6 @@ function PlayerToplistsPageContent() {
             tableRef={tableRef}
             renderMode="live"
             onCaptureStatusChange={handleLivePlayerCaptureStatusChange}
-            onPresetReadOnlyDataChange={handlePlayerPresetReadOnlyDataChange}
           />
         )}
         {activeTab === "guilds" && (
@@ -1483,9 +1469,7 @@ function PlayerToplistsPageContent() {
   );
 }
 
-function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPresetReadOnlyDataChange,
-}: {
+type TableDataViewProps = {
   servers: string[];
   classes: string[];
   range: DaysFilter;
@@ -1502,8 +1486,11 @@ function TableDataView({
   presetAmount?: ToplistExportAmount | null;
   onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
   presetReadOnlyData?: PlayerPresetReadOnlyData | null;
-  onPresetReadOnlyDataChange?: (data: PlayerPresetReadOnlyData) => void;
-}) {
+};
+
+const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(function TableDataView({
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null,
+}, ref) {
   const { t } = useTranslation();
   const { guilds, favoritesOnly } = useFilters();
   const { user } = useAuth();
@@ -1685,7 +1672,7 @@ function TableDataView({
   };
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
-  const rows = isPresetRender ? (presetReadOnlyData?.rows ?? []) : (playerRows || []);
+  const rows = isPresetRender ? (presetReadOnlyData?.rows ?? (playerRows || [])) : (playerRows || []);
   const isCompareMonthsMode = compareMode === "months";
   const progressBaselineMonth = String(progressSinceMonth ?? "").trim();
   const compareFromMonthValue = String(compareFromMonth ?? "").trim();
@@ -1728,7 +1715,6 @@ function TableDataView({
     return nextRows;
   }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, user, favoritePlayerSet]);
 
-  const [searchParams, setSearchParams] = useSearchParams();
   const [compareState, setCompareState] = React.useState<{
     rows: FirestoreToplistPlayerRow[];
     loading: boolean;
@@ -1748,10 +1734,8 @@ function TableDataView({
     () => normalizeServerList(servers).join(","),
     [servers]
   );
-  const compareServers = React.useMemo(
-    () => (compareServersKey ? compareServersKey.split(",").filter(Boolean) : []),
-    [compareServersKey]
-  );
+  const compareBaselineRequestKeyRef = React.useRef<string>("");
+  const compareTargetRequestKeyRef = React.useRef<string>("");
   const baselineServerSet = React.useMemo(() => {
     const normalized = (compareState.baselineServers || [])
       .map((server) => String(server).trim().toUpperCase())
@@ -1767,75 +1751,52 @@ function TableDataView({
   const compareLoading = isPresetRender ? (presetReadOnlyData?.compareLoading ?? false) : derivedCompareLoading;
   const showCompare = isPresetRender ? (presetReadOnlyData?.showCompare ?? false) : derivedShowCompare;
 
-  // persist compare selection in URL (optional param)
-  useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
-    const normalizedMode =
-      compareMode === "months"
-        ? "months"
-        : compareMode === "progress" && activeBaselineCompareMonth
-          ? "progress"
-          : "off";
-    if (normalizedMode === "progress" && activeBaselineCompareMonth) {
-      nextParams.set("compare", activeBaselineCompareMonth);
-    } else {
-      nextParams.delete("compare");
-    }
-    if (normalizedMode === "months") {
-      nextParams.set("compareMode", "months");
-      if (compareFromMonthValue) nextParams.set("compareFrom", compareFromMonthValue);
-      else nextParams.delete("compareFrom");
-      if (compareToMonthValue) nextParams.set("compareTo", compareToMonthValue);
-      else nextParams.delete("compareTo");
-    } else {
-      if (normalizedMode === "progress") nextParams.set("compareMode", "progress");
-      else nextParams.delete("compareMode");
-      nextParams.delete("compareFrom");
-      nextParams.delete("compareTo");
-    }
-    if (normalizedMode === "off") {
-      nextParams.delete("compareMode");
-    }
-    const prevKey = searchParams.toString();
-    const nextKey = nextParams.toString();
-    if (prevKey !== nextKey) {
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [
-    compareMode,
-    activeBaselineCompareMonth,
-    compareFromMonthValue,
-    compareToMonthValue,
-    searchParams,
-    setSearchParams,
-  ]);
-
   // Load monthly baseline snapshot(s) for comparison
   useEffect(() => {
     if (isPresetRender) return;
     let cancelled = false;
     const normalizedCompareMonth = activeBaselineCompareMonth;
+    const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
     const compareDisabled =
       !normalizedCompareMonth || normalizedCompareMonth.toLowerCase() === "off";
 
     if (compareDisabled) {
+      compareBaselineRequestKeyRef.current = "";
       setCompareState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
       return () => {
         cancelled = true;
       };
     }
 
-    if (!compareServers.length) {
+    if (!compareServersList.length) {
+      compareBaselineRequestKeyRef.current = "";
       setCompareState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
       return () => {
         cancelled = true;
       };
     }
 
-    const docIds = compareServers.map((s) => buildCompareDocId(s, normalizedCompareMonth));
+    const requestKey = `${normalizedCompareMonth}__${compareServersKey}`;
+    if (compareBaselineRequestKeyRef.current === requestKey) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    compareBaselineRequestKeyRef.current = requestKey;
+    const stateCacheKey = `players:baseline:${requestKey}`;
+
+    const cachedState = compareSnapshotStateMemory.get(stateCacheKey);
+    if (cachedState) {
+      setCompareState({ ...cachedState, loading: false });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const docIds = compareServersList.map((s) => buildCompareDocId(s, normalizedCompareMonth));
     const compareCacheKey = buildCompareSnapshotCacheKey({
       scope: "players",
-      servers: compareServers,
+      servers: compareServersList,
       month: normalizedCompareMonth,
     });
     const cachedCompareState = readCompareSnapshotCache(compareCacheKey);
@@ -1843,6 +1804,24 @@ function TableDataView({
       setCompareState({
         ...cachedCompareState,
         loading: false,
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingInFlight = compareSnapshotStateInFlight.get(stateCacheKey);
+    if (existingInFlight) {
+      setCompareState((prev) => ({
+        ...prev,
+        loading: true,
+        baselineServers: [],
+        missingServers: [],
+        error: null,
+      }));
+      existingInFlight.then((nextState) => {
+        if (cancelled) return;
+        setCompareState(nextState);
       });
       return () => {
         cancelled = true;
@@ -1857,12 +1836,10 @@ function TableDataView({
       error: null,
     }));
 
-    (async () => {
+    const fetchPromise = (async (): Promise<CompareSnapshotState> => {
       const results: FirestoreLatestToplistResult[] = await Promise.all(
-        docIds.map((docId) => getPlayerToplistSnapshotByDocId(docId))
+        docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
-      if (cancelled) return;
-
       const snapshots: FirestoreLatestToplistSnapshot[] = [];
       const baselineServers: string[] = [];
       const missingServers: string[] = [];
@@ -1891,18 +1868,38 @@ function TableDataView({
       const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
       const missingKey = missingServers.length ? missingServers.join(", ") : null;
       const errorMsg = missingServers.length
-        ? t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
+        ? i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
         : (firstErrorDetail ?? firstErrorCode ?? null);
-
-      const nextState = {
+      return {
         rows: mergedRows,
         loading: false,
         baselineServers,
         missingServers,
         error: errorMsg,
       };
+    })()
+      .catch((err) => {
+        const missingKey = docIds.join(", ");
+        const msg = i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
+        console.warn("[ToplistsPlayersCompare] snapshot fetch failed", err);
+        return {
+          rows: [],
+          loading: false,
+          baselineServers: [],
+          missingServers: docIds,
+          error: msg,
+        } satisfies CompareSnapshotState;
+      })
+      .finally(() => {
+        compareSnapshotStateInFlight.delete(stateCacheKey);
+      });
+
+    compareSnapshotStateInFlight.set(stateCacheKey, fetchPromise);
+    fetchPromise.then((nextState) => {
+      compareSnapshotStateMemory.set(stateCacheKey, nextState);
+      if (cancelled) return;
       setCompareState(nextState);
-      if (!missingServers.length) {
+      if (!nextState.missingServers.length) {
         writeCompareSnapshotCache(compareCacheKey, {
           rows: nextState.rows,
           baselineServers: nextState.baselineServers,
@@ -1910,50 +1907,76 @@ function TableDataView({
           error: null,
         });
       }
-    })().catch((err) => {
-      if (cancelled) return;
-      const missingKey = docIds.join(", ");
-      const msg = t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
-      setCompareState({
-        rows: [],
-        loading: false,
-        baselineServers: [],
-        missingServers: docIds,
-        error: msg,
-      });
-      console.warn("[ToplistsPlayersCompare] snapshot fetch failed", err);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [activeBaselineCompareMonth, compareServersKey, isPresetRender, t]);
+  }, [activeBaselineCompareMonth, compareServersKey, isPresetRender]);
 
   // Load compare target snapshot(s) when comparing month-to-month (visible list = "to" month)
   useEffect(() => {
     if (isPresetRender) return;
     let cancelled = false;
     const normalizedTargetMonth = activeTargetCompareMonth;
+    const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
     const compareDisabled =
       !isCompareMonthsMode ||
       !normalizedTargetMonth ||
       normalizedTargetMonth.toLowerCase() === "off";
 
     if (compareDisabled) {
+      compareTargetRequestKeyRef.current = "";
       setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
       return () => {
         cancelled = true;
       };
     }
 
-    if (!compareServers.length) {
+    if (!compareServersList.length) {
+      compareTargetRequestKeyRef.current = "";
       setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
       return () => {
         cancelled = true;
       };
     }
 
-    const docIds = compareServers.map((s) => buildCompareDocId(s, normalizedTargetMonth));
+    const requestKey = `${normalizedTargetMonth}__${compareServersKey}`;
+    if (compareTargetRequestKeyRef.current === requestKey) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    compareTargetRequestKeyRef.current = requestKey;
+    const stateCacheKey = `players:target:${requestKey}`;
+
+    const cachedState = compareSnapshotStateMemory.get(stateCacheKey);
+    if (cachedState) {
+      setCompareTargetState({ ...cachedState, loading: false });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const docIds = compareServersList.map((s) => buildCompareDocId(s, normalizedTargetMonth));
+
+    const existingInFlight = compareSnapshotStateInFlight.get(stateCacheKey);
+    if (existingInFlight) {
+      setCompareTargetState((prev) => ({
+        ...prev,
+        loading: true,
+        baselineServers: [],
+        missingServers: [],
+        error: null,
+      }));
+      existingInFlight.then((nextState) => {
+        if (cancelled) return;
+        setCompareTargetState(nextState);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     setCompareTargetState((prev) => ({
       ...prev,
@@ -1963,12 +1986,10 @@ function TableDataView({
       error: null,
     }));
 
-    (async () => {
+    const fetchPromise = (async (): Promise<CompareSnapshotState> => {
       const results: FirestoreLatestToplistResult[] = await Promise.all(
-        docIds.map((docId) => getPlayerToplistSnapshotByDocId(docId))
+        docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
-      if (cancelled) return;
-
       const snapshots: FirestoreLatestToplistSnapshot[] = [];
       const snapshotServers: string[] = [];
       const missingServers: string[] = [];
@@ -1997,35 +2018,43 @@ function TableDataView({
       const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
       const missingKey = missingServers.length ? missingServers.join(", ") : null;
       const errorMsg = missingServers.length
-        ? t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
+        ? i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
         : (firstErrorDetail ?? firstErrorCode ?? null);
-
-      const nextState = {
+      return {
         rows: mergedRows,
         loading: false,
         baselineServers: snapshotServers,
         missingServers,
         error: errorMsg,
       };
-      setCompareTargetState(nextState);
-    })().catch((err) => {
-      if (cancelled) return;
-      const missingKey = docIds.join(", ");
-      const msg = t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
-      setCompareTargetState({
-        rows: [],
-        loading: false,
-        baselineServers: [],
-        missingServers: docIds,
-        error: msg,
+    })()
+      .catch((err) => {
+        const missingKey = docIds.join(", ");
+        const msg = i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
+        console.warn("[ToplistsPlayersCompare] target snapshot fetch failed", err);
+        return {
+          rows: [],
+          loading: false,
+          baselineServers: [],
+          missingServers: docIds,
+          error: msg,
+        } satisfies CompareSnapshotState;
+      })
+      .finally(() => {
+        compareSnapshotStateInFlight.delete(stateCacheKey);
       });
-      console.warn("[ToplistsPlayersCompare] target snapshot fetch failed", err);
+
+    compareSnapshotStateInFlight.set(stateCacheKey, fetchPromise);
+    fetchPromise.then((nextState) => {
+      compareSnapshotStateMemory.set(stateCacheKey, nextState);
+      if (cancelled) return;
+      setCompareTargetState(nextState);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [activeTargetCompareMonth, compareServersKey, compareServers, isCompareMonthsMode, isPresetRender, t]);
+  }, [activeTargetCompareMonth, compareServersKey, isCompareMonthsMode, isPresetRender]);
 
   const compareMonthsTargetRows = React.useMemo(() => {
     if (!isCompareMonthsMode) return [] as FirestoreToplistPlayerRow[];
@@ -2540,21 +2569,18 @@ function TableDataView({
     virtualTotalSize,
   ]);
 
-  React.useEffect(() => {
-    if (isPresetRender || !onPresetReadOnlyDataChange) return;
-    onPresetReadOnlyDataChange({
-      rows: enhancedRows,
-      tableLoading,
-      compareLoading,
-      compareExpected,
-      showCompare,
-      compareError: activeCompareError,
-      playerError: effectivePlayerError,
-      playerLastUpdatedAt: effectivePlayerLastUpdatedAt,
-      playerScopeStatus: effectivePlayerScopeStatus,
-      playerAvgMode: effectivePlayerAvgMode,
-    });
-  }, [
+  const getPresetReadOnlyData = React.useCallback((): PlayerPresetReadOnlyData => ({
+    rows: enhancedRows.slice(0, 150),
+    tableLoading,
+    compareLoading,
+    compareExpected,
+    showCompare,
+    compareError: activeCompareError,
+    playerError: effectivePlayerError,
+    playerLastUpdatedAt: effectivePlayerLastUpdatedAt,
+    playerScopeStatus: effectivePlayerScopeStatus,
+    playerAvgMode: effectivePlayerAvgMode,
+  }), [
     activeCompareError,
     compareExpected,
     compareLoading,
@@ -2563,11 +2589,13 @@ function TableDataView({
     effectivePlayerLastUpdatedAt,
     effectivePlayerScopeStatus,
     enhancedRows,
-    isPresetRender,
-    onPresetReadOnlyDataChange,
     showCompare,
     tableLoading,
   ]);
+
+  React.useImperativeHandle(ref, () => ({
+    getPresetReadOnlyData,
+  }), [getPresetReadOnlyData]);
 
   const resolveGuildOverlayTarget = React.useCallback(
     async (row: FirestoreToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
@@ -3064,7 +3092,7 @@ function TableDataView({
       )}
     </div>
   );
-}
+});
 
 function TopTab({
   active,

@@ -536,8 +536,7 @@ export async function getPlayerToplistSnapshotByDocId(
       cached.v === 1 &&
       typeof cached.savedAt === "number" &&
       cached.data &&
-      typeof cached.data === "object" &&
-      !snapshotHasInvalidRatio(cached.data as FirestoreLatestToplistSnapshot)
+      typeof cached.data === "object"
     ) {
       return { ok: true, snapshot: cached.data as FirestoreLatestToplistSnapshot };
     }
@@ -549,7 +548,7 @@ export async function getPlayerToplistSnapshotByDocId(
 
   const promise = (async () => {
     const result = await getPlayerToplistSnapshotByDocIdNoCache(code);
-    if (useLocalStorageCache && result.ok && !snapshotHasInvalidRatio(result.snapshot)) {
+    if (useLocalStorageCache && result.ok) {
       const entry: CachedProgressSnapshot = {
         v: 1,
         savedAt: Date.now(),
@@ -597,6 +596,7 @@ const getLatestToplistSnapshotCacheKey = (entity: "player" | "guild", serverCode
 
 const getCompareSnapshotCacheKey = (docId: string) => `toplists:compare:${docId}`;
 const compareInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
+const compareSnapshotMemory = new Map<string, { expiresAt: number; result: FirestoreLatestToplistResult }>();
 const latestPlayerSnapshotInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
 const latestGuildSnapshotInFlight = new Map<string, Promise<FirestoreLatestGuildToplistResult>>();
 const latestPlayerSnapshotMemory = new Map<string, LatestToplistMemoryEntry<FirestoreLatestToplistResult>>();
@@ -725,15 +725,6 @@ const readSnapshotCache = <T,>(key: string): SnapshotCacheEntry<T> | null => {
   } catch {
     return null;
   }
-};
-
-const ratioLooksValid = (value: unknown) =>
-  value == null || (typeof value === "string" && value.includes("/"));
-
-const snapshotHasInvalidRatio = (snapshot: FirestoreLatestToplistSnapshot | null | undefined) => {
-  const rows = snapshot?.players;
-  if (!Array.isArray(rows)) return false;
-  return rows.some((row) => row && !ratioLooksValid((row as any).ratio));
 };
 
 const writeSnapshotCache = <T,>(key: string, entry: SnapshotCacheEntry<T>) => {
@@ -883,10 +874,17 @@ export async function getPlayerToplistSnapshotByDocIdCached(
 
   const key = getCompareSnapshotCacheKey(code);
   const now = Date.now();
+  const memoryHit = compareSnapshotMemory.get(code);
+  if (memoryHit) {
+    if (now < memoryHit.expiresAt) return memoryHit.result;
+    compareSnapshotMemory.delete(code);
+  }
   const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
   if (cached) {
-    if (now < cached.expiresAt && !snapshotHasInvalidRatio(cached.snapshot)) {
-      return { ok: true, snapshot: cached.snapshot };
+    if (now < cached.expiresAt) {
+      const result: FirestoreLatestToplistResult = { ok: true, snapshot: cached.snapshot };
+      compareSnapshotMemory.set(code, { expiresAt: cached.expiresAt, result });
+      return result;
     }
     clearSnapshotCache(key);
   }
@@ -896,8 +894,11 @@ export async function getPlayerToplistSnapshotByDocIdCached(
 
   const promise = (async () => {
     const result = await getPlayerToplistSnapshotByDocId(code);
+    const expiresAt = result.ok
+      ? (typeof ttlMs === "number" && ttlMs > 0 ? now + ttlMs : nextFullHour(now))
+      : now + TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
+    compareSnapshotMemory.set(code, { expiresAt, result });
     if (result.ok) {
-      const expiresAt = typeof ttlMs === "number" && ttlMs > 0 ? now + ttlMs : nextFullHour(now);
       writeSnapshotCache(key, {
         snapshot: result.snapshot,
         fetchedAt: now,
