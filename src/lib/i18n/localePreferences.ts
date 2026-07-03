@@ -145,7 +145,7 @@ export const readLocaleStateFromLocalStorage = (
     {
       activeLocale,
       preferredSecondaryLocale:
-        storedSecondary
+        normalizeLocale(storedSecondary)
         ?? (activeLocale !== PRIMARY_LOCALE ? activeLocale : undefined),
     },
     { activeLocale: fallbackActive },

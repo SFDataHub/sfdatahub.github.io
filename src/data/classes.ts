@@ -82,7 +82,7 @@ add("druide", "druid");
 add("barde", "bard");
 add("necro", "necromancer"); add("nekromant", "necromancer");
 add("pala", "paladin");
-add("plaguedoctor", "plague-doctor"); add("plague doctor", "plague-doctor"); add("plague-doctor", "plague-doctor");
+add("plaguedoctor", "plague-doctor"); add("plague doctor", "plague-doctor"); add("plague-doctor", "plague-doctor"); add("pestdoktor", "plague-doctor"); add("12", "plague-doctor");
 
 /** Öffentliche Helper: aus beliebigem Namen verlässlich das Icon bestimmen. */
 export function iconForClassName(input?: string | null): { url?: string; fallback?: string } {

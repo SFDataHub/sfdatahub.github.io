@@ -216,6 +216,7 @@ const classIdFromName = (name: string): number | null => {
   for (const [id, label] of Object.entries(PLAYER_CLASS_NAMES)) {
     if (CANON(label) === canon) return Number(id);
   }
+  if (canon === CANON("plague-doctor") || canon === CANON("Pestdoktor")) return 12;
   return null;
 };
 
@@ -259,13 +260,17 @@ const COL = {
 
 const PLAYER_CLASS_NAMES: Record<number, string> = {
   1: "Warrior",
-  2: "Mage",
-  3: "Scout",
+  2: "Scout",
+  3: "Mage",
   4: "Assassin",
   5: "Battle Mage",
   6: "Berserker",
   7: "Demon Hunter",
-  8: "Bard",
+  8: "Druid",
+  9: "Bard",
+  10: "Necromancer",
+  11: "Paladin",
+  12: "Plague Doctor",
 };
 
 const PLAYER_LEVEL_KEYS = [COL.PLAYERS.LEVEL, CANON("Level"), CANON("Lvl"), CANON("Stufe")];
