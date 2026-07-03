@@ -191,13 +191,17 @@ const pickAnyByCanon = (row: Record<string, any>, keys: string[]): any =>
 
 const PLAYER_CLASS_NAMES: Record<number, string> = {
   1: "Warrior",
-  2: "Mage",
-  3: "Scout",
+  2: "Scout",
+  3: "Mage",
   4: "Assassin",
   5: "Battle Mage",
   6: "Berserker",
   7: "Demon Hunter",
-  8: "Bard",
+  8: "Druid",
+  9: "Bard",
+  10: "Necromancer",
+  11: "Paladin",
+  12: "Plague Doctor",
 };
 
 const classIdFromName = (name: string): number | null => {
@@ -205,6 +209,7 @@ const classIdFromName = (name: string): number | null => {
   for (const [id, label] of Object.entries(PLAYER_CLASS_NAMES)) {
     if (CANON(label) === canon) return Number(id);
   }
+  if (canon === CANON("plague-doctor") || canon === CANON("Pestdoktor")) return 12;
   return null;
 };
 
@@ -283,6 +288,20 @@ type ResolvedServerKeys = {
   queryKey: string;
   writeKey: string;
   longValueServer: string;
+};
+
+const TOP_LEVEL_SERVER_READ_ALIASES = {
+  MAERWYNN: ["MAERWYNN", "maerwynn_net", "MAERWYNN_NET"],
+  BLACKFOREST: ["BLACKFOREST", "blackforest_net", "BLACKFOREST_NET", "BLACK_FOREST"],
+  GNAROGRIM: ["GNAROGRIM", "gnarogrim_net", "GNAROGRIM_NET", "GRANOGRIM", "granogrim_net"],
+} as const satisfies Record<string, readonly string[]>;
+
+// Top-level `server` aliases are read independently and merged by Firestore document path.
+const getTopLevelServerReadCandidates = (canonicalServerKey: string): string[] => {
+  const aliases = TOP_LEVEL_SERVER_READ_ALIASES[
+    canonicalServerKey as keyof typeof TOP_LEVEL_SERVER_READ_ALIASES
+  ];
+  return [...new Set([canonicalServerKey, ...(aliases ?? [])])];
 };
 
 const normalizeServerShortKey = (input: string): string => {
@@ -607,81 +626,90 @@ const run = async () => {
   console.log(`[monthly-toplists] values.server example candidate=${resolvedServer.longValueServer}`);
   console.log(`[monthly-toplists] Target path (progress): ${targetPath}`);
 
-  const scanForServer = async (serverFieldPath: "server" | "values.server", serverValue: string) => {
+  const scanForServer = async (
+    serverFieldPath: "server" | "values.server",
+    serverValues: readonly string[]
+  ) => {
     let scansInWindow = 0;
     let skippedNonPlayerPath = 0;
     let skippedLegacyPlayerIdNamespace = 0;
     let skippedBadIdentifierField = 0;
     let skippedBadTimestamp = 0;
+    const seenDocumentNames = new Set<string>();
     const byPlayer = new Map<string, { ts: number; data: any; docId: string }>();
 
     try {
-      let cursor: FirestoreCursor = null;
-      for (;;) {
-        const { rows, nextCursor } = await runScansQueryPage(
-          baseDocsUrl,
-          accessToken,
-          serverFieldPath,
-          serverValue,
-          fromSec,
-          toSec,
-          cursor
-        );
-        if (rows.length === 0) break;
+      for (const serverValue of serverValues) {
+        let cursor: FirestoreCursor = null;
+        for (;;) {
+          const { rows, nextCursor } = await runScansQueryPage(
+            baseDocsUrl,
+            accessToken,
+            serverFieldPath,
+            serverValue,
+            fromSec,
+            toSec,
+            cursor
+          );
+          if (rows.length === 0) break;
 
-        for (const doc of rows) {
-          const path = String(doc.name).split("/documents/")[1] ?? "";
-          if (!path) {
-            skippedNonPlayerPath++;
-            continue;
+          for (const doc of rows) {
+            if (seenDocumentNames.has(doc.name)) continue;
+            seenDocumentNames.add(doc.name);
+
+            const path = String(doc.name).split("/documents/")[1] ?? "";
+            if (!path) {
+              skippedNonPlayerPath++;
+              continue;
+            }
+
+            const data = doc.data || {};
+            const pathMatch = /^players\/([^/]+)\/scans\/([^/]+)$/.exec(path);
+            if (!pathMatch) {
+              skippedNonPlayerPath++;
+              continue;
+            }
+            const playerDocId = String(pathMatch[1] ?? "").trim();
+            if (!playerDocId) {
+              skippedNonPlayerPath++;
+              continue;
+            }
+            if (/^\d+$/.test(playerDocId)) {
+              skippedLegacyPlayerIdNamespace++;
+              continue;
+            }
+
+            const identifierField = String(data?.identifier ?? "").trim();
+            if (identifierField && /^\d+$/.test(identifierField)) {
+              skippedBadIdentifierField++;
+            }
+
+            const identifier = playerDocId;
+            if (!identifier) {
+              skippedNonPlayerPath++;
+              continue;
+            }
+
+            const ts = resolveTimestampSec(data, doc.docId);
+            if (!ts) {
+              skippedBadTimestamp++;
+              continue;
+            }
+            if (ts < fromSec || ts > toSec) continue;
+
+            scansInWindow++;
+            const prev = byPlayer.get(identifier);
+            if (!prev || ts > prev.ts) {
+              byPlayer.set(identifier, { ts, data, docId: doc.docId });
+            }
           }
 
-          const data = doc.data || {};
-          const pathMatch = /^players\/([^/]+)\/scans\/([^/]+)$/.exec(path);
-          if (!pathMatch) {
-            skippedNonPlayerPath++;
-            continue;
+          if (!nextCursor) break;
+          if (cursor && cursor.name === nextCursor.name && cursor.ts === nextCursor.ts) {
+            throw new Error("REST runQuery pagination cursor did not advance; aborting to prevent infinite loop.");
           }
-          const playerDocId = String(pathMatch[1] ?? "").trim();
-          if (!playerDocId) {
-            skippedNonPlayerPath++;
-            continue;
-          }
-          if (/^\d+$/.test(playerDocId)) {
-            skippedLegacyPlayerIdNamespace++;
-            continue;
-          }
-
-          const identifierField = String(data?.identifier ?? "").trim();
-          if (identifierField && /^\d+$/.test(identifierField)) {
-            skippedBadIdentifierField++;
-          }
-
-          const identifier = playerDocId;
-          if (!identifier) {
-            skippedNonPlayerPath++;
-            continue;
-          }
-
-          const ts = resolveTimestampSec(data, doc.docId);
-          if (!ts) {
-            skippedBadTimestamp++;
-            continue;
-          }
-          if (ts < fromSec || ts > toSec) continue;
-
-          scansInWindow++;
-          const prev = byPlayer.get(identifier);
-          if (!prev || ts > prev.ts) {
-            byPlayer.set(identifier, { ts, data, docId: doc.docId });
-          }
+          cursor = nextCursor;
         }
-
-        if (!nextCursor) break;
-        if (cursor && cursor.name === nextCursor.name && cursor.ts === nextCursor.ts) {
-          throw new Error("REST runQuery pagination cursor did not advance; aborting to prevent infinite loop.");
-        }
-        cursor = nextCursor;
       }
     } catch (err: any) {
       const msg = String(err?.message ?? err);
@@ -768,20 +796,21 @@ const run = async () => {
     }
   };
 
+  const serverReadCandidates = getTopLevelServerReadCandidates(resolvedServer.canonicalShortKey);
   let activeServerField: "server" | "values.server" = "server";
-  let activeServerValue = resolvedServer.queryKey;
-  let scanResult = await scanForServer(activeServerField, activeServerValue);
+  let activeServerValues = serverReadCandidates;
+  let scanResult = await scanForServer(activeServerField, activeServerValues);
   if (scanResult.scansInWindow === 0) {
-    await logZeroResultDebugSample(activeServerField, activeServerValue);
+    await logZeroResultDebugSample(activeServerField, activeServerValues.join(","));
     console.warn(
       `[monthly-toplists] Primary scan query returned 0 docs. Retrying fallback with values.server=${resolvedServer.longValueServer}.`
     );
     activeServerField = "values.server";
-    activeServerValue = resolvedServer.longValueServer;
-    scanResult = await scanForServer(activeServerField, activeServerValue);
+    activeServerValues = [resolvedServer.longValueServer];
+    scanResult = await scanForServer(activeServerField, activeServerValues);
   }
   if (scanResult.scansInWindow === 0) {
-    await logZeroResultDebugSample(activeServerField, activeServerValue);
+    await logZeroResultDebugSample(activeServerField, activeServerValues.join(","));
   }
 
   const {

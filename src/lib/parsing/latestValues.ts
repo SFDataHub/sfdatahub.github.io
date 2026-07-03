@@ -143,6 +143,8 @@ const MAIN_ATTRIBUTE_BY_CLASS_NAME: Record<string, AttributeCode> = {
   necromancer: "int",
   paladin: "str",
   plaguedoctor: "dex",
+  pestdoktor: "dex",
+  "12": "dex",
 };
 
 const getMainAttributeCodeForClassName = (className: string | null): AttributeCode | null => {

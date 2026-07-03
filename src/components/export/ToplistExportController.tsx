@@ -539,15 +539,16 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
           requiredStableFrames: 4,
         });
         if (!captureTarget) return null;
+        const resolvedCaptureTarget = captureTarget;
 
         await waitForFontsReady();
-        await waitForImagesInNode(captureTarget);
+        await waitForImagesInNode(resolvedCaptureTarget);
         await waitForAnimationFrame();
-        await waitForStableLayout(captureTarget);
+        await waitForStableLayout(resolvedCaptureTarget);
 
-        const rect = captureTarget.getBoundingClientRect();
-        const targetWidth = Math.max(1, Math.ceil(rect.width || captureTarget.offsetWidth || 1));
-        const targetHeight = Math.max(1, Math.ceil(rect.height || captureTarget.offsetHeight || 1));
+        const rect = resolvedCaptureTarget.getBoundingClientRect();
+        const targetWidth = Math.max(1, Math.ceil(rect.width || resolvedCaptureTarget.offsetWidth || 1));
+        const targetHeight = Math.max(1, Math.ceil(rect.height || resolvedCaptureTarget.offsetHeight || 1));
         const captureRightBleed = 2;
         const captureTopBleed = TOPLIST_EXPORT_TOP_BLEED;
         const captureWidth = targetWidth + captureRightBleed;
@@ -558,15 +559,15 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
         const captureWindowWidth = Math.max(viewportWidth, captureWidth);
         const captureWindowHeight = Math.max(viewportHeight, captureHeight);
         const iconDataUrlBySource = await buildToplistIconDataUrlMap(
-          captureTarget,
+          resolvedCaptureTarget,
           iconDataUrlPromiseCacheRef.current,
         );
 
-        const restoreCaptureTarget = markCaptureTarget(captureTarget);
-        const { scrollState, cleanup: cleanupScrollState } = collectCaptureScrollState(captureTarget);
+        const restoreCaptureTarget = markCaptureTarget(resolvedCaptureTarget);
+        const { scrollState, cleanup: cleanupScrollState } = collectCaptureScrollState(resolvedCaptureTarget);
         try {
           const outputScale = Math.max(1, Math.min(2, Number.isFinite(scale) ? scale : 1));
-          const runCapture = (useForeignObjectRendering: boolean) => html2canvas(captureTarget, {
+          const runCapture = (useForeignObjectRendering: boolean) => html2canvas(resolvedCaptureTarget, {
             backgroundColor,
             foreignObjectRendering: useForeignObjectRendering,
             scale: outputScale,

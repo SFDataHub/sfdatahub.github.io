@@ -70,6 +70,9 @@ type CompareSnapshotState = {
   missingServers: string[];
   error: string | null;
 };
+type CompareSnapshotUiState = CompareSnapshotState & {
+  loading: boolean;
+};
 
 type PlayerPresetReadOnlyData = {
   rows: FirestoreToplistPlayerRow[];
@@ -149,8 +152,8 @@ const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => 
   }
 };
 
-const compareSnapshotStateMemory = new Map<string, CompareSnapshotState>();
-const compareSnapshotStateInFlight = new Map<string, Promise<CompareSnapshotState>>();
+const compareSnapshotStateMemory = new Map<string, CompareSnapshotUiState>();
+const compareSnapshotStateInFlight = new Map<string, Promise<CompareSnapshotUiState>>();
 
 const mergeCompareSnapshotRows = (snapshots: FirestoreLatestToplistSnapshot[]) => {
   const mergedRows: FirestoreToplistPlayerRow[] = [];
@@ -1715,20 +1718,20 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return nextRows;
   }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, user, favoritePlayerSet]);
 
-  const [compareState, setCompareState] = React.useState<{
-    rows: FirestoreToplistPlayerRow[];
-    loading: boolean;
-    baselineServers: string[];
-    missingServers: string[];
-    error: string | null;
-  }>({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-  const [compareTargetState, setCompareTargetState] = React.useState<{
-    rows: FirestoreToplistPlayerRow[];
-    loading: boolean;
-    baselineServers: string[];
-    missingServers: string[];
-    error: string | null;
-  }>({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
+  const [compareState, setCompareState] = React.useState<CompareSnapshotUiState>({
+    rows: [],
+    loading: false,
+    baselineServers: [],
+    missingServers: [],
+    error: null,
+  });
+  const [compareTargetState, setCompareTargetState] = React.useState<CompareSnapshotUiState>({
+    rows: [],
+    loading: false,
+    baselineServers: [],
+    missingServers: [],
+    error: null,
+  });
 
   const compareServersKey = React.useMemo(
     () => normalizeServerList(servers).join(","),
@@ -1836,7 +1839,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       error: null,
     }));
 
-    const fetchPromise = (async (): Promise<CompareSnapshotState> => {
+    const fetchPromise = (async (): Promise<CompareSnapshotUiState> => {
       const results: FirestoreLatestToplistResult[] = await Promise.all(
         docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
@@ -1888,7 +1891,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
           baselineServers: [],
           missingServers: docIds,
           error: msg,
-        } satisfies CompareSnapshotState;
+        } satisfies CompareSnapshotUiState;
       })
       .finally(() => {
         compareSnapshotStateInFlight.delete(stateCacheKey);
@@ -1986,7 +1989,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       error: null,
     }));
 
-    const fetchPromise = (async (): Promise<CompareSnapshotState> => {
+    const fetchPromise = (async (): Promise<CompareSnapshotUiState> => {
       const results: FirestoreLatestToplistResult[] = await Promise.all(
         docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
@@ -2038,7 +2041,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
           baselineServers: [],
           missingServers: docIds,
           error: msg,
-        } satisfies CompareSnapshotState;
+        } satisfies CompareSnapshotUiState;
       })
       .finally(() => {
         compareSnapshotStateInFlight.delete(stateCacheKey);

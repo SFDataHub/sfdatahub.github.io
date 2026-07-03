@@ -63,10 +63,13 @@ export function canonClassKey(raw: any): GameClassKey | null {
     "bard": "bard",
     "necromancer": "necromancer",
     "paladin": "paladin",
+    "plague-doctor": "plague-doctor",
+    "12": "plague-doctor",
 
     // populäre Varianten/Aliasse
     "demonhunter": "demon-hunter",
     "battlemage": "battle-mage",
+    "plaguedoctor": "plague-doctor",
     "dh": "demon-hunter",
     "bm": "battle-mage",
     "war": "warrior",
@@ -88,6 +91,7 @@ export function canonClassKey(raw: any): GameClassKey | null {
     "druide": "druid",
     "barde": "bard",
     "nekromant": "necromancer",
+    "pestdoktor": "plague-doctor",
   };
 
   if (map[s]) return map[s];
