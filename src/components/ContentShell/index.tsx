@@ -130,12 +130,6 @@ export default function ContentShell({
     </>
   );
 
-  // Wrapper (Card/Page)
-  const Wrap: React.FC<{ children: React.ReactNode }> =
-    mode === "card"
-      ? ({ children }) => <Frame rounded={rounded} padded={padded}>{children}</Frame>
-      : ({ children }) => <div className={`w-full ${outerPadding}`}>{children}</div>;
-
   // ---------- Body: NUR CENTER scrollt ----------
   const Body = (
     <div className="relative min-h-0 h-full" style={cssVars}>
@@ -234,17 +228,21 @@ export default function ContentShell({
   }
 
   // Standard (page/card, left inside)
-  return (
-    <Wrap>
-      <div
-        className="flex flex-col min-h-0"
-        style={{ height: `calc(100vh - ${shellViewportOffset})` }}
-      >
-        {TopArea}
-        <div className="flex-1 min-h-0">
-          {Body}
-        </div>
+  const content = (
+    <div
+      className="flex flex-col min-h-0"
+      style={{ height: `calc(100vh - ${shellViewportOffset})` }}
+    >
+      {TopArea}
+      <div className="flex-1 min-h-0">
+        {Body}
       </div>
-    </Wrap>
+    </div>
+  );
+
+  return mode === "card" ? (
+    <Frame rounded={rounded} padded={padded}>{content}</Frame>
+  ) : (
+    <div className={`w-full ${outerPadding}`}>{content}</div>
   );
 }

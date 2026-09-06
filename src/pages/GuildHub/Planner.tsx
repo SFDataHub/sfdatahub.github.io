@@ -1,5 +1,6 @@
 import React from "react";
 import ContentShell from "../../components/ContentShell";
+import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -170,6 +171,7 @@ export default function GuildHubPlanner() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerStack}>
+            <GuildHubBackLink />
             <div>
               <p className={styles.kicker}>Deployment</p>
               <h1 className={styles.title}>Planer</h1>

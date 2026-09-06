@@ -87,7 +87,7 @@ const PLAYER_GUILDID = ["guildid", "guild_id", "guild", "Guild", "Guild ID"];
  * Schneidet einen fetten SFTools-Player auf die Felder zusammen, die unser Schema sicher versteht.
  * Alles andere (save, pets, items, ...) wird absichtlich weggelassen.
  */
-function slimPlayer(o: Obj) {
+export function slimPlayer(o: Obj) {
   const id = pickFirst(o, PLAYER_ID_KEYS);
   const name = pickFirst(o, PLAYER_NAME_KEYS);
   const cls = pickFirst(o, PLAYER_CLASS_KEYS);

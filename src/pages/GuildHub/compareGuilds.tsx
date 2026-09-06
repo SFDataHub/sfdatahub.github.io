@@ -1,5 +1,6 @@
 import React from "react";
 import ContentShell from "../../components/ContentShell";
+import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
 import {
   collectionGroup,
   endAt,
@@ -151,6 +152,7 @@ export default function GuildHubCompareGuilds() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerStack}>
+            <GuildHubBackLink />
             <div>
               <p className={styles.kicker}>Guild Hub</p>
               <h1 className={styles.title}>Gilden vergleichen</h1>

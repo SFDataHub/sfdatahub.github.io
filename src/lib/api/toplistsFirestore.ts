@@ -789,12 +789,7 @@ const readLatestToplistSnapshotCache = <T,>(key: string): LatestToplistSnapshotC
 };
 
 const writeLatestToplistSnapshotCache = <T,>(key: string, entry: LatestToplistSnapshotCacheEntry<T>) => {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    // ignore cache write errors (quota, privacy mode, etc.)
-  }
+  writeLS(key, entry);
 };
 
 const readLiveToplistMemoryEntry = <R,>(

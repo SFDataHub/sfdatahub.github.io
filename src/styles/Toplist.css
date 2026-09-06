@@ -31,7 +31,7 @@
 }
 
 /* Mobile drawer overlays content; main content starts at viewport left */
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   #app-shell[data-sidebar="collapsed"] .profile-overlay,
   #app-shell[data-sidebar="expanded"] .profile-overlay {
     left: 0;
@@ -83,7 +83,7 @@
   margin: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .profile-overlay {
     left: 0;
     padding:

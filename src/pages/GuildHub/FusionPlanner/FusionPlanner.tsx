@@ -1,7 +1,7 @@
 import React from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { Link } from "react-router-dom";
 import ContentShell from "../../../components/ContentShell";
+import GuildHubBackLink from "../../../components/guildhub/GuildHubBackLink";
 import styles from "./FusionPlanner.module.css";
 import SetupTab from "./FusionPlannerTabs/SetupTab/SetupTab";
 import MembersTab from "./FusionPlannerTabs/MembersTab/MembersTab";
@@ -592,9 +592,7 @@ export default function FusionPlanner() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerLeading}>
-            <Link to="/guild-hub" className={styles.backLink}>
-              Back to Guild Hub
-            </Link>
+            <GuildHubBackLink />
             <div className={styles.headerStack}>
               <p className={styles.kicker}>Guild Hub</p>
               <h1 className={styles.title}>Fusion Planner</h1>

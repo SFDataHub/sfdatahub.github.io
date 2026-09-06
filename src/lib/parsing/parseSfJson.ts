@@ -1,4 +1,5 @@
 import { extractPortraitFromSaveArray, parseSaveStringToArray } from "./extractPortrait";
+import { buildStatsModelFromLatestValues, parseNumberLoose } from "./latestValues";
 import type {
   SfJsonAchievements,
   SfJsonBackpackItems,
@@ -15,6 +16,7 @@ import type {
   SfJsonModernItemSlot,
   SfJsonOwnPlayer,
   SfJsonParseResult,
+  SfJsonPlayerStats,
   SfJsonPets,
   SfJsonResources,
   SfJsonScrapbook,
@@ -105,6 +107,185 @@ const asRecord = (value: unknown): Record<string, unknown> | null => {
 const asNumberArray = (value: unknown): number[] | null => {
   if (!Array.isArray(value)) return null;
   return value.map((entry) => toFiniteNumberWithFallback(entry, 0));
+};
+
+const STRENGTH_CLASS_IDS = new Set([1, 5, 6, 11]);
+const DEXTERITY_CLASS_IDS = new Set([2, 4, 7, 12]);
+const INTELLIGENCE_CLASS_IDS = new Set([3, 8, 9, 10]);
+
+const canonicalizeFieldKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const normalizeStringValue = (value: unknown): string | null => {
+  if (value == null) return null;
+  const text = String(value).replace(/\u00a0/g, " ").trim();
+  if (!text || ["?", "-", "--", "n/a", "na", "null", "undefined"].includes(text.toLowerCase())) return null;
+  return text;
+};
+
+const getGenericPlayerValueSources = (row: Record<string, unknown>): Record<string, unknown>[] => {
+  const values = asRecord(row.values);
+  const valuesLatestValues = asRecord(values?.latestValues);
+  const latest = asRecord(row.latest);
+  const latestValues = asRecord(latest?.values);
+  const directLatestValues = asRecord(row.latestValues);
+  return [row, values, valuesLatestValues, latest, latestValues, directLatestValues].filter(
+    (source): source is Record<string, unknown> => Boolean(source),
+  );
+};
+
+const pickGenericPlayerValue = (row: Record<string, unknown>, keys: readonly string[]) => {
+  for (const source of getGenericPlayerValueSources(row)) {
+    const canonical = new Map<string, unknown>();
+    Object.entries(source).forEach(([key, value]) => {
+      canonical.set(canonicalizeFieldKey(key), value);
+    });
+
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
+      const value = canonical.get(canonicalizeFieldKey(key));
+      if (value != null) return value;
+    }
+  }
+  return undefined;
+};
+
+const pickGenericPlayerNumber = (row: Record<string, unknown>, keys: readonly string[]) =>
+  parseNumberLoose(pickGenericPlayerValue(row, keys));
+
+const pickGenericPlayerString = (row: Record<string, unknown>, keys: readonly string[]) =>
+  normalizeStringValue(pickGenericPlayerValue(row, keys));
+
+const PLAYER_LEVEL_KEYS = ["level", "Level", "lvl", "Lvl"];
+
+const readSaveArrayForPlayerStats = (row: Record<string, unknown>): number[] | null => {
+  const saveField = row.save ?? row.playerSave;
+  const saveArray = asNumberArray(saveField);
+  if (saveArray && saveArray.length) return saveArray;
+
+  const saveString =
+    typeof saveField === "string"
+      ? saveField
+      : typeof row.saveString === "string"
+        ? row.saveString
+        : undefined;
+  const fromString = saveString ? parseSaveStringToArray(saveString) : undefined;
+  return fromString && fromString.length ? fromString : null;
+};
+
+const readSaveNumber = (saveArray: number[] | null, index: number): number | null => {
+  if (!saveArray || index >= saveArray.length) return null;
+  return toFiniteNumberOrNull(saveArray[index]);
+};
+
+const normalizeSfPlayerLevel = (value: number | null): number | null =>
+  value != null && Number.isFinite(value) && value > 0 ? value : null;
+
+export const readSfPlayerLevel = (player: unknown): number | null => {
+  const row = asRecord(player);
+  if (!row) return null;
+
+  const directLevel = normalizeSfPlayerLevel(pickGenericPlayerNumber(row, PLAYER_LEVEL_KEYS));
+  if (directLevel != null) return directLevel;
+
+  const saveArray = readSaveArrayForPlayerStats(row);
+  const own = toFiniteNumberOrNull(row.own);
+  if (own === 1) return normalizeSfPlayerLevel(readSaveNumber(saveArray, 7));
+  if (saveArray?.length === 70) return normalizeSfPlayerLevel(readSaveNumber(saveArray, 3));
+  return normalizeSfPlayerLevel(readSaveNumber(saveArray, 2));
+};
+
+const readClassIdForPlayerStats = (row: Record<string, unknown>, saveArray: number[] | null): string | null => {
+  const portrait = saveArray && saveArray.length > 0 ? extractPortraitFromSaveArray(saveArray) : null;
+  const direct =
+    pickGenericPlayerString(row, ["classId", "Class ID", "class", "Class", "className", "Class Name"]) ??
+    normalizeStringValue(portrait?.classId);
+  return direct;
+};
+
+const getMainSaveBaseIndex = (classId: string | null): number | null => {
+  const classNumber = classId == null ? null : Number(classId);
+  if (classNumber != null && Number.isFinite(classNumber)) {
+    if (STRENGTH_CLASS_IDS.has(classNumber)) return 30;
+    if (DEXTERITY_CLASS_IDS.has(classNumber)) return 31;
+    if (INTELLIGENCE_CLASS_IDS.has(classNumber)) return 32;
+  }
+
+  const key = canonicalizeFieldKey(classId ?? "");
+  if (["warrior", "berserker", "battlemage", "paladin"].includes(key)) return 30;
+  if (["scout", "assassin", "demonhunter", "plaguedoctor", "pestdoktor"].includes(key)) return 31;
+  if (["mage", "druid", "bard", "necromancer"].includes(key)) return 32;
+  return null;
+};
+
+const sumPair = (left: number | null, right: number | null) =>
+  left != null && right != null ? left + right : null;
+
+const sumKnownNumbers = (values: Array<number | null>, minKnownValues = 2) => {
+  const known = values.filter((value): value is number => value != null);
+  return known.length >= minKnownValues ? known.reduce((sum, value) => sum + value, 0) : null;
+};
+
+const buildLatestValuesForStats = (row: Record<string, unknown>) =>
+  Object.assign({}, ...getGenericPlayerValueSources(row).reverse());
+
+export const readSfPlayerStats = (player: unknown): SfJsonPlayerStats => {
+  const row = asRecord(player);
+  if (!row) {
+    return {
+      level: null,
+      classId: null,
+      baseStats: null,
+      totalStats: null,
+      baseMain: null,
+      conBase: null,
+      attrTotal: null,
+      conTotal: null,
+    };
+  }
+
+  const saveArray = readSaveArrayForPlayerStats(row);
+  const classId = readClassIdForPlayerStats(row, saveArray);
+  const mainSaveIndex = getMainSaveBaseIndex(classId);
+  const mainSaveBase = mainSaveIndex == null ? null : readSaveNumber(saveArray, mainSaveIndex);
+  const mainSaveBonus = mainSaveIndex == null ? null : readSaveNumber(saveArray, mainSaveIndex + 5);
+  const conSaveBase = readSaveNumber(saveArray, 33);
+  const conSaveBonus = readSaveNumber(saveArray, 38);
+  const latestStats = buildStatsModelFromLatestValues(buildLatestValuesForStats(row));
+  const latestBaseStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.base));
+  const latestTotalStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.total));
+
+  const level = readSfPlayerLevel(row);
+  const baseMain =
+    pickGenericPlayerNumber(row, ["baseMain", "Base Main", "Base", "Base Attribute", "Basis Attribut"]) ??
+    mainSaveBase;
+  const conBase =
+    pickGenericPlayerNumber(row, ["conBase", "Con Base", "Constitution Base", "Base Constitution", "Basis Konstitution"]) ??
+    conSaveBase;
+  const attrTotal =
+    pickGenericPlayerNumber(row, ["attrTotal", "Attribute", "Attr Total", "Attribut", "Attribut Gesamt"]) ??
+    sumPair(mainSaveBase, mainSaveBonus);
+  const conTotal =
+    pickGenericPlayerNumber(row, ["conTotal", "Constitution", "Constitution Total", "Konstitution", "Konstitution Gesamt"]) ??
+    sumPair(conSaveBase, conSaveBonus);
+  const baseStats =
+    pickGenericPlayerNumber(row, ["sumBaseTotal", "baseStats", "Base Stats"]) ??
+    sumPair(baseMain, conBase) ??
+    latestBaseStats;
+  const totalStats =
+    pickGenericPlayerNumber(row, ["totalStats", "Total Stats", "Total"]) ??
+    sumPair(attrTotal, conTotal) ??
+    latestTotalStats;
+
+  return {
+    level,
+    classId,
+    baseStats,
+    totalStats,
+    baseMain,
+    conBase,
+    attrTotal,
+    conTotal,
+  };
 };
 
 const parseModernItemSlots = (
