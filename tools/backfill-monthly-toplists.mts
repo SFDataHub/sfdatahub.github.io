@@ -294,6 +294,13 @@ const TOP_LEVEL_SERVER_READ_ALIASES = {
   MAERWYNN: ["MAERWYNN", "maerwynn_net", "MAERWYNN_NET"],
   BLACKFOREST: ["BLACKFOREST", "blackforest_net", "BLACKFOREST_NET", "BLACK_FOREST"],
   GNAROGRIM: ["GNAROGRIM", "gnarogrim_net", "GNAROGRIM_NET", "GRANOGRIM", "granogrim_net"],
+  STUMPLESTEPPE: [
+    "STUMPLESTEPPE",
+    "stumplesteppe_net",
+    "STUMPLESTEPPE_NET",
+    "stumblesteppe_net",
+    "STUMBLESTEPPE_NET",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 // Top-level `server` aliases are read independently and merged by Firestore document path.

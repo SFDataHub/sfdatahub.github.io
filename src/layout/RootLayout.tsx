@@ -12,6 +12,7 @@ import LoginModalHost from "../components/auth/LoginModalHost";
 const SURFACE_STYLE = { borderColor: "#2B4C73", background: "#1A2F4A" };
 const AUTH_NEXT_STORAGE_KEY = "sfh:authNext";
 const GOATCOUNTER_RETRY_DELAYS_MS = [75, 200, 500, 1000, 2000];
+const SIDEBAR_MOBILE_MEDIA_QUERY = "(max-width: 1024px)";
 
 type GoatCounterWindow = Window & {
   goatcounter?: {
@@ -58,7 +59,7 @@ export default function RootLayout() {
   const [pinned, setPinned] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 1023px)").matches;
+    return window.matchMedia(SIDEBAR_MOBILE_MEDIA_QUERY).matches;
   });
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const isOpen = pinned || expanded;
@@ -113,7 +114,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const media = window.matchMedia("(max-width: 1023px)");
+    const media = window.matchMedia(SIDEBAR_MOBILE_MEDIA_QUERY);
     const update = () => setIsMobile(media.matches);
     update();
     media.addEventListener("change", update);
@@ -158,7 +159,7 @@ export default function RootLayout() {
   const sidebarState = isMobile ? "collapsed" : (isOpen ? "expanded" : "collapsed");
 
   return (
-    <div id="app-shell" data-sidebar={sidebarState} style={{ ["--left" as any]: leftVar }}>
+    <div id="app-shell" data-sidebar={sidebarState} style={{ ["--left" as any]: leftVar, ["--app-shell-left" as any]: leftVar }}>
       <LogoDock src="/logo.png" />
       <Topbar />
 

@@ -7,6 +7,7 @@ export type GameClassKey =
   | "plague-doctor";
 
 export type ClassMeta = {
+  id: number;
   key: GameClassKey;
   label: string;
   iconUrl: string;   // Einbett-URL (Google Drive)
@@ -44,21 +45,29 @@ const canon = (s: any) =>
 
 // --- Stammdaten
 export const CLASSES: ClassMeta[] = [
-  { key: "warrior",      label: "Warrior",      iconUrl: driveViewUrl(DRIVE["warrior"]),      fallback: "🗡️" },
-  { key: "mage",         label: "Mage",         iconUrl: driveViewUrl(DRIVE["mage"]),         fallback: "✨"  },
-  { key: "scout",        label: "Scout",        iconUrl: driveViewUrl(DRIVE["scout"]),        fallback: "🏹"  },
-  { key: "assassin",     label: "Assassin",     iconUrl: driveViewUrl(DRIVE["assassin"]),     fallback: "🗡️" },
-  { key: "demon-hunter", label: "Demon Hunter", iconUrl: driveViewUrl(DRIVE["demon-hunter"]), fallback: "😈🏹" },
-  { key: "berserker",    label: "Berserker",    iconUrl: driveViewUrl(DRIVE["berserker"]),    fallback: "🪓"  },
-  { key: "battle-mage",  label: "Battle Mage",  iconUrl: driveViewUrl(DRIVE["battle-mage"]),  fallback: "🛡️✨" },
-  { key: "druid",        label: "Druid",        iconUrl: driveViewUrl(DRIVE["druid"]),        fallback: "🌿"  },
-  { key: "bard",         label: "Bard",         iconUrl: driveViewUrl(DRIVE["bard"]),         fallback: "🎶"  },
-  { key: "necromancer",  label: "Necromancer",  iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
-  { key: "paladin",      label: "Paladin",      iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
-  { key: "plague-doctor", label: "Plague Doctor", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
+  { id: 1,  key: "warrior",      label: "Warrior",      iconUrl: driveViewUrl(DRIVE["warrior"]),      fallback: "🗡️" },
+  { id: 2,  key: "mage",         label: "Mage",         iconUrl: driveViewUrl(DRIVE["mage"]),         fallback: "✨"  },
+  { id: 3,  key: "scout",        label: "Scout",        iconUrl: driveViewUrl(DRIVE["scout"]),        fallback: "🏹"  },
+  { id: 4,  key: "assassin",     label: "Assassin",     iconUrl: driveViewUrl(DRIVE["assassin"]),     fallback: "🗡️" },
+  { id: 7,  key: "demon-hunter", label: "Demon Hunter", iconUrl: driveViewUrl(DRIVE["demon-hunter"]), fallback: "😈🏹" },
+  { id: 6,  key: "berserker",    label: "Berserker",    iconUrl: driveViewUrl(DRIVE["berserker"]),    fallback: "🪓"  },
+  { id: 5,  key: "battle-mage",  label: "Battle Mage",  iconUrl: driveViewUrl(DRIVE["battle-mage"]),  fallback: "🛡️✨" },
+  { id: 8,  key: "druid",        label: "Druid",        iconUrl: driveViewUrl(DRIVE["druid"]),        fallback: "🌿"  },
+  { id: 9,  key: "bard",         label: "Bard",         iconUrl: driveViewUrl(DRIVE["bard"]),         fallback: "🎶"  },
+  { id: 10, key: "necromancer",  label: "Necromancer",  iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
+  { id: 11, key: "paladin",      label: "Paladin",      iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
+  { id: 12, key: "plague-doctor", label: "Plague Doctor", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
 ];
 
 export const CLASS_BY_KEY = Object.fromEntries(CLASSES.map(c => [c.key, c] as const));
+export const CLASS_BY_ID = Object.fromEntries(CLASSES.map(c => [c.id, c] as const));
+
+export function getClassMetaById(input?: number | string | null): ClassMeta | null {
+  if (input == null || input === "") return null;
+  const id = typeof input === "number" ? input : Number(String(input).trim());
+  if (!Number.isInteger(id)) return null;
+  return CLASS_BY_ID[id] ?? null;
+}
 
 /** Alias-Lexikon: akzeptiert Labels, Keys und gängige Synonyme (DE/EN).
  *  → „Necromancer“ (Label, groß geschrieben) matched sicher auf den Key.

@@ -317,6 +317,17 @@ export type SfJsonOwnPlayer = {
   webshopId?: string;
 };
 
+export type SfJsonPlayerStats = {
+  level: number | null;
+  classId: string | null;
+  baseStats: number | null;
+  totalStats: number | null;
+  baseMain: number | null;
+  conBase: number | null;
+  attrTotal: number | null;
+  conTotal: number | null;
+};
+
 export type SfJsonParseResult = {
   ownPlayers: SfJsonOwnPlayer[];
   ownPlayer: SfJsonOwnPlayer | null;

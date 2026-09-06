@@ -18,24 +18,6 @@
   gap: 10px;
 }
 
-.backLink {
-  align-self: flex-start;
-  padding: 6px 10px;
-  border-radius: 12px;
-  border: 1px solid #2b4c73;
-  background: rgba(255, 255, 255, 0.04);
-  color: #cdd9ec;
-  font-size: 13px;
-  text-decoration: none;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.backLink:hover {
-  border-color: #3f7ff0;
-  color: #f5f9ff;
-  background: rgba(43, 109, 224, 0.14);
-}
-
 .headerStack {
   display: flex;
   flex-direction: column;

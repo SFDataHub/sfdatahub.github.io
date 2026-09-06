@@ -74,9 +74,11 @@ import ScansArchive from "./pages/Scans/Archive";
 
 // GuildHub
 import GuildHubIndex from "./pages/GuildHub/Index";
+import GuildHubDashboard from "./pages/GuildHub/Dashboard";
 import GuildHubPlanner from "./pages/GuildHub/Planner";
 import GuildHubFusionPlanner from "./pages/GuildHub/FusionPlanner/FusionPlanner";
 import GuildHubCompareGuilds from "./pages/GuildHub/compareGuilds";
+import GuildHubFightTracking from "./pages/GuildHub/FightTracking";
 import GuildHubWaitlist from "./pages/GuildHub/Waitlist";
 import GuildHubActivity from "./pages/GuildHub/Activity";
 import GuildHubImports from "./pages/GuildHub/Imports";
@@ -380,6 +382,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubIndex />)}
                 />
                 <Route
+                  path="/guild-hub/dashboard"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubDashboard />)}
+                />
+                <Route
                   path="/guild-hub/planner"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubPlanner />)}
                 />
@@ -392,6 +398,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubCompareGuilds />)}
                 />
                 <Route
+                  path="/guild-hub/fight-tracking"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFightTracking />)}
+                />
+                <Route
                   path="/guild-hub/waitlist"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubWaitlist />)}
                 />
@@ -400,9 +410,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubActivity />)}
                 />
                 <Route
-                  path="/guild-hub/imports"
+                  path="/guild-hub/import"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubImports />)}
                 />
+                <Route path="/guild-hub/imports" element={<Navigate to="/guild-hub/import" replace />} />
                 <Route
                   path="/guild-hub/announcements"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubAnnouncements />)}

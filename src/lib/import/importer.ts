@@ -5,6 +5,7 @@
 
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toNumber } from "../../../tools/playerDerivedHelpers";
+import { buildStatsModelFromLatestValues } from "../parsing/latestValues";
 import type { ImportScanWriteMode } from "./csv";
 import { db } from "../firebase";
 import { traceGetDoc, traceSetDoc } from "../debug/firestoreReadTrace";
@@ -65,6 +66,48 @@ function toNumberLoose(v: any): number | null {
   const n = Number(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
+
+const asRecord = (value: unknown): Record<string, any> | null =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : null;
+
+const getStatsSources = (row: Record<string, any>): Record<string, any>[] => {
+  const values = asRecord(row.values);
+  const valuesLatestValues = asRecord(values?.latestValues);
+  const latest = asRecord(row.latest);
+  const latestValues = asRecord(latest?.values);
+  const directLatestValues = asRecord(row.latestValues);
+  return [row, values, valuesLatestValues, latest, latestValues, directLatestValues].filter(
+    (source): source is Record<string, any> => Boolean(source),
+  );
+};
+
+const getLatestValuesStatsSource = (row: Record<string, any>): Record<string, any> => {
+  const sources = getStatsSources(row);
+  return Object.assign({}, ...[...sources].reverse());
+};
+
+function pickByCanonFromStatsSources(row: Record<string, any>, canonKey: string): any {
+  for (const source of getStatsSources(row)) {
+    const value = pickByCanon(source, canonKey);
+    if (value != null && String(value) !== "") return value;
+  }
+  return undefined;
+}
+
+function pickAnyByCanonFromStatsSources(row: Record<string, any>, keys: readonly string[]): any {
+  for (const kk of keys) {
+    const value = pickByCanonFromStatsSources(row, kk);
+    if (value != null && String(value) !== "") return value;
+  }
+  return undefined;
+}
+
+const sumKnownStats = (values: Array<number | null>, minKnownValues = 2) => {
+  const knownValues = values.filter((value): value is number => value != null);
+  if (knownValues.length < minKnownValues) return null;
+  return knownValues.reduce((sum, value) => sum + value, 0);
+};
+
 function toSecFlexible(v: any): number | null {
   if (v == null) return null;
   const s = String(v).trim();
@@ -219,6 +262,16 @@ type MemberSummary = {
   xpTotal: number | null;
 };
 
+export type GuildAnalyticsMemberStats = {
+  level: number | null;
+  baseMain: number | null;
+  conBase: number | null;
+  sumBaseTotal: number | null;
+  attrTotal: number | null;
+  conTotal: number | null;
+  totalStats: number | null;
+};
+
 // ---------- Helpers ----------
 function roleRank(v: any): number {
   const key = String(v || "").trim().toUpperCase();
@@ -263,6 +316,35 @@ const readSnapshotUpdatedAtMs = (value: any): number | null => {
   if (fallbackSec == null) return null;
   return fallbackSec * 1000;
 };
+
+export function readGuildAnalyticsMemberStats(row: Record<string, any>): GuildAnalyticsMemberStats {
+  const level = toNumberLoose(pickByCanonFromStatsSources(row, P.LEVEL));
+  const baseMain = toNumberLoose(pickAnyByCanonFromStatsSources(row, P.BASE_MAIN));
+  const conBase = toNumberLoose(pickAnyByCanonFromStatsSources(row, P.CON_BASE));
+  const attrTotal = toNumberLoose(pickAnyByCanonFromStatsSources(row, P.ATTR_TOT));
+  const conTotal = toNumberLoose(pickAnyByCanonFromStatsSources(row, P.CON_TOT));
+  const statsModel = buildStatsModelFromLatestValues(getLatestValuesStatsSource(row));
+  const parsedBaseTotal = sumKnownStats(statsModel.attributeComposition.map((attribute) => attribute.base));
+  const parsedTotalStats = sumKnownStats(statsModel.attributeComposition.map((attribute) => attribute.total));
+  const sumBaseTotal =
+    toNumberLoose(pickByCanonFromStatsSources(row, CANON("sumBaseTotal"))) ??
+    (baseMain != null && conBase != null ? baseMain + conBase : null) ??
+    parsedBaseTotal;
+  const totalStats =
+    toNumberLoose(pickByCanonFromStatsSources(row, CANON("totalStats"))) ??
+    (attrTotal != null && conTotal != null ? attrTotal + conTotal : null) ??
+    parsedTotalStats;
+
+  return {
+    level,
+    baseMain,
+    conBase,
+    sumBaseTotal,
+    attrTotal,
+    conTotal,
+    totalStats,
+  };
+}
 
 export type CoaSummaryImportResult = {
   guildId: string;
@@ -340,7 +422,8 @@ function toMemberSummary(row: CSVRow): MemberSummary {
   const joinedRaw = pickAnyByCanon(row, P.GUILD_JOINED);
   const joinedSec = toSecFlexible(joinedRaw);
 
-  const level    = toNumberLoose(pickByCanon(row, P.LEVEL));
+  const memberStats = readGuildAnalyticsMemberStats(row);
+  const level = memberStats.level;
   const classStr = ((): string | null => {
     const v = pickByCanon(row, P.CLASS);
     return v != null && String(v).trim() !== "" ? String(v) : null;
@@ -354,10 +437,10 @@ function toMemberSummary(row: CSVRow): MemberSummary {
 
   const treasury = toNumberLoose(pickAnyByCanon(row, P.TREASURY));
   const mine     = toNumberLoose(pickAnyByCanon(row, P.MINE));
-  const baseMain = toNumberLoose(pickAnyByCanon(row, P.BASE_MAIN));
-  const conBase  = toNumberLoose(pickAnyByCanon(row, P.CON_BASE));
-  const attrTot  = toNumberLoose(pickAnyByCanon(row, P.ATTR_TOT));
-  const conTot   = toNumberLoose(pickAnyByCanon(row, P.CON_TOT));
+  const baseMain = memberStats.baseMain;
+  const conBase = memberStats.conBase;
+  const attrTot = memberStats.attrTotal;
+  const conTot = memberStats.conTotal;
   const xpProgress = toNumberOrNull(pickAnyByCanon(row, P.XP));
   const xpTotal = toNumberOrNull(pickAnyByCanon(row, P.XP_TOTAL));
   const honor = toNumberOrNull(pickAnyByCanon(row, P.HONOR));
@@ -365,9 +448,9 @@ function toMemberSummary(row: CSVRow): MemberSummary {
   const album = scrapbook != null ? scrapbook : null;
 
   // Regeln:
-  const sumBaseTotal = baseMain != null && conBase != null ? baseMain + conBase : null;
-  const totalStats   = attrTot  != null && conTot  != null ? attrTot  + conTot  : null;
-  const sumTotal     = attrTot  != null && conTot  != null ? attrTot  + conTot  : null;
+  const sumBaseTotal = memberStats.sumBaseTotal;
+  const totalStats = memberStats.totalStats;
+  const sumTotal = memberStats.totalStats;
 
   const name = ((): string | null => {
     const v = pickByCanon(row, P.NAME);

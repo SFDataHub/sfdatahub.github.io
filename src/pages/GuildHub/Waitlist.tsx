@@ -1,5 +1,6 @@
 import React from "react";
 import ContentShell from "../../components/ContentShell";
+import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -116,6 +117,7 @@ export default function GuildHubWaitlist() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerStack}>
+            <GuildHubBackLink />
             <div>
               <p className={styles.kicker}>Recruiting</p>
               <h1 className={styles.title}>Waitlist</h1>
