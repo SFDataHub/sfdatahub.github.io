@@ -1,8 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
 
 export type FightNumber = "1" | "2";
 export type FightSource = "manual" | "ocr";
 export type FightMemberStatus = "ok" | "missed" | "unknown";
+export type FightTrackerGuildRole = NormalizedGuildRole;
 
 export type FightTrackerGuild = {
   id: string;
@@ -13,6 +15,7 @@ export type FightTrackerGuild = {
   linkedGuildHubLogoIdentifier: string | null;
   lastSyncedScanId: string | null;
   lastSyncedScanAt: string | null;
+  lastSyncedNormalizerVersion?: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +29,11 @@ export type FightTrackerMember = {
   scanMemberRef: string | null;
   className: string | null;
   level: number | null;
+  baseStats: number | null;
+  totalStats: number | null;
+  statsSeenAt: string | null;
+  guildRole: FightTrackerGuildRole;
+  guildRoleSeenAt: string | null;
   lastSeenScanId: string | null;
   lastSeenScanAt: string | null;
   lastConfirmedActiveAt: string | null;
@@ -86,6 +94,11 @@ export type CreateFightTrackerMemberInput = {
   scanMemberRef?: string | null;
   className?: string | null;
   level?: number | null;
+  baseStats?: number | null;
+  totalStats?: number | null;
+  statsSeenAt?: string | null;
+  guildRole?: FightTrackerGuildRole;
+  guildRoleSeenAt?: string | null;
   lastSeenScanId?: string | null;
   lastSeenScanAt?: string | null;
   lastConfirmedActiveAt?: string | null;
@@ -99,6 +112,7 @@ export type CreateFightTrackerInput = {
   linkedGuildHubLogoIdentifier?: string | null;
   lastSyncedScanId?: string | null;
   lastSyncedScanAt?: string | null;
+  lastSyncedNormalizerVersion?: number | null;
   members?: CreateFightTrackerMemberInput[];
 };
 
@@ -142,6 +156,22 @@ let dbPromise: Promise<IDBPDatabase<FightTrackingDb>> | null = null;
 const normalizeText = (value: unknown) => String(value ?? "").trim();
 
 const normalizeIdentityText = (value: unknown) => normalizeText(value).toLowerCase().replace(/\s+/g, "");
+
+const normalizeGuildRole = (value: unknown): FightTrackerGuildRole =>
+  value === "leader" || value === "officer" || value === "member" ? value : null;
+
+const normalizeNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const normalizeVersion = (value: unknown) => {
+  const parsed = normalizeNumber(value);
+  return parsed != null && parsed >= 0 ? parsed : null;
+};
+
+const timestampMs = (value: string | null | undefined) => {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const createId = (prefix: string) => {
   const random =
@@ -251,6 +281,7 @@ export async function createFightTracker(input: CreateFightTrackerInput): Promis
     linkedGuildHubLogoIdentifier: normalizeText(input.linkedGuildHubLogoIdentifier) || null,
     lastSyncedScanId: normalizeText(input.lastSyncedScanId) || null,
     lastSyncedScanAt: normalizeText(input.lastSyncedScanAt) || null,
+    lastSyncedNormalizerVersion: normalizeVersion(input.lastSyncedNormalizerVersion),
     createdAt: now,
     updatedAt: now,
   };
@@ -406,11 +437,22 @@ export async function updateFightTrackerSyncMetadata(
   tracker: FightTrackerGuild,
   scanId: string | null,
   scanAt: string | null,
+  normalizerVersion?: number | null,
 ): Promise<FightTrackerGuild> {
+  const scanAtMs = timestampMs(scanAt);
+  const lastSyncedScanAtMs = timestampMs(tracker.lastSyncedScanAt);
+  const canStoreIncomingScan = scanAtMs == null ? lastSyncedScanAtMs == null : lastSyncedScanAtMs == null || scanAtMs >= lastSyncedScanAtMs;
+  const nextSyncedScanAt = canStoreIncomingScan && scanAtMs != null ? new Date(scanAtMs).toISOString() : tracker.lastSyncedScanAt;
+  const nextSyncedScanId = canStoreIncomingScan ? scanId : tracker.lastSyncedScanId;
+  const existingVersion = normalizeVersion(tracker.lastSyncedNormalizerVersion);
+  const incomingVersion = normalizeVersion(normalizerVersion);
+  const nextNormalizerVersion =
+    incomingVersion == null ? existingVersion : Math.max(existingVersion ?? Number.NEGATIVE_INFINITY, incomingVersion);
   const updated: FightTrackerGuild = {
     ...tracker,
-    lastSyncedScanId: scanId,
-    lastSyncedScanAt: scanAt,
+    lastSyncedScanId: nextSyncedScanId,
+    lastSyncedScanAt: nextSyncedScanAt,
+    lastSyncedNormalizerVersion: nextNormalizerVersion,
     updatedAt: new Date().toISOString(),
   };
   const db = await getFightTrackingDb();
@@ -427,6 +469,9 @@ function createFightTrackerMemberRecord(
   const name = normalizeText(input.name);
   if (!name) return null;
   const isActive = input.active ?? true;
+  const baseStats = normalizeNumber(input.baseStats);
+  const totalStats = normalizeNumber(input.totalStats);
+  const hasStats = baseStats != null || totalStats != null;
   return {
     id: createId("fight-member"),
     trackerId,
@@ -435,7 +480,14 @@ function createFightTrackerMemberRecord(
     source: input.source,
     scanMemberRef: normalizeText(input.scanMemberRef) || null,
     className: normalizeText(input.className) || null,
-    level: typeof input.level === "number" && Number.isFinite(input.level) ? input.level : null,
+    level: normalizeNumber(input.level),
+    baseStats,
+    totalStats,
+    statsSeenAt: hasStats ? normalizeText(input.statsSeenAt) || null : null,
+    guildRole: normalizeGuildRole(input.guildRole),
+    guildRoleSeenAt: normalizeGuildRole(input.guildRole)
+      ? normalizeText(input.guildRoleSeenAt) || normalizeText(input.lastSeenScanAt) || null
+      : null,
     lastSeenScanId: normalizeText(input.lastSeenScanId) || null,
     lastSeenScanAt: normalizeText(input.lastSeenScanAt) || null,
     lastConfirmedActiveAt:

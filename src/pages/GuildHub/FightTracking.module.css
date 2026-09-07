@@ -1346,7 +1346,17 @@
   align-items: center;
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
+}
+
+.tableHeaderActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .tableSortField {
@@ -1370,6 +1380,23 @@
   padding: 0 10px;
 }
 
+.tableToggleField {
+  align-items: center;
+  color: #d9e9ff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tableToggleField input {
+  accent-color: #38bdf8;
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
 .sortDirectionButton {
   align-items: center;
   background: #091021;
@@ -1384,8 +1411,32 @@
   width: 42px;
 }
 
+.applyDraftButton {
+  align-items: center;
+  background: #16304a;
+  border: 1px solid #3d74a9;
+  border-radius: 10px;
+  color: #f5f9ff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.applyDraftButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .tableWrapper {
   overflow: auto;
+}
+
+.mobileParticipationList {
+  display: none;
 }
 
 .tableEmpty {
@@ -1394,6 +1445,12 @@
 }
 
 .table {
+  --participation-member-column: 240px;
+  --participation-missed-column: 82px;
+  --participation-quote-column: 82px;
+  --participation-last-missed-column: 142px;
+  --participation-streak-column: 126px;
+
   border-collapse: separate;
   border-spacing: 0;
   min-width: 760px;
@@ -1420,10 +1477,46 @@
 }
 
 .stickyColumn {
-  left: 0;
-  min-width: 220px;
   position: sticky;
   z-index: 3;
+}
+
+.stickyMemberColumn {
+  left: 0;
+  min-width: var(--participation-member-column);
+  width: var(--participation-member-column);
+}
+
+.stickyMissedColumn {
+  left: var(--participation-member-column);
+  min-width: var(--participation-missed-column);
+  width: var(--participation-missed-column);
+}
+
+.stickyQuoteColumn {
+  left: calc(var(--participation-member-column) + var(--participation-missed-column));
+  min-width: var(--participation-quote-column);
+  width: var(--participation-quote-column);
+}
+
+.stickyLastMissedColumn {
+  left: calc(var(--participation-member-column) + var(--participation-missed-column) + var(--participation-quote-column));
+  min-width: var(--participation-last-missed-column);
+  width: var(--participation-last-missed-column);
+}
+
+.stickyStreakColumn {
+  box-shadow: 12px 0 18px -18px rgba(0, 0, 0, 0.9);
+  left: calc(
+    var(--participation-member-column) + var(--participation-missed-column) + var(--participation-quote-column) +
+      var(--participation-last-missed-column)
+  );
+  min-width: var(--participation-streak-column);
+  width: var(--participation-streak-column);
+}
+
+.table thead .stickyColumn {
+  z-index: 5;
 }
 
 .table tbody .stickyColumn {
@@ -1512,6 +1605,166 @@
   background: rgba(141, 171, 208, 0.08);
   border-color: #2b4c73;
   color: #b0c4d9;
+}
+
+.statusDraft {
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.26);
+}
+
+.mobileParticipationMember {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 12px;
+}
+
+.mobileParticipationInactive {
+  color: #8dabd0;
+}
+
+.mobileParticipationSummary {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(120px, 1fr) repeat(3, minmax(54px, auto));
+}
+
+.mobileParticipationName {
+  min-width: 0;
+}
+
+.mobileParticipationName strong {
+  color: #f5f9ff;
+  display: block;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileParticipationName span {
+  color: #8dabd0;
+  display: block;
+  font-size: 10px;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.mobileParticipationMetric {
+  min-width: 0;
+  text-align: right;
+}
+
+.mobileParticipationMetric span {
+  color: #8dabd0;
+  display: block;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.mobileParticipationMetric strong {
+  color: #f5f9ff;
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.mobileFightNavigator {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 20px minmax(0, 1fr) 20px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.mobileFightNavButton {
+  align-items: center;
+  align-self: stretch;
+  background: rgba(141, 171, 208, 0.08);
+  border: 1px solid #2b4c73;
+  border-radius: 7px;
+  color: #d9e9ff;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0;
+}
+
+.mobileFightNavButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.28;
+}
+
+.mobileFightBar {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  touch-action: pan-y;
+}
+
+.mobileFightBarSlideOlder {
+  animation: mobileFightSlideOlder 180ms ease-out;
+}
+
+.mobileFightBarSlideNewer {
+  animation: mobileFightSlideNewer 180ms ease-out;
+}
+
+.mobileFightSlot {
+  color: #8dabd0;
+  display: flex;
+  flex-direction: column;
+  font-size: 9px;
+  gap: 2px;
+  line-height: 1.2;
+  min-width: 0;
+  text-align: center;
+}
+
+.mobileFightSlot span,
+.mobileFightSlot small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileFightSlot small {
+  color: #b0c4d9;
+  min-height: 11px;
+}
+
+.mobileStatusButton {
+  width: 100%;
+  border-radius: 8px;
+  font-size: 10px;
+  gap: 0;
+  min-height: 30px;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+@keyframes mobileFightSlideOlder {
+  from {
+    opacity: 0.65;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mobileFightSlideNewer {
+  from {
+    opacity: 0.65;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .emptyState {
@@ -1719,11 +1972,25 @@
 
   .functionDialogBody .tableHeader {
     align-items: flex-start;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 10px 12px;
   }
 
+  .functionDialogBody .tableHeaderActions {
+    display: contents;
+  }
+
+  .functionDialogBody .applyDraftButton {
+    grid-column: 2;
+    justify-self: end;
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
   .functionDialogBody .tableSortControls {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
     flex-wrap: wrap;
     width: 100%;
   }
@@ -1737,8 +2004,12 @@
     min-width: 0;
   }
 
-  .functionDialogBody .table {
-    min-width: 640px;
+  .functionDialogBody .tableWrapper {
+    display: none;
+  }
+
+  .functionDialogBody .mobileParticipationList {
+    display: block;
   }
 
   .functionDialogBody .table th,
@@ -1774,6 +2045,14 @@
     min-height: 32px;
     min-width: 74px;
     padding: 0 8px;
+  }
+
+  .functionDialogBody .mobileStatusButton {
+    border-radius: 8px;
+    font-size: 10px;
+    min-height: 30px;
+    min-width: 0;
+    padding: 0 3px;
   }
 
   .functionDialogBody .emptyState {
@@ -1861,6 +2140,39 @@
   .memberDeleteConfirmActions .dangerAction {
     width: 100%;
   }
+
+  .tableWrapper {
+    display: none;
+  }
+
+  .mobileParticipationList {
+    display: block;
+  }
+
+  .mobileFightNavigator {
+    gap: 3px;
+    grid-template-columns: 18px minmax(0, 1fr) 18px;
+  }
+
+  .mobileFightNavButton {
+    min-height: 46px;
+  }
+
+  .mobileFightBar {
+    gap: 3px;
+  }
+
+  .mobileParticipationMember {
+    padding: 9px 10px;
+  }
+
+  .functionDialogBody .mobileStatusButton {
+    border-radius: 7px;
+    font-size: 9px;
+    min-height: 28px;
+    min-width: 0;
+    padding: 0 2px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1876,11 +2188,52 @@
     padding: 10px;
   }
 
-  .functionDialogBody .table {
-    min-width: 580px;
+  .mobileParticipationSummary {
+    gap: 5px;
+    grid-template-columns: minmax(94px, 1fr) repeat(3, minmax(38px, auto));
   }
 
-  .functionDialogBody .stickyColumn {
-    min-width: 154px;
+  .mobileFightNavigator {
+    gap: 2px;
+    grid-template-columns: 16px minmax(0, 1fr) 16px;
+  }
+
+  .mobileFightNavButton {
+    min-height: 42px;
+  }
+
+  .mobileFightBar {
+    gap: 2px;
+  }
+
+  .mobileFightSlot {
+    font-size: 8px;
+  }
+
+  .mobileParticipationMember {
+    padding: 8px;
+  }
+
+  .mobileParticipationName strong {
+    font-size: 12px;
+  }
+
+  .mobileParticipationName span {
+    font-size: 9px;
+  }
+
+  .mobileParticipationMetric span {
+    font-size: 8px;
+  }
+
+  .mobileParticipationMetric strong {
+    font-size: 10px;
+  }
+
+  .functionDialogBody .mobileStatusButton {
+    font-size: 8px;
+    min-height: 26px;
+    min-width: 0;
+    padding: 0 1px;
   }
 }
