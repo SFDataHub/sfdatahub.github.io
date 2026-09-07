@@ -21,6 +21,7 @@ export type FightTrackerScanMember = CreateFightTrackerMemberInput & {
 export type FightTrackerScanSnapshot = {
   scanId: string;
   scanAt: string | null;
+  normalizerVersion: number | null;
   guildName: string;
   server: string | null;
   members: FightTrackerScanMember[];
@@ -152,6 +153,14 @@ const timestampMs = (value: string | null | undefined) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const normalizeNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const normalizeVersion = (value: unknown) => {
+  const parsed = normalizeNumber(value);
+  return parsed != null && parsed >= 0 ? parsed : null;
+};
+
 const scanTimeMs = (scan: GuildHubLocalScan) => {
   const scannedAt = scan.scannedAt ? Date.parse(scan.scannedAt) : NaN;
   return Number.isFinite(scannedAt) ? scannedAt : null;
@@ -180,6 +189,7 @@ const isGroupMatch = (
 const toScanMember = (member: NormalizedGuildMember, scan: GuildHubLocalScan): FightTrackerScanMember | null => {
   if (!member.memberRef || !member.name) return null;
   const scannedAt = scanTimeIso(scan);
+  const hasStats = member.baseStats != null || member.totalStats != null;
 
   return {
     name: member.name,
@@ -188,8 +198,12 @@ const toScanMember = (member: NormalizedGuildMember, scan: GuildHubLocalScan): F
     scanMemberRef: member.memberRef,
     className: member.classId,
     level: member.level,
-    baseStatsSum: member.baseStats,
+    guildRole: member.guildRole,
+    guildRoleSeenAt: member.guildRole ? scannedAt : null,
+    baseStats: member.baseStats,
     totalStats: member.totalStats,
+    statsSeenAt: hasStats ? scannedAt : null,
+    baseStatsSum: member.baseStats,
     lastSeenScanId: scan.id,
     lastSeenScanAt: scannedAt,
     lastConfirmedActiveAt: scannedAt,
@@ -221,6 +235,7 @@ export async function loadLatestScanSnapshotForGuild(
       return {
         scanId: scan.id,
         scanAt: scanTimeIso(scan),
+        normalizerVersion: normalizeVersion(scan.normalizerVersion),
         guildName: matchedGuild.name,
         server: group ? readString(group, ["server", "Server", "prefix", "world", "realm"]) ?? guild.server ?? null : guild.server ?? null,
         members,
@@ -240,9 +255,13 @@ export function buildFightTrackerSyncPlan(
 
   const scanMs = timestampMs(snapshot.scanAt);
   const latestAppliedMs = timestampMs(tracker.lastSyncedScanAt);
+  const scanNormalizerVersion = normalizeVersion(snapshot.normalizerVersion);
+  const lastSyncedNormalizerVersion = normalizeVersion(tracker.lastSyncedNormalizerVersion);
   const isOlderThanApplied = scanMs != null && latestAppliedMs != null && scanMs < latestAppliedMs;
   const canApplyRosterChanges = !isOlderThanApplied;
   const hasNewerSnapshot = canApplyRosterChanges && scanMs != null && (latestAppliedMs == null || scanMs > latestAppliedMs);
+  const hasNewerNormalizerVersion =
+    scanNormalizerVersion != null && (lastSyncedNormalizerVersion == null || scanNormalizerVersion > lastSyncedNormalizerVersion);
 
   const lastConfirmedActiveMs = (member: FightTrackerMember) => {
     const explicit = timestampMs(member.lastConfirmedActiveAt);
@@ -261,13 +280,46 @@ export function buildFightTrackerSyncPlan(
 
   const canReactivateFromScan = (member: FightTrackerMember) => {
     const updatedMs = timestampMs(member.updatedAt);
-    return !member.active && canConfirmFromScan(member) && (updatedMs == null || scanMs == null || scanMs >= updatedMs);
+    const createdMs = timestampMs(member.createdAt);
+    const isUnchangedScanImport = member.source === "scan" && createdMs != null && updatedMs != null && createdMs === updatedMs;
+    return !member.active && canConfirmFromScan(member) && (isUnchangedScanImport || updatedMs == null || scanMs == null || scanMs >= updatedMs);
   };
 
   const canInactivateFromScan = (member: FightTrackerMember) => {
     if (!canApplyRosterChanges || scanMs == null) return false;
     const confirmedMs = lastConfirmedActiveMs(member);
     return confirmedMs != null && scanMs > confirmedMs;
+  };
+
+  const canUpdateGuildRoleFromScan = (member: FightTrackerMember, scanMember: FightTrackerScanMember) => {
+    if (!scanMember.guildRole) return false;
+    const roleSeenAt = normalizeText(member.guildRoleSeenAt);
+    if (!member.guildRole) return true;
+    if (scanMs == null) return false;
+    const roleSeenMs = timestampMs(roleSeenAt);
+    if (roleSeenMs != null && scanMs < roleSeenMs) return false;
+    return member.guildRole !== scanMember.guildRole || !roleSeenAt;
+  };
+
+  const canUpdateStatsFromScan = (member: FightTrackerMember, scanMember: FightTrackerScanMember) => {
+    const incomingBaseStats = normalizeNumber(scanMember.baseStatsSum ?? scanMember.baseStats);
+    const incomingTotalStats = normalizeNumber(scanMember.totalStats);
+    if (incomingBaseStats == null && incomingTotalStats == null) return false;
+
+    const existingBaseStats = normalizeNumber(member.baseStats);
+    const existingTotalStats = normalizeNumber(member.totalStats);
+    const hasExistingStats = existingBaseStats != null || existingTotalStats != null;
+    const statsSeenAt = normalizeText(member.statsSeenAt);
+    if (scanMs == null) return !hasExistingStats;
+
+    const statsSeenMs = timestampMs(statsSeenAt);
+    if (statsSeenMs != null && scanMs < statsSeenMs) return false;
+
+    return (
+      (incomingBaseStats != null && incomingBaseStats !== existingBaseStats) ||
+      (incomingTotalStats != null && incomingTotalStats !== existingTotalStats) ||
+      !statsSeenAt
+    );
   };
 
   const byScanRef = new Map<string, FightTrackerMember>();
@@ -285,6 +337,8 @@ export function buildFightTrackerSyncPlan(
   const reactivatedMembers: Array<{ member: FightTrackerMember; scanMember: FightTrackerScanMember }> = [];
   const matchedMemberIds = new Set<string>();
   let existingMemberCount = 0;
+  let hasGuildRoleUpdates = false;
+  let hasStatsUpdates = false;
 
   snapshot.members.forEach((scanMember) => {
     const existingByRef = byScanRef.get(normalizeScanRef(scanMember.scanMemberRef));
@@ -292,6 +346,8 @@ export function buildFightTrackerSyncPlan(
       if (!matchedMemberIds.has(existingByRef.id)) {
         existingMemberCount += 1;
         matchedMemberIds.add(existingByRef.id);
+        hasGuildRoleUpdates = hasGuildRoleUpdates || canUpdateGuildRoleFromScan(existingByRef, scanMember);
+        hasStatsUpdates = hasStatsUpdates || canUpdateStatsFromScan(existingByRef, scanMember);
         if (canReactivateFromScan(existingByRef)) {
           reactivatedMembers.push({ member: existingByRef, scanMember });
         } else {
@@ -306,6 +362,8 @@ export function buildFightTrackerSyncPlan(
       if (!matchedMemberIds.has(existingByName.id)) {
         existingMemberCount += 1;
         matchedMemberIds.add(existingByName.id);
+        hasGuildRoleUpdates = hasGuildRoleUpdates || canUpdateGuildRoleFromScan(existingByName, scanMember);
+        hasStatsUpdates = hasStatsUpdates || canUpdateStatsFromScan(existingByName, scanMember);
         if (existingByName.active && canConfirmFromScan(existingByName)) confirmedManualMembers.push({ member: existingByName, scanMember });
         if (canReactivateFromScan(existingByName)) {
           reactivatedMembers.push({ member: existingByName, scanMember });
@@ -316,7 +374,7 @@ export function buildFightTrackerSyncPlan(
       return;
     }
 
-    if (canApplyRosterChanges) newMembers.push(scanMember);
+    newMembers.push(isOlderThanApplied ? { ...scanMember, active: false } : scanMember);
   });
 
   const missingMembers = members.filter((member) => member.active && !matchedMemberIds.has(member.id) && canInactivateFromScan(member));
@@ -334,6 +392,9 @@ export function buildFightTrackerSyncPlan(
       confirmedManualMembers.length > 0 ||
       reactivatedMembers.length > 0 ||
       missingMembers.length > 0 ||
+      hasGuildRoleUpdates ||
+      hasStatsUpdates ||
+      hasNewerNormalizerVersion ||
       hasNewerSnapshot,
   };
 }

@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   FileImage,
   ListChecks,
   MoreVertical,
@@ -53,6 +55,7 @@ import {
 import {
   buildFightTrackerSyncPlan,
   loadLatestScanSnapshotForGuild,
+  type FightTrackerScanMember,
   type FightTrackerScanSnapshot,
   type FightTrackerSyncPlan,
 } from "./fightTrackingScanSource";
@@ -63,8 +66,18 @@ type TrackerRow = FightTrackerMember & {
   isCurrentMember: boolean;
 };
 
-type ParticipationSortKey = "name" | "baseStats" | "totalStats" | "level" | "missed";
+type ParticipationSortKey = "guildRole" | "name" | "baseStats" | "totalStats" | "level" | "missed";
 type ParticipationSortDirection = "asc" | "desc";
+type ParticipationStatusDrafts = Record<string, { fightId: string; memberId: string; status: FightMemberStatus }>;
+type MobileFightWindowDirection = "older" | "newer";
+type MobileFightSwipeState = {
+  memberId: string;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  swiped: boolean;
+};
 
 type FightTrackerReadonlyStats = {
   level: number | null;
@@ -125,6 +138,8 @@ const createFightId = () => `fight-${Date.now().toString(36)}-${Math.random().to
 const createImportSessionId = () => `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 const createScreenshotId = () => `shot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+const createParticipationDraftKey = (fightId: string, memberId: string) => `${fightId}::${memberId}`;
 
 const normalizeFightNumber = (value: unknown): FightNumber => (value === "2" ? "2" : "1");
 
@@ -189,6 +204,87 @@ const pickNewestTimestamp = (existing: string | null | undefined, candidate: str
   return normalizeString(existing) || null;
 };
 
+const pickGuildRoleFromScan = (
+  member: FightTrackerMember,
+  input: CreateFightTrackerMemberInput,
+  scanAt: string | null,
+): Pick<FightTrackerMember, "guildRole" | "guildRoleSeenAt"> => {
+  const existingRole = member.guildRole ?? null;
+  const existingSeenAt = normalizeString(member.guildRoleSeenAt) || null;
+  const incomingRole = input.guildRole ?? null;
+  if (!incomingRole) return { guildRole: existingRole, guildRoleSeenAt: existingSeenAt };
+
+  const scanMs = timestampMs(scanAt);
+  if (scanMs == null) {
+    return existingRole
+      ? { guildRole: existingRole, guildRoleSeenAt: existingSeenAt }
+      : { guildRole: incomingRole, guildRoleSeenAt: existingSeenAt };
+  }
+
+  const roleSeenMs = timestampMs(existingSeenAt);
+  if (roleSeenMs != null && scanMs < roleSeenMs) {
+    return { guildRole: existingRole, guildRoleSeenAt: existingSeenAt };
+  }
+
+  return { guildRole: incomingRole, guildRoleSeenAt: new Date(scanMs).toISOString() };
+};
+
+const hasGuildRolePatchFromScan = (member: FightTrackerMember, input: CreateFightTrackerMemberInput, scanAt: string | null) => {
+  const next = pickGuildRoleFromScan(member, input, scanAt);
+  return next.guildRole !== (member.guildRole ?? null) || next.guildRoleSeenAt !== (normalizeString(member.guildRoleSeenAt) || null);
+};
+
+const readIncomingBaseStats = (input: CreateFightTrackerMemberInput | FightTrackerScanMember) =>
+  ("baseStatsSum" in input ? getFiniteNumber(input.baseStatsSum) : null) ?? getFiniteNumber(input.baseStats);
+
+const pickStatsFromScan = (
+  member: FightTrackerMember,
+  input: CreateFightTrackerMemberInput | FightTrackerScanMember,
+  scanAt: string | null,
+): Pick<FightTrackerMember, "baseStats" | "totalStats" | "statsSeenAt"> => {
+  const existingBaseStats = getFiniteNumber(member.baseStats);
+  const existingTotalStats = getFiniteNumber(member.totalStats);
+  const existingSeenAt = normalizeString(member.statsSeenAt) || null;
+  const incomingBaseStats = readIncomingBaseStats(input);
+  const incomingTotalStats = getFiniteNumber(input.totalStats);
+  const hasIncomingStats = incomingBaseStats != null || incomingTotalStats != null;
+  if (!hasIncomingStats) {
+    return { baseStats: existingBaseStats, totalStats: existingTotalStats, statsSeenAt: existingSeenAt };
+  }
+
+  const scanMs = timestampMs(scanAt);
+  const hasExistingStats = existingBaseStats != null || existingTotalStats != null;
+  if (scanMs == null) {
+    return hasExistingStats
+      ? { baseStats: existingBaseStats, totalStats: existingTotalStats, statsSeenAt: existingSeenAt }
+      : { baseStats: incomingBaseStats, totalStats: incomingTotalStats, statsSeenAt: existingSeenAt };
+  }
+
+  const statsSeenMs = timestampMs(existingSeenAt);
+  if (statsSeenMs != null && scanMs < statsSeenMs) {
+    return { baseStats: existingBaseStats, totalStats: existingTotalStats, statsSeenAt: existingSeenAt };
+  }
+
+  return {
+    baseStats: incomingBaseStats ?? existingBaseStats,
+    totalStats: incomingTotalStats ?? existingTotalStats,
+    statsSeenAt: new Date(scanMs).toISOString(),
+  };
+};
+
+const hasStatsPatchFromScan = (
+  member: FightTrackerMember,
+  input: CreateFightTrackerMemberInput | FightTrackerScanMember,
+  scanAt: string | null,
+) => {
+  const next = pickStatsFromScan(member, input, scanAt);
+  return (
+    next.baseStats !== getFiniteNumber(member.baseStats) ||
+    next.totalStats !== getFiniteNumber(member.totalStats) ||
+    next.statsSeenAt !== (normalizeString(member.statsSeenAt) || null)
+  );
+};
+
 const canUseScanConfirmationForMember = (member: FightTrackerMember, scanAt: string | null) => {
   const scanMs = timestampMs(scanAt);
   if (scanMs == null) return false;
@@ -212,10 +308,7 @@ const toFightMemberSnapshot = (
 });
 
 const sortMembers = <T extends { name: string; active?: boolean }>(members: T[]) =>
-  [...members].sort((a, b) => {
-    if (typeof a.active === "boolean" && typeof b.active === "boolean" && a.active !== b.active) return a.active ? -1 : 1;
-    return a.name.localeCompare(b.name, "de-DE", { sensitivity: "base" });
-  });
+  [...members].sort((a, b) => a.name.localeCompare(b.name, "de-DE", { sensitivity: "base" }));
 
 const withoutName = (names: string[], name: string) => names.filter((entry) => normalizeNameKey(entry) !== normalizeNameKey(name));
 
@@ -321,6 +414,8 @@ export default function GuildHubFightTracking() {
   const [scanImportStatus, setScanImportStatus] = React.useState<string | null>(null);
   const [importSession, setImportSession] = React.useState<LocalScreenshotImportSession | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = React.useState<MobileFunctionPanelId | null>(null);
+  const [participationStatusDrafts, setParticipationStatusDrafts] = React.useState<ParticipationStatusDrafts>({});
+  const [isApplyingParticipationDrafts, setIsApplyingParticipationDrafts] = React.useState(false);
   const [scanState, setScanState] = React.useState<ScanState>({
     status: "idle",
     progress: 0,
@@ -335,6 +430,8 @@ export default function GuildHubFightTracking() {
     setTrackerScanSnapshot(null);
     setScanImportStatus(null);
     setActiveMobilePanel(null);
+    setParticipationStatusDrafts({});
+    setIsApplyingParticipationDrafts(false);
     setImportSession((prev) => {
       prev?.screenshots.forEach((screenshot) => URL.revokeObjectURL(screenshot.previewUrl));
       return null;
@@ -438,6 +535,11 @@ export default function GuildHubFightTracking() {
           scanMemberRef: null,
           className: member.className,
           level: member.level,
+          baseStats: null,
+          totalStats: null,
+          statsSeenAt: null,
+          guildRole: null,
+          guildRoleSeenAt: null,
           lastSeenScanId: null,
           lastSeenScanAt: null,
           lastConfirmedActiveAt: null,
@@ -522,6 +624,8 @@ export default function GuildHubFightTracking() {
       setStoreError(null);
       setIsAddPanelOpen(false);
       setActiveMobilePanel(null);
+      setParticipationStatusDrafts({});
+      setIsApplyingParticipationDrafts(false);
     } catch {
       setStoreError("Fight Tracker konnte nicht geoeffnet werden.");
     } finally {
@@ -559,6 +663,8 @@ export default function GuildHubFightTracking() {
     setIsAddPanelOpen(false);
     setActiveMobilePanel(null);
     setSelectedScanGuildId("");
+    setParticipationStatusDrafts({});
+    setIsApplyingParticipationDrafts(false);
   };
 
   const createSelectedScanTracker = async () => {
@@ -580,6 +686,8 @@ export default function GuildHubFightTracking() {
     setScanImportStatus(null);
     setIsAddPanelOpen(false);
     setActiveMobilePanel(null);
+    setParticipationStatusDrafts({});
+    setIsApplyingParticipationDrafts(false);
   };
 
   const startTrackerManagement = (summary: FightTrackerSummary, mode: TrackerManagerState["mode"]) => {
@@ -623,6 +731,8 @@ export default function GuildHubFightTracking() {
           active: true,
           className: normalizeString(input.className) || existing.className,
           level: typeof input.level === "number" && Number.isFinite(input.level) ? input.level : existing.level,
+          ...pickGuildRoleFromScan(existing, input, input.lastSeenScanAt ?? null),
+          ...pickStatsFromScan(existing, input, input.lastSeenScanAt ?? null),
           lastConfirmedActiveAt: pickNewestTimestamp(getMemberPositiveConfirmationAt(existing), confirmedAt),
         };
         await putFightTrackerMember(updated);
@@ -723,9 +833,10 @@ export default function GuildHubFightTracking() {
   };
 
   const applyMemberMergePlan = async (plan: FightTrackerSyncPlan) => {
-    if (!tracker) return { newCount: 0, existingCount: 0, inactiveCount: 0 };
+    if (!tracker) return { newCount: 0, formerCount: 0, existingCount: 0, inactiveCount: 0 };
     const updatedMembers: FightTrackerMember[] = [];
     let addedCount = 0;
+    let formerCount = 0;
     let inactiveCount = 0;
     const knownNames = new Set(trackerMembers.map((member) => normalizeNameKey(member.name)));
     const knownScanRefs = new Set(trackerMembers.map((member) => normalizeString(member.scanMemberRef)).filter(Boolean));
@@ -737,15 +848,22 @@ export default function GuildHubFightTracking() {
       const member = await addFightTrackerMember(tracker.id, scanMember);
       if (!member) continue;
       updatedMembers.push(member);
-      addedCount += 1;
+      if (scanMember.active === false) {
+        formerCount += 1;
+      } else {
+        addedCount += 1;
+      }
       if (scanMemberName) knownNames.add(scanMemberName);
       if (scanMemberRef) knownScanRefs.add(scanMemberRef);
     }
 
-    const linkEntries = new Map<string, { member: FightTrackerMember; scanMember: CreateFightTrackerMemberInput }>();
+    const linkEntries = new Map<string, { member: FightTrackerMember; scanMember: FightTrackerScanMember }>();
     [
       ...plan.existingMembers.filter(
-        (entry) => entry.member.active && canUseScanConfirmationForMember(entry.member, plan.snapshot.scanAt),
+        (entry) =>
+          (entry.member.active && canUseScanConfirmationForMember(entry.member, plan.snapshot.scanAt)) ||
+          hasGuildRolePatchFromScan(entry.member, entry.scanMember, plan.snapshot.scanAt) ||
+          hasStatsPatchFromScan(entry.member, entry.scanMember, plan.snapshot.scanAt),
       ),
       ...plan.confirmedManualMembers,
       ...plan.reactivatedMembers,
@@ -760,15 +878,24 @@ export default function GuildHubFightTracking() {
         plan.snapshot.scanAt && nextLastSeenScanAt === new Date(Date.parse(plan.snapshot.scanAt)).toISOString()
           ? plan.snapshot.scanId
           : entry.member.lastSeenScanId;
+      const guildRoleUpdate = pickGuildRoleFromScan(entry.member, entry.scanMember, plan.snapshot.scanAt);
+      const statsUpdate = pickStatsFromScan(entry.member, entry.scanMember, plan.snapshot.scanAt);
       const updated: FightTrackerMember = {
         ...entry.member,
-        active: true,
+        active: entry.member.active || canUseScanDetails,
         scanMemberRef: canUseScanDetails ? normalizeString(entry.scanMember.scanMemberRef) || entry.member.scanMemberRef : entry.member.scanMemberRef,
         className: canUseScanDetails ? entry.scanMember.className ?? entry.member.className : entry.member.className,
         level: canUseScanDetails ? entry.scanMember.level ?? entry.member.level : entry.member.level,
+        guildRole: guildRoleUpdate.guildRole,
+        guildRoleSeenAt: guildRoleUpdate.guildRoleSeenAt,
+        baseStats: statsUpdate.baseStats,
+        totalStats: statsUpdate.totalStats,
+        statsSeenAt: statsUpdate.statsSeenAt,
         lastSeenScanId: nextLastSeenScanId,
         lastSeenScanAt: nextLastSeenScanAt,
-        lastConfirmedActiveAt: pickNewestTimestamp(getMemberPositiveConfirmationAt(entry.member), plan.snapshot.scanAt),
+        lastConfirmedActiveAt: canUseScanDetails
+          ? pickNewestTimestamp(getMemberPositiveConfirmationAt(entry.member), plan.snapshot.scanAt)
+          : entry.member.lastConfirmedActiveAt,
         updatedAt: new Date().toISOString(),
       };
       await putFightTrackerMember(updated);
@@ -791,7 +918,12 @@ export default function GuildHubFightTracking() {
       plan.snapshot.scanAt && nextSyncedScanAt === new Date(Date.parse(plan.snapshot.scanAt)).toISOString()
         ? plan.snapshot.scanId
         : tracker.lastSyncedScanId;
-    const nextTracker = await updateFightTrackerSyncMetadata(tracker, nextSyncedScanId, nextSyncedScanAt);
+    const nextTracker = await updateFightTrackerSyncMetadata(
+      tracker,
+      nextSyncedScanId,
+      nextSyncedScanAt,
+      plan.snapshot.normalizerVersion,
+    );
     setTracker(nextTracker);
     setTrackerMembers((prev) => {
       const next = new Map(prev.map((member) => [member.id, member]));
@@ -802,6 +934,7 @@ export default function GuildHubFightTracking() {
 
     return {
       newCount: addedCount,
+      formerCount,
       existingCount: plan.existingMemberCount,
       inactiveCount,
     };
@@ -812,6 +945,7 @@ export default function GuildHubFightTracking() {
     const result = await applyMemberMergePlan(visibleScanImportPlan);
     const parts = [];
     if (result.newCount) parts.push(`${result.newCount} neue Mitglieder ergaenzt`);
+    if (result.formerCount) parts.push(`${result.formerCount} ehemalige Gildenmitglieder ergaenzt`);
     if (result.existingCount) parts.push(`${result.existingCount} bereits vorhanden`);
     if (result.inactiveCount) parts.push(`${result.inactiveCount} nicht mehr im Scan`);
     setScanImportStatus(parts.length ? parts.join(", ") : "Keine neuen Mitglieder gefunden");
@@ -1000,20 +1134,55 @@ export default function GuildHubFightTracking() {
     handleClearImportSession();
   };
 
-  const handleCycleFightStatus = async (fightId: string, memberId: string) => {
-    if (!tracker) return;
-    let updatedFight: GuildFight | null = null;
-    const nextFights = fights.map((fight) => {
-      if (fight.id !== fightId) return fight;
-      const member = rosterLookup.get(memberId);
-      const status = getFightMemberStatus(fight, memberId);
-      const nextStatus: FightMemberStatus = status === "unknown" ? "ok" : status === "ok" ? "missed" : "unknown";
-      updatedFight = setFightMemberStatus(fight, member, tracker, nextStatus);
-      return updatedFight;
+  const handleParticipationStatusDraftChange = (fightId: string, memberId: string, status: FightMemberStatus) => {
+    const fight = fights.find((entry) => entry.id === fightId);
+    if (!fight) return;
+    const persistedStatus = getFightMemberStatus(fight, memberId);
+    const draftKey = createParticipationDraftKey(fightId, memberId);
+    setParticipationStatusDrafts((prev) => {
+      const next = { ...prev };
+      if (status === persistedStatus) {
+        delete next[draftKey];
+      } else {
+        next[draftKey] = { fightId, memberId, status };
+      }
+      return next;
     });
-    if (!updatedFight) return;
-    setFights(nextFights);
-    if (updatedFight) await putFightTrackerFight(updatedFight);
+  };
+
+  const applyParticipationStatusDrafts = async () => {
+    if (!tracker || isApplyingParticipationDrafts) return;
+    const draftEntries = Object.values(participationStatusDrafts);
+    if (!draftEntries.length) return;
+
+    setIsApplyingParticipationDrafts(true);
+    try {
+      let nextFights = fights;
+      const changedFights = new Map<string, GuildFight>();
+
+      draftEntries.forEach((draft) => {
+        nextFights = nextFights.map((fight) => {
+          if (fight.id !== draft.fightId) return fight;
+          if (getFightMemberStatus(fight, draft.memberId) === draft.status) return fight;
+          const updatedFight = setFightMemberStatus(fight, rosterLookup.get(draft.memberId), tracker, draft.status);
+          if (updatedFight !== fight) changedFights.set(updatedFight.id, updatedFight);
+          return updatedFight;
+        });
+      });
+
+      if (!changedFights.size) {
+        setParticipationStatusDrafts({});
+        return;
+      }
+
+      setFights(nextFights);
+      for (const fight of changedFights.values()) {
+        await putFightTrackerFight(fight);
+      }
+      setParticipationStatusDrafts({});
+    } finally {
+      setIsApplyingParticipationDrafts(false);
+    }
   };
 
   const handleSetMemberFightStatus = async (fightId: string, memberId: string, status: FightMemberStatus) => {
@@ -1031,6 +1200,7 @@ export default function GuildHubFightTracking() {
 
   const totalMissed = fights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0);
   const canCreateFight = Boolean(tracker && date);
+  const hasParticipationStatusDrafts = Object.keys(participationStatusDrafts).length > 0;
   const canApplyImportReview = Boolean(
     importSession && tracker && importSession.review.date && importSession.review.reportType !== "unsupported_defense",
   );
@@ -1135,7 +1305,11 @@ export default function GuildHubFightTracking() {
       fights={sortedFights}
       rows={rowMembers}
       readonlyStatsByMemberId={readonlyStatsByMemberId}
-      onCycleStatus={handleCycleFightStatus}
+      statusDrafts={participationStatusDrafts}
+      hasStatusDrafts={hasParticipationStatusDrafts}
+      isApplyingStatusDrafts={isApplyingParticipationDrafts}
+      onStatusDraftChange={handleParticipationStatusDraftChange}
+      onApplyStatusDrafts={applyParticipationStatusDrafts}
     />
   );
   const desktopToolPanels: Array<{
@@ -1212,6 +1386,14 @@ export default function GuildHubFightTracking() {
     })),
   ];
   const activePanelConfig = (isCompactLayout ? mobilePanels : desktopToolPanels).find((panel) => panel.id === activeMobilePanel) ?? null;
+  const closeActiveFunctionPanel = () => {
+    if (activeMobilePanel === "tracklist" && hasParticipationStatusDrafts) {
+      const shouldDiscard = typeof window === "undefined" || window.confirm("Ungespeicherte Änderungen verwerfen?");
+      if (!shouldDiscard) return;
+      setParticipationStatusDrafts({});
+    }
+    setActiveMobilePanel(null);
+  };
 
   if (storeLoading) {
     return (
@@ -1298,7 +1480,7 @@ export default function GuildHubFightTracking() {
                 </section>
 
                 {activePanelConfig ? (
-                  <FunctionOverlay title={activePanelConfig.title} onClose={() => setActiveMobilePanel(null)}>
+                  <FunctionOverlay title={activePanelConfig.title} onClose={closeActiveFunctionPanel}>
                     {activePanelConfig.content}
                   </FunctionOverlay>
                 ) : null}
@@ -1319,10 +1501,10 @@ export default function GuildHubFightTracking() {
 
                 {activePanelConfig ? (
                   <FunctionOverlay
-                    title={activePanelConfig.title}
-                    subtitle={activePanelConfig.subtitle}
-                    onClose={() => setActiveMobilePanel(null)}
-                  >
+                  title={activePanelConfig.title}
+                  subtitle={activePanelConfig.subtitle}
+                  onClose={closeActiveFunctionPanel}
+                >
                     {activePanelConfig.content}
                   </FunctionOverlay>
                 ) : null}
@@ -1630,7 +1812,7 @@ function ScanMemberImportPanel({
               id: "new",
               title: "Neue Spieler",
               hint: "neu im Scan",
-              items: plan.newMembers.map((member) => member.name),
+              items: plan.newMembers.filter((member) => member.active !== false).map((member) => member.name),
             },
             {
               id: "confirmed",
@@ -1649,6 +1831,12 @@ function ScanMemberImportPanel({
               title: "Nicht mehr im aktuellen Scan",
               hint: "wird inaktiv",
               items: plan.missingMembers.map((member) => member.name),
+            },
+            {
+              id: "former",
+              title: "Ehemalige Gildenmitglieder",
+              hint: "nur in aelterem Scan gefunden",
+              items: plan.newMembers.filter((member) => member.active === false).map((member) => member.name),
             },
           ]
         : [],
@@ -2621,49 +2809,243 @@ function FightTable({
   rows,
   fights,
   readonlyStatsByMemberId,
-  onCycleStatus,
+  statusDrafts,
+  hasStatusDrafts,
+  isApplyingStatusDrafts,
+  onStatusDraftChange,
+  onApplyStatusDrafts,
 }: {
   rows: TrackerRow[];
   fights: GuildFight[];
   readonlyStatsByMemberId: Map<string, FightTrackerReadonlyStats>;
-  onCycleStatus: (fightId: string, memberId: string) => void;
+  statusDrafts: ParticipationStatusDrafts;
+  hasStatusDrafts: boolean;
+  isApplyingStatusDrafts: boolean;
+  onStatusDraftChange: (fightId: string, memberId: string, status: FightMemberStatus) => void;
+  onApplyStatusDrafts: () => void | Promise<void>;
 }) {
-  const [sortKey, setSortKey] = React.useState<ParticipationSortKey>("name");
-  const [sortDirection, setSortDirection] = React.useState<ParticipationSortDirection>("asc");
+  const [sortKey, setSortKey] = React.useState<ParticipationSortKey>("guildRole");
+  const [sortDirection, setSortDirection] = React.useState<ParticipationSortDirection>("desc");
+  const [showInactiveMembers, setShowInactiveMembers] = React.useState(true);
+  const [swipeTogether, setSwipeTogether] = React.useState(false);
+  const [sharedFightWindowOffset, setSharedFightWindowOffset] = React.useState(0);
+  const [memberFightWindowOffsets, setMemberFightWindowOffsets] = React.useState<Record<string, number>>({});
+  const [sharedFightWindowDirection, setSharedFightWindowDirection] = React.useState<MobileFightWindowDirection | null>(null);
+  const [memberFightWindowDirections, setMemberFightWindowDirections] = React.useState<Record<string, MobileFightWindowDirection | null>>({});
+  const mobileSwipeStateRef = React.useRef<MobileFightSwipeState | null>(null);
+  const suppressedMobileClickMembersRef = React.useRef<Set<string>>(new Set());
   const subtitle = fights.length ? `${fights.length} gespeicherte Fights` : "Noch keine Fights angelegt";
   const emptyMessage = fights.length
     ? `${fights.length} Fights gespeichert. Noch keine Member im Fight Tracker vorhanden.`
     : "Noch keine Member im Fight Tracker vorhanden.";
   const sortOptions: Array<{ key: ParticipationSortKey; label: string }> = [
+    { key: "guildRole", label: "Gildenrang" },
     { key: "name", label: "Name" },
     { key: "baseStats", label: "Base Stats" },
     { key: "totalStats", label: "Total Stats" },
     { key: "level", label: "Level" },
     { key: "missed", label: "Missed Fights" },
   ];
+  const getParticipationStatus = React.useCallback(
+    (fight: GuildFight, memberId: string) =>
+      statusDrafts[createParticipationDraftKey(fight.id, memberId)]?.status ?? getFightMemberStatus(fight, memberId),
+    [statusDrafts],
+  );
+  const cycleParticipationStatus = (fight: GuildFight, memberId: string) => {
+    const status = getParticipationStatus(fight, memberId);
+    const nextStatus: FightMemberStatus = status === "unknown" ? "ok" : status === "ok" ? "missed" : "unknown";
+    onStatusDraftChange(fight.id, memberId, nextStatus);
+  };
+  const maxFightWindowOffset = Math.max(0, fights.length - 7);
+  const clampFightWindowOffset = React.useCallback(
+    (offset: number) => Math.min(Math.max(0, offset), maxFightWindowOffset),
+    [maxFightWindowOffset],
+  );
+  const getFightWindowOffset = React.useCallback(
+    (memberId: string) => clampFightWindowOffset(swipeTogether ? sharedFightWindowOffset : memberFightWindowOffsets[memberId] ?? sharedFightWindowOffset),
+    [clampFightWindowOffset, memberFightWindowOffsets, sharedFightWindowOffset, swipeTogether],
+  );
+  const getMobileFightWindow = React.useCallback(
+    (memberId: string) => {
+      const offset = getFightWindowOffset(memberId);
+      const startIndex = Math.max(0, fights.length - 7 - offset);
+      return fights.slice(startIndex, startIndex + 7);
+    },
+    [fights, getFightWindowOffset],
+  );
+  const updateFightWindowOffset = React.useCallback(
+    (memberId: string, delta: number) => {
+      if (!delta || maxFightWindowOffset <= 0) return;
+      const direction: MobileFightWindowDirection = delta > 0 ? "older" : "newer";
+      const currentOffset = getFightWindowOffset(memberId);
+      const nextOffset = clampFightWindowOffset(currentOffset + delta);
+      if (nextOffset === currentOffset) return;
+      if (swipeTogether) {
+        setSharedFightWindowDirection(direction);
+        setSharedFightWindowOffset(nextOffset);
+        return;
+      }
+      setMemberFightWindowDirections((current) => ({ ...current, [memberId]: direction }));
+      setMemberFightWindowOffsets((current) => ({ ...current, [memberId]: nextOffset }));
+    },
+    [clampFightWindowOffset, getFightWindowOffset, maxFightWindowOffset, swipeTogether],
+  );
+  const handleSwipeTogetherChange = (checked: boolean) => {
+    if (checked) {
+      setSwipeTogether(true);
+      setSharedFightWindowOffset(0);
+      setSharedFightWindowDirection(null);
+      return;
+    }
+    const nextOffset = clampFightWindowOffset(sharedFightWindowOffset);
+    setSwipeTogether(false);
+    setMemberFightWindowOffsets(Object.fromEntries(rows.map((member) => [member.id, nextOffset])));
+    setMemberFightWindowDirections({});
+  };
+  const handleMobileFightTouchStart = (event: React.TouchEvent, memberId: string) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    mobileSwipeStateRef.current = {
+      memberId,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      currentY: touch.clientY,
+      swiped: false,
+    };
+  };
+  const handleMobileFightTouchMove = (event: React.TouchEvent) => {
+    const state = mobileSwipeStateRef.current;
+    if (!state || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    state.currentX = touch.clientX;
+    state.currentY = touch.clientY;
+    const deltaX = state.currentX - state.startX;
+    const deltaY = state.currentY - state.startY;
+    if (Math.abs(deltaX) > 18 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) state.swiped = true;
+  };
+  const handleMobileFightTouchEnd = (event: React.TouchEvent) => {
+    const state = mobileSwipeStateRef.current;
+    if (!state) return;
+    const touch = event.changedTouches[0];
+    const endX = touch?.clientX ?? state.currentX;
+    const endY = touch?.clientY ?? state.currentY;
+    const deltaX = endX - state.startX;
+    const deltaY = endY - state.startY;
+    mobileSwipeStateRef.current = null;
+    if (!state.swiped || Math.abs(deltaX) < 36 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+
+    suppressedMobileClickMembersRef.current.add(state.memberId);
+    window.setTimeout(() => suppressedMobileClickMembersRef.current.delete(state.memberId), 350);
+    updateFightWindowOffset(state.memberId, deltaX < 0 ? 1 : -1);
+  };
+  const handleMobileFightTouchCancel = () => {
+    mobileSwipeStateRef.current = null;
+  };
+  const handleMobileStatusClick = (event: React.MouseEvent, fight: GuildFight, memberId: string) => {
+    if (suppressedMobileClickMembersRef.current.has(memberId)) {
+      event.preventDefault();
+      return;
+    }
+    cycleParticipationStatus(fight, memberId);
+  };
+
+  React.useEffect(() => {
+    setSharedFightWindowOffset((current) => clampFightWindowOffset(current));
+    setMemberFightWindowOffsets((current) => {
+      let changed = false;
+      const knownMemberIds = new Set(rows.map((member) => member.id));
+      const next: Record<string, number> = {};
+      Object.entries(current).forEach(([memberId, offset]) => {
+        if (!knownMemberIds.has(memberId)) {
+          changed = true;
+          return;
+        }
+        const nextOffset = clampFightWindowOffset(offset);
+        next[memberId] = nextOffset;
+        if (nextOffset !== offset) changed = true;
+      });
+      return changed ? next : current;
+    });
+    setMemberFightWindowDirections((current) => {
+      let changed = false;
+      const knownMemberIds = new Set(rows.map((member) => member.id));
+      const next: Record<string, MobileFightWindowDirection | null> = {};
+      Object.entries(current).forEach(([memberId, direction]) => {
+        if (!knownMemberIds.has(memberId)) {
+          changed = true;
+          return;
+        }
+        next[memberId] = direction;
+      });
+      return changed ? next : current;
+    });
+  }, [clampFightWindowOffset, rows]);
 
   const participationRows = React.useMemo(
     () =>
       rows.map((member) => {
-        const statuses = fights.map((fight) => getFightMemberStatus(fight, member.id));
+        const statuses = fights.map((fight) => getParticipationStatus(fight, member.id));
         const missed = statuses.filter((status) => status === "missed").length;
         const evaluated = statuses.filter((status) => status !== "unknown").length;
+        let lastMissedFight: GuildFight | null = null;
+        let streakStatus: Exclude<FightMemberStatus, "unknown"> | null = null;
+        let streakCount = 0;
+        for (let index = statuses.length - 1; index >= 0; index -= 1) {
+          const status = statuses[index];
+          if (!lastMissedFight && status === "missed") lastMissedFight = fights[index] ?? null;
+          if (status === "unknown") continue;
+          if (!streakStatus) streakStatus = status;
+          if (status !== streakStatus) break;
+          streakCount += 1;
+        }
         const readonlyStats = readonlyStatsByMemberId.get(member.id);
         return {
           member,
           missed,
           evaluated,
+          lastMissedFight,
+          streakStatus,
+          streakCount,
           level: getFiniteNumber(member.level) ?? readonlyStats?.level ?? null,
-          baseStatsSum: readonlyStats?.baseStatsSum ?? null,
-          totalStats: readonlyStats?.totalStats ?? null,
+          baseStatsSum: getFiniteNumber(member.baseStats) ?? readonlyStats?.baseStatsSum ?? null,
+          totalStats: getFiniteNumber(member.totalStats) ?? readonlyStats?.totalStats ?? null,
         };
       }),
-    [fights, readonlyStatsByMemberId, rows],
+    [fights, getParticipationStatus, readonlyStatsByMemberId, rows],
   );
+
+  const visibleParticipationRows = React.useMemo(
+    () => participationRows.filter((row) => showInactiveMembers || row.member.active !== false),
+    [participationRows, showInactiveMembers],
+  );
+  const tableEmptyMessage =
+    !showInactiveMembers && participationRows.length ? "Keine aktiven Member sichtbar." : emptyMessage;
 
   const sortedRows = React.useMemo(() => {
     const byName = (a: { member: TrackerRow }, b: { member: TrackerRow }) =>
       a.member.name.localeCompare(b.member.name, "de-DE", { sensitivity: "base" });
+    const byGuildRole = (a: (typeof participationRows)[number], b: (typeof participationRows)[number]) => {
+      const roleOrder = { leader: 0, officer: 1, member: 2 } as const;
+      const aRole = a.member.guildRole ? roleOrder[a.member.guildRole] : 3;
+      const bRole = b.member.guildRole ? roleOrder[b.member.guildRole] : 3;
+      if (aRole !== bRole) {
+        if (aRole === 3 || bRole === 3) return aRole - bRole;
+        return sortDirection === "asc" ? bRole - aRole : aRole - bRole;
+      }
+
+      const aLevel = a.level;
+      const bLevel = b.level;
+      const aLevelMissing = aLevel == null;
+      const bLevelMissing = bLevel == null;
+      if (aLevelMissing || bLevelMissing) {
+        if (aLevelMissing && bLevelMissing) return byName(a, b);
+        return aLevelMissing ? 1 : -1;
+      }
+
+      const levelCompare = sortDirection === "asc" ? aLevel - bLevel : bLevel - aLevel;
+      return levelCompare || byName(a, b);
+    };
     const numericValue = (row: (typeof participationRows)[number]) => {
       switch (sortKey) {
         case "baseStats":
@@ -2679,7 +3061,9 @@ function FightTable({
       }
     };
 
-    return [...participationRows].sort((a, b) => {
+    return [...visibleParticipationRows].sort((a, b) => {
+      if (sortKey === "guildRole") return byGuildRole(a, b);
+
       if (sortKey === "name") {
         const nameCompare = byName(a, b);
         return sortDirection === "asc" ? nameCompare : -nameCompare;
@@ -2697,7 +3081,7 @@ function FightTable({
       const diff = sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       return diff || byName(a, b);
     });
-  }, [participationRows, sortDirection, sortKey]);
+  }, [sortDirection, sortKey, visibleParticipationRows]);
 
   return (
     <section className={styles.tablePanel}>
@@ -2706,93 +3090,239 @@ function FightTable({
           <h2>Participation</h2>
           <p>{subtitle}</p>
         </div>
-        <div className={styles.tableSortControls}>
-          <label className={styles.tableSortField}>
-            <span>Sortieren</span>
-            <select value={sortKey} onChange={(event) => setSortKey(event.target.value as ParticipationSortKey)}>
-              {sortOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={styles.tableHeaderActions}>
+          <div className={styles.tableSortControls}>
+            <label className={styles.tableSortField}>
+              <span>Sortieren</span>
+              <select
+                value={sortKey}
+                onChange={(event) => {
+                  const nextSortKey = event.target.value as ParticipationSortKey;
+                  setSortKey(nextSortKey);
+                  setSortDirection(nextSortKey === "name" ? "asc" : "desc");
+                }}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className={styles.sortDirectionButton}
+              aria-label={sortDirection === "asc" ? "Aufsteigend sortieren" : "Absteigend sortieren"}
+              title={sortDirection === "asc" ? "Aufsteigend" : "Absteigend"}
+              onClick={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+            >
+              {sortDirection === "asc" ? "↑" : "↓"}
+            </button>
+            <label className={styles.tableToggleField}>
+              <input
+                type="checkbox"
+                checked={showInactiveMembers}
+                onChange={(event) => setShowInactiveMembers(event.target.checked)}
+              />
+              <span>Ehemalige Gildenmitglieder</span>
+            </label>
+            <label className={styles.tableToggleField}>
+              <input
+                type="checkbox"
+                checked={swipeTogether}
+                onChange={(event) => handleSwipeTogetherChange(event.target.checked)}
+              />
+              <span>Gemeinsam swipen</span>
+            </label>
+          </div>
           <button
             type="button"
-            className={styles.sortDirectionButton}
-            aria-label={sortDirection === "asc" ? "Aufsteigend sortieren" : "Absteigend sortieren"}
-            title={sortDirection === "asc" ? "Aufsteigend" : "Absteigend"}
-            onClick={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+            className={styles.applyDraftButton}
+            disabled={!hasStatusDrafts || isApplyingStatusDrafts}
+            onClick={() => void onApplyStatusDrafts()}
           >
-            {sortDirection === "asc" ? "↑" : "↓"}
+            Änderung übernehmen
           </button>
         </div>
       </div>
       {sortedRows.length ? (
-        <div className={styles.tableWrapper}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.stickyColumn}>Member</th>
-              <th>Missed</th>
-              <th>Quote</th>
-              {fights.map((fight) => (
-                <th key={fight.id} className={styles.fightHead}>
-                  <span>Fight {fight.fightNumber}</span>
-                  <small>{formatDate(fight.date)}</small>
-                  <small>{fight.opponentGuild || "—"}</small>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.map(({ member, missed, evaluated, level }) => {
+        <>
+          <div className={styles.tableWrapper}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={`${styles.stickyColumn} ${styles.stickyMemberColumn}`}>Member</th>
+                <th className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>Missed</th>
+                <th className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>Quote</th>
+                <th className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>Letzter Fehlkampf</th>
+                <th className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>Serie</th>
+                {fights.map((fight) => (
+                  <th key={fight.id} className={styles.fightHead}>
+                    <span>Fight {fight.fightNumber}</span>
+                    <small>{formatDate(fight.date)}</small>
+                    <small>{fight.opponentGuild || "—"}</small>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
+                const memberMetaParts = [
+                  formatMemberClassName(member.className),
+                  level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
+                  !member.active ? "nicht mehr in aktueller Gilde" : null,
+                ].filter((entry): entry is string => Boolean(entry));
+
+                return (
+                  <tr key={member.id} className={member.active ? undefined : styles.inactiveRow}>
+                    <td className={`${styles.stickyColumn} ${styles.stickyMemberColumn} ${styles.memberCell}`}>
+                      <div className={styles.memberName}>{member.name}</div>
+                      <div className={styles.memberMeta}>{memberMetaParts.join(" · ")}</div>
+                    </td>
+                    <td className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{missed}</td>
+                    <td className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>{formatQuote(missed, evaluated)}</td>
+                    <td className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>
+                      {lastMissedFight ? formatDate(lastMissedFight.date) : "—"}
+                    </td>
+                    <td className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>
+                      {streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : "—"}
+                    </td>
+                    {fights.map((fight) => {
+                      const status = getParticipationStatus(fight, member.id);
+                      const hasDraft = Boolean(statusDrafts[createParticipationDraftKey(fight.id, member.id)]);
+                      return (
+                        <td key={`${member.id}-${fight.id}`}>
+                          <button
+                            type="button"
+                            className={`${styles.statusButton} ${
+                              status === "missed" ? styles.statusMissed : status === "ok" ? styles.statusOk : styles.statusUnknown
+                            } ${hasDraft ? styles.statusDraft : ""}`}
+                            disabled={isApplyingStatusDrafts}
+                            onClick={() => cycleParticipationStatus(fight, member.id)}
+                            aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
+                          >
+                            {status === "unknown" ? (
+                              "?"
+                            ) : (
+                              <>
+                                {status === "missed" ? <XCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
+                                {status === "missed" ? "Fehlt" : "OK"}
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          </div>
+          <div className={styles.mobileParticipationList}>
+            {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
+              const visibleMemberFights = getMobileFightWindow(member.id);
+              const fightWindowOffset = getFightWindowOffset(member.id);
+              const canShowOlderFights = fightWindowOffset < maxFightWindowOffset;
+              const canShowNewerFights = fightWindowOffset > 0;
+              const fightWindowDirection = swipeTogether ? sharedFightWindowDirection : memberFightWindowDirections[member.id] ?? null;
+              const streakLabel = streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : null;
               const memberMetaParts = [
                 formatMemberClassName(member.className),
                 level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
+                streakLabel,
                 !member.active ? "nicht mehr in aktueller Gilde" : null,
               ].filter((entry): entry is string => Boolean(entry));
 
               return (
-                <tr key={member.id} className={member.active ? undefined : styles.inactiveRow}>
-                  <td className={`${styles.stickyColumn} ${styles.memberCell}`}>
-                    <div className={styles.memberName}>{member.name}</div>
-                    <div className={styles.memberMeta}>{memberMetaParts.join(" · ")}</div>
-                  </td>
-                  <td>{missed}</td>
-                  <td>{formatQuote(missed, evaluated)}</td>
-                  {fights.map((fight) => {
-                    const status = getFightMemberStatus(fight, member.id);
-                    return (
-                      <td key={`${member.id}-${fight.id}`}>
-                        <button
-                          type="button"
-                          className={`${styles.statusButton} ${
-                            status === "missed" ? styles.statusMissed : status === "ok" ? styles.statusOk : styles.statusUnknown
-                          }`}
-                          onClick={() => onCycleStatus(fight.id, member.id)}
-                          aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
-                        >
-                          {status === "unknown" ? (
-                            "?"
-                          ) : (
-                            <>
-                              {status === "missed" ? <XCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
-                              {status === "missed" ? "Fehlt" : "OK"}
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
+                <article key={member.id} className={`${styles.mobileParticipationMember} ${member.active ? "" : styles.mobileParticipationInactive}`}>
+                  <div className={styles.mobileParticipationSummary}>
+                    <div className={styles.mobileParticipationName}>
+                      <strong>{member.name}</strong>
+                      <span>{memberMetaParts.join(" · ")}</span>
+                    </div>
+                    <div className={styles.mobileParticipationMetric}>
+                      <span>Missed</span>
+                      <strong>{missed}</strong>
+                    </div>
+                    <div className={styles.mobileParticipationMetric}>
+                      <span>Quote</span>
+                      <strong>{formatQuote(missed, evaluated)}</strong>
+                    </div>
+                    <div className={styles.mobileParticipationMetric}>
+                      <span>Fehlkampf</span>
+                      <strong>{lastMissedFight ? formatDate(lastMissedFight.date) : "—"}</strong>
+                    </div>
+                  </div>
+                  {visibleMemberFights.length ? (
+                    <div className={styles.mobileFightNavigator}>
+                      <button
+                        type="button"
+                        className={styles.mobileFightNavButton}
+                        disabled={!canShowOlderFights}
+                        onClick={() => updateFightWindowOffset(member.id, 1)}
+                        aria-label={`${member.name} ältere Fights anzeigen`}
+                        title="Ältere Fights"
+                      >
+                        <ChevronLeft size={14} aria-hidden />
+                      </button>
+                      <div
+                        key={`${member.id}-${fightWindowOffset}-${fightWindowDirection ?? "still"}`}
+                        className={`${styles.mobileFightBar} ${
+                          fightWindowDirection === "older"
+                            ? styles.mobileFightBarSlideOlder
+                            : fightWindowDirection === "newer"
+                              ? styles.mobileFightBarSlideNewer
+                              : ""
+                        }`}
+                        style={{ gridTemplateColumns: `repeat(${visibleMemberFights.length}, minmax(0, 1fr))` }}
+                        onTouchStart={(event) => handleMobileFightTouchStart(event, member.id)}
+                        onTouchMove={handleMobileFightTouchMove}
+                        onTouchEnd={handleMobileFightTouchEnd}
+                        onTouchCancel={handleMobileFightTouchCancel}
+                      >
+                        {visibleMemberFights.map((fight) => {
+                          const status = getParticipationStatus(fight, member.id);
+                          const hasDraft = Boolean(statusDrafts[createParticipationDraftKey(fight.id, member.id)]);
+                          return (
+                            <div key={`${member.id}-${fight.id}`} className={styles.mobileFightSlot}>
+                              <small title={fight.opponentGuild || undefined}>{fight.opponentGuild || ""}</small>
+                              <button
+                                type="button"
+                                className={`${styles.statusButton} ${styles.mobileStatusButton} ${
+                                  status === "missed" ? styles.statusMissed : status === "ok" ? styles.statusOk : styles.statusUnknown
+                                } ${hasDraft ? styles.statusDraft : ""}`}
+                                disabled={isApplyingStatusDrafts}
+                                title={formatFightLabel(fight)}
+                                onClick={(event) => handleMobileStatusClick(event, fight, member.id)}
+                                aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
+                              >
+                                {status === "unknown" ? "?" : status === "missed" ? "Fehlt" : "OK"}
+                              </button>
+                              <span>{formatDate(fight.date)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.mobileFightNavButton}
+                        disabled={!canShowNewerFights}
+                        onClick={() => updateFightWindowOffset(member.id, -1)}
+                        aria-label={`${member.name} neuere Fights anzeigen`}
+                        title="Neuere Fights"
+                      >
+                        <ChevronRight size={14} aria-hidden />
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
               );
             })}
-          </tbody>
-        </table>
-        </div>
+          </div>
+        </>
       ) : (
-        <div className={styles.tableEmpty}>{emptyMessage}</div>
+        <div className={styles.tableEmpty}>{tableEmptyMessage}</div>
       )}
     </section>
   );

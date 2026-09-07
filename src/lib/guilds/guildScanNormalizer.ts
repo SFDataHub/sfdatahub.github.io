@@ -1,10 +1,13 @@
 import { slimPlayer } from "../import/parsers";
+import { parseSaveStringToArray } from "../parsing/extractPortrait";
 import { readSfPlayerStats } from "../parsing";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 
-export const GUILD_SCAN_NORMALIZER_VERSION = 6;
+export const GUILD_SCAN_NORMALIZER_VERSION = 8;
 
 type JsonRecord = Record<string, unknown>;
+
+export type NormalizedGuildRole = "leader" | "officer" | "member" | null;
 
 export type NormalizedGuildMember = {
   memberRef: string;
@@ -17,6 +20,7 @@ export type NormalizedGuildMember = {
   guildSegment: string | null;
   groupSegment: string | null;
   guildName: string | null;
+  guildRole: NormalizedGuildRole;
 };
 
 export type NormalizedGuildMatchIdentity = {
@@ -69,6 +73,20 @@ const getMemberValue = (record: JsonRecord, keys: readonly string[]) => {
 
 const readString = (record: JsonRecord, keys: readonly string[]) => normalizeDisplayString(getMemberValue(record, keys));
 
+const toFiniteNumberOrNull = (value: unknown) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const toNumberArray = (value: unknown) =>
+  Array.isArray(value) ? value.map((entry) => toFiniteNumberOrNull(entry) ?? 0) : null;
+
 export const normalizeGuildScanServer = (value: unknown) => {
   const normalized = normalizeServerKeyFromInput(value)?.toLowerCase();
   if (normalized) return normalized;
@@ -80,6 +98,14 @@ const parseServerFromIdentifier = (value: unknown) => {
   const identifier = normalizeText(value);
   const match = identifier.match(/^(.+)_[pg][^_]+$/i);
   return match?.[1] ? normalizeGuildScanServer(match[1]) : null;
+};
+
+const parsePlayerIdFromIdentifier = (value: unknown) => {
+  const identifier = normalizeText(value);
+  const match = identifier.match(/_p(\d+)$/i);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 export const normalizeGuildSegmentForScan = (value: unknown) => {
@@ -113,7 +139,75 @@ const readGroupSegment = (player: JsonRecord) => normalizeGuildSegmentForScan(re
 const readGuildName = (player: JsonRecord) =>
   readString(player, ["groupname", "groupName", "guildName", "Guild Name", "guild", "Guild", "group", "Group"]);
 
-export function normalizeGuildScanMember(player: unknown, fallbackServer: string | null = null): NormalizedGuildMember | null {
+const decodeGuildRole = (value: unknown): NormalizedGuildRole => {
+  const raw = toFiniteNumberOrNull(value);
+  if (raw === 1) return "leader";
+  if (raw === 2) return "officer";
+  if (raw === 3) return "member";
+  return null;
+};
+
+const readGroupSaveArray = (group: JsonRecord) => {
+  const saveArr = toNumberArray(group.save ?? group.groupSave);
+  if (saveArr && saveArr.length) return saveArr;
+  const saveString = readString(group, ["saveString"]);
+  return saveString ? parseSaveStringToArray(saveString) : [];
+};
+
+const readGroupServer = (group: JsonRecord, fallbackServer: string | null) =>
+  normalizeGuildScanServer(readString(group, ["server", "Server", "prefix", "world", "realm"])) ||
+  parseServerFromIdentifier(readString(group, ["identifier", "Identifier", "guildIdentifier", "Guild Identifier", "group", "Group"])) ||
+  fallbackServer;
+
+const memberRoleKey = (server: string | null, playerId: number | string) =>
+  `${server ? `${server}_` : ""}p${String(playerId).trim().toLowerCase()}`;
+
+const buildGuildRoleLookup = (raw: JsonRecord, fallbackServer: string | null) => {
+  const groups = Array.isArray(raw.groups) ? raw.groups : Array.isArray(raw.guilds) ? raw.guilds : [];
+  const roles = new Map<string, Exclude<NormalizedGuildRole, null>>();
+
+  groups
+    .map(asRecord)
+    .filter((group): group is JsonRecord => Boolean(group))
+    .forEach((group) => {
+      const saveArray = readGroupSaveArray(group);
+      if (!saveArray.length) return;
+      const server = readGroupServer(group, fallbackServer);
+
+      for (let slot = 0; slot < 50; slot += 1) {
+        const memberId = toFiniteNumberOrNull(saveArray[14 + slot]);
+        if (memberId == null || memberId <= 0) continue;
+        const role = decodeGuildRole(saveArray[314 + slot]);
+        if (!role) continue;
+        roles.set(memberRoleKey(server, memberId), role);
+        if (!server) roles.set(memberRoleKey(null, memberId), role);
+      }
+    });
+
+  return roles;
+};
+
+const readGuildRoleForMember = (
+  lookup: Map<string, Exclude<NormalizedGuildRole, null>>,
+  server: string | null,
+  playerId: string | null,
+  memberRef: string,
+): NormalizedGuildRole => {
+  const numericPlayerId = playerId ?? parsePlayerIdFromIdentifier(memberRef);
+  if (numericPlayerId != null) {
+    const serverKey = lookup.get(memberRoleKey(server, numericPlayerId));
+    if (serverKey) return serverKey;
+    const globalKey = lookup.get(memberRoleKey(null, numericPlayerId));
+    if (globalKey) return globalKey;
+  }
+  return null;
+};
+
+export function normalizeGuildScanMember(
+  player: unknown,
+  fallbackServer: string | null = null,
+  guildRoleLookup: Map<string, Exclude<NormalizedGuildRole, null>> = new Map(),
+): NormalizedGuildMember | null {
   const record = asRecord(player);
   if (!record) return null;
 
@@ -142,6 +236,7 @@ export function normalizeGuildScanMember(player: unknown, fallbackServer: string
     guildSegment: normalizeGuildSegmentForScan(slim.guildId) ?? readGuildSegment(record),
     groupSegment: readGroupSegment(record),
     guildName: readGuildName(record),
+    guildRole: readGuildRoleForMember(guildRoleLookup, server, playerId, memberRef),
   };
 }
 
@@ -149,9 +244,10 @@ export function normalizeGuildScanMembers(rawData: unknown): NormalizedGuildMemb
   const raw = asRecord(rawData);
   if (!raw || !Array.isArray(raw.players)) return [];
   const fallbackServer = normalizeGuildScanServer(raw.prefix ?? raw.server);
+  const guildRoleLookup = buildGuildRoleLookup(raw, fallbackServer);
 
   return raw.players
-    .map((player) => normalizeGuildScanMember(player, fallbackServer))
+    .map((player) => normalizeGuildScanMember(player, fallbackServer, guildRoleLookup))
     .filter((member): member is NormalizedGuildMember => Boolean(member));
 }
 

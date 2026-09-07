@@ -110,8 +110,8 @@ const asNumberArray = (value: unknown): number[] | null => {
 };
 
 const STRENGTH_CLASS_IDS = new Set([1, 5, 6, 11]);
-const DEXTERITY_CLASS_IDS = new Set([2, 4, 7, 12]);
-const INTELLIGENCE_CLASS_IDS = new Set([3, 8, 9, 10]);
+const DEXTERITY_CLASS_IDS = new Set([3, 4, 7, 12]);
+const INTELLIGENCE_CLASS_IDS = new Set([2, 8, 9, 10]);
 
 const canonicalizeFieldKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
