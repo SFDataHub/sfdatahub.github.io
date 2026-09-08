@@ -294,12 +294,13 @@ const TOP_LEVEL_SERVER_READ_ALIASES = {
   MAERWYNN: ["MAERWYNN", "maerwynn_net", "MAERWYNN_NET"],
   BLACKFOREST: ["BLACKFOREST", "blackforest_net", "BLACKFOREST_NET", "BLACK_FOREST"],
   GNAROGRIM: ["GNAROGRIM", "gnarogrim_net", "GNAROGRIM_NET", "GRANOGRIM", "granogrim_net"],
-  STUMPLESTEPPE: [
+  STUMBLESTEPPE: [
+    "STUMBLESTEPPE",
+    "stumblesteppe_net",
+    "STUMBLESTEPPE_NET",
     "STUMPLESTEPPE",
     "stumplesteppe_net",
     "STUMPLESTEPPE_NET",
-    "stumblesteppe_net",
-    "STUMBLESTEPPE_NET",
   ],
 } as const satisfies Record<string, readonly string[]>;
 
@@ -330,6 +331,10 @@ const normalizeServerShortKey = (input: string): string => {
   if (legacyEu) return `EU${legacyEu[1]}`;
 
   if (!token) throw new Error(`Invalid --server value: ${input}`);
+  const namedToken = token.replace(/[\s._-]+/g, "");
+  if (namedToken === "STUMBLESTEPPE" || namedToken === "STUMPLESTEPPE") {
+    return "STUMBLESTEPPE";
+  }
   return token;
 };
 

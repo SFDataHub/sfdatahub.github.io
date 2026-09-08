@@ -50,14 +50,42 @@ const normalizeServerList = (list: string[]) => {
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 };
 
+const STUMBLE_STEPPE_COMPARE_ALIAS_TOKENS = new Set([
+  "STUMBLESTEPPE",
+  "STUMPLESTEPPE",
+]);
+
+const compareServerAliasToken = (value: string) => {
+  let token = String(value ?? "").trim().toUpperCase();
+  if (!token) return "";
+  token = token.replace(/^[A-Z][A-Z0-9+.-]*:\/\//, "");
+  token = token.split(/[/?#]/)[0] ?? token;
+  token = token.replace(/:\d+$/, "").replace(/^\.+|\.+$/g, "");
+  token = token.replace(/\.SFGAME\.(NET|EU)$/, "");
+  token = token.replace(/[_.-]?(NET|EU)$/, "");
+  return token.replace(/[\s._-]+/g, "");
+};
+
 const normalizeCompareServerKey = (value: string) => {
   const raw = String(value ?? "").trim().toUpperCase();
   if (!raw) return "";
+  if (STUMBLE_STEPPE_COMPARE_ALIAS_TOKENS.has(compareServerAliasToken(raw))) {
+    return "STUMBLESTEPPE";
+  }
   const hostMatch = raw.match(/^S(\d+)(?:\.EU)?$/);
   if (hostMatch) return `EU${hostMatch[1]}`;
   const euMatch = raw.match(/^EU(\d+)$/);
   if (euMatch) return `EU${euMatch[1]}`;
   return raw;
+};
+
+const normalizeCompareServerList = (list: string[]) => {
+  const set = new Set<string>();
+  list.forEach((entry) => {
+    const normalized = normalizeCompareServerKey(entry);
+    if (normalized) set.add(normalized);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 };
 
 const buildCompareDocId = (serverKey: string, month: string) =>
@@ -1734,14 +1762,14 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   });
 
   const compareServersKey = React.useMemo(
-    () => normalizeServerList(servers).join(","),
+    () => normalizeCompareServerList(servers).join(","),
     [servers]
   );
   const compareBaselineRequestKeyRef = React.useRef<string>("");
   const compareTargetRequestKeyRef = React.useRef<string>("");
   const baselineServerSet = React.useMemo(() => {
     const normalized = (compareState.baselineServers || [])
-      .map((server) => String(server).trim().toUpperCase())
+      .map((server) => normalizeCompareServerKey(server))
       .filter(Boolean);
     return new Set(normalized);
   }, [compareState.baselineServers]);
@@ -2153,11 +2181,29 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     const suffix = fallbackIndex != null ? String(fallbackIndex) : "na";
     return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
   }, []);
+
+  const buildCompareFallbackKey = React.useCallback((row: FirestoreToplistPlayerRow, fallbackIndex?: number) => {
+    const serverKey = normalizeCompareServerKey(String(row.server ?? ""));
+    const nameKey = String(row.name ?? "").trim();
+    const classKey = String(row.class ?? "").trim();
+    const suffix = fallbackIndex != null ? String(fallbackIndex) : "na";
+    return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
+  }, []);
+
+  const normalizeCompareIdentifier = React.useCallback((value: string | null) => {
+    if (!value) return null;
+    const parsed = parsePlayerIdentifier(value);
+    if (!parsed) return value.trim().toLowerCase() || null;
+    const serverKey = normalizeCompareServerKey(parsed.serverKey);
+    if (!serverKey) return value.trim().toLowerCase() || null;
+    return `${serverKey.toLowerCase()}_p${parsed.playerId}`;
+  }, []);
+
   const buildCompareKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
-    const identifier = resolveToplistRowIdentifier(row);
+    const identifier = normalizeCompareIdentifier(resolveToplistRowIdentifier(row));
     if (identifier) return identifier;
-    return buildRowKey(row);
-  }, [buildRowKey]);
+    return buildCompareFallbackKey(row);
+  }, [buildCompareFallbackKey, normalizeCompareIdentifier]);
 
   const baselineRowByKey = React.useMemo(() => {
     const map = new Map<string, FirestoreToplistPlayerRow>();
@@ -2176,7 +2222,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return effectiveCurrentRows.map((row) => {
       const key = buildCompareKey(row);
       const past = baselineRowByKey.get(key);
-      const serverKey = normalizeServerCode(String((row as any).server ?? ""));
+      const serverKey = normalizeCompareServerKey(String((row as any).server ?? ""));
       const baselineExists = baselineServerSet.has(serverKey);
       const compareMissing = !baselineExists || !past;
       const delta = (field: keyof FirestoreToplistPlayerRow) => {
