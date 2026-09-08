@@ -20,7 +20,50 @@ export type FightReportScanResult = {
   notices: string[];
 };
 
+type OcrBox = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+type OcrWord = OcrBox & {
+  text: string;
+  confidence: number | null;
+  lineKey: string;
+};
+
+type OcrLine = OcrBox & {
+  text: string;
+  words: OcrWord[];
+  confidence: number | null;
+};
+
+type OcrPage = {
+  width: number;
+  height: number;
+};
+
 const collapseWhitespace = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const boxRight = (box: OcrBox) => box.left + box.width;
+
+const boxBottom = (box: OcrBox) => box.top + box.height;
+
+const boxCenterX = (box: OcrBox) => box.left + box.width / 2;
+
+const unionBoxes = <T extends OcrBox>(boxes: T[]): OcrBox => {
+  const left = Math.min(...boxes.map((box) => box.left));
+  const top = Math.min(...boxes.map((box) => box.top));
+  const right = Math.max(...boxes.map(boxRight));
+  const bottom = Math.max(...boxes.map(boxBottom));
+  return { left, top, width: right - left, height: bottom - top };
+};
+
+const parseFiniteNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const simplifyForAnchors = (value: string) =>
   collapseWhitespace(
@@ -113,6 +156,10 @@ const isKnownHeading = (value: string) => {
   );
 };
 
+const isAttackAnchor = (line: string) =>
+  hasAnchorWords(line, ["attack", "on"]) ||
+  hasAnchorWords(line, ["angriff", "auf"]);
+
 const cleanOpponentName = (value: string) => {
   const withoutTrailingSections = value
     .split(/members\s+that|mitglieder\s*,?\s*die|fight\s+\d|kampf\s+\d/i)[0]
@@ -131,9 +178,20 @@ const extractOpponentGuild = (lines: string[]) => {
   return "";
 };
 
+const stripLeadingIconArtifact = (value: string) => {
+  const tokens = collapseWhitespace(value).split(" ");
+  if (tokens.length < 2) return collapseWhitespace(value);
+
+  const firstToken = tokens[0].replace(/[^\p{L}\p{N}]+/gu, "");
+  if (!firstToken) return tokens.slice(1).join(" ");
+  if (Array.from(firstToken).length === 1) return tokens.slice(1).join(" ");
+
+  return collapseWhitespace(value);
+};
+
 const cleanMissingNameLine = (line: string) => {
   const cleaned = collapseWhitespace(
-    line
+    stripLeadingIconArtifact(line)
       .replace(/\((?:level|stufe)\s*\d+\)/gi, "")
       .replace(/\b(?:level|stufe)\s*\d+\b/gi, "")
       .replace(/^[\s\d.)\u2022*\-\u2013\u2014:;|]+/u, "")
@@ -144,9 +202,171 @@ const cleanMissingNameLine = (line: string) => {
   if (!cleaned || isKnownHeading(cleaned)) return "";
   const simple = simplifyForAnchors(cleaned);
   if (!simple || /^\d+$/.test(simple)) return "";
+  if (simple === "x") return "";
   if (["level", "stufe", "lvl", "rang", "rank"].some((word) => simple === word || simple.startsWith(`${word} `))) return "";
   if (simple.includes("signed up") || simple.includes("teilgenommen")) return "";
   return cleaned;
+};
+
+const parseTsvOcrLines = (tsv: string | null | undefined): { page: OcrPage; lines: OcrLine[] } | null => {
+  if (!tsv) return null;
+  const rows = tsv.split(/\r?\n/g).filter(Boolean);
+  const standardHeader = [
+    "level",
+    "page_num",
+    "block_num",
+    "par_num",
+    "line_num",
+    "word_num",
+    "left",
+    "top",
+    "width",
+    "height",
+    "conf",
+    "text",
+  ];
+  const firstRow = rows.shift()?.split("\t") ?? [];
+  const hasHeader = firstRow.includes("level") && firstRow.includes("text");
+  const header = hasHeader ? firstRow : standardHeader;
+  if (!hasHeader && firstRow.length) rows.unshift(firstRow.join("\t"));
+  const columnIndex = new Map(header.map((column, index) => [column, index]));
+  const read = (columns: string[], name: string) => columns[columnIndex.get(name) ?? -1] ?? "";
+  const lineGroups = new Map<string, OcrWord[]>();
+  let pageWidth = 0;
+  let pageHeight = 0;
+
+  rows.forEach((row) => {
+    const columns = row.split("\t");
+    const level = read(columns, "level");
+    const left = parseFiniteNumber(read(columns, "left"));
+    const top = parseFiniteNumber(read(columns, "top"));
+    const width = parseFiniteNumber(read(columns, "width"));
+    const height = parseFiniteNumber(read(columns, "height"));
+    if (left == null || top == null || width == null || height == null) return;
+
+    if (level === "1") {
+      pageWidth = Math.max(pageWidth, width);
+      pageHeight = Math.max(pageHeight, height);
+    }
+
+    const text = read(columns, "text").trim();
+    if (level !== "5" || !text) return;
+
+    const confidence = parseFiniteNumber(read(columns, "conf"));
+    const lineKey = [
+      read(columns, "page_num"),
+      read(columns, "block_num"),
+      read(columns, "par_num"),
+      read(columns, "line_num"),
+    ].join(":");
+    const words = lineGroups.get(lineKey) ?? [];
+    words.push({ text, left, top, width, height, confidence, lineKey });
+    lineGroups.set(lineKey, words);
+  });
+
+  const lines = [...lineGroups.values()]
+    .map((words) => {
+      const sortedWords = [...words].sort((a, b) => a.left - b.left);
+      const box = unionBoxes(sortedWords);
+      const confidences = sortedWords
+        .map((word) => word.confidence)
+        .filter((confidence): confidence is number => confidence != null && confidence >= 0);
+      return {
+        ...box,
+        text: collapseWhitespace(sortedWords.map((word) => word.text).join(" ")),
+        words: sortedWords,
+        confidence: confidences.length
+          ? confidences.reduce((sum, confidence) => sum + confidence, 0) / confidences.length
+          : null,
+      };
+    })
+    .filter((line) => line.text)
+    .sort((a, b) => a.top - b.top || a.left - b.left);
+
+  if (!pageWidth) pageWidth = Math.max(1, ...lines.map(boxRight));
+  if (!pageHeight) pageHeight = Math.max(1, ...lines.map(boxBottom));
+  if (!lines.length) return null;
+
+  return { page: { width: pageWidth, height: pageHeight }, lines };
+};
+
+const isSameReportColumn = (line: OcrLine, anchor: OcrLine, page: OcrPage) => {
+  const leftTolerance = Math.max(80, page.width * 0.08);
+  const centerTolerance = Math.max(120, page.width * 0.12);
+  const minRight = Math.min(boxRight(line), boxRight(anchor));
+  const maxLeft = Math.max(line.left, anchor.left);
+  const overlap = Math.max(0, minRight - maxLeft);
+  const overlapRatio = overlap / Math.max(1, Math.min(line.width, anchor.width));
+
+  return (
+    Math.abs(line.left - anchor.left) <= leftTolerance ||
+    Math.abs(boxCenterX(line) - boxCenterX(anchor)) <= centerTolerance ||
+    overlapRatio >= 0.35
+  );
+};
+
+const findNearestAttackHeader = (lines: OcrLine[], startLine: OcrLine, page: OcrPage) => {
+  const maxDistance = Math.max(180, page.height * 0.22);
+  return lines
+    .filter((line) => {
+      if (boxBottom(line) > startLine.top) return false;
+      if (startLine.top - boxBottom(line) > maxDistance) return false;
+      return isAttackAnchor(simplifyForAnchors(line.text)) && isSameReportColumn(line, startLine, page);
+    })
+    .sort((a, b) => boxBottom(b) - boxBottom(a))[0] ?? null;
+};
+
+const buildFightReportTextFromTsv = (tsv: string | null | undefined) => {
+  const parsed = parseTsvOcrLines(tsv);
+  if (!parsed) return null;
+
+  const { page, lines } = parsed;
+  const startLines = lines.filter((line) => isMissedStartAnchor(simplifyForAnchors(line.text)));
+  const endLines = lines.filter((line) => isSignedUpEndAnchor(simplifyForAnchors(line.text)));
+  if (!startLines.length || !endLines.length) return null;
+
+  const candidates = startLines
+    .flatMap((startLine) =>
+      endLines
+        .filter((endLine) => endLine.top > startLine.top && isSameReportColumn(endLine, startLine, page))
+        .map((endLine) => ({
+          startLine,
+          endLine,
+          score:
+            endLine.top - startLine.top +
+            Math.abs(endLine.left - startLine.left) * 2 +
+            Math.abs(boxCenterX(endLine) - boxCenterX(startLine)),
+        })),
+    )
+    .sort((a, b) => a.score - b.score);
+  const selected = candidates[0];
+  if (!selected) return null;
+
+  const { startLine, endLine } = selected;
+  const attackHeader = findNearestAttackHeader(lines, startLine, page);
+  const sameColumnRight = Math.max(boxRight(startLine), boxRight(endLine)) + Math.max(160, page.width * 0.24);
+  const nameColumnLeft = startLine.left + Math.max(28, page.width * 0.018);
+  const outputLines: string[] = [];
+
+  if (attackHeader) outputLines.push(attackHeader.text);
+  outputLines.push(startLine.text);
+
+  lines
+    .filter((line) => line.top > boxBottom(startLine) && boxBottom(line) < endLine.top)
+    .filter((line) => boxRight(line) >= nameColumnLeft && line.left <= sameColumnRight)
+    .filter((line) => isSameReportColumn(line, startLine, page))
+    .forEach((line) => {
+      const lineText = collapseWhitespace(
+        line.words
+          .filter((word) => word.left >= nameColumnLeft && word.left <= sameColumnRight)
+          .map((word) => word.text)
+          .join(" "),
+      );
+      if (lineText) outputLines.push(lineText);
+    });
+
+  outputLines.push(endLine.text);
+  return outputLines.join("\n");
 };
 
 const buildRosterIndex = (roster: FightReportRosterMember[]) => {
@@ -313,7 +533,7 @@ export const scanFightReportScreenshot = async (
   onProgress?: (progress: FightReportScanProgress) => void,
 ) => {
   const { PSM, createWorker } = await import("tesseract.js");
-  const worker = await createWorker(["deu", "eng"], 1, {
+  const worker = await createWorker(["deu", "eng", "ces", "pol", "slk", "hun"], 1, {
     logger: (message) => {
       onProgress?.({
         status: message.status,
@@ -327,8 +547,9 @@ export const scanFightReportScreenshot = async (
       preserve_interword_spaces: "1",
       tessedit_pageseg_mode: PSM.SPARSE_TEXT,
     });
-    const result = await worker.recognize(file);
-    return parseFightReportText(result.data.text, roster);
+    const result = await worker.recognize(file, {}, { text: true, tsv: true });
+    const reportText = buildFightReportTextFromTsv(result.data.tsv) ?? result.data.text;
+    return parseFightReportText(reportText, roster);
   } finally {
     await worker.terminate();
   }
