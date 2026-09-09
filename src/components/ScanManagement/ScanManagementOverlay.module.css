@@ -12,8 +12,8 @@
 }
 
 .panel {
-  width: min(980px, 100%);
-  max-height: calc(100dvh - 32px);
+  width: min(980px, calc(100vw - 32px));
+  height: min(760px, calc(100dvh - 32px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -55,6 +55,7 @@
 
 .closeButton,
 .primaryButton,
+.secondaryButton,
 .dangerButton,
 .iconButton {
   appearance: none;
@@ -85,8 +86,18 @@
 
 .body {
   min-height: 0;
-  overflow: auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 16px 18px 18px;
+}
+
+.contentScroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .hiddenInput {
@@ -101,7 +112,57 @@
   margin-bottom: 12px;
 }
 
+.globalToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(16, 34, 56, 0.58);
+}
+
+.tabButton {
+  min-height: 34px;
+  flex: 1 1 180px;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.tabButton:hover {
+  border-color: rgba(77, 163, 255, 0.24);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+}
+
+.tabButtonActive {
+  border-color: rgba(77, 163, 255, 0.46);
+  background: #1c3554;
+  color: var(--text);
+}
+
 .primaryButton,
+.secondaryButton,
 .dangerButton {
   min-height: 38px;
   border-radius: 12px;
@@ -119,9 +180,14 @@
   background: #1c3554;
 }
 
-.primaryButton:hover {
+.primaryButton:hover,
+.secondaryButton:hover {
   background: #25456b;
   transform: translateY(-1px);
+}
+
+.secondaryButton {
+  background: rgba(20, 32, 48, 0.86);
 }
 
 .dangerButton {
@@ -136,6 +202,7 @@
 }
 
 .primaryButton:disabled,
+.secondaryButton:disabled,
 .dangerButton:disabled,
 .iconButton:disabled {
   cursor: default;
@@ -175,6 +242,79 @@
   color: #f6b8ca;
 }
 
+.previewBox {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid rgba(77, 163, 255, 0.34);
+  border-radius: 14px;
+  background: rgba(16, 34, 56, 0.78);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previewHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.previewHeader p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.previewHeader > span {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.previewGrid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(20, 32, 48, 0.58);
+}
+
+.previewGrid dt {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.previewGrid dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.previewActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .scanSection {
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -202,6 +342,13 @@
   flex: 0 0 auto;
   font-size: 12px;
   color: var(--text-soft);
+}
+
+.sectionHeaderActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .emptyState {
@@ -277,12 +424,150 @@
   border-color: rgba(246, 120, 156, 0.32);
 }
 
+.selectionToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(16, 34, 56, 0.42);
+}
+
+.selectionCount {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .truncate {
   max-width: 250px;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.trackerTable {
+  min-width: 720px;
+}
+
+.trackerNameCell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.importBadge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(62, 164, 110, 0.48);
+  border-radius: 999px;
+  background: rgba(62, 164, 110, 0.14);
+  color: #a7ecc8;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.trackerList {
+  display: none;
+}
+
+.trackerListItem {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.trackerListItem:last-child {
+  border-bottom: 0;
+}
+
+.trackerListHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.trackerListTitleRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trackerListTitleRow input {
+  flex: 0 0 auto;
+}
+
+.trackerListHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trackerListHeader span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.trackerStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.trackerStats div {
+  min-width: 0;
+}
+
+.trackerStats dt {
+  margin: 0 0 3px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.trackerStats dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inlineActionButton {
+  min-height: 34px;
+  width: 100%;
+  margin-top: 12px;
+  appearance: none;
+  border: 1px solid rgba(77, 163, 255, 0.42);
+  border-radius: 10px;
+  background: #1c3554;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.12s ease, border-color 0.15s ease;
+}
+
+.inlineActionButton:hover {
+  background: #25456b;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 767px) {
@@ -292,7 +577,8 @@
   }
 
   .panel {
-    max-height: calc(100dvh - 16px);
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
     border-radius: 14px;
   }
 
@@ -301,8 +587,23 @@
     padding: 14px;
   }
 
+  .header {
+    align-items: center;
+  }
+
   .closeButton span {
     display: none;
+  }
+
+  .tabs {
+    gap: 6px;
+  }
+
+  .tabButton {
+    flex-basis: 0;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 12px;
   }
 
   .table {
@@ -314,11 +615,81 @@
   }
 }
 
+@media (max-width: 560px) {
+  .backdrop {
+    padding: 6px;
+  }
+
+  .panel {
+    width: calc(100vw - 12px);
+    height: calc(100dvh - 12px);
+    border-radius: 12px;
+  }
+
+  .title {
+    font-size: 17px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .globalToolbar,
+  .selectionToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton {
+    width: 100%;
+  }
+
+  .previewActions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .previewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sectionHeaderActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .trackerTableWrap {
+    display: none;
+  }
+
+  .trackerList {
+    display: grid;
+  }
+
+  .trackerStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .closeButton,
   .primaryButton,
+  .secondaryButton,
   .dangerButton,
-  .iconButton {
+  .iconButton,
+  .tabButton,
+  .inlineActionButton {
     transition: none;
   }
 }

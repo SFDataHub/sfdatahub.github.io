@@ -16,6 +16,7 @@ export type FightTrackerGuild = {
   lastSyncedScanId: string | null;
   lastSyncedScanAt: string | null;
   lastSyncedNormalizerVersion?: number | null;
+  importedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -68,6 +69,12 @@ export type GuildFight = {
 
 export type FightTrackerState = {
   tracker: FightTrackerGuild | null;
+  members: FightTrackerMember[];
+  fights: GuildFight[];
+};
+
+export type FightTrackerTransferState = {
+  tracker: FightTrackerGuild;
   members: FightTrackerMember[];
   fights: GuildFight[];
 };
@@ -328,6 +335,119 @@ export async function readFightTrackerSummaries(): Promise<FightTrackerSummary[]
     }),
   );
   return summaries.sort((a, b) => a.tracker.name.localeCompare(b.tracker.name, "de-DE", { sensitivity: "base" }));
+}
+
+export async function readFightTrackerTransferState(trackerId: string): Promise<FightTrackerTransferState | null> {
+  const db = await getFightTrackingDb();
+  const tracker = (await db.get("trackers", trackerId)) ?? null;
+  if (!tracker) return null;
+  const [members, fights] = await Promise.all([
+    db.getAllFromIndex("members", "by_trackerId", tracker.id),
+    db.getAllFromIndex("fights", "by_trackerId", tracker.id),
+  ]);
+  return { tracker, members, fights };
+}
+
+export async function importFightTrackerTransferState(input: FightTrackerTransferState): Promise<FightTrackerState> {
+  const [state] = await importFightTrackerTransferStates([input]);
+  return state;
+}
+
+export async function importFightTrackerTransferStates(inputs: FightTrackerTransferState[]): Promise<FightTrackerState[]> {
+  if (!inputs.length) throw new Error("Fight-Tracker-Pack enthält keine Tracker.");
+
+  const sourceTrackerIds = new Set<string>();
+  inputs.forEach((input) => {
+    if (sourceTrackerIds.has(input.tracker.id)) {
+      throw new Error("Fight-Tracker-Pack enthält doppelte Tracker-IDs.");
+    }
+    sourceTrackerIds.add(input.tracker.id);
+  });
+
+  const importedAt = new Date().toISOString();
+  const states = inputs.map((input) => prepareImportedFightTrackerState(input, importedAt));
+  const db = await getFightTrackingDb();
+  const tx = db.transaction(["trackers", "members", "fights", "state"], "readwrite");
+  await Promise.all([
+    ...states.map((state) => tx.objectStore("trackers").add(state.tracker!)),
+    ...states.flatMap((state) => state.members.map((member) => tx.objectStore("members").add(member))),
+    ...states.flatMap((state) => state.fights.map((fight) => tx.objectStore("fights").add(fight))),
+    tx.objectStore("state").put({
+      key: ACTIVE_TRACKER_STATE_KEY,
+      value: states[states.length - 1].tracker!.id,
+      updatedAt: importedAt,
+    }),
+  ]);
+  await tx.done;
+
+  return states;
+}
+
+function prepareImportedFightTrackerState(input: FightTrackerTransferState, importedAt: string): FightTrackerState {
+  validateFightTrackerTransferInput(input);
+
+  const nextTrackerId = createId("fight-tracker");
+  const memberIdMap = new Map(input.members.map((member) => [member.id, createId("fight-member")]));
+  const nextTracker: FightTrackerGuild = {
+    ...input.tracker,
+    id: nextTrackerId,
+    importedAt,
+  };
+  const nextMembers = input.members.map((member) => ({
+    ...member,
+    id: memberIdMap.get(member.id)!,
+    trackerId: nextTrackerId,
+  }));
+  const nextFights = input.fights.map((fight) => ({
+    ...fight,
+    id: createId("fight"),
+    trackerId: nextTrackerId,
+    rosterSnapshot: fight.rosterSnapshot.map((member) => ({
+      ...member,
+      id: memberIdMap.get(member.id)!,
+      guildId: nextTrackerId,
+      guildName: nextTracker.name,
+      server: nextTracker.server ?? "",
+    })),
+    missedMemberIds: fight.missedMemberIds.map((memberId) => memberIdMap.get(memberId)!),
+  }));
+
+  return { tracker: nextTracker, members: nextMembers, fights: nextFights };
+}
+
+function validateFightTrackerTransferInput(input: FightTrackerTransferState) {
+  const trackerId = input.tracker.id;
+  const memberIds = new Set<string>();
+  input.members.forEach((member) => {
+    if (member.trackerId !== trackerId) {
+      throw new Error(`Fight Tracker "${input.tracker.name}" enthält Member mit falscher Tracker-Referenz.`);
+    }
+    if (memberIds.has(member.id)) {
+      throw new Error(`Fight Tracker "${input.tracker.name}" enthält doppelte Member-IDs.`);
+    }
+    memberIds.add(member.id);
+  });
+
+  const fightIds = new Set<string>();
+  input.fights.forEach((fight) => {
+    if (fight.trackerId !== trackerId) {
+      throw new Error(`Fight Tracker "${input.tracker.name}" enthält Fights mit falscher Tracker-Referenz.`);
+    }
+    if (fightIds.has(fight.id)) {
+      throw new Error(`Fight Tracker "${input.tracker.name}" enthält doppelte Fight-IDs.`);
+    }
+    fightIds.add(fight.id);
+    fight.rosterSnapshot.forEach((member) => {
+      if (!memberIds.has(member.id)) {
+        throw new Error(`Fight Tracker "${input.tracker.name}" enthält Roster-Verweise auf unbekannte Member.`);
+      }
+    });
+    fight.missedMemberIds.forEach((memberId) => {
+      if (!memberIds.has(memberId)) {
+        throw new Error(`Fight Tracker "${input.tracker.name}" enthält Missed-Verweise auf unbekannte Member.`);
+      }
+    });
+  });
 }
 
 export async function readFightTrackerStateById(trackerId: string): Promise<FightTrackerState> {
