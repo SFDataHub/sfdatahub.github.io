@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import html2canvas from "html2canvas";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -7,6 +8,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileImage,
   ListChecks,
   MoreVertical,
@@ -78,6 +80,15 @@ type MobileFightSwipeState = {
   currentY: number;
   swiped: boolean;
 };
+type ParticipationMouseDragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  scrollLeft: number;
+  startedOnInteractiveTarget: boolean;
+  hasPointerCapture: boolean;
+  didDrag: boolean;
+};
 
 type FightTrackerReadonlyStats = {
   level: number | null;
@@ -85,7 +96,26 @@ type FightTrackerReadonlyStats = {
   totalStats: number | null;
 };
 
+type ParticipationDerivedRow = {
+  member: TrackerRow;
+  missed: number;
+  evaluated: number;
+  lastMissedFight: GuildFight | null;
+  streakStatus: Exclude<FightMemberStatus, "unknown"> | null;
+  streakCount: number;
+  level: number | null;
+  baseStatsSum: number | null;
+  totalStats: number | null;
+};
+
+type FightCreationTarget = {
+  date: string;
+  fightNumber: FightNumber;
+};
+
 type ReviewRecognitionState = "confirmed" | "uncertain" | "not_detected";
+
+type ParticipationExportType = "simple" | "detailed";
 
 type LocalScreenshotPreview = {
   id: string;
@@ -131,7 +161,10 @@ type MobileFunctionPanelId = "sync" | "member" | "memberList" | "fight" | "scree
 
 type TrackerGuildSource = GuildHubSelectedGuild;
 
-const todayInputValue = () => new Date().toISOString().slice(0, 10);
+const formatInputDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+const todayInputValue = () => formatInputDate(new Date());
 
 const createFightId = () => `fight-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -140,10 +173,147 @@ const createImportSessionId = () => `import-${Date.now().toString(36)}-${Math.ra
 const createScreenshotId = () => `shot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 const createParticipationDraftKey = (fightId: string, memberId: string) => `${fightId}::${memberId}`;
+const PARTICIPATION_MOUSE_DRAG_THRESHOLD_PX = 6;
+const PARTICIPATION_FIGHT_COLUMN_WIDTH_PX = 132;
+const PARTICIPATION_STICKY_COLUMN_WIDTH_PX = 240 + 82 + 82 + 142 + 126;
+const PARTICIPATION_STICKY_COLUMN_VARS = [
+  "--participation-member-column",
+  "--participation-missed-column",
+  "--participation-quote-column",
+  "--participation-last-missed-column",
+  "--participation-streak-column",
+] as const;
+const FIGHT_SLOTS: FightNumber[] = ["1", "2"];
+const EXPORT_ACTIVITY_DAY_WIDTH_PX = 20;
 
 const normalizeFightNumber = (value: unknown): FightNumber => (value === "2" ? "2" : "1");
 
 const normalizeString = (value: unknown) => String(value ?? "").trim();
+
+const isValidFightNumber = (value: unknown): value is FightNumber => value === "1" || value === "2";
+
+const getFightDateKey = (value: string) => {
+  const normalized = normalizeString(value);
+  const dateMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateMatch?.[1]) return dateMatch[1];
+  const germanDateMatch = normalized.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (germanDateMatch) {
+    const [, dayValue, monthValue, yearValue] = germanDateMatch;
+    return `${yearValue}-${monthValue.padStart(2, "0")}-${dayValue.padStart(2, "0")}`;
+  }
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : normalized.slice(0, 10);
+};
+
+const getFightSlotKey = (date: string, fightNumber: FightNumber) => `${getFightDateKey(date)}::${fightNumber}`;
+
+const getFightsForSlot = (fights: GuildFight[], date: string, fightNumber: FightNumber) =>
+  fights.filter((fight) => getFightDateKey(fight.date) === getFightDateKey(date) && fight.fightNumber === fightNumber);
+
+const getNextAvailableFightNumber = (fights: GuildFight[], date: string): FightNumber | null => {
+  const dateKey = getFightDateKey(date);
+  const occupiedSlots = new Set(
+    fights.filter((fight) => getFightDateKey(fight.date) === dateKey && isValidFightNumber(fight.fightNumber)).map((fight) => fight.fightNumber),
+  );
+  if (!occupiedSlots.has("1")) return "1";
+  if (!occupiedSlots.has("2")) return "2";
+  return null;
+};
+
+const addDaysToInputDate = (dateValue: string, days: number) => {
+  const dateKey = getFightDateKey(dateValue);
+  const dateMatch = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) return todayInputValue();
+  const [, yearValue, monthValue, dayValue] = dateMatch;
+  const date = new Date(Number(yearValue), Number(monthValue) - 1, Number(dayValue));
+  if (Number.isNaN(date.getTime())) return todayInputValue();
+  date.setDate(date.getDate() + days);
+  return formatInputDate(date);
+};
+
+const getFightCreationOrderIssue = (fights: GuildFight[]) => {
+  if (!fights.length) return null;
+  const createdAtValues = fights.map((fight) => timestampMs(fight.createdAt));
+  if (createdAtValues.some((value) => value == null)) {
+    return "Mindestens ein gespeicherter Fight hat keine gueltige Erstellzeit.";
+  }
+  const newest = Math.max(...createdAtValues.filter((value): value is number => value != null));
+  const newestCount = createdAtValues.filter((value) => value === newest).length;
+  if (newestCount > 1) {
+    return "Mehrere gespeicherte Fights teilen sich dieselbe neueste Erstellzeit.";
+  }
+  return null;
+};
+
+const getLatestSavedFight = (fights: GuildFight[]) => {
+  const orderIssue = getFightCreationOrderIssue(fights);
+  if (orderIssue) return null;
+  return fights.reduce<GuildFight | null>((latest, fight) => {
+    if (!latest) return fight;
+    return (timestampMs(fight.createdAt) ?? 0) > (timestampMs(latest.createdAt) ?? 0) ? fight : latest;
+  }, null);
+};
+
+const getNextFightCreationTarget = (fights: GuildFight[], latestFightOverride?: GuildFight): FightCreationTarget => {
+  const latestFight = latestFightOverride ?? getLatestSavedFight(fights);
+  if (!latestFight) return { date: todayInputValue(), fightNumber: "1" };
+  const date = getFightDateKey(latestFight.date);
+
+  const availableSlot = getNextAvailableFightNumber(fights, date);
+  if (availableSlot) return { date, fightNumber: availableSlot };
+
+  return { date: addDaysToInputDate(date, 1), fightNumber: "1" };
+};
+
+const getDuplicateFightSlots = (fights: GuildFight[]) => {
+  const slots = new Map<string, GuildFight[]>();
+  fights.forEach((fight) => {
+    if (!isValidFightNumber(fight.fightNumber)) return;
+    const key = getFightSlotKey(fight.date, fight.fightNumber);
+    slots.set(key, [...(slots.get(key) ?? []), fight]);
+  });
+  return [...slots.values()].filter((slotFights) => slotFights.length > 1);
+};
+
+const getMonthInputValue = () => todayInputValue().slice(0, 7);
+
+const getMonthDays = (monthValue: string) => {
+  const [yearValue, monthPart] = monthValue.split("-");
+  const year = Number(yearValue);
+  const monthIndex = Number(monthPart) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) return 0;
+  return new Date(year, monthIndex + 1, 0).getDate();
+};
+
+const getDateForMonthDay = (monthValue: string, day: number) => `${monthValue}-${String(day).padStart(2, "0")}`;
+
+const formatMonthLabel = (monthValue: string) => {
+  const [yearValue, monthPart] = monthValue.split("-");
+  const year = Number(yearValue);
+  const monthIndex = Number(monthPart) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex)) return monthValue;
+  return new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(new Date(year, monthIndex, 1));
+};
+
+const sortFightsByDateAndSlot = (fights: GuildFight[]) =>
+  [...fights].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.fightNumber.localeCompare(b.fightNumber) || a.createdAt.localeCompare(b.createdAt);
+  });
+
+const getFightsForMonth = (fights: GuildFight[], monthValue: string) =>
+  sortFightsByDateAndSlot(fights.filter((fight) => fight.date.startsWith(`${monthValue}-`)));
+
+const getParticipationStickyWidth = (wrapper: HTMLDivElement) => {
+  const table = wrapper.querySelector("table");
+  if (!table) return 0;
+  const tableStyle = window.getComputedStyle(table);
+  return PARTICIPATION_STICKY_COLUMN_VARS.reduce((sum, propertyName) => {
+    const value = Number.parseFloat(tableStyle.getPropertyValue(propertyName));
+    return Number.isFinite(value) ? sum + value : sum;
+  }, 0);
+};
 
 const normalizeNameKey = (value: unknown) =>
   normalizeString(value)
@@ -171,6 +341,13 @@ const formatDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
+};
+
+const formatShortDate = (value: string) => {
+  if (!value) return "-";
+  const date = new Date(`${getFightDateKey(value)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(date);
 };
 
 const formatFightLabel = (fight: GuildFight) =>
@@ -371,6 +548,189 @@ const setFightMemberStatus = (
   };
 };
 
+const deriveParticipationRows = (
+  rows: TrackerRow[],
+  fights: GuildFight[],
+  getParticipationStatus: (fight: GuildFight, memberId: string) => FightMemberStatus,
+  readonlyStatsByMemberId: Map<string, FightTrackerReadonlyStats>,
+): ParticipationDerivedRow[] =>
+  rows.map((member) => {
+    const statuses = fights.map((fight) => getParticipationStatus(fight, member.id));
+    const missed = statuses.filter((status) => status === "missed").length;
+    const evaluated = statuses.filter((status) => status !== "unknown").length;
+    let lastMissedFight: GuildFight | null = null;
+    let streakStatus: Exclude<FightMemberStatus, "unknown"> | null = null;
+    let streakCount = 0;
+    for (let index = statuses.length - 1; index >= 0; index -= 1) {
+      const status = statuses[index];
+      if (!lastMissedFight && status === "missed") lastMissedFight = fights[index] ?? null;
+      if (status === "unknown") continue;
+      if (!streakStatus) streakStatus = status;
+      if (status !== streakStatus) break;
+      streakCount += 1;
+    }
+    const readonlyStats = readonlyStatsByMemberId.get(member.id);
+    return {
+      member,
+      missed,
+      evaluated,
+      lastMissedFight,
+      streakStatus,
+      streakCount,
+      level: getFiniteNumber(member.level) ?? readonlyStats?.level ?? null,
+      baseStatsSum: getFiniteNumber(member.baseStats) ?? readonlyStats?.baseStatsSum ?? null,
+      totalStats: getFiniteNumber(member.totalStats) ?? readonlyStats?.totalStats ?? null,
+    };
+  });
+
+const sortParticipationRows = (
+  rows: ParticipationDerivedRow[],
+  sortKey: ParticipationSortKey,
+  sortDirection: ParticipationSortDirection,
+) => {
+  const byName = (a: ParticipationDerivedRow, b: ParticipationDerivedRow) =>
+    a.member.name.localeCompare(b.member.name, "de-DE", { sensitivity: "base" });
+  const byGuildRole = (a: ParticipationDerivedRow, b: ParticipationDerivedRow) => {
+    const roleOrder = { leader: 0, officer: 1, member: 2 } as const;
+    const aRole = a.member.guildRole ? roleOrder[a.member.guildRole] : 3;
+    const bRole = b.member.guildRole ? roleOrder[b.member.guildRole] : 3;
+    if (aRole !== bRole) {
+      if (aRole === 3 || bRole === 3) return aRole - bRole;
+      return sortDirection === "asc" ? bRole - aRole : aRole - bRole;
+    }
+
+    const aLevel = a.level;
+    const bLevel = b.level;
+    const aLevelMissing = aLevel == null;
+    const bLevelMissing = bLevel == null;
+    if (aLevelMissing || bLevelMissing) {
+      if (aLevelMissing && bLevelMissing) return byName(a, b);
+      return aLevelMissing ? 1 : -1;
+    }
+
+    const levelCompare = sortDirection === "asc" ? aLevel - bLevel : bLevel - aLevel;
+    return levelCompare || byName(a, b);
+  };
+  const numericValue = (row: ParticipationDerivedRow) => {
+    switch (sortKey) {
+      case "baseStats":
+        return row.baseStatsSum;
+      case "totalStats":
+        return row.totalStats;
+      case "level":
+        return row.level;
+      case "missed":
+        return row.missed;
+      default:
+        return null;
+    }
+  };
+
+  return [...rows].sort((a, b) => {
+    if (sortKey === "guildRole") return byGuildRole(a, b);
+
+    if (sortKey === "name") {
+      const nameCompare = byName(a, b);
+      return sortDirection === "asc" ? nameCompare : -nameCompare;
+    }
+
+    const aValue = numericValue(a);
+    const bValue = numericValue(b);
+    const aMissing = aValue == null;
+    const bMissing = bValue == null;
+    if (aMissing || bMissing) {
+      if (aMissing && bMissing) return byName(a, b);
+      return aMissing ? 1 : -1;
+    }
+
+    const diff = sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    return diff || byName(a, b);
+  });
+};
+
+const formatStreak = (status: Exclude<FightMemberStatus, "unknown"> | null, count: number) =>
+  status ? `${count}x ${status === "ok" ? "dabei" : "fehlt"}` : "-";
+
+const sanitizeFileBaseName = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "") || "fight-participation";
+
+const waitForAnimationFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+const waitForStableLayout = async (node: HTMLElement) => {
+  let previous = "";
+  for (let index = 0; index < 6; index += 1) {
+    await waitForAnimationFrame();
+    const rect = node.getBoundingClientRect();
+    const current = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    if (current === previous) return;
+    previous = current;
+  }
+};
+
+const exportNodeToPng = async (node: HTMLElement, fileBaseName: string) => {
+  await waitForAnimationFrame();
+  await waitForAnimationFrame();
+  if (document.fonts?.ready) await document.fonts.ready;
+  await waitForStableLayout(node);
+
+  const rect = node.getBoundingClientRect();
+  const targetWidth = Math.max(1, Math.ceil(rect.width));
+  const targetHeight = Math.max(1, Math.ceil(rect.height));
+  const scale = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  if (targetWidth * scale > 32000 || targetHeight * scale > 32000 || targetWidth * targetHeight * scale * scale > 268000000) {
+    throw new Error("Der Report ist fuer einen einzelnen PNG-Export zu gross. Inhalte wurden nicht gekuerzt.");
+  }
+  const viewportWidth = Math.max(1, Math.ceil(document.documentElement.clientWidth || window.innerWidth));
+  const viewportHeight = Math.max(1, Math.ceil(document.documentElement.clientHeight || window.innerHeight));
+  const canvas = await html2canvas(node, {
+    backgroundColor: null,
+    scale,
+    foreignObjectRendering: false,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    width: targetWidth,
+    height: targetHeight,
+    windowWidth: Math.max(viewportWidth, targetWidth),
+    windowHeight: Math.max(viewportHeight, targetHeight),
+    onclone: (clonedDoc) => {
+      const clonedExportNode = clonedDoc.querySelector<HTMLElement>("[data-fight-participation-export-root='true']");
+      if (!clonedExportNode) return;
+      clonedExportNode.style.width = `${targetWidth}px`;
+      clonedExportNode.style.minWidth = `${targetWidth}px`;
+      clonedExportNode.style.maxWidth = `${targetWidth}px`;
+      clonedExportNode.style.minHeight = "0";
+      clonedExportNode.style.height = "auto";
+      clonedExportNode.style.overflow = "visible";
+    },
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("PNG konnte nicht erzeugt werden."));
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `${sanitizeFileBaseName(fileBaseName)}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        resolve();
+      },
+      "image/png",
+      1,
+    );
+  });
+};
+
 function useMediaQuery(query: string) {
   const getSnapshot = React.useCallback(() => {
     if (typeof window === "undefined" || !("matchMedia" in window)) return false;
@@ -560,14 +920,13 @@ export default function GuildHubFightTracking() {
   }, [rowMembers]);
 
   const sortedFights = React.useMemo(
-    () =>
-      [...fights].sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
-        return a.fightNumber.localeCompare(b.fightNumber) || a.createdAt.localeCompare(b.createdAt);
-      }),
+    () => sortFightsByDateAndSlot(fights),
     [fights],
   );
+  const fightCreationOrderIssue = React.useMemo(() => getFightCreationOrderIssue(fights), [fights]);
+  const manualDefaultFightNumber = React.useMemo(() => getNextAvailableFightNumber(fights, date), [date, fights]);
+  const manualSelectedSlotFights = React.useMemo(() => getFightsForSlot(fights, date, fightNumber), [date, fightNumber, fights]);
+  const hasInvalidFightSlots = React.useMemo(() => fights.some((fight) => !isValidFightNumber(fight.fightNumber)), [fights]);
 
   const scanImportPlan = React.useMemo(
     () => (tracker ? buildFightTrackerSyncPlan(tracker, trackerMembers, trackerScanSnapshot) : null),
@@ -611,6 +970,13 @@ export default function GuildHubFightTracking() {
         : null,
     [activeGuild, trackerSummaries],
   );
+  const applyFightCreationTarget = (targetFights: GuildFight[]) => {
+    const orderIssue = getFightCreationOrderIssue(targetFights);
+    if (orderIssue) return;
+    const target = getNextFightCreationTarget(targetFights);
+    setDate(target.date);
+    setFightNumber(target.fightNumber);
+  };
 
   const openTracker = async (trackerId: string) => {
     setStoreLoading(true);
@@ -619,6 +985,7 @@ export default function GuildHubFightTracking() {
       setTracker(state.tracker);
       setTrackerMembers(state.members);
       setFights(state.fights);
+      applyFightCreationTarget(state.fights);
       setSyncPlan(null);
       setScanImportStatus(null);
       setStoreError(null);
@@ -658,6 +1025,7 @@ export default function GuildHubFightTracking() {
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
+    applyFightCreationTarget(state.fights);
     setSyncPlan(null);
     setScanImportStatus(null);
     setIsAddPanelOpen(false);
@@ -681,6 +1049,7 @@ export default function GuildHubFightTracking() {
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
+    applyFightCreationTarget(state.fights);
     setSetupGuildName("");
     setSetupGuildServer("");
     setScanImportStatus(null);
@@ -811,6 +1180,7 @@ export default function GuildHubFightTracking() {
     const result = await deleteFightTrackerFight(tracker.id, fightId);
     if (!result.deleted) return;
     setFights(result.fights);
+    applyFightCreationTarget(result.fights);
     setTrackerSummaries((prev) =>
       prev.map((entry) =>
         entry.tracker.id === tracker.id
@@ -830,6 +1200,65 @@ export default function GuildHubFightTracking() {
     const updatedFight: GuildFight = { ...fight, opponentGuild: normalizeString(opponentGuild) };
     await putFightTrackerFight(updatedFight);
     setFights((prev) => prev.map((entry) => (entry.id === fightId ? updatedFight : entry)));
+  };
+
+  const saveFightInDailySlot = async (fightInput: Omit<GuildFight, "id">) => {
+    if (fightCreationOrderIssue) {
+      window.alert(`${fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.`);
+      return false;
+    }
+    if (hasInvalidFightSlots) {
+      window.alert("Mindestens ein gespeicherter Fight hat keinen gueltigen Fight-1/Fight-2-Slot. Bitte Daten pruefen, bevor neue Fights angelegt werden.");
+      return false;
+    }
+
+    const slotFights = getFightsForSlot(fights, fightInput.date, fightInput.fightNumber);
+    if (slotFights.length > 1) {
+      window.alert(
+        `Mehrere gespeicherte Fights belegen Fight ${fightInput.fightNumber} am ${formatDate(fightInput.date)}. Der Slot kann nicht automatisch ersetzt werden.`,
+      );
+      return false;
+    }
+
+    const existingFight = slotFights[0] ?? null;
+    if (existingFight) {
+      const shouldOverwrite = window.confirm(
+        `Fight ${fightInput.fightNumber} fuer den ${formatDate(fightInput.date)} existiert bereits. Wirklich ueberschreiben?`,
+      );
+      if (!shouldOverwrite) return false;
+    }
+
+    const nextFight: GuildFight = {
+      ...fightInput,
+      id: existingFight?.id ?? createFightId(),
+    };
+    const nextFights = existingFight ? fights.map((fight) => (fight.id === existingFight.id ? nextFight : fight)) : [...fights, nextFight];
+    await putFightTrackerFight(nextFight);
+    setFights(nextFights);
+    setTrackerSummaries((summaries) =>
+      summaries.map((summary) =>
+        summary.tracker.id === fightInput.trackerId
+          ? {
+              ...summary,
+              fightCount: nextFights.length,
+              missedCount: nextFights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0),
+            }
+          : summary,
+      ),
+    );
+    const nextTarget = getNextFightCreationTarget(nextFights, nextFight);
+    setDate(nextTarget.date);
+    setFightNumber(nextTarget.fightNumber);
+    if (existingFight) {
+      setParticipationStatusDrafts((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (next[key]?.fightId === existingFight.id) delete next[key];
+        });
+        return next;
+      });
+    }
+    return true;
   };
 
   const applyMemberMergePlan = async (plan: FightTrackerSyncPlan) => {
@@ -955,8 +1384,7 @@ export default function GuildHubFightTracking() {
     const opponent = opponentGuild.trim();
     if (!tracker || !date) return;
     const createdAt = new Date().toISOString();
-    const nextFight: GuildFight = {
-      id: createFightId(),
+    const didSave = await saveFightInDailySlot({
       trackerId: tracker.id,
       guildId: tracker.id,
       type: "attack",
@@ -967,10 +1395,8 @@ export default function GuildHubFightTracking() {
       createdAt,
       rosterSnapshot: activeRoster.map((member) => toFightMemberSnapshot(member, tracker, createdAt)),
       missedMemberIds: [],
-    };
-    await putFightTrackerFight(nextFight);
-    setFights((prev) => [...prev, nextFight]);
-    setOpponentGuild("");
+    });
+    if (didSave) setOpponentGuild("");
   };
 
   const handleScreenshotsSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -992,7 +1418,7 @@ export default function GuildHubFightTracking() {
       return {
         id: createImportSessionId(),
         screenshots,
-        review: createEmptyReviewState(date, fightNumber),
+        review: createEmptyReviewState(date, manualDefaultFightNumber ?? fightNumber),
       };
     });
     setScanState({ status: "idle", progress: 0, message: "" });
@@ -1018,7 +1444,14 @@ export default function GuildHubFightTracking() {
   };
 
   const handleReviewChange = (partial: Partial<ImportReviewState>) => {
-    setImportSession((prev) => (prev ? { ...prev, review: { ...prev.review, ...partial } } : prev));
+    setImportSession((prev) => {
+      if (!prev) return prev;
+      const nextReview = { ...prev.review, ...partial };
+      if (partial.date && partial.fightNumber == null) {
+        nextReview.fightNumber = getNextAvailableFightNumber(fights, partial.date) ?? nextReview.fightNumber;
+      }
+      return { ...prev, review: nextReview };
+    });
   };
 
   const handleReviewMemberStateChange = (memberId: string, state: ReviewRecognitionState) => {
@@ -1116,8 +1549,7 @@ export default function GuildHubFightTracking() {
         snapshotMembers.set(memberId, toFightMemberSnapshot(member, tracker, createdAt));
       }
     });
-    const nextFight: GuildFight = {
-      id: createFightId(),
+    const didSave = await saveFightInDailySlot({
       trackerId: tracker.id,
       guildId: tracker.id,
       type: "attack",
@@ -1128,10 +1560,8 @@ export default function GuildHubFightTracking() {
       createdAt,
       rosterSnapshot: [...snapshotMembers.values()],
       missedMemberIds,
-    };
-    await putFightTrackerFight(nextFight);
-    setFights((prev) => [...prev, nextFight]);
-    handleClearImportSession();
+    });
+    if (didSave) handleClearImportSession();
   };
 
   const handleParticipationStatusDraftChange = (fightId: string, memberId: string, status: FightMemberStatus) => {
@@ -1199,10 +1629,10 @@ export default function GuildHubFightTracking() {
   };
 
   const totalMissed = fights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0);
-  const canCreateFight = Boolean(tracker && date);
+  const canCreateFight = Boolean(tracker && date && !hasInvalidFightSlots && !fightCreationOrderIssue);
   const hasParticipationStatusDrafts = Object.keys(participationStatusDrafts).length > 0;
   const canApplyImportReview = Boolean(
-    importSession && tracker && importSession.review.date && importSession.review.reportType !== "unsupported_defense",
+    importSession && tracker && importSession.review.date && importSession.review.reportType !== "unsupported_defense" && !fightCreationOrderIssue,
   );
   const syncPanel = hasGuildScanLink ? (
     <ScanMemberImportPanel
@@ -1268,6 +1698,28 @@ export default function GuildHubFightTracking() {
             <option value="2">Fight 2</option>
           </select>
         </label>
+        {fightCreationOrderIssue ? (
+          <div className={styles.slotWarning}>
+            <AlertTriangle size={16} aria-hidden />
+            <span>{fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.</span>
+          </div>
+        ) : manualSelectedSlotFights.length ? (
+          <div className={styles.slotWarning}>
+            <AlertTriangle size={16} aria-hidden />
+            <span>
+              Fight {fightNumber} fuer den {formatDate(date)} existiert bereits
+              {manualSelectedSlotFights[0]?.opponentGuild ? ` (${manualSelectedSlotFights[0].opponentGuild})` : ""}.
+              Speichern ersetzt diesen Fight nach Bestaetigung.
+            </span>
+          </div>
+        ) : manualDefaultFightNumber ? (
+          <div className={styles.slotHint}>Freier Slot: Fight {manualDefaultFightNumber}</div>
+        ) : (
+          <div className={styles.slotWarning}>
+            <AlertTriangle size={16} aria-hidden />
+            <span>Beide Fight-Slots an diesem Tag sind belegt. Waehle Fight 1 oder Fight 2 zum Ueberschreiben.</span>
+          </div>
+        )}
         <label className={styles.field}>
           <span>Gegner</span>
           <input
@@ -1288,6 +1740,8 @@ export default function GuildHubFightTracking() {
     <ScreenshotImportPanel
       session={importSession}
       rows={rowMembers}
+      fights={fights}
+      fightCreationOrderIssue={fightCreationOrderIssue}
       onSelectScreenshots={handleScreenshotsSelected}
       onRemoveScreenshot={handleRemoveScreenshot}
       onClearSession={handleClearImportSession}
@@ -1300,10 +1754,12 @@ export default function GuildHubFightTracking() {
       scanState={scanState}
     />
   );
-  const tracklistPanel = (
+  const tracklistPanel = tracker ? (
     <FightTable
+      tracker={tracker}
       fights={sortedFights}
       rows={rowMembers}
+      isCompactLayout={isCompactLayout}
       readonlyStatsByMemberId={readonlyStatsByMemberId}
       statusDrafts={participationStatusDrafts}
       hasStatusDrafts={hasParticipationStatusDrafts}
@@ -1311,7 +1767,7 @@ export default function GuildHubFightTracking() {
       onStatusDraftChange={handleParticipationStatusDraftChange}
       onApplyStatusDrafts={applyParticipationStatusDrafts}
     />
-  );
+  ) : null;
   const desktopToolPanels: Array<{
     id: MobileFunctionPanelId;
     title: string;
@@ -1605,7 +2061,10 @@ function TrackerSelectionPanel({
                 <span className={styles.trackerCardKicker}>
                   {summary.tracker.source === "guild_scan" ? "Guild-Hub-Scan" : "Manuell"}
                 </span>
-                <strong>{summary.tracker.name}</strong>
+                <span className={styles.trackerCardTitleRow}>
+                  <strong>{summary.tracker.name}</strong>
+                  {summary.tracker.importedAt ? <span className={styles.importedTrackerBadge}>Importiert</span> : null}
+                </span>
                 <small>{summary.tracker.server || "ohne Server"}</small>
                 <span className={styles.trackerCardStats}>
                   {summary.memberCount} Member · {summary.fightCount} Fights · {summary.missedCount} Missed
@@ -2534,6 +2993,8 @@ function MemberStatusPanel({
 function ScreenshotImportPanel({
   session,
   rows,
+  fights,
+  fightCreationOrderIssue,
   onSelectScreenshots,
   onRemoveScreenshot,
   onClearSession,
@@ -2547,6 +3008,8 @@ function ScreenshotImportPanel({
 }: {
   session: LocalScreenshotImportSession | null;
   rows: TrackerRow[];
+  fights: GuildFight[];
+  fightCreationOrderIssue: string | null;
   onSelectScreenshots: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveScreenshot: (screenshotId: string) => void;
   onClearSession: () => void;
@@ -2572,6 +3035,8 @@ function ScreenshotImportPanel({
       })
     : [];
   const canScan = Boolean(session?.screenshots.length && scanState.status !== "scanning");
+  const reviewSlotFights = session ? getFightsForSlot(fights, session.review.date, session.review.fightNumber) : [];
+  const reviewDefaultFightNumber = session ? getNextAvailableFightNumber(fights, session.review.date) : null;
   const reportTypeLabel =
     session?.review.reportType === "unsupported_defense"
       ? "Defense nicht unterstuetzt"
@@ -2720,6 +3185,28 @@ function ScreenshotImportPanel({
                   <option value="2">Fight 2</option>
                 </select>
               </label>
+              {fightCreationOrderIssue ? (
+                <div className={styles.slotWarning}>
+                  <AlertTriangle size={16} aria-hidden />
+                  <span>{fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.</span>
+                </div>
+              ) : reviewSlotFights.length ? (
+                <div className={styles.slotWarning}>
+                  <AlertTriangle size={16} aria-hidden />
+                  <span>
+                    Fight {session.review.fightNumber} fuer den {formatDate(session.review.date)} existiert bereits
+                    {reviewSlotFights[0]?.opponentGuild ? ` (${reviewSlotFights[0].opponentGuild})` : ""}. Speichern ersetzt diesen Fight
+                    nach Bestaetigung.
+                  </span>
+                </div>
+              ) : reviewDefaultFightNumber ? (
+                <div className={styles.slotHint}>Freier Slot: Fight {reviewDefaultFightNumber}</div>
+              ) : (
+                <div className={styles.slotWarning}>
+                  <AlertTriangle size={16} aria-hidden />
+                  <span>Beide Fight-Slots an diesem Tag sind belegt. Waehle Fight 1 oder Fight 2 zum Ueberschreiben.</span>
+                </div>
+              )}
               <div className={styles.reviewReadOnly}>
                 <span>Kampftyp</span>
                 <strong>{reportTypeLabel}</strong>
@@ -2806,8 +3293,10 @@ function formatFileSize(size: number) {
 }
 
 function FightTable({
+  tracker,
   rows,
   fights,
+  isCompactLayout,
   readonlyStatsByMemberId,
   statusDrafts,
   hasStatusDrafts,
@@ -2815,8 +3304,10 @@ function FightTable({
   onStatusDraftChange,
   onApplyStatusDrafts,
 }: {
+  tracker: FightTrackerGuild;
   rows: TrackerRow[];
   fights: GuildFight[];
+  isCompactLayout: boolean;
   readonlyStatsByMemberId: Map<string, FightTrackerReadonlyStats>;
   statusDrafts: ParticipationStatusDrafts;
   hasStatusDrafts: boolean;
@@ -2832,6 +3323,16 @@ function FightTable({
   const [memberFightWindowOffsets, setMemberFightWindowOffsets] = React.useState<Record<string, number>>({});
   const [sharedFightWindowDirection, setSharedFightWindowDirection] = React.useState<MobileFightWindowDirection | null>(null);
   const [memberFightWindowDirections, setMemberFightWindowDirections] = React.useState<Record<string, MobileFightWindowDirection | null>>({});
+  const [isExportOverlayOpen, setIsExportOverlayOpen] = React.useState(false);
+  const [exportType, setExportType] = React.useState<ParticipationExportType>("simple");
+  const [exportMonth, setExportMonth] = React.useState(getMonthInputValue);
+  const [showFormerMembersInExport, setShowFormerMembersInExport] = React.useState(false);
+  const [isExportingParticipation, setIsExportingParticipation] = React.useState(false);
+  const [exportError, setExportError] = React.useState<string | null>(null);
+  const exportRef = React.useRef<HTMLDivElement | null>(null);
+  const participationMouseDragStateRef = React.useRef<ParticipationMouseDragState | null>(null);
+  const suppressNextParticipationClickRef = React.useRef(false);
+  const suppressParticipationClickTimerRef = React.useRef<number | null>(null);
   const mobileSwipeStateRef = React.useRef<MobileFightSwipeState | null>(null);
   const suppressedMobileClickMembersRef = React.useRef<Set<string>>(new Set());
   const subtitle = fights.length ? `${fights.length} gespeicherte Fights` : "Noch keine Fights angelegt";
@@ -2902,6 +3403,98 @@ function FightTable({
     setMemberFightWindowOffsets(Object.fromEntries(rows.map((member) => [member.id, nextOffset])));
     setMemberFightWindowDirections({});
   };
+  const clearSuppressedParticipationClick = () => {
+    suppressNextParticipationClickRef.current = false;
+    if (suppressParticipationClickTimerRef.current != null) {
+      window.clearTimeout(suppressParticipationClickTimerRef.current);
+      suppressParticipationClickTimerRef.current = null;
+    }
+  };
+  const suppressNextParticipationClick = () => {
+    clearSuppressedParticipationClick();
+    suppressNextParticipationClickRef.current = true;
+    suppressParticipationClickTimerRef.current = window.setTimeout(clearSuppressedParticipationClick, 350);
+  };
+  const isParticipationInteractiveTarget = (target: Element) =>
+    Boolean(target.closest("button, a, input, select, textarea, [role='button'], [contenteditable='true']"));
+  const captureParticipationPointer = (wrapper: HTMLDivElement, state: ParticipationMouseDragState) => {
+    if (state.hasPointerCapture) return;
+    wrapper.setPointerCapture(state.pointerId);
+    wrapper.classList.add(styles.tableWrapperDragging);
+    state.hasPointerCapture = true;
+  };
+  const finishParticipationMouseDrag = (wrapper: HTMLDivElement, suppressClick: boolean) => {
+    const state = participationMouseDragStateRef.current;
+    if (!state) return;
+    if (state.hasPointerCapture && wrapper.hasPointerCapture(state.pointerId)) {
+      wrapper.releasePointerCapture(state.pointerId);
+    }
+    wrapper.classList.remove(styles.tableWrapperDragging);
+    participationMouseDragStateRef.current = null;
+    if (state.didDrag) {
+      if (suppressClick) suppressNextParticipationClick();
+    }
+  };
+  const handleParticipationPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.pointerType !== "mouse") return;
+    if (event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return;
+
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const tableCell = target.closest("td, th");
+    if (!tableCell || !event.currentTarget.contains(tableCell) || tableCell.classList.contains(styles.stickyColumn)) return;
+
+    const wrapperRect = event.currentTarget.getBoundingClientRect();
+    if (event.clientX - wrapperRect.left <= getParticipationStickyWidth(event.currentTarget)) return;
+
+    clearSuppressedParticipationClick();
+    const dragState: ParticipationMouseDragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: event.currentTarget.scrollLeft,
+      startedOnInteractiveTarget: isParticipationInteractiveTarget(target),
+      hasPointerCapture: false,
+      didDrag: false,
+    };
+    participationMouseDragStateRef.current = dragState;
+    if (!dragState.startedOnInteractiveTarget) {
+      captureParticipationPointer(event.currentTarget, dragState);
+    }
+  };
+  const handleParticipationPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = participationMouseDragStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
+    if (Math.abs(deltaX) <= Math.abs(deltaY) || deltaX === 0) return;
+
+    const didPassClickThreshold = Math.abs(deltaX) >= PARTICIPATION_MOUSE_DRAG_THRESHOLD_PX;
+    if (didPassClickThreshold) state.didDrag = true;
+    if (!state.startedOnInteractiveTarget || state.didDrag) {
+      captureParticipationPointer(event.currentTarget, state);
+      event.preventDefault();
+    }
+    event.currentTarget.scrollLeft = state.scrollLeft - deltaX;
+  };
+  const handleParticipationPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    finishParticipationMouseDrag(event.currentTarget, true);
+  };
+  const handleParticipationPointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
+    finishParticipationMouseDrag(event.currentTarget, true);
+  };
+  const handleParticipationPointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = participationMouseDragStateRef.current;
+    if (state && event.currentTarget.hasPointerCapture(state.pointerId)) return;
+    finishParticipationMouseDrag(event.currentTarget, true);
+  };
+  const handleParticipationClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!suppressNextParticipationClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearSuppressedParticipationClick();
+  };
   const handleMobileFightTouchStart = (event: React.TouchEvent, memberId: string) => {
     if (event.touches.length !== 1) return;
     const touch = event.touches[0];
@@ -2950,6 +3543,15 @@ function FightTable({
     cycleParticipationStatus(fight, memberId);
   };
 
+  React.useEffect(
+    () => () => {
+      if (suppressParticipationClickTimerRef.current != null) {
+        window.clearTimeout(suppressParticipationClickTimerRef.current);
+      }
+    },
+    [],
+  );
+
   React.useEffect(() => {
     setSharedFightWindowOffset((current) => clampFightWindowOffset(current));
     setMemberFightWindowOffsets((current) => {
@@ -2983,35 +3585,7 @@ function FightTable({
   }, [clampFightWindowOffset, rows]);
 
   const participationRows = React.useMemo(
-    () =>
-      rows.map((member) => {
-        const statuses = fights.map((fight) => getParticipationStatus(fight, member.id));
-        const missed = statuses.filter((status) => status === "missed").length;
-        const evaluated = statuses.filter((status) => status !== "unknown").length;
-        let lastMissedFight: GuildFight | null = null;
-        let streakStatus: Exclude<FightMemberStatus, "unknown"> | null = null;
-        let streakCount = 0;
-        for (let index = statuses.length - 1; index >= 0; index -= 1) {
-          const status = statuses[index];
-          if (!lastMissedFight && status === "missed") lastMissedFight = fights[index] ?? null;
-          if (status === "unknown") continue;
-          if (!streakStatus) streakStatus = status;
-          if (status !== streakStatus) break;
-          streakCount += 1;
-        }
-        const readonlyStats = readonlyStatsByMemberId.get(member.id);
-        return {
-          member,
-          missed,
-          evaluated,
-          lastMissedFight,
-          streakStatus,
-          streakCount,
-          level: getFiniteNumber(member.level) ?? readonlyStats?.level ?? null,
-          baseStatsSum: getFiniteNumber(member.baseStats) ?? readonlyStats?.baseStatsSum ?? null,
-          totalStats: getFiniteNumber(member.totalStats) ?? readonlyStats?.totalStats ?? null,
-        };
-      }),
+    () => deriveParticipationRows(rows, fights, getParticipationStatus, readonlyStatsByMemberId),
     [fights, getParticipationStatus, readonlyStatsByMemberId, rows],
   );
 
@@ -3022,66 +3596,36 @@ function FightTable({
   const tableEmptyMessage =
     !showInactiveMembers && participationRows.length ? "Keine aktiven Member sichtbar." : emptyMessage;
 
-  const sortedRows = React.useMemo(() => {
-    const byName = (a: { member: TrackerRow }, b: { member: TrackerRow }) =>
-      a.member.name.localeCompare(b.member.name, "de-DE", { sensitivity: "base" });
-    const byGuildRole = (a: (typeof participationRows)[number], b: (typeof participationRows)[number]) => {
-      const roleOrder = { leader: 0, officer: 1, member: 2 } as const;
-      const aRole = a.member.guildRole ? roleOrder[a.member.guildRole] : 3;
-      const bRole = b.member.guildRole ? roleOrder[b.member.guildRole] : 3;
-      if (aRole !== bRole) {
-        if (aRole === 3 || bRole === 3) return aRole - bRole;
-        return sortDirection === "asc" ? bRole - aRole : aRole - bRole;
-      }
-
-      const aLevel = a.level;
-      const bLevel = b.level;
-      const aLevelMissing = aLevel == null;
-      const bLevelMissing = bLevel == null;
-      if (aLevelMissing || bLevelMissing) {
-        if (aLevelMissing && bLevelMissing) return byName(a, b);
-        return aLevelMissing ? 1 : -1;
-      }
-
-      const levelCompare = sortDirection === "asc" ? aLevel - bLevel : bLevel - aLevel;
-      return levelCompare || byName(a, b);
-    };
-    const numericValue = (row: (typeof participationRows)[number]) => {
-      switch (sortKey) {
-        case "baseStats":
-          return row.baseStatsSum;
-        case "totalStats":
-          return row.totalStats;
-        case "level":
-          return row.level;
-        case "missed":
-          return row.missed;
-        default:
-          return null;
-      }
-    };
-
-    return [...visibleParticipationRows].sort((a, b) => {
-      if (sortKey === "guildRole") return byGuildRole(a, b);
-
-      if (sortKey === "name") {
-        const nameCompare = byName(a, b);
-        return sortDirection === "asc" ? nameCompare : -nameCompare;
-      }
-
-      const aValue = numericValue(a);
-      const bValue = numericValue(b);
-      const aMissing = aValue == null;
-      const bMissing = bValue == null;
-      if (aMissing || bMissing) {
-        if (aMissing && bMissing) return byName(a, b);
-        return aMissing ? 1 : -1;
-      }
-
-      const diff = sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      return diff || byName(a, b);
-    });
-  }, [sortDirection, sortKey, visibleParticipationRows]);
+  const sortedRows = React.useMemo(
+    () => sortParticipationRows(visibleParticipationRows, sortKey, sortDirection),
+    [sortDirection, sortKey, visibleParticipationRows],
+  );
+  const exportMonthFights = React.useMemo(() => getFightsForMonth(fights, exportMonth), [exportMonth, fights]);
+  const exportDuplicateSlots = React.useMemo(() => getDuplicateFightSlots(exportMonthFights), [exportMonthFights]);
+  const exportRows = React.useMemo(() => {
+    const memberRows = rows.filter((member) => showFormerMembersInExport || member.active !== false);
+    return sortParticipationRows(
+      deriveParticipationRows(memberRows, exportMonthFights, getFightMemberStatus, readonlyStatsByMemberId),
+      sortKey,
+      sortDirection,
+    );
+  }, [exportMonthFights, readonlyStatsByMemberId, rows, showFormerMembersInExport, sortDirection, sortKey]);
+  const canExportParticipation = Boolean(exportMonth && exportRows.length && !exportDuplicateSlots.length);
+  const handleExportParticipation = async () => {
+    if (!exportRef.current || isExportingParticipation || !canExportParticipation) return;
+    setIsExportingParticipation(true);
+    setExportError(null);
+    try {
+      await exportNodeToPng(exportRef.current, `${tracker.name}-${exportMonth}-fight-participation-${exportType}`);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "PNG konnte nicht erzeugt werden.");
+    } finally {
+      setIsExportingParticipation(false);
+    }
+  };
+  const participationTableStyle = {
+    "--participation-table-width": `${PARTICIPATION_STICKY_COLUMN_WIDTH_PX + fights.length * PARTICIPATION_FIGHT_COLUMN_WIDTH_PX}px`,
+  } as React.CSSProperties;
 
   return (
     <section className={styles.tablePanel}>
@@ -3126,15 +3670,21 @@ function FightTable({
               />
               <span>Ehemalige Gildenmitglieder</span>
             </label>
-            <label className={styles.tableToggleField}>
-              <input
-                type="checkbox"
-                checked={swipeTogether}
-                onChange={(event) => handleSwipeTogetherChange(event.target.checked)}
-              />
-              <span>Gemeinsam swipen</span>
-            </label>
+            {isCompactLayout ? (
+              <label className={styles.tableToggleField}>
+                <input
+                  type="checkbox"
+                  checked={swipeTogether}
+                  onChange={(event) => handleSwipeTogetherChange(event.target.checked)}
+                />
+                <span>Gemeinsam swipen</span>
+              </label>
+            ) : null}
           </div>
+          <button type="button" className={styles.secondaryAction} onClick={() => setIsExportOverlayOpen(true)}>
+            <Download size={16} aria-hidden />
+            Exportieren
+          </button>
           <button
             type="button"
             className={styles.applyDraftButton}
@@ -3147,77 +3697,95 @@ function FightTable({
       </div>
       {sortedRows.length ? (
         <>
-          <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={`${styles.stickyColumn} ${styles.stickyMemberColumn}`}>Member</th>
-                <th className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>Missed</th>
-                <th className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>Quote</th>
-                <th className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>Letzter Fehlkampf</th>
-                <th className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>Serie</th>
+          <div
+            className={`${styles.tableWrapper} ${styles.tableWrapperDesktopDrag}`}
+            onPointerDown={handleParticipationPointerDown}
+            onPointerMove={handleParticipationPointerMove}
+            onPointerUp={handleParticipationPointerUp}
+            onPointerCancel={handleParticipationPointerCancel}
+            onPointerLeave={handleParticipationPointerLeave}
+            onClickCapture={handleParticipationClickCapture}
+          >
+            <table className={styles.table} style={participationTableStyle}>
+              <colgroup>
+                <col className={styles.stickyMemberColumn} />
+                <col className={styles.stickyMissedColumn} />
+                <col className={styles.stickyQuoteColumn} />
+                <col className={styles.stickyLastMissedColumn} />
+                <col className={styles.stickyStreakColumn} />
                 {fights.map((fight) => (
-                  <th key={fight.id} className={styles.fightHead}>
-                    <span>Fight {fight.fightNumber}</span>
-                    <small>{formatDate(fight.date)}</small>
-                    <small>{fight.opponentGuild || "—"}</small>
-                  </th>
+                  <col key={fight.id} className={styles.fightColumn} />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
-                const memberMetaParts = [
-                  formatMemberClassName(member.className),
-                  level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
-                  !member.active ? "nicht mehr in aktueller Gilde" : null,
-                ].filter((entry): entry is string => Boolean(entry));
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className={`${styles.stickyColumn} ${styles.stickyMemberColumn}`}>Member</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>Missed</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>Quote</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>Letzter Fehlkampf</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>Serie</th>
+                  {fights.map((fight) => (
+                    <th key={fight.id} className={styles.fightHead}>
+                      <span>Fight {fight.fightNumber}</span>
+                      <small>{formatDate(fight.date)}</small>
+                      <small>{fight.opponentGuild || "—"}</small>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
+                  const memberMetaParts = [
+                    formatMemberClassName(member.className),
+                    level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
+                    !member.active ? "nicht mehr in aktueller Gilde" : null,
+                  ].filter((entry): entry is string => Boolean(entry));
 
-                return (
-                  <tr key={member.id} className={member.active ? undefined : styles.inactiveRow}>
-                    <td className={`${styles.stickyColumn} ${styles.stickyMemberColumn} ${styles.memberCell}`}>
-                      <div className={styles.memberName}>{member.name}</div>
-                      <div className={styles.memberMeta}>{memberMetaParts.join(" · ")}</div>
-                    </td>
-                    <td className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{missed}</td>
-                    <td className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>{formatQuote(missed, evaluated)}</td>
-                    <td className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>
-                      {lastMissedFight ? formatDate(lastMissedFight.date) : "—"}
-                    </td>
-                    <td className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>
-                      {streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : "—"}
-                    </td>
-                    {fights.map((fight) => {
-                      const status = getParticipationStatus(fight, member.id);
-                      const hasDraft = Boolean(statusDrafts[createParticipationDraftKey(fight.id, member.id)]);
-                      return (
-                        <td key={`${member.id}-${fight.id}`}>
-                          <button
-                            type="button"
-                            className={`${styles.statusButton} ${
-                              status === "missed" ? styles.statusMissed : status === "ok" ? styles.statusOk : styles.statusUnknown
-                            } ${hasDraft ? styles.statusDraft : ""}`}
-                            disabled={isApplyingStatusDrafts}
-                            onClick={() => cycleParticipationStatus(fight, member.id)}
-                            aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
-                          >
-                            {status === "unknown" ? (
-                              "?"
-                            ) : (
-                              <>
-                                {status === "missed" ? <XCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
-                                {status === "missed" ? "Fehlt" : "OK"}
-                              </>
-                            )}
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={member.id} className={member.active ? undefined : styles.inactiveRow}>
+                      <td className={`${styles.stickyColumn} ${styles.stickyMemberColumn} ${styles.memberCell}`}>
+                        <div className={styles.memberName}>{member.name}</div>
+                        <div className={styles.memberMeta}>{memberMetaParts.join(" · ")}</div>
+                      </td>
+                      <td className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{missed}</td>
+                      <td className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>{formatQuote(missed, evaluated)}</td>
+                      <td className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>
+                        {lastMissedFight ? formatDate(lastMissedFight.date) : "—"}
+                      </td>
+                      <td className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>
+                        {streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : "—"}
+                      </td>
+                      {fights.map((fight) => {
+                        const status = getParticipationStatus(fight, member.id);
+                        const hasDraft = Boolean(statusDrafts[createParticipationDraftKey(fight.id, member.id)]);
+                        return (
+                          <td key={`${member.id}-${fight.id}`}>
+                            <button
+                              type="button"
+                              className={`${styles.statusButton} ${
+                                status === "missed" ? styles.statusMissed : status === "ok" ? styles.statusOk : styles.statusUnknown
+                              } ${hasDraft ? styles.statusDraft : ""}`}
+                              disabled={isApplyingStatusDrafts}
+                              onClick={() => cycleParticipationStatus(fight, member.id)}
+                              aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
+                            >
+                              {status === "unknown" ? (
+                                "?"
+                              ) : (
+                                <>
+                                  {status === "missed" ? <XCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
+                                  {status === "missed" ? "Fehlt" : "OK"}
+                                </>
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           <div className={styles.mobileParticipationList}>
             {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
@@ -3324,6 +3892,438 @@ function FightTable({
       ) : (
         <div className={styles.tableEmpty}>{tableEmptyMessage}</div>
       )}
+      {isExportOverlayOpen ? (
+        <ParticipationExportOverlay
+          exportType={exportType}
+          exportMonth={exportMonth}
+          showFormerMembers={showFormerMembersInExport}
+          fightCount={exportMonthFights.length}
+          memberCount={exportRows.length}
+          duplicateSlotCount={exportDuplicateSlots.length}
+          canExport={canExportParticipation}
+          isExporting={isExportingParticipation}
+          exportError={exportError}
+          onExportTypeChange={setExportType}
+          onExportMonthChange={(value) => {
+            setExportMonth(value);
+            setExportError(null);
+          }}
+          onShowFormerMembersChange={setShowFormerMembersInExport}
+          onExport={() => void handleExportParticipation()}
+          onClose={() => setIsExportOverlayOpen(false)}
+        />
+      ) : null}
+      <div className={styles.exportStage} aria-hidden>
+        <ParticipationExportReport
+          ref={exportRef}
+          tracker={tracker}
+          exportType={exportType}
+          month={exportMonth}
+          fights={exportMonthFights}
+          rows={exportRows}
+        />
+      </div>
     </section>
+  );
+}
+
+function ParticipationExportOverlay({
+  exportType,
+  exportMonth,
+  showFormerMembers,
+  fightCount,
+  memberCount,
+  duplicateSlotCount,
+  canExport,
+  isExporting,
+  exportError,
+  onExportTypeChange,
+  onExportMonthChange,
+  onShowFormerMembersChange,
+  onExport,
+  onClose,
+}: {
+  exportType: ParticipationExportType;
+  exportMonth: string;
+  showFormerMembers: boolean;
+  fightCount: number;
+  memberCount: number;
+  duplicateSlotCount: number;
+  canExport: boolean;
+  isExporting: boolean;
+  exportError: string | null;
+  onExportTypeChange: (value: ParticipationExportType) => void;
+  onExportMonthChange: (value: string) => void;
+  onShowFormerMembersChange: (value: boolean) => void;
+  onExport: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <FunctionOverlay title="Participation exportieren" subtitle={`${formatMonthLabel(exportMonth)} · ${fightCount} Fights`} onClose={onClose}>
+      <section className={styles.exportPanel}>
+        <div className={styles.exportModeControl} role="group" aria-label="Exporttyp">
+          <button
+            type="button"
+            className={`${styles.exportModeButton} ${exportType === "simple" ? styles.exportModeButtonActive : ""}`}
+            onClick={() => onExportTypeChange("simple")}
+          >
+            Einfach
+          </button>
+          <button
+            type="button"
+            className={`${styles.exportModeButton} ${exportType === "detailed" ? styles.exportModeButtonActive : ""}`}
+            onClick={() => onExportTypeChange("detailed")}
+          >
+            Detailliert
+          </button>
+        </div>
+
+        <div className={styles.exportOptionsGrid}>
+          <label className={styles.field}>
+            <span>Monat</span>
+            <input type="month" value={exportMonth} onChange={(event) => onExportMonthChange(event.target.value)} />
+          </label>
+          <label className={styles.tableToggleField}>
+            <input
+              type="checkbox"
+              checked={showFormerMembers}
+              onChange={(event) => onShowFormerMembersChange(event.target.checked)}
+            />
+            <span>Ehemalige Gildenmitglieder anzeigen</span>
+          </label>
+        </div>
+
+        <div className={styles.exportSummaryStrip}>
+          <InfoPill label="Fights im Monat" value={String(fightCount)} />
+          <InfoPill label="Mitglieder im Export" value={String(memberCount)} />
+        </div>
+
+        {duplicateSlotCount ? (
+          <div className={styles.slotWarning}>
+            <AlertTriangle size={16} aria-hidden />
+            <span>
+              Im gewaehlten Monat belegen mehrere gespeicherte Fights denselben Tages-Slot. Der Export wird blockiert, damit kein Fight
+              still ausgeblendet wird.
+            </span>
+          </div>
+        ) : null}
+        {exportError ? <div className={styles.warningBanner}>{exportError}</div> : null}
+
+        <div className={styles.exportActions}>
+          <button type="button" className={styles.secondaryAction} onClick={onClose}>
+            Abbrechen
+          </button>
+          <button type="button" className={styles.primaryAction} disabled={!canExport || isExporting} onClick={onExport}>
+            <Download size={16} aria-hidden />
+            {isExporting ? "Export wird erzeugt..." : "Export erzeugen"}
+          </button>
+        </div>
+      </section>
+    </FunctionOverlay>
+  );
+}
+
+const ParticipationExportReport = React.forwardRef<
+  HTMLDivElement,
+  {
+    tracker: FightTrackerGuild;
+    exportType: ParticipationExportType;
+    month: string;
+    fights: GuildFight[];
+    rows: ParticipationDerivedRow[];
+  }
+>(function ParticipationExportReport({ tracker, exportType, month, fights, rows }, ref) {
+  const dayCount = getMonthDays(month);
+  const days = Array.from({ length: dayCount }, (_, index) => index + 1);
+  const fightBySlot = new Map(fights.map((fight) => [getFightSlotKey(fight.date, fight.fightNumber), fight]));
+  const monthLabel = formatMonthLabel(month);
+  const exportClassName = `${styles.exportReport} ${exportType === "detailed" ? styles.exportReportDetailed : styles.exportReportSimple}`;
+
+  const perfectRows = rows.filter((row) => row.evaluated > 0 && row.missed === 0);
+  const maxMissed = Math.max(0, ...rows.map((row) => row.missed));
+  const mostMissedRows = maxMissed > 0 ? rows.filter((row) => row.missed === maxMissed) : [];
+  const bestStreak = Math.max(0, ...rows.map((row) => (row.streakStatus === "ok" ? row.streakCount : 0)));
+  const bestStreakRows = bestStreak > 0 ? rows.filter((row) => row.streakStatus === "ok" && row.streakCount === bestStreak) : [];
+
+  return (
+    <div ref={ref} className={exportClassName} data-fight-participation-export-root="true">
+      <header className={styles.exportReportHeader}>
+        <div>
+          <p>Fight Participation</p>
+          <h2>{tracker.name}</h2>
+          <span>{monthLabel}</span>
+        </div>
+        <div className={styles.exportReportStats}>
+          <strong>{fights.length}</strong>
+          <span>Fights</span>
+          {exportType === "detailed" ? (
+            <>
+              <strong>{rows.length}</strong>
+              <span>Member</span>
+            </>
+          ) : null}
+        </div>
+      </header>
+
+      {exportType === "detailed" ? (
+        <>
+          <section className={styles.exportBlock}>
+            <div className={styles.exportBlockHeader}>
+              <h3>Gilden-Activity</h3>
+              <span>{monthLabel}</span>
+            </div>
+            <ExportCalendarGrid days={days}>
+              {days.map((day) => (
+                <ExportFightDayCells
+                  key={day}
+                  date={getDateForMonthDay(month, day)}
+                  fightBySlot={fightBySlot}
+                  rows={rows}
+                  mode="guild"
+                />
+              ))}
+            </ExportCalendarGrid>
+          </section>
+
+          <section className={styles.exportHighlights}>
+            <ExportHighlightCard title="Meiste verpasste Kaempfe" value={maxMissed ? `${maxMissed} Missed` : "-"} rows={mostMissedRows} />
+            <ExportHighlightCard title="Laengste Teilnahme-Serie" value={bestStreak ? `${bestStreak}x dabei` : "-"} rows={bestStreakRows} />
+            <ExportHighlightCard title="Keinen Kampf verpasst" value={String(perfectRows.length)} rows={perfectRows} />
+          </section>
+        </>
+      ) : null}
+
+      <section className={`${styles.exportMemberList} ${exportType === "simple" ? styles.exportSimpleTable : ""}`}>
+        {exportType === "simple" ? <ExportSimpleMemberHeader /> : null}
+        {exportType === "simple" ? <ExportSimpleFightAxis fights={fights} /> : null}
+        {rows.map((row) =>
+          exportType === "simple" ? (
+            <ExportSimpleMemberRow key={row.member.id} row={row} fights={fights} />
+          ) : (
+            <article key={row.member.id} className={`${styles.exportMemberRow} ${styles.exportMemberDetailedRow} ${row.member.active ? "" : styles.exportMemberInactive}`}>
+              <ExportMemberSummary row={row} />
+              <div className={styles.exportMemberActivity}>
+                <ExportCalendarGrid days={days}>
+                  {days.map((day) => (
+                    <ExportFightDayCells
+                      key={day}
+                      date={getDateForMonthDay(month, day)}
+                      fightBySlot={fightBySlot}
+                      rows={rows}
+                      memberId={row.member.id}
+                      mode="member"
+                    />
+                  ))}
+                </ExportCalendarGrid>
+              </div>
+            </article>
+          ),
+        )}
+      </section>
+    </div>
+  );
+});
+
+function ExportSimpleMemberHeader() {
+  return (
+    <div className={`${styles.exportSimpleRow} ${styles.exportSimpleHeader}`}>
+      <span>Member</span>
+      <span>Missed</span>
+      <span>Quote</span>
+      <span>Letzter Fehlkampf</span>
+      <span>Serie</span>
+    </div>
+  );
+}
+
+function ExportSimpleMemberRow({
+  row,
+  fights,
+}: {
+  row: ParticipationDerivedRow;
+  fights: GuildFight[];
+}) {
+  const memberMetaParts = [
+    formatMemberClassName(row.member.className),
+    row.level != null ? `Level ${row.level.toLocaleString("de-DE")}` : null,
+    !row.member.active ? "nicht mehr in aktueller Gilde" : null,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return (
+    <article className={`${styles.exportSimpleMemberBlock} ${row.member.active ? "" : styles.exportMemberInactive}`}>
+      <div className={styles.exportSimpleRow}>
+        <div className={styles.exportMemberIdentity}>
+          <strong>{row.member.name}</strong>
+          <span>{memberMetaParts.join(" · ")}</span>
+        </div>
+        <strong>{row.missed}</strong>
+        <strong>{formatQuote(row.missed, row.evaluated)}</strong>
+        <strong>{row.lastMissedFight ? formatDate(row.lastMissedFight.date) : "-"}</strong>
+        <strong>{formatStreak(row.streakStatus, row.streakCount)}</strong>
+      </div>
+      <ExportSimpleFightTimeline fights={fights} memberId={row.member.id} />
+    </article>
+  );
+}
+
+function ExportSimpleFightAxis({ fights }: { fights: GuildFight[] }) {
+  if (!fights.length) return null;
+  const gridStyle = { gridTemplateColumns: `repeat(${fights.length}, minmax(0, 1fr))` };
+  return (
+    <div className={styles.exportSimpleFightAxis} style={gridStyle}>
+      {fights.map((fight) => (
+        <div key={fight.id} className={styles.exportSimpleFightLabel}>
+          <span>{formatShortDate(fight.date)}</span>
+          <strong>F{fight.fightNumber}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExportSimpleFightTimeline({ fights, memberId }: { fights: GuildFight[]; memberId: string }) {
+  if (!fights.length) return null;
+  const gridStyle = { gridTemplateColumns: `repeat(${fights.length}, minmax(0, 1fr))` };
+  return (
+    <div className={styles.exportSimpleFightTimeline} style={gridStyle}>
+      {fights.map((fight) => {
+        const status = getFightMemberStatus(fight, memberId);
+        const statusClass =
+          status === "ok" ? styles.exportActivityOk : status === "missed" ? styles.exportActivityMissed : styles.exportActivityUnknown;
+        return (
+          <span
+            key={fight.id}
+            className={`${styles.exportSimpleFightCell} ${statusClass}`}
+            title={`Fight ${fight.fightNumber} ${formatDate(fight.date)}: ${status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?"}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ExportMemberSummary({ row }: { row: ParticipationDerivedRow }) {
+  const memberMetaParts = [
+    formatMemberClassName(row.member.className),
+    row.level != null ? `Level ${row.level.toLocaleString("de-DE")}` : null,
+    !row.member.active ? "nicht mehr in aktueller Gilde" : null,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return (
+    <div className={styles.exportMemberSummary}>
+      <div className={styles.exportMemberIdentity}>
+        <strong>{row.member.name}</strong>
+        <span>{memberMetaParts.join(" · ")}</span>
+      </div>
+      <ExportMetric label="Missed" value={String(row.missed)} />
+      <ExportMetric label="Quote" value={formatQuote(row.missed, row.evaluated)} />
+      <ExportMetric label="Letzter Fehlkampf" value={row.lastMissedFight ? formatDate(row.lastMissedFight.date) : "-"} />
+      <ExportMetric label="Serie" value={formatStreak(row.streakStatus, row.streakCount)} />
+    </div>
+  );
+}
+
+function ExportMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.exportMetric}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ExportCalendarHeader({ days }: { days: number[] }) {
+  return (
+    <div className={styles.exportCalendarHeader} style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, ${EXPORT_ACTIVITY_DAY_WIDTH_PX}px)` }}>
+      {days.map((day) => (
+        <span key={day}>{String(day).padStart(2, "0")}</span>
+      ))}
+    </div>
+  );
+}
+
+function ExportCalendarGrid({ days, children }: { days: number[]; children: React.ReactNode }) {
+  const gridStyle = { gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, ${EXPORT_ACTIVITY_DAY_WIDTH_PX}px)` };
+  return (
+    <div className={styles.exportCalendar}>
+      <ExportCalendarHeader days={days} />
+      <div className={styles.exportCalendarGrid} style={gridStyle}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ExportFightDayCells({
+  date,
+  fightBySlot,
+  rows,
+  memberId,
+  mode,
+}: {
+  date: string;
+  fightBySlot: Map<string, GuildFight>;
+  rows: ParticipationDerivedRow[];
+  memberId?: string;
+  mode: "guild" | "member";
+}) {
+  return (
+    <div className={styles.exportDayCellGroup}>
+      {FIGHT_SLOTS.map((slot) => {
+        const fight = fightBySlot.get(getFightSlotKey(date, slot)) ?? null;
+        if (!fight) return <span key={slot} className={`${styles.exportActivityCell} ${styles.exportActivityEmpty}`} />;
+
+        if (mode === "guild") {
+          const statusCounts = rows.reduce(
+            (counts, row) => {
+              const status = getFightMemberStatus(fight, row.member.id);
+              if (status === "ok") counts.ok += 1;
+              if (status === "missed") counts.missed += 1;
+              return counts;
+            },
+            { ok: 0, missed: 0 },
+          );
+          const evaluated = statusCounts.ok + statusCounts.missed;
+          const rate = evaluated ? statusCounts.ok / evaluated : null;
+          const rateClass =
+            rate == null
+              ? styles.exportActivityUnknown
+              : rate >= 0.8
+                ? styles.exportActivityHigh
+                : rate >= 0.5
+                  ? styles.exportActivityMid
+                  : styles.exportActivityLow;
+          return (
+            <span
+              key={slot}
+              className={`${styles.exportActivityCell} ${rateClass}`}
+              title={`Fight ${slot} ${formatDate(date)}: ${rate == null ? "keine Bewertung" : `${Math.round(rate * 100)}%`}`}
+            />
+          );
+        }
+
+        const status = memberId ? getFightMemberStatus(fight, memberId) : "unknown";
+        const statusClass =
+          status === "ok" ? styles.exportActivityOk : status === "missed" ? styles.exportActivityMissed : styles.exportActivityUnknown;
+        return (
+          <span
+            key={slot}
+            className={`${styles.exportActivityCell} ${statusClass}`}
+            title={`Fight ${slot} ${formatDate(date)}: ${status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?"}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ExportHighlightCard({ title, value, rows }: { title: string; value: string; rows: ParticipationDerivedRow[] }) {
+  const names = rows.map((row) => row.member.name).join(", ");
+  return (
+    <article className={styles.exportHighlightCard}>
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <small>{names || "-"}</small>
+    </article>
   );
 }

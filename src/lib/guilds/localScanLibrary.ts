@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction } from "idb";
 import {
   GUILD_SCAN_NORMALIZER_VERSION,
   normalizeGuildScanMembers,
@@ -7,11 +7,15 @@ import {
 import { normalizeServerKeyFromInput } from "../players/identifier";
 import { parsers } from "../import/parsers";
 
-const DB_NAME = "sfdatahub-guild-hub";
-const DB_VERSION = 2;
+const GUILD_HUB_DB_NAME = "sfdatahub-guild-hub";
+const GUILD_HUB_DB_VERSION = 2;
+const LOCAL_DATA_DB_NAME = "sfdatahub-local-data";
+const LOCAL_DATA_DB_VERSION = 1;
 const SCAN_STORE = "scans";
+const METADATA_STORE = "metadata";
 const STATE_STORE = "state";
 const GUILD_SELECTION_STATE_KEY = "guild-selection";
+const GUILD_HUB_SCANS_MIGRATION_KEY = "migration.guildHubScans";
 const LOCAL_SCAN_LIBRARY_CHANGE_EVENT = "sfdatahub:local-scans-changed";
 
 type JsonRecord = Record<string, unknown>;
@@ -42,6 +46,7 @@ export type GuildHubLocalScan = {
   normalizerVersion?: number;
   detectedType?: "players" | "guilds" | "scan";
   parserName?: string | null;
+  [key: string]: unknown;
 };
 
 export type GuildHubLocalServerOption = {
@@ -84,8 +89,14 @@ export type GuildHubImportScanResult =
   | { status: "imported"; scan: GuildHubLocalScan }
   | { status: "duplicate"; scan: GuildHubLocalScan };
 
+export type GuildHubImportScanRecordsResult = {
+  imported: GuildHubLocalScan[];
+  duplicates: GuildHubLocalScan[];
+};
+
 export type SfDataHubLocalScan = GuildHubLocalScan;
 export type SfDataHubImportScanResult = GuildHubImportScanResult;
+export type SfDataHubImportScanRecordsResult = GuildHubImportScanRecordsResult;
 
 type GuildHubStateRecord = {
   key: string;
@@ -93,7 +104,28 @@ type GuildHubStateRecord = {
   updatedAt: string;
 };
 
-interface GuildHubScanDb extends DBSchema {
+type LocalDataMetadataRecord = {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+};
+
+interface LocalScanDb extends DBSchema {
+  scans: {
+    key: string;
+    value: GuildHubLocalScan;
+    indexes: {
+      by_contentHash: string;
+      by_importedAt: string;
+    };
+  };
+  metadata: {
+    key: string;
+    value: LocalDataMetadataRecord;
+  };
+}
+
+interface GuildHubStateDb extends DBSchema {
   scans: {
     key: string;
     value: GuildHubLocalScan;
@@ -108,26 +140,198 @@ interface GuildHubScanDb extends DBSchema {
   };
 }
 
-let dbPromise: Promise<IDBPDatabase<GuildHubScanDb>> | null = null;
+let guildHubStateDbPromise: Promise<IDBPDatabase<GuildHubStateDb>> | null = null;
+let localScanDbPromise: Promise<IDBPDatabase<LocalScanDb>> | null = null;
+let legacyScanMigrationPromise: Promise<void> | null = null;
 const scanLibraryListeners = new Set<() => void>();
 
-function getGuildHubScanDb() {
-  if (!dbPromise) {
-    dbPromise = openDB<GuildHubScanDb>(DB_NAME, DB_VERSION, {
+function ensureLocalScanStore(
+  db: IDBPDatabase<LocalScanDb>,
+  transaction: IDBPTransaction<LocalScanDb, (typeof SCAN_STORE | typeof METADATA_STORE)[], "versionchange">,
+) {
+  const store = db.objectStoreNames.contains(SCAN_STORE)
+    ? transaction.objectStore(SCAN_STORE)
+    : db.createObjectStore(SCAN_STORE, { keyPath: "id" });
+  if (!store.indexNames.contains("by_contentHash")) {
+    store.createIndex("by_contentHash", "contentHash", { unique: true });
+  }
+  if (!store.indexNames.contains("by_importedAt")) {
+    store.createIndex("by_importedAt", "importedAt");
+  }
+}
+
+function ensureLocalMetadataStore(db: IDBPDatabase<LocalScanDb>) {
+  if (!db.objectStoreNames.contains(METADATA_STORE)) {
+    db.createObjectStore(METADATA_STORE, { keyPath: "key" });
+  }
+}
+
+function isLocalDataDbReady(db: IDBPDatabase<LocalScanDb>) {
+  if (!db.objectStoreNames.contains(SCAN_STORE)) return false;
+  if (!db.objectStoreNames.contains(METADATA_STORE)) return false;
+
+  const tx = db.transaction(SCAN_STORE);
+  const { indexNames } = tx.store;
+  const ready = indexNames.contains("by_contentHash") && indexNames.contains("by_importedAt");
+  void tx.done.catch(() => undefined);
+  return ready;
+}
+
+function isGuildHubStateDbReady(db: IDBPDatabase<GuildHubStateDb>) {
+  return db.objectStoreNames.contains(STATE_STORE);
+}
+
+function isIndexedDbVersionError(error: unknown) {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "VersionError";
+  }
+  return isRecord(error) && error.name === "VersionError";
+}
+
+async function openGuildHubStateDbAtMinimumVersion() {
+  try {
+    return await openDB<GuildHubStateDb>(GUILD_HUB_DB_NAME, GUILD_HUB_DB_VERSION, {
       upgrade(db) {
-        if (!db.objectStoreNames.contains(SCAN_STORE)) {
-          const store = db.createObjectStore(SCAN_STORE, { keyPath: "id" });
-          store.createIndex("by_contentHash", "contentHash", { unique: true });
-          store.createIndex("by_importedAt", "importedAt");
-        }
         if (!db.objectStoreNames.contains(STATE_STORE)) {
           db.createObjectStore(STATE_STORE, { keyPath: "key" });
         }
       },
     });
+  } catch (error) {
+    if (!isIndexedDbVersionError(error)) throw error;
+    return openDB<GuildHubStateDb>(GUILD_HUB_DB_NAME);
+  }
+}
+
+function getGuildHubStateDb() {
+  if (!guildHubStateDbPromise) {
+    guildHubStateDbPromise = openGuildHubStateDbAtMinimumVersion().then(async (db) => {
+      if (!isGuildHubStateDbReady(db)) {
+        const nextVersion = db.version + 1;
+        db.close();
+        guildHubStateDbPromise = openDB<GuildHubStateDb>(GUILD_HUB_DB_NAME, nextVersion, {
+          upgrade(upgradeDb) {
+            if (!upgradeDb.objectStoreNames.contains(STATE_STORE)) {
+              upgradeDb.createObjectStore(STATE_STORE, { keyPath: "key" });
+            }
+          },
+        });
+        return guildHubStateDbPromise;
+      }
+
+      return db;
+    });
   }
 
-  return dbPromise;
+  return guildHubStateDbPromise;
+}
+
+async function openLocalScanDb(version: number) {
+  return openDB<LocalScanDb>(LOCAL_DATA_DB_NAME, version, {
+    upgrade(db, _oldVersion, _newVersion, transaction) {
+      ensureLocalScanStore(db, transaction);
+      ensureLocalMetadataStore(db);
+    },
+  });
+}
+
+async function openLocalScanDbAtMinimumVersion() {
+  try {
+    return await openLocalScanDb(LOCAL_DATA_DB_VERSION);
+  } catch (error) {
+    if (!isIndexedDbVersionError(error)) throw error;
+    return openDB<LocalScanDb>(LOCAL_DATA_DB_NAME);
+  }
+}
+
+function getLocalScanDbWithoutMigration() {
+  if (!localScanDbPromise) {
+    localScanDbPromise = openLocalScanDbAtMinimumVersion().then(async (db) => {
+      if (!isLocalDataDbReady(db)) {
+        const nextVersion = db.version + 1;
+        db.close();
+        localScanDbPromise = openLocalScanDb(nextVersion);
+        return localScanDbPromise;
+      }
+
+      return db;
+    });
+  }
+
+  return localScanDbPromise;
+}
+
+function isCompletedMigrationMarker(record: LocalDataMetadataRecord | undefined) {
+  return isRecord(record?.value) && record.value.status === "completed";
+}
+
+async function writeGuildHubScansMigrationCompletedMarker(db: IDBPDatabase<LocalScanDb>) {
+  const completedAt = new Date().toISOString();
+  await db.put(METADATA_STORE, {
+    key: GUILD_HUB_SCANS_MIGRATION_KEY,
+    value: { status: "completed", completedAt },
+    updatedAt: completedAt,
+  });
+}
+
+async function migrateLegacyScansToLocalDataDb() {
+  const localDb = await getLocalScanDbWithoutMigration();
+  const existingMarker = await localDb.get(METADATA_STORE, GUILD_HUB_SCANS_MIGRATION_KEY);
+  if (isCompletedMigrationMarker(existingMarker)) return;
+
+  const legacyDb = await getGuildHubStateDb();
+  if (!legacyDb.objectStoreNames.contains(SCAN_STORE)) {
+    await writeGuildHubScansMigrationCompletedMarker(localDb);
+    return;
+  }
+
+  const legacyScans = await legacyDb.getAll(SCAN_STORE);
+  if (!legacyScans.length) {
+    await writeGuildHubScansMigrationCompletedMarker(localDb);
+    return;
+  }
+
+  const tx = localDb.transaction([SCAN_STORE, METADATA_STORE], "readwrite");
+  const scanStore = tx.objectStore(SCAN_STORE);
+  const metadataStore = tx.objectStore(METADATA_STORE);
+  const contentHashIndex = scanStore.index("by_contentHash");
+
+  for (const legacyScan of legacyScans) {
+    const existingById = await scanStore.get(legacyScan.id);
+    if (existingById) continue;
+
+    const existingByHash =
+      typeof legacyScan.contentHash === "string"
+        ? await contentHashIndex.get(legacyScan.contentHash)
+        : undefined;
+    if (existingByHash) continue;
+
+    await scanStore.add(legacyScan);
+  }
+
+  const completedAt = new Date().toISOString();
+  await metadataStore.put({
+    key: GUILD_HUB_SCANS_MIGRATION_KEY,
+    value: { status: "completed", completedAt },
+    updatedAt: completedAt,
+  });
+  await tx.done;
+}
+
+async function ensureLegacyScanMigration() {
+  if (!legacyScanMigrationPromise) {
+    legacyScanMigrationPromise = migrateLegacyScansToLocalDataDb().catch((error) => {
+      legacyScanMigrationPromise = null;
+      throw error;
+    });
+  }
+
+  return legacyScanMigrationPromise;
+}
+
+async function getLocalScanDb() {
+  await ensureLegacyScanMigration();
+  return getLocalScanDbWithoutMigration();
 }
 
 function notifyLocalScanLibraryChanged() {
@@ -156,7 +360,7 @@ export function subscribeToSfDataHubLocalScanChanges(listener: () => void) {
 }
 
 export async function readGuildHubSelectionState(): Promise<GuildHubSelectionState> {
-  const db = await getGuildHubScanDb();
+  const db = await getGuildHubStateDb();
   const record = await db.get(STATE_STORE, GUILD_SELECTION_STATE_KEY);
   const value = record?.value;
 
@@ -171,7 +375,7 @@ export async function readGuildHubSelectionState(): Promise<GuildHubSelectionSta
 }
 
 export async function writeGuildHubSelectionState(state: GuildHubSelectionState): Promise<void> {
-  const db = await getGuildHubScanDb();
+  const db = await getGuildHubStateDb();
   await db.put(STATE_STORE, {
     key: GUILD_SELECTION_STATE_KEY,
     value: state,
@@ -461,7 +665,7 @@ function normalizeStoredScan(scan: GuildHubLocalScan): GuildHubLocalScan {
   };
 }
 
-async function persistScanNormalizationIfNeeded(db: IDBPDatabase<GuildHubScanDb>, scan: GuildHubLocalScan) {
+async function persistScanNormalizationIfNeeded(db: IDBPDatabase<LocalScanDb>, scan: GuildHubLocalScan) {
   const normalized = normalizeStoredScan(scan);
   if (normalized !== scan) {
     await db.put(SCAN_STORE, normalized);
@@ -784,7 +988,7 @@ function isNewerGuildSource(candidate: GuildHubLocalGuildIdentity, existing: Gui
 }
 
 async function findScanByHash(contentHash: string) {
-  const db = await getGuildHubScanDb();
+  const db = await getLocalScanDb();
   return db.getFromIndex(SCAN_STORE, "by_contentHash", contentHash);
 }
 
@@ -833,23 +1037,17 @@ function buildLocalScanRecord({
 }
 
 export async function listGuildHubLocalScans() {
-  const db = await getGuildHubScanDb();
+  const db = await getLocalScanDb();
   const scans = await db.getAll(SCAN_STORE);
   const normalizedScans = await Promise.all(scans.map((scan) => persistScanNormalizationIfNeeded(db, scan)));
   return normalizedScans.sort(compareScans);
 }
 
-export async function importGuildHubLocalScan(filename: string, content: string): Promise<GuildHubImportScanResult> {
+export async function createGuildHubLocalScanImportPreview(filename: string, content: string): Promise<GuildHubLocalScan> {
   const rawData = JSON.parse(content);
   const { raw, detectedType, parserName } = await requireRawScan(rawData);
   const contentHash = await sha256Hex(content);
-  const duplicate = await findScanByHash(contentHash);
-  if (duplicate) {
-    const db = await getGuildHubScanDb();
-    return { status: "duplicate", scan: await persistScanNormalizationIfNeeded(db, duplicate) };
-  }
-
-  const scan = buildLocalScanRecord({
+  return buildLocalScanRecord({
     id: createScanId(),
     filename,
     contentHash,
@@ -859,15 +1057,71 @@ export async function importGuildHubLocalScan(filename: string, content: string)
     detectedType,
     parserName,
   });
+}
 
-  const db = await getGuildHubScanDb();
+export async function importGuildHubLocalScan(filename: string, content: string): Promise<GuildHubImportScanResult> {
+  const scan = await createGuildHubLocalScanImportPreview(filename, content);
+  const duplicate = await findScanByHash(scan.contentHash);
+  if (duplicate) {
+    const db = await getLocalScanDb();
+    return { status: "duplicate", scan: await persistScanNormalizationIfNeeded(db, duplicate) };
+  }
+
+  const db = await getLocalScanDb();
   await db.add(SCAN_STORE, scan);
   notifyLocalScanLibraryChanged();
   return { status: "imported", scan };
 }
 
+export async function importGuildHubLocalScanRecords(scans: GuildHubLocalScan[]): Promise<GuildHubImportScanRecordsResult> {
+  if (!scans.length) return { imported: [], duplicates: [] };
+
+  const db = await getLocalScanDb();
+  const imported: GuildHubLocalScan[] = [];
+  const duplicates: GuildHubLocalScan[] = [];
+  const pendingIds = new Set<string>();
+  const pendingHashes = new Set<string>();
+
+  for (const scan of scans) {
+    const existingById = await db.get(SCAN_STORE, scan.id);
+    if (existingById) {
+      if (existingById.contentHash === scan.contentHash) {
+        duplicates.push(existingById);
+        continue;
+      }
+      throw new Error(`Scan-ID-Konflikt: ${scan.id}`);
+    }
+
+    const existingByHash = await findScanByHash(scan.contentHash);
+    if (existingByHash) {
+      duplicates.push(existingByHash);
+      continue;
+    }
+
+    if (pendingIds.has(scan.id)) {
+      throw new Error(`Scan-ID ist mehrfach in der Transferdatei enthalten: ${scan.id}`);
+    }
+    if (pendingHashes.has(scan.contentHash)) {
+      duplicates.push(scan);
+      continue;
+    }
+
+    pendingIds.add(scan.id);
+    pendingHashes.add(scan.contentHash);
+    imported.push(scan);
+  }
+
+  if (!imported.length) return { imported, duplicates };
+
+  const tx = db.transaction(SCAN_STORE, "readwrite");
+  await Promise.all(imported.map((scan) => tx.store.add(scan)));
+  await tx.done;
+  notifyLocalScanLibraryChanged();
+  return { imported, duplicates };
+}
+
 export async function updateGuildHubLocalScan(id: string, filename: string, content: string): Promise<GuildHubLocalScan> {
-  const db = await getGuildHubScanDb();
+  const db = await getLocalScanDb();
   const existing = await db.get(SCAN_STORE, id);
   if (!existing) throw new Error("Scan wurde nicht gefunden.");
 
@@ -899,7 +1153,7 @@ export async function updateGuildHubLocalScan(id: string, filename: string, cont
 export async function deleteGuildHubLocalScans(ids: string[]) {
   if (!ids.length) return;
 
-  const db = await getGuildHubScanDb();
+  const db = await getLocalScanDb();
   const tx = db.transaction(SCAN_STORE, "readwrite");
   await Promise.all(ids.map((id) => tx.store.delete(id)));
   await tx.done;
@@ -911,7 +1165,9 @@ export function getSfDataHubScanNormalizedPlayers(scan: SfDataHubLocalScan): Nor
 }
 
 export const listSfDataHubLocalScans = listGuildHubLocalScans;
+export const createSfDataHubLocalScanImportPreview = createGuildHubLocalScanImportPreview;
 export const importSfDataHubLocalScan = importGuildHubLocalScan;
+export const importSfDataHubLocalScanRecords = importGuildHubLocalScanRecords;
 export const updateSfDataHubLocalScan = updateGuildHubLocalScan;
 export const deleteSfDataHubLocalScans = deleteGuildHubLocalScans;
 export const listSfDataHubLocalServersFromScans = listGuildHubLocalServersFromScans;
