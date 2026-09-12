@@ -17,7 +17,7 @@ const SNAPSHOT_DOC = "news_latestByChannel";
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 const CONTENT_TEXT_MAX = 600;
 const CHANNEL_ID_PATTERN = /^\d{17,20}$/;
-const RECORD_ANNOUNCEMENTS_LIMIT = 5;
+const RECORD_ANNOUNCEMENTS_LIMIT = 15;
 
 type DiscordRecordAnnouncementItem = {
   id: string;
