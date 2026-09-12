@@ -1,0 +1,423 @@
+.badge {
+  --record-accent: #f2c94c;
+  --record-accent-2: #4ed7b7;
+  --record-glow: rgba(242, 201, 76, 0.26);
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--record-accent) 46%, var(--line));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(15, 31, 50, 0.95), rgba(10, 21, 36, 0.95));
+  color: var(--text);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.badge[data-family="level"] {
+  --record-accent: #f2c94c;
+  --record-accent-2: #4ed7b7;
+  --record-glow: rgba(242, 201, 76, 0.28);
+}
+
+.badge[data-family="guild"] {
+  --record-accent: #6eb6ff;
+  --record-accent-2: #c2d8ff;
+  --record-glow: rgba(110, 182, 255, 0.26);
+}
+
+.badge[data-family="mine"] {
+  --record-accent: #d6a15e;
+  --record-accent-2: #77d1a7;
+  --record-glow: rgba(214, 161, 94, 0.24);
+}
+
+.badge[data-family="fortress"] {
+  --record-accent: #91b5d8;
+  --record-accent-2: #f0c36b;
+  --record-glow: rgba(145, 181, 216, 0.24);
+}
+
+.badge[data-family="demonPortal"] {
+  --record-accent: #f05a78;
+  --record-accent-2: #a56bff;
+  --record-glow: rgba(240, 90, 120, 0.28);
+}
+
+.badge[data-family="twister"] {
+  --record-accent: #79dfd7;
+  --record-accent-2: #d7f5ff;
+  --record-glow: rgba(121, 223, 215, 0.24);
+}
+
+.badge[data-family="sandstorm"] {
+  --record-accent: #e1c46a;
+  --record-accent-2: #f2f0c2;
+  --record-glow: rgba(225, 196, 106, 0.22);
+}
+
+.badge[data-family="mozone"] {
+  --record-accent: #7ce38b;
+  --record-accent-2: #78c3ff;
+  --record-glow: rgba(124, 227, 139, 0.23);
+}
+
+.badge[data-family="boss"] {
+  --record-accent: #f79b52;
+  --record-accent-2: #f7dc8a;
+  --record-glow: rgba(247, 155, 82, 0.24);
+}
+
+.badge[data-family="class"] {
+  --record-accent: #bd9cff;
+  --record-accent-2: #55d5c6;
+  --record-glow: rgba(189, 156, 255, 0.25);
+}
+
+.badge[data-scope="class"] {
+  --record-accent: var(--record-class-accent, #bd9cff);
+  --record-accent-2: var(--record-class-muted-accent, #55d5c6);
+  --record-glow: color-mix(in srgb, var(--record-accent) 28%, transparent);
+}
+
+.badgeOverallScope .familyMotif {
+  opacity: 0.46;
+}
+
+.badgeCompact {
+  min-height: 126px;
+  padding: 8px;
+}
+
+.badgeLarge {
+  min-height: 184px;
+  padding: 12px;
+}
+
+.badgeMedallion {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  border-radius: 18px;
+}
+
+.badgeEmblem {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border-radius: 12px;
+}
+
+.badgeCard {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 9px;
+  border-radius: 10px;
+}
+
+.badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 50% 18%, var(--record-glow), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--record-accent) 14%, transparent), transparent 54%);
+}
+
+.badgeArt {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.badgeMedallion .badgeArt {
+  aspect-ratio: 1;
+  width: min(86px, 100%);
+  border: 2px solid color-mix(in srgb, var(--record-accent) 72%, white 8%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.14), transparent 44%),
+    conic-gradient(from 20deg, rgba(255, 255, 255, 0.04), var(--record-glow), rgba(255, 255, 255, 0.05), var(--record-glow));
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.04),
+    inset 0 0 0 6px rgba(10, 21, 36, 0.7),
+    0 12px 24px rgba(0, 0, 0, 0.28);
+}
+
+.badgeLarge.badgeMedallion .badgeArt {
+  width: min(120px, 100%);
+}
+
+.badgeEmblem .badgeArt {
+  aspect-ratio: 1;
+  width: min(94px, 100%);
+  border: 1px solid color-mix(in srgb, var(--record-accent) 58%, var(--line));
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--record-accent) 18%, transparent), transparent 45%),
+    rgba(255, 255, 255, 0.04);
+  clip-path: polygon(50% 0, 96% 20%, 90% 78%, 50% 100%, 10% 78%, 4% 20%);
+}
+
+.badgeLarge.badgeEmblem .badgeArt {
+  width: min(136px, 100%);
+}
+
+.badgeCard .badgeArt {
+  min-height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.badgeLarge.badgeCard .badgeArt {
+  min-height: 112px;
+}
+
+.familyMotif {
+  position: absolute;
+  inset: 12%;
+  z-index: -1;
+  opacity: 0.52;
+}
+
+.badge[data-family="level"] .familyMotif,
+.badge[data-family="demonPortal"] .familyMotif {
+  border: 3px solid var(--record-accent);
+  border-left-color: transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 8px rgba(255, 255, 255, 0.04);
+  transform: rotate(-28deg);
+}
+
+.badge[data-family="guild"] .familyMotif,
+.badge[data-family="fortress"] .familyMotif {
+  border: 2px solid var(--record-accent);
+  clip-path: polygon(18% 4%, 82% 4%, 94% 36%, 76% 92%, 24% 92%, 6% 36%);
+}
+
+.badge[data-family="fortress"] .familyMotif::before {
+  content: "";
+  position: absolute;
+  inset: -2px 10% auto;
+  height: 18px;
+  background: repeating-linear-gradient(90deg, var(--record-accent) 0 10px, transparent 10px 16px);
+}
+
+.badge[data-family="mine"] .familyMotif {
+  border: 0;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--record-accent) 46% 54%, transparent 55%),
+    linear-gradient(45deg, transparent 45%, var(--record-accent-2) 46% 54%, transparent 55%);
+}
+
+.badge[data-family="twister"] .familyMotif,
+.badge[data-family="sandstorm"] .familyMotif {
+  border-top: 3px solid var(--record-accent);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid var(--record-accent-2);
+  border-left: 2px solid transparent;
+  border-radius: 50%;
+  transform: rotate(-18deg);
+  box-shadow:
+    12px 7px 0 -8px var(--record-accent),
+    -12px -7px 0 -8px var(--record-accent-2);
+}
+
+.badge[data-family="mozone"] .familyMotif {
+  border: 2px solid var(--record-accent);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--record-accent-2) 0 2px, transparent 3px),
+    repeating-radial-gradient(circle, transparent 0 13px, rgba(255, 255, 255, 0.18) 14px 15px);
+}
+
+.badge[data-family="boss"] .familyMotif {
+  border-bottom: 3px solid var(--record-accent);
+  border-radius: 50%;
+  transform: rotate(-35deg);
+  box-shadow:
+    inset 0 -10px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.badge[data-family="class"] .familyMotif {
+  border: 2px solid color-mix(in srgb, var(--record-accent) 60%, transparent);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 0 0 6px rgba(255, 255, 255, 0.04),
+    0 0 22px var(--record-glow);
+  transform: rotate(45deg) scale(0.72);
+}
+
+.mainIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.36));
+}
+
+.mainIcon svg {
+  width: 34px;
+  height: 34px;
+  stroke-width: 2.15;
+}
+
+.badgeLarge .mainIcon svg {
+  width: 52px;
+  height: 52px;
+}
+
+.customArtwork {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: visible;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.36));
+}
+
+.badgeLarge .customArtwork {
+  width: 82px;
+  height: 82px;
+}
+
+.badgeCard .customArtwork {
+  width: 48px;
+  height: 48px;
+}
+
+.badgeLarge.badgeCard .customArtwork {
+  width: 72px;
+  height: 72px;
+}
+
+.badgeMeta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.badgeLabel {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  min-height: 26px;
+  overflow-wrap: anywhere;
+}
+
+.badgeLarge .badgeLabel {
+  font-size: 13px;
+}
+
+.badgeValue {
+  justify-self: center;
+  min-width: 48px;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--record-accent) 50%, var(--line));
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent),
+    rgba(255, 255, 255, 0.04);
+  color: color-mix(in srgb, var(--record-accent-2) 58%, white);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+}
+
+.scopeChip {
+  justify-self: center;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--record-accent) 44%, var(--line));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: color-mix(in srgb, var(--record-accent-2) 54%, white);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+}
+
+.badgeExtra {
+  min-width: 0;
+  width: 100%;
+}
+
+.badgeLarge .badgeValue {
+  min-width: 62px;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.badgeCard .badgeMeta {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: left;
+}
+
+.badgeCard .badgeLabel {
+  min-height: 0;
+}
+
+.badgeCard .badgeValue {
+  justify-self: end;
+}
+
+.classIcon {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 7px 12px rgba(0, 0, 0, 0.34));
+}
+
+.classIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.classIconDominant {
+  position: static;
+  width: 58px;
+  height: 58px;
+}
+
+.badgeLarge .classIconDominant {
+  width: 82px;
+  height: 82px;
+}
+
+.classIconFallback {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.badgeClassDominant .familyMotif {
+  opacity: 0.38;
+}
+
+.badgeClassIntegrated .mainIcon {
+  transform: translate(-6px, -4px);
+}

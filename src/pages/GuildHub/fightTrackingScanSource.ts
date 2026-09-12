@@ -1,5 +1,6 @@
 import { listGuildHubLocalScans, type GuildHubLocalScan } from "../../lib/guilds/localScanLibrary";
 import { isNormalizedGuildMemberInGuild, type NormalizedGuildMember } from "../../lib/guilds/guildScanNormalizer";
+import { mapGuildJsonRecord } from "../../lib/import/parsers";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
 import type { GuildHubSelectedGuild } from "./hooks/useGuildHubSelection";
 import type { CreateFightTrackerMemberInput, FightTrackerGuild, FightTrackerMember } from "./fightTrackingStore";
@@ -24,6 +25,7 @@ export type FightTrackerScanSnapshot = {
   normalizerVersion: number | null;
   guildName: string;
   server: string | null;
+  coaString?: string;
   members: FightTrackerScanMember[];
 };
 
@@ -126,6 +128,8 @@ const readGuildIdSegment = (record: JsonRecord) =>
 const readGuildName = (record: JsonRecord) =>
   readString(record, ["name", "Name", "groupname", "groupName", "guildName", "Guild Name", "guild", "Guild"]);
 
+const readCoaString = (record: JsonRecord) => readString(record, ["coaString"]);
+
 const getScanGuildIdentity = (guild: GuildHubSelectedGuild | FightTrackerGuild): ScanGuildIdentity => {
   const linkedGuildId = "guildId" in guild ? guild.guildId : guild.linkedGuildHubGuildId;
   const linkedLogoIdentifier = "logoIdentifier" in guild ? guild.logoIdentifier : guild.linkedGuildHubLogoIdentifier;
@@ -144,7 +148,10 @@ const getRawScan = (scan: GuildHubLocalScan) => {
   const normalizedMembers = Array.isArray(scan.normalizedMembers) ? scan.normalizedMembers : [];
   return {
     members: normalizedMembers,
-    groups: groups.map(asRecord).filter((entry): entry is JsonRecord => Boolean(entry)),
+    groups: groups
+      .map(asRecord)
+      .filter((entry): entry is JsonRecord => Boolean(entry))
+      .map((entry) => mapGuildJsonRecord(entry) as JsonRecord),
   };
 };
 
@@ -232,14 +239,17 @@ export async function loadLatestScanSnapshotForGuild(
         .map((entry) => toScanMember(entry, scan))
         .filter((member): member is FightTrackerScanMember => Boolean(member));
       if (!group && !members.length) return null;
-      return {
+      const coaString = group ? readCoaString(group) : null;
+      const snapshot: FightTrackerScanSnapshot = {
         scanId: scan.id,
         scanAt: scanTimeIso(scan),
         normalizerVersion: normalizeVersion(scan.normalizerVersion),
         guildName: matchedGuild.name,
         server: group ? readString(group, ["server", "Server", "prefix", "world", "realm"]) ?? guild.server ?? null : guild.server ?? null,
         members,
-      } satisfies FightTrackerScanSnapshot;
+      };
+      if (coaString) snapshot.coaString = coaString;
+      return snapshot;
     })
     .filter((snapshot): snapshot is FightTrackerScanSnapshot => Boolean(snapshot));
 
@@ -262,6 +272,7 @@ export function buildFightTrackerSyncPlan(
   const hasNewerSnapshot = canApplyRosterChanges && scanMs != null && (latestAppliedMs == null || scanMs > latestAppliedMs);
   const hasNewerNormalizerVersion =
     scanNormalizerVersion != null && (lastSyncedNormalizerVersion == null || scanNormalizerVersion > lastSyncedNormalizerVersion);
+  const hasCoaUpdate = Boolean(normalizeText(snapshot.coaString) && normalizeText(snapshot.coaString) !== normalizeText(tracker.coaString));
 
   const lastConfirmedActiveMs = (member: FightTrackerMember) => {
     const explicit = timestampMs(member.lastConfirmedActiveAt);
@@ -394,6 +405,7 @@ export function buildFightTrackerSyncPlan(
       missingMembers.length > 0 ||
       hasGuildRoleUpdates ||
       hasStatsUpdates ||
+      hasCoaUpdate ||
       hasNewerNormalizerVersion ||
       hasNewerSnapshot,
   };

@@ -88,6 +88,20 @@ export default function PlaygroundIndex() {
             </NavLink>
 
             <NavLink
+              to="record-badges"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Record Badges
+            </NavLink>
+
+            <NavLink
+              to="records-showcase"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Records Showcase
+            </NavLink>
+
+            <NavLink
               to="gamified"
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >

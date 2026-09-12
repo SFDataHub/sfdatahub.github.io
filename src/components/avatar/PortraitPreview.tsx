@@ -67,11 +67,25 @@ export default function PortraitPreview({
   label,
   fallbackImage,
   fallbackLabel,
+  fallbackNode,
+  className,
+  shellClassName,
+  canvasClassName,
+  statusClassName,
+  canvasId = "PortraitCanvasPopOut",
+  showStatus = true,
 }: {
   config?: Partial<PortraitOptions>;
   label: string;
   fallbackImage?: string;
   fallbackLabel?: string;
+  fallbackNode?: React.ReactNode;
+  className?: string;
+  shellClassName?: string;
+  canvasClassName?: string;
+  statusClassName?: string;
+  canvasId?: string;
+  showStatus?: boolean;
 }) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -133,22 +147,22 @@ export default function PortraitPreview({
   const showFallback = !libraryConfig || status === "error";
 
   return (
-    <div className="avatar-portrait" aria-live="polite">
-      <div className="avatar-portrait__canvas-shell">
+    <div className={["avatar-portrait", className].filter(Boolean).join(" ")} aria-live="polite">
+      <div className={["avatar-portrait__canvas-shell", shellClassName].filter(Boolean).join(" ")}>
         {!showFallback && (
           <canvas
             ref={canvasRef}
-            id="PortraitCanvasPopOut"
+            id={canvasId}
             width={526}
             height={526}
-            className="avatar-portrait__canvas avatar-portrait__canvas--popout"
+            className={["avatar-portrait__canvas avatar-portrait__canvas--popout", canvasClassName].filter(Boolean).join(" ")}
             aria-label={t("playerProfile.heroPanel.portrait.canvasAriaLabel", {
               label,
               defaultValue: "Portrait of {{label}}",
             })}
           />
         )}
-        {showFallback && (
+        {showFallback && (fallbackNode ?? (
           <img
             src={placeholderSrc}
             alt={placeholderAlt}
@@ -157,9 +171,11 @@ export default function PortraitPreview({
             width={240}
             height={240}
           />
-        )}
+        ))}
       </div>
-      {statusMessage && <span className="avatar-portrait__status">{statusMessage}</span>}
+      {showStatus && statusMessage && (
+        <span className={["avatar-portrait__status", statusClassName].filter(Boolean).join(" ")}>{statusMessage}</span>
+      )}
     </div>
   );
 }

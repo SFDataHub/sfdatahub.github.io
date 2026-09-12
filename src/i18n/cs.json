@@ -99,7 +99,42 @@
       "fallbackChannel": "Rekordy",
       "previous": "Předchozí: {{holder}} • {{days}}d",
       "daysLabel": "dní",
-      "empty": "Zatím žádná oznámení rekordů."
+      "empty": "Zatím žádná oznámení rekordů.",
+      "front": {
+        "previousRecord": "Předchozí rekord",
+        "newRecord": "Nový rekord"
+      },
+      "back": {
+        "record": "Rekord",
+        "category": "Kategorie",
+        "newRecordholder": "Nový držitel rekordu",
+        "server": "Server",
+        "postedAt": "Zveřejněno",
+        "timeTaken": "Čas dosažení",
+        "previousRecordholder": "Předchozí držitel rekordu",
+        "previousTime": "Předchozí čas"
+      },
+      "category": {
+        "class": "Třída",
+        "any": "Libovolná",
+        "guild": "Cech"
+      },
+      "scope": {
+        "overallRecord": "Celkový rekord",
+        "classRecord": "Rekord třídy: {{className}}",
+        "guildRecord": "Cechovní rekord"
+      },
+      "nav": {
+        "previous": "Předchozí rekordy",
+        "next": "Další rekordy"
+      },
+      "backButton": "Zpět",
+      "recordCardAria": "Karta rekordu {{record}}",
+      "daysCount_one": "{{count}} den",
+      "daysCount_few": "{{count}} dny",
+      "daysCount_many": "{{count}} dne",
+      "daysCount_other": "{{count}} dní",
+      "daysValue": "{{days}} dní"
     },
     "youtube": {
       "title": "YouTube",

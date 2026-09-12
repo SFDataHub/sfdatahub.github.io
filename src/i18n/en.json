@@ -99,7 +99,40 @@
       "fallbackChannel": "Records",
       "previous": "Previous: {{holder}} • {{days}}d",
       "daysLabel": "days",
-      "empty": "No record announcements yet."
+      "empty": "No record announcements yet.",
+      "front": {
+        "previousRecord": "Previous Record",
+        "newRecord": "New Record"
+      },
+      "back": {
+        "record": "Record",
+        "category": "Category",
+        "newRecordholder": "New Recordholder",
+        "server": "Server",
+        "postedAt": "Posted At",
+        "timeTaken": "Time Taken",
+        "previousRecordholder": "Previous Recordholder",
+        "previousTime": "Previous Time"
+      },
+      "category": {
+        "class": "Class",
+        "any": "Any",
+        "guild": "Guild"
+      },
+      "scope": {
+        "overallRecord": "Overall Record",
+        "classRecord": "Class Record: {{className}}",
+        "guildRecord": "Guild Record"
+      },
+      "nav": {
+        "previous": "Previous records",
+        "next": "Next records"
+      },
+      "backButton": "Back",
+      "recordCardAria": "{{record}} record card",
+      "daysCount_one": "{{count}} day",
+      "daysCount_other": "{{count}} days",
+      "daysValue": "{{days}} days"
     },
     "youtube": {
       "title": "YouTube",

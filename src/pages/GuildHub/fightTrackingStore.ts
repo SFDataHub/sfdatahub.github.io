@@ -13,6 +13,7 @@ export type FightTrackerGuild = {
   source: "manual" | "guild_scan";
   linkedGuildHubGuildId: string | null;
   linkedGuildHubLogoIdentifier: string | null;
+  coaString?: string | null;
   lastSyncedScanId: string | null;
   lastSyncedScanAt: string | null;
   lastSyncedNormalizerVersion?: number | null;
@@ -117,6 +118,7 @@ export type CreateFightTrackerInput = {
   source: "manual" | "guild_scan";
   linkedGuildHubGuildId?: string | null;
   linkedGuildHubLogoIdentifier?: string | null;
+  coaString?: string | null;
   lastSyncedScanId?: string | null;
   lastSyncedScanAt?: string | null;
   lastSyncedNormalizerVersion?: number | null;
@@ -286,6 +288,7 @@ export async function createFightTracker(input: CreateFightTrackerInput): Promis
     source: input.source,
     linkedGuildHubGuildId: normalizeText(input.linkedGuildHubGuildId) || null,
     linkedGuildHubLogoIdentifier: normalizeText(input.linkedGuildHubLogoIdentifier) || null,
+    coaString: normalizeText(input.coaString) || null,
     lastSyncedScanId: normalizeText(input.lastSyncedScanId) || null,
     lastSyncedScanAt: normalizeText(input.lastSyncedScanAt) || null,
     lastSyncedNormalizerVersion: normalizeVersion(input.lastSyncedNormalizerVersion),
@@ -558,6 +561,7 @@ export async function updateFightTrackerSyncMetadata(
   scanId: string | null,
   scanAt: string | null,
   normalizerVersion?: number | null,
+  coaString?: string | null,
 ): Promise<FightTrackerGuild> {
   const scanAtMs = timestampMs(scanAt);
   const lastSyncedScanAtMs = timestampMs(tracker.lastSyncedScanAt);
@@ -568,11 +572,13 @@ export async function updateFightTrackerSyncMetadata(
   const incomingVersion = normalizeVersion(normalizerVersion);
   const nextNormalizerVersion =
     incomingVersion == null ? existingVersion : Math.max(existingVersion ?? Number.NEGATIVE_INFINITY, incomingVersion);
+  const nextCoaString = normalizeText(coaString) || tracker.coaString || null;
   const updated: FightTrackerGuild = {
     ...tracker,
     lastSyncedScanId: nextSyncedScanId,
     lastSyncedScanAt: nextSyncedScanAt,
     lastSyncedNormalizerVersion: nextNormalizerVersion,
+    coaString: nextCoaString,
     updatedAt: new Date().toISOString(),
   };
   const db = await getFightTrackingDb();

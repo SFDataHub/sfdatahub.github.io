@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
 import { getClassMetaById } from "../../data/classes";
+import { guildIconByIdentifier } from "../../data/guilds";
 import {
   listGuildHubLocalGuildsForServerFromScans,
   listGuildHubLocalScans,
@@ -61,7 +62,12 @@ import {
   type FightTrackerScanSnapshot,
   type FightTrackerSyncPlan,
 } from "./fightTrackingScanSource";
-import { mapLocalGuildIdentityToSelection, useGuildHubSelection, type GuildHubSelectedGuild } from "./hooks/useGuildHubSelection";
+import {
+  buildGuildLogoIdentifier,
+  mapLocalGuildIdentityToSelection,
+  useGuildHubSelection,
+  type GuildHubSelectedGuild,
+} from "./hooks/useGuildHubSelection";
 import styles from "./FightTracking.module.css";
 
 type TrackerRow = FightTrackerMember & {
@@ -116,6 +122,39 @@ type FightCreationTarget = {
 type ReviewRecognitionState = "confirmed" | "uncertain" | "not_detected";
 
 type ParticipationExportType = "simple" | "detailed";
+type ParticipationExportBusyAction = "preview" | "download";
+type ParticipationExportPreview = {
+  blob: Blob;
+  cacheKey: string;
+  fileBaseName: string;
+  height: number;
+  url: string;
+  width: number;
+};
+type GuildParticipationSummary = {
+  ok: number;
+  missed: number;
+  evaluated: number;
+  rate: number | null;
+};
+type GuildActivityLevel = "empty" | "low" | "mid" | "high" | "max";
+type GuildActivityFightSlot = GuildParticipationSummary & {
+  date: string;
+  day: number;
+  fightNumber: FightNumber;
+  hasFight: boolean;
+  level: GuildActivityLevel;
+};
+type GuildActivityDay = {
+  date: string;
+  day: number;
+  fights: Record<FightNumber, GuildActivityFightSlot>;
+};
+
+const PARTICIPATION_EXPORT_PREVIEW_ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM = PARTICIPATION_EXPORT_PREVIEW_ZOOM_LEVELS[0];
+const PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM =
+  PARTICIPATION_EXPORT_PREVIEW_ZOOM_LEVELS[PARTICIPATION_EXPORT_PREVIEW_ZOOM_LEVELS.length - 1];
 
 type LocalScreenshotPreview = {
   id: string;
@@ -185,6 +224,10 @@ const PARTICIPATION_STICKY_COLUMN_VARS = [
 ] as const;
 const FIGHT_SLOTS: FightNumber[] = ["1", "2"];
 const EXPORT_ACTIVITY_DAY_WIDTH_PX = 20;
+const EXPORT_SIMPLE_BASE_WIDTH_PX = 1240;
+const EXPORT_SIMPLE_FIGHT_BLOCK_WIDTH_PX = 54;
+const EXPORT_SIMPLE_FIGHT_BLOCK_GAP_PX = 4;
+const EXPORT_SIMPLE_REPORT_HORIZONTAL_CHROME_PX = 80;
 
 const normalizeFightNumber = (value: unknown): FightNumber => (value === "2" ? "2" : "1");
 
@@ -356,6 +399,76 @@ const formatFightLabel = (fight: GuildFight) =>
 const formatQuote = (missed: number, eligible: number) => {
   if (!eligible) return "—";
   return `${Math.round((missed / eligible) * 100)}%`;
+};
+
+const formatParticipationRate = (rate: number | null) => (rate == null ? "—" : `${Math.round(rate * 1000) / 10}%`);
+
+const getGuildActivityLevel = (rate: number | null): GuildActivityLevel => {
+  if (rate == null) return "empty";
+  if (rate >= 0.95) return "max";
+  if (rate >= 0.85) return "high";
+  if (rate >= 0.7) return "mid";
+  return "low";
+};
+
+const getGuildParticipationSummary = (fights: GuildFight[], rows: ParticipationDerivedRow[]): GuildParticipationSummary => {
+  const counts = fights.reduce(
+    (sum, fight) => {
+      rows.forEach((row) => {
+        const status = getFightMemberStatus(fight, row.member.id);
+        if (status === "ok") sum.ok += 1;
+        if (status === "missed") sum.missed += 1;
+      });
+      return sum;
+    },
+    { ok: 0, missed: 0 },
+  );
+  const evaluated = counts.ok + counts.missed;
+  return {
+    ...counts,
+    evaluated,
+    rate: evaluated ? counts.ok / evaluated : null,
+  };
+};
+
+const getGuildActivityDays = (month: string, fights: GuildFight[], rows: ParticipationDerivedRow[]): GuildActivityDay[] => {
+  const dayCount = getMonthDays(month);
+  const fightBySlot = new Map(fights.map((fight) => [getFightSlotKey(fight.date, fight.fightNumber), fight]));
+  return Array.from({ length: dayCount }, (_, index) => {
+    const day = index + 1;
+    const date = getDateForMonthDay(month, day);
+    return {
+      date,
+      day,
+      fights: FIGHT_SLOTS.reduce(
+        (slots, fightNumber) => {
+          const fight = fightBySlot.get(getFightSlotKey(date, fightNumber)) ?? null;
+          const summary = getGuildParticipationSummary(fight ? [fight] : [], rows);
+          slots[fightNumber] = {
+            ...summary,
+            date,
+            day,
+            fightNumber,
+            hasFight: Boolean(fight),
+            level: fight ? getGuildActivityLevel(summary.rate) : "empty",
+          };
+          return slots;
+        },
+        {} as Record<FightNumber, GuildActivityFightSlot>,
+      ),
+    };
+  });
+};
+
+const hasPerfectMonthParticipation = (row: ParticipationDerivedRow) => row.evaluated > 0 && row.missed === 0;
+
+const getFightTrackerGuildLogoIdentifier = (tracker: FightTrackerGuild) =>
+  tracker.linkedGuildHubLogoIdentifier ?? buildGuildLogoIdentifier(tracker.server, tracker.linkedGuildHubGuildId);
+
+const getSimpleExportWidth = (fightCount: number) => {
+  const fightTimelineWidth =
+    fightCount * EXPORT_SIMPLE_FIGHT_BLOCK_WIDTH_PX + Math.max(0, fightCount - 1) * EXPORT_SIMPLE_FIGHT_BLOCK_GAP_PX;
+  return Math.max(EXPORT_SIMPLE_BASE_WIDTH_PX, EXPORT_SIMPLE_REPORT_HORIZONTAL_CHROME_PX + fightTimelineWidth);
 };
 
 const getFiniteNumber = (value: unknown): number | null =>
@@ -672,16 +785,37 @@ const waitForStableLayout = async (node: HTMLElement) => {
   }
 };
 
-const exportNodeToPng = async (node: HTMLElement, fileBaseName: string) => {
+const waitForExportAssets = async (node: HTMLElement) => {
+  for (let index = 0; index < 90; index += 1) {
+    const coaState = node.dataset.fightParticipationExportCoaState;
+    if (coaState !== "loading") break;
+    await waitForAnimationFrame();
+  }
+
+  const images = [...node.querySelectorAll("img")];
+  await Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        const done = () => resolve();
+        image.addEventListener("load", done, { once: true });
+        image.addEventListener("error", done, { once: true });
+      });
+    }),
+  );
+};
+
+const renderExportNodeToPngBlob = async (node: HTMLElement, options: { preserveCssPixelSize?: boolean } = {}) => {
   await waitForAnimationFrame();
   await waitForAnimationFrame();
   if (document.fonts?.ready) await document.fonts.ready;
+  await waitForExportAssets(node);
   await waitForStableLayout(node);
 
   const rect = node.getBoundingClientRect();
   const targetWidth = Math.max(1, Math.ceil(rect.width));
   const targetHeight = Math.max(1, Math.ceil(rect.height));
-  const scale = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const scale = options.preserveCssPixelSize ? 1 : Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   if (targetWidth * scale > 32000 || targetHeight * scale > 32000 || targetWidth * targetHeight * scale * scale > 268000000) {
     throw new Error("Der Report ist fuer einen einzelnen PNG-Export zu gross. Inhalte wurden nicht gekuerzt.");
   }
@@ -709,26 +843,34 @@ const exportNodeToPng = async (node: HTMLElement, fileBaseName: string) => {
       clonedExportNode.style.overflow = "visible";
     },
   });
+  if (options.preserveCssPixelSize && (canvas.width !== targetWidth || canvas.height !== targetHeight)) {
+    throw new Error(
+      `PNG konnte nicht in Originalgroesse erzeugt werden (${canvas.width}x${canvas.height} statt ${targetWidth}x${targetHeight}). Inhalte wurden nicht verkleinert.`,
+    );
+  }
 
-  await new Promise<void>((resolve, reject) => {
+  const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
         if (!blob) {
           reject(new Error("PNG konnte nicht erzeugt werden."));
           return;
         }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.download = `${sanitizeFileBaseName(fileBaseName)}.png`;
-        link.href = url;
-        link.click();
-        URL.revokeObjectURL(url);
-        resolve();
+        resolve(blob);
       },
       "image/png",
       1,
     );
   });
+
+  return { blob, height: canvas.height, width: canvas.width };
+};
+
+const downloadPngUrl = (url: string, fileBaseName: string) => {
+  const link = document.createElement("a");
+  link.download = `${sanitizeFileBaseName(fileBaseName)}.png`;
+  link.href = url;
+  link.click();
 };
 
 function useMediaQuery(query: string) {
@@ -1352,6 +1494,7 @@ export default function GuildHubFightTracking() {
       nextSyncedScanId,
       nextSyncedScanAt,
       plan.snapshot.normalizerVersion,
+      plan.snapshot.coaString,
     );
     setTracker(nextTracker);
     setTrackerMembers((prev) => {
@@ -2408,13 +2551,18 @@ function FunctionOverlay({
   title,
   subtitle = "Fight Tracker",
   children,
+  dialogClassName = "",
+  bodyClassName = "",
   onClose,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  dialogClassName?: string;
+  bodyClassName?: string;
   onClose: () => void;
 }) {
+  const titleId = React.useId();
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -2433,22 +2581,22 @@ function FunctionOverlay({
       className={`${styles.syncOverlay} ${styles.functionOverlay}`}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="fight-function-overlay-title"
+      aria-labelledby={titleId}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className={`${styles.syncDialog} ${styles.functionDialog}`}>
+      <div className={`${styles.syncDialog} ${styles.functionDialog} ${dialogClassName}`}>
         <div className={styles.syncDialogHeader}>
           <div>
-            <h2 id="fight-function-overlay-title">{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             <p>{subtitle}</p>
           </div>
           <button type="button" className={styles.iconOnlyButton} aria-label="Ansicht schliessen" onClick={onClose}>
             <X size={17} aria-hidden />
           </button>
         </div>
-        <div className={styles.functionDialogBody}>{children}</div>
+        <div className={`${styles.functionDialogBody} ${bodyClassName}`}>{children}</div>
       </div>
     </div>
   );
@@ -3327,9 +3475,12 @@ function FightTable({
   const [exportType, setExportType] = React.useState<ParticipationExportType>("simple");
   const [exportMonth, setExportMonth] = React.useState(getMonthInputValue);
   const [showFormerMembersInExport, setShowFormerMembersInExport] = React.useState(false);
-  const [isExportingParticipation, setIsExportingParticipation] = React.useState(false);
+  const [exportBusyAction, setExportBusyAction] = React.useState<ParticipationExportBusyAction | null>(null);
   const [exportError, setExportError] = React.useState<string | null>(null);
+  const [participationExportPreview, setParticipationExportPreview] = React.useState<ParticipationExportPreview | null>(null);
+  const [isExportPreviewOpen, setIsExportPreviewOpen] = React.useState(false);
   const exportRef = React.useRef<HTMLDivElement | null>(null);
+  const participationExportPreviewUrlRef = React.useRef<string | null>(null);
   const participationMouseDragStateRef = React.useRef<ParticipationMouseDragState | null>(null);
   const suppressNextParticipationClickRef = React.useRef(false);
   const suppressParticipationClickTimerRef = React.useRef<number | null>(null);
@@ -3600,7 +3751,13 @@ function FightTable({
     () => sortParticipationRows(visibleParticipationRows, sortKey, sortDirection),
     [sortDirection, sortKey, visibleParticipationRows],
   );
-  const exportMonthFights = React.useMemo(() => getFightsForMonth(fights, exportMonth), [exportMonth, fights]);
+  const exportMonthFights = React.useMemo(
+    () =>
+      fights
+        .filter((fight) => fight.date.startsWith(`${exportMonth}-`))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.fightNumber.localeCompare(b.fightNumber)),
+    [exportMonth, fights],
+  );
   const exportDuplicateSlots = React.useMemo(() => getDuplicateFightSlots(exportMonthFights), [exportMonthFights]);
   const exportRows = React.useMemo(() => {
     const memberRows = rows.filter((member) => showFormerMembersInExport || member.active !== false);
@@ -3611,16 +3768,134 @@ function FightTable({
     );
   }, [exportMonthFights, readonlyStatsByMemberId, rows, showFormerMembersInExport, sortDirection, sortKey]);
   const canExportParticipation = Boolean(exportMonth && exportRows.length && !exportDuplicateSlots.length);
-  const handleExportParticipation = async () => {
-    if (!exportRef.current || isExportingParticipation || !canExportParticipation) return;
-    setIsExportingParticipation(true);
+  const isExportingParticipation = exportBusyAction !== null;
+  const exportFileBaseName = React.useMemo(
+    () => `${tracker.name}-${exportMonth}-fight-participation-${exportType}`,
+    [exportMonth, exportType, tracker.name],
+  );
+  const exportCacheKey = React.useMemo(
+    () =>
+      JSON.stringify({
+        exportMonth,
+        exportType,
+        fights: exportMonthFights.map((fight) => ({
+          date: fight.date,
+          fightNumber: fight.fightNumber,
+          id: fight.id,
+          missedMemberIds: [...fight.missedMemberIds].sort(),
+          opponentGuild: fight.opponentGuild,
+        })),
+        rows: exportRows.map((row) => ({
+          active: row.member.active,
+          baseStatsSum: row.baseStatsSum,
+          className: row.member.className,
+          evaluated: row.evaluated,
+          guildRole: row.member.guildRole,
+          id: row.member.id,
+          lastMissedFightId: row.lastMissedFight?.id ?? null,
+          level: row.level,
+          missed: row.missed,
+          name: row.member.name,
+          streakCount: row.streakCount,
+          streakStatus: row.streakStatus,
+          totalStats: row.totalStats,
+        })),
+        showFormerMembersInExport,
+        sortDirection,
+        sortKey,
+        trackerId: tracker.id,
+        trackerLogoIdentifier: getFightTrackerGuildLogoIdentifier(tracker),
+        trackerName: tracker.name,
+      }),
+    [
+      exportMonth,
+      exportMonthFights,
+      exportRows,
+      exportType,
+      showFormerMembersInExport,
+      sortDirection,
+      sortKey,
+      tracker.id,
+      tracker.linkedGuildHubLogoIdentifier,
+      tracker.linkedGuildHubGuildId,
+      tracker.server,
+      tracker.name,
+    ],
+  );
+  const discardParticipationExportPreview = React.useCallback(() => {
+    if (participationExportPreviewUrlRef.current) {
+      URL.revokeObjectURL(participationExportPreviewUrlRef.current);
+      participationExportPreviewUrlRef.current = null;
+    }
+    setParticipationExportPreview(null);
+  }, []);
+  const storeParticipationExportPreview = React.useCallback((nextPreview: ParticipationExportPreview) => {
+    setParticipationExportPreview((current) => {
+      if (current && current.url !== nextPreview.url) URL.revokeObjectURL(current.url);
+      participationExportPreviewUrlRef.current = nextPreview.url;
+      return nextPreview;
+    });
+  }, []);
+  const renderParticipationExportPreview = React.useCallback(async () => {
+    if (!exportRef.current) throw new Error("Export-Vorschau konnte nicht vorbereitet werden.");
+    const rendered = await renderExportNodeToPngBlob(exportRef.current, { preserveCssPixelSize: exportType === "simple" });
+    return {
+      ...rendered,
+      cacheKey: exportCacheKey,
+      fileBaseName: exportFileBaseName,
+      url: URL.createObjectURL(rendered.blob),
+    };
+  }, [exportCacheKey, exportFileBaseName, exportType]);
+  const getCurrentParticipationExportPreview = React.useCallback(async () => {
+    if (participationExportPreview?.cacheKey === exportCacheKey) return participationExportPreview;
+    const nextPreview = await renderParticipationExportPreview();
+    storeParticipationExportPreview(nextPreview);
+    return nextPreview;
+  }, [exportCacheKey, participationExportPreview, renderParticipationExportPreview, storeParticipationExportPreview]);
+  React.useEffect(() => {
+    setExportError(null);
+    setIsExportPreviewOpen(false);
+    setParticipationExportPreview((current) => {
+      if (!current || current.cacheKey === exportCacheKey) return current;
+      URL.revokeObjectURL(current.url);
+      if (participationExportPreviewUrlRef.current === current.url) participationExportPreviewUrlRef.current = null;
+      return null;
+    });
+  }, [exportCacheKey]);
+  React.useEffect(
+    () => () => {
+      if (participationExportPreviewUrlRef.current) {
+        URL.revokeObjectURL(participationExportPreviewUrlRef.current);
+        participationExportPreviewUrlRef.current = null;
+      }
+    },
+    [],
+  );
+  const handlePreviewParticipationExport = async () => {
+    if (isExportingParticipation || !canExportParticipation) return;
+    setExportBusyAction("preview");
     setExportError(null);
     try {
-      await exportNodeToPng(exportRef.current, `${tracker.name}-${exportMonth}-fight-participation-${exportType}`);
+      await getCurrentParticipationExportPreview();
+      setIsExportPreviewOpen(true);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "PNG-Vorschau konnte nicht erzeugt werden.");
+      setIsExportPreviewOpen(false);
+    } finally {
+      setExportBusyAction(null);
+    }
+  };
+  const handleExportParticipation = async () => {
+    if (isExportingParticipation || !canExportParticipation) return;
+    setExportBusyAction("download");
+    setExportError(null);
+    try {
+      const currentPreview = await getCurrentParticipationExportPreview();
+      downloadPngUrl(currentPreview.url, currentPreview.fileBaseName);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "PNG konnte nicht erzeugt werden.");
     } finally {
-      setIsExportingParticipation(false);
+      setExportBusyAction(null);
     }
   };
   const participationTableStyle = {
@@ -3903,14 +4178,31 @@ function FightTable({
           canExport={canExportParticipation}
           isExporting={isExportingParticipation}
           exportError={exportError}
+          exportBusyAction={exportBusyAction}
           onExportTypeChange={setExportType}
           onExportMonthChange={(value) => {
             setExportMonth(value);
             setExportError(null);
           }}
           onShowFormerMembersChange={setShowFormerMembersInExport}
+          onPreview={() => void handlePreviewParticipationExport()}
           onExport={() => void handleExportParticipation()}
-          onClose={() => setIsExportOverlayOpen(false)}
+          onClose={() => {
+            setIsExportOverlayOpen(false);
+            setIsExportPreviewOpen(false);
+            discardParticipationExportPreview();
+          }}
+        />
+      ) : null}
+      {isExportPreviewOpen && participationExportPreview?.cacheKey === exportCacheKey ? (
+        <ParticipationExportPreviewOverlay
+          preview={participationExportPreview}
+          subtitle={`${formatMonthLabel(exportMonth)} · ${exportMonthFights.length} Fights`}
+          onDownload={() => downloadPngUrl(participationExportPreview.url, participationExportPreview.fileBaseName)}
+          onClose={() => {
+            setIsExportPreviewOpen(false);
+            discardParticipationExportPreview();
+          }}
         />
       ) : null}
       <div className={styles.exportStage} aria-hidden>
@@ -3937,9 +4229,11 @@ function ParticipationExportOverlay({
   canExport,
   isExporting,
   exportError,
+  exportBusyAction,
   onExportTypeChange,
   onExportMonthChange,
   onShowFormerMembersChange,
+  onPreview,
   onExport,
   onClose,
 }: {
@@ -3952,9 +4246,11 @@ function ParticipationExportOverlay({
   canExport: boolean;
   isExporting: boolean;
   exportError: string | null;
+  exportBusyAction: ParticipationExportBusyAction | null;
   onExportTypeChange: (value: ParticipationExportType) => void;
   onExportMonthChange: (value: string) => void;
   onShowFormerMembersChange: (value: boolean) => void;
+  onPreview: () => void;
   onExport: () => void;
   onClose: () => void;
 }) {
@@ -4013,10 +4309,92 @@ function ParticipationExportOverlay({
           <button type="button" className={styles.secondaryAction} onClick={onClose}>
             Abbrechen
           </button>
+          <button type="button" className={styles.secondaryAction} disabled={!canExport || isExporting} onClick={onPreview}>
+            <FileImage size={16} aria-hidden />
+            {exportBusyAction === "preview" ? "Vorschau wird erstellt..." : "Vorschau"}
+          </button>
           <button type="button" className={styles.primaryAction} disabled={!canExport || isExporting} onClick={onExport}>
             <Download size={16} aria-hidden />
-            {isExporting ? "Export wird erzeugt..." : "Export erzeugen"}
+            {exportBusyAction === "download" ? "Export wird erzeugt..." : "Export erzeugen"}
           </button>
+        </div>
+      </section>
+    </FunctionOverlay>
+  );
+}
+
+function ParticipationExportPreviewOverlay({
+  preview,
+  subtitle,
+  onDownload,
+  onClose,
+}: {
+  preview: ParticipationExportPreview;
+  subtitle: string;
+  onDownload: () => void;
+  onClose: () => void;
+}) {
+  const viewerRef = React.useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = React.useState(1);
+  const fitWidth = React.useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !preview.width) return;
+    const nextZoom = Math.max(
+      PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM,
+      Math.min(PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM, (viewer.clientWidth - 32) / preview.width),
+    );
+    setZoom(nextZoom);
+    viewer.scrollTo({ left: 0, top: 0 });
+  }, [preview.width]);
+  React.useLayoutEffect(() => {
+    fitWidth();
+  }, [fitWidth, preview.url]);
+  const stepZoom = (direction: "in" | "out") => {
+    const levels = PARTICIPATION_EXPORT_PREVIEW_ZOOM_LEVELS;
+    if (direction === "in") {
+      setZoom((current) => levels.find((level) => level > current + 0.01) ?? PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM);
+      return;
+    }
+    setZoom((current) => [...levels].reverse().find((level) => level < current - 0.01) ?? PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM);
+  };
+  const displayWidth = Math.max(1, Math.round(preview.width * zoom));
+
+  return (
+    <FunctionOverlay
+      title="Participation Vorschau"
+      subtitle={subtitle}
+      dialogClassName={styles.exportPreviewDialog}
+      bodyClassName={styles.exportPreviewDialogBody}
+      onClose={onClose}
+    >
+      <section className={styles.exportPreviewPanel}>
+        <div className={styles.exportPreviewControls}>
+          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("out")} disabled={zoom <= PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM}>
+            -
+          </button>
+          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("in")} disabled={zoom >= PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM}>
+            +
+          </button>
+          <button type="button" className={styles.secondaryAction} onClick={() => setZoom(1)}>
+            100 %
+          </button>
+          <button type="button" className={styles.secondaryAction} onClick={fitWidth}>
+            An Breite anpassen
+          </button>
+          <button type="button" className={styles.primaryAction} onClick={onDownload}>
+            <Download size={16} aria-hidden />
+            Export herunterladen
+          </button>
+        </div>
+        <div className={styles.exportPreviewViewer} ref={viewerRef}>
+          <img
+            alt="Participation Export Vorschau"
+            className={styles.exportPreviewImage}
+            height={preview.height}
+            src={preview.url}
+            style={{ width: `${displayWidth}px` }}
+            width={preview.width}
+          />
         </div>
       </section>
     </FunctionOverlay>
@@ -4038,6 +4416,10 @@ const ParticipationExportReport = React.forwardRef<
   const fightBySlot = new Map(fights.map((fight) => [getFightSlotKey(fight.date, fight.fightNumber), fight]));
   const monthLabel = formatMonthLabel(month);
   const exportClassName = `${styles.exportReport} ${exportType === "detailed" ? styles.exportReportDetailed : styles.exportReportSimple}`;
+  const exportStyle = exportType === "simple" ? ({ width: `${getSimpleExportWidth(fights.length)}px` } as React.CSSProperties) : undefined;
+  const guildEmblemUrl = exportType === "simple" ? guildIconByIdentifier(getFightTrackerGuildLogoIdentifier(tracker), 160).thumb : null;
+  const guildSummary = getGuildParticipationSummary(fights, rows);
+  const guildActivityDays = getGuildActivityDays(month, fights, rows);
 
   const perfectRows = rows.filter((row) => row.evaluated > 0 && row.missed === 0);
   const maxMissed = Math.max(0, ...rows.map((row) => row.missed));
@@ -4046,24 +4428,40 @@ const ParticipationExportReport = React.forwardRef<
   const bestStreakRows = bestStreak > 0 ? rows.filter((row) => row.streakStatus === "ok" && row.streakCount === bestStreak) : [];
 
   return (
-    <div ref={ref} className={exportClassName} data-fight-participation-export-root="true">
-      <header className={styles.exportReportHeader}>
-        <div>
-          <p>Fight Participation</p>
-          <h2>{tracker.name}</h2>
-          <span>{monthLabel}</span>
-        </div>
-        <div className={styles.exportReportStats}>
-          <strong>{fights.length}</strong>
-          <span>Fights</span>
-          {exportType === "detailed" ? (
-            <>
-              <strong>{rows.length}</strong>
-              <span>Member</span>
-            </>
-          ) : null}
-        </div>
-      </header>
+    <div
+      ref={ref}
+      className={exportClassName}
+      style={exportStyle}
+      data-fight-participation-export-root="true"
+    >
+      {exportType === "simple" ? (
+        <ExportSimpleGuildInfo
+          activityDays={guildActivityDays}
+          emblemUrl={guildEmblemUrl}
+          fightCount={fights.length}
+          guildName={tracker.name}
+          monthLabel={monthLabel}
+          participationRate={guildSummary.rate}
+        />
+      ) : (
+        <header className={styles.exportReportHeader}>
+          <div>
+            <p>Fight Participation</p>
+            <h2>{tracker.name}</h2>
+            <span>{monthLabel}</span>
+          </div>
+          <div className={styles.exportReportStats}>
+            <strong>{fights.length}</strong>
+            <span>Fights</span>
+            {exportType === "detailed" ? (
+              <>
+                <strong>{rows.length}</strong>
+                <span>Member</span>
+              </>
+            ) : null}
+          </div>
+        </header>
+      )}
 
       {exportType === "detailed" ? (
         <>
@@ -4095,7 +4493,6 @@ const ParticipationExportReport = React.forwardRef<
 
       <section className={`${styles.exportMemberList} ${exportType === "simple" ? styles.exportSimpleTable : ""}`}>
         {exportType === "simple" ? <ExportSimpleMemberHeader /> : null}
-        {exportType === "simple" ? <ExportSimpleFightAxis fights={fights} /> : null}
         {rows.map((row) =>
           exportType === "simple" ? (
             <ExportSimpleMemberRow key={row.member.id} row={row} fights={fights} />
@@ -4123,6 +4520,100 @@ const ParticipationExportReport = React.forwardRef<
     </div>
   );
 });
+
+function ExportSimpleGuildInfo({
+  activityDays,
+  emblemUrl,
+  fightCount,
+  guildName,
+  monthLabel,
+  participationRate,
+}: {
+  activityDays: GuildActivityDay[];
+  emblemUrl: string | null;
+  fightCount: number;
+  guildName: string;
+  monthLabel: string;
+  participationRate: number | null;
+}) {
+  return (
+    <header className={`${styles.exportReportHeader} ${styles.exportSimpleGuildInfo}`}>
+      <div className={styles.exportSimpleGuildMain}>
+        <div className={styles.exportGuildEmblem}>
+          {emblemUrl ? <img src={emblemUrl} alt={`${guildName} Wappen`} /> : <span aria-hidden />}
+        </div>
+        <div className={styles.exportSimpleGuildText}>
+          <p>Fight Participation</p>
+          <h2>{guildName}</h2>
+          <span>{monthLabel}</span>
+        </div>
+      </div>
+      <ExportSimpleGuildActivity days={activityDays} />
+      <div className={styles.exportSimpleGuildMetrics}>
+        <div>
+          <strong>{fightCount}</strong>
+          <span>Fights</span>
+        </div>
+        <div>
+          <strong>{formatParticipationRate(participationRate)}</strong>
+          <span>Ø Beteiligung</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ExportSimpleGuildActivity({ days }: { days: GuildActivityDay[] }) {
+  const gridStyle = { gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, 16px)` } as React.CSSProperties;
+
+  return (
+    <div
+      className={styles.exportGuildActivity}
+      aria-label="Guild Activity im Monat"
+    >
+      <div className={styles.exportGuildActivityTitle}>Guild Activity</div>
+      <div className={styles.exportGuildActivityTimeline}>
+        <div className={styles.exportGuildActivityDays} style={gridStyle}>
+          {days.map((day) => (
+            <span key={day.date}>{String(day.day).padStart(2, "0")}</span>
+          ))}
+        </div>
+        {FIGHT_SLOTS.map((slot) => (
+          <React.Fragment key={slot}>
+            <span className={styles.exportGuildActivityFightLabel}>F{slot}</span>
+            <div className={styles.exportGuildActivityCells} style={gridStyle}>
+              {days.map((day) => {
+                const fight = day.fights[slot];
+                const levelClass =
+                  fight.level === "max"
+                    ? styles.exportGuildActivityMax
+                    : fight.level === "high"
+                      ? styles.exportGuildActivityHigh
+                      : fight.level === "mid"
+                        ? styles.exportGuildActivityMid
+                        : fight.level === "low"
+                          ? styles.exportGuildActivityLow
+                          : styles.exportGuildActivityEmpty;
+                const valueLabel = fight.hasFight
+                  ? fight.evaluated
+                    ? `${formatParticipationRate(fight.rate)} (${fight.ok}/${fight.evaluated})`
+                    : "keine Bewertung"
+                  : "kein Fight";
+                return (
+                  <span
+                    key={`${day.date}-${slot}`}
+                    className={`${styles.exportGuildActivityDay} ${levelClass}`}
+                    title={`Fight ${slot} ${formatDate(day.date)}: ${valueLabel}`}
+                  />
+                );
+              })}
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ExportSimpleMemberHeader() {
   return (
@@ -4152,9 +4643,16 @@ function ExportSimpleMemberRow({
   return (
     <article className={`${styles.exportSimpleMemberBlock} ${row.member.active ? "" : styles.exportMemberInactive}`}>
       <div className={styles.exportSimpleRow}>
-        <div className={styles.exportMemberIdentity}>
-          <strong>{row.member.name}</strong>
-          <span>{memberMetaParts.join(" · ")}</span>
+        <div className={`${styles.exportMemberIdentity} ${styles.exportSimpleMemberIdentity}`}>
+          <strong>
+            {row.member.name}
+            {hasPerfectMonthParticipation(row) ? (
+              <span className={styles.exportPerfectMarker} title="Keinen Fight verpasst">
+                ★
+              </span>
+            ) : null}
+          </strong>
+          {memberMetaParts.length ? <span>{memberMetaParts.join(" · ")}</span> : null}
         </div>
         <strong>{row.missed}</strong>
         <strong>{formatQuote(row.missed, row.evaluated)}</strong>
@@ -4166,36 +4664,25 @@ function ExportSimpleMemberRow({
   );
 }
 
-function ExportSimpleFightAxis({ fights }: { fights: GuildFight[] }) {
-  if (!fights.length) return null;
-  const gridStyle = { gridTemplateColumns: `repeat(${fights.length}, minmax(0, 1fr))` };
-  return (
-    <div className={styles.exportSimpleFightAxis} style={gridStyle}>
-      {fights.map((fight) => (
-        <div key={fight.id} className={styles.exportSimpleFightLabel}>
-          <span>{formatShortDate(fight.date)}</span>
-          <strong>F{fight.fightNumber}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function ExportSimpleFightTimeline({ fights, memberId }: { fights: GuildFight[]; memberId: string }) {
   if (!fights.length) return null;
-  const gridStyle = { gridTemplateColumns: `repeat(${fights.length}, minmax(0, 1fr))` };
+  const gridStyle = { gridTemplateColumns: `repeat(${fights.length}, ${EXPORT_SIMPLE_FIGHT_BLOCK_WIDTH_PX}px)` };
   return (
     <div className={styles.exportSimpleFightTimeline} style={gridStyle}>
       {fights.map((fight) => {
         const status = getFightMemberStatus(fight, memberId);
         const statusClass =
           status === "ok" ? styles.exportActivityOk : status === "missed" ? styles.exportActivityMissed : styles.exportActivityUnknown;
+        const statusLabel = status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?";
         return (
-          <span
+          <div
             key={fight.id}
-            className={`${styles.exportSimpleFightCell} ${statusClass}`}
-            title={`Fight ${fight.fightNumber} ${formatDate(fight.date)}: ${status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?"}`}
-          />
+            className={styles.exportSimpleFightBlock}
+            title={`Fight ${fight.fightNumber} ${formatDate(fight.date)}: ${statusLabel}`}
+          >
+            <span className={`${styles.exportSimpleFightCell} ${statusClass}`} />
+            <strong>{formatShortDate(fight.date)} · F{fight.fightNumber}</strong>
+          </div>
         );
       })}
     </div>
