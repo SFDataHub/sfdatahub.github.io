@@ -303,6 +303,10 @@
 
 /* Avatar */
 .avatarBtn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   padding: 2px;
   border-radius: 999px;
   background: var(--tile);
@@ -310,8 +314,10 @@
   cursor: pointer;
 }
 .avatar{
+  flex: 0 0 36px;
   width: 36px;
   height: 36px;
+  max-width: none;
   border-radius: 999px;
   display: block;
   object-fit: cover;
@@ -350,6 +356,7 @@
 .accountRoot{
   position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
 }
 .accountDropdown{
   position: absolute;
@@ -868,15 +875,18 @@
 }
 
 @media (max-width: 479px){
-  .topbar{ padding-left: 176px; }
-  :global(.logo-dock){ left: 52px; width: 112px; }
-  :global(.logo-dock .logo-img){ max-width: 110px; max-height: 76px; }
+  .topbar{ column-gap: 6px; padding-left: 132px; }
+  :global(.logo-dock){ left: 36px; width: 104px; }
+  :global(.logo-dock .logo-img){ max-width: 100px; max-height: 80px; }
+  .topbarLeft, .topbarRight{ gap: 6px; }
+  .btnIco, .upload{ width: 36px; height: 36px; border-radius: 10px; }
+  .ico{ width: 18px; height: 18px; }
 }
 
 @media (max-width: 399px){
-  .topbar{ column-gap: 6px; padding-left: 160px; padding-right: 8px; }
-  :global(.logo-dock){ left: 56px; width: 96px; }
-  :global(.logo-dock .logo-img){ max-width: 94px; max-height: 70px; }
+  .topbar{ column-gap: 6px; padding-left: 164px; padding-right: 8px; }
+  :global(.logo-dock){ left: 52px; width: 104px; }
+  :global(.logo-dock .logo-img){ max-width: 100px; max-height: 80px; }
   .topbarLeft, .topbarRight{ gap: 6px; }
   .accountRoot{ display: none; }
   .btnIco, .upload{ width: 36px; height: 36px; border-radius: 10px; }
@@ -884,9 +894,9 @@
 }
 
 @media (max-width: 340px){
-  .topbar{ padding-left: 154px; }
-  :global(.logo-dock){ left: 54px; width: 92px; }
-  :global(.logo-dock .logo-img){ max-width: 90px; max-height: 66px; }
+  .topbar{ padding-left: 150px; }
+  :global(.logo-dock){ left: 50px; width: 96px; }
+  :global(.logo-dock .logo-img){ max-width: 92px; max-height: 76px; }
   .topbarLeft > .btnIco:not(.mobileSearchBtn){ display: none; }
 }
 
