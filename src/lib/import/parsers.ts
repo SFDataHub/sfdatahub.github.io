@@ -70,7 +70,7 @@ function extractGuildCoaString(o: Obj): string | undefined {
   return toTrimmedString(save[1]);
 }
 
-function mapGuildJsonRecord(o: Obj): Obj {
+export function mapGuildJsonRecord(o: Obj): Obj {
   const coaString = extractGuildCoaString(o);
   return coaString ? { ...o, coaString } : o;
 }

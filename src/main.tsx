@@ -112,7 +112,9 @@ import GamifiedTab6 from "./pages/Playground/GamifiedTab6";
 import GamifiedTab7 from "./pages/Playground/GamifiedTab7";
 import GamifiedTab8 from "./pages/Playground/GamifiedTab8";
 import ListViews from "./pages/Playground/ListViews";
+import RecordBadgesPage from "./pages/Playground/RecordBadgesPage";
 import RecordsSvgIconsPage from "./pages/Playground/RecordsSvgIconsPage";
+import RecordsShowcasePage from "./pages/Playground/RecordsShowcasePage";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
@@ -490,6 +492,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="gamified-7" element={<GamifiedTab7 />} />
                   <Route path="gamified-8" element={<GamifiedTab8 />} />
                   <Route path="records-svg-icons" element={<RecordsSvgIconsPage />} />
+                  <Route path="record-badges" element={<RecordBadgesPage />} />
+                  <Route path="records-showcase" element={<RecordsShowcasePage />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />

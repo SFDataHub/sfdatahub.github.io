@@ -99,7 +99,40 @@
       "fallbackChannel": "Rekorde",
       "previous": "Vorher: {{holder}} • {{days}}d",
       "daysLabel": "Tage",
-      "empty": "Noch keine Rekord-Ankuendigungen."
+      "empty": "Noch keine Rekord-Ankuendigungen.",
+      "front": {
+        "previousRecord": "Vorheriger Rekord",
+        "newRecord": "Neuer Rekord"
+      },
+      "back": {
+        "record": "Rekord",
+        "category": "Kategorie",
+        "newRecordholder": "Neuer Rekordhalter",
+        "server": "Server",
+        "postedAt": "Gepostet am",
+        "timeTaken": "Benoetigte Zeit",
+        "previousRecordholder": "Vorheriger Rekordhalter",
+        "previousTime": "Vorherige Zeit"
+      },
+      "category": {
+        "class": "Klasse",
+        "any": "Alle",
+        "guild": "Gilde"
+      },
+      "scope": {
+        "overallRecord": "Gesamtrekord",
+        "classRecord": "Klassenrekord: {{className}}",
+        "guildRecord": "Gildenrekord"
+      },
+      "nav": {
+        "previous": "Vorherige Rekorde",
+        "next": "Naechste Rekorde"
+      },
+      "backButton": "Zurueck",
+      "recordCardAria": "Rekordkarte {{record}}",
+      "daysCount_one": "{{count}} Tag",
+      "daysCount_other": "{{count}} Tage",
+      "daysValue": "{{days}} Tage"
     },
     "youtube": {
       "title": "YouTube",

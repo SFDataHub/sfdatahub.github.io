@@ -1,0 +1,329 @@
+.showcaseModule {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid #2B4C73;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95));
+  color: #E7F1FF;
+}
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.moduleTitle {
+  margin: 0;
+  color: #f5f9ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.moduleSubtitle {
+  margin: 3px 0 0;
+  color: #b0c4d9;
+  font-size: 12px;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.navButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2b4c73;
+  background: #254364;
+  color: #e7f1ff;
+  cursor: pointer;
+}
+
+.navButton {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.navButton:hover {
+  background: #2b4c73;
+}
+
+.navButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.positionLabel {
+  min-width: 70px;
+  color: #b0c4d9;
+  font-size: 11px;
+  text-align: center;
+}
+
+.recordGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(var(--record-visible-count, 4), minmax(0, 1fr));
+}
+
+.flipCard {
+  position: relative;
+  min-width: 0;
+  min-height: 326px;
+  border: 0;
+  border-radius: 22px;
+  color: inherit;
+  outline: none;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.flipCard:focus-visible {
+  outline: 2px solid #2b8ae0;
+  outline-offset: 3px;
+}
+
+.flipInner {
+  position: relative;
+  width: 100%;
+  min-height: 326px;
+  transform-style: preserve-3d;
+  transition: transform 220ms ease;
+}
+
+.flipCard[data-flipped="true"] .flipInner {
+  transform: rotateY(180deg);
+}
+
+.faceFront,
+.faceBack {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+
+.faceFront {
+  overflow: visible;
+}
+
+.faceBack {
+  --record-accent: #f2c94c;
+  --record-accent-2: #4ed7b7;
+  --record-glow: rgba(242, 201, 76, 0.26);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--record-accent) 46%, #2b4c73);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 18%, var(--record-glow), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(15, 31, 50, 0.95), rgba(10, 21, 36, 0.95));
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: rotateY(180deg);
+  isolation: isolate;
+}
+
+.backScrollArea {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-color: rgba(154, 209, 255, 0.45) rgba(12, 28, 47, 0.32);
+  scrollbar-width: thin;
+}
+
+.backScrollArea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.backScrollArea::-webkit-scrollbar-track {
+  background: rgba(12, 28, 47, 0.32);
+  border-radius: 999px;
+}
+
+.backScrollArea::-webkit-scrollbar-thumb {
+  background: rgba(154, 209, 255, 0.42);
+  border-radius: 999px;
+}
+
+.faceBack[data-family="level"] {
+  --record-accent: #f2c94c;
+  --record-accent-2: #4ed7b7;
+  --record-glow: rgba(242, 201, 76, 0.28);
+}
+
+.faceBack[data-family="guild"] {
+  --record-accent: #6eb6ff;
+  --record-accent-2: #c2d8ff;
+  --record-glow: rgba(110, 182, 255, 0.26);
+}
+
+.faceBack[data-family="mine"] {
+  --record-accent: #d6a15e;
+  --record-accent-2: #77d1a7;
+  --record-glow: rgba(214, 161, 94, 0.24);
+}
+
+.faceBack[data-family="fortress"] {
+  --record-accent: #91b5d8;
+  --record-accent-2: #f0c36b;
+  --record-glow: rgba(145, 181, 216, 0.24);
+}
+
+.faceBack[data-family="demonPortal"] {
+  --record-accent: #f05a78;
+  --record-accent-2: #a56bff;
+  --record-glow: rgba(240, 90, 120, 0.28);
+}
+
+.faceBack[data-family="mozone"] {
+  --record-accent: #7ce38b;
+  --record-accent-2: #78c3ff;
+  --record-glow: rgba(124, 227, 139, 0.23);
+}
+
+.faceBack[data-family="boss"] {
+  --record-accent: #f79b52;
+  --record-accent-2: #f7dc8a;
+  --record-glow: rgba(247, 155, 82, 0.24);
+}
+
+.faceBack[data-scope="class"] {
+  --record-accent: var(--record-class-accent, #bd9cff);
+  --record-accent-2: var(--record-class-muted-accent, #55d5c6);
+  --record-glow: color-mix(in srgb, var(--record-accent) 28%, transparent);
+}
+
+.backMotif {
+  position: absolute;
+  inset: 16px;
+  z-index: -1;
+  border: 2px solid color-mix(in srgb, var(--record-accent) 45%, transparent);
+  border-left-color: transparent;
+  border-radius: 50%;
+  opacity: 0.22;
+  transform: rotate(-28deg);
+}
+
+.flipBadgeFront {
+  min-height: 326px;
+  height: 100%;
+  align-content: center;
+  border-radius: 22px;
+  padding: 14px;
+}
+
+.frontCopy {
+  display: grid;
+  justify-items: center;
+  gap: 11px;
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.frontRecordBlock {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.frontBlockLabel {
+  color: #b0c4d9;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.frontBlockValue {
+  color: #e7f1ff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.frontDate {
+  color: #9ad1ff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.detailsList {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  margin: 0;
+  min-width: 0;
+}
+
+.detailRow {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(176, 196, 217, 0.15);
+}
+
+.detailRow dt {
+  color: #b0c4d9;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.detailRow dd {
+  margin: 0;
+  color: #f5f9ff;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.emptyState {
+  color: #b0c4d9;
+  font-size: 12px;
+  padding: 10px 2px;
+}
+
+@media (max-width: 620px) {
+  .showcaseModule {
+    padding: 10px;
+  }
+
+  .moduleHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

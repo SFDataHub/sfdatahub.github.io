@@ -99,7 +99,40 @@
       "fallbackChannel": "Rekordok",
       "previous": "Előző: {{holder}} • {{days}}n",
       "daysLabel": "nap",
-      "empty": "Még nincs rekordbejelentés."
+      "empty": "Még nincs rekordbejelentés.",
+      "front": {
+        "previousRecord": "Előző rekord",
+        "newRecord": "Új rekord"
+      },
+      "back": {
+        "record": "Rekord",
+        "category": "Kategória",
+        "newRecordholder": "Új rekordtartó",
+        "server": "Szerver",
+        "postedAt": "Közzétéve",
+        "timeTaken": "Teljesítési idő",
+        "previousRecordholder": "Előző rekordtartó",
+        "previousTime": "Előző idő"
+      },
+      "category": {
+        "class": "Kaszt",
+        "any": "Bármely",
+        "guild": "Céh"
+      },
+      "scope": {
+        "overallRecord": "Összesített rekord",
+        "classRecord": "Kaszt rekord: {{className}}",
+        "guildRecord": "Céhrekord"
+      },
+      "nav": {
+        "previous": "Előző rekordok",
+        "next": "Következő rekordok"
+      },
+      "backButton": "Vissza",
+      "recordCardAria": "{{record}} rekordkártya",
+      "daysCount_one": "{{count}} nap",
+      "daysCount_other": "{{count}} nap",
+      "daysValue": "{{days}} nap"
     },
     "youtube": {
       "title": "YouTube",
