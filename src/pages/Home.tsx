@@ -155,7 +155,7 @@ function extractRecordAnnouncements(snapshot: DiscordByChannelSnapshot | null): 
           typeof entry.postedAt === "string",
       );
     })
-    .slice(0, 5);
+    .slice(0, 15);
 }
 
 function areSameRecordAnnouncements(

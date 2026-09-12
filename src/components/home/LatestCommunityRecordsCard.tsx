@@ -8,7 +8,7 @@ type LatestCommunityRecordsCardProps = {
   records?: DiscordRecordAnnouncementItem[];
 };
 
-const MAX_HOME_RECORDS = 5;
+const MAX_HOME_RECORDS = 15;
 
 function parseFiniteDayCount(days: string) {
   const parsed = Number(days);

@@ -6,14 +6,17 @@
   background: var(--nav);
   z-index: 50;
   display: grid; /* ← Grid statt Flex */
-  grid-template-columns: 1fr minmax(200px, 680px) 1fr;
+  grid-template-columns: minmax(80px, max-content) minmax(240px, 460px) max-content;
   align-items: center;
   column-gap: 12px;
+  justify-content: space-between;
   padding: 0 24px 0 calc(var(--logo-dock-w) + 16px);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   border-bottom: 0;
   box-shadow: none;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* LINKS */
@@ -22,6 +25,8 @@
   align-items: center;
   gap: 12px;
   justify-self: start;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 /* MITTE (zentriert) */
@@ -29,8 +34,9 @@
   position: relative;
   justify-self: center;
   width: 100%;
-  max-width: 680px;
-  min-width: 200px;
+  max-width: 460px;
+  min-width: 240px;
+  min-inline-size: 0;
 }
 .search{
   width: 100%;
@@ -57,6 +63,8 @@
   align-items: center;
   gap: 12px;
   justify-self: end;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .topbarLeft .mobileSearchBtn{
@@ -72,6 +80,7 @@
 
 /* Icon-Buttons (Glocke, Stern) */
 .btnIco{
+  flex: 0 0 auto;
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -233,12 +242,14 @@
   display: inline-flex;
   gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
   background: var(--tile);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 6px 10px;
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap;
 }
 .pillActive{
   background: var(--tile-hover);
@@ -261,6 +272,7 @@
   border: 0;
   font-weight: 600;
   transition: transform .12s ease, filter .12s ease;
+  white-space: nowrap;
 }
 .gameLinkButton:hover{
   transform: translateY(-1px);
@@ -275,6 +287,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
   padding: 8px 12px;
   border-radius: 12px;
   background: var(--btn);
@@ -825,18 +838,56 @@
   cursor: default;
 }
 
-/* Responsive: Mitte darf flexibel, rechts wird kompakter */
-@media (max-width: 920px){
-  .topbar{ grid-template-columns: 1fr minmax(160px, 1fr) 1fr; }
-  .pill{ display:none; }
-  .label{ display:none; }
+@media (max-width: 1199px){
+  .topbar{ grid-template-columns: max-content minmax(220px, 420px) max-content; column-gap: 10px; padding-right: 16px; }
+  .topbarNav, .gameLinkButton{ display: none; }
+  .searchWrap{ max-width: 420px; min-width: 220px; }
 }
 
-@media (max-width: 767px){
-  .topbar{ grid-template-columns: auto 0 auto; }
+@media (max-width: 899px){
+  .topbar{ grid-template-columns: max-content minmax(180px, 240px) max-content; padding-right: 12px; }
+  .searchWrap{ max-width: 240px; min-width: 180px; }
+  .mobileSearchPanel .searchWrap{ display: block; }
+  .label{ display: none; }
+  .upload{ width: 40px; height: 40px; padding: 0; justify-content: center; }
+}
+
+@media (max-width: 699px){
+  .topbar{ grid-template-columns: max-content 0 max-content; column-gap: 8px; padding-left: 224px; padding-right: 12px; }
   .searchWrap{ display: none; }
   .topbarLeft .mobileSearchBtn{ display: inline-flex; }
-  .mobileSearchPanel .searchWrap{ display: block; }
+  :global(.logo-dock){ left: 58px; width: 150px; }
+  :global(.logo-dock .logo-img){ max-width: 146px; max-height: 82px; }
+  .topbarLeft, .topbarRight{ gap: 8px; }
+}
+
+@media (max-width: 520px){
+  .topbar{ padding-left: 202px; padding-right: 10px; }
+  :global(.logo-dock){ left: 56px; width: 130px; }
+  :global(.logo-dock .logo-img){ max-width: 126px; max-height: 78px; }
+}
+
+@media (max-width: 479px){
+  .topbar{ padding-left: 176px; }
+  :global(.logo-dock){ left: 52px; width: 112px; }
+  :global(.logo-dock .logo-img){ max-width: 110px; max-height: 76px; }
+}
+
+@media (max-width: 399px){
+  .topbar{ column-gap: 6px; padding-left: 160px; padding-right: 8px; }
+  :global(.logo-dock){ left: 56px; width: 96px; }
+  :global(.logo-dock .logo-img){ max-width: 94px; max-height: 70px; }
+  .topbarLeft, .topbarRight{ gap: 6px; }
+  .accountRoot{ display: none; }
+  .btnIco, .upload{ width: 36px; height: 36px; border-radius: 10px; }
+  .ico{ width: 18px; height: 18px; }
+}
+
+@media (max-width: 340px){
+  .topbar{ padding-left: 154px; }
+  :global(.logo-dock){ left: 54px; width: 92px; }
+  :global(.logo-dock .logo-img){ max-width: 90px; max-height: 66px; }
+  .topbarLeft > .btnIco:not(.mobileSearchBtn){ display: none; }
 }
 
 /* Bevorzugt reduzierte Bewegung */
