@@ -156,6 +156,12 @@ const pickGenericPlayerString = (row: Record<string, unknown>, keys: readonly st
   normalizeStringValue(pickGenericPlayerValue(row, keys));
 
 const PLAYER_LEVEL_KEYS = ["level", "Level", "lvl", "Lvl"];
+const CURRENT_COMPACT_SAVE_VERSION = 2;
+const CURRENT_COMPACT_SAVE_LENGTH = 70;
+const LEGACY_OWN_SAVE_MIN_LENGTH = 650;
+const LEGACY_OTHER_SAVE_MIN_LENGTH = 256;
+
+type SfPlayerSaveLayout = "currentCompact" | "legacyOwn" | "legacyOther";
 
 const readSaveArrayForPlayerStats = (row: Record<string, unknown>): number[] | null => {
   const saveField = row.save ?? row.playerSave;
@@ -180,6 +186,34 @@ const readSaveNumber = (saveArray: number[] | null, index: number): number | nul
 const normalizeSfPlayerLevel = (value: number | null): number | null =>
   value != null && Number.isFinite(value) && value > 0 ? value : null;
 
+const readSfPlayerSaveLayout = (
+  row: Record<string, unknown>,
+  saveArray: number[] | null,
+): SfPlayerSaveLayout | null => {
+  if (!saveArray?.length) return null;
+
+  const saveVersion = toFiniteNumberOrNull(row.saveVersion);
+  if (saveVersion === CURRENT_COMPACT_SAVE_VERSION && saveArray.length === CURRENT_COMPACT_SAVE_LENGTH) {
+    return "currentCompact";
+  }
+
+  const own = toFiniteNumberOrNull(row.own);
+  if (own === 1 && saveArray.length >= LEGACY_OWN_SAVE_MIN_LENGTH) return "legacyOwn";
+  if (own !== 1 && saveArray.length >= LEGACY_OTHER_SAVE_MIN_LENGTH) return "legacyOther";
+
+  return null;
+};
+
+const readSfPlayerLevelFromSave = (row: Record<string, unknown>, saveArray: number[] | null): number | null => {
+  const layout = readSfPlayerSaveLayout(row, saveArray);
+  if (layout === "currentCompact") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 3));
+  if (layout === "legacyOwn") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 7));
+  if (layout === "legacyOther") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 2));
+
+  const own = toFiniteNumberOrNull(row.own);
+  return normalizeSfPlayerLevel(readSaveNumber(saveArray, own === 1 ? 7 : 2));
+};
+
 export const readSfPlayerLevel = (player: unknown): number | null => {
   const row = asRecord(player);
   if (!row) return null;
@@ -188,10 +222,7 @@ export const readSfPlayerLevel = (player: unknown): number | null => {
   if (directLevel != null) return directLevel;
 
   const saveArray = readSaveArrayForPlayerStats(row);
-  const own = toFiniteNumberOrNull(row.own);
-  if (own === 1) return normalizeSfPlayerLevel(readSaveNumber(saveArray, 7));
-  if (saveArray?.length === 70) return normalizeSfPlayerLevel(readSaveNumber(saveArray, 3));
-  return normalizeSfPlayerLevel(readSaveNumber(saveArray, 2));
+  return readSfPlayerLevelFromSave(row, saveArray);
 };
 
 const readClassIdForPlayerStats = (row: Record<string, unknown>, saveArray: number[] | null): string | null => {

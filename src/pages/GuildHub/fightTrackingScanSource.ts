@@ -1,4 +1,10 @@
-import { listGuildHubLocalScans, type GuildHubLocalScan } from "../../lib/guilds/localScanLibrary";
+import {
+  getGuildHubLocalScan,
+  listGuildHubScanSummaries,
+  type GuildHubLocalGuildIdentity,
+  type GuildHubLocalScan,
+  type GuildHubScanSummary,
+} from "../../lib/guilds/localScanLibrary";
 import { isNormalizedGuildMemberInGuild, type NormalizedGuildMember } from "../../lib/guilds/guildScanNormalizer";
 import { mapGuildJsonRecord } from "../../lib/import/parsers";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
@@ -193,6 +199,41 @@ const isGroupMatch = (
   return Boolean(groupName && normalizeLoose(groupName) === normalizeLoose(guild.name) && serverMatches);
 };
 
+const isSummaryGuildMatch = (source: GuildHubLocalGuildIdentity, guild: ScanGuildIdentity) => {
+  const sourceServer = normalizeServer(source.server);
+  const serverMatches = !guild.server || !sourceServer || guild.server === sourceServer;
+  const sourceSegment = normalizeGuildSegment(source.guildIdentifier) ?? normalizeGuildSegment(source.guildId);
+  if (guild.guildSegment && sourceSegment && guild.guildSegment === sourceSegment && serverMatches) return true;
+
+  return Boolean(source.name && normalizeLoose(source.name) === normalizeLoose(guild.name) && serverMatches);
+};
+
+const summaryScanTimeMs = (summary: GuildHubScanSummary, guild?: GuildHubLocalGuildIdentity) => {
+  const guildScannedAt = timestampMs(guild?.sourceScannedAt);
+  if (guildScannedAt != null) return guildScannedAt;
+  if (summary.lastSnapshotTimestamp != null) return summary.lastSnapshotTimestamp;
+  return summary.importedAt;
+};
+
+async function findLatestScanSummaryForGuild(
+  guild: GuildHubSelectedGuild | FightTrackerGuild,
+): Promise<GuildHubScanSummary | null> {
+  const summaries = await listGuildHubScanSummaries();
+  const guildIdentity = getScanGuildIdentity(guild);
+  const matches = summaries
+    .map((summary) => {
+      const matchedGuild = summary.guilds.find((source) => isSummaryGuildMatch(source, guildIdentity));
+      return matchedGuild ? { summary, matchedGuild } : null;
+    })
+    .filter((entry): entry is { summary: GuildHubScanSummary; matchedGuild: GuildHubLocalGuildIdentity } => Boolean(entry));
+
+  return (
+    matches.sort(
+      (a, b) => summaryScanTimeMs(b.summary, b.matchedGuild) - summaryScanTimeMs(a.summary, a.matchedGuild),
+    )[0]?.summary ?? null
+  );
+}
+
 const toScanMember = (member: NormalizedGuildMember, scan: GuildHubLocalScan): FightTrackerScanMember | null => {
   if (!member.memberRef || !member.name) return null;
   const scannedAt = scanTimeIso(scan);
@@ -221,12 +262,14 @@ export async function loadLatestScanSnapshotForGuild(
   guild: GuildHubSelectedGuild | FightTrackerGuild | null,
 ): Promise<FightTrackerScanSnapshot | null> {
   if (!guild) return null;
-  const scans = await listGuildHubLocalScans();
+  const latestSummary = await findLatestScanSummaryForGuild(guild);
+  const scan = latestSummary ? await getGuildHubLocalScan(latestSummary.sourceScanId) : null;
+  if (!scan) return null;
   const guildIdentity = getScanGuildIdentity(guild);
 
-  const snapshots = scans
-    .map((scan) => {
-      const raw = getRawScan(scan);
+  const snapshots = [scan]
+    .map((entry) => {
+      const raw = getRawScan(entry);
       if (!raw) return null;
       const group = raw.groups.find((entry) => isGroupMatch(entry, guildIdentity));
       const matchedGuild: ScanGuildIdentity = {
@@ -236,14 +279,14 @@ export async function loadLatestScanSnapshotForGuild(
       };
       const members = raw.members
         .filter((entry) => isNormalizedGuildMemberInGuild(entry, matchedGuild))
-        .map((entry) => toScanMember(entry, scan))
+        .map((member) => toScanMember(member, entry))
         .filter((member): member is FightTrackerScanMember => Boolean(member));
       if (!group && !members.length) return null;
       const coaString = group ? readCoaString(group) : null;
       const snapshot: FightTrackerScanSnapshot = {
-        scanId: scan.id,
-        scanAt: scanTimeIso(scan),
-        normalizerVersion: normalizeVersion(scan.normalizerVersion),
+        scanId: entry.id,
+        scanAt: scanTimeIso(entry),
+        normalizerVersion: normalizeVersion(entry.normalizerVersion),
         guildName: matchedGuild.name,
         server: group ? readString(group, ["server", "Server", "prefix", "world", "realm"]) ?? guild.server ?? null : guild.server ?? null,
         members,

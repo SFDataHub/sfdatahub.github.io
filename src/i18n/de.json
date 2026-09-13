@@ -27,6 +27,7 @@
     "guideHub": "Guide Hub",
     "scans": "Scans",
     "overview": "Uebersicht",
+    "analytics": "Analytics",
     "guildPlanner": "Guild Planner",
     "fusionPlanner": "Fusion Planner",
     "guildCompare": "Gildenvergleich",
@@ -93,7 +94,7 @@
     },
     "records": {
       "title": "Neueste Community-Rekorde",
-      "subtitle": "Live-Snapshot",
+      "subtitle": "Aktuelle Rekordhalter aus Einzel- und Gildenrekorden",
       "fallbackTitle": "Rekord-Ankuendigung",
       "fallbackAuthor": "Discord",
       "fallbackChannel": "Rekorde",

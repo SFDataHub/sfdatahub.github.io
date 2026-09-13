@@ -18,6 +18,13 @@ import {
   reportWriteSummary,
   startReadTraceSession,
 } from "../../lib/debug/firestoreReadTrace";
+import {
+  collectGuildCoaCandidates,
+  extractGuildCoaString as extractNormalizedGuildCoaString,
+  extractRawGuildSaveTokens,
+  isValidGuildCoaString,
+  type RawGuildSaveToken,
+} from "../../lib/guilds/guildCoa";
 import { useAuth } from "../../context/AuthContext";
 import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.js";
 import styles from "./UploadCenterV2JsonImport.module.css";
@@ -261,6 +268,15 @@ const asObject = (value: unknown): Record<string, unknown> | null => {
   return value as Record<string, unknown>;
 };
 
+const getRawGroups = (rawJson: unknown): Record<string, unknown>[] => {
+  const root = asObject(rawJson);
+  const rawGroups = root && Array.isArray(root.groups) ? root.groups : [];
+  return rawGroups.map((entry) => asObject(entry)).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
+const getRawSaveSlot1ForGroup = (tokens: RawGuildSaveToken[], index: number): string | null =>
+  tokens.find((token) => token.arrayKey === "groups" && token.index === index)?.saveSlot1 ?? null;
+
 const readString = (obj: Record<string, unknown>, keys: string[]): string | null => {
   for (const key of keys) {
     const value = obj[key];
@@ -279,7 +295,6 @@ const readIdentifierString = (obj: Record<string, unknown>, keys: string[]): str
 };
 
 const normalizeLoose = (value: string) => value.trim().toLowerCase();
-const isValidCoaString = (value: string) => value === "0" || /^[0-9a-f]{22}$/i.test(value);
 
 const toNumberArray = (value: unknown): number[] | null => {
   if (!Array.isArray(value)) return null;
@@ -331,49 +346,12 @@ const findSelectedRawPlayer = (
   return candidates[0];
 };
 
-const extractCoaFromGroup = (group: Record<string, unknown>): string | null => {
-  const direct = readString(group, [
-    "coaString",
-    "coa",
-    "coa_string",
-    "coatOfArms",
-    "coat_of_arms",
-    "emblem",
-    "emblemString",
-  ]);
-  if (direct) return direct;
-
-  const save = group.save;
-  if (Array.isArray(save)) {
-    const maybe = save[1];
-    if (typeof maybe === "string" && maybe.trim()) return maybe.trim();
-  }
-
-  return null;
-};
-
-const COA_SOURCE_KEYS = [
-  "coaString",
-  "coa",
-  "coa_string",
-  "coatOfArms",
-  "coat_of_arms",
-  "emblem",
-  "emblemString",
-] as const;
-
-const findMatchedRawGroup = (
+const findMatchedRawGroupEntry = (
   rawJson: unknown,
   selectedRawObj: Record<string, unknown> | null,
   selectedPlayer: SfJsonOwnPlayer | null,
-): Record<string, unknown> | null => {
-  const root = asObject(rawJson);
-  if (!root) return null;
-
-  const groupsRaw = Array.isArray(root.groups) ? root.groups : [];
-  const groups = groupsRaw
-    .map((entry) => asObject(entry))
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+): { group: Record<string, unknown>; index: number } | null => {
+  const groups = getRawGroups(rawJson);
   if (groups.length === 0) return null;
 
   const groupIdentifier = selectedRawObj
@@ -385,46 +363,48 @@ const findMatchedRawGroup = (
 
   if (groupIdentifier) {
     const wanted = normalizeLoose(groupIdentifier);
-    const byIdentifier = groups.find((group) => {
+    const byIdentifierIndex = groups.findIndex((group) => {
       const candidate = readString(group, ["identifier", "id", "group", "groupIdentifier", "groupId", "guildId"]);
       return candidate ? normalizeLoose(candidate) === wanted : false;
     });
-    if (byIdentifier) return byIdentifier;
+    if (byIdentifierIndex >= 0) return { group: groups[byIdentifierIndex], index: byIdentifierIndex };
   }
 
   if (groupName) {
     const wanted = normalizeLoose(groupName);
-    const byName = groups.find((group) => {
+    const byNameIndex = groups.findIndex((group) => {
       const candidate = readString(group, ["name", "groupname", "groupName", "guildName", "guild"]);
       return candidate ? normalizeLoose(candidate) === wanted : false;
     });
-    if (byName) return byName;
+    if (byNameIndex >= 0) return { group: groups[byNameIndex], index: byNameIndex };
   }
 
-  return groups[0] ?? null;
+  return groups[0] ? { group: groups[0], index: 0 } : null;
 };
+
+const findMatchedRawGroup = (
+  rawJson: unknown,
+  selectedRawObj: Record<string, unknown> | null,
+  selectedPlayer: SfJsonOwnPlayer | null,
+): Record<string, unknown> | null => findMatchedRawGroupEntry(rawJson, selectedRawObj, selectedPlayer)?.group ?? null;
 
 const extractCoaString = (
   rawJson: unknown,
   selectedRawObj: Record<string, unknown> | null,
   selectedPlayer: SfJsonOwnPlayer | null,
+  rawGuildSaveTokens: RawGuildSaveToken[],
 ): string | null => {
   if (selectedRawObj) {
-    const direct = readString(selectedRawObj, [
-      "coaString",
-      "coa",
-      "coa_string",
-      "coatOfArms",
-      "coat_of_arms",
-      "emblem",
-      "emblemString",
-    ]);
-    if (direct) return direct;
+    const coa = extractNormalizedGuildCoaString(selectedRawObj);
+    if (coa) return coa;
   }
 
-  const matchedGroup = findMatchedRawGroup(rawJson, selectedRawObj, selectedPlayer);
+  const matchedGroup = findMatchedRawGroupEntry(rawJson, selectedRawObj, selectedPlayer);
   if (!matchedGroup) return null;
-  const coa = extractCoaFromGroup(matchedGroup);
+  const coa = extractNormalizedGuildCoaString(
+    matchedGroup.group,
+    getRawSaveSlot1ForGroup(rawGuildSaveTokens, matchedGroup.index),
+  );
   if (coa) return coa;
 
   return null;
@@ -461,46 +441,25 @@ const collectCoaCandidatesFromObject = (
   obj: Record<string, unknown> | null,
   sourcePrefix: string,
   guildName: string | null,
+  rawSaveSlot1?: string | null,
 ): CoaPreviewCandidate[] => {
   if (!obj) return [];
 
-  const candidates: CoaPreviewCandidate[] = [];
-  for (const key of COA_SOURCE_KEYS) {
-    const value = obj[key];
-    if (typeof value !== "string" || !value.trim()) continue;
-    const trimmed = value.trim();
-    candidates.push({
-      key: `${sourcePrefix}.${key}:${trimmed}`,
-      source: `${sourcePrefix}.${key}`,
-      coaString: trimmed,
-      guildName,
-    });
-  }
-
-  const saveValue = Array.isArray(obj.save) ? obj.save[1] : null;
-  if (typeof saveValue === "string" && saveValue.trim()) {
-    const trimmed = saveValue.trim();
-    candidates.push({
-      key: `${sourcePrefix}.save[1]:${trimmed}`,
-      source: `${sourcePrefix}.save[1]`,
-      coaString: trimmed,
-      guildName,
-    });
-  }
-
-  return candidates;
+  return collectGuildCoaCandidates(obj, sourcePrefix, rawSaveSlot1).map((candidate) => ({
+    key: `${candidate.source}:${candidate.coaString ?? candidate.rawValue}`,
+    source: candidate.source,
+    coaString: candidate.coaString ?? candidate.rawValue,
+    guildName,
+  }));
 };
 
 const extractAllCoaCandidates = (
   rawJson: unknown,
   selectedRawPlayer: Record<string, unknown> | null,
   selectedGuildName: string | null,
+  rawGuildSaveTokens: RawGuildSaveToken[],
 ): CoaPreviewCandidate[] => {
-  const root = asObject(rawJson);
-  const rawGroups = root && Array.isArray(root.groups) ? root.groups : [];
-  const groups = rawGroups
-    .map((entry) => asObject(entry))
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const groups = getRawGroups(rawJson);
 
   const playerGuildName = extractGuildNameFromRecord(selectedRawPlayer) ?? selectedGuildName;
   const groupCandidates = groups.flatMap((group, index) => {
@@ -515,7 +474,12 @@ const extractAllCoaCandidates = (
     ]);
     const groupGuildName = extractGuildNameFromRecord(group) ?? selectedGuildName;
     const sourcePrefix = identifier ? `groups[${index}] (${identifier})` : `groups[${index}]`;
-    return collectCoaCandidatesFromObject(group, sourcePrefix, groupGuildName);
+    return collectCoaCandidatesFromObject(
+      group,
+      sourcePrefix,
+      groupGuildName,
+      getRawSaveSlot1ForGroup(rawGuildSaveTokens, index),
+    );
   });
 
   const rawCandidates = [
@@ -533,12 +497,12 @@ const extractAllCoaCandidates = (
   return Array.from(unique.values());
 };
 
-const extractCoaBatchTargets = (rawJson: unknown, fallbackGuildName: string | null): CoaBatchExtraction => {
-  const root = asObject(rawJson);
-  const rawGroups = root && Array.isArray(root.groups) ? root.groups : [];
-  const groups = rawGroups
-    .map((entry) => asObject(entry))
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+const extractCoaBatchTargets = (
+  rawJson: unknown,
+  fallbackGuildName: string | null,
+  rawGuildSaveTokens: RawGuildSaveToken[],
+): CoaBatchExtraction => {
+  const groups = getRawGroups(rawJson);
 
   const seenGuildIds = new Set<string>();
   const targetsByGuildId = new Map<string, CoaBatchTarget>();
@@ -568,14 +532,19 @@ const extractCoaBatchTargets = (rawJson: unknown, fallbackGuildName: string | nu
 
     const guildName = extractGuildNameFromRecord(group) ?? fallbackGuildName;
     const sourcePrefix = `groups[${index}] (${guildId})`;
-    const coaCandidates = collectCoaCandidatesFromObject(group, sourcePrefix, guildName);
+    const coaCandidates = collectCoaCandidatesFromObject(
+      group,
+      sourcePrefix,
+      guildName,
+      getRawSaveSlot1ForGroup(rawGuildSaveTokens, index),
+    );
 
     if (coaCandidates.length === 0) {
       skippedMissingCoa += 1;
       return;
     }
 
-    const validCandidate = coaCandidates.find((candidate) => isValidCoaString(candidate.coaString));
+    const validCandidate = coaCandidates.find((candidate) => isValidGuildCoaString(candidate.coaString));
     if (!validCandidate) {
       skippedInvalidCoa += 1;
       return;
@@ -610,7 +579,7 @@ function CoaPreviewCanvas({
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const rendererRef = React.useRef<CoaRenderer | null>(null);
-  const isValid = isValidCoaString(coaString);
+  const isValid = isValidGuildCoaString(coaString);
 
   React.useEffect(() => {
     return () => {
@@ -811,6 +780,7 @@ export default function UploadCenterV2JsonImport() {
   const [jsonInput, setJsonInput] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [rawJson, setRawJson] = React.useState<unknown>(null);
+  const [rawGuildSaveTokens, setRawGuildSaveTokens] = React.useState<RawGuildSaveToken[]>([]);
   const [parseResult, setParseResult] = React.useState<SfJsonParseResult | null>(null);
   const [parseStatus, setParseStatus] = React.useState<string | null>(null);
   const [parseError, setParseError] = React.useState<string | null>(null);
@@ -858,7 +828,9 @@ export default function UploadCenterV2JsonImport() {
     try {
       const parsedJson = JSON.parse(jsonInput);
       const parsed = parseSfJson(parsedJson);
+      const guildSaveTokens = extractRawGuildSaveTokens(jsonInput);
       setRawJson(parsedJson);
+      setRawGuildSaveTokens(guildSaveTokens);
       setParseResult(parsed);
       setParseError(null);
       setCoaImportStatus(null);
@@ -882,6 +854,7 @@ export default function UploadCenterV2JsonImport() {
       setParseError(`Invalid JSON: ${message}`);
       setParseStatus(null);
       setRawJson(null);
+      setRawGuildSaveTokens([]);
       setParseResult(null);
       setSelectedIdentifier("");
       setCoaImportStatus(null);
@@ -909,8 +882,8 @@ export default function UploadCenterV2JsonImport() {
   );
 
   const coaString = React.useMemo(
-    () => extractCoaString(rawJson, selectedRawPlayer, selectedPlayer),
-    [rawJson, selectedRawPlayer, selectedPlayer],
+    () => extractCoaString(rawJson, selectedRawPlayer, selectedPlayer, rawGuildSaveTokens),
+    [rawJson, selectedRawPlayer, selectedPlayer, rawGuildSaveTokens],
   );
   const selectedRawGroup = React.useMemo(
     () => findMatchedRawGroup(rawJson, selectedRawPlayer, selectedPlayer),
@@ -921,12 +894,12 @@ export default function UploadCenterV2JsonImport() {
     [selectedRawPlayer, selectedRawGroup, selectedPlayer],
   );
   const coaPreviewCandidates = React.useMemo(
-    () => extractAllCoaCandidates(rawJson, selectedRawPlayer, selectedGuildName),
-    [rawJson, selectedRawPlayer, selectedGuildName],
+    () => extractAllCoaCandidates(rawJson, selectedRawPlayer, selectedGuildName, rawGuildSaveTokens),
+    [rawJson, selectedRawPlayer, selectedGuildName, rawGuildSaveTokens],
   );
   const coaBatchExtraction = React.useMemo(
-    () => extractCoaBatchTargets(rawJson, selectedGuildName),
-    [rawJson, selectedGuildName],
+    () => extractCoaBatchTargets(rawJson, selectedGuildName, rawGuildSaveTokens),
+    [rawJson, selectedGuildName, rawGuildSaveTokens],
   );
   const coaBatchTargets = coaBatchExtraction.targets;
 

@@ -52,9 +52,8 @@ const categories: Item[] = [
 const SUBTABS: Record<string, SubItem[]> = {
   "/guild-hub": [
     { to: "/guild-hub", labelKey: "nav.overview" },
-    { to: "/guild-hub/planner", labelKey: "nav.guildPlanner" },
+    { to: "/guild-hub/analytics", labelKey: "nav.analytics" },
     { to: "/guild-hub/fusion-planner", labelKey: "nav.fusionPlanner" },
-    { to: "/guild-hub/compare-guilds", labelKey: "nav.guildCompare" },
     { to: "/guild-hub/waitlist", labelKey: "nav.waitlist" },
     { to: "/guild-hub/settings", labelKey: "nav.settings" },
   ],

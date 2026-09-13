@@ -6,11 +6,11 @@
 }
 
 .guildSelectionPanel {
-  border: 1px solid #2b4c73;
-  border-radius: 16px;
-  background: #152a42;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #f5f9ff;
-  padding: 16px;
+  padding: 0;
 }
 
 .guildSelectionHeader {
@@ -48,35 +48,48 @@
   color: #f5f9ff;
 }
 
-.guildLogoEditWrap {
+.guildCardGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14px;
+}
+
+.guildCardItem {
   position: relative;
   display: inline-grid;
 }
 
-.guildRemoveButton {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  z-index: 2;
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid rgba(255, 212, 212, 0.72);
-  border-radius: 999px;
-  background: #c6283d;
-  color: #fff7f7;
-  box-shadow:
-    0 0 0 2px #152a42,
-    0 8px 16px rgba(0, 0, 0, 0.28);
-  transition:
-    background 160ms ease,
-    transform 160ms ease;
+.guildCardItemEditing {
+  cursor: default;
 }
 
-.guildRemoveButton:hover {
-  background: #e1394f;
-  transform: translateY(-1px);
+.guildCardItemDragging {
+  opacity: 0.64;
+  transform: translateY(-2px);
+}
+
+.guildCardDropBefore::before,
+.guildCardDropAfter::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  z-index: 4;
+  width: 3px;
+  border-radius: 999px;
+  background: #78aef5;
+  box-shadow: 0 0 12px rgba(120, 174, 245, 0.62);
+  pointer-events: none;
+}
+
+.guildCardDropBefore::before {
+  left: -8px;
+}
+
+.guildCardDropAfter::after {
+  right: -8px;
 }
 
 .confirmOverlay {

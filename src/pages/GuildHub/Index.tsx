@@ -1,17 +1,18 @@
 // src/pages/GuildHub/Index.tsx
 import React from "react";
-import { Check, Loader2, Minus, Pencil, Plus, Search, X } from "lucide-react";
+import { Check, Loader2, Pencil, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import ContentShell from "../../components/ContentShell"; // <- korrigierter Pfad
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
+import GuildCard from "../../components/guilds/GuildCard";
 import { guildIconByIdentifier } from "../../data/guilds";
 import { SERVER_BY_ID } from "../../data/servers";
 import {
-  listGuildHubLocalGuildsForServerFromScans,
-  listGuildHubLocalScans,
-  listGuildHubLocalServersFromScans,
+  listGuildHubLocalGuildsForServerFromScanSummaries,
+  listGuildHubLocalServersFromScanSummaries,
+  listGuildHubScanSummaries,
   subscribeToSfDataHubLocalScanChanges,
-  type GuildHubLocalScan,
+  type GuildHubScanSummary,
 } from "../../lib/guilds/localScanLibrary";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import {
@@ -23,14 +24,14 @@ import {
 import styles from "./Index.module.css";
 
 type LocalScanState = {
-  scans: GuildHubLocalScan[];
+  summaries: GuildHubScanSummary[];
   loading: boolean;
   error: string | null;
 };
 
 export default function GuildHubIndex() {
   const localScanState = useGuildHubLocalScanState();
-  const hasLocalGuildScans = localScanState.scans.length > 0;
+  const hasLocalGuildScans = localScanState.summaries.length > 0;
   const scanDependentDisabled = !localScanState.loading && !localScanState.error && !hasLocalGuildScans;
   const selection = useGuildHubSelection();
 
@@ -109,6 +110,7 @@ function GuildSelectionPanel({
         scanDependentDisabled={scanDependentDisabled}
         onSelectActiveGuild={selection.setActiveGuildId}
         onSelectGuild={handleSelectGuild}
+        onReorderGuild={selection.reorderGuilds}
         onRequestRemoveGuild={handleRequestRemoveGuild}
         onTogglePicker={() => setPickerOpen((open) => !open)}
         onClosePicker={() => setPickerOpen(false)}
@@ -134,9 +136,9 @@ function GuildHubTileMenu({ scanDependentDisabled }: { scanDependentDisabled: bo
         disabled={scanDependentDisabled}
       />
       <Tile
-        to="/guild-hub/planner"
-        title="Planner"
-        desc="Raids, Events, Aufgaben"
+        to="/guild-hub/analytics"
+        title="Analytics"
+        desc="Fortschritt, Entwicklung & Vergleiche"
         disabled={scanDependentDisabled}
       />
       <Tile
@@ -146,12 +148,6 @@ function GuildHubTileMenu({ scanDependentDisabled }: { scanDependentDisabled: bo
         disabled={scanDependentDisabled}
       />
       <Tile to="/guild-hub/fight-tracking" title="Fight Tracking" desc="Angriffe & Fehlquoten" />
-      <Tile
-        to="/guild-hub/compare-guilds"
-        title="Gildenvergleich"
-        desc="Kennzahlen nebeneinander legen"
-        disabled={scanDependentDisabled}
-      />
       <Tile to="/guild-hub/waitlist" title="Waitlist" desc="Bewerber & Slots" />
       <Tile
         to="/guild-hub/import"
@@ -166,7 +162,7 @@ function GuildHubTileMenu({ scanDependentDisabled }: { scanDependentDisabled: bo
 
 function useGuildHubLocalScanState(): LocalScanState {
   const [state, setState] = React.useState<LocalScanState>({
-    scans: [],
+    summaries: [],
     loading: true,
     error: null,
   });
@@ -175,15 +171,15 @@ function useGuildHubLocalScanState(): LocalScanState {
     let cancelled = false;
 
     const load = () => {
-      listGuildHubLocalScans()
-        .then((scans) => {
+      listGuildHubScanSummaries()
+        .then((summaries) => {
           if (cancelled) return;
-          setState({ scans, loading: false, error: null });
+          setState({ summaries, loading: false, error: null });
         })
         .catch((err) => {
           if (cancelled) return;
           console.error("[GuildHub] failed to load local scans", err);
-          setState({ scans: [], loading: false, error: "Lokale Scans konnten nicht geladen werden." });
+          setState({ summaries: [], loading: false, error: "Lokale Scans konnten nicht geladen werden." });
         });
     };
 
@@ -208,6 +204,7 @@ function GuildSlot({
   scanDependentDisabled,
   onSelectActiveGuild,
   onSelectGuild,
+  onReorderGuild,
   onRequestRemoveGuild,
   onTogglePicker,
   onClosePicker,
@@ -220,38 +217,127 @@ function GuildSlot({
   scanDependentDisabled: boolean;
   onSelectActiveGuild: (id: string) => void;
   onSelectGuild: (guild: GuildHubSelectedGuild) => void;
+  onReorderGuild: (sourceId: string, targetIndex: number) => void;
   onRequestRemoveGuild: (guild: GuildHubSelectedGuild) => void;
   onTogglePicker: () => void;
   onClosePicker: () => void;
 }) {
+  const [draggedGuildId, setDraggedGuildId] = React.useState<string | null>(null);
+  const [dropTarget, setDropTarget] = React.useState<{ id: string; placement: "before" | "after" } | null>(null);
+
+  const selectedGuildsWithLocalVisuals = React.useMemo(() => {
+    if (!selectedGuilds.length || !localScanState.summaries.length) return selectedGuilds;
+
+    const localGuildsById = new Map<string, GuildHubSelectedGuild>();
+    const selectedServers = [...new Set(selectedGuilds.map((guild) => guild.server).filter(Boolean))];
+
+    for (const server of selectedServers) {
+      for (const option of listGuildHubLocalGuildsForServerFromScanSummaries(localScanState.summaries, server)) {
+        const guild = mapLocalGuildIdentityToSelection(option);
+        if (guild) localGuildsById.set(guild.id, guild);
+      }
+    }
+
+    return selectedGuilds.map((guild) => {
+      const localGuild = localGuildsById.get(guild.id);
+      if (!localGuild?.coaString || guild.coaString) return guild;
+      return { ...guild, coaString: localGuild.coaString };
+    });
+  }, [localScanState.summaries, selectedGuilds]);
+
+  const clearDragState = React.useCallback(() => {
+    setDraggedGuildId(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleDragStart = React.useCallback((event: React.DragEvent<HTMLButtonElement>, guildId: string) => {
+    if (!isEditing) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", guildId);
+    setDraggedGuildId(guildId);
+  }, [isEditing]);
+
+  const handleDragOver = React.useCallback((event: React.DragEvent<HTMLDivElement>, targetGuildId: string) => {
+    if (!isEditing || !draggedGuildId || draggedGuildId === targetGuildId) {
+      setDropTarget(null);
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rect = event.currentTarget.getBoundingClientRect();
+    const placement = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+    setDropTarget({ id: targetGuildId, placement });
+  }, [draggedGuildId, isEditing]);
+
+  const handleDrop = React.useCallback((event: React.DragEvent<HTMLDivElement>, targetGuildId: string) => {
+    if (!isEditing) return;
+    event.preventDefault();
+
+    const sourceId = draggedGuildId ?? event.dataTransfer.getData("text/plain");
+    if (!sourceId || sourceId === targetGuildId) {
+      clearDragState();
+      return;
+    }
+
+    const targetIndex = selectedGuilds.findIndex((guild) => guild.id === targetGuildId);
+    if (targetIndex < 0) {
+      clearDragState();
+      return;
+    }
+
+    const placement = dropTarget?.id === targetGuildId ? dropTarget.placement : "before";
+    onReorderGuild(sourceId, targetIndex + (placement === "after" ? 1 : 0));
+    clearDragState();
+  }, [clearDragState, draggedGuildId, dropTarget, isEditing, onReorderGuild, selectedGuilds]);
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        {selectedGuilds.map((guild) => (
-          <GuildLogoButton
-            key={guild.id}
-            guild={guild}
-            active={guild.id === activeGuildId}
-            onClick={() => onSelectActiveGuild(guild.id)}
-            isEditing={isEditing}
-            onRequestRemove={() => onRequestRemoveGuild(guild)}
-          />
-        ))}
-        <button
-          type="button"
-          className="grid h-11 w-11 place-items-center rounded-xl border transition hover:bg-white/5"
-          style={{
-            borderColor: pickerOpen ? "#2B6DE0" : "#2B4C73",
-            background: pickerOpen ? "#1C3554" : "#152A42",
-            color: "#F5F9FF",
-            boxShadow: pickerOpen ? "0 0 0 1px rgba(43, 109, 224, 0.4)" : undefined,
-          }}
-          aria-label="Gilde hinzufuegen"
-          title="Gilde hinzufuegen"
+      <div className={styles.guildCardGrid}>
+        {selectedGuildsWithLocalVisuals.map((guild) => {
+          const dropPlacement = dropTarget?.id === guild.id ? dropTarget.placement : null;
+          return (
+            <div
+              key={guild.id}
+              className={[
+                styles.guildCardItem,
+                isEditing ? styles.guildCardItemEditing : "",
+                draggedGuildId === guild.id ? styles.guildCardItemDragging : "",
+                dropPlacement === "before" ? styles.guildCardDropBefore : "",
+                dropPlacement === "after" ? styles.guildCardDropAfter : "",
+              ].filter(Boolean).join(" ")}
+              onDragOver={(event) => handleDragOver(event, guild.id)}
+              onDragLeave={() => setDropTarget((current) => (current?.id === guild.id ? null : current))}
+              onDrop={(event) => handleDrop(event, guild.id)}
+              onDragEnd={clearDragState}
+            >
+              <GuildCard
+                name={guild.name}
+                server={guild.server}
+                memberCount={guild.memberCount}
+                memberLimit={50}
+                coaString={guild.coaString}
+                emblemUrl={guildIconByIdentifier(guild.logoIdentifier, 128).thumb || undefined}
+                fallbackLabel={guild.name.trim().charAt(0).toUpperCase() || "G"}
+                active={guild.id === activeGuildId}
+                draggable={isEditing}
+                dragging={draggedGuildId === guild.id}
+                onClick={isEditing ? undefined : () => onSelectActiveGuild(guild.id)}
+                onDragStart={isEditing ? (event) => handleDragStart(event, guild.id) : undefined}
+                onDragEnd={clearDragState}
+                onRemove={isEditing ? () => onRequestRemoveGuild(guild) : undefined}
+                removeLabel={`${guild.name} aus Guild Hub entfernen`}
+              />
+            </div>
+          );
+        })}
+        <GuildCard
+          kind="add"
+          active={pickerOpen}
+          label="Gilde hinzufügen"
+          selectLabel="Gilde hinzufügen"
           onClick={onTogglePicker}
-        >
-          <Plus size={18} strokeWidth={2.2} aria-hidden />
-        </button>
+        />
       </div>
 
       {pickerOpen ? (
@@ -262,68 +348,6 @@ function GuildSlot({
           onSelectGuild={onSelectGuild}
           onClose={onClosePicker}
         />
-      ) : null}
-    </div>
-  );
-}
-
-function GuildLogoButton({
-  guild,
-  active,
-  isEditing,
-  onClick,
-  onRequestRemove,
-}: {
-  guild: GuildHubSelectedGuild;
-  active: boolean;
-  isEditing: boolean;
-  onClick: () => void;
-  onRequestRemove: () => void;
-}) {
-  const emblem = guildIconByIdentifier(guild.logoIdentifier, 96);
-  const emblemUrl = emblem.thumb || undefined;
-  const fallback = guild.name.trim().charAt(0).toUpperCase() || "G";
-
-  return (
-    <div className={styles.guildLogoEditWrap}>
-      <button
-        type="button"
-        className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl border transition hover:bg-white/5"
-        style={{
-          borderColor: active ? "#2B6DE0" : "#2B4C73",
-          background: active ? "#1C3554" : "#0F2135",
-          color: "#F5F9FF",
-          boxShadow: active ? "0 0 0 2px rgba(43, 109, 224, 0.45)" : undefined,
-        }}
-        aria-pressed={active}
-        aria-label={`${guild.name} aktivieren`}
-        title={`${guild.name} (${guild.server})`}
-        onClick={onClick}
-      >
-        {emblemUrl ? (
-          <img
-            src={emblemUrl}
-            alt={`${guild.name} Logo`}
-            className="h-9 w-9 object-contain drop-shadow"
-            loading="lazy"
-          />
-        ) : (
-          <span className="text-sm font-semibold">{fallback}</span>
-        )}
-      </button>
-      {isEditing ? (
-        <button
-          type="button"
-          className={styles.guildRemoveButton}
-          aria-label={`${guild.name} aus Guild Hub entfernen`}
-          title="Aus Guild Hub entfernen"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRequestRemove();
-          }}
-        >
-          <Minus size={12} strokeWidth={3} aria-hidden />
-        </button>
       ) : null}
     </div>
   );
@@ -384,12 +408,12 @@ function GuildPicker({
 }) {
   const [server, setServer] = React.useState("");
   const [query, setQuery] = React.useState("");
-  const { scans, loading, error } = localScanState;
+  const { summaries, loading, error } = localScanState;
 
-  const serverOptions = React.useMemo(() => listGuildHubLocalServersFromScans(scans), [scans]);
+  const serverOptions = React.useMemo(() => listGuildHubLocalServersFromScanSummaries(summaries), [summaries]);
   const guildOptions = React.useMemo(
-    () => listGuildHubLocalGuildsForServerFromScans(scans, server),
-    [scans, server],
+    () => listGuildHubLocalGuildsForServerFromScanSummaries(summaries, server),
+    [summaries, server],
   );
 
   const filteredGuilds = React.useMemo(() => {

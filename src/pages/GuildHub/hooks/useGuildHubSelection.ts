@@ -11,6 +11,8 @@ export type GuildHubSelectedGuild = GuildHubSelectionGuild;
 
 export type GuildHubPersistedState = GuildHubSelectionState;
 
+const GUILD_HUB_SELECTION_CHANGE_EVENT = "sfdatahub:guild-hub-selection-change";
+
 export const normalizeText = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
 const normalizeGuildIdSegment = (value: unknown): string | null => {
@@ -73,6 +75,7 @@ export const normalizeSelectedGuild = (
     logoIdentifier,
     hofRank: typeof value.hofRank === "number" ? value.hofRank : null,
     memberCount: typeof value.memberCount === "number" ? value.memberCount : null,
+    coaString: String(value.coaString ?? "").trim() || null,
   };
 };
 
@@ -90,6 +93,7 @@ export const mapLocalGuildIdentityToSelection = (
     logoIdentifier,
     hofRank: guild.hofRank,
     memberCount: guild.memberCount,
+    coaString: guild.coaString ?? null,
   };
 };
 
@@ -111,6 +115,11 @@ const normalizeGuildHubState = (state: GuildHubPersistedState): GuildHubPersiste
 };
 
 const createEmptyGuildHubState = (): GuildHubPersistedState => ({ selectedGuilds: [], activeGuildId: null });
+
+const emitGuildHubSelectionChange = (state: GuildHubPersistedState) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<GuildHubPersistedState>(GUILD_HUB_SELECTION_CHANGE_EVENT, { detail: state }));
+};
 
 export const readGuildHubState = async (): Promise<GuildHubPersistedState> => {
   try {
@@ -149,6 +158,25 @@ export function useGuildHubSelection() {
   }, []);
 
   React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleSelectionChange = (event: Event) => {
+      const detail = (event as CustomEvent<GuildHubPersistedState>).detail;
+      if (!detail) return;
+      const normalized = normalizeGuildHubState(detail);
+      userStateCommittedRef.current = true;
+      stateRef.current = normalized;
+      setState(normalized);
+      setIsLoading(false);
+    };
+
+    window.addEventListener(GUILD_HUB_SELECTION_CHANGE_EVENT, handleSelectionChange);
+    return () => {
+      window.removeEventListener(GUILD_HUB_SELECTION_CHANGE_EVENT, handleSelectionChange);
+    };
+  }, []);
+
+  React.useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
@@ -157,6 +185,7 @@ export function useGuildHubSelection() {
     userStateCommittedRef.current = true;
     stateRef.current = normalized;
     setState(normalized);
+    emitGuildHubSelectionChange(normalized);
     writeGuildHubState(normalized).catch((err) => {
       console.error("[GuildHub] failed to persist guild selection", err);
     });
@@ -193,6 +222,25 @@ export function useGuildHubSelection() {
     commitUserState({ selectedGuilds, activeGuildId });
   }, [commitUserState]);
 
+  const reorderGuilds = React.useCallback((sourceId: string, targetIndex: number) => {
+    const prev = stateRef.current;
+    const fromIndex = prev.selectedGuilds.findIndex((guild) => guild.id === sourceId);
+    if (fromIndex < 0) return;
+
+    const boundedTargetIndex = Math.max(0, Math.min(targetIndex, prev.selectedGuilds.length));
+    const adjustedTargetIndex = fromIndex < boundedTargetIndex ? boundedTargetIndex - 1 : boundedTargetIndex;
+    if (adjustedTargetIndex === fromIndex) return;
+
+    const selectedGuilds = [...prev.selectedGuilds];
+    const [movedGuild] = selectedGuilds.splice(fromIndex, 1);
+    selectedGuilds.splice(adjustedTargetIndex, 0, movedGuild);
+
+    commitUserState({
+      selectedGuilds,
+      activeGuildId: resolveActiveGuildId({ selectedGuilds, activeGuildId: prev.activeGuildId }),
+    });
+  }, [commitUserState]);
+
   const activeGuild = React.useMemo(
     () => state.selectedGuilds.find((guild) => guild.id === state.activeGuildId) ?? state.selectedGuilds[0] ?? null,
     [state.selectedGuilds, state.activeGuildId],
@@ -206,5 +254,6 @@ export function useGuildHubSelection() {
     setActiveGuildId,
     selectGuild,
     removeGuild,
+    reorderGuilds,
   };
 }

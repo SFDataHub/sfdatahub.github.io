@@ -82,10 +82,17 @@ export type FightTrackerTransferState = {
 
 export type FightTrackerSummary = {
   tracker: FightTrackerGuild;
+  trackerId?: string;
+  linkedGuildIdentifier?: string | null;
   memberCount: number;
   activeMemberCount: number;
+  inactiveMemberCount?: number;
   fightCount: number;
   missedCount: number;
+  latestFightTimestamp?: number | null;
+  createdAt?: number;
+  updatedAt?: number;
+  summaryVersion?: number;
 };
 
 export type FightTrackerGuildHubIdentity = {
@@ -136,6 +143,15 @@ interface FightTrackingDb extends DBSchema {
     key: string;
     value: FightTrackerGuild;
   };
+  summaries: {
+    key: string;
+    value: FightTrackerSummaryRecord;
+    indexes: {
+      by_trackerId: string;
+      by_updatedAt: number;
+      by_linkedGuildIdentifier: string;
+    };
+  };
   members: {
     key: string;
     value: FightTrackerMember;
@@ -157,8 +173,10 @@ interface FightTrackingDb extends DBSchema {
 }
 
 const DB_NAME = "sfdatahub-guild-fight-tracking";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const FIGHT_TRACKER_SUMMARY_VERSION = 1;
 const ACTIVE_TRACKER_STATE_KEY = "active-tracker";
+const FIGHT_TRACKING_CHANGE_EVENT = "sfdatahub:fight-tracking-change";
 
 let dbPromise: Promise<IDBPDatabase<FightTrackingDb>> | null = null;
 
@@ -182,6 +200,66 @@ const timestampMs = (value: string | null | undefined) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+type FightTrackerSummaryRecord = FightTrackerSummary & {
+  id: string;
+  trackerId: string;
+  linkedGuildIdentifier: string | null;
+  inactiveMemberCount: number;
+  latestFightTimestamp: number | null;
+  createdAt: number;
+  updatedAt: number;
+  trackerUpdatedAt: string;
+  summaryVersion: number;
+};
+
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => {
+    if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
+      window.requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+
+const parseTimeOrZero = (value: string | null | undefined) => timestampMs(value) ?? 0;
+
+const getFightTimestamp = (fight: GuildFight) => timestampMs(fight.date) ?? timestampMs(fight.createdAt) ?? 0;
+
+const getLinkedGuildIdentifier = (tracker: FightTrackerGuild) =>
+  normalizeIdentityText(tracker.linkedGuildHubLogoIdentifier) || normalizeIdentityText(tracker.linkedGuildHubGuildId) || "";
+
+const createFightTrackerSummaryRecord = (
+  tracker: FightTrackerGuild,
+  members: FightTrackerMember[],
+  fights: GuildFight[],
+): FightTrackerSummaryRecord => {
+  const activeMemberCount = members.filter((member) => member.active).length;
+  const fightTimestamps = fights.map(getFightTimestamp).filter((value) => Number.isFinite(value) && value > 0);
+  const linkedGuildIdentifier = getLinkedGuildIdentifier(tracker) || null;
+  return {
+    id: tracker.id,
+    trackerId: tracker.id,
+    linkedGuildIdentifier,
+    tracker,
+    memberCount: members.length,
+    activeMemberCount,
+    inactiveMemberCount: Math.max(0, members.length - activeMemberCount),
+    fightCount: fights.length,
+    missedCount: fights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0),
+    latestFightTimestamp: fightTimestamps.length ? Math.max(...fightTimestamps) : null,
+    createdAt: parseTimeOrZero(tracker.createdAt),
+    updatedAt: Date.now(),
+    trackerUpdatedAt: tracker.updatedAt,
+    summaryVersion: FIGHT_TRACKER_SUMMARY_VERSION,
+  };
+};
+
+const isCurrentFightTrackerSummary = (
+  summary: FightTrackerSummaryRecord | undefined,
+  tracker: FightTrackerGuild,
+): summary is FightTrackerSummaryRecord =>
+  summary?.summaryVersion === FIGHT_TRACKER_SUMMARY_VERSION && summary.trackerUpdatedAt === tracker.updatedAt;
+
 const createId = (prefix: string) => {
   const random =
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -190,12 +268,31 @@ const createId = (prefix: string) => {
   return `${prefix}:${Date.now().toString(36)}:${random}`;
 };
 
+const emitFightTrackingChange = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(FIGHT_TRACKING_CHANGE_EVENT));
+};
+
+export function subscribeToFightTrackingChanges(listener: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(FIGHT_TRACKING_CHANGE_EVENT, listener);
+  return () => {
+    window.removeEventListener(FIGHT_TRACKING_CHANGE_EVENT, listener);
+  };
+}
+
 function getFightTrackingDb() {
   if (!dbPromise) {
     dbPromise = openDB<FightTrackingDb>(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains("trackers")) {
           db.createObjectStore("trackers", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("summaries")) {
+          const store = db.createObjectStore("summaries", { keyPath: "id" });
+          store.createIndex("by_trackerId", "trackerId");
+          store.createIndex("by_updatedAt", "updatedAt");
+          store.createIndex("by_linkedGuildIdentifier", "linkedGuildIdentifier");
         }
         if (!db.objectStoreNames.contains("members")) {
           const store = db.createObjectStore("members", { keyPath: "id" });
@@ -213,6 +310,27 @@ function getFightTrackingDb() {
   }
 
   return dbPromise;
+}
+
+async function rebuildFightTrackerSummary(db: IDBPDatabase<FightTrackingDb>, trackerId: string) {
+  const tracker = (await db.get("trackers", trackerId)) ?? null;
+  if (!tracker) {
+    await db.delete("summaries", trackerId);
+    return null;
+  }
+
+  const [members, fights] = await Promise.all([
+    db.getAllFromIndex("members", "by_trackerId", tracker.id),
+    db.getAllFromIndex("fights", "by_trackerId", tracker.id),
+  ]);
+  const summary = createFightTrackerSummaryRecord(tracker, members, fights);
+  await db.put("summaries", summary);
+  return summary;
+}
+
+async function refreshFightTrackerSummary(trackerId: string) {
+  const db = await getFightTrackingDb();
+  return rebuildFightTrackerSummary(db, trackerId);
 }
 
 async function setActiveTrackerId(id: string) {
@@ -279,6 +397,20 @@ export async function readFightTrackerState(guild: FightTrackerGuildHubIdentity 
   return readFightTrackerStateByTracker(matches[0]);
 }
 
+export async function readLinkedFightTrackerState(guild: FightTrackerGuildHubIdentity | null): Promise<FightTrackerState> {
+  const db = await getFightTrackingDb();
+  if (!guild) return { tracker: null, members: [], fights: [] };
+
+  const trackers = await db.getAll("trackers");
+  const matches = trackers.filter((tracker) => isFightTrackerLinkedToGuild(tracker, guild));
+  if (matches.length > 1) {
+    throw new Error("Mehrere Fight Tracker passen zur aktiven Guild-Hub-Gilde. Bitte keine automatische Zuordnung vornehmen.");
+  }
+  if (!matches.length) return { tracker: null, members: [], fights: [] };
+
+  return readFightTrackerStateByTracker(matches[0]);
+}
+
 export async function createFightTracker(input: CreateFightTrackerInput): Promise<FightTrackerState> {
   const now = new Date().toISOString();
   const tracker: FightTrackerGuild = {
@@ -300,15 +432,18 @@ export async function createFightTracker(input: CreateFightTrackerInput): Promis
     .filter((member): member is FightTrackerMember => Boolean(member));
 
   const db = await getFightTrackingDb();
-  const tx = db.transaction(["trackers", "members", "state"], "readwrite");
+  const summary = createFightTrackerSummaryRecord(tracker, members, []);
+  const tx = db.transaction(["trackers", "members", "summaries", "state"], "readwrite");
   await tx.objectStore("trackers").put(tracker);
   await Promise.all(members.map((member) => tx.objectStore("members").put(member)));
+  await tx.objectStore("summaries").put(summary);
   await tx.objectStore("state").put({
     key: ACTIVE_TRACKER_STATE_KEY,
     value: tracker.id,
     updatedAt: now,
   });
   await tx.done;
+  emitFightTrackingChange();
 
   return { tracker, members, fights: [] };
 }
@@ -322,21 +457,26 @@ export async function readFightTrackers(): Promise<FightTrackerGuild[]> {
 export async function readFightTrackerSummaries(): Promise<FightTrackerSummary[]> {
   const db = await getFightTrackingDb();
   const trackers = await readFightTrackers();
-  const summaries = await Promise.all(
-    trackers.map(async (tracker) => {
-      const [members, fights] = await Promise.all([
-        db.getAllFromIndex("members", "by_trackerId", tracker.id),
-        db.getAllFromIndex("fights", "by_trackerId", tracker.id),
-      ]);
-      return {
-        tracker,
-        memberCount: members.length,
-        activeMemberCount: members.filter((member) => member.active).length,
-        fightCount: fights.length,
-        missedCount: fights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0),
-      };
-    }),
-  );
+  const trackerIds = new Set(trackers.map((tracker) => tracker.id));
+  const summaryByTrackerId = new Map((await db.getAll("summaries")).map((summary) => [summary.trackerId, summary]));
+  const summaries: FightTrackerSummaryRecord[] = [];
+
+  for (const summary of summaryByTrackerId.values()) {
+    if (!trackerIds.has(summary.trackerId)) await db.delete("summaries", summary.trackerId);
+  }
+
+  for (const tracker of trackers) {
+    const existing = summaryByTrackerId.get(tracker.id);
+    if (isCurrentFightTrackerSummary(existing, tracker)) {
+      summaries.push(existing);
+      continue;
+    }
+
+    const rebuilt = await rebuildFightTrackerSummary(db, tracker.id);
+    if (rebuilt) summaries.push(rebuilt);
+    await yieldToBrowser();
+  }
+
   return summaries.sort((a, b) => a.tracker.name.localeCompare(b.tracker.name, "de-DE", { sensitivity: "base" }));
 }
 
@@ -370,11 +510,13 @@ export async function importFightTrackerTransferStates(inputs: FightTrackerTrans
   const importedAt = new Date().toISOString();
   const states = inputs.map((input) => prepareImportedFightTrackerState(input, importedAt));
   const db = await getFightTrackingDb();
-  const tx = db.transaction(["trackers", "members", "fights", "state"], "readwrite");
+  const summaries = states.map((state) => createFightTrackerSummaryRecord(state.tracker!, state.members, state.fights));
+  const tx = db.transaction(["trackers", "members", "fights", "summaries", "state"], "readwrite");
   await Promise.all([
     ...states.map((state) => tx.objectStore("trackers").add(state.tracker!)),
     ...states.flatMap((state) => state.members.map((member) => tx.objectStore("members").add(member))),
     ...states.flatMap((state) => state.fights.map((fight) => tx.objectStore("fights").add(fight))),
+    ...summaries.map((summary) => tx.objectStore("summaries").add(summary)),
     tx.objectStore("state").put({
       key: ACTIVE_TRACKER_STATE_KEY,
       value: states[states.length - 1].tracker!.id,
@@ -382,6 +524,7 @@ export async function importFightTrackerTransferStates(inputs: FightTrackerTrans
     }),
   ]);
   await tx.done;
+  emitFightTrackingChange();
 
   return states;
 }
@@ -472,6 +615,8 @@ export async function renameFightTracker(tracker: FightTrackerGuild, name: strin
   };
   const db = await getFightTrackingDb();
   await db.put("trackers", updated);
+  await refreshFightTrackerSummary(updated.id);
+  emitFightTrackingChange();
   return updated;
 }
 
@@ -482,14 +627,16 @@ export async function deleteFightTracker(trackerId: string): Promise<void> {
     db.getAllFromIndex("fights", "by_trackerId", trackerId),
     db.get("state", ACTIVE_TRACKER_STATE_KEY),
   ]);
-  const tx = db.transaction(["trackers", "members", "fights", "state"], "readwrite");
+  const tx = db.transaction(["trackers", "members", "fights", "summaries", "state"], "readwrite");
   await Promise.all([
     tx.objectStore("trackers").delete(trackerId),
     ...members.map((member) => tx.objectStore("members").delete(member.id)),
     ...fights.map((fight) => tx.objectStore("fights").delete(fight.id)),
+    tx.objectStore("summaries").delete(trackerId),
     state?.value === trackerId ? tx.objectStore("state").delete(ACTIVE_TRACKER_STATE_KEY) : Promise.resolve(),
   ]);
   await tx.done;
+  emitFightTrackingChange();
 }
 
 export async function deleteFightTrackerMember(
@@ -515,6 +662,8 @@ export async function deleteFightTrackerMember(
     ...updatedFights.map((fight) => tx.objectStore("fights").put(fight)),
   ]);
   await tx.done;
+  await refreshFightTrackerSummary(trackerId);
+  emitFightTrackingChange();
 
   return { deleted: true, fights: updatedFights };
 }
@@ -530,6 +679,8 @@ export async function deleteFightTrackerFight(
   }
 
   await db.delete("fights", fightId);
+  await refreshFightTrackerSummary(trackerId);
+  emitFightTrackingChange();
   return { deleted: true, fights: await db.getAllFromIndex("fights", "by_trackerId", trackerId) };
 }
 
@@ -543,17 +694,23 @@ export async function addFightTrackerMember(
 
   const db = await getFightTrackingDb();
   await db.put("members", member);
+  await refreshFightTrackerSummary(trackerId);
+  emitFightTrackingChange();
   return member;
 }
 
 export async function putFightTrackerMember(member: FightTrackerMember): Promise<void> {
   const db = await getFightTrackingDb();
   await db.put("members", { ...member, updatedAt: new Date().toISOString() });
+  await refreshFightTrackerSummary(member.trackerId);
+  emitFightTrackingChange();
 }
 
 export async function putFightTrackerFight(fight: GuildFight): Promise<void> {
   const db = await getFightTrackingDb();
   await db.put("fights", fight);
+  await refreshFightTrackerSummary(fight.trackerId);
+  emitFightTrackingChange();
 }
 
 export async function updateFightTrackerSyncMetadata(
@@ -584,6 +741,8 @@ export async function updateFightTrackerSyncMetadata(
   const db = await getFightTrackingDb();
   await db.put("trackers", updated);
   await setActiveTrackerId(updated.id);
+  await refreshFightTrackerSummary(updated.id);
+  emitFightTrackingChange();
   return updated;
 }
 

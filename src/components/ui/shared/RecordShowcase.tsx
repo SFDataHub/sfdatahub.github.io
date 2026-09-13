@@ -13,6 +13,11 @@ import RecordBadge, { getRecordScopeThemeStyle } from "./RecordBadge";
 import type { RecordBadgeFamily, RecordBadgeScope } from "./RecordBadge";
 import styles from "./RecordShowcase.module.css";
 
+const CLICK_MOVE_TOLERANCE = 6;
+const SWIPE_THRESHOLD = 48;
+const SWIPE_AXIS_DOMINANCE = 1.25;
+const SUPPRESS_CLICK_MS = 350;
+
 export type RecordShowcaseRecord = {
   id?: string;
   messageId?: string;
@@ -70,6 +75,13 @@ export type RecordShowcaseProps<TRecord extends RecordShowcaseRecord = RecordSho
   maxRecords?: number;
   className?: string;
   artworkForRecord?: (record: TRecord) => ReactNode;
+};
+
+type PointerGestureState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  hasMoved: boolean;
 };
 
 function cleanScopeLabel(scopeLabel: string | null | undefined) {
@@ -159,6 +171,10 @@ function scopeTextFromScope(scope: RecordBadgeScope, labels: RecordShowcaseLabel
   return scope.label.toLowerCase() === "guild" ? labels.guildRecord : `${scope.label} ${labels.record}`;
 }
 
+function isHorizontalSwipe(deltaX: number, deltaY: number) {
+  return Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * SWIPE_AXIS_DOMINANCE;
+}
+
 function detailRows(
   record: RecordShowcaseRecord,
   recordLabel: string,
@@ -192,7 +208,8 @@ export default function RecordShowcase<TRecord extends RecordShowcaseRecord = Re
   const [flippedIds, setFlippedIds] = useState<Set<string>>(() => new Set());
   const [measuredVisibleRecords, setMeasuredVisibleRecords] = useState(visibleRecords);
   const showcaseRef = useRef<HTMLElement | null>(null);
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerGestureRef = useRef<PointerGestureState | null>(null);
+  const suppressClickUntilRef = useRef(0);
 
   const latestRecords = useMemo(() => {
     const sortedRecords = [...records].sort((a, b) => {
@@ -245,21 +262,6 @@ export default function RecordShowcase<TRecord extends RecordShowcaseRecord = Re
     });
   };
 
-  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
-    pointerStartRef.current = { x: event.clientX, y: event.clientY };
-  };
-
-  const handleCardClick = (recordId: string, event: MouseEvent<HTMLElement>) => {
-    const pointerStart = pointerStartRef.current;
-    pointerStartRef.current = null;
-    if (pointerStart) {
-      const deltaX = Math.abs(event.clientX - pointerStart.x);
-      const deltaY = Math.abs(event.clientY - pointerStart.y);
-      if (deltaX > 6 || deltaY > 6) return;
-    }
-    toggleCard(recordId);
-  };
-
   const move = (direction: -1 | 1) => {
     setStartIndex((current) => {
       if (maxStartIndex <= 0) return 0;
@@ -268,9 +270,86 @@ export default function RecordShowcase<TRecord extends RecordShowcaseRecord = Re
     });
   };
 
+  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pointerGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      hasMoved: false,
+    };
+    suppressClickUntilRef.current = 0;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    const moved = Math.abs(deltaX) > CLICK_MOVE_TOLERANCE || Math.abs(deltaY) > CLICK_MOVE_TOLERANCE;
+
+    if (moved) gesture.hasMoved = true;
+    if (canNavigate && isHorizontalSwipe(deltaX, deltaY)) {
+      suppressClickUntilRef.current = Date.now() + SUPPRESS_CLICK_MS;
+      event.preventDefault();
+    }
+  };
+
+  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    const moved = gesture.hasMoved || Math.abs(deltaX) > CLICK_MOVE_TOLERANCE || Math.abs(deltaY) > CLICK_MOVE_TOLERANCE;
+
+    pointerGestureRef.current = null;
+    suppressClickUntilRef.current = moved ? Date.now() + SUPPRESS_CLICK_MS : 0;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (!canNavigate || !isHorizontalSwipe(deltaX, deltaY)) return;
+    move(deltaX < 0 ? 1 : -1);
+  };
+
+  const handlePointerCancel = (event: PointerEvent<HTMLElement>) => {
+    const gesture = pointerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    pointerGestureRef.current = null;
+    suppressClickUntilRef.current = gesture.hasMoved ? Date.now() + SUPPRESS_CLICK_MS : 0;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleCardClick = (recordId: string, event: MouseEvent<HTMLElement>) => {
+    if (Date.now() <= suppressClickUntilRef.current) {
+      suppressClickUntilRef.current = 0;
+      return;
+    }
+    const gesture = pointerGestureRef.current;
+    pointerGestureRef.current = null;
+    if (gesture) {
+      const deltaX = Math.abs(event.clientX - gesture.startX);
+      const deltaY = Math.abs(event.clientY - gesture.startY);
+      if (deltaX > CLICK_MOVE_TOLERANCE || deltaY > CLICK_MOVE_TOLERANCE) return;
+    }
+    toggleCard(recordId);
+  };
+
   const visibleEnd = latestRecords.length
     ? Math.min(effectiveStartIndex + visibleCount, latestRecords.length)
     : 0;
+  const visibleStart = effectiveStartIndex + 1;
+  const positionLabel = visibleCount === 1
+    ? `${visibleStart} / ${latestRecords.length}`
+    : `${visibleStart}-${visibleEnd} / ${latestRecords.length}`;
 
   return (
     <section ref={showcaseRef} className={[styles.showcaseModule, className].filter(Boolean).join(" ")} aria-label={labels.title}>
@@ -284,9 +363,7 @@ export default function RecordShowcase<TRecord extends RecordShowcaseRecord = Re
             <button className={styles.navButton} type="button" onClick={() => move(-1)} aria-label={labels.previousRecords}>
               <ChevronLeft aria-hidden="true" />
             </button>
-            <span className={styles.positionLabel}>
-              {effectiveStartIndex + 1}-{visibleEnd} / {latestRecords.length}
-            </span>
+            <span className={styles.positionLabel}>{positionLabel}</span>
             <button className={styles.navButton} type="button" onClick={() => move(1)} aria-label={labels.nextRecords}>
               <ChevronRight aria-hidden="true" />
             </button>
@@ -319,6 +396,9 @@ export default function RecordShowcase<TRecord extends RecordShowcaseRecord = Re
                 data-flipped={isFlipped}
                 style={themeStyle}
                 onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
                 onClick={(event) => handleCardClick(recordId, event)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {

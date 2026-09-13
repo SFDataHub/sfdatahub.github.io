@@ -33,6 +33,7 @@ import {
 } from "../../lib/api/toplistsFirestore";
 import { normalizeServerKeyFromInput, parsePlayerIdentifier } from "../../lib/players/identifier";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
@@ -1541,6 +1542,8 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   const isPresetRender = renderMode === "preset";
   const resolvedPresetAmount = presetAmount ?? 50;
   const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
+  const isCompactToplistView = useMediaQuery("(max-width: 1099px)") && !isPresetRender;
+  const [expandedMobileRowKey, setExpandedMobileRowKey] = React.useState<string | null>(null);
 
   const hasServers = (servers?.length ?? 0) > 0;
   const [playerAvgMode, setPlayerAvgMode] = React.useState<"base" | "total">(() => PLAYER_AVG_MODE_CACHE);
@@ -2440,6 +2443,15 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     () => (captureRowLimit == null ? enhancedRows : enhancedRows.slice(0, captureRowLimit)),
     [captureRowLimit, enhancedRows]
   );
+  const mobileRenderedRowKeys = React.useMemo(() => {
+    const keys = new Set<string>();
+    renderedRows.forEach((row) => keys.add(buildCompareKey(row)));
+    return keys;
+  }, [buildCompareKey, renderedRows]);
+
+  React.useEffect(() => {
+    setExpandedMobileRowKey((prev) => (prev && mobileRenderedRowKeys.has(prev) ? prev : null));
+  }, [mobileRenderedRowKeys]);
 
   const avgTop100StatsPerDay = (() => {
     if (!showCompare) return null;
@@ -2565,7 +2577,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   }, [renderedRows]);
   const rowVirtualizer = useVirtualizer({
     count: renderedRows.length,
-    getScrollElement: () => (isPresetRender ? null : tableScrollRef.current),
+    getScrollElement: () => (isPresetRender || isCompactToplistView ? null : tableScrollRef.current),
     estimateSize: () => virtualRowHeight,
     overscan: 14,
     getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
@@ -2759,6 +2771,286 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       focusHighlightTimeoutRef.current = null;
     }, 2600);
   }, [focusIdentifier, focusRank, hasServers, isPresetRender, playerLoading, rowIndexByIdentifier, rowVirtualizer]);
+
+  const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
+    if (!showCompare) return null;
+    if (missing) {
+      return <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>-</div>;
+    }
+    if (value == null && hideIfNull) return null;
+    return (
+      <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>
+        {value == null ? t("toplists.deltaNew", "NEW") : fmtDelta(value)}
+      </div>
+    );
+  };
+
+  const formatMetricText = (value: React.ReactNode) => {
+    const text = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+    return text || "-";
+  };
+
+  const getRowDisplayData = (r: FirestoreToplistPlayerRow, i: number) => {
+    const rankDelta = showCompare ? (r as any)._rankDelta : null;
+    const deltas = (r as any)._delta || {};
+    const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
+    const rankDeltaDisplay = showCompare ? getRankDeltaDisplay(rankDelta, compareMissing) : null;
+    const statsPerDayValue = showCompare ? (r as any)._statsPerDay : null;
+    const statsDaysValue = showCompare ? (r as any)._statsDays : null;
+    const statsPerDayText = statsPerDayValue == null ? "-" : fmtNum(statsPerDayValue);
+    const statsDaysText = statsDaysValue == null ? "-" : `${statsDaysValue}d`;
+    const statsDayVariant = getStatsDayVariant(statsPerDayValue, avgTop100StatsPerDay);
+    const isBestStatsDay =
+      statsPerDayValue != null &&
+      maxStatsPerDay != null &&
+      statsPerDayValue === maxStatsPerDay;
+    const statsDayClassName = isBestStatsDay
+      ? "stats-day-chip stats-day-chip--best"
+      : statsDayVariant
+        ? `stats-day-chip stats-day-chip--${statsDayVariant}`
+        : "stats-day-chip";
+    const lastScanDotColor = computeLastScanColor((r as any).lastScan, nowMs);
+    const lastScanLabel = formatLastScanDisplay((r as any).lastScan);
+    const classKey = String(r.class ?? "").trim();
+    const classIconUrl = getClassIconUrl(classKey, 48);
+    const sublineServer = String(r.server ?? "").trim();
+    const sublineText = sublineServer;
+    const profileIdentifier = resolveToplistRowIdentifier(r);
+    const rowKey = profileIdentifier ?? `missing-identifier-row-${i}`;
+    const accordionKey = buildCompareKey(r);
+    const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
+    const decor = decorMap.get(buildCompareKey(r));
+    const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
+    const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
+    const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
+    const mineTone = getMineTone(decor?.mineTier);
+    const calculatedSum = (r as any)._calculatedSum ?? 0;
+    const displayMain = effectivePlayerAvgMode === "total" ? r.mainTotal : r.main;
+    const displayCon = effectivePlayerAvgMode === "total" ? r.conTotal : r.con;
+    const displaySum = effectivePlayerAvgMode === "total" ? r.sumTotal : calculatedSum;
+    const mainDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.mainTotal ?? null) : (deltas.main ?? null);
+    const conDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.conTotal ?? null) : (deltas.con ?? null);
+    const sumDeltaValue = effectivePlayerAvgMode === "total" ? (deltas.sumTotal ?? null) : (deltas.sum ?? null);
+
+    return {
+      accordionKey,
+      calculatedSum,
+      classIconUrl,
+      classKey,
+      compareMissing,
+      conDeltaValue,
+      conTone,
+      deltas,
+      displayCon,
+      displayMain,
+      displaySum,
+      isFocusedRow,
+      lastScanDotColor,
+      lastScanLabel,
+      levelTone,
+      mainDeltaValue,
+      mainTone,
+      mineTone,
+      profileIdentifier,
+      rankDeltaDisplay,
+      rowKey,
+      statsDayClassName,
+      statsDaysText,
+      statsPerDayText,
+      sublineServer,
+      sublineText,
+      sumDeltaValue,
+    };
+  };
+
+  const getSortMetric = (
+    r: FirestoreToplistPlayerRow,
+    row: ReturnType<typeof getRowDisplayData>,
+  ) => {
+    const valueOrDash = (value: React.ReactNode) => formatMetricText(value);
+    switch (effectiveSort.key) {
+      case "name":
+        return { label: t("toplists.columns.player", "Player"), value: valueOrDash(r.name) };
+      case "lastScan":
+        return { label: t("toplists.columns.lastScan", "Last Scan"), value: valueOrDash(row.lastScanLabel) };
+      case "main":
+      case "mainTotal":
+        return { label: t("toplists.columns.main", "Main"), value: valueOrDash(fmtNum(row.displayMain)) };
+      case "con":
+      case "conTotal":
+        return { label: t("toplists.columns.con", "Con"), value: valueOrDash(fmtNum(row.displayCon)) };
+      case "sum":
+      case "sumTotal":
+        return { label: t("toplists.columns.sum", "Sum"), value: valueOrDash(fmtNum(row.displaySum)) };
+      case "statsDay":
+      case "statsDayTotal":
+        return { label: t("toplists.columns.statsPerDay", "Stats/Day"), value: valueOrDash(row.statsPerDayText) };
+      case "ratio":
+        return { label: t("toplists.columns.ratio", "Ratio"), value: valueOrDash((r as any)._ratioLabel ?? r.ratio) };
+      case "mine":
+        return { label: t("toplists.columns.mine", "Mine"), value: valueOrDash(fmtNum(r.mine)) };
+      case "treasury":
+        return { label: t("toplists.columns.treasury", "Treasury"), value: valueOrDash(fmtNum(r.treasury)) };
+      case "xpProgress":
+        return { label: t("toplists.columns.xpProgress", "XP Progress"), value: valueOrDash(fmtNum((r as any).xpProgress)) };
+      case "xpTotal":
+        return { label: t("toplists.columns.xpTotal", "XP Total"), value: valueOrDash(fmtNum((r as any).xpTotal)) };
+      case "level":
+      default:
+        return { label: t("toplists.columns.level", "Level"), value: valueOrDash(fmtNum(r.level)) };
+    }
+  };
+
+  const renderMobileDetailItem = (
+    key: string,
+    label: React.ReactNode,
+    value: React.ReactNode,
+    delta?: React.ReactNode,
+    className = "",
+  ) => (
+    <div key={key} className={`toplists-mobile-detail-item${className ? ` ${className}` : ""}`}>
+      <div className="toplists-mobile-detail-label">{label}</div>
+      <div className="toplists-mobile-detail-value">
+        {value}
+        {delta}
+      </div>
+    </div>
+  );
+
+  const renderMobileAccordion = () => (
+    <div
+      ref={tableRef}
+      className="toplists-mobile-list"
+      data-toplists-export-root="true"
+    >
+      {renderedRows.map((r, i) => {
+        const row = getRowDisplayData(r, i);
+        const sortMetric = getSortMetric(r, row);
+        const isExpanded = expandedMobileRowKey === row.accordionKey;
+        const guildName = String(r.guild ?? "").trim();
+        const detailId = `toplist-mobile-details-${i}`;
+        const openPlayerProfile = () => {
+          if (!row.profileIdentifier) return;
+          setSelectedPlayerProfile({
+            identifier: row.profileIdentifier,
+            name: typeof r.name === "string" ? r.name : null,
+            server: typeof r.server === "string" ? r.server : null,
+          });
+        };
+
+        return (
+          <div
+            key={row.accordionKey}
+            className={`toplists-mobile-row${row.isFocusedRow ? " toplists-mobile-row--focused" : ""}${isExpanded ? " toplists-mobile-row--open" : ""}`}
+            data-sfh-identifier={row.profileIdentifier ?? undefined}
+          >
+            <button
+              type="button"
+              className="toplists-mobile-summary"
+              aria-expanded={isExpanded}
+              aria-controls={detailId}
+              onClick={() => setExpandedMobileRowKey((prev) => (prev === row.accordionKey ? null : row.accordionKey))}
+            >
+              <span className="toplists-mobile-rank">
+                #{i + 1}
+                {row.rankDeltaDisplay ? (
+                  <span className={`rank-delta-chip rank-delta-chip--${row.rankDeltaDisplay.variant}`}>
+                    {row.rankDeltaDisplay.text}
+                  </span>
+                ) : null}
+              </span>
+              <span className="toplists-mobile-player">
+                <span className="toplists-mobile-class">
+                  {row.classIconUrl ? (
+                    <img
+                      src={row.classIconUrl}
+                      alt={row.classKey || t("toplists.columns.class", "Class")}
+                      loading="lazy"
+                      className="class-icon-toplist"
+                    />
+                  ) : (
+                    <span>{row.classKey}</span>
+                  )}
+                </span>
+                <span className="toplists-mobile-player-copy">
+                  <span className="toplists-mobile-name">{r.name}</span>
+                  <span className="toplists-mobile-guild">{guildName || "-"}</span>
+                  <span className="toplists-mobile-meta">
+                    {[row.sublineServer, `${t("toplists.columns.level", "Level")} ${fmtNum(r.level) || "-"}`].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </span>
+              <span className="toplists-mobile-metric">
+                <span className="toplists-mobile-metric-value">
+                  <ValueCrossfade value={sortMetric.value} fadeKey={`${effectiveSort.key}:${effectivePlayerAvgMode}`} minWidthCh={0} />
+                </span>
+                <span className="toplists-mobile-metric-label">{sortMetric.label}</span>
+              </span>
+              <span className="toplists-mobile-chevron" aria-hidden />
+            </button>
+            {isExpanded && (
+              <div id={detailId} className="toplists-mobile-details">
+                <div
+                  className="toplists-mobile-actions"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <NeonCoreButton
+                    label={t("toplists.mobileActions.playerProfile", "Spielerprofil")}
+                    title={t("toplists.mobileActions.playerProfile", "Spielerprofil")}
+                    icon={null}
+                    disabled={!row.profileIdentifier}
+                    className="toplists-mobile-action-button"
+                    onClick={openPlayerProfile}
+                  />
+                  <NeonCoreButton
+                    label={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    title={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    icon={null}
+                    disabled={!guildName}
+                    className="toplists-mobile-action-button"
+                    onClick={() => {
+                      if (!guildName) return;
+                      void handleGuildCellClick(r);
+                    }}
+                  />
+                </div>
+                {renderMobileDetailItem("level", t("toplists.columns.level", "Level"), <span style={getFrameStyle(row.levelTone)}>{fmtNum(r.level) || "-"}</span>, renderDelta(row.deltas.level ?? null, row.compareMissing))}
+                {renderMobileDetailItem("main", t("toplists.columns.main", "Main"), <span style={getFrameStyle(row.mainTone)}>{fmtNum(row.displayMain) || "-"}</span>, renderDelta(row.mainDeltaValue, row.compareMissing))}
+                {renderMobileDetailItem("con", t("toplists.columns.con", "Con"), <span style={getFrameStyle(row.conTone)}>{fmtNum(row.displayCon) || "-"}</span>, renderDelta(row.conDeltaValue, row.compareMissing))}
+                {renderMobileDetailItem("sum", t("toplists.columns.sum", "Sum"), fmtNum(row.displaySum) || "-", renderDelta(row.sumDeltaValue, row.compareMissing))}
+                {renderMobileDetailItem(
+                  "statsPerDay",
+                  t("toplists.columns.statsPerDay", "Stats/Day"),
+                  <span className={row.statsDayClassName}>{row.statsPerDayText}</span>,
+                  <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>{row.statsDaysText}</div>,
+                )}
+                {renderMobileDetailItem("ratio", t("toplists.columns.ratio", "Ratio"), formatMetricText((r as any)._ratioLabel ?? r.ratio), renderDelta(row.deltas.ratio ?? null, row.compareMissing, true))}
+                {renderMobileDetailItem("mine", t("toplists.columns.mine", "Mine"), <span style={getFrameStyle(row.mineTone)}>{fmtNum(r.mine) || "-"}</span>, renderDelta(row.deltas.mine ?? null, row.compareMissing))}
+                {renderMobileDetailItem("treasury", t("toplists.columns.treasury", "Treasury"), fmtNum(r.treasury) || "-", renderDelta(row.deltas.treasury ?? null, row.compareMissing))}
+                {renderMobileDetailItem(
+                  "lastScan",
+                  t("toplists.columns.lastScan", "Last Scan"),
+                  <span className="toplists-mobile-last-scan">
+                    <span>{formatMetricText(row.lastScanLabel)}</span>
+                    {row.lastScanDotColor && <span aria-hidden style={{ background: row.lastScanDotColor }} />}
+                  </span>
+                  ,
+                  undefined,
+                  "toplists-mobile-detail-item--wide",
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {tableLoading && renderedRows.length === 0 && (
+        <div className="toplists-mobile-empty">{t("toplists.table.loading", "Loading...")}</div>
+      )}
+      {!tableLoading && !effectivePlayerError && renderedRows.length === 0 && (
+        <div className="toplists-mobile-empty">{t("toplists.table.noResults", "No results")}</div>
+      )}
+    </div>
+  );
 
   const renderToplistColGroup = () => (
     <colgroup>
@@ -3093,6 +3385,8 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
         <div style={{ padding: 12, color: "#B0C4D9" }}>
           {t("toplists.players.selectServerHint", "Please select at least one server.")}
         </div>
+      ) : isCompactToplistView ? (
+        renderMobileAccordion()
       ) : (
         <>
           <div

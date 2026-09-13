@@ -27,6 +27,7 @@
     "guideHub": "Guide Hub",
     "scans": "Szkenek",
     "overview": "Áttekintés",
+    "analytics": "Analytics",
     "guildPlanner": "Guild Planner",
     "fusionPlanner": "Fusion Planner",
     "guildCompare": "Céh-összehasonlítás",
@@ -93,7 +94,7 @@
     },
     "records": {
       "title": "Legfrissebb közösségi rekordok",
-      "subtitle": "Élő pillanatkép",
+      "subtitle": "Legutóbbi rekordtartók egyéni és céhes rekordokból",
       "fallbackTitle": "Rekord bejelentés",
       "fallbackAuthor": "Discord",
       "fallbackChannel": "Rekordok",
