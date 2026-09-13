@@ -180,6 +180,7 @@ import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCe
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
+import { DataJobsProvider } from "./context/DataJobsContext";
 import FeatureGate from "./components/FeatureGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
 import UploadCenterPage from "./pages/UploadCenter/Index";
@@ -222,12 +223,13 @@ const withFeatureGate = (
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <NotificationsProvider>
-      <AuthProvider>
-        <LocalePreferencesProvider>
-          <FeatureAccessProvider>
-            <UploadCenterProvider>
-              <UploadCenterSessionsProvider>
-                <HashRouter>
+      <DataJobsProvider>
+        <AuthProvider>
+          <LocalePreferencesProvider>
+            <FeatureAccessProvider>
+              <UploadCenterProvider>
+                <UploadCenterSessionsProvider>
+                  <HashRouter>
                   <Routes>
                     <Route element={<RootLayout />}>
                 {/* Home */}
@@ -396,9 +398,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFusionPlanner />)}
                 />
                 <Route
-                  path="/guild-hub/compare-guilds"
+                  path="/guild-hub/analytics"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubCompareGuilds />)}
                 />
+                <Route path="/guild-hub/compare-guilds" element={<Navigate to="/guild-hub/analytics" replace />} />
                 <Route
                   path="/guild-hub/fight-tracking"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFightTracking />)}
@@ -578,15 +581,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
                   </Routes>
-                </HashRouter>
+                  </HashRouter>
 
-                {/* Modal am Root */}
-                <UploadCenterModal />
-              </UploadCenterSessionsProvider>
-            </UploadCenterProvider>
-          </FeatureAccessProvider>
-        </LocalePreferencesProvider>
-      </AuthProvider>
+                  {/* Modal am Root */}
+                  <UploadCenterModal />
+                </UploadCenterSessionsProvider>
+              </UploadCenterProvider>
+            </FeatureAccessProvider>
+          </LocalePreferencesProvider>
+        </AuthProvider>
+      </DataJobsProvider>
     </NotificationsProvider>
   </React.StrictMode>
 );

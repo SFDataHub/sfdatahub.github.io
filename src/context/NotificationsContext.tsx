@@ -1,7 +1,12 @@
 import React from "react";
 
 export type NotificationJobStatus = "running" | "success" | "error";
-export type ActivityEventKind = "favorite_added" | "favorite_removed";
+export type ActivityEventKind =
+  | "favorite_added"
+  | "favorite_removed"
+  | "data_job_completed"
+  | "data_job_failed"
+  | "data_job_interrupted";
 
 export type NotificationJob = {
   id: string;
@@ -54,7 +59,11 @@ const ACTIVITY_EVENT_MAX_COUNT = 10;
 const ACTIVITY_EVENT_DEDUPE_WINDOW_MS = 2000;
 
 const isValidActivityEventKind = (value: unknown): value is ActivityEventKind =>
-  value === "favorite_added" || value === "favorite_removed";
+  value === "favorite_added" ||
+  value === "favorite_removed" ||
+  value === "data_job_completed" ||
+  value === "data_job_failed" ||
+  value === "data_job_interrupted";
 
 const normalizeActivityEvents = (value: unknown, nowMs: number): ActivityEvent[] => {
   if (!Array.isArray(value)) return [];

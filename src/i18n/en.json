@@ -27,6 +27,7 @@
     "guideHub": "Guide Hub",
     "scans": "Scans",
     "overview": "Overview",
+    "analytics": "Analytics",
     "guildPlanner": "Guild Planner",
     "fusionPlanner": "Fusion Planner",
     "guildCompare": "Guild comparison",
@@ -93,7 +94,7 @@
     },
     "records": {
       "title": "Latest Community Records",
-      "subtitle": "Live snapshot",
+      "subtitle": "Recent record holders across individual and guild records",
       "fallbackTitle": "Record announcement",
       "fallbackAuthor": "Discord",
       "fallbackChannel": "Records",

@@ -96,6 +96,656 @@
   border: 1px solid rgba(123, 162, 214, 0.15);
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tabButton {
+  min-height: 36px;
+  border: 1px solid rgba(123, 162, 214, 0.22);
+  border-radius: 10px;
+  background: rgba(13, 24, 47, 0.72);
+  color: #b1c3e6;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.tabButton:hover,
+.tabButtonActive {
+  border-color: rgba(125, 165, 216, 0.55);
+  background: rgba(43, 109, 224, 0.18);
+  color: #f5f9ff;
+}
+
+.analyticsShellPanel {
+  min-height: 120px;
+}
+
+.progressPanel,
+.developmentPanel {
+  border: 1px solid rgba(123, 162, 214, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 16, 32, 0.86);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.progressReport {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progressRange {
+  align-items: center;
+  border: 1px solid rgba(123, 162, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 18, 34, 0.72);
+  color: #9fb4d6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.progressRange strong {
+  color: #f5f9ff;
+}
+
+.progressSummaryCard,
+.progressDetailCard,
+.progressTableCard {
+  border: 1px solid rgba(123, 162, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 22, 42, 0.86);
+  padding: 16px;
+}
+
+.progressSummaryCard,
+.progressTableCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progressCardTitle {
+  color: #f5f9ff;
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+
+.progressMetricGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.progressMetricTile {
+  border: 1px solid rgba(123, 162, 214, 0.16);
+  border-radius: 8px;
+  background: rgba(8, 16, 32, 0.68);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.progressMetricTile span {
+  color: #7da5d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progressMetricTile strong {
+  color: #f5f9ff;
+  font-size: 20px;
+}
+
+.progressMetricTile em {
+  color: #55dba6;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.progressDetailGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.progressDetailCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progressDetailCard h3 {
+  color: #f5f9ff;
+  font-size: 16px;
+  margin: 0;
+}
+
+.progressDetailCard dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.progressDetailCard div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressDetailCard dt {
+  color: #9fb4d6;
+  font-size: 13px;
+}
+
+.progressDetailCard dd {
+  color: #f5f9ff;
+  font-weight: 700;
+  margin: 0;
+}
+
+.progressTableWrap {
+  overflow-x: auto;
+}
+
+.progressTable {
+  border-collapse: collapse;
+  min-width: 620px;
+  width: 100%;
+}
+
+.progressTable th,
+.progressTable td {
+  border-bottom: 1px solid rgba(123, 162, 214, 0.12);
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.progressTable th:first-child,
+.progressTable td:first-child {
+  text-align: left;
+}
+
+.progressTable th {
+  color: #7da5d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progressTable td {
+  color: #d9e7ff;
+  font-size: 14px;
+}
+
+.progressTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.developmentHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.developmentTitleBlock {
+  min-width: 0;
+}
+
+.developmentEyebrow {
+  margin: 0;
+  color: #7da5d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.developmentTitle {
+  margin: 4px 0 0;
+  color: #f5f9ff;
+  font-size: 22px;
+}
+
+.developmentMeta {
+  margin: 6px 0 0;
+  color: #9fb4d6;
+  font-size: 14px;
+}
+
+.developmentControls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.segmentedControl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segmentButton {
+  min-height: 34px;
+  border: 1px solid rgba(123, 162, 214, 0.24);
+  border-radius: 8px;
+  background: rgba(13, 24, 47, 0.75);
+  color: #b1c3e6;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 11px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.segmentButton:hover,
+.segmentButtonActive {
+  border-color: rgba(85, 219, 166, 0.48);
+  background: rgba(85, 219, 166, 0.12);
+  color: #f5f9ff;
+}
+
+.rangePicker {
+  position: relative;
+}
+
+.rangeButton {
+  min-height: 36px;
+  border: 1px solid rgba(123, 162, 214, 0.28);
+  border-radius: 8px;
+  background: rgba(13, 24, 47, 0.78);
+  color: #f5f9ff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 13px;
+  text-align: left;
+  width: 100%;
+}
+
+.rangePopover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(320px, 88vw);
+  z-index: 20;
+}
+
+.rangeMenu {
+  border: 1px solid rgba(123, 162, 214, 0.24);
+  border-radius: 8px;
+  background: rgba(10, 18, 34, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+}
+
+.rangeOption {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #d3e1ff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.rangeOption:hover,
+.rangeOptionActive {
+  border-color: rgba(85, 219, 166, 0.38);
+  background: rgba(85, 219, 166, 0.12);
+  color: #f5f9ff;
+}
+
+.rangeCustomFields {
+  border-top: 1px solid rgba(123, 162, 214, 0.16);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.playerPicker {
+  min-width: min(100%, 320px);
+  position: relative;
+}
+
+.playerPickerDisabled {
+  opacity: 0.62;
+}
+
+.playerChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.playerChipList button {
+  align-items: center;
+  border: 1px solid rgba(123, 162, 214, 0.24);
+  border-radius: 999px;
+  background: rgba(43, 109, 224, 0.12);
+  color: #d9e7ff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.playerChipList button:hover {
+  border-color: rgba(125, 165, 216, 0.52);
+  background: rgba(43, 109, 224, 0.2);
+}
+
+.playerChipList i {
+  color: #9fb4d6;
+  font-style: normal;
+  line-height: 1;
+}
+
+.playerPickerMenu {
+  border: 1px solid rgba(123, 162, 214, 0.24);
+  border-radius: 8px;
+  background: rgba(10, 18, 34, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.playerPickerList {
+  border: 1px solid rgba(123, 162, 214, 0.16);
+  border-radius: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.playerPickerRow {
+  align-items: center;
+  border-bottom: 1px solid rgba(123, 162, 214, 0.1);
+  color: #d9e7ff;
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.playerPickerRow:last-child {
+  border-bottom: none;
+}
+
+.playerPickerRow input {
+  accent-color: #55dba6;
+}
+
+.developmentChartFrame {
+  min-height: 320px;
+  border: 1px solid rgba(123, 162, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 18, 34, 0.88);
+  padding: 12px;
+}
+
+.developmentChartFrame :global(.player-profile__trend-wrapper) {
+  height: 300px;
+  position: relative;
+  width: 100%;
+}
+
+.developmentChartFrame :global(.player-profile__trend-chart) {
+  display: block;
+  height: 300px;
+  width: 100%;
+}
+
+.developmentChartFrame :global(.player-profile__trend-line) {
+  stroke: #55dba6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.developmentChartFrame :global(.player-profile__trend-y-axis line) {
+  stroke: rgba(143, 166, 204, 0.45);
+  stroke-width: 1;
+}
+
+.developmentChartFrame :global(.player-profile__trend-y-axis text) {
+  fill: #8fa6cc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.developmentChartFrame :global(.player-profile__trend-area) {
+  opacity: 0.95;
+}
+
+.developmentChartFrame :global(.player-profile__trend-xlabels text) {
+  fill: #8fa6cc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.developmentChartFrame :global(.player-profile__trend-dots) {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.developmentChartFrame :global(.player-profile__trend-dot-anchor) {
+  pointer-events: auto;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.developmentChartFrame :global(.player-profile__trend-dot) {
+  background: #e9fff6;
+  border: 2px solid #55dba6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(85, 219, 166, 0.16);
+  display: block;
+  height: 10px;
+  width: 10px;
+}
+
+.developmentChartFrame :global(.player-profile__trend-dot-svg-group) {
+  pointer-events: none;
+}
+
+.developmentChartFrame :global(.player-profile__trend-dot-halo) {
+  opacity: 0.18;
+}
+
+.developmentChartFrame :global(.player-profile__trend-dot-svg) {
+  stroke-width: 1.5;
+}
+
+.developmentChartFrame :global(.player-profile__trend-hover-dot) {
+  fill: transparent;
+  pointer-events: none;
+  stroke-width: 2;
+}
+
+.developmentChartFrame :global(.player-profile__trend-plot-hitarea) {
+  cursor: crosshair;
+  pointer-events: auto;
+}
+
+.developmentChartFrame :global(.player-profile__trend-hover-tooltip) {
+  background: rgba(8, 16, 32, 0.96);
+  border: 1px solid rgba(123, 162, 214, 0.32);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  color: #f5f9ff;
+  max-width: min(320px, calc(100% - 24px));
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  z-index: 3;
+}
+
+.developmentChartFrame :global(.player-profile__trend-tooltip-cluster-item) {
+  border-top: 1px solid rgba(123, 162, 214, 0.18);
+}
+
+.developmentChartFrame :global(.player-profile__trend-tooltip-cluster-item:first-child) {
+  border-top: none;
+}
+
+.chartLegend {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.chartLegend span {
+  align-items: center;
+  color: #b1c3e6;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.chartLegend i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 10px;
+  width: 10px;
+}
+
+.fightTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 150px;
+}
+
+.fightTooltip strong {
+  color: #f5f9ff;
+}
+
+.fightTooltip span {
+  color: #d3e1ff;
+  font-size: 12px;
+}
+
+.scanTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 190px;
+}
+
+.scanTooltip strong {
+  color: #f5f9ff;
+}
+
+.scanTooltip span {
+  align-items: center;
+  color: #d3e1ff;
+  display: flex;
+  font-size: 12px;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.scanTooltip em {
+  color: #9fb4d6;
+  font-style: normal;
+}
+
+.scanTooltip b {
+  color: #f5f9ff;
+}
+
+.developmentSummary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.developmentStat {
+  border: 1px solid rgba(123, 162, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 22, 42, 0.86);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+}
+
+.developmentStat span {
+  color: #7da5d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.developmentStat strong {
+  color: #f5f9ff;
+  font-size: 22px;
+}
+
+.developmentHint {
+  margin: -4px 0 0;
+  color: #9fb4d6;
+  font-size: 13px;
+}
+
+.developmentEmpty {
+  align-items: center;
+  border: 1px dashed rgba(123, 162, 214, 0.4);
+  border-radius: 8px;
+  color: #9fb4d6;
+  display: flex;
+  justify-content: center;
+  min-height: 220px;
+  padding: 24px;
+  text-align: center;
+}
+
+.developmentEmpty p {
+  margin: 0;
+}
+
 .filterField {
   display: flex;
   flex-direction: column;
@@ -570,6 +1220,20 @@
 }
 
 @media (min-width: 1024px) {
+  .developmentHeader {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .progressDetailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .developmentControls {
+    align-items: flex-end;
+  }
+
   .layout {
     display: grid;
     grid-template-columns: minmax(320px, 1fr) minmax(400px, 1.2fr);

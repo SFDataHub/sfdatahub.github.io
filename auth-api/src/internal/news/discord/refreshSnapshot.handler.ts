@@ -226,6 +226,16 @@ const cleanParsedText = (value?: string | null): string | null => {
   return cleaned.length > 0 ? cleaned : null;
 };
 
+const DELETED_RECORD_PLACEHOLDER = "[Original Message Deleted]";
+
+const normalizeRecordAnnouncementContent = (content: string): string => {
+  return content.replace(/\s+/g, " ").trim();
+};
+
+const isDeletedRecordAnnouncementPlaceholder = (content: string): boolean => {
+  return normalizeRecordAnnouncementContent(content) === DELETED_RECORD_PLACEHOLDER;
+};
+
 const normalizeRecordKeyToken = (value: string): string => {
   return value
     .toLowerCase()
@@ -303,8 +313,9 @@ const parseRecordAnnouncementFields = (content: string): ParsedRecordAnnouncemen
 const toRecordAnnouncementItem = (
   item: DiscordNewsItem,
   channelName: string,
-): DiscordRecordAnnouncementItem => {
+): DiscordRecordAnnouncementItem | null => {
   const content = truncateContent(item.contentText);
+  if (isDeletedRecordAnnouncementPlaceholder(content)) return null;
   const parsed = parseRecordAnnouncementFields(content);
   return {
     id: item.id,
@@ -453,7 +464,9 @@ export const refreshDiscordNewsSnapshotHandler = async (req: Request, res: Respo
           picked: latestItem?.id ?? null,
         });
         const channelName = labels[channelId] ?? channelId;
-        return result.items.map((item) => toRecordAnnouncementItem(item, channelName));
+        return result.items
+          .map((item) => toRecordAnnouncementItem(item, channelName))
+          .filter((item): item is DiscordRecordAnnouncementItem => item !== null);
       }),
     )
   ).flat();

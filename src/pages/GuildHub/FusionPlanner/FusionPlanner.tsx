@@ -1,7 +1,7 @@
 import React from "react";
 import { doc, getDoc } from "firebase/firestore";
 import ContentShell from "../../../components/ContentShell";
-import GuildHubBackLink from "../../../components/guildhub/GuildHubBackLink";
+import GuildContextBar from "../../../components/guilds/GuildContextBar";
 import styles from "./FusionPlanner.module.css";
 import SetupTab from "./FusionPlannerTabs/SetupTab/SetupTab";
 import MembersTab from "./FusionPlannerTabs/MembersTab/MembersTab";
@@ -592,7 +592,7 @@ export default function FusionPlanner() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerLeading}>
-            <GuildHubBackLink />
+            <GuildContextBar />
             <div className={styles.headerStack}>
               <p className={styles.kicker}>Guild Hub</p>
               <h1 className={styles.title}>Fusion Planner</h1>

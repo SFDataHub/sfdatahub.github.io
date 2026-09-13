@@ -1,16 +1,20 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Check, Database, Download, RefreshCw, Swords, Trash2, Upload, X } from "lucide-react";
+import { Check, Database, Download, Loader2, Pencil, RefreshCw, Swords, Trash2, Upload, X } from "lucide-react";
 
 import { useBackClose } from "../../hooks/useBackClose";
 import {
   createSfDataHubLocalScanImportPreview,
   deleteSfDataHubLocalScans,
-  importSfDataHubLocalScan,
+  deriveGuildHubLogicalScanSnapshots,
+  getSfDataHubLocalScan,
   importSfDataHubLocalScanRecords,
-  listSfDataHubLocalScans,
+  listSfDataHubScanSummaries,
+  renameSfDataHubScanSlot,
   subscribeToSfDataHubLocalScanChanges,
   updateSfDataHubLocalScan,
+  type GuildHubScanMergeMode,
+  type GuildHubScanSummary,
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
 import {
@@ -26,6 +30,7 @@ import {
   stringifySfDataHubTransfer,
   type SfDataHubAnyTransferEnvelope,
 } from "../../lib/transfer/sfDataHubTransfer";
+import { getDataJobDetail, getDataJobProgress, useDataJobs, type DataJob } from "../../context/DataJobsContext";
 import styles from "./ScanManagementOverlay.module.css";
 
 type ScanManagementOverlayProps = {
@@ -54,11 +59,21 @@ type PendingScanJsonImport = {
   kind: "scanJson";
   id: string;
   filename: string;
-  content: string;
+  file: File;
   scan: SfDataHubLocalScan;
 };
 
-type PendingImport = PendingTransferImport | PendingScanJsonImport;
+type PendingScanMergeImport = {
+  kind: "scanMerge";
+  id: string;
+  filename: string;
+  mode: GuildHubScanMergeMode;
+  displayName: string;
+  sourceIds: string[];
+  summaries: GuildHubScanSummary[];
+};
+
+type PendingImport = PendingTransferImport | PendingScanJsonImport | PendingScanMergeImport;
 
 const EMPTY_FEEDBACK: ImportFeedback = {
   imported: [],
@@ -100,6 +115,36 @@ function formatScanDate(value: string | null | undefined) {
   }).format(date);
 }
 
+function formatScanDateShort(value: string | null | undefined) {
+  if (!value) return "Unbekannt";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Unbekannt";
+
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
+function isoFromSummaryTimestamp(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? new Date(value).toISOString() : null;
+}
+
+function formatScanSnapshotCell(summary: GuildHubScanSummary) {
+  if (summary.logicalScanCount <= 1) {
+    return {
+      label: formatScanDate(isoFromSummaryTimestamp(summary.firstSnapshotTimestamp) ?? summary.scannedAt),
+      title: undefined,
+    };
+  }
+
+  return {
+    label: `${summary.logicalScanCount} Scans / ${formatScanDateShort(
+      isoFromSummaryTimestamp(summary.firstSnapshotTimestamp),
+    )} - ${formatScanDateShort(isoFromSummaryTimestamp(summary.lastSnapshotTimestamp))}`,
+    title: summary.snapshotTimestamps.map((timestamp) => formatScanDate(new Date(timestamp).toISOString())).join("\n"),
+  };
+}
+
 function formatOptionalDate(value: string | null | undefined) {
   if (!value) return "Unbekannt";
   const date = new Date(value);
@@ -111,7 +156,7 @@ function formatOptionalDate(value: string | null | undefined) {
   }).format(date);
 }
 
-function formatServerList(scan: SfDataHubLocalScan) {
+function formatServerList(scan: Pick<SfDataHubLocalScan, "servers"> | Pick<GuildHubScanSummary, "servers">) {
   return scan.servers.length ? scan.servers.join(", ") : "Unbekannt";
 }
 
@@ -121,6 +166,19 @@ function downloadSfDataFile(filename: string, envelope: SfDataHubAnyTransferEnve
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadJsonFile(filename: string, value: unknown) {
+  const normalizedFilename = normalizeMergeFilenameInput(filename);
+  const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = normalizedFilename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -141,7 +199,7 @@ function dateFromOptionalTimestamp(value: string | null | undefined) {
   return date && Number.isFinite(date.getTime()) ? date : new Date();
 }
 
-function getScanGuildCount(scan: SfDataHubLocalScan) {
+function getScanGuildCount(scan: Pick<SfDataHubLocalScan, "guildCount" | "groupCount">) {
   return typeof scan.guildCount === "number" ? scan.guildCount : scan.groupCount;
 }
 
@@ -159,6 +217,15 @@ function formatCompactNames(names: string[], limit = 5) {
   return remaining > 0 ? `${visible} +${remaining} weitere` : visible || "Unbekannt";
 }
 
+function normalizeMergeFilenameInput(filename: string) {
+  const trimmed = filename.trim();
+  if (!trimmed) throw new Error("Dateiname darf nicht leer sein.");
+  if (/[<>:"/\\|?*\u0000-\u001f]/.test(trimmed)) {
+    throw new Error("Dateiname enthält ungültige Zeichen.");
+  }
+  return trimmed.toLowerCase().endsWith(".json") ? trimmed : `${trimmed}.json`;
+}
+
 function mergeFeedback(base: ImportFeedback, patch: Partial<ImportFeedback>): ImportFeedback {
   return {
     imported: patch.imported ?? base.imported,
@@ -169,11 +236,68 @@ function mergeFeedback(base: ImportFeedback, patch: Partial<ImportFeedback>): Im
   };
 }
 
+function createMergeFilenameSuggestion(scans: Array<Pick<GuildHubScanSummary, "servers">>) {
+  const servers = new Set(scans.flatMap((scan) => scan.servers.map((server) => server.trim()).filter(Boolean)));
+  if (servers.size === 1) {
+    const [server] = [...servers];
+    return `${server}_history.json`;
+  }
+  return "sfdatahub_scan_bundle.json";
+}
+
+function createScanSlotNameSuggestion(scans: Array<Pick<GuildHubScanSummary, "servers">>) {
+  const servers = new Set(scans.flatMap((scan) => scan.servers.map((server) => server.trim()).filter(Boolean)));
+  if (servers.size === 1) {
+    const [server] = [...servers];
+    return `${server} - Historie`;
+  }
+  return "Neuer Scan-Slot";
+}
+
+function normalizeScanSlotNameInput(displayName: string) {
+  const normalized = displayName.trim().replace(/\s+/g, " ");
+  if (!normalized) throw new Error("Scan-Slot-Name darf nicht leer sein.");
+  return normalized;
+}
+
+function createScanSlotTechnicalFilename(displayName: string, summaries: GuildHubScanSummary[]) {
+  const normalizedBase =
+    displayName
+      .normalize("NFKD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "scan_slot";
+  const existingFilenames = new Set(summaries.map((summary) => summary.filename.toLowerCase()));
+  let filename = `${normalizedBase}.json`;
+  let suffix = 2;
+  while (existingFilenames.has(filename.toLowerCase())) {
+    filename = `${normalizedBase}_${suffix}.json`;
+    suffix += 1;
+  }
+  return filename;
+}
+
+function getScanDisplayName(scan: Pick<GuildHubScanSummary, "displayName" | "filename">) {
+  return scan.displayName?.trim() || scan.filename;
+}
+
+function getScanExportFilename(scan: Pick<GuildHubScanSummary, "displayName" | "filename" | "isScanSlot">) {
+  if (!scan.isScanSlot) return scan.filename;
+  return normalizeMergeFilenameInput(getScanDisplayName(scan).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_"));
+}
+
+function getScanSlotSourceInfo(scan: Pick<GuildHubScanSummary, "isScanSlot" | "mergedSourceIds" | "logicalScanCount">) {
+  if (!scan.isScanSlot) return null;
+  const sourceCount = scan.mergedSourceIds?.length ?? 0;
+  return `${sourceCount.toLocaleString("de-DE")} Quelldateien · ${scan.logicalScanCount.toLocaleString("de-DE")} Scans`;
+}
+
 export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagementOverlayProps) {
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateTargetIdRef = React.useRef<string | null>(null);
-  const [scans, setScans] = React.useState<SfDataHubLocalScan[]>([]);
+  const [scans, setScans] = React.useState<GuildHubScanSummary[]>([]);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
   const [loading, setLoading] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -185,20 +309,31 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const [trackersLoading, setTrackersLoading] = React.useState(false);
   const [trackersError, setTrackersError] = React.useState<string | null>(null);
   const [pendingImport, setPendingImport] = React.useState<PendingImport | null>(null);
+  const [renamingSlot, setRenamingSlot] = React.useState<GuildHubScanSummary | null>(null);
+  const [renameSlotValue, setRenameSlotValue] = React.useState("");
+  const {
+    isReady: dataJobsReady,
+    runningSfToolsImportJob,
+    runningScanMergeJob,
+    startSfToolsImportJob,
+    startScanMergeJob,
+  } = useDataJobs();
 
   useBackClose(isOpen, onClose);
 
   React.useEffect(() => {
     if (isOpen) setActiveTab("scans");
+    else setPendingImport(null);
   }, [isOpen]);
 
   const loadScans = React.useCallback(async () => {
     setStorageError(null);
     setLoading(true);
     try {
-      const rows = await listSfDataHubLocalScans();
+      const rows = await listSfDataHubScanSummaries();
       setScans(rows);
-      setSelectedIds((current) => new Set(rows.filter((scan) => current.has(scan.id)).map((scan) => scan.id)));
+      const visibleIds = new Set(rows.filter((scan) => !scan.containedInScanSlotId).map((scan) => scan.sourceScanId));
+      setSelectedIds((current) => new Set([...current].filter((id) => visibleIds.has(id))));
     } catch (error) {
       console.error("[ScanManagement] failed to load scans", error);
       setStorageError("Lokale Scans konnten nicht geladen werden.");
@@ -253,6 +388,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     };
   }, [isOpen]);
 
+  const visibleScans = React.useMemo(() => scans.filter((scan) => !scan.containedInScanSlotId), [scans]);
+
   const handleImportFiles = async (files: File[]) => {
     if (!files.length) return;
     setBusy(true);
@@ -264,8 +401,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
     for (const file of files) {
       try {
-        const content = await file.text();
         if (getFileExtension(file.name) === ".sfdata") {
+          const content = await file.text();
           if (nextPendingImport) {
             nextFeedback.errors.push({
               filename: file.name,
@@ -282,6 +419,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
           continue;
         }
 
+        const content = await file.text();
         if (nextPendingImport) {
           nextFeedback.errors.push({
             filename: file.name,
@@ -294,7 +432,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
           kind: "scanJson",
           id: createImportPreviewId(),
           filename: file.name,
-          content,
+          file,
           scan: await createSfDataHubLocalScanImportPreview(file.name, content),
         };
       } catch (error) {
@@ -354,13 +492,25 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
   const toggleAllVisible = () => {
     setSelectedIds((current) => {
-      if (scans.length > 0 && scans.every((scan) => current.has(scan.id))) return new Set();
-      return new Set(scans.map((scan) => scan.id));
+      if (visibleScans.length > 0 && visibleScans.every((scan) => current.has(scan.sourceScanId))) return new Set();
+      return new Set(visibleScans.map((scan) => scan.sourceScanId));
     });
   };
 
   const deleteScans = async (ids: string[]) => {
     if (!ids.length) return;
+    const selectedScans = visibleScans.filter((scan) => ids.includes(scan.sourceScanId));
+    const slotCount = selectedScans.filter((scan) => scan.isScanSlot).length;
+    if (
+      slotCount > 0 &&
+      !window.confirm(
+        slotCount === 1
+          ? "Scan-Slot auflösen? Die enthaltenen Originalscans werden wieder sichtbar und aktiv."
+          : "Scan-Slots auflösen? Die enthaltenen Originalscans werden wieder sichtbar und aktiv.",
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     setStorageError(null);
     try {
@@ -397,17 +547,56 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     });
   };
 
-  const exportSelectedScans = () => {
-    const selectedScans = scans.filter((scan) => selectedIds.has(scan.id));
+  const exportSelectedScans = async () => {
+    const selectedScans = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
     if (!selectedScans.length) return;
-    if (selectedScans.length === 1) {
-      const envelope = createSfDataHubTransferEnvelope("scan", selectedScans[0]);
-      downloadSfDataFile(createSfDataFileName("scan", null, dateFromOptionalTimestamp(selectedScans[0].scannedAt ?? selectedScans[0].importedAt)), envelope);
-      return;
-    }
+    setBusy(true);
+    setStorageError(null);
+    try {
+      const rawScans = (await Promise.all(selectedScans.map((scan) => getSfDataHubLocalScan(scan.sourceScanId)))).filter(
+        (scan): scan is SfDataHubLocalScan => Boolean(scan),
+      );
+      if (rawScans.length !== selectedScans.length) {
+        setStorageError("Mindestens ein ausgewählter Scan wurde nicht gefunden.");
+        return;
+      }
 
-    const envelope = createSfDataHubTransferEnvelope("scanpack", { scans: selectedScans });
-    downloadSfDataFile(createSfDataFileName("scanpack"), envelope);
+      if (rawScans.length === 1) {
+        if (rawScans[0].isMergedBundle) {
+          downloadJsonFile(getScanExportFilename(selectedScans[0]), rawScans[0].rawData);
+          return;
+        }
+        const envelope = createSfDataHubTransferEnvelope("scan", rawScans[0]);
+        downloadSfDataFile(
+          createSfDataFileName("scan", null, dateFromOptionalTimestamp(rawScans[0].scannedAt ?? rawScans[0].importedAt)),
+          envelope,
+        );
+        return;
+      }
+
+      const envelope = createSfDataHubTransferEnvelope("scanpack", { scans: rawScans });
+      downloadSfDataFile(createSfDataFileName("scanpack"), envelope);
+    } catch (error) {
+      console.error("[ScanManagement] failed to export scans", error);
+      setStorageError("Scans konnten nicht exportiert werden.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startMergePreview = () => {
+    const selectedScans = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
+    if (selectedScans.length < 2) return;
+    setPendingImport({
+      kind: "scanMerge",
+      id: createImportPreviewId(),
+      filename: createMergeFilenameSuggestion(selectedScans),
+      mode: "merged-file",
+      displayName: createScanSlotNameSuggestion(selectedScans),
+      sourceIds: selectedScans.map((scan) => scan.sourceScanId),
+      summaries: selectedScans,
+    });
+    setActiveTab("scans");
   };
 
   const exportSelectedFightTrackers = async () => {
@@ -447,14 +636,23 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     const { filename } = pendingImport;
     try {
       if (pendingImport.kind === "scanJson") {
-        const result = await importSfDataHubLocalScan(pendingImport.filename, pendingImport.content);
-        if (result.status === "duplicate") {
-          nextFeedback.duplicates.push(result.scan.filename);
-        } else {
-          nextFeedback.imported.push(result.scan.filename);
-        }
+        await startSfToolsImportJob(pendingImport.file);
         setActiveTab("scans");
-        await loadScans();
+        setPendingImport(null);
+        return;
+      }
+
+      if (pendingImport.kind === "scanMerge") {
+        if (pendingImport.mode === "scan-slot") {
+          const displayName = normalizeScanSlotNameInput(pendingImport.displayName);
+          const filename = createScanSlotTechnicalFilename(displayName, scans);
+          await startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "scan-slot", displayName });
+        } else {
+          const filename = normalizeMergeFilenameInput(pendingImport.filename);
+          await startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "merged-file" });
+        }
+        setSelectedIds(new Set());
+        setActiveTab("scans");
         setPendingImport(null);
         return;
       }
@@ -493,9 +691,50 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     }
   };
 
-  const allVisibleSelected = scans.length > 0 && scans.every((scan) => selectedIds.has(scan.id));
+  const updatePendingMergeFilename = (filename: string) => {
+    setPendingImport((current) => (current?.kind === "scanMerge" ? { ...current, filename } : current));
+  };
+
+  const updatePendingMergeMode = (mode: GuildHubScanMergeMode) => {
+    setPendingImport((current) => (current?.kind === "scanMerge" ? { ...current, mode } : current));
+  };
+
+  const updatePendingMergeDisplayName = (displayName: string) => {
+    setPendingImport((current) => (current?.kind === "scanMerge" ? { ...current, displayName } : current));
+  };
+
+  const startRenameSlot = (scan: GuildHubScanSummary) => {
+    setRenamingSlot(scan);
+    setRenameSlotValue(getScanDisplayName(scan));
+  };
+
+  const confirmRenameSlot = async () => {
+    if (!renamingSlot) return;
+    setBusy(true);
+    setStorageError(null);
+    const nextFeedback = createEmptyFeedback();
+    try {
+      const displayName = normalizeScanSlotNameInput(renameSlotValue);
+      await renameSfDataHubScanSlot(renamingSlot.sourceScanId, displayName);
+      nextFeedback.updated.push(displayName);
+      setRenamingSlot(null);
+      await loadScans();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Scan-Slot konnte nicht umbenannt werden.";
+      nextFeedback.errors.push({ filename: getScanDisplayName(renamingSlot), message });
+    } finally {
+      setFeedback(nextFeedback);
+      setBusy(false);
+    }
+  };
+
+  const selectedVisibleCount = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).length;
+  const allVisibleSelected = visibleScans.length > 0 && visibleScans.every((scan) => selectedIds.has(scan.sourceScanId));
   const allTrackersSelected = trackerSummaries.length > 0 && trackerSummaries.every((summary) => selectedTrackerIds.has(summary.tracker.id));
   const selectedTrackerCount = trackerSummaries.filter((summary) => selectedTrackerIds.has(summary.tracker.id)).length;
+  const activeDataJob = runningSfToolsImportJob ?? runningScanMergeJob;
+  const importDisabled = busy || !dataJobsReady || Boolean(activeDataJob);
+  const canMergeSelectedScans = selectedVisibleCount >= 2 && !importDisabled;
 
   if (!isOpen || typeof document === "undefined") return null;
 
@@ -539,16 +778,50 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             className={styles.hiddenInput}
             onChange={handleUpdateInputChange}
           />
+          {renamingSlot ? (
+            <div className={styles.inlineDialog} role="dialog" aria-modal="true" aria-label="Scan-Slot umbenennen">
+              <div className={styles.inlineDialogPanel}>
+                <div className={styles.inlineDialogHeader}>
+                  <h3>Scan-Slot umbenennen</h3>
+                  <button
+                    type="button"
+                    className={styles.iconButton}
+                    onClick={() => setRenamingSlot(null)}
+                    disabled={busy}
+                    aria-label="Dialog schließen"
+                    title="Schließen"
+                  >
+                    <X size={15} aria-hidden />
+                  </button>
+                </div>
+                <label className={styles.filenameField}>
+                  <span>Name</span>
+                  <input value={renameSlotValue} onChange={(event) => setRenameSlotValue(event.target.value)} autoFocus />
+                </label>
+                <p className={styles.dialogHint}>Die technische JSON-Datei bleibt {renamingSlot.filename}.</p>
+                <div className={styles.previewActions}>
+                  <button type="button" className={styles.secondaryButton} onClick={() => setRenamingSlot(null)} disabled={busy}>
+                    <X size={15} aria-hidden />
+                    <span>Abbrechen</span>
+                  </button>
+                  <button type="button" className={styles.primaryButton} onClick={() => void confirmRenameSlot()} disabled={busy}>
+                    <Check size={15} aria-hidden />
+                    <span>{busy ? "Speichert..." : "Speichern"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className={styles.globalToolbar}>
             <button
               type="button"
               className={styles.primaryButton}
               onClick={() => importInputRef.current?.click()}
-              disabled={busy}
+              disabled={importDisabled}
             >
               <Upload size={16} aria-hidden />
-              <span>{busy ? "Verarbeite..." : "Importieren"}</span>
+              <span>{activeDataJob ? "Job läuft..." : busy ? "Verarbeite..." : "Importieren"}</span>
             </button>
           </div>
 
@@ -582,29 +855,44 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
           <div className={styles.contentScroll}>
             {storageError ? <div className={styles.errorBox}>{storageError}</div> : null}
             {hasFeedback(feedback) ? <FeedbackBox feedback={feedback!} /> : null}
+            {activeDataJob ? <DataJobStatusBox job={activeDataJob} /> : null}
             {pendingImport ? (
               <TransferImportPreview
                 pending={pendingImport}
                 busy={busy}
                 onConfirm={() => void confirmTransferImport()}
                 onCancel={() => setPendingImport(null)}
+                onFilenameChange={updatePendingMergeFilename}
+                onMergeModeChange={updatePendingMergeMode}
+                onDisplayNameChange={updatePendingMergeDisplayName}
               />
             ) : null}
 
             {activeTab === "scans" ? (
               <div id="data-management-scans-panel" role="tabpanel" aria-labelledby="data-management-scans-tab">
                 <div className={styles.toolbar}>
-                  {selectedIds.size > 0 ? (
-                    <button type="button" className={styles.primaryButton} onClick={exportSelectedScans} disabled={busy}>
+                  {selectedVisibleCount > 0 ? (
+                    <button type="button" className={styles.primaryButton} onClick={() => void exportSelectedScans()} disabled={busy}>
                       <Download size={16} aria-hidden />
-                      <span>{selectedIds.size === 1 ? "Scan exportieren" : "Scanpack exportieren"}</span>
+                      <span>{selectedVisibleCount === 1 ? "Scan exportieren" : "Scanpack exportieren"}</span>
                     </button>
                   ) : null}
-                  {selectedIds.size > 0 ? (
+                  {selectedVisibleCount >= 2 ? (
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={startMergePreview}
+                      disabled={!canMergeSelectedScans}
+                    >
+                      <Database size={15} aria-hidden />
+                      <span>Zusammenführen</span>
+                    </button>
+                  ) : null}
+                  {selectedVisibleCount > 0 ? (
                     <button
                       type="button"
                       className={styles.dangerButton}
-                      onClick={() => void deleteScans([...selectedIds])}
+                      onClick={() => void deleteScans(visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).map((scan) => scan.sourceScanId))}
                       disabled={busy}
                     >
                       <Trash2 size={15} aria-hidden />
@@ -616,12 +904,12 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                 <section className={styles.scanSection} aria-label="Vorhandene Scans">
                   <div className={styles.sectionHeader}>
                     <h3>Vorhandene Scans</h3>
-                    <span>{loading ? "Lädt..." : `${scans.length} gespeichert`}</span>
+                    <span>{loading ? "Lädt..." : `${visibleScans.length} gespeichert`}</span>
                   </div>
 
                   {loading ? (
                     <div className={styles.emptyState}>Lokale Scans werden geladen.</div>
-                  ) : scans.length ? (
+                  ) : visibleScans.length ? (
                     <div className={styles.tableWrap}>
                       <table className={styles.table}>
                         <thead>
@@ -643,53 +931,82 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                           </tr>
                         </thead>
                         <tbody>
-                          {scans.map((scan) => (
-                            <tr key={scan.id}>
-                              <td className={styles.checkCell}>
-                                <input
-                                  type="checkbox"
-                                  aria-label={`${scan.filename} auswählen`}
-                                  checked={selectedIds.has(scan.id)}
-                                  onChange={() => toggleScan(scan.id)}
-                                />
-                              </td>
-                              <td>{formatScanDate(scan.scannedAt)}</td>
-                              <td>
-                                <span className={styles.truncate} title={formatServerList(scan)}>
-                                  {formatServerList(scan)}
-                                </span>
-                              </td>
-                              <td className={styles.numericCell}>{scan.playerCount}</td>
-                              <td className={styles.numericCell}>{getScanGuildCount(scan)}</td>
-                              <td>
-                                <span className={styles.truncate} title={scan.filename}>
-                                  {scan.filename}
-                                </span>
-                              </td>
-                              <td className={styles.rowActions}>
-                                <button
-                                  type="button"
-                                  className={styles.iconButton}
-                                  onClick={() => startUpdate(scan.id)}
-                                  disabled={busy}
-                                  aria-label={`${scan.filename} aktualisieren`}
-                                  title="Scan aktualisieren"
-                                >
-                                  <RefreshCw size={15} aria-hidden />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                                  onClick={() => void deleteScans([scan.id])}
-                                  disabled={busy}
-                                  aria-label={`${scan.filename} löschen`}
-                                  title="Scan löschen"
-                                >
-                                  <Trash2 size={15} aria-hidden />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {visibleScans.map((scan) => {
+                            const scanTimeCell = formatScanSnapshotCell(scan);
+                            const displayName = getScanDisplayName(scan);
+                            const slotInfo = getScanSlotSourceInfo(scan);
+                            return (
+                              <tr key={scan.sourceScanId}>
+                                <td className={styles.checkCell}>
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`${displayName} auswählen`}
+                                    checked={selectedIds.has(scan.sourceScanId)}
+                                    onChange={() => toggleScan(scan.sourceScanId)}
+                                  />
+                                </td>
+                                <td title={scanTimeCell.title}>{scanTimeCell.label}</td>
+                                <td>
+                                  <span className={styles.truncate} title={formatServerList(scan)}>
+                                    {formatServerList(scan)}
+                                  </span>
+                                </td>
+                                <td className={styles.numericCell}>{scan.playerCount}</td>
+                                <td className={styles.numericCell}>{getScanGuildCount(scan)}</td>
+                                <td>
+                                  <span className={styles.truncate} title={displayName}>
+                                    {displayName}
+                                  </span>
+                                  {slotInfo ? <span className={styles.slotMeta}>{slotInfo}</span> : null}
+                                  {scan.isScanSlot ? (
+                                    <span className={styles.technicalFilename} title={scan.filename}>
+                                      {scan.filename}
+                                    </span>
+                                  ) : null}
+                                  {scan.isScanSlot ? (
+                                    <span className={`${styles.bundleBadge} ${styles.slotBadge}`}>Slot</span>
+                                  ) : scan.isMergedBundle ? (
+                                    <span className={styles.bundleBadge}>Bundle</span>
+                                  ) : null}
+                                </td>
+                                <td className={styles.rowActions}>
+                                  {scan.isScanSlot ? (
+                                    <button
+                                      type="button"
+                                      className={styles.iconButton}
+                                      onClick={() => startRenameSlot(scan)}
+                                      disabled={busy}
+                                      aria-label={`${displayName} umbenennen`}
+                                      title="Scan-Slot umbenennen"
+                                    >
+                                      <Pencil size={15} aria-hidden />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className={styles.iconButton}
+                                      onClick={() => startUpdate(scan.sourceScanId)}
+                                      disabled={busy}
+                                      aria-label={`${displayName} aktualisieren`}
+                                      title="Scan aktualisieren"
+                                    >
+                                      <RefreshCw size={15} aria-hidden />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                                    onClick={() => void deleteScans([scan.sourceScanId])}
+                                    disabled={busy}
+                                    aria-label={`${displayName} löschen`}
+                                    title={scan.isScanSlot ? "Scan-Slot auflösen" : "Scan löschen"}
+                                  >
+                                    <Trash2 size={15} aria-hidden />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -880,19 +1197,60 @@ function FightTrackerOverview({
   );
 }
 
+function DataJobStatusBox({ job }: { job: DataJob }) {
+  const progress = getDataJobProgress(job);
+  const detail = getDataJobDetail(job);
+  const percent =
+    progress && progress.total > 0 ? Math.max(0, Math.min(100, (progress.current / progress.total) * 100)) : null;
+
+  return (
+    <section className={styles.jobStatusBox} aria-label="Laufender Import">
+      <div className={styles.jobStatusHeader}>
+        <span className={styles.jobStatusIcon} aria-hidden>
+          <Loader2 size={16} />
+        </span>
+        <div>
+          <h3>{job.title}</h3>
+          <p>{detail}</p>
+        </div>
+        {progress ? (
+          <span className={styles.jobStatusCount}>
+            {progress.current}/{progress.total}
+          </span>
+        ) : null}
+      </div>
+      <div className={styles.jobProgressTrack} aria-hidden>
+        {percent == null ? (
+          <span className={styles.jobProgressIndeterminate} />
+        ) : (
+          <span className={styles.jobProgressBar} style={{ width: `${percent}%` }} />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function TransferImportPreview({
   pending,
   busy,
   onConfirm,
   onCancel,
+  onFilenameChange,
+  onMergeModeChange,
+  onDisplayNameChange,
 }: {
   pending: PendingImport;
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  onFilenameChange?: (filename: string) => void;
+  onMergeModeChange?: (mode: GuildHubScanMergeMode) => void;
+  onDisplayNameChange?: (displayName: string) => void;
 }) {
   const title = getImportPreviewTitle(pending);
   const rows = buildImportPreviewRows(pending);
+  const confirmLabel = pending.kind === "scanMerge" ? "Zusammenführen" : pending.kind === "scanJson" ? "Importieren" : "Import bestätigen";
+  const selectedContainsSlot = pending.kind === "scanMerge" && pending.summaries.some((summary) => summary.isScanSlot);
 
   return (
     <section className={styles.previewBox} aria-label="Import-Vorschau">
@@ -901,7 +1259,7 @@ function TransferImportPreview({
           <h3>{title}</h3>
           <p>{pending.filename}</p>
         </div>
-        <span>{pending.kind === "scanJson" ? ".json" : ".sfdata"}</span>
+        <span>{pending.kind === "scanMerge" || pending.kind === "scanJson" ? ".json" : ".sfdata"}</span>
       </div>
       <dl className={styles.previewGrid}>
         {rows.map((row) => (
@@ -911,6 +1269,51 @@ function TransferImportPreview({
           </div>
         ))}
       </dl>
+      {pending.kind === "scanMerge" ? (
+        <>
+          <fieldset className={styles.mergeModeField}>
+            <legend>Art der Zusammenführung</legend>
+            <label className={styles.mergeModeOption}>
+              <input
+                type="radio"
+                name={`scan-merge-mode-${pending.id}`}
+                value="merged-file"
+                checked={pending.mode === "merged-file"}
+                onChange={() => onMergeModeChange?.("merged-file")}
+              />
+              <span>
+                <strong>Zusammengeführte Datei</strong>
+                <small>Erstellt eine zusätzliche JSON. Die ausgewählten Scans bleiben einzeln erhalten.</small>
+              </span>
+            </label>
+            <label className={styles.mergeModeOption}>
+              <input
+                type="radio"
+                name={`scan-merge-mode-${pending.id}`}
+                value="scan-slot"
+                checked={pending.mode === "scan-slot"}
+                disabled={selectedContainsSlot}
+                onChange={() => onMergeModeChange?.("scan-slot")}
+              />
+              <span>
+                <strong>Neuer Scan-Slot</strong>
+                <small>Bündelt die ausgewählten Scans unter einem gemeinsamen Namen.</small>
+              </span>
+            </label>
+          </fieldset>
+          {pending.mode === "scan-slot" ? (
+            <label className={styles.filenameField}>
+              <span>Scan-Slot-Name</span>
+              <input value={pending.displayName} onChange={(event) => onDisplayNameChange?.(event.target.value)} />
+            </label>
+          ) : (
+            <label className={styles.filenameField}>
+              <span>Dateiname</span>
+              <input value={pending.filename} onChange={(event) => onFilenameChange?.(event.target.value)} />
+            </label>
+          )}
+        </>
+      ) : null}
       <div className={styles.previewActions}>
         <button type="button" className={styles.secondaryButton} onClick={onCancel} disabled={busy}>
           <X size={15} aria-hidden />
@@ -918,7 +1321,7 @@ function TransferImportPreview({
         </button>
         <button type="button" className={styles.primaryButton} onClick={onConfirm} disabled={busy}>
           <Check size={15} aria-hidden />
-          <span>{busy ? "Importiert..." : "Import bestätigen"}</span>
+          <span>{busy ? "Verarbeitet..." : confirmLabel}</span>
         </button>
       </div>
     </section>
@@ -927,6 +1330,7 @@ function TransferImportPreview({
 
 function getImportPreviewTitle(pending: PendingImport) {
   if (pending.kind === "scanJson") return "SFtools-Scan importieren";
+  if (pending.kind === "scanMerge") return "Scans zusammenführen";
   if (pending.envelope.type === "scan") return "SFtools-Scan importieren";
   if (pending.envelope.type === "scanpack") return "Scanpack importieren";
   if (pending.envelope.type === "fighttrackerpack") return "Fight-Tracker-Pack importieren";
@@ -936,6 +1340,9 @@ function getImportPreviewTitle(pending: PendingImport) {
 function buildImportPreviewRows(pending: PendingImport): Array<{ label: string; value: string }> {
   if (pending.kind === "scanJson") {
     return buildScanPreviewRows(pending.scan);
+  }
+  if (pending.kind === "scanMerge") {
+    return buildMergePreviewRows(pending);
   }
 
   const { envelope } = pending;
@@ -985,7 +1392,49 @@ function buildImportPreviewRows(pending: PendingImport): Array<{ label: string; 
   ];
 }
 
+function buildMergePreviewRows(pending: PendingScanMergeImport): Array<{ label: string; value: string }> {
+  const snapshotTimes = pending.summaries.flatMap((summary) => summary.snapshotTimestamps).filter((value) => Number.isFinite(value));
+  const servers = new Set(pending.summaries.flatMap((scan) => scan.servers));
+  const period =
+    snapshotTimes.length > 0
+      ? `${formatOptionalDate(new Date(Math.min(...snapshotTimes)).toISOString())} - ${formatOptionalDate(
+          new Date(Math.max(...snapshotTimes)).toISOString(),
+        )}`
+      : "Unbekannt";
+  const logicalScanCount = pending.summaries.reduce((sum, summary) => sum + summary.logicalScanCount, 0);
+  const playerCount = pending.summaries.reduce((sum, summary) => sum + summary.playerCount, 0);
+  const guildCount = pending.summaries.reduce((sum, summary) => sum + summary.guildCount, 0);
+
+  return [
+    { label: "Modus", value: pending.mode === "scan-slot" ? "Neuer Scan-Slot" : "Zusammengeführte Datei" },
+    ...(pending.mode === "scan-slot" ? [{ label: "Name", value: pending.displayName || "Unbenannt" }] : []),
+    { label: "Dateien", value: `${pending.summaries.length.toLocaleString("de-DE")} ausgewählt` },
+    { label: "Zeitraum", value: period },
+    { label: "Server", value: servers.size ? [...servers].join(", ") : "Unbekannt" },
+    { label: "Enthaltene Scans", value: `${logicalScanCount.toLocaleString("de-DE")} Scans` },
+    { label: "Spieler", value: playerCount.toLocaleString("de-DE") },
+    { label: "Gilden", value: guildCount.toLocaleString("de-DE") },
+    { label: "Quellen", value: formatCompactNames(pending.summaries.map((scan) => scan.filename), 6) },
+  ];
+}
+
 function buildScanPreviewRows(scan: SfDataHubLocalScan): Array<{ label: string; value: string }> {
+  const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
+  if (snapshots.length > 1) {
+    const first = snapshots[0];
+    const last = snapshots[snapshots.length - 1];
+    const playerCount = snapshots.reduce((sum, snapshot) => sum + snapshot.playerCount, 0);
+    const guildCount = snapshots.reduce((sum, snapshot) => sum + snapshot.guildCount, 0);
+    return [
+      { label: "Datei", value: scan.filename || "Unbekannt" },
+      { label: "Erkannte Scans", value: `${snapshots.length.toLocaleString("de-DE")} Scans` },
+      { label: "Datumsbereich", value: `${formatOptionalDate(first.timestamp)} - ${formatOptionalDate(last.timestamp)}` },
+      { label: "Server", value: formatServerList(scan) },
+      { label: "Spieler", value: playerCount.toLocaleString("de-DE") },
+      { label: "Gilden", value: guildCount.toLocaleString("de-DE") },
+    ];
+  }
+
   return [
     { label: "Datei", value: scan.filename || "Unbekannt" },
     { label: "Scanzeit", value: formatOptionalDate(scan.scannedAt) },

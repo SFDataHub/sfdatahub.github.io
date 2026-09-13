@@ -1,0 +1,364 @@
+.cardWrap {
+  position: relative;
+  display: inline-grid;
+  width: 164px;
+}
+
+.card {
+  --guild-card-accent: #91b5d8;
+  --guild-card-accent-soft: color-mix(in srgb, var(--guild-card-accent) 24%, transparent);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: 104px 50px 30px;
+  row-gap: 4px;
+  justify-items: center;
+  width: 164px;
+  height: 216px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--guild-card-accent) 42%, var(--line, #2c4a73));
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 23%, var(--guild-card-accent-soft), transparent 43%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--guild-card-accent) 12%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(15, 31, 50, 0.95), rgba(10, 21, 36, 0.95));
+  color: var(--title, #f5f9ff);
+  padding: 14px 12px 12px;
+  text-align: center;
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--guild-card-accent) 28%, transparent);
+  border-radius: 15px;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: auto 20px -28px;
+  z-index: -1;
+  height: 58px;
+  background: radial-gradient(ellipse, var(--guild-card-accent-soft), transparent 68%);
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--guild-card-accent) 62%, #ffffff 6%);
+  box-shadow:
+    0 16px 30px rgba(0, 0, 0, 0.28),
+    0 0 22px color-mix(in srgb, var(--guild-card-accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.draggable .card {
+  cursor: grab;
+}
+
+.dragging .card {
+  cursor: grabbing;
+}
+
+.card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--guild-card-accent) 72%, #ffffff 10%);
+  outline-offset: 3px;
+}
+
+.active {
+  border-color: color-mix(in srgb, var(--guild-card-accent) 74%, #ffffff 7%);
+  background:
+    radial-gradient(circle at 50% 23%, color-mix(in srgb, var(--guild-card-accent) 34%, transparent), transparent 45%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.095), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--guild-card-accent) 16%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(18, 36, 58, 0.97), rgba(10, 21, 36, 0.97));
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.3),
+    0 0 0 1px color-mix(in srgb, var(--guild-card-accent) 30%, transparent),
+    0 0 28px color-mix(in srgb, var(--guild-card-accent) 27%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.emblemZone {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.emblemRoot {
+  --guild-card-accent: #91b5d8;
+  display: inline-grid;
+  place-items: center;
+}
+
+.emblemRootCompact {
+  width: 44px;
+  height: 44px;
+}
+
+.emblemRing {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 98px;
+  height: 98px;
+  margin-top: 2px;
+  border: 2px solid color-mix(in srgb, var(--guild-card-accent) 70%, white 8%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.14), transparent 44%),
+    conic-gradient(
+      from 20deg,
+      rgba(255, 255, 255, 0.04),
+      color-mix(in srgb, var(--guild-card-accent) 30%, transparent),
+      rgba(255, 255, 255, 0.05),
+      color-mix(in srgb, var(--guild-card-accent) 25%, transparent)
+    );
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.04),
+    inset 0 0 0 7px rgba(10, 21, 36, 0.72),
+    0 12px 24px rgba(0, 0, 0, 0.28),
+    0 0 20px color-mix(in srgb, var(--guild-card-accent) 18%, transparent);
+}
+
+.active .emblemRing,
+.emblemRootActive .emblemRing {
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 7px rgba(10, 21, 36, 0.68),
+    0 14px 26px rgba(0, 0, 0, 0.32),
+    0 0 28px color-mix(in srgb, var(--guild-card-accent) 28%, transparent);
+}
+
+.emblemRootActive .emblemRing {
+  border-color: color-mix(in srgb, var(--guild-card-accent) 84%, white 10%);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--guild-card-accent) 30%, transparent),
+    inset 0 0 0 4px rgba(10, 21, 36, 0.72),
+    0 0 18px color-mix(in srgb, var(--guild-card-accent) 34%, transparent);
+}
+
+.emblemRingCompact {
+  width: 42px;
+  height: 42px;
+  margin-top: 0;
+  border-width: 2px;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.04),
+    inset 0 0 0 4px rgba(10, 21, 36, 0.72),
+    0 7px 14px rgba(0, 0, 0, 0.24),
+    0 0 14px color-mix(in srgb, var(--guild-card-accent) 18%, transparent);
+}
+
+.emblemInner {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+}
+
+.emblemInnerCompact {
+  width: 31px;
+  height: 31px;
+}
+
+.emblem {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  transform: translateY(-4px);
+  filter: drop-shadow(0 7px 10px rgba(0, 0, 0, 0.38));
+}
+
+.emblemCompact {
+  width: 31px;
+  height: 31px;
+  transform: translateY(-2px);
+  filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.34));
+}
+
+.fallbackMark {
+  color: var(--title, #f5f9ff);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+}
+
+.fallbackMarkCompact {
+  font-size: 17px;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.34);
+}
+
+.addIcon {
+  display: grid;
+  place-items: center;
+  color: var(--title, #f5f9ff);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.34));
+}
+
+.addIconCompact {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.32));
+}
+
+.identityZone {
+  display: grid;
+  grid-template-rows: 36px 12px;
+  align-items: end;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+}
+
+.name {
+  display: -webkit-box;
+  max-width: 100%;
+  min-width: 0;
+  height: 36px;
+  overflow: hidden;
+  color: var(--title, #f5f9ff);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.server {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-soft, #b0c4d9);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  transform: translateY(-3px);
+  white-space: nowrap;
+}
+
+.footerZone {
+  display: grid;
+  place-items: start center;
+  min-width: 0;
+  transform: translateY(-2px);
+  width: 100%;
+}
+
+.memberCount {
+  justify-self: center;
+  max-width: 100%;
+  min-width: 58px;
+  border: 1px solid color-mix(in srgb, var(--guild-card-accent) 48%, var(--line, #2c4a73));
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent),
+    rgba(255, 255, 255, 0.04);
+  color: color-mix(in srgb, var(--guild-card-accent) 45%, #ffffff);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.removeButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(255, 212, 212, 0.72);
+  border-radius: 999px;
+  background: #c6283d;
+  color: #fff7f7;
+  box-shadow:
+    0 0 0 2px rgba(10, 21, 36, 0.72),
+    0 8px 16px rgba(0, 0, 0, 0.28);
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.removeButton:hover,
+.removeButton:focus-visible {
+  background: #e1394f;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 420px) {
+  .cardWrap {
+    width: 150px;
+  }
+
+  .card {
+    grid-template-rows: 96px 48px 28px;
+    width: 150px;
+    height: 208px;
+    padding-inline: 10px;
+  }
+
+  .emblemRing {
+    width: 92px;
+    height: 92px;
+  }
+
+  .emblemInner,
+  .emblem {
+    width: 68px;
+    height: 68px;
+  }
+
+  .emblemRootCompact {
+    width: 40px;
+    height: 40px;
+  }
+
+  .emblemRingCompact {
+    width: 38px;
+    height: 38px;
+  }
+
+  .emblemInnerCompact,
+  .emblemCompact {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .removeButton {
+    transition: none;
+  }
+
+  .card:hover,
+  .removeButton:hover {
+    transform: none;
+  }
+}

@@ -12,6 +12,7 @@
 }
 
 .panel {
+  position: relative;
   width: min(980px, calc(100vw - 32px));
   height: min(760px, calc(100dvh - 32px));
   display: flex;
@@ -242,6 +243,76 @@
   color: #f6b8ca;
 }
 
+.jobStatusBox {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(77, 163, 255, 0.34);
+  border-radius: 12px;
+  background: rgba(16, 34, 56, 0.78);
+}
+
+.jobStatusHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.jobStatusIcon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: #9ec7ff;
+  animation: scanManagementSpinner 0.9s linear infinite;
+}
+
+.jobStatusHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.jobStatusHeader p {
+  margin: 3px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.jobStatusCount {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.jobProgressTrack {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.jobProgressBar,
+.jobProgressIndeterminate {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: inherit;
+  background: #4da3ff;
+}
+
+.jobProgressBar {
+  transition: width 0.18s ease;
+}
+
+.jobProgressIndeterminate {
+  width: 42%;
+  animation: scanManagementProgress 1.2s ease-in-out infinite;
+}
+
 .previewBox {
   display: grid;
   gap: 12px;
@@ -313,6 +384,115 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.filenameField {
+  display: grid;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filenameField input {
+  min-height: 36px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(20, 32, 48, 0.86);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 10px;
+}
+
+.mergeModeField {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mergeModeField legend {
+  margin-bottom: 2px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mergeModeOption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(20, 32, 48, 0.58);
+  color: var(--text);
+}
+
+.mergeModeOption input {
+  margin-top: 2px;
+}
+
+.mergeModeOption span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mergeModeOption strong {
+  font-size: 12px;
+}
+
+.mergeModeOption small {
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.inlineDialog {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(3, 10, 18, 0.56);
+}
+
+.inlineDialogPanel {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(77, 163, 255, 0.34);
+  border-radius: 12px;
+  background: var(--tile);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42);
+}
+
+.inlineDialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inlineDialogHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.dialogHint {
+  margin: -2px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .scanSection {
@@ -472,6 +652,43 @@
   padding: 5px 7px;
 }
 
+.bundleBadge {
+  width: fit-content;
+  display: block;
+  margin-top: 5px;
+  border: 1px solid rgba(77, 163, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(77, 163, 255, 0.12);
+  color: #b9d8ff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
+.slotBadge {
+  border-color: rgba(62, 164, 110, 0.48);
+  background: rgba(62, 164, 110, 0.14);
+  color: #a7ecc8;
+}
+
+.slotMeta,
+.technicalFilename {
+  width: fit-content;
+  display: block;
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.technicalFilename {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .trackerList {
   display: none;
 }
@@ -568,6 +785,21 @@
 .inlineActionButton:hover {
   background: #25456b;
   transform: translateY(-1px);
+}
+
+@keyframes scanManagementSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scanManagementProgress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
 }
 
 @media (max-width: 767px) {

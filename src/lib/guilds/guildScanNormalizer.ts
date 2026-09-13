@@ -3,7 +3,7 @@ import { parseSaveStringToArray } from "../parsing/extractPortrait";
 import { readSfPlayerStats } from "../parsing";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 
-export const GUILD_SCAN_NORMALIZER_VERSION = 8;
+export const GUILD_SCAN_NORMALIZER_VERSION = 9;
 
 type JsonRecord = Record<string, unknown>;
 

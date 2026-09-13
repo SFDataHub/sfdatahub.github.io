@@ -1,7 +1,7 @@
 import React from "react";
 import { Trash2, Upload } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
-import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
+import GuildContextBar from "../../components/guilds/GuildContextBar";
 import {
   deleteGuildHubLocalScans,
   importGuildHubLocalScan,
@@ -155,7 +155,7 @@ export default function GuildHubImports() {
       />
 
       <div className="space-y-4">
-        <GuildHubBackLink />
+        <GuildContextBar />
         <FeedbackPanel feedback={feedback} storageError={storageError} />
 
         <section

@@ -9,6 +9,7 @@ import {
   type ScanPayloadT,
 } from "./schemas";
 import type { DetectedPayload } from "./types";
+import { extractGuildCoaString } from "../guilds/guildCoa";
 
 // ---------- Utils ----------
 type Obj = Record<string, any>;
@@ -56,18 +57,6 @@ function toNumMaybe(v: any) {
   if (v == null || v === "") return undefined;
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
-}
-
-function toTrimmedString(v: any): string | undefined {
-  if (typeof v !== "string") return undefined;
-  const trimmed = v.trim();
-  return trimmed || undefined;
-}
-
-function extractGuildCoaString(o: Obj): string | undefined {
-  const save = o.save;
-  if (!Array.isArray(save) || save.length < 2) return undefined;
-  return toTrimmedString(save[1]);
 }
 
 export function mapGuildJsonRecord(o: Obj): Obj {

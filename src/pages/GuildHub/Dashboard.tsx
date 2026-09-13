@@ -2,16 +2,21 @@ import React from "react";
 import { BarChart3, TrendingDown, TrendingUp, UserMinus, UserPlus, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import ContentShell from "../../components/ContentShell";
-import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
+import GuildContextBar from "../../components/guilds/GuildContextBar";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import { getClassMetaById, iconForClassName, type ClassMeta } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
 import { SERVER_BY_ID } from "../../data/servers";
 import {
-  listGuildHubLocalScans,
+  getGuildHubLocalScan,
+  isGuildHubScanAnalyticsEnabled,
+  listGuildHubScanSummaries,
   subscribeToSfDataHubLocalScanChanges,
+  type GuildHubLocalGuildIdentity,
   type GuildHubLocalScan,
+  type GuildHubScanSummary,
 } from "../../lib/guilds/localScanLibrary";
+import type { GuildAnalyticsMemberSnapshot } from "../../lib/guilds/localGuildAnalyticsStore";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { toDriveThumbProxy } from "../../lib/urls";
@@ -36,8 +41,9 @@ type LocalMember = {
 };
 
 type LocalGuildScanView = {
-  scan: GuildHubLocalScan;
+  source: DashboardGuildSource;
   scannedAtMs: number;
+  scannedAtIso: string | null;
   guild: {
     name: string | null;
     server: string | null;
@@ -47,9 +53,26 @@ type LocalGuildScanView = {
   members: LocalMember[];
 };
 
+type DashboardGuildSource = {
+  sourceScanId: string;
+  sourceFilename: string;
+  scannedAtMs: number;
+  scannedAtIso: string | null;
+  guild: {
+    name: string | null;
+    server: string | null;
+    memberCount: number | null;
+    hofRank: number | null;
+    coaString?: string | null;
+  };
+};
+
 type ScanState = {
-  scans: GuildHubLocalScan[];
+  sources: DashboardGuildSource[];
+  latest: LocalGuildScanView | null;
+  comparisonMembers: LocalMember[] | null;
   loading: boolean;
+  detailLoading: boolean;
   error: string | null;
 };
 
@@ -60,31 +83,25 @@ type TransferSummary = {
 
 export default function GuildHubDashboard() {
   const { activeGuild } = useGuildHubSelection();
-  const scanState = useLocalScans();
+  const scanState = useDashboardScans(activeGuild);
 
-  const guildScans = React.useMemo(() => {
-    if (!activeGuild) return [];
-    return scanState.scans
-      .map((scan) => buildGuildScanView(scan, activeGuild))
-      .filter((scan): scan is LocalGuildScanView => Boolean(scan))
-      .sort((a, b) => b.scannedAtMs - a.scannedAtMs);
-  }, [activeGuild, scanState.scans]);
-
-  const latest = guildScans[0] ?? null;
+  const latest = scanState.latest;
   const comparison = React.useMemo(() => {
     if (!latest) return null;
-    return guildScans.find((scan) => latest.scannedAtMs - scan.scannedAtMs >= MIN_COMPARISON_DAYS * DAY_MS) ?? null;
-  }, [guildScans, latest]);
+    return (
+      scanState.sources.find((source) => latest.scannedAtMs - source.scannedAtMs >= MIN_COMPARISON_DAYS * DAY_MS) ?? null
+    );
+  }, [latest, scanState.sources]);
   const transfers = React.useMemo(() => {
-    if (!latest || !comparison) return null;
-    return buildTransferSummary(latest.members, comparison.members);
-  }, [comparison, latest]);
+    if (!latest || !comparison || !scanState.comparisonMembers) return null;
+    return buildTransferSummary(latest.members, scanState.comparisonMembers);
+  }, [comparison, latest, scanState.comparisonMembers]);
 
   return (
     <ContentShell centerFramed={false}>
       <div className={styles.page}>
         <div className={styles.topbar}>
-          <GuildHubBackLink />
+          <GuildContextBar />
           <SectionDividerHeader title="Dashboard" className={styles.divider} />
         </div>
 
@@ -94,7 +111,7 @@ export default function GuildHubDashboard() {
             text="Waehle zuerst im Guild-Hub-Startmenue eine Gilde aus. Das Dashboard trifft hier keine automatische Auswahl."
             action={<Link to="/guild-hub">Zur Gildenauswahl</Link>}
           />
-        ) : scanState.loading ? (
+        ) : scanState.loading || scanState.detailLoading ? (
           <EmptyPanel title="Lokale Scans werden geladen" text="Die IndexedDB-Bibliothek wird gelesen." />
         ) : scanState.error ? (
           <EmptyPanel title="Lokale Scans nicht verfuegbar" text={scanState.error} />
@@ -107,11 +124,11 @@ export default function GuildHubDashboard() {
         ) : (
           <div className={styles.dashboardGrid}>
             <div className={styles.leftColumn}>
-              <GuildOverviewCard guild={activeGuild} latest={latest} scanCount={guildScans.length} />
+              <GuildOverviewCard guild={activeGuild} latest={latest} scanCount={scanState.sources.length} />
               <MemberListCard members={latest.members} />
             </div>
             <div className={styles.rightColumn}>
-              <KpiPanel latest={latest} scanCount={guildScans.length} />
+              <KpiPanel latest={latest} scanCount={scanState.sources.length} />
               <HistoryPanel latest={latest} comparison={comparison} transfers={transfers} />
             </div>
           </div>
@@ -121,23 +138,77 @@ export default function GuildHubDashboard() {
   );
 }
 
-function useLocalScans(): ScanState {
-  const [state, setState] = React.useState<ScanState>({ scans: [], loading: true, error: null });
+function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState {
+  const [state, setState] = React.useState<ScanState>({
+    sources: [],
+    latest: null,
+    comparisonMembers: null,
+    loading: true,
+    detailLoading: false,
+    error: null,
+  });
 
   React.useEffect(() => {
     let cancelled = false;
+    let runId = 0;
 
-    const load = () => {
-      listGuildHubLocalScans()
-        .then((scans) => {
-          if (!cancelled) setState({ scans, loading: false, error: null });
-        })
-        .catch((error) => {
-          console.error("[GuildHubDashboard] failed to load local scans", error);
-          if (!cancelled) {
-            setState({ scans: [], loading: false, error: "Lokale Scans konnten nicht geladen werden." });
-          }
+    if (!activeGuild) {
+      setState({ sources: [], latest: null, comparisonMembers: null, loading: false, detailLoading: false, error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const load = async () => {
+      const currentRunId = ++runId;
+      setState((current) => ({ ...current, loading: true, detailLoading: false, error: null }));
+
+      try {
+        const summaries = await listGuildHubScanSummaries();
+        const sources = buildDashboardGuildSources(summaries, activeGuild);
+        const latestSource = sources[0] ?? null;
+        const comparisonSource = latestSource
+          ? sources.find((source) => latestSource.scannedAtMs - source.scannedAtMs >= MIN_COMPARISON_DAYS * DAY_MS) ?? null
+          : null;
+
+        if (cancelled || currentRunId !== runId) return;
+
+        if (!latestSource) {
+          setState({ sources, latest: null, comparisonMembers: null, loading: false, detailLoading: false, error: null });
+          return;
+        }
+
+        setState((current) => ({ ...current, sources, loading: false, detailLoading: true, error: null }));
+
+        const [latestScan, comparisonMembers] = await Promise.all([
+          getGuildHubLocalScan(latestSource.sourceScanId),
+          readComparisonMembers(comparisonSource, activeGuild),
+        ]);
+
+        if (cancelled || currentRunId !== runId) return;
+
+        const latest = latestScan ? buildGuildScanView(latestScan, activeGuild, latestSource) : null;
+        setState({
+          sources,
+          latest,
+          comparisonMembers,
+          loading: false,
+          detailLoading: false,
+          error: latest ? null : "Lokale Scans konnten nicht geladen werden.",
         });
+      } catch (error) {
+        console.error("[GuildHubDashboard] failed to load local scan summaries", error);
+        if (!cancelled && currentRunId === runId) {
+          setState({
+            sources: [],
+            latest: null,
+            comparisonMembers: null,
+            loading: false,
+            detailLoading: false,
+            error: "Lokale Scans konnten nicht geladen werden.",
+          });
+        }
+      }
     };
 
     load();
@@ -147,9 +218,109 @@ function useLocalScans(): ScanState {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [activeGuild]);
 
   return state;
+}
+
+function buildDashboardGuildSources(
+  summaries: GuildHubScanSummary[],
+  activeGuild: GuildHubSelectedGuild,
+): DashboardGuildSource[] {
+  const sources = summaries.flatMap((summary) => {
+    if (!isGuildHubScanAnalyticsEnabled(summary)) return [];
+    const guild = summary.guilds.find((entry) => isSummaryGuildMatch(entry, activeGuild));
+    if (!guild) return [];
+
+    const scannedAt = resolveSummaryGuildScanTime(summary, guild);
+    if (!scannedAt) return [];
+
+    return [
+      {
+        sourceScanId: summary.sourceScanId,
+        sourceFilename: guild.sourceScanFilename ?? summary.filename,
+        scannedAtMs: scannedAt.ms,
+        scannedAtIso: scannedAt.iso,
+        guild: {
+          name: guild.name || activeGuild.name,
+          server: guild.server || activeGuild.server,
+          memberCount: guild.memberCount,
+          hofRank: guild.hofRank,
+          coaString: guild.coaString ?? activeGuild.coaString ?? null,
+        },
+      },
+    ];
+  });
+
+  return sources.sort(
+    (a, b) =>
+      b.scannedAtMs - a.scannedAtMs ||
+      a.sourceFilename.localeCompare(b.sourceFilename, undefined, { sensitivity: "base" }) ||
+      a.sourceScanId.localeCompare(b.sourceScanId),
+  );
+}
+
+async function readComparisonMembers(
+  source: DashboardGuildSource | null,
+  activeGuild: GuildHubSelectedGuild,
+): Promise<LocalMember[] | null> {
+  if (!source) return null;
+
+  try {
+    const { isDerivedMemberInGuild, readGuildAnalyticsDerivedSource } = await import(
+      "../../lib/guilds/localGuildAnalyticsStore"
+    );
+    const data = await readGuildAnalyticsDerivedSource(source.sourceScanId);
+    const members = data.members
+      .filter((member) => member.snapshotTimestamp === source.scannedAtMs && isDerivedMemberInGuild(member, activeGuild))
+      .map(toLocalMemberFromDerived);
+
+    return members.length ? members : null;
+  } catch (error) {
+    console.error("[GuildHubDashboard] failed to load derived comparison members", error);
+    return null;
+  }
+}
+
+function toLocalMemberFromDerived(member: GuildAnalyticsMemberSnapshot): LocalMember {
+  const classMeta = getClassMetaById(member.classId);
+  return {
+    key: member.memberRef.toLowerCase(),
+    name: member.name,
+    classLabel: classMeta?.label ?? normalizeMemberClassLabel(member.classId),
+    classMeta,
+    level: member.level,
+    honor: null,
+    hofRank: null,
+    baseMain: member.baseStats,
+    totalStats: member.totalStats,
+  };
+}
+
+function isSummaryGuildMatch(guild: GuildHubLocalGuildIdentity, activeGuild: GuildHubSelectedGuild) {
+  const activeServer = normalizeServerForCompare(activeGuild.server);
+  const guildServer = normalizeServerForCompare(guild.server);
+  const serverMatches = !activeServer || !guildServer || activeServer === guildServer;
+  const activeGuildSegment = normalizeGuildSegment(activeGuild.guildId) ?? normalizeGuildSegment(activeGuild.logoIdentifier);
+  const sourceGuildSegment = normalizeGuildSegment(guild.guildIdentifier) ?? normalizeGuildSegment(guild.guildId);
+
+  if (activeGuildSegment && sourceGuildSegment && activeGuildSegment === sourceGuildSegment && serverMatches) {
+    return true;
+  }
+
+  return Boolean(guild.name && normalizeLoose(guild.name) === normalizeLoose(activeGuild.name) && serverMatches);
+}
+
+function resolveSummaryGuildScanTime(summary: GuildHubScanSummary, guild: GuildHubLocalGuildIdentity) {
+  const guildTime = parseTimestampMs(guild.sourceScannedAt);
+  if (guildTime != null) return { ms: guildTime, iso: new Date(guildTime).toISOString() };
+
+  if (summary.lastSnapshotTimestamp != null && Number.isFinite(summary.lastSnapshotTimestamp)) {
+    return { ms: summary.lastSnapshotTimestamp, iso: new Date(summary.lastSnapshotTimestamp).toISOString() };
+  }
+
+  const summaryTime = parseTimestampMs(summary.scannedAt);
+  return summaryTime != null ? { ms: summaryTime, iso: new Date(summaryTime).toISOString() } : null;
 }
 
 function GuildOverviewCard({
@@ -187,7 +358,7 @@ function GuildOverviewCard({
       </div>
 
       <div className={styles.factGrid}>
-        <Fact label="Scanstand" value={formatScanDateTimeLabel(latest.scan.scannedAt ?? latest.scan.importedAt)} hint={formatAge(latest.scannedAtMs)} />
+        <Fact label="Scanstand" value={formatScanDateTimeLabel(latest.scannedAtIso)} hint={formatAge(latest.scannedAtMs)} />
         <Fact label="Mitglieder" value={formatInteger(memberCount)} hint={`${formatInteger(latest.members.length)} im Scan`} />
         <Fact label="Lokale Scans" value={formatInteger(scanCount)} hint="aktive Gilde" />
       </div>
@@ -300,13 +471,11 @@ function HistoryPanel({
   transfers,
 }: {
   latest: LocalGuildScanView;
-  comparison: LocalGuildScanView | null;
+  comparison: DashboardGuildSource | null;
   transfers: TransferSummary | null;
 }) {
   const comparisonLabel = comparison
-    ? `Vergleich: ${formatScanDateTimeLabel(comparison.scan.scannedAt ?? comparison.scan.importedAt)} -> ${formatScanDateTimeLabel(
-        latest.scan.scannedAt ?? latest.scan.importedAt,
-      )}`
+    ? `Vergleich: ${formatScanDateTimeLabel(comparison.scannedAtIso)} -> ${formatScanDateTimeLabel(latest.scannedAtIso)}`
     : null;
   const daySpan = comparison ? Math.floor((latest.scannedAtMs - comparison.scannedAtMs) / DAY_MS) : null;
 
@@ -452,8 +621,12 @@ function EmptyPanel({
   );
 }
 
-function buildGuildScanView(scan: GuildHubLocalScan, activeGuild: GuildHubSelectedGuild): LocalGuildScanView | null {
-  const raw = asRawScan(scan.rawData);
+function buildGuildScanView(
+  scan: GuildHubLocalScan,
+  activeGuild: GuildHubSelectedGuild,
+  source: DashboardGuildSource,
+): LocalGuildScanView | null {
+  const raw = asRawScan(scan.rawData, source.scannedAtMs);
   if (!raw) return null;
 
   const activeServer = normalizeServerForCompare(activeGuild.server);
@@ -463,33 +636,45 @@ function buildGuildScanView(scan: GuildHubLocalScan, activeGuild: GuildHubSelect
     .filter((entry) => isPlayerInGuild(entry, activeGuild, activeServer, activeGuildSegment))
     .map((entry) => toLocalMember(entry, activeServer))
     .filter((member): member is LocalMember => Boolean(member));
-  if (!group && !members.length) return null;
 
   return {
-    scan,
-    scannedAtMs: resolveScanTimeMs(scan),
+    source,
+    scannedAtMs: source.scannedAtMs,
+    scannedAtIso: source.scannedAtIso,
     guild: {
-      name: group ? readString(group, ["name", "Name", "groupname", "groupName", "guildName", "Guild Name"]) : activeGuild.name,
-      server: group ? readString(group, ["server", "Server", "prefix", "world", "realm"]) ?? activeGuild.server : activeGuild.server,
-      memberCount: group
-        ? readNumber(group, ["guildMemberCount", "Guild Member Count", "memberCount", "members", "count"])
-        : members.length,
-      hofRank: group ? readNumber(group, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank", "guildRank"]) : null,
+      name: source.guild.name ?? (group ? readString(group, ["name", "Name", "groupname", "groupName", "guildName", "Guild Name"]) : activeGuild.name),
+      server:
+        source.guild.server ??
+        (group ? readString(group, ["server", "Server", "prefix", "world", "realm"]) ?? activeGuild.server : activeGuild.server),
+      memberCount:
+        source.guild.memberCount ??
+        (group ? readNumber(group, ["guildMemberCount", "Guild Member Count", "memberCount", "members", "count"]) : members.length),
+      hofRank:
+        source.guild.hofRank ??
+        (group ? readNumber(group, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank", "guildRank"]) : null),
     },
     members,
   };
 }
 
-function asRawScan(value: unknown): { players: JsonRecord[]; groups: JsonRecord[] } | null {
+function asRawScan(value: unknown, snapshotTimestampMs: number): { players: JsonRecord[]; groups: JsonRecord[] } | null {
   const record = asRecord(value);
   if (!record) return null;
-  const players = Array.isArray(record.players) ? record.players : [];
-  const groups = Array.isArray(record.groups) ? record.groups : Array.isArray(record.guilds) ? record.guilds : [];
+  const rawPlayers = Array.isArray(record.players) ? record.players : [];
+  const rawGroups = Array.isArray(record.groups) ? record.groups : Array.isArray(record.guilds) ? record.guilds : [];
+  const players = filterEntriesForSnapshot(rawPlayers, snapshotTimestampMs);
+  const groups = filterEntriesForSnapshot(rawGroups, snapshotTimestampMs);
   if (!players.length && !groups.length) return null;
   return {
     players: players.map(asRecord).filter((entry): entry is JsonRecord => Boolean(entry)),
     groups: groups.map(asRecord).filter((entry): entry is JsonRecord => Boolean(entry)),
   };
+}
+
+function filterEntriesForSnapshot(entries: unknown[], snapshotTimestampMs: number) {
+  const timestampedEntries = entries.filter((entry) => getEntryTimestampMs(entry) != null);
+  if (!timestampedEntries.length) return entries;
+  return timestampedEntries.filter((entry) => getEntryTimestampMs(entry) === snapshotTimestampMs);
 }
 
 function isGroupMatch(
@@ -597,11 +782,46 @@ function buildClassDistribution(members: LocalMember[]) {
     .slice(0, 8);
 }
 
-function resolveScanTimeMs(scan: GuildHubLocalScan) {
-  const scanned = scan.scannedAt ? Date.parse(scan.scannedAt) : NaN;
+function parseTimestampMs(value: string | null | undefined) {
+  const scanned = value ? Date.parse(value) : NaN;
   if (Number.isFinite(scanned)) return scanned;
-  const imported = Date.parse(scan.importedAt);
-  return Number.isFinite(imported) ? imported : 0;
+  return null;
+}
+
+function getEntryTimestampMs(entry: unknown) {
+  const record = asRecord(entry);
+  if (!record) return null;
+  return readTimestampMs(record, ["scannedAt", "scanAt", "timestamp", "timestampSec", "timestampRaw"]);
+}
+
+function readTimestampMs(record: JsonRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = pickFirst(record, [key]);
+    const parsed = toTimestampMillis(value);
+    if (parsed != null) return parsed;
+  }
+
+  return null;
+}
+
+function toTimestampMillis(value: unknown): number | null {
+  if (value == null || value === "") return null;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 1_000_000_000_000 ? value : value * 1000;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{13}$/.test(trimmed)) return Number(trimmed);
+    if (/^\d{10}$/.test(trimmed)) return Number(trimmed) * 1000;
+
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 function comparisonNeededText() {

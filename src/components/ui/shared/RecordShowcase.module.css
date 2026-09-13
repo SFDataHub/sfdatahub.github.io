@@ -33,7 +33,6 @@
   color: #b0c4d9;
   font-size: 12px;
   line-height: 1.35;
-  text-transform: uppercase;
 }
 
 .controls {
@@ -79,6 +78,7 @@
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(var(--record-visible-count, 4), minmax(0, 1fr));
+  touch-action: pan-y;
 }
 
 .flipCard {
@@ -91,6 +91,7 @@
   outline: none;
   perspective: 1000px;
   cursor: pointer;
+  touch-action: pan-y;
 }
 
 .flipCard:focus-visible {

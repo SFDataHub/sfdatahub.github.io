@@ -16,6 +16,8 @@ import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import type { ToplistExportAmount } from "../../components/export/ToplistPngExportDialog";
 import type { ToplistCaptureStatus } from "../../components/export/ToplistExportController";
 import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
+import NeonCoreButton from "../../components/ui/NeonCoreButton";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 type GuildToplistsProps = {
   serverCodes?: string[];
@@ -425,11 +427,13 @@ export default function GuildToplists({
   const isPresetRender = renderMode === "preset";
   const resolvedPresetAmount = presetAmount ?? 50;
   const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
+  const isCompactToplistView = useMediaQuery("(max-width: 1099px)") && !isPresetRender;
   const [rows, setRows] = useState<FirestoreToplistGuildRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [guildAvgMode, setGuildAvgMode] = useState<"base" | "total">("base");
+  const [expandedMobileGuildKey, setExpandedMobileGuildKey] = useState<string | null>(null);
   const [selectedGuildProfile, setSelectedGuildProfile] = useState<{
     identifier: string;
     guildId: string;
@@ -675,6 +679,17 @@ export default function GuildToplists({
     () => (captureRowLimit == null ? displayRows : displayRows.slice(0, captureRowLimit)),
     [captureRowLimit, displayRows]
   );
+  const mobileRenderedGuildKeys = useMemo(() => {
+    const keys = new Set<string>();
+    renderedRows.forEach((row, idx) => {
+      keys.add(resolveGuildIdentifier(row) ?? `${row.guildId}-${row.server}-${idx}`);
+    });
+    return keys;
+  }, [renderedRows]);
+
+  useEffect(() => {
+    setExpandedMobileGuildKey((prev) => (prev && mobileRenderedGuildKeys.has(prev) ? prev : null));
+  }, [mobileRenderedGuildKeys]);
 
   const virtualTotalSize = renderedRows.length * 56;
   const firstRenderedIdentifier = renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[0]) ?? "" : "";
@@ -721,6 +736,142 @@ export default function GuildToplists({
     virtualTotalSize,
   ]);
 
+  const openGuildProfile = (row: FirestoreToplistGuildRow) => {
+    if (isPresetRender) return;
+    const guildId = String(row.guildId ?? "").trim();
+    if (!guildId) return;
+    const rowIdentifier = resolveGuildIdentifier(row);
+    setSelectedGuildProfile({
+      identifier: rowIdentifier ?? buildGuildToplistIdentifier(row.server, guildId) ?? guildId,
+      guildId,
+      name: typeof row.name === "string" ? row.name : null,
+      server: typeof row.server === "string" ? row.server : null,
+    });
+  };
+
+  const getGuildSortMetric = (row: FirestoreToplistGuildRow) => {
+    const valueOrDash = (value: string | number | null | undefined) => {
+      const text = String(value ?? "").trim();
+      return text || "-";
+    };
+    switch (activeSortKey) {
+      case "guildMembers":
+        return { label: t("toplists.columns.members", "Members"), value: valueOrDash(fmtNum(row.memberCount)) };
+      case "guildAvgMain":
+        return { label: t("toplists.columns.avgMain", "\u00F8 Main"), value: valueOrDash(fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode))) };
+      case "guildAvgCon":
+        return { label: t("toplists.columns.avgCon", "\u00F8 Con"), value: valueOrDash(fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode))) };
+      case "guildAvgSum":
+        return { label: t("toplists.columns.avgSum", "\u00F8 Sum"), value: valueOrDash(fmtGroupedInt(getGuildAvgSum(row, avgSumSortMode))) };
+      case "guildRaids":
+        return { label: t("toplists.columns.raids", "Raids"), value: valueOrDash(fmtNum(row.raids)) };
+      case "guildHydra":
+        return { label: t("toplists.columns.hydra", "Hydra"), value: valueOrDash(fmtNum(row.hydra)) };
+      case "guildAvgLevel":
+      default:
+        return { label: t("toplists.columns.avgLevel", "\u00F8 Level"), value: valueOrDash(fmtNum(row.avgLevel)) };
+    }
+  };
+
+  const renderGuildMobileDetailItem = (
+    key: string,
+    label: React.ReactNode,
+    value: React.ReactNode,
+    className = "",
+  ) => (
+    <div key={key} className={`toplists-mobile-detail-item${className ? ` ${className}` : ""}`}>
+      <div className="toplists-mobile-detail-label">{label}</div>
+      <div className="toplists-mobile-detail-value">{value}</div>
+    </div>
+  );
+
+  const renderGuildMobileAccordion = () => (
+    <div
+      ref={tableRef}
+      className="toplists-mobile-list"
+      data-toplists-export-root="true"
+    >
+      {renderedRows.map((row, idx) => {
+        const rowIdentifier = resolveGuildIdentifier(row);
+        const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
+        const isExpanded = expandedMobileGuildKey === rowKey;
+        const lastScanSec = resolveGuildLastScanSec(row);
+        const sortMetric = getGuildSortMetric(row);
+        const guildName = String(row.name ?? "").trim() || "-";
+        const guildServer = String(row.server ?? "").trim();
+        const guildId = String(row.guildId ?? "").trim();
+        const detailId = `toplist-guild-mobile-details-${idx}`;
+
+        return (
+          <div
+            key={rowKey}
+            className={`toplists-mobile-row${isExpanded ? " toplists-mobile-row--open" : ""}`}
+            data-sfh-identifier={rowIdentifier ?? undefined}
+          >
+            <button
+              type="button"
+              className="toplists-mobile-summary"
+              aria-expanded={isExpanded}
+              aria-controls={detailId}
+              onClick={() => setExpandedMobileGuildKey((prev) => (prev === rowKey ? null : rowKey))}
+            >
+              <span className="toplists-mobile-rank">#{idx + 1}</span>
+              <span className="toplists-mobile-guild-identity">
+                <span className="toplists-mobile-name">{guildName}</span>
+                <span className="toplists-mobile-meta">{guildServer || "-"}</span>
+              </span>
+              <span className="toplists-mobile-metric">
+                <span className="toplists-mobile-metric-value">{sortMetric.value}</span>
+                <span className="toplists-mobile-metric-label">{sortMetric.label}</span>
+              </span>
+              <span className="toplists-mobile-chevron" aria-hidden />
+            </button>
+            {isExpanded && (
+              <div id={detailId} className="toplists-mobile-details">
+                <div
+                  className="toplists-mobile-actions toplists-mobile-actions--single"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <NeonCoreButton
+                    label={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    title={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    icon={null}
+                    disabled={!guildId}
+                    className="toplists-mobile-action-button"
+                    onClick={() => openGuildProfile(row)}
+                  />
+                </div>
+                {renderGuildMobileDetailItem("hofRank", t("toplists.columns.hofRank", "HoF Rank"), fmtNum(row.hofRank) || "-")}
+                {renderGuildMobileDetailItem("honor", t("toplists.columns.honor", "Honor"), fmtGroupedInt(row.honor) || "-")}
+                {renderGuildMobileDetailItem("raids", t("toplists.columns.raids", "Raids"), fmtNum(row.raids) || "-")}
+                {renderGuildMobileDetailItem("portal", t("toplists.columns.portal", "Portal"), fmtNum(row.portalFloor) || "-")}
+                {renderGuildMobileDetailItem("hydra", t("toplists.columns.hydra", "Hydra"), fmtNum(row.hydra) || "-")}
+                {renderGuildMobileDetailItem("petLevel", t("toplists.columns.petLevel", "Pet Level"), fmtNum(row.instructor) || "-")}
+                {renderGuildMobileDetailItem("members", t("toplists.columns.members", "Members"), fmtNum(row.memberCount) || "-")}
+                {renderGuildMobileDetailItem("avgLevel", t("toplists.columns.avgLevel", "\u00F8 Level"), fmtNum(row.avgLevel) || "-")}
+                {renderGuildMobileDetailItem("avgMain", t("toplists.columns.avgMain", "\u00F8 Main"), fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode)) || "-")}
+                {renderGuildMobileDetailItem("avgCon", t("toplists.columns.avgCon", "\u00F8 Con"), fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode)) || "-")}
+                {renderGuildMobileDetailItem("avgSum", t("toplists.columns.avgSum", "\u00F8 Sum"), fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode)) || "-")}
+                {renderGuildMobileDetailItem(
+                  "lastScan",
+                  t("toplists.columns.lastScan", "Last Scan"),
+                  formatLastScanDisplay(lastScanSec) || "-",
+                  "toplists-mobile-detail-item--wide",
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {effectiveLoading && renderedRows.length === 0 && (
+        <div className="toplists-mobile-empty">{t("toplists.table.loading", "Loading...")}</div>
+      )}
+      {!effectiveLoading && !effectiveError && renderedRows.length === 0 && (
+        <div className="toplists-mobile-empty">{t("toplists.table.noResults", "No results")}</div>
+      )}
+    </div>
+  );
+
   const renderGuildBody = () => {
     const rows = renderedRows;
 
@@ -735,15 +886,7 @@ export default function GuildToplists({
             const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
               event.preventDefault();
               event.stopPropagation();
-              if (isPresetRender) return;
-              const guildId = String(row.guildId ?? "").trim();
-              if (!guildId) return;
-              setSelectedGuildProfile({
-                identifier: rowIdentifier ?? buildGuildToplistIdentifier(row.server, guildId) ?? guildId,
-                guildId,
-                name: typeof row.name === "string" ? row.name : null,
-                server: typeof row.server === "string" ? row.server : null,
-              });
+              openGuildProfile(row);
             };
 
             return (
@@ -851,24 +994,28 @@ export default function GuildToplists({
         </div>
       )}
 
-      <div
-        ref={tableRef}
-        className="toplists-table-viewport"
-        data-toplists-export-root="true"
-        style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
-      >
-        <div className="toplists-table-header" style={{ paddingRight: 0 }}>
-          <GuildToplistHeader />
-        </div>
+      {isCompactToplistView ? (
+        renderGuildMobileAccordion()
+      ) : (
         <div
-          ref={tableScrollRef}
-          className="toplists-table-scroll"
-          data-toplists-export-scroll="true"
-          style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+          ref={tableRef}
+          className="toplists-table-viewport"
+          data-toplists-export-root="true"
+          style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
         >
-          {renderGuildBody()}
+          <div className="toplists-table-header" style={{ paddingRight: 0 }}>
+            <GuildToplistHeader />
+          </div>
+          <div
+            ref={tableScrollRef}
+            className="toplists-table-scroll"
+            data-toplists-export-scroll="true"
+            style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+          >
+            {renderGuildBody()}
+          </div>
         </div>
-      </div>
+      )}
       {!isPresetRender && (
         <GuildProfileOverlay
           isOpen={Boolean(selectedGuildProfile?.guildId)}

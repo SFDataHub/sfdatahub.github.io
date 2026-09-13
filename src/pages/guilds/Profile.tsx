@@ -39,6 +39,7 @@ import type { Member as GuildMember } from "../../components/guilds/guild-tabs/g
 import { adaptClassMeta } from "../../components/guilds/GuildClassOverview/utils";
 import { CLASSES } from "../../data/classes";
 import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
+import { isValidGuildCoaString } from "../../lib/guilds/guildCoa";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 
 const C = {
@@ -88,8 +89,6 @@ const EMPTY_MONTHLY_SEED: GuildMonthlyProgressSeedData = {
   knownMissingMonthKeys: [],
 };
 
-const isValidCoaString = (value: string) => value === "0" || /^[0-9a-f]{22}$/i.test(value);
-
 const normalizeCoaString = (value: unknown): string => String(value ?? "").trim();
 
 function useProfileCoaLogoUrl({
@@ -111,7 +110,7 @@ function useProfileCoaLogoUrl({
     const raw = String(guildName ?? "").trim();
     return raw || undefined;
   }, [guildName]);
-  const canRenderCoa = enabled && isValidCoaString(normalizedCoa);
+  const canRenderCoa = enabled && isValidGuildCoaString(normalizedCoa);
 
   useEffect(() => {
     return () => {
@@ -542,7 +541,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
       const needsFreshOverlayCoa = (data: GuildProfileLoadResult): boolean => {
         if (!heroOnly) return false;
         const cachedCoa = normalizeCoaString(data?.snapshot?.coaString);
-        return !isValidCoaString(cachedCoa);
+        return !isValidGuildCoaString(cachedCoa);
       };
 
       if (cacheKey) {

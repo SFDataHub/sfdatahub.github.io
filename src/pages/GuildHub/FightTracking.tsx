@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import html2canvas from "html2canvas";
 import {
   AlertTriangle,
@@ -23,12 +22,13 @@ import {
   XCircle,
 } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
+import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { getClassMetaById } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
 import {
-  listGuildHubLocalGuildsForServerFromScans,
-  listGuildHubLocalScans,
-  listGuildHubLocalServersFromScans,
+  listGuildHubLocalGuildsForServerFromScanSummaries,
+  listGuildHubLocalServersFromScanSummaries,
+  listGuildHubScanSummaries,
   subscribeToSfDataHubLocalScanChanges,
 } from "../../lib/guilds/localScanLibrary";
 import type { FightReportScanProgress } from "./fightReportOcr";
@@ -112,6 +112,11 @@ type ParticipationDerivedRow = {
   level: number | null;
   baseStatsSum: number | null;
   totalStats: number | null;
+};
+
+type FightParticipationLookup = {
+  missedMemberIds: Set<string>;
+  rosterMemberIds: Set<string>;
 };
 
 type FightCreationTarget = {
@@ -606,10 +611,10 @@ const loadTrackerGuildSources = async (selectedGuilds: GuildHubSelectedGuild[]):
   const guilds = new Map<string, TrackerGuildSource>();
   selectedGuilds.forEach((guild) => guilds.set(guild.id, guild));
 
-  const scans = await listGuildHubLocalScans();
-  const serverOptions = listGuildHubLocalServersFromScans(scans);
+  const summaries = await listGuildHubScanSummaries();
+  const serverOptions = listGuildHubLocalServersFromScanSummaries(summaries);
   serverOptions.forEach((server) => {
-    listGuildHubLocalGuildsForServerFromScans(scans, server.id).forEach((guild) => {
+    listGuildHubLocalGuildsForServerFromScanSummaries(summaries, server.id).forEach((guild) => {
       const selection = mapLocalGuildIdentityToSelection(guild);
       if (selection) guilds.set(selection.id, selection);
     });
@@ -625,6 +630,29 @@ const loadTrackerGuildSources = async (selectedGuilds: GuildHubSelectedGuild[]):
 const getFightMemberStatus = (fight: GuildFight, memberId: string): FightMemberStatus => {
   if (fight.missedMemberIds.includes(memberId)) return "missed";
   if (fight.rosterSnapshot.some((snapshotMember) => snapshotMember.id === memberId)) return "ok";
+  return "unknown";
+};
+
+const buildFightParticipationLookup = (fights: GuildFight[]) => {
+  const lookup = new Map<string, FightParticipationLookup>();
+  fights.forEach((fight) => {
+    lookup.set(fight.id, {
+      missedMemberIds: new Set(fight.missedMemberIds),
+      rosterMemberIds: new Set(fight.rosterSnapshot.map((member) => member.id)),
+    });
+  });
+  return lookup;
+};
+
+const getFightMemberStatusFromLookup = (
+  fight: GuildFight,
+  memberId: string,
+  lookupByFightId: Map<string, FightParticipationLookup>,
+): FightMemberStatus => {
+  const lookup = lookupByFightId.get(fight.id);
+  if (!lookup) return getFightMemberStatus(fight, memberId);
+  if (lookup.missedMemberIds.has(memberId)) return "missed";
+  if (lookup.rosterMemberIds.has(memberId)) return "ok";
   return "unknown";
 };
 
@@ -895,8 +923,12 @@ function useMediaQuery(query: string) {
 export default function GuildHubFightTracking() {
   const { activeGuild, selectedGuilds, isLoading: guildSelectionLoading } = useGuildHubSelection();
   const isCompactLayout = useMediaQuery("(max-width: 1024px)");
-  const [storeLoading, setStoreLoading] = React.useState(true);
+  const [overviewLoading, setOverviewLoading] = React.useState(true);
+  const [guildSourcesLoading, setGuildSourcesLoading] = React.useState(false);
+  const [trackerDetailLoading, setTrackerDetailLoading] = React.useState(false);
+  const [syncLoading, setSyncLoading] = React.useState(false);
   const [storeError, setStoreError] = React.useState<string | null>(null);
+  const [guildSourcesError, setGuildSourcesError] = React.useState<string | null>(null);
   const [trackerSummaries, setTrackerSummaries] = React.useState<FightTrackerSummary[]>([]);
   const [trackerGuildSources, setTrackerGuildSources] = React.useState<TrackerGuildSource[]>([]);
   const [tracker, setTracker] = React.useState<FightTrackerGuild | null>(null);
@@ -941,9 +973,13 @@ export default function GuildHubFightTracking() {
     setScanState({ status: "idle", progress: 0, message: "" });
   }, []);
 
-  const refreshOverview = React.useCallback(async () => {
-    const [summaries, guildSources] = await Promise.all([readFightTrackerSummaries(), loadTrackerGuildSources(selectedGuilds)]);
+  const refreshTrackerSummaries = React.useCallback(async () => {
+    const summaries = await readFightTrackerSummaries();
     setTrackerSummaries(summaries);
+  }, []);
+
+  const refreshGuildSources = React.useCallback(async () => {
+    const guildSources = await loadTrackerGuildSources(selectedGuilds);
     setTrackerGuildSources(guildSources);
   }, [selectedGuilds]);
 
@@ -951,9 +987,9 @@ export default function GuildHubFightTracking() {
     let cancelled = false;
     if (guildSelectionLoading) return undefined;
 
-    const load = (showLoading: boolean) => {
-      if (showLoading) setStoreLoading(true);
-      refreshOverview()
+    const load = () => {
+      setOverviewLoading(true);
+      refreshTrackerSummaries()
         .then(() => {
           if (!cancelled) setStoreError(null);
         })
@@ -961,7 +997,32 @@ export default function GuildHubFightTracking() {
           if (!cancelled) setStoreError("Fight-Tracker-Daten konnten nicht geladen werden.");
         })
         .finally(() => {
-          if (!cancelled && showLoading) setStoreLoading(false);
+          if (!cancelled) setOverviewLoading(false);
+        });
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [guildSelectionLoading, refreshTrackerSummaries]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (guildSelectionLoading) return undefined;
+
+    const load = (showLoading: boolean) => {
+      if (showLoading) setGuildSourcesLoading(true);
+      refreshGuildSources()
+        .then(() => {
+          if (!cancelled) setGuildSourcesError(null);
+        })
+        .catch(() => {
+          if (!cancelled) setGuildSourcesError("Scan-Quellen konnten nicht geladen werden.");
+        })
+        .finally(() => {
+          if (!cancelled && showLoading) setGuildSourcesLoading(false);
         });
     };
 
@@ -972,7 +1033,7 @@ export default function GuildHubFightTracking() {
       cancelled = true;
       unsubscribe();
     };
-  }, [guildSelectionLoading, refreshOverview]);
+  }, [guildSelectionLoading, refreshGuildSources]);
 
   React.useEffect(() => {
     return () => {
@@ -985,39 +1046,10 @@ export default function GuildHubFightTracking() {
   }, [activeMobilePanel, isCompactLayout]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    if (!tracker?.linkedGuildHubGuildId && !tracker?.linkedGuildHubLogoIdentifier) {
-      setSyncPlan(null);
-      setTrackerScanSnapshot(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const load = () => {
-      loadLatestScanSnapshotForGuild(tracker)
-        .then(async (snapshot) => {
-          if (cancelled) return;
-          setTrackerScanSnapshot(snapshot);
-          const plan = buildFightTrackerSyncPlan(tracker, trackerMembers, snapshot);
-          setSyncPlan(plan);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setTrackerScanSnapshot(null);
-            setSyncPlan(null);
-          }
-        });
-    };
-
-    load();
-    const unsubscribe = subscribeToSfDataHubLocalScanChanges(load);
-
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [tracker, trackerMembers]);
+    setSyncPlan(null);
+    setTrackerScanSnapshot(null);
+    setSyncLoading(false);
+  }, [tracker?.id]);
 
   const activeRoster = React.useMemo(() => trackerMembers.filter((member) => member.active), [trackerMembers]);
 
@@ -1121,7 +1153,7 @@ export default function GuildHubFightTracking() {
   };
 
   const openTracker = async (trackerId: string) => {
-    setStoreLoading(true);
+    setTrackerDetailLoading(true);
     try {
       const state = await readFightTrackerStateById(trackerId);
       setTracker(state.tracker);
@@ -1138,20 +1170,18 @@ export default function GuildHubFightTracking() {
     } catch {
       setStoreError("Fight Tracker konnte nicht geoeffnet werden.");
     } finally {
-      setStoreLoading(false);
+      setTrackerDetailLoading(false);
     }
   };
 
   const backToSelection = async () => {
     resetTrackerView();
-    setStoreLoading(true);
     try {
-      await refreshOverview();
+      await refreshTrackerSummaries();
+      void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
       setStoreError(null);
     } catch {
       setStoreError("Fight-Tracker-Auswahl konnte nicht aktualisiert werden.");
-    } finally {
-      setStoreLoading(false);
     }
   };
 
@@ -1163,7 +1193,8 @@ export default function GuildHubFightTracking() {
       linkedGuildHubGuildId: guild.guildId,
       linkedGuildHubLogoIdentifier: guild.logoIdentifier,
     });
-    await refreshOverview();
+    await refreshTrackerSummaries();
+    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
@@ -1187,7 +1218,8 @@ export default function GuildHubFightTracking() {
     const name = setupGuildName.trim();
     if (!name) return;
     const state = await createFightTracker({ name, server: setupGuildServer, source: "manual" });
-    await refreshOverview();
+    await refreshTrackerSummaries();
+    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
@@ -1226,7 +1258,8 @@ export default function GuildHubFightTracking() {
     await deleteFightTracker(managerState.trackerId);
     if (tracker?.id === managerState.trackerId) resetTrackerView();
     setManagerState(null);
-    await refreshOverview();
+    await refreshTrackerSummaries();
+    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
   };
 
   const addMember = async (input: CreateFightTrackerMemberInput, options?: { markMissingInReview?: boolean }) => {
@@ -1248,6 +1281,9 @@ export default function GuildHubFightTracking() {
         };
         await putFightTrackerMember(updated);
         setTrackerMembers((prev) => sortMembers(prev.map((member) => (member.id === updated.id ? updated : member))));
+        setSyncPlan(null);
+        setTrackerScanSnapshot(null);
+        void refreshTrackerSummaries();
         if (options?.markMissingInReview) markReviewMember(updated.id, name);
         return updated;
       }
@@ -1258,6 +1294,9 @@ export default function GuildHubFightTracking() {
     const member = await addFightTrackerMember(tracker.id, input);
     if (!member) return null;
     setTrackerMembers((prev) => sortMembers([...prev, member]));
+    setSyncPlan(null);
+    setTrackerScanSnapshot(null);
+    void refreshTrackerSummaries();
     if (options?.markMissingInReview) markReviewMember(member.id, name);
     return member;
   };
@@ -1295,6 +1334,9 @@ export default function GuildHubFightTracking() {
     };
     await putFightTrackerMember(updated);
     setTrackerMembers((prev) => sortMembers(prev.map((entry) => (entry.id === memberId ? updated : entry))));
+    setSyncPlan(null);
+    setTrackerScanSnapshot(null);
+    void refreshTrackerSummaries();
   };
 
   const handleMemberDelete = async (memberId: string) => {
@@ -1303,6 +1345,9 @@ export default function GuildHubFightTracking() {
     if (!result.deleted) return;
     setTrackerMembers((prev) => sortMembers(prev.filter((entry) => entry.id !== memberId)));
     setFights(result.fights);
+    setSyncPlan(null);
+    setTrackerScanSnapshot(null);
+    void refreshTrackerSummaries();
     setImportSession((prev) => {
       if (!prev || !(memberId in prev.review.memberStates)) return prev;
       const memberStates = { ...prev.review.memberStates };
@@ -1503,6 +1548,8 @@ export default function GuildHubFightTracking() {
       return sortMembers([...next.values()]);
     });
     setSyncPlan(null);
+    setTrackerScanSnapshot(null);
+    void refreshTrackerSummaries();
 
     return {
       newCount: addedCount,
@@ -1777,10 +1824,31 @@ export default function GuildHubFightTracking() {
   const canApplyImportReview = Boolean(
     importSession && tracker && importSession.review.date && importSession.review.reportType !== "unsupported_defense" && !fightCreationOrderIssue,
   );
+  const loadSyncPlan = React.useCallback(async () => {
+    if (!tracker || !hasGuildScanLink || syncLoading) return;
+    setSyncLoading(true);
+    setScanImportStatus(null);
+    try {
+      const snapshot = await loadLatestScanSnapshotForGuild(tracker);
+      setTrackerScanSnapshot(snapshot);
+      setSyncPlan(buildFightTrackerSyncPlan(tracker, trackerMembers, snapshot));
+    } catch {
+      setTrackerScanSnapshot(null);
+      setSyncPlan(null);
+      setScanImportStatus("Scan-Synchronisierung konnte nicht vorbereitet werden.");
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [hasGuildScanLink, syncLoading, tracker, trackerMembers]);
+  const openFunctionPanel = (panelId: MobileFunctionPanelId) => {
+    setActiveMobilePanel(panelId);
+    if (panelId === "sync") void loadSyncPlan();
+  };
   const syncPanel = hasGuildScanLink ? (
     <ScanMemberImportPanel
       plan={visibleScanImportPlan}
       snapshot={trackerScanSnapshot}
+      loading={syncLoading}
       status={scanImportStatus}
       trackerMemberCount={trackerMembers.length}
       onImport={handleImportScanMembers}
@@ -1790,6 +1858,7 @@ export default function GuildHubFightTracking() {
     <ScanMemberImportPanel
       plan={visibleScanImportPlan}
       snapshot={trackerScanSnapshot}
+      loading={syncLoading}
       status={scanImportStatus}
       trackerMemberCount={trackerMembers.length}
       onImport={handleImportScanMembers}
@@ -1994,7 +2063,7 @@ export default function GuildHubFightTracking() {
     setActiveMobilePanel(null);
   };
 
-  if (storeLoading) {
+  if (overviewLoading && !trackerSummaries.length && !tracker && !trackerDetailLoading) {
     return (
       <ContentShell centerFramed={false}>
         <div className={styles.page}>
@@ -2013,28 +2082,28 @@ export default function GuildHubFightTracking() {
               <p className={styles.kicker}>Guild Hub</p>
               <h1 className={styles.title}>Fight Tracking</h1>
             </div>
+            <GuildContextBar />
             {tracker ? (
               <button type="button" className={styles.selectionBackButton} onClick={backToSelection}>
                 <ArrowLeft size={16} aria-hidden />
                 Zur Gildenauswahl
               </button>
-            ) : (
-              <Link to="/guild-hub" className={`${styles.selectionBackButton} ${styles.guildHubBackButton}`}>
-                <ArrowLeft size={16} aria-hidden />
-                Zurück zum Guild Hub
-              </Link>
-            )}
+            ) : null}
           </div>
         </header>
 
         {storeError ? <section className={styles.emptyState}>{storeError}</section> : null}
 
-        {!tracker ? (
+        {trackerDetailLoading ? (
+          <section className={styles.emptyState}>Tracker wird geladen...</section>
+        ) : !tracker ? (
           <TrackerSelectionPanel
             summaries={trackerSummaries}
             activeGuild={activeGuild}
             activeGuildTrackerId={activeGuildTrackerId}
             scanSourceOptions={scanSourceOptions}
+            scanSourceLoading={guildSourcesLoading}
+            scanSourceError={guildSourcesError}
             selectedScanGuildId={selectedScanGuildId}
             onSelectedScanGuildIdChange={setSelectedScanGuildId}
             isAddPanelOpen={isAddPanelOpen}
@@ -2064,19 +2133,19 @@ export default function GuildHubFightTracking() {
               <InfoPill label="Missed" value={String(totalMissed)} hint="manuell/OCR markiert" />
             </section>
 
-            {isCompactLayout ? (
-              <>
-                <section className={styles.mobileFunctionGrid} aria-label="Fight-Tracker-Funktionen">
-                  {mobilePanels.map((panel) => (
-                    <FunctionTile
-                      key={panel.id}
-                      title={panel.title}
-                      description={panel.description}
-                      icon={panel.icon}
-                      onOpen={() => setActiveMobilePanel(panel.id)}
-                    />
-                  ))}
-                </section>
+	            {isCompactLayout ? (
+	              <>
+	                <section className={styles.mobileFunctionGrid} aria-label="Fight-Tracker-Funktionen">
+	                  {mobilePanels.map((panel) => (
+	                    <FunctionTile
+                        key={panel.id}
+                        title={panel.title}
+                        description={panel.description}
+                        icon={panel.icon}
+                        onOpen={() => openFunctionPanel(panel.id)}
+                      />
+	                  ))}
+	                </section>
 
                 {activePanelConfig ? (
                   <FunctionOverlay title={activePanelConfig.title} onClose={closeActiveFunctionPanel}>
@@ -2084,19 +2153,19 @@ export default function GuildHubFightTracking() {
                   </FunctionOverlay>
                 ) : null}
               </>
-            ) : (
-              <>
-                <section className={styles.toolGrid} aria-label="Fight-Tracker-Werkzeuge">
-                  {desktopToolPanels.map((panel) => (
-                    <FunctionTile
-                      key={panel.id}
-                      title={panel.title}
-                      description={panel.description}
-                      icon={panel.icon}
-                      onOpen={() => setActiveMobilePanel(panel.id)}
-                    />
-                  ))}
-                </section>
+	            ) : (
+	              <>
+	                <section className={styles.toolGrid} aria-label="Fight-Tracker-Werkzeuge">
+	                  {desktopToolPanels.map((panel) => (
+	                    <FunctionTile
+                        key={panel.id}
+                        title={panel.title}
+                        description={panel.description}
+                        icon={panel.icon}
+                        onOpen={() => openFunctionPanel(panel.id)}
+                      />
+	                  ))}
+	                </section>
 
                 {activePanelConfig ? (
                   <FunctionOverlay
@@ -2133,6 +2202,8 @@ function TrackerSelectionPanel({
   activeGuild,
   activeGuildTrackerId,
   scanSourceOptions,
+  scanSourceLoading,
+  scanSourceError,
   selectedScanGuildId,
   onSelectedScanGuildIdChange,
   isAddPanelOpen,
@@ -2155,6 +2226,8 @@ function TrackerSelectionPanel({
   activeGuild: GuildHubSelectedGuild | null;
   activeGuildTrackerId: string | null;
   scanSourceOptions: TrackerGuildSource[];
+  scanSourceLoading: boolean;
+  scanSourceError: string | null;
   selectedScanGuildId: string;
   onSelectedScanGuildIdChange: (value: string) => void;
   isAddPanelOpen: boolean;
@@ -2314,8 +2387,8 @@ function TrackerSelectionPanel({
         </div>
       ) : null}
 
-      {isAddPanelOpen ? (
-      <div className={styles.setupPanel}>
+	      {isAddPanelOpen ? (
+	        <div className={styles.setupPanel}>
         <div className={styles.createHeading}>
           <div className={styles.createIcon} aria-hidden>
             <Swords size={18} />
@@ -2325,10 +2398,14 @@ function TrackerSelectionPanel({
             <p>Ein Tracker mit 0 Membern ist gueltig.</p>
           </div>
         </div>
-        <div className={styles.setupActions}>
-          <div className={styles.setupOption}>
-            <strong>Aus Guild-Hub-Daten</strong>
-            <span>Verknuepfung erstellen, Memberimport bleibt optional.</span>
+	        <div className={styles.setupActions}>
+	          <div className={styles.setupOption}>
+	            <strong>Aus Guild-Hub-Daten</strong>
+	            <span>
+	              {scanSourceLoading
+	                ? "Scan-Quellen werden geladen."
+	                : scanSourceError ?? "Verknuepfung erstellen, Memberimport bleibt optional."}
+	            </span>
             <label className={styles.field}>
               <span>Guild-Hub-Gilde</span>
               <select
@@ -2377,6 +2454,7 @@ function TrackerSelectionPanel({
 function ScanMemberImportPanel({
   plan,
   snapshot,
+  loading,
   status,
   trackerMemberCount,
   onImport,
@@ -2384,6 +2462,7 @@ function ScanMemberImportPanel({
 }: {
   plan: FightTrackerSyncPlan | null;
   snapshot: FightTrackerScanSnapshot | null;
+  loading: boolean;
   status: string | null;
   trackerMemberCount: number;
   onImport: () => void;
@@ -2399,7 +2478,9 @@ function ScanMemberImportPanel({
       ]
         .filter(Boolean)
         .join(" - ")
-    : "Kein passender lokaler Guild-Hub-Scan gefunden";
+    : loading
+      ? "Scan-Synchronisierung wird vorbereitet..."
+      : "Kein passender lokaler Guild-Hub-Scan gefunden";
   const isInitialImport = trackerMemberCount === 0;
   const actionLabel = isInitialImport
     ? plan?.newMembers.length
@@ -2464,7 +2545,9 @@ function ScanMemberImportPanel({
       {snapshot && plan && !plan.hasChanges && !status ? (
         <span className={styles.scanNotice}>Tracker-Mitglieder entsprechen diesem Scan.</span>
       ) : null}
-      {!snapshot ? (
+      {loading ? (
+        <span className={styles.scanNotice}>Passender Scan wird geladen und abgeglichen.</span>
+      ) : !snapshot ? (
         <span className={styles.scanNotice}>Importiere im Guild Hub zuerst einen passenden lokalen Scan fuer diese Gilde.</span>
       ) : null}
       {plan ? (
@@ -2482,7 +2565,7 @@ function ScanMemberImportPanel({
       ) : null}
       <div className={styles.reviewActions}>
         {status ? <span className={styles.scanNotice}>{status}</span> : null}
-        <button type="button" className={styles.primaryAction} disabled={!plan?.hasChanges} onClick={onImport}>
+        <button type="button" className={styles.primaryAction} disabled={loading || !plan?.hasChanges} onClick={onImport}>
           <Check size={16} aria-hidden />
           {actionLabel}
         </button>
@@ -3498,10 +3581,12 @@ function FightTable({
     { key: "level", label: "Level" },
     { key: "missed", label: "Missed Fights" },
   ];
+  const fightParticipationLookup = React.useMemo(() => buildFightParticipationLookup(fights), [fights]);
   const getParticipationStatus = React.useCallback(
     (fight: GuildFight, memberId: string) =>
-      statusDrafts[createParticipationDraftKey(fight.id, memberId)]?.status ?? getFightMemberStatus(fight, memberId),
-    [statusDrafts],
+      statusDrafts[createParticipationDraftKey(fight.id, memberId)]?.status ??
+      getFightMemberStatusFromLookup(fight, memberId, fightParticipationLookup),
+    [fightParticipationLookup, statusDrafts],
   );
   const cycleParticipationStatus = (fight: GuildFight, memberId: string) => {
     const status = getParticipationStatus(fight, memberId);
@@ -3759,14 +3844,20 @@ function FightTable({
     [exportMonth, fights],
   );
   const exportDuplicateSlots = React.useMemo(() => getDuplicateFightSlots(exportMonthFights), [exportMonthFights]);
+  const exportMonthFightLookup = React.useMemo(() => buildFightParticipationLookup(exportMonthFights), [exportMonthFights]);
   const exportRows = React.useMemo(() => {
     const memberRows = rows.filter((member) => showFormerMembersInExport || member.active !== false);
     return sortParticipationRows(
-      deriveParticipationRows(memberRows, exportMonthFights, getFightMemberStatus, readonlyStatsByMemberId),
+      deriveParticipationRows(
+        memberRows,
+        exportMonthFights,
+        (fight, memberId) => getFightMemberStatusFromLookup(fight, memberId, exportMonthFightLookup),
+        readonlyStatsByMemberId,
+      ),
       sortKey,
       sortDirection,
     );
-  }, [exportMonthFights, readonlyStatsByMemberId, rows, showFormerMembersInExport, sortDirection, sortKey]);
+  }, [exportMonthFightLookup, exportMonthFights, readonlyStatsByMemberId, rows, showFormerMembersInExport, sortDirection, sortKey]);
   const canExportParticipation = Boolean(exportMonth && exportRows.length && !exportDuplicateSlots.length);
   const isExportingParticipation = exportBusyAction !== null;
   const exportFileBaseName = React.useMemo(

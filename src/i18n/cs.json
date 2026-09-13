@@ -27,6 +27,7 @@
     "guideHub": "Guide Hub",
     "scans": "Skeny",
     "overview": "Přehled",
+    "analytics": "Analytics",
     "guildPlanner": "Guild Planner",
     "fusionPlanner": "Fusion Planner",
     "guildCompare": "Porovnání cechů",
@@ -93,7 +94,7 @@
     },
     "records": {
       "title": "Nejnovější komunitní rekordy",
-      "subtitle": "Živý snapshot",
+      "subtitle": "Nejnovější držitelé individuálních a cechovních rekordů",
       "fallbackTitle": "Oznámení rekordu",
       "fallbackAuthor": "Discord",
       "fallbackChannel": "Rekordy",

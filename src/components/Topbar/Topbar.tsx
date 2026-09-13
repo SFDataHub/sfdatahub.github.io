@@ -273,11 +273,12 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
                         <div className={styles.notificationBody}>
                           <p className={styles.notificationTitle}>{job.title}</p>
                           <p className={styles.notificationDetail}>
-                            {job.status === "running"
-                              ? "Updating favorites..."
-                              : job.status === "success"
-                              ? "Favorites updated"
-                              : "Favorites update failed"}
+                            {job.detail ??
+                              (job.status === "running"
+                                ? "Updating favorites..."
+                                : job.status === "success"
+                                  ? "Favorites updated"
+                                  : "Favorites update failed")}
                           </p>
                         </div>
                         {job.progress ? (
@@ -299,8 +300,12 @@ export default function Topbar({ user }: { user?: { name: string; role?: string 
                         <span className={styles.notificationStatusIcon} aria-hidden>
                           {event.kind === "favorite_added" ? (
                             <Star className={`${styles.notificationStatusGlyph} ${styles.notificationStatusActivityAdd}`} />
-                          ) : (
+                          ) : event.kind === "favorite_removed" ? (
                             <StarOff className={`${styles.notificationStatusGlyph} ${styles.notificationStatusActivityRemove}`} />
+                          ) : event.kind === "data_job_completed" ? (
+                            <CheckCircle2 className={`${styles.notificationStatusGlyph} ${styles.notificationStatusSuccess}`} />
+                          ) : (
+                            <AlertCircle className={`${styles.notificationStatusGlyph} ${styles.notificationStatusError}`} />
                           )}
                         </span>
                         <div className={styles.notificationBody}>
