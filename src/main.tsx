@@ -71,6 +71,7 @@ import CommunityRecords from "./pages/Community/Records";
 import ScansIndex from "./pages/Scans/Index";
 import ScansLatest from "./pages/Scans/Latest";
 import ScansArchive from "./pages/Scans/Archive";
+import ScansFusionIdentity from "./pages/Scans/FusionIdentity";
 
 // GuildHub
 import GuildHubIndex from "./pages/GuildHub/Index";
@@ -378,6 +379,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route
                   path="/scans/archive"
                   element={withFeatureGate("main.scans", "/scans", <ScansArchive />)}
+                />
+                <Route
+                  path="/scans/fusion-identity"
+                  element={withFeatureGate("main.scans", "/scans", <ScansFusionIdentity />)}
                 />
 
                 {/* Guild Hub */}

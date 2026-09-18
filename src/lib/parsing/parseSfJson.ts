@@ -1,5 +1,11 @@
 import { extractPortraitFromSaveArray, parseSaveStringToArray } from "./extractPortrait";
 import { buildStatsModelFromLatestValues, parseNumberLoose } from "./latestValues";
+import {
+  detectSfPlayerSaveLayout,
+  readSfPlayerSaveArray,
+  readSfSaveLowerShort,
+  readSfSaveNumber,
+} from "./playerSaveLayout";
 import type {
   SfJsonAchievements,
   SfJsonBackpackItems,
@@ -156,62 +162,21 @@ const pickGenericPlayerString = (row: Record<string, unknown>, keys: readonly st
   normalizeStringValue(pickGenericPlayerValue(row, keys));
 
 const PLAYER_LEVEL_KEYS = ["level", "Level", "lvl", "Lvl"];
-const CURRENT_COMPACT_SAVE_VERSION = 2;
-const CURRENT_COMPACT_SAVE_LENGTH = 70;
-const LEGACY_OWN_SAVE_MIN_LENGTH = 650;
-const LEGACY_OTHER_SAVE_MIN_LENGTH = 256;
-
-type SfPlayerSaveLayout = "currentCompact" | "legacyOwn" | "legacyOther";
-
-const readSaveArrayForPlayerStats = (row: Record<string, unknown>): number[] | null => {
-  const saveField = row.save ?? row.playerSave;
-  const saveArray = asNumberArray(saveField);
-  if (saveArray && saveArray.length) return saveArray;
-
-  const saveString =
-    typeof saveField === "string"
-      ? saveField
-      : typeof row.saveString === "string"
-        ? row.saveString
-        : undefined;
-  const fromString = saveString ? parseSaveStringToArray(saveString) : undefined;
-  return fromString && fromString.length ? fromString : null;
-};
-
-const readSaveNumber = (saveArray: number[] | null, index: number): number | null => {
-  if (!saveArray || index >= saveArray.length) return null;
-  return toFiniteNumberOrNull(saveArray[index]);
-};
 
 const normalizeSfPlayerLevel = (value: number | null): number | null =>
   value != null && Number.isFinite(value) && value > 0 ? value : null;
 
-const readSfPlayerSaveLayout = (
-  row: Record<string, unknown>,
-  saveArray: number[] | null,
-): SfPlayerSaveLayout | null => {
-  if (!saveArray?.length) return null;
+const toNumberArrayForPortrait = (saveArray: unknown[] | null): number[] | null =>
+  saveArray ? saveArray.map((entry) => toFiniteNumberWithFallback(entry, 0)) : null;
 
-  const saveVersion = toFiniteNumberOrNull(row.saveVersion);
-  if (saveVersion === CURRENT_COMPACT_SAVE_VERSION && saveArray.length === CURRENT_COMPACT_SAVE_LENGTH) {
-    return "currentCompact";
-  }
+const readSfPlayerLevelFromSave = (row: Record<string, unknown>, saveArray: unknown[] | null): number | null => {
+  const layout = detectSfPlayerSaveLayout(row, saveArray);
+  if (layout === "currentCompact") return normalizeSfPlayerLevel(readSfSaveLowerShort(saveArray, 3));
+  if (layout === "legacyOwn") return normalizeSfPlayerLevel(readSfSaveLowerShort(saveArray, 7));
+  if (layout === "legacyOther") return normalizeSfPlayerLevel(readSfSaveLowerShort(saveArray, 2));
 
   const own = toFiniteNumberOrNull(row.own);
-  if (own === 1 && saveArray.length >= LEGACY_OWN_SAVE_MIN_LENGTH) return "legacyOwn";
-  if (own !== 1 && saveArray.length >= LEGACY_OTHER_SAVE_MIN_LENGTH) return "legacyOther";
-
-  return null;
-};
-
-const readSfPlayerLevelFromSave = (row: Record<string, unknown>, saveArray: number[] | null): number | null => {
-  const layout = readSfPlayerSaveLayout(row, saveArray);
-  if (layout === "currentCompact") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 3));
-  if (layout === "legacyOwn") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 7));
-  if (layout === "legacyOther") return normalizeSfPlayerLevel(readSaveNumber(saveArray, 2));
-
-  const own = toFiniteNumberOrNull(row.own);
-  return normalizeSfPlayerLevel(readSaveNumber(saveArray, own === 1 ? 7 : 2));
+  return normalizeSfPlayerLevel(readSfSaveLowerShort(saveArray, own === 1 ? 7 : 2));
 };
 
 export const readSfPlayerLevel = (player: unknown): number | null => {
@@ -221,12 +186,13 @@ export const readSfPlayerLevel = (player: unknown): number | null => {
   const directLevel = normalizeSfPlayerLevel(pickGenericPlayerNumber(row, PLAYER_LEVEL_KEYS));
   if (directLevel != null) return directLevel;
 
-  const saveArray = readSaveArrayForPlayerStats(row);
+  const saveArray = readSfPlayerSaveArray(row);
   return readSfPlayerLevelFromSave(row, saveArray);
 };
 
-const readClassIdForPlayerStats = (row: Record<string, unknown>, saveArray: number[] | null): string | null => {
-  const portrait = saveArray && saveArray.length > 0 ? extractPortraitFromSaveArray(saveArray) : null;
+const readClassIdForPlayerStats = (row: Record<string, unknown>, saveArray: unknown[] | null): string | null => {
+  const portraitArray = toNumberArrayForPortrait(saveArray);
+  const portrait = portraitArray && portraitArray.length > 0 ? extractPortraitFromSaveArray(portraitArray) : null;
   const direct =
     pickGenericPlayerString(row, ["classId", "Class ID", "class", "Class", "className", "Class Name"]) ??
     normalizeStringValue(portrait?.classId);
@@ -274,13 +240,13 @@ export const readSfPlayerStats = (player: unknown): SfJsonPlayerStats => {
     };
   }
 
-  const saveArray = readSaveArrayForPlayerStats(row);
+  const saveArray = readSfPlayerSaveArray(row);
   const classId = readClassIdForPlayerStats(row, saveArray);
   const mainSaveIndex = getMainSaveBaseIndex(classId);
-  const mainSaveBase = mainSaveIndex == null ? null : readSaveNumber(saveArray, mainSaveIndex);
-  const mainSaveBonus = mainSaveIndex == null ? null : readSaveNumber(saveArray, mainSaveIndex + 5);
-  const conSaveBase = readSaveNumber(saveArray, 33);
-  const conSaveBonus = readSaveNumber(saveArray, 38);
+  const mainSaveBase = mainSaveIndex == null ? null : readSfSaveNumber(saveArray, mainSaveIndex);
+  const mainSaveBonus = mainSaveIndex == null ? null : readSfSaveNumber(saveArray, mainSaveIndex + 5);
+  const conSaveBase = readSfSaveNumber(saveArray, 33);
+  const conSaveBonus = readSfSaveNumber(saveArray, 38);
   const latestStats = buildStatsModelFromLatestValues(buildLatestValuesForStats(row));
   const latestBaseStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.base));
   const latestTotalStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.total));
