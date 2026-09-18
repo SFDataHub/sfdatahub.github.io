@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Check, Database, Download, Loader2, Pencil, RefreshCw, Swords, Trash2, Upload, X } from "lucide-react";
+import { Check, Database, Download, Eye, Loader2, Pencil, RefreshCw, Swords, Trash2, Upload, X } from "lucide-react";
 
 import { useBackClose } from "../../hooks/useBackClose";
 import {
@@ -14,9 +14,17 @@ import {
   subscribeToSfDataHubLocalScanChanges,
   updateSfDataHubLocalScan,
   type GuildHubScanMergeMode,
+  type GuildHubLogicalScanSnapshot,
   type GuildHubScanSummary,
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
+import {
+  deriveGuildCoverageForLogicalSnapshots,
+  summarizeGuildCoverage,
+  type GuildCoverageSummary,
+  type GuildSnapshotCoverage,
+  type GuildSnapshotCoverageStatus,
+} from "../../lib/guilds/guildCoverage";
 import {
   importFightTrackerTransferStates,
   readFightTrackerSummaries,
@@ -74,6 +82,23 @@ type PendingScanMergeImport = {
 };
 
 type PendingImport = PendingTransferImport | PendingScanJsonImport | PendingScanMergeImport;
+
+type ScanDetailsGuildGroup = {
+  key: string;
+  server: string;
+  guildIdentifier: string;
+  guildName: string;
+  rows: GuildSnapshotCoverage[];
+  completeSnapshotCount: number;
+};
+
+type ScanDetailsData = {
+  scan: SfDataHubLocalScan;
+  snapshots: GuildHubLogicalScanSnapshot[];
+  coverageRows: GuildSnapshotCoverage[];
+  coverageSummary: GuildCoverageSummary;
+  guildGroups: ScanDetailsGuildGroup[];
+};
 
 const EMPTY_FEEDBACK: ImportFeedback = {
   imported: [],
@@ -293,6 +318,123 @@ function getScanSlotSourceInfo(scan: Pick<GuildHubScanSummary, "isScanSlot" | "m
   return `${sourceCount.toLocaleString("de-DE")} Quelldateien · ${scan.logicalScanCount.toLocaleString("de-DE")} Scans`;
 }
 
+function getCoverageUniqueKey(row: Pick<GuildSnapshotCoverage, "server" | "guildIdentifier">) {
+  return `${row.server.toLowerCase()}::${row.guildIdentifier.toLowerCase()}`;
+}
+
+function formatCount(value: number) {
+  return value.toLocaleString("de-DE");
+}
+
+function getScanSourceTypeLabel(scan: Pick<GuildHubScanSummary, "isScanSlot" | "isMergedBundle">) {
+  if (scan.isScanSlot) return "Slot";
+  if (scan.isMergedBundle) return "Bundle";
+  return "Scan";
+}
+
+function formatCoverageStatus(status: GuildSnapshotCoverageStatus) {
+  if (status === "complete") return { symbol: "✓", label: "complete" };
+  if (status === "overcount") return { symbol: "⚠", label: "overcount" };
+  if (status === "unknown") return { symbol: "?", label: "unknown" };
+  return { symbol: "-", label: "incomplete" };
+}
+
+function formatCoverageRatio(row: GuildSnapshotCoverage) {
+  return `${formatCount(row.countedMemberCount)} / ${
+    row.declaredMemberCount == null ? "?" : formatCount(row.declaredMemberCount)
+  }`;
+}
+
+function groupGuildCoverageRows(rows: GuildSnapshotCoverage[]): ScanDetailsGuildGroup[] {
+  const groups = new Map<string, ScanDetailsGuildGroup>();
+
+  for (const row of rows) {
+    const key = getCoverageUniqueKey(row);
+    const existing =
+      groups.get(key) ??
+      ({
+        key,
+        server: row.server,
+        guildIdentifier: row.guildIdentifier,
+        guildName: row.guildName?.trim() || "Unknown Guild",
+        rows: [],
+        completeSnapshotCount: 0,
+      } satisfies ScanDetailsGuildGroup);
+
+    if (existing.guildName === "Unknown Guild" && row.guildName?.trim()) {
+      existing.guildName = row.guildName.trim();
+    }
+    existing.rows.push(row);
+    if (row.complete) existing.completeSnapshotCount += 1;
+    groups.set(key, existing);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((a, b) => a.snapshotTimestamp - b.snapshotTimestamp),
+    }))
+    .sort(
+      (a, b) =>
+        a.server.localeCompare(b.server, undefined, { numeric: true, sensitivity: "base" }) ||
+        a.guildName.localeCompare(b.guildName, undefined, { numeric: true, sensitivity: "base" }) ||
+        a.guildIdentifier.localeCompare(b.guildIdentifier, undefined, { numeric: true, sensitivity: "base" }),
+    );
+}
+
+function buildScanDetailsData(scan: SfDataHubLocalScan): ScanDetailsData {
+  const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
+  const coverageRows = deriveGuildCoverageForLogicalSnapshots(snapshots);
+  return {
+    scan,
+    snapshots,
+    coverageRows,
+    coverageSummary: summarizeGuildCoverage(coverageRows),
+    guildGroups: groupGuildCoverageRows(coverageRows),
+  };
+}
+
+function formatGroupStatus(group: ScanDetailsGuildGroup) {
+  if (group.rows.length === 1) {
+    const status = formatCoverageStatus(group.rows[0].status);
+    return `${status.symbol} ${status.label}`;
+  }
+
+  const counts = group.rows.reduce(
+    (acc, row) => {
+      acc[row.status] += 1;
+      return acc;
+    },
+    { complete: 0, incomplete: 0, overcount: 0, unknown: 0 } as Record<GuildSnapshotCoverageStatus, number>,
+  );
+
+  return (Object.entries(counts) as Array<[GuildSnapshotCoverageStatus, number]>)
+    .filter(([, count]) => count > 0)
+    .map(([status, count]) => `${formatCount(count)} ${formatCoverageStatus(status).symbol}`)
+    .join(" · ");
+}
+
+function buildScanDetailsMetadata(summary: GuildHubScanSummary, data: ScanDetailsData | null): Array<{ label: string; value: string }> {
+  const timestamps = data
+    ? data.snapshots.map((snapshot) => snapshot.timestampMs).filter((value) => Number.isFinite(value))
+    : summary.snapshotTimestamps;
+  const firstTimestamp = timestamps.length ? Math.min(...timestamps) : summary.firstSnapshotTimestamp;
+  const lastTimestamp = timestamps.length ? Math.max(...timestamps) : summary.lastSnapshotTimestamp;
+  const servers = data?.snapshots.length
+    ? [...new Set(data.snapshots.flatMap((snapshot) => snapshot.servers))]
+    : summary.servers;
+
+  return [
+    { label: "Name", value: getScanDisplayName(summary) },
+    { label: "Datei", value: summary.filename },
+    { label: "Typ", value: getScanSourceTypeLabel(summary) },
+    { label: "Logical Scans", value: formatCount(data?.snapshots.length ?? summary.logicalScanCount) },
+    { label: "Erster Timestamp", value: formatScanDate(isoFromSummaryTimestamp(firstTimestamp)) },
+    { label: "Letzter Timestamp", value: formatScanDate(isoFromSummaryTimestamp(lastTimestamp)) },
+    { label: "Server", value: formatCount(servers.length) },
+  ];
+}
+
 export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagementOverlayProps) {
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -311,6 +453,11 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const [pendingImport, setPendingImport] = React.useState<PendingImport | null>(null);
   const [renamingSlot, setRenamingSlot] = React.useState<GuildHubScanSummary | null>(null);
   const [renameSlotValue, setRenameSlotValue] = React.useState("");
+  const detailsRequestIdRef = React.useRef(0);
+  const [detailsSummary, setDetailsSummary] = React.useState<GuildHubScanSummary | null>(null);
+  const [detailsData, setDetailsData] = React.useState<ScanDetailsData | null>(null);
+  const [detailsLoading, setDetailsLoading] = React.useState(false);
+  const [detailsError, setDetailsError] = React.useState<string | null>(null);
   const {
     isReady: dataJobsReady,
     runningSfToolsImportJob,
@@ -321,10 +468,21 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
   useBackClose(isOpen, onClose);
 
+  const closeScanDetails = React.useCallback(() => {
+    detailsRequestIdRef.current += 1;
+    setDetailsSummary(null);
+    setDetailsData(null);
+    setDetailsLoading(false);
+    setDetailsError(null);
+  }, []);
+
   React.useEffect(() => {
     if (isOpen) setActiveTab("scans");
-    else setPendingImport(null);
-  }, [isOpen]);
+    else {
+      setPendingImport(null);
+      closeScanDetails();
+    }
+  }, [closeScanDetails, isOpen]);
 
   const loadScans = React.useCallback(async () => {
     setStorageError(null);
@@ -373,11 +531,16 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   React.useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (detailsSummary) {
+        closeScanDetails();
+        return;
+      }
+      onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [closeScanDetails, detailsSummary, isOpen, onClose]);
 
   React.useEffect(() => {
     if (!isOpen || typeof document === "undefined") return;
@@ -529,6 +692,31 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const startUpdate = (scanId: string) => {
     updateTargetIdRef.current = scanId;
     updateInputRef.current?.click();
+  };
+
+  const openScanDetails = (summary: GuildHubScanSummary) => {
+    const requestId = detailsRequestIdRef.current + 1;
+    detailsRequestIdRef.current = requestId;
+    setDetailsSummary(summary);
+    setDetailsData(null);
+    setDetailsError(null);
+    setDetailsLoading(true);
+
+    void (async () => {
+      try {
+        const scan = await getSfDataHubLocalScan(summary.sourceScanId);
+        if (!scan) throw new Error("Scan wurde nicht gefunden.");
+        const data = buildScanDetailsData(scan);
+        if (detailsRequestIdRef.current === requestId) setDetailsData(data);
+      } catch (error) {
+        console.error("[ScanManagement] failed to load scan details", error);
+        if (detailsRequestIdRef.current === requestId) {
+          setDetailsError("Scan-Details konnten nicht geladen werden.");
+        }
+      } finally {
+        if (detailsRequestIdRef.current === requestId) setDetailsLoading(false);
+      }
+    })();
   };
 
   const toggleTracker = (id: string) => {
@@ -739,16 +927,17 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   if (!isOpen || typeof document === "undefined") return null;
 
   return createPortal(
-    <div
-      className={styles.backdrop}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="data-management-title"
-      onClick={(event) => {
-        if (event.currentTarget === event.target) onClose();
-      }}
-    >
-      <div className={styles.panel} onClick={(event) => event.stopPropagation()}>
+    <>
+      <div
+        className={styles.backdrop}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="data-management-title"
+        onClick={(event) => {
+          if (event.currentTarget === event.target) onClose();
+        }}
+      >
+        <div className={styles.panel} onClick={(event) => event.stopPropagation()}>
         <header className={styles.header}>
           <div className={styles.titleBlock}>
             <h2 id="data-management-title" className={styles.title}>
@@ -969,40 +1158,53 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                     <span className={styles.bundleBadge}>Bundle</span>
                                   ) : null}
                                 </td>
-                                <td className={styles.rowActions}>
-                                  {scan.isScanSlot ? (
+                                <td className={styles.actionCell}>
+                                  <div className={styles.rowActions}>
                                     <button
                                       type="button"
-                                      className={styles.iconButton}
-                                      onClick={() => startRenameSlot(scan)}
+                                      className={`${styles.iconButton} ${styles.detailsButton}`}
+                                      onClick={() => openScanDetails(scan)}
                                       disabled={busy}
-                                      aria-label={`${displayName} umbenennen`}
-                                      title="Scan-Slot umbenennen"
+                                      aria-label={`${displayName} Details anzeigen`}
+                                      title="Scan-Details anzeigen"
                                     >
-                                      <Pencil size={15} aria-hidden />
+                                      <Eye size={15} aria-hidden />
+                                      <span>Details</span>
                                     </button>
-                                  ) : (
+                                    {scan.isScanSlot ? (
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => startRenameSlot(scan)}
+                                        disabled={busy}
+                                        aria-label={`${displayName} umbenennen`}
+                                        title="Scan-Slot umbenennen"
+                                      >
+                                        <Pencil size={15} aria-hidden />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => startUpdate(scan.sourceScanId)}
+                                        disabled={busy}
+                                        aria-label={`${displayName} aktualisieren`}
+                                        title="Scan aktualisieren"
+                                      >
+                                        <RefreshCw size={15} aria-hidden />
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
-                                      className={styles.iconButton}
-                                      onClick={() => startUpdate(scan.sourceScanId)}
+                                      className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                                      onClick={() => void deleteScans([scan.sourceScanId])}
                                       disabled={busy}
-                                      aria-label={`${displayName} aktualisieren`}
-                                      title="Scan aktualisieren"
+                                      aria-label={`${displayName} löschen`}
+                                      title={scan.isScanSlot ? "Scan-Slot auflösen" : "Scan löschen"}
                                     >
-                                      <RefreshCw size={15} aria-hidden />
+                                      <Trash2 size={15} aria-hidden />
                                     </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                                    onClick={() => void deleteScans([scan.sourceScanId])}
-                                    disabled={busy}
-                                    aria-label={`${displayName} löschen`}
-                                    title={scan.isScanSlot ? "Scan-Slot auflösen" : "Scan löschen"}
-                                  >
-                                    <Trash2 size={15} aria-hidden />
-                                  </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1032,9 +1234,208 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             )}
           </div>
         </div>
+        </div>
       </div>
-    </div>,
+      {detailsSummary ? (
+        <ScanDetailsOverlay
+          summary={detailsSummary}
+          data={detailsData}
+          loading={detailsLoading}
+          error={detailsError}
+          onClose={closeScanDetails}
+        />
+      ) : null}
+    </>,
     document.body,
+  );
+}
+
+function ScanDetailsOverlay({
+  summary,
+  data,
+  loading,
+  error,
+  onClose,
+}: {
+  summary: GuildHubScanSummary;
+  data: ScanDetailsData | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const displayName = getScanDisplayName(summary);
+  const coverage = data?.coverageSummary ?? summary.guildCoverage;
+  const metadata = buildScanDetailsMetadata(summary, data);
+
+  return (
+    <div
+      className={`${styles.backdrop} ${styles.detailsBackdrop}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scan-details-title"
+      onClick={(event) => {
+        if (event.currentTarget === event.target) onClose();
+      }}
+    >
+      <div className={styles.detailsPanel} onClick={(event) => event.stopPropagation()}>
+        <header className={styles.header}>
+          <div className={styles.titleBlock}>
+            <h2 id="scan-details-title" className={styles.title}>
+              Scan Details
+            </h2>
+            <p className={styles.subtitle}>{displayName}</p>
+          </div>
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Scan-Details schließen">
+            <X size={18} aria-hidden />
+            <span>Schließen</span>
+          </button>
+        </header>
+
+        <div className={styles.detailsBody}>
+          <dl className={styles.detailsMetaGrid}>
+            {metadata.map((entry) => (
+              <div key={entry.label}>
+                <dt>{entry.label}</dt>
+                <dd title={entry.value}>{entry.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          {loading ? (
+            <div className={styles.detailsLoading}>
+              <Loader2 size={18} aria-hidden />
+              <span>Scan-Details werden geladen.</span>
+            </div>
+          ) : error ? (
+            <div className={styles.errorBox}>{error}</div>
+          ) : data ? (
+            <>
+              <dl className={styles.detailsKpiGrid}>
+                <ScanDetailsKpi label="Vertretene Gilden" value={coverage.uniqueGuildCount} />
+                <ScanDetailsKpi label="Vollständig gescannte Gilden" value={coverage.completeUniqueGuildCount} />
+                <ScanDetailsKpi label="Guild-Snapshots" value={coverage.guildSnapshotCount} />
+                <ScanDetailsKpi label="Vollständige Guild-Snapshots" value={coverage.completeGuildSnapshotCount} />
+                <ScanDetailsKpi label="Server" value={coverage.byServer.length} />
+                {coverage.incompleteGuildSnapshotCount ? (
+                  <ScanDetailsKpi label="Incomplete" value={coverage.incompleteGuildSnapshotCount} />
+                ) : null}
+                {coverage.overcountGuildSnapshotCount ? (
+                  <ScanDetailsKpi label="Overcount" value={coverage.overcountGuildSnapshotCount} />
+                ) : null}
+                {coverage.unknownGuildSnapshotCount ? (
+                  <ScanDetailsKpi label="Unknown" value={coverage.unknownGuildSnapshotCount} />
+                ) : null}
+              </dl>
+
+              <section className={styles.detailsSection} aria-label="Server-Coverage">
+                <h3>Server</h3>
+                {coverage.byServer.length ? (
+                  <div className={styles.tableWrap}>
+                    <table className={`${styles.table} ${styles.detailsTable}`}>
+                      <thead>
+                        <tr>
+                          <th>Server</th>
+                          <th className={styles.numericCell}>Gilden</th>
+                          <th className={styles.numericCell}>Vollständig</th>
+                          <th className={styles.numericCell}>Guild-Snapshots</th>
+                          <th className={styles.numericCell}>Vollständig</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {coverage.byServer.map((server) => (
+                          <tr key={server.server}>
+                            <td>{server.server}</td>
+                            <td className={styles.numericCell}>{formatCount(server.uniqueGuildCount)}</td>
+                            <td className={styles.numericCell}>{formatCount(server.completeUniqueGuildCount)}</td>
+                            <td className={styles.numericCell}>{formatCount(server.guildSnapshotCount)}</td>
+                            <td className={styles.numericCell}>{formatCount(server.completeGuildSnapshotCount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>Keine Guild-Coverage gefunden.</div>
+                )}
+              </section>
+
+              <section className={styles.detailsSection} aria-label="Guild-Coverage">
+                <h3>Guilds</h3>
+                {data.guildGroups.length ? (
+                  <div className={styles.detailsGuildList}>
+                    {data.guildGroups.map((group) => (
+                      <ScanDetailsGuildRow group={group} key={group.key} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>Keine Guilds mit stabiler Identity gefunden.</div>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScanDetailsKpi({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{formatCount(value)}</dd>
+    </div>
+  );
+}
+
+function ScanDetailsGuildRow({ group }: { group: ScanDetailsGuildGroup }) {
+  const singleRow = group.rows.length === 1 ? group.rows[0] : null;
+
+  if (singleRow) {
+    const status = formatCoverageStatus(singleRow.status);
+    return (
+      <div className={styles.detailsGuildRow}>
+        <div className={styles.detailsGuildName}>
+          <strong>{group.guildName}</strong>
+          <span>{group.guildIdentifier}</span>
+        </div>
+        <span>{group.server}</span>
+        <span>1 Scan</span>
+        <span>{formatCoverageRatio(singleRow)}</span>
+        <span title={status.label}>
+          {status.symbol} {status.label}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <details className={styles.detailsGuildGroup}>
+      <summary className={styles.detailsGuildRow}>
+        <div className={styles.detailsGuildName}>
+          <strong>{group.guildName}</strong>
+          <span>{group.guildIdentifier}</span>
+        </div>
+        <span>{group.server}</span>
+        <span>{formatCount(group.rows.length)} Scans</span>
+        <span>{formatCount(group.completeSnapshotCount)} vollständig</span>
+        <span>{formatGroupStatus(group)}</span>
+      </summary>
+      <div className={styles.detailsGuildSnapshots}>
+        {group.rows.map((row) => {
+          const status = formatCoverageStatus(row.status);
+          return (
+            <div className={styles.detailsGuildSnapshot} key={`${row.snapshotTimestamp}:${row.server}:${row.guildIdentifier}`}>
+              <span>{formatScanDate(new Date(row.snapshotTimestamp).toISOString())}</span>
+              <span>{formatCoverageRatio(row)}</span>
+              <span title={status.label}>
+                {status.symbol} {status.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 

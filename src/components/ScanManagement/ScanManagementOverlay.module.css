@@ -579,12 +579,14 @@
 }
 
 .actionCell {
-  width: 104px;
+  width: 200px;
   text-align: right;
+  vertical-align: middle;
 }
 
 .rowActions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 7px;
 }
@@ -602,6 +604,15 @@
 .iconButtonDanger {
   color: #f6b8ca;
   border-color: rgba(246, 120, 156, 0.32);
+}
+
+.detailsButton {
+  width: auto;
+  min-width: 92px;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .selectionToolbar {
@@ -787,6 +798,186 @@
   transform: translateY(-1px);
 }
 
+.detailsBackdrop {
+  z-index: 2100;
+}
+
+.detailsPanel {
+  position: relative;
+  width: min(1080px, calc(100vw - 32px));
+  height: min(820px, calc(100dvh - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--tile);
+  color: var(--text);
+  box-shadow:
+    0 22px 44px rgba(0, 0, 0, 0.54),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.detailsBody {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 16px 18px 18px;
+}
+
+.detailsMetaGrid,
+.detailsKpiGrid {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.detailsMetaGrid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.detailsKpiGrid {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+
+.detailsMetaGrid div,
+.detailsKpiGrid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.58);
+}
+
+.detailsMetaGrid dt,
+.detailsKpiGrid dt {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.detailsMetaGrid dd,
+.detailsKpiGrid dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailsLoading {
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.72);
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailsLoading svg {
+  animation: scanManagementSpinner 0.9s linear infinite;
+}
+
+.detailsSection {
+  display: grid;
+  gap: 10px;
+}
+
+.detailsSection h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.detailsTable {
+  min-width: 620px;
+}
+
+.detailsGuildList {
+  display: grid;
+  gap: 8px;
+}
+
+.detailsGuildRow {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.35fr) minmax(70px, 0.45fr) minmax(90px, 0.55fr) minmax(110px, 0.65fr) minmax(120px, 0.75fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.58);
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.detailsGuildGroup {
+  min-width: 0;
+}
+
+.detailsGuildGroup > summary {
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.detailsGuildName {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.detailsGuildName strong,
+.detailsGuildName span,
+.detailsGuildRow > span,
+.detailsGuildSnapshot span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailsGuildName strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.detailsGuildName span {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.detailsGuildSnapshots {
+  display: grid;
+  gap: 6px;
+  padding: 7px 0 2px 20px;
+}
+
+.detailsGuildSnapshot {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(90px, 0.5fr) minmax(100px, 0.5fr);
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.54);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 @keyframes scanManagementSpinner {
   to {
     transform: rotate(360deg);
@@ -814,8 +1005,15 @@
     border-radius: 14px;
   }
 
+  .detailsPanel {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+
   .header,
-  .body {
+  .body,
+  .detailsBody {
     padding: 14px;
   }
 
@@ -842,6 +1040,10 @@
     min-width: 680px;
   }
 
+  .detailsGuildList {
+    min-width: 760px;
+  }
+
   .truncate {
     max-width: 180px;
   }
@@ -853,6 +1055,12 @@
   }
 
   .panel {
+    width: calc(100vw - 12px);
+    height: calc(100dvh - 12px);
+    border-radius: 12px;
+  }
+
+  .detailsPanel {
     width: calc(100vw - 12px);
     height: calc(100dvh - 12px);
     border-radius: 12px;

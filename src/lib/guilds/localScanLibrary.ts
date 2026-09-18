@@ -12,6 +12,11 @@ import {
   extractGuildCoaString,
   isValidGuildCoaString,
 } from "./guildCoa";
+import {
+  deriveGuildCoverageForLogicalSnapshots,
+  summarizeGuildCoverage,
+  type GuildCoverageSummary,
+} from "./guildCoverage";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 import { parsers } from "../import/parsers";
 import { parseSfJson } from "../parsing/parseSfJson";
@@ -28,7 +33,7 @@ const STATE_STORE = "state";
 const GUILD_SELECTION_STATE_KEY = "guild-selection";
 const GUILD_HUB_SCANS_MIGRATION_KEY = "migration.guildHubScans";
 const LOCAL_SCAN_LIBRARY_CHANGE_EVENT = "sfdatahub:local-scans-changed";
-export const GUILD_HUB_SCAN_SUMMARY_VERSION = 1;
+export const GUILD_HUB_SCAN_SUMMARY_VERSION = 3;
 
 type JsonRecord = Record<string, unknown>;
 type RawScanRecord = JsonRecord & {
@@ -128,6 +133,7 @@ export type GuildHubScanSummary = {
   groupCount: number;
   guildCount: number;
   guilds: GuildHubLocalGuildIdentity[];
+  guildCoverage: GuildCoverageSummary;
   isMergedBundle?: boolean;
   isScanSlot?: boolean;
   scanSlotStatus?: GuildHubScanSlotStatus;
@@ -1346,6 +1352,7 @@ function parseTimeOrZero(value: string | null | undefined) {
 
 function createGuildHubScanSummary(scan: GuildHubLocalScan): GuildHubScanSummary {
   const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
+  const guildCoverage = summarizeGuildCoverage(deriveGuildCoverageForLogicalSnapshots(snapshots));
   const snapshotTimestamps = snapshots.map((snapshot) => snapshot.timestampMs).filter((value) => Number.isFinite(value));
   const servers = snapshots.length
     ? [...new Set(snapshots.flatMap((snapshot) => snapshot.servers))].sort((a, b) =>
@@ -1382,6 +1389,7 @@ function createGuildHubScanSummary(scan: GuildHubLocalScan): GuildHubScanSummary
     groupCount,
     guildCount,
     guilds: collectGuildIdentitiesForScan(scan),
+    guildCoverage,
     ...(scan.isMergedBundle ? { isMergedBundle: true } : {}),
     ...(scan.isScanSlot ? { isScanSlot: true } : {}),
     ...(scan.scanSlotStatus ? { scanSlotStatus: scan.scanSlotStatus } : {}),
@@ -1403,7 +1411,7 @@ function applyScanMetadataToSummary(summary: GuildHubScanSummary, scan: GuildHub
     importedAtIso: scan.importedAt,
     scannedAt: scan.scannedAt,
     contentHash: scan.contentHash,
-    summaryVersion: GUILD_HUB_SCAN_SUMMARY_VERSION,
+    summaryVersion: isCurrentGuildHubScanSummary(summary) ? GUILD_HUB_SCAN_SUMMARY_VERSION : summary.summaryVersion,
   };
 
   if (scan.updatedAt) next.updatedAtIso = scan.updatedAt;
@@ -1440,7 +1448,15 @@ async function putGuildHubScanSummary(db: IDBPDatabase<LocalScanDb>, scan: Guild
 }
 
 function isCurrentGuildHubScanSummary(summary: GuildHubScanSummary | undefined) {
-  return summary?.summaryVersion === GUILD_HUB_SCAN_SUMMARY_VERSION && typeof summary.contentHash === "string";
+  return (
+    summary?.summaryVersion === GUILD_HUB_SCAN_SUMMARY_VERSION &&
+    typeof summary.contentHash === "string" &&
+    typeof summary.guildCoverage?.completeGuildSnapshotCount === "number" &&
+    typeof summary.guildCoverage.incompleteGuildSnapshotCount === "number" &&
+    typeof summary.guildCoverage.overcountGuildSnapshotCount === "number" &&
+    typeof summary.guildCoverage.unknownGuildSnapshotCount === "number" &&
+    Array.isArray(summary.guildCoverage.byServer)
+  );
 }
 
 export async function ensureGuildHubScanSummaries() {
@@ -1538,10 +1554,13 @@ async function removeGuildHubLocalScanRecords(ids: string[]) {
 
 async function readExistingScanSummaries(db: IDBPDatabase<LocalScanDb>, scans: GuildHubLocalScan[]) {
   return Promise.all(
-    scans.map(async (scan) => ({
-      scan,
-      summary: (await db.get(SCAN_SUMMARY_STORE, scan.id)) ?? createGuildHubScanSummary(scan),
-    })),
+    scans.map(async (scan) => {
+      const summary = await db.get(SCAN_SUMMARY_STORE, scan.id);
+      return {
+        scan,
+        summary: summary && isCurrentGuildHubScanSummary(summary) ? summary : createGuildHubScanSummary(scan),
+      };
+    }),
   );
 }
 
@@ -1674,6 +1693,12 @@ export async function listGuildHubLocalScans() {
   const scans = await db.getAll(SCAN_STORE);
   const normalizedScans = await Promise.all(scans.map((scan) => persistScanNormalizationIfNeeded(db, scan)));
   return normalizedScans.sort(compareScans);
+}
+
+export async function listGuildHubLocalScansReadOnly() {
+  const db = await getLocalScanDbWithoutMigration();
+  const scans = await db.getAll(SCAN_STORE);
+  return scans.map(normalizeStoredScan).sort(compareScans);
 }
 
 export async function getGuildHubLocalScan(id: string) {
@@ -2189,6 +2214,7 @@ export function getSfDataHubScanNormalizedPlayers(scan: SfDataHubLocalScan): Nor
 }
 
 export const listSfDataHubLocalScans = listGuildHubLocalScans;
+export const listSfDataHubLocalScansReadOnly = listGuildHubLocalScansReadOnly;
 export const getSfDataHubLocalScan = getGuildHubLocalScan;
 export const createSfDataHubLocalScanImportPreview = createGuildHubLocalScanImportPreview;
 export const importSfDataHubLocalScan = importGuildHubLocalScan;

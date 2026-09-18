@@ -48,6 +48,24 @@ export default function ScansIndex() {
         </Link>
 
         <Link
+          to="/scans/fusion-identity"
+          style={{
+            display: "block",
+            padding: "14px 16px",
+            background: "var(--tile)",
+            border: "1px solid var(--line)",
+            borderRadius: 12,
+            textDecoration: "none",
+            color: "var(--text)",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "var(--title)" }}>Fusion &amp; Identity</div>
+          <div style={{ opacity: 0.75, marginTop: 4 }}>
+            Server fusion detection and player identity preview
+          </div>
+        </Link>
+
+        <Link
           to="/upload-center"
           style={{
             display: "block",
