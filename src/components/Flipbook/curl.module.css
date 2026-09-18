@@ -24,6 +24,14 @@
   inset: 0;
 }
 
+.htmlSource {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
 /* Klick-Ränder (Heyzine-Feeling) */
 .edge {
   position: absolute;
@@ -136,6 +144,15 @@
   height: 100%;
   object-fit: cover;
   image-rendering: auto;
+}
+
+:global(.stf__page button),
+:global(.stf__page a),
+:global(.stf__page [role="button"]),
+:global(.stf__page input),
+:global(.stf__page select),
+:global(.stf__page textarea) {
+  pointer-events: auto;
 }
 
 :global(.stf__page.is-flipping),

@@ -17,6 +17,12 @@ import {
 import { calculateSfPlayerAttributes } from "./normalizedAttributes";
 import { calculateSfPlayerRunes, type NormalizedPlayerRunes } from "./normalizedRunes";
 import { calculateSfPlayerCombat, type NormalizedPlayerCombat } from "./normalizedCombat";
+import { normalizeSfPlayerFortress, type NormalizedFortress } from "./normalizedFortress";
+import { normalizeSfPlayerProgressionStatus, type NormalizedPlayerProgressionStatus } from "./normalizedProgressionStatus";
+import { normalizeSfPlayerDungeons, type NormalizedDungeons } from "./normalizedDungeons";
+import { normalizeSfPlayerResources, type NormalizedPlayerResources } from "./normalizedResources";
+import { normalizeSfPlayerUnderworld, type NormalizedUnderworld } from "./normalizedUnderworld";
+import { normalizeSfPlayerExtendedValues, type NormalizedExtendedPlayerValues } from "./normalizedExtendedPlayer";
 
 export type NormalizedPlayerFieldStatus = "available" | "missing" | "unsupported" | "invalid";
 export type NormalizedPlayerFieldProvenance = "raw" | "derived" | "calculated";
@@ -68,6 +74,12 @@ export type NormalizedPlayer = {
     luck: NormalizedPlayerAttribute;
   };
   combat: NormalizedPlayerCombat;
+  dungeons: NormalizedDungeons;
+  fortress: NormalizedFortress;
+  resources: NormalizedPlayerResources;
+  underworld: NormalizedUnderworld;
+  progressionStatus: NormalizedPlayerProgressionStatus;
+  extended: NormalizedExtendedPlayerValues;
   items?: NormalizedPlayerItems;
   potions?: NormalizedPotions;
   pets?: NormalizedPets;
@@ -356,6 +368,12 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
   const items = normalizeSfPlayerItems(row, { layout, saveArray, characterClass: classId });
   const potions = normalizeSfPlayerPotions(row, { layout, saveArray });
   const pets = normalizeSfPlayerPets(row, { layout });
+  const dungeons = normalizeSfPlayerDungeons(row, { layout, saveArray });
+  const fortress = normalizeSfPlayerFortress(row, { layout, saveArray });
+  const resources = normalizeSfPlayerResources(row, { layout });
+  const underworld = normalizeSfPlayerUnderworld(row, { layout });
+  const progressionStatus = normalizeSfPlayerProgressionStatus(row, { layout, saveArray });
+  const extended = normalizeSfPlayerExtendedValues(row, { layout, saveArray });
   const attributes = calculateSfPlayerAttributes(rawAttributes, {
     characterClass: classId,
     items,
@@ -390,6 +408,12 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
     progression,
     attributes,
     combat,
+    dungeons,
+    fortress,
+    resources,
+    underworld,
+    progressionStatus,
+    extended,
     ...(items ? { items } : {}),
     ...(potions ? { potions } : {}),
     ...(pets ? { pets } : {}),

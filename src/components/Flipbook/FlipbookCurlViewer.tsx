@@ -15,7 +15,12 @@ type FlipbookManifest = {
 };
 
 type Props = {
-  slug: string;
+  slug?: string;
+  htmlPages?: React.ReactNode[];
+  htmlPagesKey?: string;
+  title?: string;
+  pageWidth?: number;
+  pageHeight?: number;
   initialPage?: number;                         // 1-basiert
   onReady?: (pf: any) => void;             // PageFlip-Instanz herausgeben
   onPageChange?: (page0: number) => void;       // 0-basiert (Parent macht +1)
@@ -54,12 +59,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 type FlipbookSingleton = {
   hostEl: HTMLDivElement | null;
   pf: PageFlip | null;
-  slug: string | null;
+  key: string | null;
 };
 const singleton: FlipbookSingleton = {
   hostEl: null,
   pf: null,
-  slug: null,
+  key: null,
 };
 
 /* ========================================================================== */
@@ -117,6 +122,11 @@ function pumpQueue() {
 /* ========================================================================== */
 const FlipbookCurlViewerInner: React.FC<Props> = ({
   slug,
+  htmlPages,
+  htmlPagesKey,
+  title,
+  pageWidth = 900,
+  pageHeight = 1200,
   initialPage = 1,
   onReady,
   onPageChange,
@@ -124,9 +134,13 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
 }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const htmlSourceRef = useRef<HTMLDivElement | null>(null);
 
   const [manifest, setManifest] = useState<FlipbookManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isHtmlMode = Boolean(htmlPages?.length);
+  const pageCount = isHtmlMode ? htmlPages!.length : (manifest?.pageCount ?? 0);
+  const bookTitle = isHtmlMode ? (title ?? "Flipbook") : (manifest?.title ?? "");
 
   // Props via Refs – keine Re-Init bei Referenzwechsel
   const readyRef = useRef<Props["onReady"]>();
@@ -136,7 +150,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   useEffect(() => { pageChangeRef.current = onPageChange; }, [onPageChange]);
   useEffect(() => { initialPageRef.current = initialPage; }, [initialPage]);
 
-  const basePath = useMemo(() => joinBase(`flipbooks/${slug}`), [slug]);
+  const basePath = useMemo(() => (slug ? joinBase(`flipbooks/${slug}`) : ""), [slug]);
 
   const pickBestSrc = useCallback(
     (p: PageEntry): string => {
@@ -156,19 +170,34 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
 
   // Manifest laden bei Slug-Wechsel
   useEffect(() => {
+    if (isHtmlMode) {
+      setError(null);
+      setManifest(null);
+      return;
+    }
+    if (!slug) {
+      setError("Missing flipbook slug.");
+      setManifest(null);
+      return;
+    }
     let live = true;
     setError(null);
     fetchManifest(slug)
       .then((m) => { if (live) setManifest(m); })
       .catch((e) => { if (live) setError(e.message || "Failed to load flipbook manifest."); });
     return () => { live = false; };
-  }, [slug]);
+  }, [isHtmlMode, slug]);
 
   // Host-Element erstellen/anhängen UND initialisieren – alles in EINEM Effekt
   useEffect(() => {
     const stage = stageRef.current;
     const wrap = wrapRef.current;
-    if (!stage || !wrap || !manifest) return;
+    const htmlSource = htmlSourceRef.current;
+    const activeManifest = isHtmlMode
+      ? ({ title: title ?? "Flipbook", pageCount: htmlPages?.length ?? 0, pageWidth, pageHeight, pages: [] } as FlipbookManifest)
+      : manifest;
+    if (!stage || !wrap || !activeManifest) return;
+    if (isHtmlMode && (!htmlSource || !htmlPages?.length)) return;
 
     // Host sicherstellen
     if (!singleton.hostEl) {
@@ -181,7 +210,10 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     }
     if (!singleton.hostEl.isConnected) return;
 
-    const needsNew = !singleton.pf || singleton.slug !== slug;
+    const bookKey = isHtmlMode
+      ? `html:${htmlPagesKey ?? activeManifest.title}:${activeManifest.pageCount}:${activeManifest.pageWidth}x${activeManifest.pageHeight}`
+      : `image:${slug}`;
+    const needsNew = !singleton.pf || singleton.key !== bookKey;
 
     if (!needsNew) {
       try { singleton.pf!.update(); } catch {}
@@ -192,11 +224,18 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     if (singleton.pf) {
       try { singleton.pf.destroy(); } catch {}
       singleton.pf = null;
+      singleton.hostEl = null;
+    }
+
+    if (!singleton.hostEl) {
+      singleton.hostEl = document.createElement("div");
+      singleton.hostEl.className = styles.host;
+      stage.appendChild(singleton.hostEl);
     }
 
     const opts = {
-      width: manifest.pageWidth,
-      height: manifest.pageHeight,
+      width: activeManifest.pageWidth,
+      height: activeManifest.pageHeight,
       size: "stretch" as any,
       maxShadowOpacity: 0.25,
       showCover: false,
@@ -212,23 +251,31 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
 
     const pf = new PageFlip(singleton.hostEl, opts as any);
     singleton.pf = pf;
-    singleton.slug = slug;
+    singleton.key = bookKey;
 
-    const imageUrls = manifest.pages.map(pickBestSrc);
-    pf.loadFromImages(imageUrls);
+    if (isHtmlMode) {
+      const htmlNodes = Array.from(htmlSource!.children).filter(
+        (node): node is HTMLElement => node instanceof HTMLElement
+      );
+      pf.loadFromHTML(htmlNodes);
+    } else {
+      const imageUrls = activeManifest.pages.map(pickBestSrc);
+      pf.loadFromImages(imageUrls);
+    }
 
     // === Preload-Helper für "nächste Doppelseite" ============================
     const preloadNextSpread = (page0: number) => {
+      if (isHtmlMode) return;
       const want: string[] = [];
       const i1 = page0 + 1;
       const i2 = page0 + 2;
-      if (manifest.pages[i1]) want.push(pickBestSrc(manifest.pages[i1]));
-      if (manifest.pages[i2]) want.push(pickBestSrc(manifest.pages[i2]));
+      if (activeManifest.pages[i1]) want.push(pickBestSrc(activeManifest.pages[i1]));
+      if (activeManifest.pages[i2]) want.push(pickBestSrc(activeManifest.pages[i2]));
       enqueuePreload(want);
     };
 
     const onInit = () => {
-      const p0 = clamp(initialPageRef.current, 1, manifest.pageCount) - 1;
+      const p0 = clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
       pf.turnToPage(p0, "hard");
       // Preload leicht verzögert starten (nach erster Darstellung)
       setTimeout(() => preloadNextSpread(p0), 220);
@@ -260,7 +307,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
     };
-  }, [manifest, pickBestSrc, slug]);
+  }, [htmlPages, htmlPagesKey, isHtmlMode, manifest, pageHeight, pageWidth, pickBestSrc, slug, title]);
 
   const flipPrev = () => singleton.pf?.flipPrev();
   const flipNext = () => singleton.pf?.flipNext();
@@ -273,20 +320,26 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   };
 
   if (error) return <div className={styles.errorBox}>Flipbook konnte nicht geladen werden: {error}</div>;
-  if (!manifest) return <div className={styles.errorBox}>Lade Flipbook…</div>;
+  if (!isHtmlMode && !manifest) return <div className={styles.errorBox}>Lade Flipbook…</div>;
+  if (isHtmlMode && !htmlPages?.length) return <div className={styles.errorBox}>Keine Flipbook-Seiten vorhanden.</div>;
 
   return (
-    <div className={styles.viewerRoot} ref={wrapRef} aria-label={manifest.title}>
+    <div className={styles.viewerRoot} ref={wrapRef} aria-label={bookTitle}>
       <div className={styles.stage} ref={stageRef}>
         {/* Host wird hier per Effekt eingehängt */}
+        {isHtmlMode && (
+          <div className={styles.htmlSource} ref={htmlSourceRef} aria-hidden>
+            {htmlPages}
+          </div>
+        )}
       </div>
 
       <div className={styles.hud}>
         <button className={styles.hBtn} onClick={flipPrev} aria-label="Zurück">‹</button>
         <div className={styles.hText}>
-          <span className={styles.title}>{manifest.title}</span>
+          <span className={styles.title}>{bookTitle}</span>
           <span className={styles.sep}>·</span>
-          <span>{manifest.pageCount} Seiten</span>
+          <span>{pageCount} Seiten</span>
         </div>
         <div className={styles.spacer} />
         {supportsFullscreen() && (

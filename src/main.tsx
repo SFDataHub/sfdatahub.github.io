@@ -24,6 +24,7 @@ import Discover from "./pages/Discover/Index";
 import SFMagazineIndex from "./pages/SFMagazine";
 // SF Magazin
 import HistoryBookPage from "./pages/SFMagazine/HistoryBook";
+import DungeonLibraryPage from "./pages/DungeonLibrary";
 
 import HelpPage from "./pages/Help/HelpPage";
 
@@ -273,6 +274,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* SF Magazine */}
                 <Route path="/sfmagazine" element={<SFMagazineIndex />} />
                 <Route path="/sfmagazine/historybook" element={<HistoryBookPage />} />
+                <Route path="/dungeons/library" element={<DungeonLibraryPage />} />
 
                 {/* Help (public) */}
                 <Route path="/help" element={<HelpPage />} />
