@@ -27,6 +27,7 @@ import type {
   SfJsonResources,
   SfJsonScrapbook,
   SfJsonShopItems,
+  SfJsonToilet,
   SfJsonUnderworld,
   SfJsonUnits,
   SfJsonWitch,
@@ -620,6 +621,18 @@ const parseUnits = (value: unknown): SfJsonUnits | undefined => {
   };
 };
 
+const parseToilet = (value: unknown): SfJsonToilet | undefined => {
+  const values = asNumberArray(value);
+  if (!values || values.length === 0) return undefined;
+
+  return {
+    values,
+    aura: toFiniteNumberOrNull(values[0]),
+    fill: toFiniteNumberOrNull(values[1]),
+    capacity: toFiniteNumberOrNull(values[3]),
+  };
+};
+
 const parseWitch = (
   value: unknown,
   offsetValue: unknown,
@@ -714,6 +727,7 @@ const parseDungeons = (value: unknown): SfJsonDungeons | undefined => {
   const legacy = createLegacyDungeonSource(raw);
   const light = asNumberArray(raw.light);
   const shadow = asNumberArray(raw.shadow);
+  const classDungeons = asNumberArray(raw.class);
 
   if (light && shadow) {
     const normalizedNormal: number[] = [];
@@ -728,6 +742,7 @@ const parseDungeons = (value: unknown): SfJsonDungeons | undefined => {
       source: "modern",
       normal: normalizedNormal,
       shadow: normalizedShadow,
+      class: classDungeons?.slice(0, 5) ?? [],
       group: legacy.group || 0,
       player: toFiniteNumberWithFallback(light[17], DUNGEON_LOCKED),
       tower: toFiniteNumberWithFallback(light[14], DUNGEON_OPEN),
@@ -767,6 +782,7 @@ const parseDungeons = (value: unknown): SfJsonDungeons | undefined => {
     source: "legacy",
     normal: normalizedNormal,
     shadow: normalizedShadow,
+    class: [],
     group: legacy.group || 0,
     player: legacy.player || 0,
     tower: legacy.tower || 0,
@@ -937,6 +953,7 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
   const achievements = parseAchievements(raw.achievements);
   const calendar = parseCalendar(raw.calendar);
   const units = parseUnits(raw.units);
+  const toilet = parseToilet(raw.toilet);
   const witch = parseWitch(raw.witch, raw.offset);
   const timestamp = parseFiniteNumber(raw.timestamp);
   const fortressRank = parseFiniteNumber(raw.fortressrank);
@@ -978,6 +995,7 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
     ...(achievements ? { achievements } : {}),
     ...(calendar ? { calendar } : {}),
     ...(units ? { units } : {}),
+    ...(toilet ? { toilet } : {}),
     ...(witch ? { witch } : {}),
     ...(timestamp != null ? { timestamp } : {}),
     ...(fortressRank != null ? { fortressRank } : {}),

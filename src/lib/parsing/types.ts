@@ -21,6 +21,7 @@ export type SfJsonDungeons = {
   source: "modern" | "legacy";
   normal: number[];
   shadow: number[];
+  class: number[];
   group: number;
   player: number;
   tower: number;
@@ -243,6 +244,13 @@ export type SfJsonUnits = {
   archers: number | null;
 };
 
+export type SfJsonToilet = {
+  values: number[];
+  aura: number | null;
+  fill: number | null;
+  capacity: number | null;
+};
+
 export type SfJsonWitchScroll = {
   index: number;
   picIndex: number | null;
@@ -310,6 +318,7 @@ export type SfJsonOwnPlayer = {
   achievements?: SfJsonAchievements;
   calendar?: SfJsonCalendar;
   units?: SfJsonUnits;
+  toilet?: SfJsonToilet;
   witch?: SfJsonWitch;
   timestamp?: number;
   fortressRank?: number;
