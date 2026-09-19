@@ -40,10 +40,10 @@ const COVER_PAGE_COUNT = 2;
 const OPENING_FRONTMATTER_PAGE_COUNT = 5;
 const CONTENT_PAGE_OFFSET = COVER_PAGE_COUNT + OPENING_FRONTMATTER_PAGE_COUNT;
 const OPENING_FRONTMATTER_PAGES = Array.from({ length: OPENING_FRONTMATTER_PAGE_COUNT }, (_, index) => index);
-const OPENING_FLIP_START_DELAY = 760;
-const OPENING_FLIP_INTERVAL = 380;
-const OPENING_DURATION_MS = 2580;
-const OPENING_FLIPPING_TIME = 360;
+const OPENING_FLIP_START_DELAY = 900;
+const OPENING_FLIP_INTERVAL = 760;
+const OPENING_DURATION_MS = 4200;
+const OPENING_FLIPPING_TIME = 560;
 const PAGE_ASPECT = 1200 / 900;
 
 const prefersReducedMotion = () =>
@@ -120,7 +120,7 @@ export default function DungeonLibraryPage() {
     pf.turnToPage(0, "hard");
     openingTimersRef.current.push(window.setTimeout(() => {
       setCoverCentered(false);
-    }, Math.max(0, OPENING_FLIP_START_DELAY - 180)));
+    }, Math.max(0, OPENING_FLIP_START_DELAY - 80)));
 
     const orientation = pf.getOrientation?.();
     const flipCount = orientation === "portrait"
@@ -221,6 +221,7 @@ export default function DungeonLibraryPage() {
 
     const coverPages = [
       <section className="dungeon-book-cover-page dungeon-book-front-cover" data-density="hard" key="front-cover">
+        <span className="dungeon-book-cover-inner-material" aria-hidden />
         <span className="dungeon-book-cover-spine" />
         <span className="dungeon-book-cover-title">{classWorld.title}</span>
         <span className="dungeon-book-cover-subtitle">5 Dungeons</span>
@@ -329,6 +330,7 @@ export default function DungeonLibraryPage() {
   }, [goToPage, pagePlan]);
 
   const opened = state !== "library";
+  const bookVisualState = state === "reading" ? "reading" : coverCentered ? "cover" : "opening";
   const bookStageStyle = bookGeometry
     ? {
         ...(() => {
@@ -407,6 +409,7 @@ export default function DungeonLibraryPage() {
                     showCover
                     enableKeyboard={state === "reading"}
                     visualMode="book"
+                    visualState={bookVisualState}
                     flippingTime={OPENING_FLIPPING_TIME}
                     syncPageIndex={state === "reading" ? CONTENT_PAGE_OFFSET : null}
                     onReady={handleReady}

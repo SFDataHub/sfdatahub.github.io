@@ -47,6 +47,12 @@ export type NormalizedPlayerAttribute = {
   total: number | null;
 };
 
+export type NormalizedPlayerGuildReference = {
+  identifier: string | null;
+  name: string | null;
+  server: string | null;
+};
+
 export type NormalizedPlayer = {
   identity: {
     id: number | null;
@@ -59,6 +65,7 @@ export type NormalizedPlayer = {
     gender: "male" | "female" | null;
     own: boolean;
   };
+  guild: NormalizedPlayerGuildReference;
   progression: {
     level: number | null;
     xp: number | null;
@@ -128,6 +135,11 @@ const parsePlayerIdFromIdentifier = (identifier: string | null): number | null =
   if (!match) return null;
   const parsed = Number.parseInt(match[1], 10);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseServerFromGuildIdentifier = (identifier: string | null): string | null => {
+  const match = String(identifier ?? "").trim().match(/^(.+)_g\d+$/i);
+  return match?.[1] ? match[1] : null;
 };
 
 const createEmptyAttributes = (): NormalizedPlayer["attributes"] => ({
@@ -302,6 +314,9 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
   const directIdentifier = toTrimmedString(row.identifier);
   const directName = toTrimmedString(row.name);
   const prefix = toTrimmedString(row.prefix);
+  const guildIdentifier = toTrimmedString(row.guildIdentifier ?? row["Guild Identifier"] ?? row.groupIdentifier ?? row["Group Identifier"]);
+  const guildName = toTrimmedString(row.guildName ?? row["Guild Name"] ?? row.groupName ?? row.groupname ?? row.group ?? row.Group);
+  const guildServer = parseServerFromGuildIdentifier(guildIdentifier) ?? prefix;
   const directOwn = toFiniteNumberOrNull(row.own);
   const saveId = indexes ? readField(saveArray, indexes.id, "identity.id", fields) : null;
   const identifier = directIdentifier ?? (prefix && saveId != null ? `${prefix}_p${saveId}` : null);
@@ -319,6 +334,9 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
   markStringField(prefix, "identity.server", fields);
   if (prefix != null) mark(fields, "identity.prefix", "available", "raw");
   else mark(fields, "identity.prefix", "missing");
+  markStringField(guildIdentifier, "guild.identifier", fields);
+  markStringField(guildName, "guild.name", fields);
+  markStringField(guildServer, "guild.server", fields);
 
   const classId = indexes ? readField(saveArray, indexes.class, "identity.class", fields, lowerShortReader) : null;
   const race = indexes ? readField(saveArray, indexes.race, "identity.race", fields, lowerShortReader) : null;
@@ -404,6 +422,11 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
       race,
       gender,
       own: directOwn === 1,
+    },
+    guild: {
+      identifier: guildIdentifier,
+      name: guildName,
+      server: guildServer,
     },
     progression,
     attributes,

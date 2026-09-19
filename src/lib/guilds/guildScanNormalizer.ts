@@ -1,6 +1,6 @@
 import { slimPlayer } from "../import/parsers";
 import { parseSaveStringToArray } from "../parsing/extractPortrait";
-import { readSfPlayerStats } from "../parsing";
+import { readSfPlayerStats } from "../parsing/parseSfJson";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 
 export const GUILD_SCAN_NORMALIZER_VERSION = 9;

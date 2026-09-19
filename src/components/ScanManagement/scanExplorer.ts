@@ -1,5 +1,13 @@
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 import {
+  createNormalizedGuildIndexes,
+  linkNormalizedPlayerToGuildMember,
+  normalizeSfGuild,
+  type NormalizedGuild,
+  type NormalizedGuildIndexes,
+  type NormalizedPlayerGuildMemberLink,
+} from "../../lib/parsing/normalizedGuild";
+import {
   detectSfPlayerSaveLayout,
   readSfPlayerSaveArray,
   readSfSaveLowerShort,
@@ -17,6 +25,7 @@ import {
   type GuildSnapshotCoverage,
   type GuildSnapshotCoverageStatus,
 } from "../../lib/guilds/guildCoverage";
+import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../../lib/guilds/guildScanNormalizer";
 
 export const SCAN_EXPLORER_MAX_VISIBLE_RESULTS = 100;
 
@@ -50,6 +59,7 @@ export type ScanExplorerGuildEntity = {
   kind: "guild";
   key: string;
   group: ScanExplorerGuildGroup;
+  normalizedGuildKey: string | null;
   searchText: string;
 };
 
@@ -65,6 +75,9 @@ export type ScanExplorerData = {
   playerLookup: Map<string, ScanExplorerPlayerEntity>;
   guilds: ScanExplorerGuildEntity[];
   guildLookup: Map<string, ScanExplorerGuildEntity>;
+  normalizedGuilds: NormalizedGuild[];
+  normalizedGuildLookup: Map<string, NormalizedGuild>;
+  guildIndexes: NormalizedGuildIndexes;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -98,6 +111,22 @@ const pickString = (record: Record<string, unknown> | null, keys: string[]): str
 
 function getCoverageUniqueKey(row: Pick<GuildSnapshotCoverage, "server" | "guildIdentifier">) {
   return `${row.server.toLowerCase()}::${row.guildIdentifier.toLowerCase()}`;
+}
+
+function getNormalizedGuildKey(guild: NormalizedGuild) {
+  const server = normalizeGuildScanServer(guild.identity.server);
+  const segment = normalizeGuildSegmentForScan(guild.identity.identifier ?? guild.identity.id);
+  return server && segment ? `${server.toLowerCase()}::${segment.toLowerCase()}` : null;
+}
+
+function getRawScanDerivedGuildCoa(scan: GuildHubLocalScan): Record<string, string> | null {
+  const rootRecord = scan as unknown as Record<string, unknown>;
+  const rawRecord = asRecord(scan.rawData);
+  return (
+    (asRecord(rootRecord.derivedGuildCoa)?.guildCoaByIdentifier as Record<string, string> | undefined) ??
+    (asRecord(rawRecord?.derivedGuildCoa)?.guildCoaByIdentifier as Record<string, string> | undefined) ??
+    null
+  );
 }
 
 export function formatCoverageStatus(status: GuildSnapshotCoverageStatus) {
@@ -231,6 +260,25 @@ export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData
   const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
   const coverageRows = deriveGuildCoverageForLogicalSnapshots(snapshots);
   const guildGroups = groupGuildCoverageRows(coverageRows);
+  const derivedGuildCoaByIdentifier = getRawScanDerivedGuildCoa(scan);
+  const normalizedGuildLookup = new Map<string, NormalizedGuild>();
+  const normalizedGuilds: NormalizedGuild[] = [];
+
+  for (const snapshot of snapshots) {
+    for (const group of snapshot.groups) {
+      const normalizedGuild = normalizeSfGuild(group, {
+        fallbackServer: snapshot.servers[0] ?? null,
+        derivedGuildCoaByIdentifier,
+      });
+      if (!normalizedGuild) continue;
+      const key = getNormalizedGuildKey(normalizedGuild);
+      if (!key || normalizedGuildLookup.has(key)) continue;
+      normalizedGuildLookup.set(key, normalizedGuild);
+      normalizedGuilds.push(normalizedGuild);
+    }
+  }
+
+  const guildIndexes = createNormalizedGuildIndexes(normalizedGuilds);
   const players = snapshots.flatMap((snapshot) =>
     snapshot.players
       .map((player, index) => createPlayerEntity(player, snapshot, index))
@@ -240,6 +288,7 @@ export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData
     kind: "guild",
     key: `guild::${group.key}`,
     group,
+    normalizedGuildKey: normalizedGuildLookup.has(group.key) ? group.key : null,
     searchText: [group.guildName, group.guildIdentifier, group.server].filter(Boolean).join(" ").toLowerCase(),
   }));
 
@@ -256,6 +305,9 @@ export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData
     playerLookup,
     guilds,
     guildLookup,
+    normalizedGuilds,
+    normalizedGuildLookup,
+    guildIndexes,
   };
 }
 
@@ -264,6 +316,17 @@ export function normalizeScanExplorerPlayer(
   normalizer: ScanExplorerPlayerNormalizer = normalizeSfPlayerCharacterCore,
 ): NormalizedPlayer {
   return normalizer(player.raw);
+}
+
+export function getScanExplorerGuildDetail(data: ScanExplorerData, guild: ScanExplorerGuildEntity): NormalizedGuild | null {
+  return guild.normalizedGuildKey ? data.normalizedGuildLookup.get(guild.normalizedGuildKey) ?? null : null;
+}
+
+export function linkScanExplorerPlayerToGuildMember(
+  data: ScanExplorerData,
+  player: NormalizedPlayer,
+): NormalizedPlayerGuildMemberLink {
+  return linkNormalizedPlayerToGuildMember(player, data.guildIndexes);
 }
 
 export function filterScanExplorerEntities(

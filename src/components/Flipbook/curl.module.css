@@ -34,33 +34,110 @@
 .bookMode .stage::after {
   content: "";
   position: absolute;
-  inset: -10px -14px -12px;
+  inset: -12px -17px -15px;
   z-index: 0;
   pointer-events: none;
-  border-radius: 22px;
+  border-radius: 8px 8px 7px 7px / 10px 10px 12px 12px;
+  clip-path: polygon(
+    0.15% 2%,
+    1.2% 1.25%,
+    4% 0.95%,
+    9% 0.78%,
+    16% 0.84%,
+    25% 1.02%,
+    34% 1.18%,
+    41% 1.38%,
+    46% 1.78%,
+    48.5% 2.45%,
+    50% 3.22%,
+    51.5% 2.45%,
+    54% 1.78%,
+    59% 1.38%,
+    66% 1.18%,
+    75% 1.02%,
+    84% 0.84%,
+    91% 0.78%,
+    96% 0.95%,
+    98.8% 1.25%,
+    99.85% 2%,
+    99.85% 97.55%,
+    98.8% 98.55%,
+    96% 98.95%,
+    91% 99.18%,
+    84% 99.12%,
+    75% 98.94%,
+    66% 98.82%,
+    59% 98.58%,
+    54% 98.15%,
+    51.5% 97.45%,
+    50% 96.68%,
+    48.5% 97.45%,
+    46% 98.15%,
+    41% 98.58%,
+    34% 98.82%,
+    25% 98.94%,
+    16% 99.12%,
+    9% 99.18%,
+    4% 98.95%,
+    1.2% 98.55%,
+    0.15% 97.55%
+  );
   background:
-    linear-gradient(90deg, rgba(31, 19, 11, 0.45), rgba(31, 19, 11, 0.08) 2%, transparent 7%, transparent 93%, rgba(31, 19, 11, 0.12)),
-    linear-gradient(180deg, rgba(255, 247, 222, 0.2), transparent 13%, transparent 88%, rgba(67, 43, 22, 0.2));
+    radial-gradient(ellipse at 50% 0%, rgba(255, 249, 228, 0.26), transparent 58%),
+    radial-gradient(ellipse at 50% 100%, rgba(78, 47, 21, 0.15), transparent 62%),
+    linear-gradient(90deg, rgba(31, 19, 11, 0.26), rgba(31, 19, 11, 0.06) 4%, transparent 12%, transparent 88%, rgba(31, 19, 11, 0.08)),
+    linear-gradient(180deg, rgba(255, 247, 222, 0.2), transparent 16%, transparent 84%, rgba(67, 43, 22, 0.16));
   box-shadow:
-    0 30px 58px rgba(2, 5, 10, 0.42),
-    0 10px 18px rgba(38, 25, 13, 0.24);
+    0 34px 70px rgba(2, 5, 10, 0.34),
+    0 12px 26px rgba(38, 25, 13, 0.16);
+  opacity: 0;
+  transform: translateZ(0);
+  transition: opacity 240ms ease, transform 520ms cubic-bezier(0.2, 0.74, 0.25, 1);
 }
 
 .bookMode .stage::before {
   content: "";
   position: absolute;
   z-index: 4;
-  top: -7px;
-  bottom: -7px;
+  top: -5px;
+  bottom: -5px;
   left: 50%;
-  width: 34px;
+  width: 24px;
   transform: translateX(-50%);
   pointer-events: none;
   background:
-    linear-gradient(90deg, transparent, rgba(51, 31, 16, 0.24) 33%, rgba(255, 247, 220, 0.18) 50%, rgba(50, 30, 15, 0.28) 68%, transparent),
-    radial-gradient(ellipse at center, rgba(25, 14, 6, 0.22), transparent 68%);
-  opacity: 0.86;
+    linear-gradient(90deg, transparent, rgba(59, 35, 17, 0.13) 28%, rgba(255, 248, 224, 0.12) 50%, rgba(55, 32, 16, 0.15) 72%, transparent),
+    radial-gradient(ellipse at center, rgba(34, 20, 9, 0.13), transparent 74%);
+  opacity: 0;
   mix-blend-mode: multiply;
+  transition: opacity 220ms ease;
+}
+
+.bookCoverState .stage::after,
+.bookCoverState .stage::before {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+.bookOpeningState .stage::after {
+  opacity: 0;
+  transform: translateY(2px) scaleX(0.99);
+  transition-delay: 0ms;
+}
+
+.bookOpeningState .stage::before {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+.bookReadingState .stage::after {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+.bookReadingState .stage::before {
+  opacity: 0;
+  transition-delay: 0ms;
 }
 
 /* PageFlip host */
@@ -72,6 +149,97 @@
 .bookMode .host {
   z-index: 1;
   overflow: visible;
+}
+
+.bookMode.bookFlippingState .host {
+  z-index: 5;
+}
+
+.bookMode.bookFlippingState .stage::before {
+  opacity: 0;
+}
+
+.bookMode :global(.stf__page),
+.bookMode :global(.page-flip__page),
+.bookMode :global(.stf__item) {
+  overflow: hidden !important;
+}
+
+.bookMode :global(.stf__item) {
+  background-color: #f5e6bd;
+  opacity: 1 !important;
+  mix-blend-mode: normal;
+}
+
+.bookMode :global(.stf__item[class~="--hard"].dungeon-book-front-cover) {
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform-style: preserve-3d;
+}
+
+.bookMode :global(.stf__page[class~="--left"]),
+.bookMode :global(.stf__page[class~="-left"]),
+.bookMode :global(.stf__page.left),
+.bookMode :global(.stf__item[class~="--left"]) {
+  border-radius: 8px 4px 5px 7px / 9px 4px 6px 10px;
+}
+
+.bookMode :global(.stf__page[class~="--right"]),
+.bookMode :global(.stf__page[class~="-right"]),
+.bookMode :global(.stf__page.right),
+.bookMode :global(.stf__item[class~="--right"]) {
+  border-radius: 4px 8px 7px 5px / 4px 9px 10px 6px;
+}
+
+.bookMode :global(.stf__outerShadow),
+.bookMode :global(.stf__innerShadow) {
+  opacity: 0.74;
+}
+
+.bookMode :global(.stf__hardShadow),
+.bookMode :global(.stf__hardInnerShadow) {
+  opacity: 0.56;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple)) {
+  background-color: #f5e6bd !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-front-cover),
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-inside-cover) {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.24), rgba(255, 226, 166, 0.08) 18%, rgba(255, 255, 255, 0.07) 66%, rgba(0, 0, 0, 0.2)),
+    linear-gradient(145deg, #6f2237 0%, #943855 46%, #263d64 100%) !important;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-page)::before,
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).opening-paper-page)::before,
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-inside-cover)::before {
+  opacity: 0.36;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-page)::after,
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).opening-paper-page)::after,
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-inside-cover)::after {
+  opacity: 0.18;
+  box-shadow: none;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-front-cover)::before {
+  opacity: 0.54;
+  box-shadow: none;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple).dungeon-book-front-cover)::after {
+  opacity: 0.24;
+  box-shadow: none;
+}
+
+.bookMode.bookFlippingState :global(.stf__item:not(.--simple) .opening-paper-warmth) {
+  opacity: 0.32;
 }
 
 .htmlSource {
@@ -172,6 +340,53 @@
 @media (min-width: 1280px) {
   .stage { min-height: 620px; }
   .bookMode .stage { min-height: 0; }
+}
+
+@media (max-width: 760px) {
+  .bookMode .stage::after {
+    inset: -8px -10px -10px;
+    border-radius: 7px / 9px;
+    clip-path: polygon(
+      0.25% 2.35%,
+      2% 1.35%,
+      8% 1%,
+      18% 0.98%,
+      32% 1.16%,
+      43% 1.35%,
+      48% 1.92%,
+      50% 2.7%,
+      52% 1.92%,
+      57% 1.35%,
+      68% 1.16%,
+      82% 0.98%,
+      92% 1%,
+      98% 1.35%,
+      99.75% 2.35%,
+      99.75% 97.5%,
+      98% 98.55%,
+      92% 98.98%,
+      82% 99.02%,
+      68% 98.84%,
+      57% 98.62%,
+      52% 98.05%,
+      50% 97.3%,
+      48% 98.05%,
+      43% 98.62%,
+      32% 98.84%,
+      18% 99.02%,
+      8% 98.98%,
+      2% 98.55%,
+      0.25% 97.5%
+    );
+    box-shadow:
+      0 26px 54px rgba(2, 5, 10, 0.3),
+      0 10px 20px rgba(38, 25, 13, 0.12);
+  }
+
+  .bookMode .stage::before {
+    width: 18px;
+    opacity: 0;
+  }
 }
 
 /* --- HistoryBook overrides: Edge-Buttons nicht in den Gutter ragen ---

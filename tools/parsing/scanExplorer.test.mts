@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   buildScanExplorerData,
   filterScanExplorerEntities,
+  getScanExplorerGuildDetail,
   getLimitedScanExplorerResults,
+  linkScanExplorerPlayerToGuildMember,
   normalizeScanExplorerPlayer,
   SCAN_EXPLORER_MAX_VISIBLE_RESULTS,
 } from "../../src/components/ScanManagement/scanExplorer.ts";
@@ -25,6 +27,38 @@ const buildSave = (id: number, level: number, characterClass: number) => {
   save[20] = characterClass;
   save[21] = 3;
   save[29] = timestamp + daySeconds;
+  return save;
+};
+
+const buildGuildSave = () => {
+  const save = Array.from({ length: 502 }, () => 0);
+  save[0] = 42;
+  save[13] = 12_345;
+  save[370] = 19;
+  save[371] = 4;
+  save[377] = 1;
+  save[378] = 10;
+  save[379] = 2;
+  save[380] = 5;
+
+  save[14] = 1001;
+  save[64] = 1_603;
+  save[114] = 11;
+  save[214] = 47;
+  save[264] = 48;
+  save[314] = 1;
+  save[390] = 7;
+  save[445] = 111;
+
+  save[15] = 1002;
+  save[65] = 2_511;
+  save[115] = 12;
+  save[215] = 11;
+  save[265] = 12;
+  save[315] = 3;
+  save[391] = 1;
+  save[446] = 10;
+
   return save;
 };
 
@@ -79,6 +113,9 @@ const scan: SfDataHubLocalScan = {
         prefix: "f28",
         name: "Welten im Wandel",
         memberCount: 2,
+        save: buildGuildSave(),
+        names: ["Darth Monk", "Arc Mage"],
+        knights: [9, 3],
       },
     ],
   },
@@ -91,6 +128,8 @@ assert.equal(JSON.stringify(scan.rawData), before, "scan explorer must not mutat
 assert.equal(data.snapshots.length, 1);
 assert.equal(data.players.length, 2);
 assert.equal(data.guilds.length, 1);
+assert.equal(data.normalizedGuilds.length, 1);
+assert.equal(data.guildIndexes.memberTargetsByPlayerIdentifier.size, 2);
 
 const [firstPlayer] = data.players;
 assert.equal(firstPlayer.name, "Darth Monk");
@@ -101,6 +140,7 @@ assert.equal("normalized" in firstPlayer, false, "scan explorer list entities mu
 
 const firstNormalizedPlayer = normalizeScanExplorerPlayer(firstPlayer);
 assert.equal(firstNormalizedPlayer.identity.class, 7);
+assert.equal(firstNormalizedPlayer.guild.identifier, "f28_g42");
 assert.equal(firstNormalizedPlayer.progression.level, 603);
 assert.equal(firstNormalizedPlayer.progressionStatus.mount.expiresAt, (timestamp + daySeconds) * 1000);
 assert.equal(firstNormalizedPlayer.potions?.slots[0]?.expires, (timestamp + daySeconds * 2) * 1000);
@@ -119,6 +159,59 @@ assert.equal(guild.group.server, "F28");
 assert.equal(guild.group.rows[0].declaredMemberCount, 2);
 assert.equal(guild.group.rows[0].countedMemberCount, 2);
 assert.equal(guild.group.rows[0].complete, true);
+assert.equal("normalized" in guild, false, "scan explorer guild list entities must stay lightweight");
+
+const detailedGuild = getScanExplorerGuildDetail(data, guild);
+assert.ok(detailedGuild);
+assert.equal(detailedGuild.identity.identifier, "f28_g42");
+assert.equal(detailedGuild.progression.honor, 12_345);
+assert.equal(detailedGuild.members.length, 2);
+
+const firstPlayerGuildLink = linkScanExplorerPlayerToGuildMember(data, firstNormalizedPlayer);
+assert.equal(firstPlayerGuildLink.linked, true);
+assert.equal(firstPlayerGuildLink.guildMember?.identity.playerIdentifier, "f28_p1001");
+assert.equal(firstPlayerGuildLink.guildBonuses.treasure, 47);
+assert.equal(firstPlayerGuildLink.guildBonuses.instructor, 48);
+assert.equal(firstPlayerGuildLink.guildBonuses.pet, 7);
+assert.equal(firstPlayerGuildLink.role, "leader");
+assert.equal(firstPlayerGuildLink.knightsContribution, 9);
+assert.notEqual(firstNormalizedPlayer.fortress.knights, firstPlayerGuildLink.knightsContribution);
+
+const missingGroupScan: SfDataHubLocalScan = {
+  id: "scan-explorer-missing-group-test",
+  contentHash: "missing-group-content-hash",
+  filename: "scan-explorer-missing-group-test.json",
+  importedAt: new Date(timestamp * 1000).toISOString(),
+  scannedAt: new Date(timestamp * 1000).toISOString(),
+  servers: ["f28"],
+  playerCount: 1,
+  groupCount: 0,
+  guildCount: 0,
+  rawData: {
+    timestamp,
+    players: [
+      {
+        timestamp,
+        saveVersion: 2,
+        save: buildSave(1001, 603, 7),
+        identifier: "f28_p1001",
+        prefix: "f28",
+        name: "Darth Monk",
+        guildIdentifier: "f28_g42",
+        guildName: "Welten im Wandel",
+      },
+    ],
+    groups: [],
+  },
+};
+const missingGroupData = buildScanExplorerData(missingGroupScan);
+const missingGroupPlayer = normalizeScanExplorerPlayer(missingGroupData.players[0]);
+const missingGroupLink = linkScanExplorerPlayerToGuildMember(missingGroupData, missingGroupPlayer);
+assert.equal(missingGroupData.guilds.length, 1);
+assert.equal(missingGroupData.normalizedGuilds.length, 0);
+assert.equal(getScanExplorerGuildDetail(missingGroupData, missingGroupData.guilds[0]), null);
+assert.equal(missingGroupLink.linked, false);
+assert.equal(missingGroupLink.guildReference?.identifier, "f28_g42");
 
 assert.deepEqual(
   filterScanExplorerEntities(data.players, data.guilds, "darth").players.map((player) => player.name),
@@ -176,6 +269,8 @@ const largeScan: SfDataHubLocalScan = {
 const largeData = buildScanExplorerData(largeScan);
 assert.equal(largeData.players.length, 20_000);
 assert.equal(largeData.guilds.length, 1_200);
+assert.equal(largeData.normalizedGuilds.length, 1_200);
+assert.equal(largeData.guildIndexes.memberTargetsByPlayerIdentifier.size, 0);
 assert.equal("normalized" in largeData.players[0], false);
 
 const broadResults = getLimitedScanExplorerResults(largeData.players, largeData.guilds, "");
