@@ -1,6 +1,23 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Check, Database, Download, Eye, Loader2, Pencil, RefreshCw, Swords, Trash2, Upload, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  Database,
+  Download,
+  Eye,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Search,
+  Shield,
+  Swords,
+  Trash2,
+  Upload,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 
 import { useBackClose } from "../../hooks/useBackClose";
 import {
@@ -14,17 +31,11 @@ import {
   subscribeToSfDataHubLocalScanChanges,
   updateSfDataHubLocalScan,
   type GuildHubScanMergeMode,
-  type GuildHubLogicalScanSnapshot,
   type GuildHubScanSummary,
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
-import {
-  deriveGuildCoverageForLogicalSnapshots,
-  summarizeGuildCoverage,
-  type GuildCoverageSummary,
-  type GuildSnapshotCoverage,
-  type GuildSnapshotCoverageStatus,
-} from "../../lib/guilds/guildCoverage";
+import type { GuildSnapshotCoverageStatus } from "../../lib/guilds/guildCoverage";
+import { normalizeGuildScanServer, normalizeGuildSegmentForScan, type NormalizedGuildMember } from "../../lib/guilds/guildScanNormalizer";
 import {
   importFightTrackerTransferStates,
   readFightTrackerSummaries,
@@ -40,6 +51,24 @@ import {
 } from "../../lib/transfer/sfDataHubTransfer";
 import { getDataJobDetail, getDataJobProgress, useDataJobs, type DataJob } from "../../context/DataJobsContext";
 import styles from "./ScanManagementOverlay.module.css";
+import {
+  buildScanExplorerData,
+  formatCoverageStatus,
+  getLimitedScanExplorerResults,
+  normalizeScanExplorerPlayer,
+  SCAN_EXPLORER_MAX_VISIBLE_RESULTS,
+  type ScanExplorerData,
+  type ScanExplorerGuildEntity,
+  type ScanExplorerGuildGroup,
+  type ScanExplorerPlayerEntity,
+} from "./scanExplorer";
+import {
+  formatScanExplorerCompactEntryValue,
+  formatScanExplorerPrimitiveValue,
+  getVisibleScanExplorerMetrics,
+  toScanExplorerTimestampDate,
+} from "./scanExplorerFormatting";
+import type { NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 
 type ScanManagementOverlayProps = {
   isOpen: boolean;
@@ -83,22 +112,7 @@ type PendingScanMergeImport = {
 
 type PendingImport = PendingTransferImport | PendingScanJsonImport | PendingScanMergeImport;
 
-type ScanDetailsGuildGroup = {
-  key: string;
-  server: string;
-  guildIdentifier: string;
-  guildName: string;
-  rows: GuildSnapshotCoverage[];
-  completeSnapshotCount: number;
-};
-
-type ScanDetailsData = {
-  scan: SfDataHubLocalScan;
-  snapshots: GuildHubLogicalScanSnapshot[];
-  coverageRows: GuildSnapshotCoverage[];
-  coverageSummary: GuildCoverageSummary;
-  guildGroups: ScanDetailsGuildGroup[];
-};
+type ScanDetailsData = ScanExplorerData;
 
 const EMPTY_FEEDBACK: ImportFeedback = {
   imported: [],
@@ -318,10 +332,6 @@ function getScanSlotSourceInfo(scan: Pick<GuildHubScanSummary, "isScanSlot" | "m
   return `${sourceCount.toLocaleString("de-DE")} Quelldateien · ${scan.logicalScanCount.toLocaleString("de-DE")} Scans`;
 }
 
-function getCoverageUniqueKey(row: Pick<GuildSnapshotCoverage, "server" | "guildIdentifier">) {
-  return `${row.server.toLowerCase()}::${row.guildIdentifier.toLowerCase()}`;
-}
-
 function formatCount(value: number) {
   return value.toLocaleString("de-DE");
 }
@@ -332,69 +342,17 @@ function getScanSourceTypeLabel(scan: Pick<GuildHubScanSummary, "isScanSlot" | "
   return "Scan";
 }
 
-function formatCoverageStatus(status: GuildSnapshotCoverageStatus) {
-  if (status === "complete") return { symbol: "✓", label: "complete" };
-  if (status === "overcount") return { symbol: "⚠", label: "overcount" };
-  if (status === "unknown") return { symbol: "?", label: "unknown" };
-  return { symbol: "-", label: "incomplete" };
-}
-
-function formatCoverageRatio(row: GuildSnapshotCoverage) {
+function formatCoverageRatio(row: ScanExplorerGuildGroup["rows"][number]) {
   return `${formatCount(row.countedMemberCount)} / ${
     row.declaredMemberCount == null ? "?" : formatCount(row.declaredMemberCount)
   }`;
 }
 
-function groupGuildCoverageRows(rows: GuildSnapshotCoverage[]): ScanDetailsGuildGroup[] {
-  const groups = new Map<string, ScanDetailsGuildGroup>();
-
-  for (const row of rows) {
-    const key = getCoverageUniqueKey(row);
-    const existing =
-      groups.get(key) ??
-      ({
-        key,
-        server: row.server,
-        guildIdentifier: row.guildIdentifier,
-        guildName: row.guildName?.trim() || "Unknown Guild",
-        rows: [],
-        completeSnapshotCount: 0,
-      } satisfies ScanDetailsGuildGroup);
-
-    if (existing.guildName === "Unknown Guild" && row.guildName?.trim()) {
-      existing.guildName = row.guildName.trim();
-    }
-    existing.rows.push(row);
-    if (row.complete) existing.completeSnapshotCount += 1;
-    groups.set(key, existing);
-  }
-
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      rows: [...group.rows].sort((a, b) => a.snapshotTimestamp - b.snapshotTimestamp),
-    }))
-    .sort(
-      (a, b) =>
-        a.server.localeCompare(b.server, undefined, { numeric: true, sensitivity: "base" }) ||
-        a.guildName.localeCompare(b.guildName, undefined, { numeric: true, sensitivity: "base" }) ||
-        a.guildIdentifier.localeCompare(b.guildIdentifier, undefined, { numeric: true, sensitivity: "base" }),
-    );
-}
-
 function buildScanDetailsData(scan: SfDataHubLocalScan): ScanDetailsData {
-  const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
-  const coverageRows = deriveGuildCoverageForLogicalSnapshots(snapshots);
-  return {
-    scan,
-    snapshots,
-    coverageRows,
-    coverageSummary: summarizeGuildCoverage(coverageRows),
-    guildGroups: groupGuildCoverageRows(coverageRows),
-  };
+  return buildScanExplorerData(scan);
 }
 
-function formatGroupStatus(group: ScanDetailsGuildGroup) {
+function formatGroupStatus(group: ScanExplorerGuildGroup) {
   if (group.rows.length === 1) {
     const status = formatCoverageStatus(group.rows[0].status);
     return `${status.symbol} ${status.label}`;
@@ -431,7 +389,9 @@ function buildScanDetailsMetadata(summary: GuildHubScanSummary, data: ScanDetail
     { label: "Logical Scans", value: formatCount(data?.snapshots.length ?? summary.logicalScanCount) },
     { label: "Erster Timestamp", value: formatScanDate(isoFromSummaryTimestamp(firstTimestamp)) },
     { label: "Letzter Timestamp", value: formatScanDate(isoFromSummaryTimestamp(lastTimestamp)) },
-    { label: "Server", value: formatCount(servers.length) },
+    { label: "Server", value: servers.length ? servers.join(", ") : "Unbekannt" },
+    { label: "Player", value: formatCount(data?.players.length ?? summary.playerCount) },
+    { label: "Guilds", value: formatCount(data?.guilds.length ?? summary.guildCount) },
   ];
 }
 
@@ -1266,6 +1226,50 @@ function ScanDetailsOverlay({
   const displayName = getScanDisplayName(summary);
   const coverage = data?.coverageSummary ?? summary.guildCoverage;
   const metadata = buildScanDetailsMetadata(summary, data);
+  const bodyRef = React.useRef<HTMLDivElement | null>(null);
+  const normalizedPlayerCacheRef = React.useRef(new Map<string, NormalizedPlayer>());
+  const [query, setQuery] = React.useState("");
+  const deferredQuery = React.useDeferredValue(query);
+  const [view, setView] = React.useState<
+    { kind: "results" } | { kind: "player"; playerKey: string } | { kind: "guild"; guildKey: string }
+  >({ kind: "results" });
+
+  React.useEffect(() => {
+    setQuery("");
+    setView({ kind: "results" });
+    normalizedPlayerCacheRef.current.clear();
+  }, [summary.sourceScanId]);
+
+  React.useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [view]);
+
+  const limitedResults = React.useMemo(
+    () =>
+      data
+        ? getLimitedScanExplorerResults(data.players, data.guilds, deferredQuery, SCAN_EXPLORER_MAX_VISIBLE_RESULTS)
+        : {
+            query: "",
+            players: [],
+            guilds: [],
+            playerTotal: 0,
+            guildTotal: 0,
+            playerVisible: 0,
+            guildVisible: 0,
+            limit: SCAN_EXPLORER_MAX_VISIBLE_RESULTS,
+          },
+    [data, deferredQuery],
+  );
+  const selectedPlayer = data && view.kind === "player" ? data.playerLookup.get(view.playerKey) ?? null : null;
+  const selectedGuild = data && view.kind === "guild" ? data.guildLookup.get(view.guildKey) ?? null : null;
+  const selectedNormalizedPlayer = React.useMemo(() => {
+    if (!selectedPlayer) return null;
+    const cached = normalizedPlayerCacheRef.current.get(selectedPlayer.key);
+    if (cached) return cached;
+    const normalized = normalizeScanExplorerPlayer(selectedPlayer);
+    normalizedPlayerCacheRef.current.set(selectedPlayer.key, normalized);
+    return normalized;
+  }, [selectedPlayer]);
 
   return (
     <div
@@ -1291,7 +1295,7 @@ function ScanDetailsOverlay({
           </button>
         </header>
 
-        <div className={styles.detailsBody}>
+        <div className={styles.detailsBody} ref={bodyRef}>
           <dl className={styles.detailsMetaGrid}>
             {metadata.map((entry) => (
               <div key={entry.label}>
@@ -1311,6 +1315,8 @@ function ScanDetailsOverlay({
           ) : data ? (
             <>
               <dl className={styles.detailsKpiGrid}>
+                <ScanDetailsKpi label="Player" value={data.players.length} />
+                <ScanDetailsKpi label="Guilds" value={data.guilds.length} />
                 <ScanDetailsKpi label="Vertretene Gilden" value={coverage.uniqueGuildCount} />
                 <ScanDetailsKpi label="Vollständig gescannte Gilden" value={coverage.completeUniqueGuildCount} />
                 <ScanDetailsKpi label="Guild-Snapshots" value={coverage.guildSnapshotCount} />
@@ -1327,55 +1333,778 @@ function ScanDetailsOverlay({
                 ) : null}
               </dl>
 
-              <section className={styles.detailsSection} aria-label="Server-Coverage">
-                <h3>Server</h3>
-                {coverage.byServer.length ? (
-                  <div className={styles.tableWrap}>
-                    <table className={`${styles.table} ${styles.detailsTable}`}>
-                      <thead>
-                        <tr>
-                          <th>Server</th>
-                          <th className={styles.numericCell}>Gilden</th>
-                          <th className={styles.numericCell}>Vollständig</th>
-                          <th className={styles.numericCell}>Guild-Snapshots</th>
-                          <th className={styles.numericCell}>Vollständig</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {coverage.byServer.map((server) => (
-                          <tr key={server.server}>
-                            <td>{server.server}</td>
-                            <td className={styles.numericCell}>{formatCount(server.uniqueGuildCount)}</td>
-                            <td className={styles.numericCell}>{formatCount(server.completeUniqueGuildCount)}</td>
-                            <td className={styles.numericCell}>{formatCount(server.guildSnapshotCount)}</td>
-                            <td className={styles.numericCell}>{formatCount(server.completeGuildSnapshotCount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className={styles.emptyState}>Keine Guild-Coverage gefunden.</div>
-                )}
-              </section>
-
-              <section className={styles.detailsSection} aria-label="Guild-Coverage">
-                <h3>Guilds</h3>
-                {data.guildGroups.length ? (
-                  <div className={styles.detailsGuildList}>
-                    {data.guildGroups.map((group) => (
-                      <ScanDetailsGuildRow group={group} key={group.key} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className={styles.emptyState}>Keine Guilds mit stabiler Identity gefunden.</div>
-                )}
-              </section>
+              {view.kind === "results" ? (
+                <ScanExplorerResults
+                  data={data}
+                  query={query}
+                  result={limitedResults}
+                  onQueryChange={setQuery}
+                  onOpenPlayer={(player) => setView({ kind: "player", playerKey: player.key })}
+                  onOpenGuild={(guild) => setView({ kind: "guild", guildKey: guild.key })}
+                />
+              ) : selectedPlayer && selectedNormalizedPlayer ? (
+                <ScanExplorerPlayerDetail
+                  player={selectedPlayer}
+                  normalized={selectedNormalizedPlayer}
+                  onBack={() => setView({ kind: "results" })}
+                />
+              ) : selectedGuild ? (
+                <ScanExplorerGuildDetail
+                  data={data}
+                  guild={selectedGuild}
+                  summary={summary}
+                  onBack={() => setView({ kind: "results" })}
+                />
+              ) : (
+                <div className={styles.emptyState}>Der ausgewählte Eintrag ist in diesem Scan nicht mehr verfügbar.</div>
+              )}
             </>
           ) : null}
         </div>
       </div>
     </div>
+  );
+}
+
+const PLAYER_CLASS_NAMES: Record<number, string> = {
+  1: "Warrior",
+  2: "Mage",
+  3: "Scout",
+  4: "Assassin",
+  5: "Battle Mage",
+  6: "Berserker",
+  7: "Demon Hunter",
+  8: "Druid",
+  9: "Bard",
+  10: "Necromancer",
+  11: "Paladin",
+  12: "Demon Warrior",
+};
+
+const ATTRIBUTE_LABELS = [
+  ["strength", "Strength"],
+  ["dexterity", "Dexterity"],
+  ["intelligence", "Intelligence"],
+  ["constitution", "Constitution"],
+  ["luck", "Luck"],
+] as const;
+
+type ScanMetric = {
+  label: string;
+  value: React.ReactNode;
+  title?: string;
+};
+
+function isPresent(value: unknown): value is string | number | boolean {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function formatOptionalValue(value: unknown) {
+  return formatScanExplorerPrimitiveValue(value, formatCount);
+}
+
+function formatValueOrUnavailable(value: unknown) {
+  return formatOptionalValue(value) ?? "Unavailable";
+}
+
+function formatPercentValue(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null;
+  return `${(value * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+}
+
+function formatTimestampMs(value: number | null | undefined) {
+  const date = toScanExplorerTimestampDate(value);
+  return date ? formatScanDate(date.toISOString()) : null;
+}
+
+function formatDamageRange(range: { min: number | null; max: number | null } | null | undefined) {
+  if (!range || range.min == null || range.max == null) return null;
+  return `${formatCount(range.min)} - ${formatCount(range.max)}`;
+}
+
+function formatClassName(value: number | null) {
+  return value == null ? null : PLAYER_CLASS_NAMES[value] ?? `Class ${value}`;
+}
+
+function formatSourceStatus(normalized: NormalizedPlayer, path: string, value: unknown) {
+  const formatted = formatOptionalValue(value);
+  if (formatted != null) return formatted;
+  const status = normalized.metadata.fields[path]?.status;
+  return status === "invalid" ? "Unavailable" : null;
+}
+
+function compactEntries(record: Record<string, unknown> | null | undefined, limit = 8): ScanMetric[] {
+  if (!record) return [];
+  return Object.entries(record)
+    .map(([label, value]) => ({ label: formatCamelLabel(label), value: formatCompactEntryValue(value) }))
+    .filter((entry) => entry.value != null)
+    .map((entry) => ({ label: entry.label, value: entry.value as string }))
+    .slice(0, limit);
+}
+
+function formatCompactEntryValue(value: unknown) {
+  return formatScanExplorerCompactEntryValue(value, { formatNumber: formatCount, formatLabel: formatCamelLabel });
+}
+
+function formatCamelLabel(value: string) {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^./, (first) => first.toUpperCase());
+}
+
+function ScanExplorerResults({
+  data,
+  query,
+  result,
+  onQueryChange,
+  onOpenPlayer,
+  onOpenGuild,
+}: {
+  data: ScanExplorerData;
+  query: string;
+  result: ReturnType<typeof getLimitedScanExplorerResults>;
+  onQueryChange: (query: string) => void;
+  onOpenPlayer: (player: ScanExplorerPlayerEntity) => void;
+  onOpenGuild: (guild: ScanExplorerGuildEntity) => void;
+}) {
+  const hasResults = result.playerTotal || result.guildTotal;
+  const searching = result.query.length > 0;
+
+  return (
+    <>
+      <label className={styles.detailsSearch}>
+        <Search size={16} aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Search players or guilds..."
+        />
+      </label>
+
+      {hasResults ? (
+        <div className={styles.entityGroups}>
+          <section className={styles.detailsSection} aria-label="Players">
+            <h3>Players ({formatCount(result.playerTotal)})</h3>
+            <ScanExplorerResultLimitNote
+              kind="players"
+              total={result.playerTotal}
+              visible={result.playerVisible}
+              limit={result.limit}
+              searching={searching}
+            />
+            {result.players.length ? (
+              <div className={styles.entityList}>
+                {result.players.map((player) => (
+                  <button type="button" className={styles.entityButton} key={player.key} onClick={() => onOpenPlayer(player)}>
+                    <User size={16} aria-hidden />
+                    <span className={styles.entityMain}>
+                      <strong>{player.name}</strong>
+                      <span>
+                        {[
+                          player.level == null ? null : `Level ${formatCount(player.level)}`,
+                          formatClassName(player.classId),
+                        ]
+                          .filter(Boolean)
+                          .join(" - ")}
+                      </span>
+                    </span>
+                    <span className={styles.entityMeta}>
+                      {[player.server, player.guildName].filter(Boolean).join(" - ")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyState}>Keine Player gefunden.</div>
+            )}
+          </section>
+
+          <section className={styles.detailsSection} aria-label="Guilds">
+            <h3>Guilds ({formatCount(result.guildTotal)})</h3>
+            <ScanExplorerResultLimitNote
+              kind="guilds"
+              total={result.guildTotal}
+              visible={result.guildVisible}
+              limit={result.limit}
+              searching={searching}
+            />
+            {result.guilds.length ? (
+              <div className={styles.entityList}>
+                {result.guilds.map((guild) => (
+                  <button type="button" className={styles.entityButton} key={guild.key} onClick={() => onOpenGuild(guild)}>
+                    <Users size={16} aria-hidden />
+                    <span className={styles.entityMain}>
+                      <strong>{guild.group.guildName}</strong>
+                      <span>{guild.group.guildIdentifier}</span>
+                    </span>
+                    <span className={styles.entityMeta}>
+                      {[
+                        guild.group.server,
+                        guild.group.rows[0]?.declaredMemberCount == null
+                          ? null
+                          : `${formatCount(guild.group.rows[0].declaredMemberCount)} Members`,
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyState}>Keine Guilds gefunden.</div>
+            )}
+          </section>
+        </div>
+      ) : (
+        <div className={styles.emptyState}>
+          Keine Treffer in {formatCount(data.players.length)} Playern und {formatCount(data.guilds.length)} Guilds.
+        </div>
+      )}
+    </>
+  );
+}
+
+function ScanExplorerResultLimitNote({
+  kind,
+  total,
+  visible,
+  limit,
+  searching,
+}: {
+  kind: "players" | "guilds";
+  total: number;
+  visible: number;
+  limit: number;
+  searching: boolean;
+}) {
+  if (!total) return null;
+  const capped = total > visible;
+  return (
+    <p className={styles.resultLimitNote}>
+      {capped
+        ? `Showing first ${formatCount(visible)} of ${formatCount(total)} ${searching ? "matches" : kind}.`
+        : `Showing ${formatCount(visible)} of ${formatCount(total)} ${searching ? "matches" : kind}.`}
+      {!searching && total > limit ? " Use search to narrow the list." : ""}
+    </p>
+  );
+}
+
+function ScanExplorerBackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button type="button" className={styles.detailBackButton} onClick={onBack}>
+      <ChevronLeft size={16} aria-hidden />
+      <span>Back</span>
+    </button>
+  );
+}
+
+function ScanExplorerPlayerDetail({
+  player,
+  normalized,
+  onBack,
+}: {
+  player: ScanExplorerPlayerEntity;
+  normalized: NormalizedPlayer;
+  onBack: () => void;
+}) {
+  const className = formatClassName(normalized.identity.class);
+
+  return (
+    <>
+      <div className={styles.detailNav}>
+        <ScanExplorerBackButton onBack={onBack} />
+      </div>
+      <section className={styles.entityDetailHeader} aria-label="Player">
+        <User size={18} aria-hidden />
+        <div>
+          <h3>{player.name}</h3>
+          <p>
+            {[
+              normalized.progression.level == null ? null : `Level ${formatCount(normalized.progression.level)}`,
+              className,
+              player.server,
+              player.guildName,
+            ]
+              .filter(Boolean)
+              .join(" - ")}
+          </p>
+        </div>
+      </section>
+
+      <ScanDetailSection title="Overview">
+        <MetricGrid
+          items={[
+            { label: "Identifier", value: normalized.identity.identifier },
+            { label: "Player ID", value: normalized.identity.id },
+            { label: "Name", value: normalized.identity.name },
+            { label: "Server", value: normalized.identity.server ?? player.server },
+            { label: "Level", value: normalized.progression.level },
+            { label: "XP", value: normalized.progression.xp },
+            { label: "XP Next", value: normalized.progression.xpNext },
+            { label: "Honor", value: normalized.progression.honor },
+            { label: "Rank", value: normalized.progression.rank },
+            { label: "Class", value: className },
+          ]}
+        />
+      </ScanDetailSection>
+
+      <ScanDetailSection title="Attributes">
+        <div className={styles.attributeGrid}>
+          {ATTRIBUTE_LABELS.map(([key, label]) => {
+            const attribute = normalized.attributes[key];
+            const details = compactEntries(attribute as unknown as Record<string, unknown>, 12).filter(
+              (entry) => entry.label !== "Total" && entry.label !== "Base",
+            );
+            return (
+              <div className={styles.attributeCard} key={key}>
+                <div className={styles.attributeTop}>
+                  <strong>{label}</strong>
+                  <span>{formatValueOrUnavailable(attribute.total)}</span>
+                </div>
+                <span>Base {formatValueOrUnavailable(attribute.base)}</span>
+                {details.length ? (
+                  <details className={styles.compactDetails}>
+                    <summary>Components</summary>
+                    <MetricGrid items={details} compact />
+                  </details>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </ScanDetailSection>
+
+      <ScanDetailSection title="Combat">
+        <MetricGrid
+          items={[
+            { label: "Armor", value: formatSourceStatus(normalized, "combat.armor", normalized.combat.armor) },
+            { label: "Damage", value: formatDamageRange(normalized.combat.damage) },
+            { label: "Secondary Damage", value: formatDamageRange(normalized.combat.damage.secondary) },
+            { label: "Health", value: formatSourceStatus(normalized, "combat.health", normalized.combat.health) },
+          ]}
+        />
+      </ScanDetailSection>
+
+      <ScanDetailSection title="Progression / Bonuses">
+        <MetricGrid
+          items={[
+            { label: "Scrapbook", value: formatValueWithMaximum(normalized.progressionStatus.scrapbook.count, normalized.progressionStatus.scrapbook.maximum) },
+            { label: "Scrapbook %", value: formatPercentValue(normalized.progressionStatus.scrapbook.percentage) },
+            { label: "Achievements", value: formatValueWithMaximum(normalized.progressionStatus.achievements.count, normalized.progressionStatus.achievements.maximum) },
+            { label: "Mount Type", value: normalized.progressionStatus.mount.type },
+            { label: "Mount Bonus", value: normalized.progressionStatus.mount.bonus == null ? null : `${formatCount(normalized.progressionStatus.mount.bonus)}%` },
+            { label: "Mount Expires", value: formatTimestampMs(normalized.progressionStatus.mount.expiresAt) },
+            { label: "Portal Health", value: normalized.progressionStatus.portalBonuses.health },
+            { label: "Portal Damage", value: normalized.progressionStatus.portalBonuses.damage },
+            { label: "Guild Treasure", value: normalized.progressionStatus.guildBonuses.treasure },
+            { label: "Guild Instructor", value: normalized.progressionStatus.guildBonuses.instructor },
+            { label: "Guild Pet", value: normalized.progressionStatus.guildBonuses.pet },
+          ]}
+        />
+      </ScanDetailSection>
+
+      <ScanExplorerFortressSection normalized={normalized} />
+      <ScanExplorerDungeonsSection normalized={normalized} />
+      <ScanExplorerAdvancedSections normalized={normalized} />
+    </>
+  );
+}
+
+function formatValueWithMaximum(value: number | null, maximum: number | null) {
+  if (value == null) return null;
+  return maximum == null ? formatCount(value) : `${formatCount(value)} / ${formatCount(maximum)}`;
+}
+
+function ScanExplorerFortressSection({ normalized }: { normalized: NormalizedPlayer }) {
+  const fortress = normalized.fortress;
+  const buildings = compactEntries(fortress.buildings as unknown as Record<string, unknown>, 20);
+  const hasAnyFortressValue =
+    isPresent(fortress.rank) ||
+    isPresent(fortress.honor) ||
+    buildings.length > 0 ||
+    isPresent(fortress.currentBuilding.active);
+
+  return (
+    <ScanDetailSection title="Fortress">
+      {hasAnyFortressValue ? (
+        <>
+          <MetricGrid
+            items={[
+              { label: "Upgrades", value: fortress.upgrades },
+              { label: "Rank", value: fortress.rank },
+              { label: "Honor", value: fortress.honor },
+              { label: "Raid Honor", value: fortress.raidHonor },
+              { label: "Gladiator", value: fortress.gladiator },
+              { label: "Knights", value: fortress.knights },
+              { label: "Current Building", value: fortress.currentBuilding.building },
+              { label: "Upgrade Active", value: fortress.currentBuilding.active },
+              ...(fortress.currentBuilding.active
+                ? [
+                    { label: "Starts", value: formatTimestampMs(fortress.currentBuilding.startsAt) },
+                    { label: "Finishes", value: formatTimestampMs(fortress.currentBuilding.finishesAt) },
+                  ]
+                : []),
+            ]}
+          />
+          {buildings.length ? <MetricGrid items={buildings} compact /> : null}
+        </>
+      ) : (
+        <div className={styles.unsupportedNote}>Fortress data is not available for this player in this scan.</div>
+      )}
+    </ScanDetailSection>
+  );
+}
+
+function ScanExplorerDungeonsSection({ normalized }: { normalized: NormalizedPlayer }) {
+  const dungeons = normalized.dungeons;
+  return (
+    <ScanDetailSection title="Dungeons">
+      <MetricGrid
+        items={[
+          { label: "Normal Total", value: dungeons.totals.normal },
+          { label: "Normal Unlocked", value: dungeons.totals.normalUnlocked },
+          { label: "Shadow Total", value: dungeons.totals.shadow },
+          { label: "Shadow Unlocked", value: dungeons.totals.shadowUnlocked },
+          { label: "Class Total", value: dungeons.totals.class },
+          { label: "Class Unlocked", value: dungeons.totals.classUnlocked },
+          { label: "Tower", value: dungeons.tower.displayProgress },
+          { label: "Twister", value: dungeons.twister.displayProgress },
+          { label: "Raid", value: dungeons.raid.displayProgress },
+          { label: "Player Portal", value: dungeons.portals.player.displayProgress },
+          { label: "Guild Portal", value: dungeons.portals.guild.displayProgress },
+        ]}
+      />
+      <MetricGrid
+        items={[
+          { label: "Normal Entries", value: dungeons.normal.count },
+          { label: "Normal Progress", value: dungeons.normal.totalProgress },
+          { label: "Shadow Entries", value: dungeons.shadow.count },
+          { label: "Shadow Progress", value: dungeons.shadow.totalProgress },
+          { label: "Class Entries", value: dungeons.class.count },
+          { label: "Class Progress", value: dungeons.class.totalProgress },
+        ]}
+        compact
+      />
+    </ScanDetailSection>
+  );
+}
+
+function ScanExplorerAdvancedSections({ normalized }: { normalized: NormalizedPlayer }) {
+  const itemEntries = Object.entries(normalized.items?.equipped?.slots ?? {})
+    .map(([slot, item]) => ({
+      label: formatCamelLabel(slot),
+      value: [
+        item?.type == null ? null : `Type ${item.type}`,
+        item?.armor == null ? null : `Armor ${formatCount(item.armor)}`,
+        formatDamageRange(item?.damage),
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    }))
+    .filter((entry) => entry.value);
+  const potionEntries =
+    normalized.potions?.slots
+      .map((slot) => ({
+        label: `Slot ${slot.slot + 1}`,
+        value: [
+          slot.attribute ? formatCamelLabel(slot.attribute) : null,
+          slot.size == null ? null : `${slot.size}%`,
+          slot.expires == null ? null : formatTimestampMs(slot.expires),
+        ]
+          .filter(Boolean)
+          .join(" - "),
+      }))
+      .filter((entry) => entry.value) ?? [];
+  const pets = normalized.pets;
+  const extended = normalized.extended;
+  const resourceGroups = [
+    compactEntries(normalized.resources.currencies as unknown as Record<string, unknown>, 8),
+    compactEntries(normalized.resources.fortress as unknown as Record<string, unknown>, 8),
+    compactEntries(normalized.resources.smithy as unknown as Record<string, unknown>, 8),
+    compactEntries(normalized.resources.underworld as unknown as Record<string, unknown>, 8),
+  ].filter((group) => group.length > 0);
+  const underworldGroups = [
+    compactEntries(normalized.underworld.buildings as unknown as Record<string, unknown>, 12),
+    compactEntries(normalized.underworld.units as unknown as Record<string, unknown>, 8),
+    compactEntries(normalized.underworld.resources as unknown as Record<string, unknown>, 12),
+  ].filter((group) => group.length > 0);
+
+  return (
+    <details className={styles.advancedDetails}>
+      <summary>Advanced</summary>
+      <div className={styles.advancedStack}>
+        <ScanDetailSection title="Items">
+          {itemEntries.length ? <MetricGrid items={itemEntries} compact /> : <div className={styles.unsupportedNote}>Equipped items are not available.</div>}
+        </ScanDetailSection>
+        <ScanDetailSection title="Potions">
+          <MetricGrid
+            items={[
+              { label: "Life Active", value: normalized.potions?.life.active },
+              { label: "Life Size", value: normalized.potions?.life.size },
+              ...potionEntries,
+            ]}
+            compact
+          />
+        </ScanDetailSection>
+        <ScanDetailSection title="Pets">
+          {pets ? (
+            <>
+              <MetricGrid
+                items={[
+                  { label: "Rank", value: pets.rank },
+                  { label: "Honor", value: pets.honor },
+                  { label: "Total Count", value: pets.own?.totalCount ?? pets.collection?.totalPets },
+                  { label: "Total Level", value: pets.own?.totalLevel },
+                ]}
+                compact
+              />
+              <MetricGrid items={compactEntries(pets.bonuses as unknown as Record<string, unknown>, 8)} compact />
+              <MetricGrid items={compactEntries(pets.foods as unknown as Record<string, unknown>, 8)} compact />
+            </>
+          ) : (
+            <div className={styles.unsupportedNote}>Pet data is not available.</div>
+          )}
+        </ScanDetailSection>
+        <ScanDetailSection title="Runes">
+          <MetricGrid
+            items={[
+              { label: "Gold", value: normalized.runes.gold },
+              { label: "XP", value: normalized.runes.xp },
+              { label: "Epic Chance", value: normalized.runes.epicChance },
+              { label: "Item Quality", value: normalized.runes.itemQuality },
+              { label: "Health", value: normalized.runes.health },
+              { label: "Damage", value: normalized.runes.damage.total },
+              { label: "Resistance", value: normalized.runes.resistance.total },
+            ]}
+            compact
+          />
+        </ScanDetailSection>
+        <ScanDetailSection title="Resources">
+          {resourceGroups.length ? (
+            resourceGroups.map((items, index) => <MetricGrid items={items} compact key={`resources:${index}`} />)
+          ) : (
+            <div className={styles.unsupportedNote}>Resource data is not available.</div>
+          )}
+        </ScanDetailSection>
+        <ScanDetailSection title="Underworld">
+          {underworldGroups.length ? (
+            underworldGroups.map((items, index) => <MetricGrid items={items} compact key={`underworld:${index}`} />)
+          ) : (
+            <div className={styles.unsupportedNote}>Underworld data is not available.</div>
+          )}
+        </ScanDetailSection>
+        <ScanDetailSection title="Witch">
+          <ScanExplorerWitchDetail witch={extended.witch} />
+        </ScanDetailSection>
+        <ScanDetailSection title="Idle">
+          <ScanExplorerIdleDetail idle={extended.idle} />
+        </ScanDetailSection>
+        <ScanDetailSection title="Toilet">
+          <MetricGrid items={compactEntries(extended.toilet as unknown as Record<string, unknown>, 8)} compact />
+        </ScanDetailSection>
+        <ScanDetailSection title="Extras">
+          <MetricGrid items={compactEntries(extended.extras as unknown as Record<string, unknown>, 8)} compact />
+        </ScanDetailSection>
+      </div>
+    </details>
+  );
+}
+
+function ScanExplorerWitchDetail({ witch }: { witch: NormalizedPlayer["extended"]["witch"] }) {
+  const ownedScrolls = witch.scrolls.filter((scroll) => scroll.owned === true).length;
+  const knownScrolls = witch.scrolls.filter((scroll) => scroll.owned != null || scroll.type != null || scroll.picIndex != null).length;
+  const scrollItems = witch.scrolls
+    .filter((scroll) => scroll.owned != null || scroll.type != null || scroll.picIndex != null || scroll.date != null)
+    .map((scroll) => ({
+      label: `Scroll ${scroll.index + 1}`,
+      value: [
+        scroll.type == null ? null : `Type ${formatCount(scroll.type)}`,
+        scroll.owned == null ? null : scroll.owned ? "Owned" : "Open",
+        formatTimestampMs(scroll.date),
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    }))
+    .filter((entry) => entry.value);
+
+  const summaryItems: ScanMetric[] = [
+    { label: "Stage", value: witch.stage },
+    { label: "Items", value: formatValueWithMaximum(witch.items, witch.itemsNext) },
+    { label: "Item", value: witch.item },
+    { label: "Finish", value: formatTimestampMs(witch.finish) },
+    ...(knownScrolls ? [{ label: "Scrolls", value: `${formatCount(ownedScrolls)} / ${formatCount(knownScrolls)} owned` }] : []),
+  ];
+
+  return (
+    <>
+      <MetricGrid items={summaryItems} compact />
+      {scrollItems.length ? <MetricGrid items={scrollItems} compact /> : null}
+      {!summaryItems.some((item) => item.value != null) && !scrollItems.length ? (
+        <div className={styles.unsupportedNote}>Witch data is not available.</div>
+      ) : null}
+    </>
+  );
+}
+
+function summarizeNumericArray(values: number[], label: string) {
+  if (!values.length) return null;
+  const active = values.filter((value) => value > 0).length;
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return `${formatCount(values.length)} ${label}${active ? ` - ${formatCount(active)} active` : ""}${total ? ` - total ${formatCount(total)}` : ""}`;
+}
+
+function ScanExplorerIdleDetail({ idle }: { idle: NormalizedPlayer["extended"]["idle"] }) {
+  const items: ScanMetric[] = [
+    { label: "Sacrifices", value: idle.sacrifices },
+    { label: "Buildings", value: summarizeNumericArray(idle.buildings, "buildings") },
+    { label: "Money", value: idle.money },
+    { label: "Ready Runes", value: idle.readyRunes },
+    { label: "Runes", value: idle.runes },
+    { label: "Speed Upgrades", value: summarizeNumericArray(idle.upgrades.speed, "upgrades") },
+    { label: "Money Upgrades", value: summarizeNumericArray(idle.upgrades.money, "upgrades") },
+    { label: "Upgrade Total", value: idle.upgrades.total },
+  ];
+
+  return items.some((item) => item.value != null && item.value !== "") ? (
+    <MetricGrid items={items} compact />
+  ) : (
+    <div className={styles.unsupportedNote}>Idle data is not available.</div>
+  );
+}
+
+function ScanExplorerGuildDetail({
+  data,
+  guild,
+  summary,
+  onBack,
+}: {
+  data: ScanExplorerData;
+  guild: ScanExplorerGuildEntity;
+  summary: GuildHubScanSummary;
+  onBack: () => void;
+}) {
+  const group = guild.group;
+  const members = getGuildMembersForExplorer(data, guild);
+  const summaryGuild = findSummaryGuild(summary, guild);
+
+  return (
+    <>
+      <div className={styles.detailNav}>
+        <ScanExplorerBackButton onBack={onBack} />
+      </div>
+      <section className={styles.entityDetailHeader} aria-label="Guild">
+        <Shield size={18} aria-hidden />
+        <div>
+          <h3>{group.guildName}</h3>
+          <p>{[group.server, group.guildIdentifier].filter(Boolean).join(" - ")}</p>
+        </div>
+      </section>
+
+      <ScanDetailSection title="Overview">
+        <MetricGrid
+          items={[
+            { label: "Name", value: group.guildName },
+            { label: "Identifier", value: group.guildIdentifier },
+            { label: "Server", value: group.server },
+            { label: "CoA", value: summaryGuild?.coaString },
+            { label: "Snapshots", value: group.rows.length },
+            { label: "Complete Snapshots", value: group.completeSnapshotCount },
+            { label: "Members", value: group.rows[0]?.declaredMemberCount ?? members.length },
+          ]}
+        />
+      </ScanDetailSection>
+
+      <ScanDetailSection title="Coverage">
+        {group.rows.length ? (
+          <div className={styles.detailsGuildList}>
+            <ScanDetailsGuildRow group={group} />
+          </div>
+        ) : (
+          <div className={styles.emptyState}>Keine Guild-Coverage gefunden.</div>
+        )}
+      </ScanDetailSection>
+
+      <ScanDetailSection title={`Members (${formatCount(members.length)})`}>
+        {members.length ? (
+          <div className={styles.memberList}>
+            {members.map(({ member, key, snapshotTimestamp }) => (
+              <div className={styles.memberRow} key={key}>
+                <strong>{member.name}</strong>
+                <span>{[member.guildRole, member.level == null ? null : `Level ${formatCount(member.level)}`, member.classId].filter(Boolean).join(" - ")}</span>
+                <span>{formatScanDate(new Date(snapshotTimestamp).toISOString())}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>Keine Memberliste aus der bestehenden Guild-Semantik verfügbar.</div>
+        )}
+      </ScanDetailSection>
+    </>
+  );
+}
+
+function findSummaryGuild(summary: GuildHubScanSummary, guild: ScanExplorerGuildEntity) {
+  const targetServer = normalizeGuildScanServer(guild.group.server);
+  const targetSegment = normalizeGuildSegmentForScan(guild.group.guildIdentifier);
+  return (
+    summary.guilds.find(
+      (entry) =>
+        normalizeGuildScanServer(entry.server) === targetServer &&
+        normalizeGuildSegmentForScan(entry.guildIdentifier ?? entry.guildId) === targetSegment,
+    ) ?? null
+  );
+}
+
+function getGuildMembersForExplorer(data: ScanExplorerData, guild: ScanExplorerGuildEntity) {
+  const targetServer = normalizeGuildScanServer(guild.group.server);
+  const targetSegment = normalizeGuildSegmentForScan(guild.group.guildIdentifier);
+  const members = new Map<string, { member: NormalizedGuildMember; key: string; snapshotTimestamp: number }>();
+
+  for (const snapshot of data.snapshots) {
+    for (const member of snapshot.normalizedMembers) {
+      const memberServer = normalizeGuildScanServer(member.server) ?? normalizeGuildScanServer(snapshot.servers[0]);
+      const memberSegment = normalizeGuildSegmentForScan(member.guildSegment ?? member.groupSegment);
+      if (memberServer !== targetServer || memberSegment !== targetSegment) continue;
+      const key = `${snapshot.id}:${member.memberRef}`;
+      members.set(key, { member, key, snapshotTimestamp: snapshot.timestampMs });
+    }
+  }
+
+  return [...members.values()].sort(
+    (a, b) =>
+      (a.member.guildRole ?? "").localeCompare(b.member.guildRole ?? "", undefined, { sensitivity: "base" }) ||
+      (b.member.level ?? -1) - (a.member.level ?? -1) ||
+      a.member.name.localeCompare(b.member.name, undefined, { numeric: true, sensitivity: "base" }),
+  );
+}
+
+function ScanDetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className={styles.detailsSection} aria-label={title}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function MetricGrid({ items, compact = false }: { items: ScanMetric[]; compact?: boolean }) {
+  const visibleItems = getVisibleScanExplorerMetrics(
+    items.map((item) => ({ ...item, value: typeof item.value === "string" ? item.value : formatOptionalValue(item.value) ?? item.value })),
+  ).map((item) => ({ ...item, value: item.value as React.ReactNode }));
+
+  if (!visibleItems.length) return null;
+
+  return (
+    <dl className={`${styles.metricGrid} ${compact ? styles.metricGridCompact : ""}`}>
+      {visibleItems.map((item) => (
+        <div key={`${item.label}:${String(item.value)}`} title={item.title}>
+          <dt>{item.label}</dt>
+          <dd>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -1388,7 +2117,7 @@ function ScanDetailsKpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ScanDetailsGuildRow({ group }: { group: ScanDetailsGuildGroup }) {
+function ScanDetailsGuildRow({ group }: { group: ScanExplorerGuildGroup }) {
   const singleRow = group.rows.length === 1 ? group.rows[0] : null;
 
   if (singleRow) {

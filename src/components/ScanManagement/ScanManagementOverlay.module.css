@@ -890,6 +890,34 @@
   animation: scanManagementSpinner 0.9s linear infinite;
 }
 
+.detailsSearch {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.72);
+  color: var(--text-soft);
+}
+
+.detailsSearch input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailsSearch input::placeholder {
+  color: rgba(207, 220, 237, 0.58);
+}
+
 .detailsSection {
   display: grid;
   gap: 10px;
@@ -903,6 +931,244 @@
 
 .detailsTable {
   min-width: 620px;
+}
+
+.entityGroups {
+  display: grid;
+  gap: 16px;
+}
+
+.entityList {
+  display: grid;
+  gap: 8px;
+}
+
+.resultLimitNote {
+  margin: -2px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.entityButton {
+  width: 100%;
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) minmax(120px, 0.7fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.58);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.entityButton:hover {
+  border-color: rgba(77, 163, 255, 0.5);
+  background: rgba(28, 53, 84, 0.86);
+  transform: translateY(-1px);
+}
+
+.entityButton svg {
+  color: #9fc7ff;
+}
+
+.entityMain {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.entityMain strong,
+.entityMain span,
+.entityMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityMain strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.entityMain span,
+.entityMeta {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detailNav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.detailBackButton {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid rgba(77, 163, 255, 0.36);
+  border-radius: 8px;
+  background: rgba(28, 53, 84, 0.72);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.entityDetailHeader {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.66);
+}
+
+.entityDetailHeader svg {
+  color: #9fc7ff;
+}
+
+.entityDetailHeader h3 {
+  margin: 0 0 4px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityDetailHeader p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.metricGridCompact {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.metricGrid div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.52);
+}
+
+.metricGrid dt {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.metricGrid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.attributeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.attributeCard {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.52);
+}
+
+.attributeTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.attributeTop strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attributeTop span {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.attributeCard > span {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compactDetails {
+  min-width: 0;
+}
+
+.compactDetails summary,
+.advancedDetails > summary {
+  cursor: pointer;
+  color: #b9d8ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advancedDetails {
+  display: grid;
+  gap: 10px;
+}
+
+.advancedStack {
+  display: grid;
+  gap: 14px;
+  padding-top: 10px;
+}
+
+.unsupportedNote {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.48);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .detailsGuildList {
@@ -978,6 +1244,38 @@
   font-variant-numeric: tabular-nums;
 }
 
+.memberList {
+  display: grid;
+  gap: 7px;
+}
+
+.memberRow {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(130px, 0.85fr) minmax(150px, 0.75fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 32, 48, 0.52);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.memberRow strong,
+.memberRow span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberRow strong {
+  color: var(--text);
+}
+
 @keyframes scanManagementSpinner {
   to {
     transform: rotate(360deg);
@@ -1042,6 +1340,19 @@
 
   .detailsGuildList {
     min-width: 760px;
+  }
+
+  .entityButton,
+  .memberRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .entityButton svg {
+    display: none;
+  }
+
+  .entityMeta {
+    white-space: normal;
   }
 
   .truncate {
@@ -1120,6 +1431,13 @@
   .trackerStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .detailsMetaGrid,
+  .detailsKpiGrid,
+  .metricGrid,
+  .attributeGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1129,7 +1447,8 @@
   .dangerButton,
   .iconButton,
   .tabButton,
-  .inlineActionButton {
+  .inlineActionButton,
+  .entityButton {
     transition: none;
   }
 }
