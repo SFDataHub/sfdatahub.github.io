@@ -24,6 +24,15 @@ type Props = {
   initialPage?: number;                         // 1-basiert
   onReady?: (pf: any) => void;             // PageFlip-Instanz herausgeben
   onPageChange?: (page0: number) => void;       // 0-basiert (Parent macht +1)
+  minPageIndex?: number;                        // 0-basiert, sperrt Prev vor technische Seiten
+  displayPageOffset?: number;                   // technische Seiten vor logischem Inhalt
+  displayPageCount?: number;
+  showHud?: boolean;
+  showCover?: boolean;
+  enableKeyboard?: boolean;
+  visualMode?: "default" | "book";
+  flippingTime?: number;
+  syncPageIndex?: number | null;
   noSound?: boolean;
 };
 
@@ -130,6 +139,15 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   initialPage = 1,
   onReady,
   onPageChange,
+  minPageIndex = 0,
+  displayPageOffset = 0,
+  displayPageCount,
+  showHud = true,
+  showCover = false,
+  enableKeyboard = true,
+  visualMode = "default",
+  flippingTime,
+  syncPageIndex = null,
   noSound = true,
 }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -140,15 +158,20 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const isHtmlMode = Boolean(htmlPages?.length);
   const pageCount = isHtmlMode ? htmlPages!.length : (manifest?.pageCount ?? 0);
+  const visiblePageCount = displayPageCount ?? Math.max(0, pageCount - displayPageOffset);
   const bookTitle = isHtmlMode ? (title ?? "Flipbook") : (manifest?.title ?? "");
+  const bookMode = visualMode === "book";
+  const [currentPage0, setCurrentPage0] = useState(0);
 
   // Props via Refs – keine Re-Init bei Referenzwechsel
   const readyRef = useRef<Props["onReady"]>();
   const pageChangeRef = useRef<Props["onPageChange"]>();
   const initialPageRef = useRef<number>(initialPage);
+  const minPageIndexRef = useRef<number>(minPageIndex);
   useEffect(() => { readyRef.current = onReady; }, [onReady]);
   useEffect(() => { pageChangeRef.current = onPageChange; }, [onPageChange]);
   useEffect(() => { initialPageRef.current = initialPage; }, [initialPage]);
+  useEffect(() => { minPageIndexRef.current = minPageIndex; }, [minPageIndex]);
 
   const basePath = useMemo(() => (slug ? joinBase(`flipbooks/${slug}`) : ""), [slug]);
 
@@ -211,7 +234,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     if (!singleton.hostEl.isConnected) return;
 
     const bookKey = isHtmlMode
-      ? `html:${htmlPagesKey ?? activeManifest.title}:${activeManifest.pageCount}:${activeManifest.pageWidth}x${activeManifest.pageHeight}`
+      ? `html:${htmlPagesKey ?? activeManifest.title}:${activeManifest.pageCount}:${activeManifest.pageWidth}x${activeManifest.pageHeight}:cover-${showCover}:flip-${flippingTime ?? "default"}`
       : `image:${slug}`;
     const needsNew = !singleton.pf || singleton.key !== bookKey;
 
@@ -238,7 +261,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       height: activeManifest.pageHeight,
       size: "stretch" as any,
       maxShadowOpacity: 0.25,
-      showCover: false,
+      showCover,
       mobileScrollSupport: true,
       usePortrait: false,
       disableFlipByClick: false,
@@ -247,6 +270,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       swipeDistance: 30,
       showPageCorners: true,
       useMouseEvents: true,
+      ...(flippingTime ? { flippingTime } : {}),
     };
 
     const pf = new PageFlip(singleton.hostEl, opts as any);
@@ -277,6 +301,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     const onInit = () => {
       const p0 = clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
       pf.turnToPage(p0, "hard");
+      setCurrentPage0(p0);
       // Preload leicht verzögert starten (nach erster Darstellung)
       setTimeout(() => preloadNextSpread(p0), 220);
       readyRef.current?.(pf);
@@ -285,6 +310,13 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
 
     pf.on("flip", (e: any) => {
       const p0 = e.data as number;    // 0-basiert
+      if (p0 < minPageIndexRef.current) {
+        pf.turnToPage(minPageIndexRef.current, "hard");
+        setCurrentPage0(minPageIndexRef.current);
+        pageChangeRef.current?.(minPageIndexRef.current);
+        return;
+      }
+      setCurrentPage0(p0);
       pageChangeRef.current?.(p0);
       // Preload NACH der Flip-Animation starten, um Flicker zu vermeiden
       setTimeout(() => preloadNextSpread(p0), 220);
@@ -297,7 +329,15 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     ro.observe(wrap);
 
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "ArrowLeft")  { ev.preventDefault(); singleton.pf?.flipPrev(); }
+      if (!enableKeyboard) return;
+      if (ev.key === "ArrowLeft")  {
+        ev.preventDefault();
+        if ((singleton.pf as any)?.getCurrentPageIndex?.() <= minPageIndexRef.current) {
+          singleton.pf?.turnToPage(minPageIndexRef.current, "hard");
+        } else {
+          singleton.pf?.flipPrev();
+        }
+      }
       if (ev.key === "ArrowRight") { ev.preventDefault(); singleton.pf?.flipNext(); }
     };
     window.addEventListener("keydown", onKey, { passive: false });
@@ -307,10 +347,26 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
     };
-  }, [htmlPages, htmlPagesKey, isHtmlMode, manifest, pageHeight, pageWidth, pickBestSrc, slug, title]);
+  }, [enableKeyboard, flippingTime, htmlPages, htmlPagesKey, isHtmlMode, manifest, pageHeight, pageWidth, pickBestSrc, showCover, slug, title]);
 
-  const flipPrev = () => singleton.pf?.flipPrev();
+  useEffect(() => {
+    if (syncPageIndex == null || !singleton.pf) return;
+    try {
+      singleton.pf.turnToPage(syncPageIndex, "hard");
+      setCurrentPage0(syncPageIndex);
+      pageChangeRef.current?.(syncPageIndex);
+    } catch {}
+  }, [syncPageIndex]);
+
+  const flipPrev = () => {
+    if ((singleton.pf as any)?.getCurrentPageIndex?.() <= minPageIndex) {
+      singleton.pf?.turnToPage(minPageIndex, "hard");
+      return;
+    }
+    singleton.pf?.flipPrev();
+  };
   const flipNext = () => singleton.pf?.flipNext();
+  const visiblePage = clamp(currentPage0 - displayPageOffset + 1, 1, Math.max(1, visiblePageCount));
 
   const enterFullscreen = () => {
     const wrap = wrapRef.current;
@@ -324,7 +380,11 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   if (isHtmlMode && !htmlPages?.length) return <div className={styles.errorBox}>Keine Flipbook-Seiten vorhanden.</div>;
 
   return (
-    <div className={styles.viewerRoot} ref={wrapRef} aria-label={bookTitle}>
+    <div
+      className={`${styles.viewerRoot} ${bookMode ? styles.bookMode : ""}`}
+      ref={wrapRef}
+      aria-label={bookTitle}
+    >
       <div className={styles.stage} ref={stageRef}>
         {/* Host wird hier per Effekt eingehängt */}
         {isHtmlMode && (
@@ -334,19 +394,19 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
         )}
       </div>
 
-      <div className={styles.hud}>
+      {showHud && <div className={styles.hud}>
         <button className={styles.hBtn} onClick={flipPrev} aria-label="Zurück">‹</button>
         <div className={styles.hText}>
           <span className={styles.title}>{bookTitle}</span>
           <span className={styles.sep}>·</span>
-          <span>{pageCount} Seiten</span>
+          <span>Seite {visiblePage} / {visiblePageCount}</span>
         </div>
         <div className={styles.spacer} />
         {supportsFullscreen() && (
           <button className={styles.hBtn} onClick={enterFullscreen} aria-label="Fullscreen">⤢</button>
         )}
         <button className={styles.hBtn} onClick={flipNext} aria-label="Weiter">›</button>
-      </div>
+      </div>}
     </div>
   );
 };

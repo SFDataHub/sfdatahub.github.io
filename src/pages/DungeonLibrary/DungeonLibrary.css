@@ -94,28 +94,87 @@
   font-size: 0.8rem;
 }
 
-.open-book-panel {
-  position: absolute;
+.book-reader-overlay {
+  position: fixed;
   inset: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
-  opacity: 0.2;
-  pointer-events: none;
-  transition: opacity 220ms ease;
+  z-index: 990;
+  pointer-events: auto;
 }
 
-.open-book-panel.is-interactive {
+.book-reader-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 18, 0.52);
+  backdrop-filter: blur(1.5px);
+}
+
+.reader-close-button {
+  position: absolute;
+  z-index: 30;
+  top: clamp(14px, 3vw, 28px);
+  right: clamp(14px, 3vw, 32px);
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(176, 196, 217, 0.38);
+  border-radius: 8px;
+  background: rgba(13, 24, 38, 0.82);
+  color: #f5f9ff;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+}
+
+.reader-close-button:hover {
+  background: rgba(42, 76, 114, 0.92);
+}
+
+.book-stage {
+  position: absolute;
+  z-index: 10;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition: transform 620ms cubic-bezier(0.18, 0.84, 0.24, 1);
+  pointer-events: none;
+}
+
+.book-reader-overlay.is-opening .book-stage {
+  transform: translate3d(var(--stage-start-x), var(--stage-start-y), 0) scale(var(--stage-start-scale));
+}
+
+.book-reader-overlay.is-opening .book-stage.is-centered {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.book-reader-overlay.is-opening .book-stage.is-centered.is-cover-centered {
+  transform: translate3d(var(--stage-cover-shift), 0, 0) scale(1);
+}
+
+.content-flipbook-layer {
+  position: absolute;
+}
+
+.content-flipbook-layer {
+  inset: 0;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.book-reader-overlay.is-reading .content-flipbook-layer {
   opacity: 1;
   pointer-events: auto;
 }
 
-.open-book-toolbar {
-  display: flex;
-  justify-content: flex-start;
+.book-reader-overlay.is-opening .content-flipbook-layer {
+  opacity: 1;
+  pointer-events: none;
 }
 
-.library-back-button,
 .book-link-button {
   border: 1px solid rgba(43, 76, 115, 0.86);
   border-radius: 8px;
@@ -126,29 +185,27 @@
   cursor: pointer;
 }
 
-.library-back-button:hover,
 .book-link-button:hover {
   background: #2a4c72;
 }
 
 .dom-flipbook-host {
-  position: relative;
+  position: absolute;
+  inset: 0;
   min-height: 0;
   height: 100%;
-  max-width: min(1080px, 100%);
-  margin: 0 auto;
   width: 100%;
-  aspect-ratio: 3 / 2;
 }
 
 .interaction-lock {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 20;
   cursor: wait;
 }
 
 .dungeon-book-page {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -163,6 +220,54 @@
     linear-gradient(135deg, #f2e1b6, #fff4d4 48%, #ead39f);
   border: 1px solid rgba(114, 77, 34, 0.26);
   font-family: Georgia, "Times New Roman", serif;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    inset 0 -18px 28px rgba(117, 77, 34, 0.08);
+}
+
+.dungeon-book-page::before,
+.opening-paper-page::before,
+.dungeon-book-inside-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(85, 54, 24, 0.18), transparent 10%, transparent 90%, rgba(85, 54, 24, 0.12)),
+    radial-gradient(ellipse at 100% 50%, rgba(90, 57, 25, 0.13), transparent 18%);
+}
+
+.dungeon-book-page::after,
+.opening-paper-page::after,
+.dungeon-book-inside-cover::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  border-radius: inherit;
+  border-right: 1px solid rgba(111, 73, 32, 0.16);
+  border-bottom: 1px solid rgba(111, 73, 32, 0.12);
+  box-shadow:
+    5px 0 0 rgba(245, 224, 179, 0.18),
+    9px 0 0 rgba(118, 77, 34, 0.06);
+}
+
+.dungeon-book-page[class~="--left"],
+.opening-paper-page[class~="--left"],
+.dungeon-book-inside-cover[class~="--left"] {
+  border-radius: 20px 6px 6px 20px / 28px 6px 6px 28px;
+  box-shadow:
+    inset -24px 0 34px rgba(81, 48, 20, 0.13),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.dungeon-book-page[class~="--right"],
+.opening-paper-page[class~="--right"],
+.dungeon-book-inside-cover[class~="--right"] {
+  border-radius: 6px 20px 20px 6px / 6px 28px 28px 6px;
+  box-shadow:
+    inset 24px 0 34px rgba(81, 48, 20, 0.15),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32);
 }
 
 .dungeon-book-page h1 {
@@ -266,127 +371,111 @@
   font-size: clamp(1.6rem, 4vw, 2.8rem);
 }
 
-.opening-book-flight {
-  position: fixed;
-  z-index: 1000;
-  transform: translate3d(0, 0, 0) scale(1);
-  transform-origin: center center;
-  transition: transform 620ms cubic-bezier(0.18, 0.84, 0.24, 1);
-  pointer-events: none;
-}
-
-.opening-book-flight.is-centered {
-  transform: translate3d(var(--open-dx), var(--open-dy), 0) scale(var(--open-scale));
-}
-
-.opening-book-assembly {
+.dungeon-book-cover-page {
   position: relative;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
-  transform-style: preserve-3d;
-  perspective: 900px;
-}
-
-.opening-book-back,
-.opening-book-cover,
-.opening-fake-page {
-  position: absolute;
-  inset: 0;
-  border-radius: 7px 10px 10px 7px;
-  transform-origin: left center;
-}
-
-.opening-book-back {
-  background: linear-gradient(135deg, #321d23, #1a273c);
-  box-shadow: 22px 28px 46px rgba(0, 0, 0, 0.5);
-}
-
-.opening-book-cover {
+  overflow: hidden;
   display: grid;
   place-items: center;
-  padding: 22px;
+  padding: 28px;
+  border: 1px solid rgba(237, 204, 137, 0.34);
+  border-radius: 7px 10px 10px 7px;
+}
+
+.dungeon-book-front-cover {
+  overflow: visible;
   color: #fff7da;
   font-weight: 900;
   text-align: center;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 16%, rgba(255, 255, 255, 0.08) 72%, rgba(0, 0, 0, 0.18)),
     linear-gradient(145deg, #6f2237, #943855 42%, #263d64);
-  box-shadow: inset 10px 0 16px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 10px 0 16px rgba(0, 0, 0, 0.3),
+    14px 18px 28px rgba(0, 0, 0, 0.32);
 }
 
-.is-centered .opening-book-cover {
-  animation: cover-open 1180ms cubic-bezier(0.22, 0.74, 0.28, 1) 520ms forwards;
+.dungeon-book-front-cover::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  pointer-events: none;
+  border: 2px solid rgba(255, 223, 151, 0.42);
+  border-radius: 13px 16px 16px 13px;
+  box-shadow:
+    0 0 0 3px rgba(80, 38, 47, 0.88),
+    18px 24px 32px rgba(0, 0, 0, 0.32);
 }
 
-.opening-fake-page {
-  inset: 4px 5px 4px 9px;
+.dungeon-book-front-cover::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 232, 172, 0.26);
+  border-radius: 7px 9px 9px 7px;
+  box-shadow: inset 0 0 24px rgba(255, 244, 199, 0.06);
+}
+
+.dungeon-book-cover-spine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: 18px;
+  border-right: 1px solid rgba(255, 232, 172, 0.24);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.dungeon-book-cover-title {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 0.95;
+}
+
+.dungeon-book-cover-subtitle {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  color: rgba(255, 247, 218, 0.76);
+  font-size: 0.95rem;
+}
+
+.dungeon-book-inside-cover {
+  border-radius: 9px 16px 16px 9px;
   background:
-    linear-gradient(90deg, rgba(103, 71, 36, 0.2), transparent 12%),
-    linear-gradient(135deg, #f4e5bd, #fff8df);
-  box-shadow: 8px 12px 18px rgba(0, 0, 0, 0.18);
-  opacity: 0;
+    linear-gradient(90deg, rgba(86, 54, 30, 0.22), transparent 18%, rgba(255, 255, 255, 0.18)),
+    linear-gradient(135deg, #dfca9d, #f4e5bd 54%, #d7bd89);
+  box-shadow: inset -10px 0 18px rgba(81, 51, 25, 0.2);
 }
 
-.is-centered .opening-fake-page-1 {
-  animation: fake-page-open 980ms cubic-bezier(0.24, 0.74, 0.28, 1) 760ms forwards;
+.opening-paper-page {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(126, 83, 36, 0.18);
+  background:
+    linear-gradient(90deg, rgba(116, 78, 35, 0.14), transparent 12%, transparent 88%, rgba(116, 78, 35, 0.08)),
+    linear-gradient(135deg, #f2dfb2, #fff7dd 50%, #ead5a4);
 }
 
-.is-centered .opening-fake-page-2 {
-  animation: fake-page-open-two 1060ms cubic-bezier(0.24, 0.74, 0.28, 1) 890ms forwards;
+.opening-paper-page:nth-child(even) {
+  background:
+    linear-gradient(90deg, rgba(116, 78, 35, 0.09), transparent 16%, rgba(255, 255, 255, 0.12) 78%, rgba(116, 78, 35, 0.12)),
+    linear-gradient(135deg, #ead39f, #f6e8c3 52%, #dfc28d);
 }
 
-.is-centered .opening-fake-page-3 {
-  animation: fake-page-open 1120ms cubic-bezier(0.22, 0.72, 0.3, 1) 1010ms forwards;
-}
-
-.is-centered .opening-fake-page-4 {
-  animation: fake-page-open-two 1180ms cubic-bezier(0.22, 0.72, 0.3, 1) 1130ms forwards;
-}
-
-.is-centered .opening-fake-page-5 {
-  animation: fake-page-open-final 1260ms cubic-bezier(0.2, 0.7, 0.25, 1) 1250ms forwards;
-}
-
-@keyframes cover-open {
-  0% {
-    transform: rotateY(0deg);
-  }
-  100% {
-    transform: rotateY(-148deg) rotateZ(-2deg) translateX(-8px);
-  }
-}
-
-@keyframes fake-page-open {
-  0% {
-    opacity: 1;
-    transform: rotateY(0deg) translateX(0);
-  }
-  100% {
-    opacity: 0.2;
-    transform: rotateY(-152deg) rotateZ(1.4deg) translateX(-6px);
-  }
-}
-
-@keyframes fake-page-open-two {
-  0% {
-    opacity: 1;
-    transform: rotateY(0deg) translateX(0);
-  }
-  100% {
-    opacity: 0.18;
-    transform: rotateY(-156deg) rotateZ(-1deg) translateX(-8px);
-  }
-}
-
-@keyframes fake-page-open-final {
-  0% {
-    opacity: 1;
-    transform: rotateY(0deg) translateX(0);
-  }
-  100% {
-    opacity: 0;
-    transform: rotateY(-160deg) rotateZ(0.6deg) translateX(-10px);
-  }
+.opening-paper-warmth {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.28), transparent 30%),
+    radial-gradient(circle at 70% 82%, rgba(120, 77, 34, 0.08), transparent 34%);
 }
 
 @media (max-width: 760px) {
@@ -399,15 +488,9 @@
     padding: 22px;
   }
 
-  .open-book-panel {
-    position: relative;
-    min-height: 620px;
-    margin-top: -320px;
-  }
-
-  .dom-flipbook-host {
-    aspect-ratio: 3 / 4;
-    min-height: 560px;
+  .reader-close-button {
+    top: 10px;
+    right: 10px;
   }
 
   .world-dungeon-grid {
@@ -433,16 +516,13 @@
 @media (prefers-reduced-motion: reduce) {
   .library-book,
   .library-shelf,
-  .open-book-panel,
+  .content-flipbook-layer,
   .world-dungeon-card,
   .floor-button {
     transition-duration: 1ms;
   }
 
-  .opening-book-flight,
-  .opening-book-cover,
-  .opening-fake-page {
-    animation: none;
+  .book-stage {
     transition: none;
   }
 }

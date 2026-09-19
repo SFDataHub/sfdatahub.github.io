@@ -6,6 +6,10 @@
   height: 100%;
 }
 
+.bookMode {
+  overflow: visible;
+}
+
 .stage {
   position: relative;
   width: 100%;
@@ -18,10 +22,56 @@
   overflow: hidden;
 }
 
+.bookMode .stage {
+  min-height: 0;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.bookMode .stage::after {
+  content: "";
+  position: absolute;
+  inset: -10px -14px -12px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 22px;
+  background:
+    linear-gradient(90deg, rgba(31, 19, 11, 0.45), rgba(31, 19, 11, 0.08) 2%, transparent 7%, transparent 93%, rgba(31, 19, 11, 0.12)),
+    linear-gradient(180deg, rgba(255, 247, 222, 0.2), transparent 13%, transparent 88%, rgba(67, 43, 22, 0.2));
+  box-shadow:
+    0 30px 58px rgba(2, 5, 10, 0.42),
+    0 10px 18px rgba(38, 25, 13, 0.24);
+}
+
+.bookMode .stage::before {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: -7px;
+  bottom: -7px;
+  left: 50%;
+  width: 34px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(51, 31, 16, 0.24) 33%, rgba(255, 247, 220, 0.18) 50%, rgba(50, 30, 15, 0.28) 68%, transparent),
+    radial-gradient(ellipse at center, rgba(25, 14, 6, 0.22), transparent 68%);
+  opacity: 0.86;
+  mix-blend-mode: multiply;
+}
+
 /* PageFlip host */
 .host {
   position: absolute;
   inset: 0;
+}
+
+.bookMode .host {
+  z-index: 1;
+  overflow: visible;
 }
 
 .htmlSource {
@@ -68,6 +118,19 @@
   z-index: 30;
 }
 
+.bookMode .hud {
+  left: 50%;
+  right: auto;
+  bottom: -58px;
+  width: min(460px, calc(100% - 24px));
+  height: 42px;
+  transform: translateX(-50%);
+  border-color: rgba(176, 196, 217, 0.36);
+  border-radius: 8px;
+  background: rgba(10, 18, 30, 0.82);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.3);
+}
+
 .hBtn {
   min-width: 36px;
   height: 28px;
@@ -104,9 +167,11 @@
 /* Responsive Mindesthöhe – kann bleiben, Bühne via aspect-ratio kommt aus Page-CSS */
 @media (min-width: 768px) {
   .stage { min-height: 560px; }
+  .bookMode .stage { min-height: 0; }
 }
 @media (min-width: 1280px) {
   .stage { min-height: 620px; }
+  .bookMode .stage { min-height: 0; }
 }
 
 /* --- HistoryBook overrides: Edge-Buttons nicht in den Gutter ragen ---
@@ -124,6 +189,13 @@
 :global(.stf__block) {
   contain: layout paint style size;
   overflow: hidden;
+}
+
+.bookMode :global(.page-flip),
+.bookMode :global(.stf__wrapper),
+.bookMode :global(.stf__block) {
+  contain: layout style;
+  overflow: visible !important;
 }
 
 :global(.stf__page),
