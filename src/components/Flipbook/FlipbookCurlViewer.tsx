@@ -31,6 +31,7 @@ type Props = {
   showCover?: boolean;
   enableKeyboard?: boolean;
   visualMode?: "default" | "book";
+  visualState?: "cover" | "opening" | "reading";
   flippingTime?: number;
   syncPageIndex?: number | null;
   noSound?: boolean;
@@ -61,6 +62,8 @@ const supportsFullscreen = () => {
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const isActivePageFlipState = (state: unknown) =>
+  state === "flipping" || state === "fold_corner" || state === "user_fold";
 
 /* ========================================================================== */
 /*  Singleton (persistiert über React Mount/Unmount hinweg)                   */
@@ -146,6 +149,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   showCover = false,
   enableKeyboard = true,
   visualMode = "default",
+  visualState = "reading",
   flippingTime,
   syncPageIndex = null,
   noSound = true,
@@ -161,6 +165,15 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   const visiblePageCount = displayPageCount ?? Math.max(0, pageCount - displayPageOffset);
   const bookTitle = isHtmlMode ? (title ?? "Flipbook") : (manifest?.title ?? "");
   const bookMode = visualMode === "book";
+  const bookStateClass = bookMode
+    ? visualState === "cover"
+      ? styles.bookCoverState
+      : visualState === "opening"
+        ? styles.bookOpeningState
+        : styles.bookReadingState
+    : "";
+  const [isFlipping, setIsFlipping] = useState(false);
+  const bookFlippingClass = bookMode && isFlipping ? styles.bookFlippingState : "";
   const [currentPage0, setCurrentPage0] = useState(0);
 
   // Props via Refs – keine Re-Init bei Referenzwechsel
@@ -301,6 +314,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     const onInit = () => {
       const p0 = clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
       pf.turnToPage(p0, "hard");
+      setIsFlipping(false);
       setCurrentPage0(p0);
       // Preload leicht verzögert starten (nach erster Darstellung)
       setTimeout(() => preloadNextSpread(p0), 220);
@@ -320,6 +334,11 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       pageChangeRef.current?.(p0);
       // Preload NACH der Flip-Animation starten, um Flicker zu vermeiden
       setTimeout(() => preloadNextSpread(p0), 220);
+    });
+
+    pf.on("changeState", (e: any) => {
+      const nextIsFlipping = isActivePageFlipState(e.data);
+      setIsFlipping((previous) => previous === nextIsFlipping ? previous : nextIsFlipping);
     });
 
     // ResizeObserver auf den äußeren Wrapper (nicht auf hostEl, die wandert)
@@ -353,6 +372,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     if (syncPageIndex == null || !singleton.pf) return;
     try {
       singleton.pf.turnToPage(syncPageIndex, "hard");
+      setIsFlipping(false);
       setCurrentPage0(syncPageIndex);
       pageChangeRef.current?.(syncPageIndex);
     } catch {}
@@ -381,7 +401,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
 
   return (
     <div
-      className={`${styles.viewerRoot} ${bookMode ? styles.bookMode : ""}`}
+      className={`${styles.viewerRoot} ${bookMode ? styles.bookMode : ""} ${bookStateClass} ${bookFlippingClass}`}
       ref={wrapRef}
       aria-label={bookTitle}
     >

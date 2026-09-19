@@ -141,6 +141,40 @@
   pointer-events: none;
 }
 
+.book-stage::before,
+.book-stage::after {
+  content: "";
+  position: absolute;
+  left: var(--book-page-width);
+  top: 0;
+  width: var(--book-page-width);
+  height: var(--book-page-height);
+  pointer-events: none;
+  border-radius: 6px 9px 9px 6px / 7px 10px 10px 7px;
+}
+
+.book-stage::before {
+  z-index: 2;
+  transform: translate3d(8px, 5px, -1px);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 249, 226, 0.72) 0 2px, rgba(214, 183, 121, 0.66) 2px 4px),
+    linear-gradient(90deg, rgba(74, 45, 21, 0.24), rgba(252, 233, 184, 0.94) 13%, rgba(224, 190, 122, 0.86));
+  box-shadow:
+    8px 11px 19px rgba(0, 0, 0, 0.24),
+    inset 8px 0 11px rgba(87, 52, 23, 0.15),
+    inset -7px 0 10px rgba(86, 51, 22, 0.13);
+}
+
+.book-stage::after {
+  z-index: 1;
+  transform: translate3d(13px, 10px, -2px);
+  background:
+    linear-gradient(90deg, rgba(34, 17, 23, 0.72), rgba(105, 36, 56, 0.94) 32%, rgba(27, 42, 68, 0.96));
+  box-shadow:
+    13px 18px 34px rgba(0, 0, 0, 0.32),
+    4px 5px 0 rgba(30, 18, 24, 0.22);
+}
+
 .book-reader-overlay.is-opening .book-stage {
   transform: translate3d(var(--stage-start-x), var(--stage-start-y), 0) scale(var(--stage-start-scale));
 }
@@ -219,6 +253,7 @@
     linear-gradient(90deg, rgba(128, 88, 43, 0.18), transparent 10%, transparent 90%, rgba(128, 88, 43, 0.12)),
     linear-gradient(135deg, #f2e1b6, #fff4d4 48%, #ead39f);
   border: 1px solid rgba(114, 77, 34, 0.26);
+  border-radius: 8px;
   font-family: Georgia, "Times New Roman", serif;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.32),
@@ -233,8 +268,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(85, 54, 24, 0.18), transparent 10%, transparent 90%, rgba(85, 54, 24, 0.12)),
-    radial-gradient(ellipse at 100% 50%, rgba(90, 57, 25, 0.13), transparent 18%);
+    linear-gradient(90deg, rgba(85, 54, 24, 0.12), transparent 12%, transparent 88%, rgba(85, 54, 24, 0.09)),
+    radial-gradient(ellipse at 100% 50%, rgba(90, 57, 25, 0.09), transparent 20%);
 }
 
 .dungeon-book-page::after,
@@ -242,31 +277,35 @@
 .dungeon-book-inside-cover::after {
   content: "";
   position: absolute;
-  inset: 4px;
+  inset: 3px;
   pointer-events: none;
   border-radius: inherit;
   border-right: 1px solid rgba(111, 73, 32, 0.16);
   border-bottom: 1px solid rgba(111, 73, 32, 0.12);
   box-shadow:
-    5px 0 0 rgba(245, 224, 179, 0.18),
-    9px 0 0 rgba(118, 77, 34, 0.06);
+    4px 0 0 rgba(245, 224, 179, 0.13),
+    7px 0 0 rgba(118, 77, 34, 0.04);
 }
 
 .dungeon-book-page[class~="--left"],
 .opening-paper-page[class~="--left"],
 .dungeon-book-inside-cover[class~="--left"] {
-  border-radius: 20px 6px 6px 20px / 28px 6px 6px 28px;
+  border-radius: 8px 4px 5px 7px / 9px 4px 6px 10px;
   box-shadow:
-    inset -24px 0 34px rgba(81, 48, 20, 0.13),
+    inset -22px 0 36px rgba(81, 48, 20, 0.12),
+    inset 0 13px 18px rgba(255, 251, 232, 0.13),
+    inset 0 -15px 24px rgba(102, 66, 28, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 .dungeon-book-page[class~="--right"],
 .opening-paper-page[class~="--right"],
 .dungeon-book-inside-cover[class~="--right"] {
-  border-radius: 6px 20px 20px 6px / 6px 28px 28px 6px;
+  border-radius: 4px 8px 7px 5px / 4px 9px 10px 6px;
   box-shadow:
-    inset 24px 0 34px rgba(81, 48, 20, 0.15),
+    inset 22px 0 36px rgba(81, 48, 20, 0.13),
+    inset 0 13px 18px rgba(255, 251, 232, 0.13),
+    inset 0 -15px 24px rgba(102, 66, 28, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.32);
 }
 
@@ -382,6 +421,9 @@
   padding: 28px;
   border: 1px solid rgba(237, 204, 137, 0.34);
   border-radius: 7px 10px 10px 7px;
+  background-color: #6f2237;
+  opacity: 1;
+  isolation: isolate;
 }
 
 .dungeon-book-front-cover {
@@ -389,6 +431,7 @@
   color: #fff7da;
   font-weight: 900;
   text-align: center;
+  transform-style: preserve-3d;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 16%, rgba(255, 255, 255, 0.08) 72%, rgba(0, 0, 0, 0.18)),
     linear-gradient(145deg, #6f2237, #943855 42%, #263d64);
@@ -404,6 +447,8 @@
   pointer-events: none;
   border: 2px solid rgba(255, 223, 151, 0.42);
   border-radius: 13px 16px 16px 13px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   box-shadow:
     0 0 0 3px rgba(80, 38, 47, 0.88),
     18px 24px 32px rgba(0, 0, 0, 0.32);
@@ -416,7 +461,27 @@
   pointer-events: none;
   border: 1px solid rgba(255, 232, 172, 0.26);
   border-radius: 7px 9px 9px 7px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   box-shadow: inset 0 0 24px rgba(255, 244, 199, 0.06);
+}
+
+.dungeon-book-cover-inner-material {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  transform: rotateY(180deg) translateZ(1px);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.3), rgba(255, 226, 166, 0.07) 18%, rgba(255, 255, 255, 0.04) 58%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(145deg, #5c1c2f 0%, #7a2b47 48%, #213658 100%);
+  box-shadow:
+    inset 16px 0 24px rgba(0, 0, 0, 0.32),
+    inset -9px 0 18px rgba(255, 225, 163, 0.08),
+    inset 0 0 0 1px rgba(255, 232, 172, 0.12);
 }
 
 .dungeon-book-cover-spine {
@@ -426,6 +491,8 @@
   width: 18px;
   border-right: 1px solid rgba(255, 232, 172, 0.24);
   background: rgba(0, 0, 0, 0.22);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .dungeon-book-cover-title {
@@ -433,6 +500,8 @@
   z-index: 1;
   font-size: clamp(2rem, 5vw, 4rem);
   line-height: 0.95;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .dungeon-book-cover-subtitle {
@@ -441,14 +510,40 @@
   align-self: end;
   color: rgba(255, 247, 218, 0.76);
   font-size: 0.95rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .dungeon-book-inside-cover {
-  border-radius: 9px 16px 16px 9px;
+  border-radius: 7px 9px 9px 6px / 7px 10px 10px 7px;
+  border-color: rgba(237, 204, 137, 0.32);
   background:
-    linear-gradient(90deg, rgba(86, 54, 30, 0.22), transparent 18%, rgba(255, 255, 255, 0.18)),
-    linear-gradient(135deg, #dfca9d, #f4e5bd 54%, #d7bd89);
-  box-shadow: inset -10px 0 18px rgba(81, 51, 25, 0.2);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.26), rgba(255, 226, 166, 0.08) 17%, rgba(255, 255, 255, 0.06) 60%, rgba(0, 0, 0, 0.18)),
+    linear-gradient(145deg, #6f2237 0%, #943855 46%, #263d64 100%);
+  box-shadow:
+    inset 14px 0 22px rgba(0, 0, 0, 0.3),
+    inset -8px 0 18px rgba(255, 225, 163, 0.1),
+    inset 0 0 0 1px rgba(255, 232, 172, 0.08),
+    10px 14px 22px rgba(0, 0, 0, 0.2);
+}
+
+.dungeon-book-inside-cover::before {
+  background:
+    linear-gradient(90deg, rgba(10, 5, 8, 0.3), transparent 20%, rgba(255, 224, 156, 0.1) 54%, rgba(9, 15, 28, 0.22)),
+    radial-gradient(ellipse at 70% 24%, rgba(255, 225, 162, 0.1), transparent 42%);
+}
+
+.dungeon-book-inside-cover::after {
+  inset: 14px;
+  border: 1px solid rgba(255, 226, 166, 0.22);
+  border-radius: 5px 7px 7px 5px;
+  box-shadow: inset 0 0 26px rgba(255, 232, 172, 0.08);
+}
+
+.dungeon-book-inside-cover .opening-paper-warmth {
+  background:
+    radial-gradient(circle at 26% 22%, rgba(255, 224, 156, 0.12), transparent 30%),
+    radial-gradient(circle at 74% 78%, rgba(15, 24, 44, 0.2), transparent 38%);
 }
 
 .opening-paper-page {
@@ -510,6 +605,48 @@
   .dungeon-book-page {
     padding: 24px;
     gap: 16px;
+  }
+
+  .book-stage::before,
+  .book-stage::after {
+    border-radius: 5px 7px 7px 5px / 6px 8px 8px 6px;
+  }
+
+  .book-stage::before {
+    transform: translate3d(5px, 4px, -1px);
+    box-shadow:
+      5px 8px 15px rgba(0, 0, 0, 0.2),
+      inset 5px 0 8px rgba(87, 52, 23, 0.12),
+      inset -5px 0 8px rgba(86, 51, 22, 0.1);
+  }
+
+  .book-stage::after {
+    transform: translate3d(8px, 8px, -2px);
+    box-shadow:
+      8px 12px 24px rgba(0, 0, 0, 0.26),
+      3px 4px 0 rgba(30, 18, 24, 0.18);
+  }
+
+  .dungeon-book-page[class~="--left"],
+  .opening-paper-page[class~="--left"],
+  .dungeon-book-inside-cover[class~="--left"] {
+    border-radius: 7px 4px 5px 7px / 8px 4px 6px 9px;
+    box-shadow:
+      inset -16px 0 28px rgba(81, 48, 20, 0.1),
+      inset 0 10px 15px rgba(255, 251, 232, 0.1),
+      inset 0 -11px 18px rgba(102, 66, 28, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  }
+
+  .dungeon-book-page[class~="--right"],
+  .opening-paper-page[class~="--right"],
+  .dungeon-book-inside-cover[class~="--right"] {
+    border-radius: 4px 7px 7px 5px / 4px 8px 9px 6px;
+    box-shadow:
+      inset 16px 0 28px rgba(81, 48, 20, 0.1),
+      inset 0 10px 15px rgba(255, 251, 232, 0.1),
+      inset 0 -11px 18px rgba(102, 66, 28, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.27);
   }
 }
 

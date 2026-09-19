@@ -14,3 +14,4 @@ export * from "./normalizedDungeons";
 export * from "./normalizedResources";
 export * from "./normalizedUnderworld";
 export * from "./normalizedExtendedPlayer";
+export * from "./normalizedGuild";

@@ -35,7 +35,7 @@ import {
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
 import type { GuildSnapshotCoverageStatus } from "../../lib/guilds/guildCoverage";
-import { normalizeGuildScanServer, normalizeGuildSegmentForScan, type NormalizedGuildMember } from "../../lib/guilds/guildScanNormalizer";
+import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../../lib/guilds/guildScanNormalizer";
 import {
   importFightTrackerTransferStates,
   readFightTrackerSummaries,
@@ -54,7 +54,9 @@ import styles from "./ScanManagementOverlay.module.css";
 import {
   buildScanExplorerData,
   formatCoverageStatus,
+  getScanExplorerGuildDetail,
   getLimitedScanExplorerResults,
+  linkScanExplorerPlayerToGuildMember,
   normalizeScanExplorerPlayer,
   SCAN_EXPLORER_MAX_VISIBLE_RESULTS,
   type ScanExplorerData,
@@ -69,6 +71,7 @@ import {
   toScanExplorerTimestampDate,
 } from "./scanExplorerFormatting";
 import type { NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
+import type { NormalizedGuild, NormalizedGuildMember, NormalizedPlayerGuildMemberLink } from "../../lib/parsing/normalizedGuild";
 
 type ScanManagementOverlayProps = {
   isOpen: boolean;
@@ -1270,6 +1273,10 @@ function ScanDetailsOverlay({
     normalizedPlayerCacheRef.current.set(selectedPlayer.key, normalized);
     return normalized;
   }, [selectedPlayer]);
+  const selectedPlayerGuildLink = React.useMemo(() => {
+    if (!data || !selectedNormalizedPlayer) return null;
+    return linkScanExplorerPlayerToGuildMember(data, selectedNormalizedPlayer);
+  }, [data, selectedNormalizedPlayer]);
 
   return (
     <div
@@ -1346,6 +1353,7 @@ function ScanDetailsOverlay({
                 <ScanExplorerPlayerDetail
                   player={selectedPlayer}
                   normalized={selectedNormalizedPlayer}
+                  guildLink={selectedPlayerGuildLink}
                   onBack={() => setView({ kind: "results" })}
                 />
               ) : selectedGuild ? (
@@ -1424,6 +1432,10 @@ function formatDamageRange(range: { min: number | null; max: number | null } | n
 
 function formatClassName(value: number | null) {
   return value == null ? null : PLAYER_CLASS_NAMES[value] ?? `Class ${value}`;
+}
+
+function formatGuildRole(value: NormalizedGuildMember["role"]["name"]) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : null;
 }
 
 function formatSourceStatus(normalized: NormalizedPlayer, path: string, value: unknown) {
@@ -1603,13 +1615,16 @@ function ScanExplorerBackButton({ onBack }: { onBack: () => void }) {
 function ScanExplorerPlayerDetail({
   player,
   normalized,
+  guildLink,
   onBack,
 }: {
   player: ScanExplorerPlayerEntity;
   normalized: NormalizedPlayer;
+  guildLink: NormalizedPlayerGuildMemberLink | null;
   onBack: () => void;
 }) {
   const className = formatClassName(normalized.identity.class);
+  const showLegacyGuildBonuses = !guildLink?.linked;
 
   return (
     <>
@@ -1649,6 +1664,25 @@ function ScanExplorerPlayerDetail({
           ]}
         />
       </ScanDetailSection>
+
+      {guildLink?.linked ? (
+        <ScanExplorerPlayerGuildMemberSection guildLink={guildLink} />
+      ) : guildLink?.ambiguous ? (
+        <ScanDetailSection title="Guild Member">
+          <div className={styles.unsupportedNote}>Guild member data is ambiguous for this player identifier in this scan.</div>
+        </ScanDetailSection>
+      ) : guildLink?.guildReference ? (
+        <ScanDetailSection title="Guild Member">
+          <MetricGrid
+            items={[
+              { label: "Guild", value: guildLink.guildReference.name },
+              { label: "Guild Identifier", value: guildLink.guildReference.identifier },
+              { label: "Server", value: guildLink.guildReference.server },
+            ]}
+          />
+          <div className={styles.unsupportedNote}>No matching GuildMember entry is available in this scan.</div>
+        </ScanDetailSection>
+      ) : null}
 
       <ScanDetailSection title="Attributes">
         <div className={styles.attributeGrid}>
@@ -1698,9 +1732,13 @@ function ScanExplorerPlayerDetail({
             { label: "Mount Expires", value: formatTimestampMs(normalized.progressionStatus.mount.expiresAt) },
             { label: "Portal Health", value: normalized.progressionStatus.portalBonuses.health },
             { label: "Portal Damage", value: normalized.progressionStatus.portalBonuses.damage },
-            { label: "Guild Treasure", value: normalized.progressionStatus.guildBonuses.treasure },
-            { label: "Guild Instructor", value: normalized.progressionStatus.guildBonuses.instructor },
-            { label: "Guild Pet", value: normalized.progressionStatus.guildBonuses.pet },
+            ...(showLegacyGuildBonuses
+              ? [
+                  { label: "Guild Treasure", value: guildLink?.guildBonuses.treasure ?? normalized.progressionStatus.guildBonuses.treasure },
+                  { label: "Guild Instructor", value: guildLink?.guildBonuses.instructor ?? normalized.progressionStatus.guildBonuses.instructor },
+                  { label: "Guild Pet", value: guildLink?.guildBonuses.pet ?? normalized.progressionStatus.guildBonuses.pet },
+                ]
+              : []),
           ]}
         />
       </ScanDetailSection>
@@ -1709,6 +1747,32 @@ function ScanExplorerPlayerDetail({
       <ScanExplorerDungeonsSection normalized={normalized} />
       <ScanExplorerAdvancedSections normalized={normalized} />
     </>
+  );
+}
+
+function ScanExplorerPlayerGuildMemberSection({ guildLink }: { guildLink: NormalizedPlayerGuildMemberLink }) {
+  return (
+    <ScanDetailSection title="Guild Member">
+      <MetricGrid
+        items={[
+          { label: "Guild", value: guildLink.guildReference?.name },
+          { label: "Guild Identifier", value: guildLink.guildReference?.identifier },
+          { label: "Server", value: guildLink.guildReference?.server },
+          { label: "Role", value: formatGuildRole(guildLink.role) },
+          { label: "Last Active", value: formatTimestampMs(guildLink.lastActive) },
+          { label: "Ready Attack", value: guildLink.readyAttack },
+          { label: "Ready Defense", value: guildLink.readyDefense },
+          { label: "Hydra Action", value: guildLink.actions.hydra },
+          { label: "Attack Action", value: guildLink.actions.attack },
+          { label: "Defense Action", value: guildLink.actions.defense },
+          { label: "Raid Action", value: guildLink.actions.raid },
+          { label: "Guild Treasure", value: guildLink.guildBonuses.treasure },
+          { label: "Guild Instructor", value: guildLink.guildBonuses.instructor },
+          { label: "Guild Pet", value: guildLink.guildBonuses.pet },
+          { label: "Knights Contribution", value: guildLink.knightsContribution },
+        ]}
+      />
+    </ScanDetailSection>
   );
 }
 
@@ -1986,8 +2050,13 @@ function ScanExplorerGuildDetail({
   onBack: () => void;
 }) {
   const group = guild.group;
-  const members = getGuildMembersForExplorer(data, guild);
+  const normalizedGuild = getScanExplorerGuildDetail(data, guild);
+  const members = normalizedGuild ? sortNormalizedGuildMembers(normalizedGuild.members) : [];
   const summaryGuild = findSummaryGuild(summary, guild);
+  const displayName = normalizedGuild?.identity.name ?? group.guildName;
+  const displayIdentifier = normalizedGuild?.identity.identifier ?? group.guildIdentifier;
+  const displayServer = normalizedGuild?.identity.server ?? group.server;
+  const coa = normalizedGuild?.identity.coa ?? summaryGuild?.coaString;
 
   return (
     <>
@@ -1997,24 +2066,29 @@ function ScanExplorerGuildDetail({
       <section className={styles.entityDetailHeader} aria-label="Guild">
         <Shield size={18} aria-hidden />
         <div>
-          <h3>{group.guildName}</h3>
-          <p>{[group.server, group.guildIdentifier].filter(Boolean).join(" - ")}</p>
+          <h3>{displayName}</h3>
+          <p>{[displayServer, displayIdentifier].filter(Boolean).join(" - ")}</p>
         </div>
       </section>
 
       <ScanDetailSection title="Overview">
         <MetricGrid
           items={[
-            { label: "Name", value: group.guildName },
-            { label: "Identifier", value: group.guildIdentifier },
-            { label: "Server", value: group.server },
-            { label: "CoA", value: summaryGuild?.coaString },
+            { label: "Name", value: displayName },
+            { label: "Identifier", value: displayIdentifier },
+            { label: "Server", value: displayServer },
+            { label: "CoA", value: coa },
+            { label: "Rank", value: normalizedGuild?.progression.rank },
+            { label: "Honor", value: normalizedGuild?.progression.honor },
             { label: "Snapshots", value: group.rows.length },
             { label: "Complete Snapshots", value: group.completeSnapshotCount },
-            { label: "Members", value: group.rows[0]?.declaredMemberCount ?? members.length },
+            { label: "Members", value: normalizedGuild?.totals.membersTotal ?? group.rows[0]?.declaredMemberCount ?? members.length },
+            { label: "Description", value: normalizedGuild?.identity.description },
           ]}
         />
       </ScanDetailSection>
+
+      {normalizedGuild ? <ScanExplorerGuildNormalizedSections guild={normalizedGuild} /> : null}
 
       <ScanDetailSection title="Coverage">
         {group.rows.length ? (
@@ -2029,19 +2103,118 @@ function ScanExplorerGuildDetail({
       <ScanDetailSection title={`Members (${formatCount(members.length)})`}>
         {members.length ? (
           <div className={styles.memberList}>
-            {members.map(({ member, key, snapshotTimestamp }) => (
-              <div className={styles.memberRow} key={key}>
-                <strong>{member.name}</strong>
-                <span>{[member.guildRole, member.level == null ? null : `Level ${formatCount(member.level)}`, member.classId].filter(Boolean).join(" - ")}</span>
-                <span>{formatScanDate(new Date(snapshotTimestamp).toISOString())}</span>
-              </div>
+            {members.map((member) => (
+              <ScanExplorerGuildMemberRow member={member} key={member.identity.playerIdentifier ?? `slot:${member.identity.slot}`} />
             ))}
           </div>
         ) : (
-          <div className={styles.emptyState}>Keine Memberliste aus der bestehenden Guild-Semantik verfügbar.</div>
+          <div className={styles.emptyState}>Keine Memberliste aus der NormalizedGuild-Semantik verfügbar.</div>
         )}
       </ScanDetailSection>
     </>
+  );
+}
+
+function ScanExplorerGuildNormalizedSections({ guild }: { guild: NormalizedGuild }) {
+  return (
+    <>
+      <ScanDetailSection title="Bonuses / Totals">
+        <MetricGrid
+          items={[
+            { label: "Total Treasure", value: guild.bonuses.totalTreasure },
+            { label: "Total Instructor", value: guild.bonuses.totalInstructor },
+            { label: "Total Knights", value: guild.totals.totalKnights },
+            { label: "Total Knights 15", value: guild.totals.totalKnights15 },
+            { label: "Guild Pet ID", value: guild.combatProgress.pet.id },
+            { label: "Guild Pet Level", value: guild.combatProgress.pet.level },
+            { label: "Guild Pet Class", value: guild.combatProgress.pet.class },
+          ]}
+        />
+      </ScanDetailSection>
+      <ScanDetailSection title="Combat Progress">
+        <MetricGrid
+          items={[
+            { label: "Raid", value: guild.combatProgress.raid },
+            { label: "Portal Floor", value: guild.combatProgress.portal.floor },
+            { label: "Portal Life", value: guild.combatProgress.portal.life },
+            { label: "Portal Percent", value: guild.combatProgress.portal.percent },
+            { label: "Hydra Level", value: guild.combatProgress.hydra.level },
+            { label: "Hydra Max", value: guild.combatProgress.hydra.max },
+            { label: "Under Attack", value: guild.combatProgress.combatState.isUnderAttack },
+            { label: "Under Attack ID", value: guild.combatProgress.combatState.underAttackId },
+            { label: "Attacking", value: guild.combatProgress.combatState.isAttacking },
+            { label: "Attacking ID", value: guild.combatProgress.combatState.attackingId },
+          ]}
+        />
+      </ScanDetailSection>
+      {guild.tournament ? (
+        <ScanDetailSection title="Tournament">
+          <MetricGrid
+            items={[
+              { label: "Rank", value: guild.tournament.rank },
+              { label: "Tokens", value: guild.tournament.tokens },
+            ]}
+          />
+        </ScanDetailSection>
+      ) : null}
+    </>
+  );
+}
+
+function ScanExplorerGuildMemberRow({ member }: { member: NormalizedGuildMember }) {
+  return (
+    <div className={styles.memberRow}>
+      <strong>{member.identity.name ?? member.identity.playerIdentifier ?? `Slot ${member.identity.slot + 1}`}</strong>
+      <span>
+        {[
+          formatGuildRole(member.role.name),
+          member.identity.level == null ? null : `Level ${formatCount(member.identity.level)}`,
+          member.identity.playerIdentifier,
+        ]
+          .filter(Boolean)
+          .join(" - ")}
+      </span>
+      <span>
+        {[
+          formatTimestampMs(member.activity.lastActive),
+          member.readyAttack == null ? null : `Attack ${formatOptionalValue(member.readyAttack)}`,
+          member.readyDefense == null ? null : `Defense ${formatOptionalValue(member.readyDefense)}`,
+        ]
+          .filter(Boolean)
+          .join(" - ")}
+      </span>
+      <details className={styles.compactDetails}>
+        <summary>Member details</summary>
+        <MetricGrid
+          items={[
+            { label: "Slot", value: member.identity.slot + 1 },
+            { label: "Player ID", value: member.identity.playerId },
+            { label: "Player Identifier", value: member.identity.playerIdentifier },
+            { label: "State", value: member.activity.state },
+            { label: "Last Active", value: formatTimestampMs(member.activity.lastActive) },
+            { label: "Hydra Action", value: member.actions.hydra },
+            { label: "Attack Action", value: member.actions.attack },
+            { label: "Defense Action", value: member.actions.defense },
+            { label: "Raid Action", value: member.actions.raid },
+            { label: "Guild Treasure", value: member.bonuses.treasure },
+            { label: "Guild Instructor", value: member.bonuses.instructor },
+            { label: "Guild Pet", value: member.bonuses.pet },
+            { label: "Knights Contribution", value: member.contributions.knights },
+          ]}
+          compact
+        />
+      </details>
+    </div>
+  );
+}
+
+function sortNormalizedGuildMembers(members: NormalizedGuildMember[]) {
+  return [...members].sort(
+    (a, b) =>
+      (a.role.id ?? Number.MAX_SAFE_INTEGER) - (b.role.id ?? Number.MAX_SAFE_INTEGER) ||
+      (b.identity.level ?? -1) - (a.identity.level ?? -1) ||
+      (a.identity.name ?? "").localeCompare(b.identity.name ?? "", undefined, { numeric: true, sensitivity: "base" }) ||
+      a.identity.slot - b.identity.slot,
   );
 }
 
@@ -2054,29 +2227,6 @@ function findSummaryGuild(summary: GuildHubScanSummary, guild: ScanExplorerGuild
         normalizeGuildScanServer(entry.server) === targetServer &&
         normalizeGuildSegmentForScan(entry.guildIdentifier ?? entry.guildId) === targetSegment,
     ) ?? null
-  );
-}
-
-function getGuildMembersForExplorer(data: ScanExplorerData, guild: ScanExplorerGuildEntity) {
-  const targetServer = normalizeGuildScanServer(guild.group.server);
-  const targetSegment = normalizeGuildSegmentForScan(guild.group.guildIdentifier);
-  const members = new Map<string, { member: NormalizedGuildMember; key: string; snapshotTimestamp: number }>();
-
-  for (const snapshot of data.snapshots) {
-    for (const member of snapshot.normalizedMembers) {
-      const memberServer = normalizeGuildScanServer(member.server) ?? normalizeGuildScanServer(snapshot.servers[0]);
-      const memberSegment = normalizeGuildSegmentForScan(member.guildSegment ?? member.groupSegment);
-      if (memberServer !== targetServer || memberSegment !== targetSegment) continue;
-      const key = `${snapshot.id}:${member.memberRef}`;
-      members.set(key, { member, key, snapshotTimestamp: snapshot.timestampMs });
-    }
-  }
-
-  return [...members.values()].sort(
-    (a, b) =>
-      (a.member.guildRole ?? "").localeCompare(b.member.guildRole ?? "", undefined, { sensitivity: "base" }) ||
-      (b.member.level ?? -1) - (a.member.level ?? -1) ||
-      a.member.name.localeCompare(b.member.name, undefined, { numeric: true, sensitivity: "base" }),
   );
 }
 
