@@ -10,6 +10,7 @@ export type ClassMeta = {
   id: number;
   key: GameClassKey;
   label: string;
+  primaryAttribute: "strength" | "dexterity" | "intelligence";
   iconUrl: string;   // Einbett-URL (Google Drive)
   fallback: string;  // Emoji-Fallback
 };
@@ -45,18 +46,18 @@ const canon = (s: any) =>
 
 // --- Stammdaten
 export const CLASSES: ClassMeta[] = [
-  { id: 1,  key: "warrior",      label: "Warrior",      iconUrl: driveViewUrl(DRIVE["warrior"]),      fallback: "🗡️" },
-  { id: 2,  key: "mage",         label: "Mage",         iconUrl: driveViewUrl(DRIVE["mage"]),         fallback: "✨"  },
-  { id: 3,  key: "scout",        label: "Scout",        iconUrl: driveViewUrl(DRIVE["scout"]),        fallback: "🏹"  },
-  { id: 4,  key: "assassin",     label: "Assassin",     iconUrl: driveViewUrl(DRIVE["assassin"]),     fallback: "🗡️" },
-  { id: 7,  key: "demon-hunter", label: "Demon Hunter", iconUrl: driveViewUrl(DRIVE["demon-hunter"]), fallback: "😈🏹" },
-  { id: 6,  key: "berserker",    label: "Berserker",    iconUrl: driveViewUrl(DRIVE["berserker"]),    fallback: "🪓"  },
-  { id: 5,  key: "battle-mage",  label: "Battle Mage",  iconUrl: driveViewUrl(DRIVE["battle-mage"]),  fallback: "🛡️✨" },
-  { id: 8,  key: "druid",        label: "Druid",        iconUrl: driveViewUrl(DRIVE["druid"]),        fallback: "🌿"  },
-  { id: 9,  key: "bard",         label: "Bard",         iconUrl: driveViewUrl(DRIVE["bard"]),         fallback: "🎶"  },
-  { id: 10, key: "necromancer",  label: "Necromancer",  iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
-  { id: 11, key: "paladin",      label: "Paladin",      iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
-  { id: 12, key: "plague-doctor", label: "Plague Doctor", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
+  { id: 1,  key: "warrior",      label: "Warrior",      primaryAttribute: "strength",     iconUrl: driveViewUrl(DRIVE["warrior"]),      fallback: "🗡️" },
+  { id: 2,  key: "mage",         label: "Mage",         primaryAttribute: "intelligence", iconUrl: driveViewUrl(DRIVE["mage"]),         fallback: "✨"  },
+  { id: 3,  key: "scout",        label: "Scout",        primaryAttribute: "dexterity",    iconUrl: driveViewUrl(DRIVE["scout"]),        fallback: "🏹"  },
+  { id: 4,  key: "assassin",     label: "Assassin",     primaryAttribute: "dexterity",    iconUrl: driveViewUrl(DRIVE["assassin"]),     fallback: "🗡️" },
+  { id: 7,  key: "demon-hunter", label: "Demon Hunter", primaryAttribute: "dexterity",    iconUrl: driveViewUrl(DRIVE["demon-hunter"]), fallback: "😈🏹" },
+  { id: 6,  key: "berserker",    label: "Berserker",    primaryAttribute: "strength",     iconUrl: driveViewUrl(DRIVE["berserker"]),    fallback: "🪓"  },
+  { id: 5,  key: "battle-mage",  label: "Battle Mage",  primaryAttribute: "strength",     iconUrl: driveViewUrl(DRIVE["battle-mage"]),  fallback: "🛡️✨" },
+  { id: 8,  key: "druid",        label: "Druid",        primaryAttribute: "intelligence", iconUrl: driveViewUrl(DRIVE["druid"]),        fallback: "🌿"  },
+  { id: 9,  key: "bard",         label: "Bard",         primaryAttribute: "intelligence", iconUrl: driveViewUrl(DRIVE["bard"]),         fallback: "🎶"  },
+  { id: 10, key: "necromancer",  label: "Necromancer",  primaryAttribute: "intelligence", iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
+  { id: 11, key: "paladin",      label: "Paladin",      primaryAttribute: "strength",     iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
+  { id: 12, key: "plague-doctor", label: "Plague Doctor", primaryAttribute: "dexterity", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
 ];
 
 export const CLASS_BY_KEY = Object.fromEntries(CLASSES.map(c => [c.key, c] as const));

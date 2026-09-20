@@ -5,6 +5,7 @@ export type LocalServerDefinition = {
   displayName: string;
   host: string;
   numericId?: number;
+  releaseDate?: string;
   region: string;
   type: LocalServerType;
   active: boolean;
@@ -17,6 +18,7 @@ export const LOCAL_SERVER_REGISTRY = [
     displayName: "EU 1",
     host: "s1.sfgame.eu",
     numericId: 458,
+    releaseDate: "2023-01-06",
     region: "EU",
     type: "origin",
     active: false,
@@ -27,6 +29,7 @@ export const LOCAL_SERVER_REGISTRY = [
     displayName: "EU 2",
     host: "s2.sfgame.eu",
     numericId: 460,
+    releaseDate: "2023-02-24",
     region: "EU",
     type: "origin",
     active: false,
@@ -37,6 +40,7 @@ export const LOCAL_SERVER_REGISTRY = [
     displayName: "EU 3",
     host: "s3.sfgame.eu",
     numericId: 462,
+    releaseDate: "2023-04-14",
     region: "EU",
     type: "origin",
     active: false,
@@ -47,6 +51,7 @@ export const LOCAL_SERVER_REGISTRY = [
     displayName: "EU 4",
     host: "s4.sfgame.eu",
     numericId: 464,
+    releaseDate: "2023-05-26",
     region: "EU",
     type: "origin",
     active: false,

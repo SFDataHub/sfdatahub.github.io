@@ -142,6 +142,13 @@ const DRIVE_BY_KEY: Record<string, string> = {
  
   // XP & Gold Curve
   goldxpcurve: "1UbZoa4h3bouL8sDdxLpKzz3kFEgFim_-",
+  // Resource drops
+  dicegameresources: "1pdIFb9jL9Kk6Ci9uLnIDjncvDnZx7no9",
+  fortressresourcesdrops: "1r1v0h0o7qqGrhuvCb0q9d6PNWneMIdC5",
+  fortressresourcesexpeditioncapacity: "1vL-GUj29_Yv2KPyn0OdmmdmpdVRErEaH",
+  underworldresourcesdrops: "1p207rLGobcWlqFP_C9NNO2pXvN8lCSDM",
+  underworldresourcesexpeditionproduction: "1bmpe4wOWzzG8FCwcxmufPl4NglF4h_tW",
+  wheelresources: "1G4D6O_2es0xyWDOfkA-fZN48PMu5_Kko",
   
   // Calendar
   calendarrewards: "1K9bm0OUtW0_QUg5i9q40N0slV6kg_iTd",

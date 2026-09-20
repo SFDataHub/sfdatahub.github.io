@@ -41,25 +41,76 @@ import {
   type GuildFusionObservation,
 } from "./guildFusionResolver";
 import {
+  getPlayerFusionClassificationRank,
+  hasPlayerFusionHardContradiction,
+  isPlayerFusionActionableIdentityCandidate,
+  isPlayerFusionReadyCandidate,
   resolvePlayerFusions,
+  selectPlayerFusionReadyCandidates,
   type PlayerFusionCandidate,
   type PlayerFusionObservation,
   type PlayerFusionPlayerResult,
 } from "./playerFusionResolver";
+import type { FusionIdentityProgress } from "./fusionIdentityWorkerTypes";
 
 export type FusionIdentityEntityType = "player" | "guild";
 export type FusionIdentityManagementStatus =
   | "ready"
   | "review"
   | "unresolved"
+  | "noHistoricalObservation"
   | "noHistory"
   | "completed";
+
+export type FusionIdentityManagementReasonCode =
+  | "no-historical-scans"
+  | "no-historical-observation"
+  | "no-viable-candidate"
+  | "level-regression"
+  | "level-progression-contradiction"
+  | "semantic-contradictions"
+  | "reserved-by-other-identity"
+  | "rejected-by-exclusion"
+  | "assignment-conflict"
+  | "no-actionable-candidate"
+  | "insufficient-continuity";
+
+export type FusionIdentityCandidatePipelineDiagnostics = {
+  historicalPoolSize: number;
+  candidatesGeneratedInitially: number;
+  candidatesAfterHardCompatibility: number;
+  candidatesAfterSemanticEvaluation: number;
+  candidatesRejectedByLevelRegression: number;
+  candidatesRejectedByLevelProgression: number;
+  candidatesAfterExclusions: number;
+  candidatesAfterReservations: number;
+  finalCandidates: number;
+};
+
+export type FusionIdentityHistoricalLookupDiagnostics = {
+  type: "fusion-suffix-base-name";
+  originServer: string;
+  baseName: string;
+  classId: string | null;
+  matchingObservationCount: number;
+  compatibleClassObservationCount: number;
+};
+
+export type FusionIdentityManagementDiagnostics = {
+  reasonCode: FusionIdentityManagementReasonCode;
+  originServerCodes: string[];
+  historicalSnapshotCount: number;
+  reliableHistoricalLookup: FusionIdentityHistoricalLookupDiagnostics | null;
+  candidatePipeline: FusionIdentityCandidatePipelineDiagnostics;
+};
 
 export type FusionIdentityObservationSummary = {
   identifier: string;
   name: string | null;
   server: string | null;
   timestamp: number;
+  classId?: string | null;
+  level?: number | null;
   guildIdentifier?: string | null;
   guildName?: string | null;
 };
@@ -100,6 +151,8 @@ export type FusionIdentityManagementItem = {
   candidates: FusionIdentityCandidate[];
   memberMigrationEdges: GuildFusionMigrationEdge[];
   reasons: string[];
+  reasonCodes: FusionIdentityManagementReasonCode[];
+  diagnostics: FusionIdentityManagementDiagnostics | null;
   readyCandidateIdentifier: string | null;
   completedEntityId: string | null;
   completedAliases: string[];
@@ -110,6 +163,7 @@ export type FusionIdentityManagementSummary = {
   ready: number;
   review: number;
   unresolved: number;
+  noHistoricalObservation: number;
   noHistory: number;
   completed: number;
   players: number;
@@ -182,6 +236,11 @@ export type FusionIdentityManagementInput = FusionIdentityManagementStores & {
   snapshots: GuildHubLogicalScanSnapshot[];
 };
 
+export type FusionIdentityManagementBuildOptions = {
+  onProgress?: (progress: FusionIdentityProgress) => void;
+  enablePlayerLevelProgressionEvidence?: boolean;
+};
+
 const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"];
 const TARGET_SERVER_CODE = "F28";
 const ORIGIN_SERVER_CODE_SET = new Set(ORIGIN_SERVER_CODES);
@@ -206,6 +265,8 @@ const toObservationSummary = (observation: PlayerFusionObservation): FusionIdent
   name: observation.name,
   server: resolveServerCode(observation.server),
   timestamp: observation.timestamp,
+  classId: observation.classId,
+  level: observation.level,
   guildIdentifier: observation.guildIdentifier,
   guildName: observation.guildName,
 });
@@ -230,6 +291,7 @@ const summarize = (items: FusionIdentityManagementItem[]): FusionIdentityManagem
   ready: items.filter((item) => item.status === "ready").length,
   review: items.filter((item) => item.status === "review").length,
   unresolved: items.filter((item) => item.status === "unresolved").length,
+  noHistoricalObservation: items.filter((item) => item.status === "noHistoricalObservation").length,
   noHistory: items.filter((item) => item.status === "noHistory").length,
   completed: items.filter((item) => item.status === "completed").length,
   players: items.filter((item) => item.entityType === "player").length,
@@ -330,9 +392,7 @@ const buildAliasOptions = async (
 const buildHighConfidencePlayerMatches = (playerResults: PlayerFusionPlayerResult[]): GuildFusionPlayerMatch[] =>
   playerResults.flatMap((result) => {
     if (result.status !== "high-confidence") return [];
-    const candidate = result.candidates.find(
-      (item) => !item.rejected && (item.evidence.exactName || item.evidence.fusionBaseName),
-    );
+    const candidate = selectPlayerFusionReadyCandidates(result)[0];
     if (!candidate) return [];
     return [
       {
@@ -346,13 +406,20 @@ const buildHighConfidencePlayerMatches = (playerResults: PlayerFusionPlayerResul
 
 const selectManagementPlayerCandidates = (candidates: PlayerFusionCandidate[]) =>
   [...candidates]
-    .filter((candidate) => !candidate.rejected || candidate.evidence.exactName || candidate.evidence.fusionBaseName)
+    .filter(
+      (candidate) =>
+        isPlayerFusionActionableIdentityCandidate(candidate) &&
+        !candidate.rejectReasons.includes("level-regression") &&
+        !candidate.rejectReasons.includes("level-progression-extreme"),
+    )
     .sort(
       (left, right) =>
-        Number(right.evidence.exactName || right.evidence.fusionBaseName) -
-          Number(left.evidence.exactName || left.evidence.fusionBaseName) ||
+        getPlayerFusionClassificationRank(right.classification) - getPlayerFusionClassificationRank(left.classification) ||
         Number(right.evidence.sameGuild === true) - Number(left.evidence.sameGuild === true) ||
-        Number(right.evidence.sameClass === true) - Number(left.evidence.sameClass === true) ||
+        Number((right.evidence.baseFingerprint.unchangedCount ?? 0) >= 3) -
+          Number((left.evidence.baseFingerprint.unchangedCount ?? 0) >= 3) ||
+        Number(right.evidence.fortressContinuity === true) - Number(left.evidence.fortressContinuity === true) ||
+        Number(right.evidence.levelProgression.category === "normal") - Number(left.evidence.levelProgression.category === "normal") ||
         (right.oldLevel ?? 0) - (left.oldLevel ?? 0) ||
         left.oldIdentifier.localeCompare(right.oldIdentifier, undefined, { numeric: true, sensitivity: "base" }),
     )
@@ -465,21 +532,227 @@ const hasAssignedToOther = (
   return Boolean(assigned && [...assigned].some((identifier) => identifier !== normalizeIdentifierKey(currentIdentifier)));
 };
 
-const applyReadyCollisions = (items: FusionIdentityManagementItem[]) => {
+const READY_ASSIGNMENT_CONFLICT_REASON = "historical identity is claimed by multiple current identities";
+const RESERVED_CANDIDATE_REMOVED_REASON = "one or more candidate identities are reserved by other ready assignments";
+
+const appendReason = (item: FusionIdentityManagementItem, reason: string) => {
+  if (item.reasons.includes(reason)) return;
+  item.reasons = [...item.reasons, reason];
+};
+
+const appendReasonCode = (item: FusionIdentityManagementItem, reasonCode: FusionIdentityManagementReasonCode) => {
+  if (item.reasonCodes.includes(reasonCode)) return;
+  item.reasonCodes = [...item.reasonCodes, reasonCode];
+  if (item.diagnostics && item.diagnostics.reasonCode !== reasonCode) {
+    item.diagnostics = { ...item.diagnostics, reasonCode };
+  }
+};
+
+const createPipelineDiagnostics = (
+  result: PlayerFusionPlayerResult | null | undefined,
+  candidatesAfterExclusions: number,
+  candidatesAfterReservations: number,
+  finalCandidates: number,
+): FusionIdentityCandidatePipelineDiagnostics => ({
+  historicalPoolSize: result?.diagnostics.historicalPoolSize ?? 0,
+  candidatesGeneratedInitially: result?.diagnostics.candidatesGeneratedInitially ?? 0,
+  candidatesAfterHardCompatibility: result?.diagnostics.candidatesAfterHardCompatibility ?? 0,
+  candidatesAfterSemanticEvaluation: result?.diagnostics.candidatesAfterSemanticEvaluation ?? result?.candidatesAfterHardFilters ?? 0,
+  candidatesRejectedByLevelRegression:
+    result?.candidates.filter((candidate) => candidate.rejectReasons.includes("level-regression")).length ?? 0,
+  candidatesRejectedByLevelProgression:
+    result?.candidates.filter((candidate) => candidate.rejectReasons.includes("level-progression-extreme")).length ?? 0,
+  candidatesAfterExclusions,
+  candidatesAfterReservations,
+  finalCandidates,
+});
+
+const createPlayerDiagnostics = ({
+  result,
+  reasonCode,
+  historicalSnapshotCount,
+  candidatesAfterExclusions,
+  candidatesAfterReservations,
+  finalCandidates,
+}: {
+  result: PlayerFusionPlayerResult | null | undefined;
+  reasonCode: FusionIdentityManagementReasonCode;
+  historicalSnapshotCount: number;
+  candidatesAfterExclusions: number;
+  candidatesAfterReservations: number;
+  finalCandidates: number;
+}): FusionIdentityManagementDiagnostics => ({
+  reasonCode,
+  originServerCodes: result?.resolvedOriginServers ?? [],
+  historicalSnapshotCount,
+  reliableHistoricalLookup: result?.diagnostics.reliableHistoricalLookup ?? null,
+  candidatePipeline: createPipelineDiagnostics(result, candidatesAfterExclusions, candidatesAfterReservations, finalCandidates),
+});
+
+const createGuildDiagnostics = (
+  reasonCode: FusionIdentityManagementReasonCode,
+  historicalSnapshotCount: number,
+  pipeline: FusionIdentityCandidatePipelineDiagnostics,
+): FusionIdentityManagementDiagnostics => ({
+  reasonCode,
+  originServerCodes: ORIGIN_SERVER_CODES,
+  historicalSnapshotCount,
+  reliableHistoricalLookup: null,
+  candidatePipeline: pipeline,
+});
+
+const hasSemanticContradiction = (candidates: FusionIdentityCandidate[]) =>
+  candidates.some(
+    (candidate) =>
+      candidate.entityType === "player" &&
+      candidate.evidence.rejectReasons.some((reason) => reason === "base-stat-regression" || reason === "base-attributes-contradiction"),
+  );
+
+const hasLevelRegression = (candidates: FusionIdentityCandidate[]) =>
+  candidates.some(
+    (candidate) =>
+      candidate.entityType === "player" &&
+      candidate.evidence.rejectReasons.some((reason) => reason === "level-regression"),
+  );
+
+const hasLevelProgressionContradiction = (candidates: FusionIdentityCandidate[]) =>
+  candidates.some(
+    (candidate) =>
+      candidate.entityType === "player" &&
+      candidate.evidence.rejectReasons.includes("level-progression-extreme") &&
+      !hasPlayerFusionHardContradiction(candidate.evidence),
+  );
+
+const hasRejectedCandidate = (candidates: FusionIdentityCandidate[]) => candidates.some((candidate) => candidate.rejected);
+
+const isActionableManagementCandidate = (candidate: FusionIdentityCandidate) =>
+  candidate.entityType === "guild" || isPlayerFusionActionableIdentityCandidate(candidate.evidence);
+
+const sumOriginCoverage = (originServerCodes: string[], countsByServer: Map<string, number>) =>
+  originServerCodes.reduce((sum, server) => sum + (countsByServer.get(server) ?? 0), 0);
+
+const itemAssignmentKey = (item: FusionIdentityManagementItem) =>
+  `${item.entityType}:${normalizeIdentifierKey(item.currentIdentifier)}`;
+
+const historicalAssignmentKey = (entityType: FusionIdentityEntityType, historicalIdentifier: string) =>
+  `${entityType}:${normalizeIdentifierKey(historicalIdentifier)}`;
+
+const recomputeNonCompletedStatus = (item: FusionIdentityManagementItem) => {
+  if (item.status === "completed") return;
+  const activeCandidates = item.candidates.filter((candidate) => !candidate.rejected && !candidate.assignedToOtherIdentity);
+  const activeActionableCandidates = activeCandidates.filter(isActionableManagementCandidate);
+  const activeReadyCandidates = activeActionableCandidates.filter(
+    (candidate) =>
+      candidate.ready ||
+      (candidate.entityType === "player" && isPlayerFusionReadyCandidate(candidate.evidence)),
+  );
+
+  if (item.readyCandidateIdentifier) {
+    const readyCandidate = activeCandidates.find(
+      (candidate) => normalizeIdentifierKey(candidate.historicalIdentifier) === normalizeIdentifierKey(item.readyCandidateIdentifier),
+    );
+    if (readyCandidate) {
+      item.status = "ready";
+      item.reasonCodes = [];
+      return;
+    }
+  }
+
+  item.readyCandidateIdentifier = null;
+  if (item.reasons.includes(READY_ASSIGNMENT_CONFLICT_REASON)) {
+    item.status = "review";
+    appendReasonCode(item, "assignment-conflict");
+    return;
+  }
+
+  if (activeReadyCandidates.length === 1) {
+    item.status = "ready";
+    item.readyCandidateIdentifier = activeReadyCandidates[0]?.historicalIdentifier ?? null;
+    item.reasonCodes = [];
+    return;
+  }
+
+  if (activeActionableCandidates.length) {
+    item.status = "review";
+    return;
+  }
+
+  if (item.diagnostics) {
+    item.diagnostics = {
+      ...item.diagnostics,
+      candidatePipeline: {
+        ...item.diagnostics.candidatePipeline,
+        candidatesAfterReservations: activeActionableCandidates.length,
+        finalCandidates: item.candidates.length,
+      },
+    };
+  }
+
+  item.status = item.status === "noHistory" || item.status === "noHistoricalObservation" ? item.status : "unresolved";
+};
+
+const applyGlobalAssignmentResolution = (items: FusionIdentityManagementItem[]) => {
   const readyByHistorical = new Map<string, FusionIdentityManagementItem[]>();
   items.forEach((item) => {
     if (item.status !== "ready" || !item.readyCandidateIdentifier) return;
-    const key = `${item.entityType}:${normalizeIdentifierKey(item.readyCandidateIdentifier)}`;
+    const key = historicalAssignmentKey(item.entityType, item.readyCandidateIdentifier);
     readyByHistorical.set(key, [...(readyByHistorical.get(key) ?? []), item]);
   });
 
+  const reservations = new Map<string, FusionIdentityManagementItem>();
   readyByHistorical.forEach((collidingItems) => {
-    if (collidingItems.length < 2) return;
+    if (collidingItems.length === 1) {
+      const item = collidingItems[0];
+      if (item?.readyCandidateIdentifier) {
+        reservations.set(historicalAssignmentKey(item.entityType, item.readyCandidateIdentifier), item);
+      }
+      return;
+    }
+
     collidingItems.forEach((item) => {
       item.status = "review";
-      item.reasons = [...item.reasons, "one historical identity is proposed for multiple current identities"];
+      appendReason(item, READY_ASSIGNMENT_CONFLICT_REASON);
       item.readyCandidateIdentifier = null;
     });
+  });
+
+  items.forEach((item) => {
+    if (item.status === "completed") return;
+
+    const ownerCandidateKeys = new Set<string>();
+    if (item.readyCandidateIdentifier) {
+      ownerCandidateKeys.add(historicalAssignmentKey(item.entityType, item.readyCandidateIdentifier));
+    }
+
+    let removedReservedCandidate = false;
+    item.candidates = item.candidates.filter((candidate) => {
+      const candidateKey = historicalAssignmentKey(item.entityType, candidate.historicalIdentifier);
+      const owner = reservations.get(candidateKey);
+      if (!owner) return true;
+      if (itemAssignmentKey(owner) === itemAssignmentKey(item)) return true;
+      removedReservedCandidate = true;
+      return false;
+    });
+
+    if (item.status === "ready" && item.readyCandidateIdentifier) {
+      const readyKey = historicalAssignmentKey(item.entityType, item.readyCandidateIdentifier);
+      item.candidates = item.candidates.filter((candidate) =>
+        ownerCandidateKeys.has(historicalAssignmentKey(item.entityType, candidate.historicalIdentifier)) ||
+        historicalAssignmentKey(item.entityType, candidate.historicalIdentifier) === readyKey,
+      );
+    }
+
+    if (removedReservedCandidate) {
+      appendReason(item, RESERVED_CANDIDATE_REMOVED_REASON);
+      appendReasonCode(item, "reserved-by-other-identity");
+    }
+    recomputeNonCompletedStatus(item);
+  });
+
+  items.forEach((item) => {
+    if (item.status === "ready" || item.status === "completed") {
+      item.reasonCodes = [];
+    }
   });
 };
 
@@ -488,6 +761,7 @@ const buildPlayerItems = async (
   playerResults: PlayerFusionPlayerResult[],
   stores: { playerStore: PlayerIdentityManagementStore },
   identityState: IdentityStoreState,
+  historicalPlayerSnapshotCountsByServer: Map<string, number>,
 ) => {
   const currentLinkReads = [...currentObservationsByIdentifier.values()].map((observations) => {
       const latest = latestByTimestamp(observations);
@@ -514,16 +788,14 @@ const buildPlayerItems = async (
       const toCandidate = (candidate: PlayerFusionCandidate): FusionIdentityCandidate => {
         const rejected = candidate.rejected || isRejectedByState(identityState, currentIdentifier, candidate.oldIdentifier);
         const assignedToOtherIdentity = isAssignedToOtherIdentity(identityState, candidate.oldIdentifier, linked?.entityId);
+        const resolverReady =
+          Boolean(result && selectPlayerFusionReadyCandidates(result).some((readyCandidate) => readyCandidate.oldIdentifier === candidate.oldIdentifier));
         return {
           entityType: "player",
           historicalIdentifier: candidate.oldIdentifier,
           historicalName: candidate.oldName,
           historicalServer: candidate.oldServer,
-          ready:
-            !rejected &&
-            !assignedToOtherIdentity &&
-            result?.status === "high-confidence" &&
-            (candidate.evidence.exactName || candidate.evidence.fusionBaseName),
+          ready: !rejected && !assignedToOtherIdentity && resolverReady,
           rejected,
           assignedToOtherIdentity,
           evidence: candidate,
@@ -538,19 +810,44 @@ const buildPlayerItems = async (
       );
       const readyCandidate = allCandidates.filter((candidate) => candidate.ready);
       const activeCandidates = allCandidates.filter((candidate) => !candidate.rejected && !candidate.assignedToOtherIdentity);
-      const hasHistory = Boolean(result && result.originSource !== "currentServerNoPredecessor" && result.originSource !== "unknown");
+      const activeActionableCandidates = activeCandidates.filter(isActionableManagementCandidate);
+      const originServerCodes = result?.resolvedOriginServers ?? [];
+      const historicalSnapshotCount = sumOriginCoverage(originServerCodes, historicalPlayerSnapshotCountsByServer);
+      const reliableLookup = result?.diagnostics.reliableHistoricalLookup ?? null;
+      const hasHistoricalScanCoverage = historicalSnapshotCount > 0;
+      const candidatesAfterExclusions = allCandidates.filter((candidate) => !candidate.rejected).length;
+      const reasonCode: FusionIdentityManagementReasonCode = completedHistorical.length
+        ? "no-viable-candidate"
+        : readyCandidate.length === 1
+          ? "no-viable-candidate"
+          : activeActionableCandidates.length
+            ? "insufficient-continuity"
+            : activeCandidates.length
+              ? "no-actionable-candidate"
+            : result?.status === "no-predecessor" || (originServerCodes.length > 0 && !hasHistoricalScanCoverage)
+              ? "no-historical-scans"
+              : reliableLookup && hasHistoricalScanCoverage && reliableLookup.compatibleClassObservationCount === 0
+                ? "no-historical-observation"
+                : hasLevelRegression(allCandidates)
+                  ? "level-regression"
+                  : hasLevelProgressionContradiction(allCandidates)
+                    ? "level-progression-contradiction"
+                    : hasSemanticContradiction(allCandidates)
+                      ? "semantic-contradictions"
+                      : hasRejectedCandidate(allCandidates)
+                        ? "rejected-by-exclusion"
+                        : "no-viable-candidate";
       const status: FusionIdentityManagementStatus = completedHistorical.length
         ? "completed"
         : readyCandidate.length === 1
           ? "ready"
-          : activeCandidates.length ||
-              result?.status === "ambiguous" ||
-              result?.status === "conflict" ||
-              result?.status === "candidate"
+          : activeActionableCandidates.length
             ? "review"
-            : !hasHistory || result?.status === "no-predecessor"
+            : reasonCode === "no-historical-scans"
               ? "noHistory"
-              : "unresolved";
+              : reasonCode === "no-historical-observation"
+                ? "noHistoricalObservation"
+                : "unresolved";
 
       return {
         id: `player:${normalizeIdentifierKey(currentIdentifier)}`,
@@ -565,7 +862,31 @@ const buildPlayerItems = async (
         historicalIdentifiers: completedHistorical,
         candidates,
         memberMigrationEdges: [],
-        reasons: [...(result?.reasons ?? [])],
+        reasons: [
+          ...(result?.reasons ?? []),
+          ...(reasonCode === "no-historical-observation"
+            ? ["no matching historical player observation in covered origin scans"]
+            : reasonCode === "level-regression"
+              ? ["no viable identity remained after reliable level continuity checks"]
+              : reasonCode === "level-progression-contradiction"
+                ? ["no viable identity remained after compensation-adjusted level progression checks"]
+                : reasonCode === "semantic-contradictions"
+                  ? ["no viable identity remained after semantic consistency checks"]
+                : reasonCode === "rejected-by-exclusion"
+                  ? ["no remaining candidate after exclusions"]
+                  : reasonCode === "no-actionable-candidate"
+                    ? ["only weak compatibility matches were found; no candidate has enough identity evidence for review"]
+                    : []),
+        ],
+        reasonCodes: status === "ready" || status === "completed" ? [] : [reasonCode],
+        diagnostics: createPlayerDiagnostics({
+          result,
+          reasonCode,
+          historicalSnapshotCount,
+          candidatesAfterExclusions,
+          candidatesAfterReservations: activeActionableCandidates.length,
+          finalCandidates: candidates.length,
+        }),
         readyCandidateIdentifier: status === "ready" ? readyCandidate[0]?.historicalIdentifier ?? null : null,
         completedEntityId: linked?.entityId ?? null,
         completedAliases,
@@ -579,6 +900,7 @@ const buildGuildItems = async (
   guildResults: GuildFusionGuildResult[],
   stores: { guildStore: GuildIdentityManagementStore },
   identityState: IdentityStoreState,
+  historicalGuildSnapshotCount: number,
 ) => {
   const currentLinkReads = [...currentObservationsByIdentifier.values()].map((observations) => {
       const latest = latestByTimestamp(observations);
@@ -637,6 +959,15 @@ const buildGuildItems = async (
       const hasOnlyOnePlausibleIdentity = plausibleIdentityIdentifiers.size === 1;
       const hasConsistentAutoIdentity = readyCandidateIdentifiers.size === 1 && hasOnlyOnePlausibleIdentity;
       const hasHistoricalData = results.some((result) => result.status !== "noHistoricalData") || rawCandidates.length > 0 || migrationEdges.length > 0;
+      const reasonCode: FusionIdentityManagementReasonCode = completedHistorical.length
+        ? "no-viable-candidate"
+        : hasConsistentAutoIdentity
+          ? "no-viable-candidate"
+          : activeCandidates.length
+            ? "insufficient-continuity"
+            : hasHistoricalData
+              ? "insufficient-continuity"
+              : "no-historical-scans";
       const status: FusionIdentityManagementStatus = completedHistorical.length
         ? "completed"
         : hasConsistentAutoIdentity
@@ -661,6 +992,18 @@ const buildGuildItems = async (
         candidates,
         memberMigrationEdges: migrationEdges,
         reasons: [...new Set(results.flatMap((result) => result.reasons))],
+        reasonCodes: status === "ready" || status === "completed" ? [] : [reasonCode],
+        diagnostics: createGuildDiagnostics(reasonCode, historicalGuildSnapshotCount, {
+          historicalPoolSize: results.length,
+          candidatesGeneratedInitially: rawCandidates.length,
+          candidatesAfterHardCompatibility: rawCandidates.length,
+          candidatesAfterSemanticEvaluation: rawCandidates.length,
+          candidatesRejectedByLevelRegression: 0,
+          candidatesRejectedByLevelProgression: 0,
+          candidatesAfterExclusions: allCandidates.filter((candidate) => !candidate.rejected).length,
+          candidatesAfterReservations: activeCandidates.length,
+          finalCandidates: candidates.length,
+        }),
         readyCandidateIdentifier: status === "ready" ? [...readyCandidateIdentifiers][0] ?? null : null,
         completedEntityId: linked?.entityId ?? null,
         completedAliases,
@@ -671,8 +1014,16 @@ const buildGuildItems = async (
 
 export async function buildFusionIdentityManagementReportFromSnapshots(
   input: FusionIdentityManagementInput,
+  options: FusionIdentityManagementBuildOptions = {},
 ): Promise<FusionIdentityManagementReport> {
+  const emitProgress = options.onProgress ?? (() => undefined);
   const snapshots = [...input.snapshots].sort((left, right) => left.timestampMs - right.timestampMs);
+  emitProgress({
+    phase: "preparing",
+    current: snapshots.length,
+    total: snapshots.length,
+    message: `Preparing ${snapshots.length} local scan snapshots`,
+  });
   const playerStore: PlayerIdentityManagementStore = input.playerStore ?? {
     getPlayerIdentity,
     getPlayerAliases,
@@ -693,8 +1044,44 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
     rejectGuildLink,
     unlinkGuildAlias,
   };
-  const allPlayerObservations = snapshots.flatMap(createFusionIdentityObservations);
-  const allGuildObservations = snapshots.flatMap(createFusionIdentityGuildObservations);
+  const allPlayerObservations: PlayerFusionObservation[] = [];
+  const allGuildObservations: GuildFusionObservation[] = [];
+  const postFusionSnapshots: GuildHubLogicalScanSnapshot[] = [];
+  const historicalSnapshots: GuildHubLogicalScanSnapshot[] = [];
+  const historicalPlayerSnapshotCountsByServer = new Map<string, number>();
+  const historicalGuildSnapshotServers = new Set<string>();
+
+  snapshots.forEach((snapshot, index) => {
+    const players = createFusionIdentityObservations(snapshot);
+    const guilds = createFusionIdentityGuildObservations(snapshot);
+    allPlayerObservations.push(...players);
+    allGuildObservations.push(...guilds);
+
+    const hasPostFusionData =
+      players.some((observation) => resolveServerCode(observation.server) === TARGET_SERVER_CODE) ||
+      guilds.some((observation) => observation.serverCode === TARGET_SERVER_CODE);
+    const hasHistoricalData =
+      players.some((observation) => ORIGIN_SERVER_CODE_SET.has(resolveServerCode(observation.server) ?? "")) ||
+      guilds.some((observation) => ORIGIN_SERVER_CODE_SET.has(observation.serverCode ?? ""));
+    if (hasPostFusionData) postFusionSnapshots.push(snapshot);
+    if (hasHistoricalData) {
+      historicalSnapshots.push(snapshot);
+      new Set(players.map((observation) => resolveServerCode(observation.server)).filter((server): server is string => ORIGIN_SERVER_CODE_SET.has(server ?? ""))).forEach(
+        (server) => historicalPlayerSnapshotCountsByServer.set(server, (historicalPlayerSnapshotCountsByServer.get(server) ?? 0) + 1),
+      );
+      new Set(guilds.map((observation) => observation.serverCode).filter((server): server is string => ORIGIN_SERVER_CODE_SET.has(server ?? ""))).forEach(
+        (server) => historicalGuildSnapshotServers.add(`${server}:${snapshot.timestampMs}`),
+      );
+    }
+
+    emitProgress({
+      phase: "normalizing",
+      current: index + 1,
+      total: snapshots.length,
+      message: "Normalizing local scan snapshots",
+    });
+  });
+
   const historicalPlayerObservations = allPlayerObservations.filter((observation) =>
     ORIGIN_SERVER_CODE_SET.has(resolveServerCode(observation.server) ?? ""),
   );
@@ -710,58 +1097,78 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
     return createEmptyReport(snapshots, allPlayerObservations.length, allGuildObservations.length);
   }
 
-  const postFusionSnapshots = snapshots.filter((snapshot) => {
-    const players = createFusionIdentityObservations(snapshot);
-    const guilds = createFusionIdentityGuildObservations(snapshot);
-    return (
-      players.some((observation) => resolveServerCode(observation.server) === TARGET_SERVER_CODE) ||
-      guilds.some((observation) => observation.serverCode === TARGET_SERVER_CODE)
-    );
-  });
-  const historicalSnapshots = snapshots.filter((snapshot) => {
-    const players = createFusionIdentityObservations(snapshot);
-    const guilds = createFusionIdentityGuildObservations(snapshot);
-    return (
-      players.some((observation) => ORIGIN_SERVER_CODE_SET.has(resolveServerCode(observation.server) ?? "")) ||
-      guilds.some((observation) => ORIGIN_SERVER_CODE_SET.has(observation.serverCode ?? ""))
-    );
+  const currentPlayersByIdentifier = groupPlayerObservations(currentPlayerObservations);
+  emitProgress({
+    phase: "player-histories",
+    current: currentPlayersByIdentifier.size,
+    total: currentPlayersByIdentifier.size,
+    message: "Building player observation histories",
   });
 
+  emitProgress({
+    phase: "player-resolution",
+    current: 0,
+    total: currentPlayersByIdentifier.size,
+    message: "Resolving player identities",
+  });
   const playerResults = resolvePlayerFusions({
     historicalObservations: historicalPlayerObservations,
-    newObservations: [...groupPlayerObservations(currentPlayerObservations).values()].map((observations) => latestByTimestamp(observations) ?? observations[0]),
+    newObservations: currentPlayerObservations,
+    enableLevelProgressionEvidence: options.enablePlayerLevelProgressionEvidence,
   }).results;
+  emitProgress({
+    phase: "player-resolution",
+    current: playerResults.length,
+    total: currentPlayersByIdentifier.size,
+    message: "Resolved player identities",
+  });
+
   const highConfidencePlayerMatches = buildHighConfidencePlayerMatches(playerResults);
   const currentGuildsByIdentifier = groupGuildObservations(currentGuildObservations);
-  const guildResults = postFusionSnapshots.flatMap((snapshot) => {
+  const guildResults: GuildFusionGuildResult[] = [];
+  postFusionSnapshots.forEach((snapshot, index) => {
     const snapshotTimestamp = snapshot.timestampMs;
     const newGuildObservations = createFusionIdentityGuildObservations(snapshot).filter(
       (observation) => observation.serverCode === TARGET_SERVER_CODE,
     );
-    if (!newGuildObservations.length) return [];
-    return resolveGuildFusions({
-      historicalGuildObservations: historicalGuildObservations.filter((observation) => observation.timestamp < snapshotTimestamp),
-      newGuildObservations,
-      highConfidencePlayerMatches,
-    }).results;
+    if (newGuildObservations.length) {
+      guildResults.push(
+        ...resolveGuildFusions({
+          historicalGuildObservations: historicalGuildObservations.filter((observation) => observation.timestamp < snapshotTimestamp),
+          newGuildObservations,
+          highConfidencePlayerMatches,
+        }).results,
+      );
+    }
+    emitProgress({
+      phase: "guild-resolution",
+      current: index + 1,
+      total: postFusionSnapshots.length,
+      message: "Resolving guild identities",
+    });
   });
+
+  emitProgress({ phase: "assignment", message: "Reading confirmed identity links and exclusions" });
   const [playerIdentityState, guildIdentityState] = await Promise.all([
     loadPlayerIdentityState(playerStore),
     loadGuildIdentityState(guildStore),
   ]);
 
+  emitProgress({ phase: "report", message: "Building management report" });
   const [playerItems, guildItems, currentPlayerAliases, historicalPlayerAliases, currentGuildAliases, historicalGuildAliases] =
     await Promise.all([
-      buildPlayerItems(groupPlayerObservations(currentPlayerObservations), playerResults, { playerStore }, playerIdentityState),
-      buildGuildItems(currentGuildsByIdentifier, guildResults, { guildStore }, guildIdentityState),
+      buildPlayerItems(currentPlayersByIdentifier, playerResults, { playerStore }, playerIdentityState, historicalPlayerSnapshotCountsByServer),
+      buildGuildItems(currentGuildsByIdentifier, guildResults, { guildStore }, guildIdentityState, historicalGuildSnapshotServers.size),
       buildAliasOptions("player", currentPlayerObservations, async (identifier) => readLinkedAliasesFromState(playerIdentityState, identifier).entityId),
       buildAliasOptions("player", historicalPlayerObservations, async (identifier) => readLinkedAliasesFromState(playerIdentityState, identifier).entityId),
       buildAliasOptions("guild", currentGuildObservations, async (identifier) => readLinkedAliasesFromState(guildIdentityState, identifier).entityId),
       buildAliasOptions("guild", historicalGuildObservations, async (identifier) => readLinkedAliasesFromState(guildIdentityState, identifier).entityId),
     ]);
 
-  const items = [...playerItems, ...guildItems].sort(compareByLatestThenName);
-  applyReadyCollisions(items);
+  const items = [...playerItems, ...guildItems];
+  emitProgress({ phase: "assignment", message: "Applying global ready reservations" });
+  applyGlobalAssignmentResolution(items);
+  items.sort(compareByLatestThenName);
 
   return {
     scope: {
@@ -787,10 +1194,27 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
 
 export async function loadFusionIdentityManagementReport(
   stores: FusionIdentityManagementStores = {},
+  options: FusionIdentityManagementBuildOptions = {},
 ): Promise<FusionIdentityManagementReport> {
+  options.onProgress?.({ phase: "loading", message: "Loading local scans" });
   const scans = await listSfDataHubLocalScansReadOnly();
-  const snapshots = scans.flatMap(deriveGuildHubLogicalScanSnapshots);
-  return buildFusionIdentityManagementReportFromSnapshots({ snapshots, ...stores });
+  options.onProgress?.({
+    phase: "preparing",
+    current: 0,
+    total: scans.length,
+    message: "Preparing fusion scan pool",
+  });
+  const snapshots: GuildHubLogicalScanSnapshot[] = [];
+  scans.forEach((scan, index) => {
+    snapshots.push(...deriveGuildHubLogicalScanSnapshots(scan));
+    options.onProgress?.({
+      phase: "preparing",
+      current: index + 1,
+      total: scans.length,
+      message: "Preparing fusion scan pool",
+    });
+  });
+  return buildFusionIdentityManagementReportFromSnapshots({ snapshots, ...stores }, options);
 }
 
 export async function confirmFusionIdentityLink(

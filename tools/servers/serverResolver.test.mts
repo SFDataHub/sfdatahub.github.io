@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   areFusionRelated,
   getDirectFusionDestination,
+  getFusionEvent,
   getFusionLineage,
   getFusionOrigins,
   getServerByCode,
@@ -24,9 +25,14 @@ assert.equal(resolveServer("F28")?.code, "F28");
 assert.equal(resolveServer("f28_net")?.code, "F28");
 assert.equal(resolveServer("f28.sfgame.net")?.code, "F28");
 assert.equal(resolveServer(549)?.code, "F28");
+assert.equal(resolveServer("EU1")?.releaseDate, "2023-01-06");
+assert.equal(resolveServer("EU2")?.releaseDate, "2023-02-24");
+assert.equal(resolveServer("EU3")?.releaseDate, "2023-04-14");
+assert.equal(resolveServer("EU4")?.releaseDate, "2023-05-26");
 
 assert.equal(getServerByCode("eu3")?.code, "EU3");
 assert.equal(getDirectFusionDestination("EU3")?.code, "F28");
+assert.deepEqual(getFusionEvent("EU3", "F28"), { compensationPolicy: "levelGoldV1" });
 assert.deepEqual(
   getFusionLineage("EU3").map((server) => server.code),
   ["EU3", "F28"],

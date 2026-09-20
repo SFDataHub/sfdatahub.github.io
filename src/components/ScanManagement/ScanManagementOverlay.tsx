@@ -50,6 +50,7 @@ import {
   type SfDataHubAnyTransferEnvelope,
 } from "../../lib/transfer/sfDataHubTransfer";
 import { getDataJobDetail, getDataJobProgress, useDataJobs, type DataJob } from "../../context/DataJobsContext";
+import { DataHubLoadingState } from "../ui/shared/DataHubLoadingState";
 import styles from "./ScanManagementOverlay.module.css";
 import {
   buildScanExplorerData,
@@ -1060,7 +1061,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                   </div>
 
                   {loading ? (
-                    <div className={styles.emptyState}>Lokale Scans werden geladen.</div>
+                    <DataHubLoadingState
+                      title="Lokale Scans werden geladen"
+                      message="Scan-Metadaten werden gelesen."
+                    />
                   ) : visibleScans.length ? (
                     <div className={styles.tableWrap}>
                       <table className={styles.table}>
@@ -2366,7 +2370,10 @@ function FightTrackerOverview({
         </div>
 
         {loading ? (
-          <div className={styles.emptyState}>Fight Tracker werden geladen.</div>
+          <DataHubLoadingState
+            title="Fight Tracker werden geladen"
+            message="Lokale Tracker-Metadaten werden gelesen."
+          />
         ) : summaries.length ? (
           <>
             <div className={styles.selectionToolbar}>

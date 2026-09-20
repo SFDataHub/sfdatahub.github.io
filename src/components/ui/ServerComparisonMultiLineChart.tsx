@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 // @ts-ignore Recharts is expected in the app dependency set where this component is mounted.
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { DataHubLoadingState } from "./shared/DataHubLoadingState";
 import styles from "./ServerComparisonMultiLineChart.module.css";
 import { getClassIconUrl } from "./shared/classIcons";
 
@@ -937,10 +938,7 @@ export default function ServerComparisonMultiLineChart({
               </div>
             ) : null}
             {isLoading ? (
-              <div className={styles.loadingOverlay}>
-                <div className={styles.loadingSpinner} aria-hidden="true" />
-                <p className={styles.loadingText}>Loading series...</p>
-              </div>
+              <DataHubLoadingState variant="overlay" title="Loading series" message="Preparing comparison chart." />
             ) : null}
           </div>
         </article>

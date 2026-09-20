@@ -5,7 +5,11 @@ import path from "node:path";
 import { normalizeGuildScanMembers } from "../../src/lib/guilds/guildScanNormalizer.ts";
 import { resolveServer } from "../../src/lib/servers/serverResolver.ts";
 import {
+  createPlayerFusionSemanticSummary,
+} from "../../src/lib/identities/playerFusionPreviewAdapter.ts";
+import {
   resolvePlayerFusions,
+  selectPlayerFusionReadyCandidates,
   type PlayerFusionObservation,
   type PlayerFusionPlayerResult,
   type PlayerFusionResultStatus,
@@ -92,9 +96,11 @@ const readScanFile = (filePath: string): ScanFile | null => {
       name: member.name,
       classId: member.classId,
       level: member.level,
+      levelAvailability: typeof member.level === "number" && Number.isFinite(member.level) && member.level > 0 ? "available" : "missing",
       guildIdentifier: member.guildSegment ?? member.groupSegment,
       guildName: member.guildName,
       originNumericId: readCurrentCompactOriginNumericId(rawPlayer),
+      semantic: createPlayerFusionSemanticSummary(rawPlayer),
     };
   });
 
@@ -149,10 +155,17 @@ const collectProblemCases = (results: PlayerFusionPlayerResult[]) => {
     if (result.status === "conflict") push("one-to-one-conflict", result, result.reasons.join("; "));
     if (result.status === "no-predecessor") push("native-current-server", result, result.reasons.join("; "));
     if (!exactMatches.length && viable.length) push("rename-or-no-name-match", result, `${viable.length} viable non-name candidates`);
+    if (viable.some((candidate) => candidate.evidence.baseAttributesConsistent === true)) {
+      push("semantic-base-match", result, `${viable.filter((candidate) => candidate.evidence.baseAttributesConsistent === true).length} base-compatible candidates`);
+    }
     if (!result.candidates.length && result.status !== "no-predecessor") push("no-historical-candidate", result, result.reasons.join("; "));
 
-    const levelDrop = result.candidates.find((candidate) => candidate.rejectReasons.includes("level-drop"));
-    if (levelDrop) push("level-conflict", result, `${levelDrop.oldIdentifier} level dropped`);
+    const levelRegression = result.candidates.find((candidate) => candidate.rejectReasons.includes("level-regression"));
+    if (levelRegression) push("level-conflict", result, `${levelRegression.oldIdentifier} level regressed`);
+    const baseContradiction = result.candidates.find((candidate) =>
+      candidate.rejectReasons.includes("base-stat-regression") || candidate.rejectReasons.includes("base-attributes-contradiction"),
+    );
+    if (baseContradiction) push("base-attribute-conflict", result, `${baseContradiction.oldIdentifier} base attributes regressed`);
   });
 
   return cases.slice(0, 28);
@@ -189,6 +202,18 @@ postScans.forEach((postScan) => {
       (candidate) => !candidate.rejected && (candidate.evidence.exactName || candidate.evidence.fusionBaseName),
     ),
   ).length;
+  const semanticReadyMatches = result.results.filter((entry) => selectPlayerFusionReadyCandidates(entry).length > 0).length;
+  const semanticRejectedCandidates = result.results.reduce(
+    (count, entry) =>
+      count +
+      entry.candidates.filter(
+        (candidate) =>
+          candidate.rejectReasons.includes("base-stat-regression") ||
+          candidate.rejectReasons.includes("base-attributes-contradiction"),
+      ).length,
+    0,
+  );
+  const makio = result.results.find((entry) => entry.newIdentifier.toLowerCase() === "f28_net_p209891");
 
   console.log(`\n${dateKey(postScan.timestamp)} ${postScan.fileName}`);
   console.log(`F28 players: ${newObservations.length}`);
@@ -200,6 +225,14 @@ postScans.forEach((postScan) => {
     `candidate counts before filters total=${sum(beforeCounts)} max=${Math.max(...beforeCounts)} after filters total=${sum(afterCounts)} max=${Math.max(...afterCounts)}`,
   );
   console.log(`exact/base-name viable results: ${strongNameMatches}`);
+  console.log(`ready-capable results: ${semanticReadyMatches}`);
+  console.log(`base-attribute rejected candidates: ${semanticRejectedCandidates}`);
+  if (makio) {
+    const best = selectPlayerFusionReadyCandidates(makio)[0] ?? makio.candidates.find((candidate) => !candidate.rejected) ?? makio.candidates[0];
+    console.log(
+      `Makio: status=${makio.status} origin=${makio.originSource} candidate=${best?.oldIdentifier ?? "none"} base=${best?.evidence.baseAttributesConsistent ?? "n/a"} level=${best?.evidence.levelConsistent ?? "n/a"} class=${best?.evidence.sameClass ?? "n/a"}`,
+    );
+  }
   console.log("problem cases:");
   collectProblemCases(result.results).forEach((entry) => console.log(`- ${entry}`));
 });

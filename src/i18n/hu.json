@@ -1043,6 +1043,94 @@
     "moreResults": "További találatok... nyomj Entert",
     "recentLabel": "Legutóbbi"
   },
+  "dungeonLibrary": {
+    "title": "Kazamatakönyvtár",
+    "subtitle": "Technikai vertikális metszet",
+    "aria": {
+      "bookshelf": "Kazamatakönyvtár könyvespolc"
+    },
+    "worlds": {
+      "lightWorld": "Fényvilág",
+      "shadowWorld": "Árnyékvilág",
+      "classWorld": "Kasztvilág",
+      "fairyTower": "Tündértorony",
+      "continuousLoop": "Bálványok végtelen ciklusa",
+      "twister": "Forgószél",
+      "sandstorm": "Homokvihar"
+    },
+    "book": {
+      "floorCount": "{{count}} szint",
+      "dungeonCount": "{{count}} kazamata",
+      "overviewPageNote": "Áttekintés {{current}} / {{total}} · Oldal {{page}}",
+      "floorRangeOverviewNote": "Szintek {{start}}-{{end}} · Áttekintés {{current}} / {{total}}",
+      "rangeOverviewPageNote": "Szinttartomanyok {{current}} / {{total}} · Oldal {{page}}",
+      "selectorPageNote": "Választó {{current}} / {{total}}",
+      "pageNote": "Oldal {{page}}",
+      "floorRangeTitle": "Szintek {{start}}-{{end}}",
+      "floorGridAria": "{{title}} szintjei",
+      "floorRangeAria": "{{title}} szintjei {{start}}-{{end}}"
+    },
+    "navigation": {
+      "floorRanges": "Szinttartományok",
+      "floors": "Szintek",
+      "floorOverview": "Szintáttekintés",
+      "dungeonOverview": "Kazamata-áttekintés",
+      "backToLibrary": "Vissza a Kazamatakönyvtárhoz"
+    },
+    "fallbacks": {
+      "dungeon": "Kazamata {{dungeonId}}",
+      "enemy": "Ellenfél-azonosító {{enemyId}}"
+    },
+    "detail": {
+      "unknownClass": "Ismeretlen kaszt",
+      "monsterArtworkAria": "Szörnykép az ellenfélhez: {{enemyId}}",
+      "noArtworkAria": "Nincs kép az ellenfélhez: {{enemyId}}",
+      "loadingArtwork": "Kép betöltése...",
+      "artworkUnavailable": "Kép nem érhető el",
+      "monsterImageAlt": "Szörny {{enemyId}}",
+      "levelShort": "Szint {{level}}",
+      "statsUnavailable": "Statok nem érhetőek el",
+      "enemyStatsAria": "Ellenfél statjai",
+      "statIconAlt": "{{stat}} ikon",
+      "enemyDamageAria": "Ellenfél sebzése",
+      "minDamage": "Min. sebzés",
+      "maxDamage": "Max. sebzés",
+      "hpUnavailable": "HP nem érhető el",
+      "hpAria": "HP: {{value}}",
+      "hpValue": "HP: {{value}}",
+      "floorCounter": "{{current}} / {{total}}. szint",
+      "lore": "Történet",
+      "loreUnavailable": "Még nem érhető el.",
+      "enemyId": "Ellenfél-azonosító {{enemyId}}"
+    },
+    "classes": {
+      "warrior": "Harcos",
+      "mage": "Mágus",
+      "scout": "Felderítő",
+      "assassin": "Orgyilkos",
+      "demon-hunter": "Démonvadász",
+      "berserker": "Berserker",
+      "battle-mage": "Csatamágus",
+      "druid": "Druida",
+      "bard": "Bard",
+      "necromancer": "Nekromanta",
+      "paladin": "Paladin",
+      "plague-doctor": "Pestisdoktor"
+    }
+  },
+  "flipbook": {
+    "errors": {
+      "missingSlug": "Hiányzik a flipbook slug.",
+      "manifestNotFound": "A flipbook manifest nem található.",
+      "loadFailed": "A flipbook nem tölthető be."
+    },
+    "loading": "Flipbook betöltése...",
+    "noPages": "Nincsenek flipbook oldalak.",
+    "previous": "Vissza",
+    "next": "Tovább",
+    "fullscreen": "Teljes képernyő",
+    "pageIndicator": "Oldal {{current}} / {{total}}"
+  },
   "footer": {
     "about": {
       "title": "A SFDataHub-ról",

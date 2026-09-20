@@ -3,6 +3,7 @@ import { BarChart3, TrendingDown, TrendingUp, UserMinus, UserPlus, Users } from 
 import { Link } from "react-router-dom";
 import ContentShell from "../../components/ContentShell";
 import GuildContextBar from "../../components/guilds/GuildContextBar";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import { getClassMetaById, iconForClassName, type ClassMeta } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
@@ -112,7 +113,11 @@ export default function GuildHubDashboard() {
             action={<Link to="/guild-hub">Zur Gildenauswahl</Link>}
           />
         ) : scanState.loading || scanState.detailLoading ? (
-          <EmptyPanel title="Lokale Scans werden geladen" text="Die IndexedDB-Bibliothek wird gelesen." />
+          <DataHubLoadingState
+            variant="page"
+            title="Lokale Scans werden geladen"
+            message="Die IndexedDB-Bibliothek wird gelesen."
+          />
         ) : scanState.error ? (
           <EmptyPanel title="Lokale Scans nicht verfuegbar" text={scanState.error} />
         ) : !latest ? (

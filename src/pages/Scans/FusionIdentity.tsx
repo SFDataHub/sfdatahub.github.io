@@ -1,10 +1,11 @@
 import React from "react";
-import { Check, Link2, Loader2, Search, Undo2, X } from "lucide-react";
+import { Check, Link2, Search, Undo2, X } from "lucide-react";
 
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
+import { getClassMetaById } from "../../data/classes";
 import { subscribeToSfDataHubLocalScanChanges } from "../../lib/guilds/localScanLibrary";
 import {
   confirmFusionIdentityLink,
-  loadFusionIdentityManagementReport,
   mergeReadyFusionIdentityItems,
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
@@ -15,8 +16,20 @@ import {
   type FusionIdentityManagementReport,
   type FusionIdentityManagementStatus,
 } from "../../lib/identities/fusionIdentityManagement";
+import {
+  FusionIdentityWorkerCancelledError,
+  startFusionIdentityWorkerRun,
+  type FusionIdentityWorkerRun,
+} from "../../lib/identities/fusionIdentityWorkerClient";
+import type { FusionIdentityProgress, FusionIdentityWorkerTiming } from "../../lib/identities/fusionIdentityWorkerTypes";
 import type { GuildFusionCandidate, GuildFusionMigrationEdge } from "../../lib/identities/guildFusionResolver";
-import type { PlayerFusionCandidate } from "../../lib/identities/playerFusionResolver";
+import type {
+  PlayerFusionCandidate,
+  PlayerFusionCandidateClassification,
+  PlayerFusionEvidenceEntry,
+  PlayerFusionEvidenceEntryType,
+  PlayerFusionEvidenceStrength,
+} from "../../lib/identities/playerFusionResolver";
 import styles from "./FusionIdentity.module.css";
 
 type StatusFilter = "all" | FusionIdentityManagementStatus;
@@ -27,6 +40,7 @@ const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
   { key: "ready", label: "Ready" },
   { key: "review", label: "Needs Review" },
   { key: "unresolved", label: "Unresolved" },
+  { key: "noHistoricalObservation", label: "No Historical Observation" },
   { key: "noHistory", label: "No Historical Data" },
   { key: "completed", label: "Completed" },
 ];
@@ -37,34 +51,20 @@ const TYPE_FILTERS: Array<{ key: TypeFilter; label: string }> = [
   { key: "guild", label: "Guilds" },
 ];
 
-const CLASS_LABELS: Record<string, string> = {
-  "1": "Warrior",
-  "2": "Mage",
-  "3": "Scout",
-  "4": "Assassin",
-  "5": "Berserker",
-  "6": "Battle Mage",
-  "7": "Demon Hunter",
-  "8": "Druid",
-  "9": "Bard",
-  "10": "Necromancer",
-  "11": "Paladin",
-  "12": "Plague Doctor",
-};
-
 const normalizeSearch = (value: string) => value.trim().toLowerCase();
 const formatNumber = (value: number) => new Intl.NumberFormat().format(value);
 const formatShare = (value: number) => `${Math.round(value * 100)}%`;
 const formatClass = (classId: string | null | undefined) => {
   const key = String(classId ?? "").trim();
   if (!key) return "Class unknown";
-  return CLASS_LABELS[key] ?? `Class ${key}`;
+  return getClassMetaById(key)?.label ?? `Class ${key}`;
 };
 const formatLevel = (level: number | null | undefined) => (level == null ? "Level unknown" : `Level ${level}`);
 const formatDate = (timestamp: number | null | undefined) =>
   timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp)) : "-";
 
 const statusLabel = (status: FusionIdentityManagementStatus) => {
+  if (status === "noHistoricalObservation") return "No Historical Observation";
   if (status === "noHistory") return "No Historical Data";
   if (status === "review") return "Needs Review";
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -74,38 +74,115 @@ const statusClassName = (status: FusionIdentityManagementStatus) => {
   if (status === "ready") return styles.statusHigh;
   if (status === "review") return styles.statusAmbiguous;
   if (status === "completed") return styles.statusSingle;
-  if (status === "noHistory") return styles.statusNative;
+  if (status === "noHistory" || status === "noHistoricalObservation") return styles.statusNative;
   return styles.statusUnresolved;
 };
 
 const typeLabel = (type: FusionIdentityEntityType) => (type === "player" ? "Player" : "Guild");
 
+const latestObservation = (observations: FusionIdentityManagementItem["observations"]) =>
+  observations.reduce<FusionIdentityManagementItem["observations"][number] | null>(
+    (latest, observation) => (latest == null || observation.timestamp > latest.timestamp ? observation : latest),
+    null,
+  );
+
+const earliestObservation = (observations: FusionIdentityManagementItem["observations"]) =>
+  observations.reduce<FusionIdentityManagementItem["observations"][number] | null>(
+    (earliest, observation) => (earliest == null || observation.timestamp < earliest.timestamp ? observation : earliest),
+    null,
+  );
+
+const formatCurrentLevel = (level: number | null | undefined) => {
+  if (level == null || !Number.isFinite(level) || level <= 0) return null;
+  return formatNumber(level);
+};
+
+const formatOriginScope = (item: FusionIdentityManagementItem) =>
+  item.diagnostics?.originServerCodes.length ? item.diagnostics.originServerCodes.join(", ") : item.currentServer ?? "unknown scope";
+
+const formatStatusExplanation = (item: FusionIdentityManagementItem) => {
+  if (item.status === "noHistoricalObservation") {
+    const lookup = item.diagnostics?.reliableHistoricalLookup;
+    const scope = formatOriginScope(item);
+    const scanCount = item.diagnostics?.historicalSnapshotCount ?? 0;
+    return lookup
+      ? `No matching player observation was found for ${lookup.baseName} in the available pre-fusion ${scope} scans. Historical scope: ${scope}. Scans checked: ${scanCount}.`
+      : `No matching observation was found in the available historical scans. Historical scope: ${scope}. Scans checked: ${scanCount}.`;
+  }
+
+  if (item.status !== "unresolved" || item.candidates.length) return null;
+  const reason = item.reasonCodes[0];
+  if (reason === "level-regression") return "No viable identity remained after reliable level continuity checks.";
+  if (reason === "semantic-contradictions") return "No viable identity remained after semantic consistency checks.";
+  if (reason === "reserved-by-other-identity") return "Candidate identities were reserved by other ready assignments.";
+  if (reason === "rejected-by-exclusion") return "No remaining candidate after exclusions.";
+  if (reason === "no-actionable-candidate") return "Only weak compatibility matches were found. No candidate currently has enough identity evidence for review.";
+  if (item.entityType === "guild") return "Historical guild scans exist, but no reliable continuity could be established.";
+  return "Historical data exists, but no reliable identity continuity could be established.";
+};
+
+const formatDuration = (durationMs: number) => {
+  if (durationMs < 1000) return `${Math.round(durationMs)} ms`;
+  return `${(durationMs / 1000).toFixed(1)} s`;
+};
+
 function useFusionIdentityReport() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [report, setReport] = React.useState<FusionIdentityManagementReport | null>(null);
+  const [progress, setProgress] = React.useState<FusionIdentityProgress | null>(null);
+  const [timings, setTimings] = React.useState<FusionIdentityWorkerTiming[]>([]);
+  const runRef = React.useRef<FusionIdentityWorkerRun | null>(null);
+  const activeRequestIdRef = React.useRef<string | null>(null);
 
   const load = React.useCallback(async () => {
+    runRef.current?.cancel();
     setLoading(true);
     setError(null);
+    setProgress({ phase: "loading", message: "Starting local fusion worker" });
+    setTimings([]);
+
+    const run = startFusionIdentityWorkerRun({
+      onProgress(nextProgress) {
+        if (activeRequestIdRef.current === run.requestId) setProgress(nextProgress);
+      },
+    });
+    runRef.current = run;
+    activeRequestIdRef.current = run.requestId;
+
     try {
-      setReport(await loadFusionIdentityManagementReport());
+      const result = await run.promise;
+      if (activeRequestIdRef.current !== run.requestId) return;
+      setReport(result.report);
+      setTimings(result.timings);
+      setProgress({ phase: "done", message: "Fusion identity report ready" });
     } catch (loadError) {
+      if (activeRequestIdRef.current !== run.requestId) return;
+      if (loadError instanceof FusionIdentityWorkerCancelledError) return;
       setError(loadError instanceof Error ? loadError.message : "Fusion identity data could not be loaded.");
       setReport(null);
     } finally {
-      setLoading(false);
+      if (activeRequestIdRef.current === run.requestId) {
+        setLoading(false);
+        runRef.current = null;
+      }
     }
   }, []);
 
   React.useEffect(() => {
     void load();
-    return subscribeToSfDataHubLocalScanChanges(() => {
+    const unsubscribe = subscribeToSfDataHubLocalScanChanges(() => {
       void load();
     });
+    return () => {
+      unsubscribe();
+      runRef.current?.cancel();
+      runRef.current = null;
+      activeRequestIdRef.current = null;
+    };
   }, [load]);
 
-  return { loading, error, report, reload: load };
+  return { loading, error, report, progress, timings, reload: load };
 }
 
 function SummaryItem({ label, value }: { label: string; value: number }) {
@@ -117,9 +194,201 @@ function SummaryItem({ label, value }: { label: string; value: number }) {
   );
 }
 
-function EvidenceChip({ positive, children }: { positive?: boolean; children: React.ReactNode }) {
-  return <span className={`${styles.evidenceChip} ${positive ? styles.evidencePositive : styles.evidenceNeutral}`}>{children}</span>;
+const PLAYER_EVIDENCE_STRENGTHS = new Set<PlayerFusionEvidenceStrength>([
+  "hardContradiction",
+  "strongContradiction",
+  "neutral",
+  "weakSupport",
+  "support",
+  "strongSupport",
+  "identityAnchor",
+]);
+
+const PLAYER_CANDIDATE_CLASSIFICATION_LABELS: Record<PlayerFusionCandidateClassification, string> = {
+  rejected: "Rejected",
+  weak: "Weak",
+  plausible: "Plausible",
+  strong: "Strong",
+  anchored: "Anchored",
+};
+
+const PLAYER_CANDIDATE_CLASSIFICATION_STRENGTHS: Record<PlayerFusionCandidateClassification, PlayerFusionEvidenceStrength> = {
+  rejected: "hardContradiction",
+  weak: "neutral",
+  plausible: "support",
+  strong: "strongSupport",
+  anchored: "identityAnchor",
+};
+
+const PLAYER_EVIDENCE_TYPE_LABELS: Record<PlayerFusionEvidenceEntryType, string> = {
+  "origin-compatibility": "Origin compatibility",
+  "class-compatibility": "Class compatibility",
+  "level-monotonicity": "Level monotonicity",
+  "level-progression": "Level progression",
+  "base-monotonicity": "Base monotonicity",
+  "base-unchanged-stats": "Unchanged base stats",
+  "base-secondary-stability": "Secondary base stability",
+  "base-ordering": "Base-stat ordering",
+  "fortress-continuity": "Fortress continuity",
+  "pet-continuity": "Pet continuity",
+  "guild-continuity": "Guild continuity",
+  "exact-name": "Exact name",
+  "fusion-base-name": "Fusion base name",
+  assignment: "Assignment",
+};
+
+const isPlayerEvidenceStrength = (value: unknown): value is PlayerFusionEvidenceStrength =>
+  typeof value === "string" && PLAYER_EVIDENCE_STRENGTHS.has(value as PlayerFusionEvidenceStrength);
+
+const isPlayerCandidateClassification = (value: unknown): value is PlayerFusionCandidateClassification =>
+  typeof value === "string" && value in PLAYER_CANDIDATE_CLASSIFICATION_LABELS;
+
+const normalizeEvidenceStrength = (
+  strength: unknown,
+): PlayerFusionEvidenceStrength | "guildSupport" | "guildNeutral" => {
+  if (isPlayerEvidenceStrength(strength) || strength === "guildSupport" || strength === "guildNeutral") return strength;
+  return "neutral";
+};
+
+const evidenceStrengthClassName = (strength: unknown) => {
+  switch (normalizeEvidenceStrength(strength)) {
+    case "identityAnchor":
+      return styles.evidenceAnchor;
+    case "strongSupport":
+      return styles.evidenceStrongSupport;
+    case "support":
+    case "guildSupport":
+      return styles.evidenceSupport;
+    case "weakSupport":
+      return styles.evidenceWeakSupport;
+    case "strongContradiction":
+      return styles.evidenceWarning;
+    case "hardContradiction":
+      return styles.evidenceHardContradiction;
+    case "neutral":
+    case "guildNeutral":
+      return styles.evidenceNeutral;
+  }
+};
+
+function EvidenceChip({
+  strength = "neutral",
+  children,
+}: {
+  strength?: PlayerFusionEvidenceStrength | "guildSupport" | "guildNeutral" | unknown;
+  children: React.ReactNode;
+}) {
+  return <span className={`${styles.evidenceChip} ${evidenceStrengthClassName(strength)}`}>{children}</span>;
 }
+
+type RenderablePlayerEvidenceEntry = {
+  type: string;
+  strength: PlayerFusionEvidenceStrength;
+  label: string;
+};
+
+const legacyBooleanEvidenceEntry = (
+  type: PlayerFusionEvidenceEntryType,
+  value: boolean | null | undefined,
+  trueLabel: string,
+  falseLabel: string,
+  falseStrength: PlayerFusionEvidenceStrength,
+  trueStrength: PlayerFusionEvidenceStrength = "neutral",
+): RenderablePlayerEvidenceEntry | null => {
+  if (value == null) return null;
+  return {
+    type,
+    strength: value ? trueStrength : falseStrength,
+    label: value ? trueLabel : falseLabel,
+  };
+};
+
+const getPlayerCandidateClassificationChip = (candidate: PlayerFusionCandidate) => {
+  if (isPlayerCandidateClassification(candidate.classification)) {
+    return {
+      label: PLAYER_CANDIDATE_CLASSIFICATION_LABELS[candidate.classification],
+      strength: PLAYER_CANDIDATE_CLASSIFICATION_STRENGTHS[candidate.classification],
+    };
+  }
+
+  return {
+    label: candidate.rejected ? "Rejected" : "Unclassified candidate",
+    strength: candidate.rejected ? ("hardContradiction" as const) : ("neutral" as const),
+  };
+};
+
+const normalizePlayerEvidenceEntry = (entry: unknown, index: number): RenderablePlayerEvidenceEntry | null => {
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Partial<PlayerFusionEvidenceEntry> & Record<string, unknown>;
+  const type = typeof record.type === "string" ? record.type : `legacy-${index}`;
+  const typedLabel = type in PLAYER_EVIDENCE_TYPE_LABELS ? PLAYER_EVIDENCE_TYPE_LABELS[type as PlayerFusionEvidenceEntryType] : null;
+  const label = typeof record.label === "string" && record.label.trim() ? record.label : typedLabel ?? "Evidence";
+
+  return {
+    type,
+    strength: isPlayerEvidenceStrength(record.strength) ? record.strength : "neutral",
+    label,
+  };
+};
+
+const legacyPlayerEvidenceEntries = (candidate: PlayerFusionCandidate): RenderablePlayerEvidenceEntry[] => {
+  const evidence = candidate.evidence;
+  if (!evidence) return [];
+  const entries: Array<RenderablePlayerEvidenceEntry | null> = [
+    legacyBooleanEvidenceEntry(
+      "origin-compatibility",
+      evidence.originMatches,
+      "Origin compatible",
+      "Origin contradiction",
+      "hardContradiction",
+    ),
+    legacyBooleanEvidenceEntry("class-compatibility", evidence.sameClass, "Class compatible", "Class contradiction", "hardContradiction"),
+    legacyBooleanEvidenceEntry(
+      "level-monotonicity",
+      evidence.levelConsistent,
+      "Level non-decreasing",
+      "Level regression",
+      "hardContradiction",
+    ),
+    legacyBooleanEvidenceEntry(
+      "base-monotonicity",
+      evidence.baseAttributesConsistent,
+      "Base stats non-decreasing",
+      "Base-stat regression",
+      "hardContradiction",
+    ),
+    legacyBooleanEvidenceEntry("fortress-continuity", evidence.fortressContinuity, "Fortress continuity", "Fortress differs", "neutral", "strongSupport"),
+    legacyBooleanEvidenceEntry("pet-continuity", evidence.petContinuity, "Pet continuity", "Pets differ", "neutral", "weakSupport"),
+    legacyBooleanEvidenceEntry("guild-continuity", evidence.sameGuild, "Guild continuity", "Guild differs", "neutral", "support"),
+  ];
+
+  if (evidence.levelProgression?.category === "normal") {
+    entries.push({ type: "level-progression", strength: "support", label: "Normal level progression" });
+  } else if (evidence.levelProgression?.category === "plausible-burst") {
+    entries.push({ type: "level-progression", strength: "weakSupport", label: "Plausible level burst" });
+  } else if (evidence.levelProgression?.category === "extreme-contradiction") {
+    entries.push({ type: "level-progression", strength: "strongContradiction", label: "Unusually high level progression" });
+  }
+  if (evidence.baseFingerprint?.unchangedCount != null && evidence.baseFingerprint.unchangedCount >= 3) {
+    entries.push({ type: "base-unchanged-stats", strength: "strongSupport", label: "3+ unchanged base stats" });
+  }
+  if (evidence.baseFingerprint?.unchangedSecondaryCount != null && evidence.baseFingerprint.unchangedSecondaryCount >= 2) {
+    entries.push({ type: "base-secondary-stability", strength: "strongSupport", label: "2 unchanged secondary base stats" });
+  }
+  if (evidence.baseFingerprint?.orderingStable === true) {
+    entries.push({ type: "base-ordering", strength: "support", label: "Base-stat ordering stable" });
+  }
+  if (evidence.exactName) entries.push({ type: "exact-name", strength: "identityAnchor", label: "Exact name" });
+  if (evidence.fusionBaseName) entries.push({ type: "fusion-base-name", strength: "identityAnchor", label: "Fusion base name" });
+
+  return entries.filter((entry): entry is RenderablePlayerEvidenceEntry => Boolean(entry));
+};
+
+const getRenderablePlayerEvidenceEntries = (candidate: PlayerFusionCandidate) => {
+  const entries = candidate.evidence?.entries;
+  if (!Array.isArray(entries)) return legacyPlayerEvidenceEntries(candidate);
+  return entries.map(normalizePlayerEvidenceEntry).filter((entry): entry is RenderablePlayerEvidenceEntry => Boolean(entry));
+};
 
 function DetailDataList({ rows }: { rows: Array<[string, React.ReactNode]> }) {
   return (
@@ -135,16 +404,21 @@ function DetailDataList({ rows }: { rows: Array<[string, React.ReactNode]> }) {
 }
 
 function PlayerEvidence({ candidate }: { candidate: PlayerFusionCandidate }) {
+  const classification = getPlayerCandidateClassificationChip(candidate);
+  const evidenceEntries = getRenderablePlayerEvidenceEntries(candidate);
+
   return (
     <div className={styles.evidenceList}>
-      <EvidenceChip positive={candidate.evidence.originMatches === true}>Origin matches</EvidenceChip>
-      {candidate.evidence.sameClass === true ? <EvidenceChip positive>Same class</EvidenceChip> : null}
-      {candidate.evidence.levelConsistent === true ? <EvidenceChip positive>Level consistent</EvidenceChip> : null}
-      {candidate.evidence.exactName ? <EvidenceChip positive>Exact name</EvidenceChip> : null}
-      {candidate.evidence.fusionBaseName ? <EvidenceChip positive>Fusion base name</EvidenceChip> : null}
-      {candidate.evidence.sameGuild === true ? <EvidenceChip positive>Same raw guild</EvidenceChip> : null}
+      <EvidenceChip strength={classification.strength}>{classification.label}</EvidenceChip>
+      {evidenceEntries.map((entry, index) => (
+        <EvidenceChip key={`${entry.type}-${entry.label}-${index}`} strength={entry.strength}>
+          {entry.label}
+        </EvidenceChip>
+      ))}
       {candidate.rejectReasons.map((reason) => (
-        <EvidenceChip key={reason}>{reason}</EvidenceChip>
+        <EvidenceChip key={reason} strength="hardContradiction">
+          {reason}
+        </EvidenceChip>
       ))}
     </div>
   );
@@ -153,13 +427,13 @@ function PlayerEvidence({ candidate }: { candidate: PlayerFusionCandidate }) {
 function GuildEvidence({ candidate }: { candidate: GuildFusionCandidate }) {
   return (
     <div className={styles.evidenceList}>
-      {candidate.autoEligible ? <EvidenceChip positive>V2 auto eligible</EvidenceChip> : <EvidenceChip>V2 review</EvidenceChip>}
-      {candidate.exactName ? <EvidenceChip positive>Exact guild name</EvidenceChip> : null}
-      {candidate.sameCoA ? <EvidenceChip positive>Same CoA</EvidenceChip> : null}
-      {candidate.mutualDominant ? <EvidenceChip positive>Mutual dominant flow</EvidenceChip> : null}
-      {candidate.matchedMemberCount > 0 ? <EvidenceChip positive>{candidate.matchedMemberCount} matched players</EvidenceChip> : null}
-      {candidate.splitEvidence.relevant ? <EvidenceChip>Split evidence</EvidenceChip> : null}
-      {candidate.convergenceEvidence.relevant ? <EvidenceChip>Convergence evidence</EvidenceChip> : null}
+      {candidate.autoEligible ? <EvidenceChip strength="guildSupport">V2 auto eligible</EvidenceChip> : <EvidenceChip>V2 review</EvidenceChip>}
+      {candidate.exactName ? <EvidenceChip strength="identityAnchor">Exact guild name</EvidenceChip> : null}
+      {candidate.sameCoA ? <EvidenceChip strength="support">Same CoA</EvidenceChip> : null}
+      {candidate.mutualDominant ? <EvidenceChip strength="strongSupport">Mutual dominant flow</EvidenceChip> : null}
+      {candidate.matchedMemberCount > 0 ? <EvidenceChip strength="support">{candidate.matchedMemberCount} matched players</EvidenceChip> : null}
+      {!candidate.autoEligible && candidate.splitEvidence.relevant ? <EvidenceChip strength="strongContradiction">Split evidence</EvidenceChip> : null}
+      {!candidate.autoEligible && candidate.convergenceEvidence.relevant ? <EvidenceChip strength="strongContradiction">Convergence evidence</EvidenceChip> : null}
     </div>
   );
 }
@@ -216,7 +490,7 @@ function CandidateRow({
       )}
       {item.status === "ready" && item.readyCandidateIdentifier === candidate.historicalIdentifier ? (
         <div className={styles.evidenceList}>
-          <EvidenceChip positive>Ready queue candidate</EvidenceChip>
+          <EvidenceChip strength="support">Ready queue candidate</EvidenceChip>
         </div>
       ) : null}
     </article>
@@ -260,6 +534,47 @@ function IdentityDetails({
     onChanged();
     onClose();
   };
+  const candidateHeading =
+    item.status === "noHistoricalObservation"
+      ? "Historical observation"
+      : item.status === "ready"
+      ? item.entityType === "guild"
+        ? "Matched historical guild"
+        : "Matched historical identity"
+      : item.status === "review"
+        ? "Possible historical identities"
+        : "Historical identity candidates";
+  const currentObservation = latestObservation(item.observations);
+  const firstObservation = earliestObservation(item.observations);
+  const currentIdentityRows: Array<[string, React.ReactNode]> = [
+    ["Type", typeLabel(item.entityType)],
+    ["Name", item.currentName ?? "-"],
+    ["Identifier", item.currentIdentifier],
+    ["Server", item.currentServer ?? "-"],
+  ];
+
+  if (item.entityType === "player") {
+    currentIdentityRows.push(
+      ["Class", currentObservation?.classId ? formatClass(currentObservation.classId) : null],
+      ["Level", formatCurrentLevel(currentObservation?.level)],
+      ["Guild", currentObservation?.guildName?.trim() || null],
+    );
+  }
+
+  currentIdentityRows.push(["Observed", item.observations.length], ["Last seen", formatDate(item.lastSeen)]);
+  const statusRows: Array<[string, React.ReactNode]> = [
+    ["Status", statusLabel(item.status)],
+    ["First seen", formatDate(firstObservation?.timestamp ?? item.firstSeen)],
+  ];
+
+  if (item.entityType === "player") {
+    statusRows.push(
+      ["First seen level", formatCurrentLevel(firstObservation?.level)],
+      ["First seen guild", firstObservation?.guildName?.trim() || null],
+    );
+  }
+
+  statusRows.push(["Candidate", item.readyCandidateIdentifier ?? "-"], ["Reason", item.reasons.join("; ") || "-"]);
 
   return (
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-labelledby="fusion-identity-detail-title" onClick={(event) => {
@@ -284,27 +599,11 @@ function IdentityDetails({
           <div className={styles.detailGrid}>
             <section className={styles.detailCard}>
               <h3>Current identity</h3>
-              <DetailDataList
-                rows={[
-                  ["Type", typeLabel(item.entityType)],
-                  ["Name", item.currentName ?? "-"],
-                  ["Identifier", item.currentIdentifier],
-                  ["Server", item.currentServer ?? "-"],
-                  ["Observed", item.observations.length],
-                  ["Last seen", formatDate(item.lastSeen)],
-                ]}
-              />
+              <DetailDataList rows={currentIdentityRows} />
             </section>
             <section className={styles.detailCard}>
               <h3>Status</h3>
-              <DetailDataList
-                rows={[
-                  ["Status", statusLabel(item.status)],
-                  ["First seen", formatDate(item.firstSeen)],
-                  ["Candidate", item.readyCandidateIdentifier ?? "-"],
-                  ["Reason", item.reasons.join("; ") || "-"],
-                ]}
-              />
+              <DetailDataList rows={statusRows} />
             </section>
             <section className={styles.detailCard}>
               <h3>Completed links</h3>
@@ -326,8 +625,10 @@ function IdentityDetails({
           </div>
 
           <section className={styles.detailCard}>
-            <h3>{item.entityType === "guild" ? "Possible historical identity" : "Historical candidates"}</h3>
-            {item.candidates.length ? (
+            <h3>{candidateHeading}</h3>
+            {formatStatusExplanation(item) ? (
+              <p className={styles.muted}>{formatStatusExplanation(item)}</p>
+            ) : item.candidates.length ? (
               <div className={styles.candidateList}>
                 {item.candidates.map((candidate) => (
                   <CandidateRow
@@ -485,7 +786,7 @@ function QueueRow({ item, onOpen }: { item: FusionIdentityManagementItem; onOpen
 }
 
 export default function FusionIdentityPage() {
-  const { loading, error, report, reload } = useFusionIdentityReport();
+  const { loading, error, report, progress, timings, reload } = useFusionIdentityReport();
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("all");
   const [search, setSearch] = React.useState("");
@@ -501,12 +802,8 @@ export default function FusionIdentityPage() {
       return (
         (item.currentName ?? "").toLowerCase().includes(query) ||
         item.currentIdentifier.toLowerCase().includes(query) ||
-        item.historicalIdentifiers.some((identifier) => identifier.toLowerCase().includes(query)) ||
-        item.candidates.some(
-          (candidate) =>
-            candidate.historicalIdentifier.toLowerCase().includes(query) ||
-            (candidate.historicalName ?? "").toLowerCase().includes(query),
-        )
+        item.completedAliases.some((identifier) => identifier.toLowerCase().includes(query)) ||
+        (item.status === "completed" && item.historicalIdentifiers.some((identifier) => identifier.toLowerCase().includes(query)))
       );
     });
   }, [report, search, statusFilter, typeFilter]);
@@ -536,12 +833,24 @@ export default function FusionIdentityPage() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div className={styles.loadingState}>
-          <Loader2 size={18} aria-hidden /> Loading global fusion identity pool.
-        </div>
+        <DataHubLoadingState
+          title="Preparing fusion identities"
+          message={progress?.message ?? "Loading local fusion identity pool"}
+          current={progress?.current}
+          total={progress?.total}
+        />
       );
     }
-    if (error) return <div className={styles.errorState}>{error}</div>;
+    if (error) {
+      return (
+        <DataHubLoadingState
+          title="Could not build fusion identity report."
+          message="Fusion identity data could not be prepared."
+          error={error}
+          onRetry={reload}
+        />
+      );
+    }
     if (!report) return null;
     if (!report.items.length) return <div className={styles.emptyState}>No supported EU1-EU4 -&gt; F28 identity pool found locally.</div>;
 
@@ -552,6 +861,7 @@ export default function FusionIdentityPage() {
           <SummaryItem label="Ready" value={report.summary.ready} />
           <SummaryItem label="Review" value={report.summary.review} />
           <SummaryItem label="Unresolved" value={report.summary.unresolved} />
+          <SummaryItem label="No Historical Observation" value={report.summary.noHistoricalObservation} />
           <SummaryItem label="No Historical Data" value={report.summary.noHistory} />
           <SummaryItem label="Completed" value={report.summary.completed} />
         </div>
@@ -585,6 +895,9 @@ export default function FusionIdentityPage() {
           {report.scope.label} · scans: {report.scope.historicalSnapshotCount} historical, {report.scope.postFusionSnapshotCount} F28 · history:{" "}
           {formatDate(report.scope.firstHistoricalTimestamp)} - {formatDate(report.scope.lastHistoricalTimestamp)} · showing{" "}
           {visibleItems.length} of {report.items.length}
+          {timings.find((timing) => timing.phase === "total")
+            ? ` · worker: ${formatDuration(timings.find((timing) => timing.phase === "total")?.durationMs ?? 0)}`
+            : ""}
         </div>
 
         {groupedItems.guilds.length ? (

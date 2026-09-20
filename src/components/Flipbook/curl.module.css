@@ -289,14 +289,19 @@
 .bookMode .hud {
   left: 50%;
   right: auto;
-  bottom: -58px;
+  bottom: var(--flipbook-hud-bottom, -58px);
   width: min(460px, calc(100% - 24px));
   height: 42px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(var(--flipbook-hud-scale, 1));
+  transform-origin: center top;
   border-color: rgba(176, 196, 217, 0.36);
   border-radius: 8px;
   background: rgba(10, 18, 30, 0.82);
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.3);
+}
+
+.bookMode .hudWithBackAction {
+  width: min(620px, calc(100% - 24px));
 }
 
 .hBtn {
@@ -309,18 +314,37 @@
   color: #FFFFFF;
 }
 
+.backActionBtn {
+  max-width: min(210px, 38vw);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+}
+
+.backActionShortLabel {
+  display: none;
+}
+
 .hBtn:hover {
   background: #2A4C72;
 }
 
 .hText {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   color: #B0C4D9;
   font-size: 12px;
 }
-.title { color:#F5F9FF; }
+.title {
+  min-width: 0;
+  color:#F5F9FF;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .sep { opacity: .5; }
 .spacer { flex: 1; }
 
@@ -386,6 +410,31 @@
   .bookMode .stage::before {
     width: 18px;
     opacity: 0;
+  }
+
+  .bookMode .hudWithBackAction {
+    width: min(520px, calc(100vw - 24px));
+  }
+
+  .bookMode .hud {
+    gap: 6px;
+  }
+
+  .backActionBtn {
+    max-width: 34vw;
+    padding: 0 7px;
+  }
+
+  .backActionLabel {
+    display: none;
+  }
+
+  .backActionShortLabel {
+    display: inline;
+  }
+
+  .hText {
+    gap: 5px;
   }
 }
 

@@ -5,6 +5,11 @@ import {
 } from "../guilds/localScanLibrary";
 import { extractGuildCoaString } from "../guilds/guildCoa";
 import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../guilds/guildScanNormalizer";
+import {
+  normalizeSfPlayerCharacterCore,
+  type NormalizedPlayer,
+  type NormalizedPlayerFieldStatus,
+} from "../parsing/normalizedPlayer";
 import { resolveServer } from "../servers/serverResolver";
 import {
   resolveGuildFusions,
@@ -14,8 +19,11 @@ import {
 } from "./guildFusionResolver";
 import {
   resolvePlayerFusions,
+  selectPlayerFusionReadyCandidates,
+  type PlayerFusionFieldAvailability,
   type PlayerFusionObservation,
   type PlayerFusionPlayerResult,
+  type PlayerFusionSemanticVector,
 } from "./playerFusionResolver";
 
 type JsonRecord = Record<string, unknown>;
@@ -70,6 +78,89 @@ const readCurrentCompactOriginNumericId = (player: JsonRecord | null) => {
   const save = Array.isArray(player.save) ? player.save : null;
   if (saveVersion !== 2 || save?.length !== 70) return null;
   return toFiniteNumber(save[68]);
+};
+
+const ATTRIBUTE_KEYS = ["strength", "dexterity", "intelligence", "constitution", "luck"] as const;
+const FORTRESS_BUILDING_KEYS = [
+  "fortress",
+  "quarters",
+  "woodcutter",
+  "quarry",
+  "gemMine",
+  "academy",
+  "archeryGuild",
+  "barracks",
+  "mageTower",
+  "treasury",
+  "smithy",
+  "fortifications",
+] as const;
+const PET_ELEMENT_KEYS = ["shadow", "light", "earth", "fire", "water"] as const;
+
+const combineAvailability = (statuses: Array<NormalizedPlayerFieldStatus | undefined>): PlayerFusionFieldAvailability => {
+  if (statuses.length && statuses.every((status) => status === "available")) return "available";
+  if (statuses.some((status) => status === "invalid")) return "invalid";
+  if (statuses.some((status) => status === "unsupported")) return "unsupported";
+  return "missing";
+};
+
+const strictVector = (values: Array<number | null | undefined>, availability: PlayerFusionFieldAvailability): PlayerFusionSemanticVector => ({
+  availability,
+  values: availability === "available" && values.every((value) => typeof value === "number" && Number.isFinite(value))
+    ? (values as number[])
+    : null,
+});
+
+const supportingVector = (values: Array<number | null | undefined>, statuses: Array<NormalizedPlayerFieldStatus | undefined>): PlayerFusionSemanticVector => {
+  const availability = combineAvailability(statuses);
+  const hasFiniteValue = values.some((value) => typeof value === "number" && Number.isFinite(value));
+  const finiteValues = values.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : 0));
+  return {
+    availability: hasFiniteValue ? "available" : availability,
+    values: hasFiniteValue ? finiteValues : null,
+  };
+};
+
+export const createPlayerFusionSemanticSummary = (player: JsonRecord | null) => {
+  if (!player) return undefined;
+  const normalized: NormalizedPlayer = normalizeSfPlayerCharacterCore(player);
+  const fields = normalized.metadata.fields;
+  const baseAttributePaths = ATTRIBUTE_KEYS.map((attribute) => `attributes.${attribute}.base`);
+  const baseAttributes = strictVector(
+    ATTRIBUTE_KEYS.map((attribute) => normalized.attributes[attribute].base),
+    combineAvailability(baseAttributePaths.map((path) => fields[path]?.status)),
+  );
+  const fortressPaths = [
+    "fortress.upgrades",
+    "fortress.gladiator",
+    "fortress.knights",
+    ...FORTRESS_BUILDING_KEYS.map((building) => `fortress.buildings.${building}`),
+  ];
+  const fortress = supportingVector(
+    [
+      normalized.fortress.upgrades,
+      normalized.fortress.gladiator,
+      normalized.fortress.knights,
+      ...FORTRESS_BUILDING_KEYS.map((building) => normalized.fortress.buildings[building]),
+    ],
+    fortressPaths.map((path) => normalized.fortress.metadata.fields[path]?.status ?? fields[path]?.status),
+  );
+  const pets = supportingVector(
+    [
+      ...PET_ELEMENT_KEYS.map((element) => normalized.pets?.bonuses[element]),
+      ...PET_ELEMENT_KEYS.map((element) => normalized.pets?.habitatProgress[element]),
+    ],
+    [
+      ...PET_ELEMENT_KEYS.map((element) => normalized.pets?.metadata.fields[`bonuses.${element}`]?.status),
+      ...PET_ELEMENT_KEYS.map((element) => normalized.pets?.metadata.fields[`habitatProgress.${element}`]?.status),
+    ],
+  );
+
+  return {
+    baseAttributes,
+    fortress,
+    pets,
+  };
 };
 
 const resolveServerCode = (value: unknown) => resolveServer(String(value ?? ""))?.code ?? null;
@@ -137,9 +228,11 @@ export const createFusionIdentityObservations = (
       name: member.name,
       classId: member.classId,
       level: member.level,
+      levelAvailability: typeof member.level === "number" && Number.isFinite(member.level) && member.level > 0 ? "available" : "missing",
       guildIdentifier: member.guildSegment ?? member.groupSegment,
       guildName: member.guildName,
       originNumericId: readCurrentCompactOriginNumericId(rawPlayer),
+      semantic: createPlayerFusionSemanticSummary(rawPlayer),
     };
   });
 };
@@ -290,9 +383,7 @@ export async function buildFusionIdentityPreviewReport(
   }));
   const highConfidencePlayerMatches: GuildFusionPlayerMatch[] = playerResults.flatMap((entry) => {
     if (entry.result.status !== "high-confidence") return [];
-    const candidate = entry.result.candidates.find(
-      (item) => !item.rejected && (item.evidence.exactName || item.evidence.fusionBaseName),
-    );
+    const candidate = selectPlayerFusionReadyCandidates(entry.result)[0];
     if (!candidate) return [];
     return [
       {

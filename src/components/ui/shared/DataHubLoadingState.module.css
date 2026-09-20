@@ -1,0 +1,101 @@
+.state {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.38);
+  color: var(--text-soft);
+  padding: 22px;
+  text-align: center;
+  min-width: 0;
+}
+
+.inline,
+.page,
+.overlay {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.page {
+  min-height: min(360px, 58dvh);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-style: solid;
+  background: rgba(7, 14, 23, 0.66);
+  pointer-events: none;
+}
+
+.error {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  border-color: rgba(255, 111, 111, 0.5);
+  background: rgba(56, 20, 28, 0.22);
+  color: #ffd1d1;
+}
+
+.spinner {
+  flex: 0 0 auto;
+  animation: dataHubLoadingSpin 900ms linear infinite;
+}
+
+.content {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.title {
+  max-width: 100%;
+  color: var(--title);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.message,
+.errorMessage {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.progressCount {
+  margin-top: 4px;
+  color: var(--title);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.retryButton {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tile-hover);
+  color: var(--text);
+  cursor: pointer;
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+
+@keyframes dataHubLoadingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 560px) {
+  .inline,
+  .page,
+  .overlay {
+    flex-direction: column;
+  }
+}

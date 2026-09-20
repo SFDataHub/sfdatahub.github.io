@@ -1,5 +1,6 @@
 // FILE: src/components/Flipbook/FlipbookCurlViewer.tsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { PageFlip } from "page-flip";
 import styles from "./curl.module.css";
 
@@ -34,6 +35,11 @@ type Props = {
   visualState?: "cover" | "opening" | "reading";
   flippingTime?: number;
   syncPageIndex?: number | null;
+  toolbarBackAction?: {
+    label: string;
+    shortLabel?: string;
+    onClick: () => void;
+  };
   noSound?: boolean;
 };
 
@@ -52,7 +58,7 @@ const joinBase = (p: string) => {
 const fetchManifest = async (slug: string): Promise<FlipbookManifest> => {
   const url = joinBase(`flipbooks/${slug}/manifest.json`);
   const res = await fetch(url, { cache: "no-cache" });
-  if (!res.ok) throw new Error(`Manifest not found for slug "${slug}"`);
+  if (!res.ok) throw new Error("manifestNotFound");
   return res.json();
 };
 
@@ -64,6 +70,11 @@ const supportsFullscreen = () => {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const isActivePageFlipState = (state: unknown) =>
   state === "flipping" || state === "fold_corner" || state === "user_fold";
+const offPageFlipEvent = (pf: PageFlip | null | undefined, event: string) => {
+  try { (pf as any)?.off?.(event); } catch {}
+};
+const getPageFlipCurrentIndex = (pf: PageFlip | null | undefined) =>
+  (pf as any)?.getCurrentPageIndex?.();
 
 /* ========================================================================== */
 /*  Singleton (persistiert über React Mount/Unmount hinweg)                   */
@@ -152,8 +163,10 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   visualState = "reading",
   flippingTime,
   syncPageIndex = null,
+  toolbarBackAction,
   noSound = true,
 }) => {
+  const { t } = useTranslation();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const htmlSourceRef = useRef<HTMLDivElement | null>(null);
@@ -212,7 +225,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       return;
     }
     if (!slug) {
-      setError("Missing flipbook slug.");
+      setError("missingSlug");
       setManifest(null);
       return;
     }
@@ -220,7 +233,9 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     setError(null);
     fetchManifest(slug)
       .then((m) => { if (live) setManifest(m); })
-      .catch((e) => { if (live) setError(e.message || "Failed to load flipbook manifest."); });
+      .catch((e) => {
+        if (live) setError(e?.message === "manifestNotFound" ? "manifestNotFound" : "loadFailed");
+      });
     return () => { live = false; };
   }, [isHtmlMode, slug]);
 
@@ -247,58 +262,102 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     if (!singleton.hostEl.isConnected) return;
 
     const bookKey = isHtmlMode
-      ? `html:${htmlPagesKey ?? activeManifest.title}:${activeManifest.pageCount}:${activeManifest.pageWidth}x${activeManifest.pageHeight}:cover-${showCover}:flip-${flippingTime ?? "default"}`
+      ? `html:${htmlPagesKey ?? activeManifest.title}:${activeManifest.pageCount}:cover-${showCover}:flip-${flippingTime ?? "default"}`
       : `image:${slug}`;
     const needsNew = !singleton.pf || singleton.key !== bookKey;
+    let pf = singleton.pf;
+    let active = true;
+    const timers: number[] = [];
+    let initPage0 = clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
 
-    if (!needsNew) {
-      try { singleton.pf!.update(); } catch {}
-      return;
-    }
+    const isCurrentInstance = () => active && singleton.pf === pf;
 
     // Echte (Neu-)Initialisierung
-    if (singleton.pf) {
-      try { singleton.pf.destroy(); } catch {}
+    if (needsNew) {
+      if (isHtmlMode) {
+        const htmlNodes = Array.from(htmlSource!.children).filter(
+          (node): node is HTMLElement => node instanceof HTMLElement
+        );
+        if (htmlNodes.length !== activeManifest.pageCount) return;
+      }
+
+      const previousPage = getPageFlipCurrentIndex(singleton.pf);
+      if (singleton.pf) {
+        try {
+          offPageFlipEvent(singleton.pf, "init");
+          offPageFlipEvent(singleton.pf, "flip");
+          offPageFlipEvent(singleton.pf, "changeState");
+          singleton.pf.destroy();
+        } catch {}
+      }
       singleton.pf = null;
       singleton.hostEl = null;
-    }
 
-    if (!singleton.hostEl) {
-      singleton.hostEl = document.createElement("div");
-      singleton.hostEl.className = styles.host;
-      stage.appendChild(singleton.hostEl);
-    }
+      if (!singleton.hostEl) {
+        singleton.hostEl = document.createElement("div");
+        singleton.hostEl.className = styles.host;
+        stage.appendChild(singleton.hostEl);
+      }
 
-    const opts = {
-      width: activeManifest.pageWidth,
-      height: activeManifest.pageHeight,
-      size: "stretch" as any,
-      maxShadowOpacity: 0.25,
-      showCover,
-      mobileScrollSupport: true,
-      usePortrait: false,
-      disableFlipByClick: false,
-      turnCorner: "all" as const,     // Drag entlang kompletter Kante
-      startZIndex: 10,
-      swipeDistance: 30,
-      showPageCorners: true,
-      useMouseEvents: true,
-      ...(flippingTime ? { flippingTime } : {}),
-    };
+      const startPage = Number.isFinite(previousPage as number)
+        ? clamp(previousPage as number, 0, Math.max(0, activeManifest.pageCount - 1))
+        : clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
+      initPage0 = startPage;
 
-    const pf = new PageFlip(singleton.hostEl, opts as any);
-    singleton.pf = pf;
-    singleton.key = bookKey;
+      const opts = {
+        width: activeManifest.pageWidth,
+        height: activeManifest.pageHeight,
+        startPage,
+        size: "stretch" as any,
+        maxShadowOpacity: 0.25,
+        showCover,
+        mobileScrollSupport: true,
+        usePortrait: false,
+        disableFlipByClick: false,
+        turnCorner: "all" as const,     // Drag entlang kompletter Kante
+        startZIndex: 10,
+        swipeDistance: 30,
+        showPageCorners: true,
+        useMouseEvents: true,
+        ...(flippingTime ? { flippingTime } : {}),
+      };
 
-    if (isHtmlMode) {
-      const htmlNodes = Array.from(htmlSource!.children).filter(
-        (node): node is HTMLElement => node instanceof HTMLElement
-      );
-      pf.loadFromHTML(htmlNodes);
+      pf = new PageFlip(singleton.hostEl, opts as any);
+      singleton.pf = pf;
+      singleton.key = bookKey;
+
+      try {
+        if (isHtmlMode) {
+          const htmlNodes = Array.from(htmlSource!.children).filter(
+            (node): node is HTMLElement => node instanceof HTMLElement
+          );
+          if (htmlNodes.length !== activeManifest.pageCount) throw new Error("htmlPageCountMismatch");
+          pf.loadFromHTML(htmlNodes);
+        } else {
+          const imageUrls = activeManifest.pages.map(pickBestSrc);
+          pf.loadFromImages(imageUrls);
+        }
+        setError(null);
+      } catch (loadError) {
+        try {
+          offPageFlipEvent(pf, "init");
+          offPageFlipEvent(pf, "flip");
+          offPageFlipEvent(pf, "changeState");
+          pf.destroy();
+        } catch {}
+        if (singleton.pf === pf) {
+          singleton.pf = null;
+          singleton.key = null;
+          singleton.hostEl = null;
+        }
+        setError("loadFailed");
+        return;
+      }
     } else {
-      const imageUrls = activeManifest.pages.map(pickBestSrc);
-      pf.loadFromImages(imageUrls);
+      try { pf?.update(); } catch {}
     }
+
+    if (!pf) return;
 
     // === Preload-Helper für "nächste Doppelseite" ============================
     const preloadNextSpread = (page0: number) => {
@@ -312,17 +371,24 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     };
 
     const onInit = () => {
-      const p0 = clamp(initialPageRef.current, 1, activeManifest.pageCount) - 1;
+      if (!isCurrentInstance()) return;
+      const p0 = initPage0;
       pf.turnToPage(p0, "hard");
       setIsFlipping(false);
       setCurrentPage0(p0);
       // Preload leicht verzögert starten (nach erster Darstellung)
-      setTimeout(() => preloadNextSpread(p0), 220);
+      timers.push(window.setTimeout(() => {
+        if (isCurrentInstance()) preloadNextSpread(p0);
+      }, 220));
       readyRef.current?.(pf);
     };
+    offPageFlipEvent(pf, "init");
+    offPageFlipEvent(pf, "flip");
+    offPageFlipEvent(pf, "changeState");
     pf.on("init", onInit);
 
     pf.on("flip", (e: any) => {
+      if (!isCurrentInstance()) return;
       const p0 = e.data as number;    // 0-basiert
       if (p0 < minPageIndexRef.current) {
         pf.turnToPage(minPageIndexRef.current, "hard");
@@ -333,38 +399,48 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       setCurrentPage0(p0);
       pageChangeRef.current?.(p0);
       // Preload NACH der Flip-Animation starten, um Flicker zu vermeiden
-      setTimeout(() => preloadNextSpread(p0), 220);
+      timers.push(window.setTimeout(() => {
+        if (isCurrentInstance()) preloadNextSpread(p0);
+      }, 220));
     });
 
     pf.on("changeState", (e: any) => {
+      if (!isCurrentInstance()) return;
       const nextIsFlipping = isActivePageFlipState(e.data);
       setIsFlipping((previous) => previous === nextIsFlipping ? previous : nextIsFlipping);
     });
 
     // ResizeObserver auf den äußeren Wrapper (nicht auf hostEl, die wandert)
     const ro = new ResizeObserver(() => {
-      try { singleton.pf?.update(); } catch {}
+      if (!isCurrentInstance()) return;
+      try { pf.update(); } catch {}
     });
     ro.observe(wrap);
 
     const onKey = (ev: KeyboardEvent) => {
+      if (!isCurrentInstance()) return;
       if (!enableKeyboard) return;
       if (ev.key === "ArrowLeft")  {
         ev.preventDefault();
-        if ((singleton.pf as any)?.getCurrentPageIndex?.() <= minPageIndexRef.current) {
-          singleton.pf?.turnToPage(minPageIndexRef.current, "hard");
+        if (getPageFlipCurrentIndex(pf) <= minPageIndexRef.current) {
+          pf.turnToPage(minPageIndexRef.current, "hard");
         } else {
-          singleton.pf?.flipPrev();
+          pf.flipPrev();
         }
       }
-      if (ev.key === "ArrowRight") { ev.preventDefault(); singleton.pf?.flipNext(); }
+      if (ev.key === "ArrowRight") { ev.preventDefault(); pf.flipNext(); }
     };
     window.addEventListener("keydown", onKey, { passive: false });
 
     return () => {
       // KEIN Destroy beim Unmount/Re-Render – nur Listener/Observer dieser Instanz lösen
+      active = false;
+      timers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("keydown", onKey);
       ro.disconnect();
+      offPageFlipEvent(pf, "init");
+      offPageFlipEvent(pf, "flip");
+      offPageFlipEvent(pf, "changeState");
     };
   }, [enableKeyboard, flippingTime, htmlPages, htmlPagesKey, isHtmlMode, manifest, pageHeight, pageWidth, pickBestSrc, showCover, slug, title]);
 
@@ -395,9 +471,9 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     (anyEl.requestFullscreen || anyEl.webkitRequestFullscreen || anyEl.msRequestFullscreen)?.call(anyEl);
   };
 
-  if (error) return <div className={styles.errorBox}>Flipbook konnte nicht geladen werden: {error}</div>;
-  if (!isHtmlMode && !manifest) return <div className={styles.errorBox}>Lade Flipbook…</div>;
-  if (isHtmlMode && !htmlPages?.length) return <div className={styles.errorBox}>Keine Flipbook-Seiten vorhanden.</div>;
+  if (error) return <div className={styles.errorBox}>{t(`flipbook.errors.${error}`)}</div>;
+  if (!isHtmlMode && !manifest) return <div className={styles.errorBox}>{t("flipbook.loading")}</div>;
+  if (isHtmlMode && !htmlPages?.length) return <div className={styles.errorBox}>{t("flipbook.noPages")}</div>;
 
   return (
     <div
@@ -414,18 +490,29 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
         )}
       </div>
 
-      {showHud && <div className={styles.hud}>
-        <button className={styles.hBtn} onClick={flipPrev} aria-label="Zurück">‹</button>
+      {showHud && <div className={`${styles.hud} ${toolbarBackAction ? styles.hudWithBackAction : ""}`}>
+        {toolbarBackAction && (
+          <button
+            className={`${styles.hBtn} ${styles.backActionBtn}`}
+            onClick={toolbarBackAction.onClick}
+            aria-label={toolbarBackAction.label}
+            title={toolbarBackAction.label}
+          >
+            <span className={styles.backActionLabel}>{toolbarBackAction.label}</span>
+            <span className={styles.backActionShortLabel}>{toolbarBackAction.shortLabel ?? toolbarBackAction.label}</span>
+          </button>
+        )}
+        <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
         <div className={styles.hText}>
           <span className={styles.title}>{bookTitle}</span>
           <span className={styles.sep}>·</span>
-          <span>Seite {visiblePage} / {visiblePageCount}</span>
+          <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
         </div>
         <div className={styles.spacer} />
         {supportsFullscreen() && (
-          <button className={styles.hBtn} onClick={enterFullscreen} aria-label="Fullscreen">⤢</button>
+          <button className={styles.hBtn} onClick={enterFullscreen} aria-label={t("flipbook.fullscreen")}>⤢</button>
         )}
-        <button className={styles.hBtn} onClick={flipNext} aria-label="Weiter">›</button>
+        <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
       </div>}
     </div>
   );

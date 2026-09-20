@@ -255,7 +255,6 @@
 }
 
 .emptyState,
-.loadingState,
 .errorState {
   border: 1px dashed var(--line);
   border-radius: 8px;
@@ -265,6 +264,9 @@
 }
 
 .errorState {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
   border-color: rgba(255, 111, 111, 0.5);
   color: #ffd1d1;
 }
@@ -418,6 +420,7 @@
   padding: 4px 7px;
   color: var(--text-soft);
   font-size: 12px;
+  background: rgba(139, 165, 196, 0.08);
 }
 
 .evidencePositive {
@@ -426,7 +429,45 @@
 }
 
 .evidenceNeutral {
+  border-color: rgba(139, 165, 196, 0.38);
   color: #d9e7f7;
+  background: rgba(139, 165, 196, 0.1);
+}
+
+.evidenceWeakSupport {
+  border-color: rgba(92, 190, 198, 0.42);
+  color: #b9f4f7;
+  background: rgba(92, 190, 198, 0.1);
+}
+
+.evidenceSupport {
+  border-color: rgba(61, 213, 180, 0.46);
+  color: #b9f8e8;
+  background: rgba(61, 213, 180, 0.11);
+}
+
+.evidenceStrongSupport {
+  border-color: rgba(92, 198, 137, 0.5);
+  color: #b7f5cf;
+  background: rgba(92, 198, 137, 0.12);
+}
+
+.evidenceAnchor {
+  border-color: rgba(245, 205, 92, 0.56);
+  color: #ffe8a8;
+  background: rgba(245, 205, 92, 0.13);
+}
+
+.evidenceWarning {
+  border-color: rgba(245, 155, 92, 0.58);
+  color: #ffd0a8;
+  background: rgba(245, 155, 92, 0.13);
+}
+
+.evidenceHardContradiction {
+  border-color: rgba(255, 111, 111, 0.62);
+  color: #ffd1d1;
+  background: rgba(255, 111, 111, 0.13);
 }
 
 @media (max-width: 860px) {

@@ -1,4 +1,4 @@
-import { LOCAL_SERVER_FUSIONS } from "../../data/serverFusions";
+import { LOCAL_SERVER_FUSIONS, type LocalServerFusionRelation } from "../../data/serverFusions";
 import { LOCAL_SERVER_REGISTRY, type LocalServerDefinition } from "../../data/serverRegistry";
 
 type ServerLookupInput = string | number | null | undefined;
@@ -16,7 +16,7 @@ const normalizeHostKey = (value: unknown) => {
 const codeLookup = new Map<string, LocalServerDefinition>();
 const stringLookup = new Map<string, LocalServerDefinition>();
 const numericLookup = new Map<number, LocalServerDefinition>();
-const directFusionLookup = new Map<string, string>();
+const directFusionLookup = new Map<string, LocalServerFusionRelation>();
 const reverseFusionLookup = new Map<string, Set<string>>();
 
 const addStringLookup = (value: unknown, server: LocalServerDefinition) => {
@@ -39,7 +39,7 @@ LOCAL_SERVER_REGISTRY.forEach((server) => {
 });
 
 LOCAL_SERVER_FUSIONS.forEach((fusion) => {
-  directFusionLookup.set(fusion.from, fusion.to);
+  directFusionLookup.set(fusion.from, fusion);
   const origins = reverseFusionLookup.get(fusion.to) ?? new Set<string>();
   origins.add(fusion.from);
   reverseFusionLookup.set(fusion.to, origins);
@@ -76,8 +76,24 @@ export const resolveServer = (input: ServerLookupInput): LocalServerDefinition |
 export const getDirectFusionDestination = (input: ServerLookupInput): LocalServerDefinition | null => {
   const server = resolveServer(input);
   if (!server) return null;
-  const destinationCode = directFusionLookup.get(server.code);
+  const destinationCode = directFusionLookup.get(server.code)?.to;
   return destinationCode ? getServerByCode(destinationCode) : null;
+};
+
+export const getDirectFusionRelation = (input: ServerLookupInput): LocalServerFusionRelation | null => {
+  const server = resolveServer(input);
+  return server ? directFusionLookup.get(server.code) ?? null : null;
+};
+
+export const getFusionEvent = (
+  originInput: ServerLookupInput,
+  destinationInput: ServerLookupInput,
+): LocalServerFusionRelation["fusionEvent"] | null => {
+  const origin = resolveServer(originInput);
+  const destination = resolveServer(destinationInput);
+  if (!origin || !destination) return null;
+  const relation = directFusionLookup.get(origin.code);
+  return relation?.to === destination.code ? relation.fusionEvent ?? null : null;
 };
 
 export const getFusionLineage = (input: ServerLookupInput): LocalServerDefinition[] => {
@@ -122,7 +138,7 @@ const collectFusionFamilyCodes = (code: string, visited: Set<string>): Set<strin
   if (visited.has(code)) return visited;
   visited.add(code);
 
-  const destination = directFusionLookup.get(code);
+  const destination = directFusionLookup.get(code)?.to;
   if (destination) collectFusionFamilyCodes(destination, visited);
 
   const origins = reverseFusionLookup.get(code);

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
 import AccountConnectedCharactersTab from "../../components/account/AccountConnectedCharactersTab";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import { useAuth } from "../../context/AuthContext";
 import { useLocalePreferences } from "../../context/LocalePreferencesContext";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
@@ -178,7 +179,7 @@ const AccountSettingsPage: React.FC = () => {
   };
 
   const renderLoading = () => (
-    <div className={styles.loadingState}>Checking session...</div>
+    <DataHubLoadingState variant="page" title="Checking session" message="Reading account session state." />
   );
 
   const renderUnauthed = () => (

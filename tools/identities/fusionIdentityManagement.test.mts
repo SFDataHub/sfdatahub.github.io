@@ -21,15 +21,16 @@ type MemberInput = {
   guildSegment: string;
   guildName: string;
   level?: number;
+  classId?: string;
 };
 
 const COA = "01234567890123456789ab";
 const OTHER_COA = "1111111111111111111111";
 
-const member = ({ id, name, server, guildSegment, guildName, level = 10 }: MemberInput) => ({
+const member = ({ id, name, server, guildSegment, guildName, level = 10, classId = "1" }: MemberInput) => ({
   memberRef: id,
   name,
-  classId: "1",
+  classId,
   level,
   baseStats: null,
   totalStats: null,
@@ -121,6 +122,125 @@ const createSnapshots = () => [
   ),
 ];
 
+const createMikaReservationSnapshots = () => [
+  snapshot(
+    "mika-old-eu1",
+    1000,
+    "s1_eu",
+    [
+      { id: "s1_eu_p61", name: "Mika", server: "s1_eu", guildSegment: "g1", guildName: "Archive" },
+      { id: "s1_eu_p62", name: "Aleendar", server: "s1_eu", guildSegment: "g1", guildName: "Archive" },
+    ],
+    [group("s1_eu", "g1", "Archive", 2, COA)],
+  ),
+  snapshot(
+    "mika-new-f28",
+    2000,
+    "f28_net",
+    [
+      { id: "f28_net_p61", name: "Mika (s1_eu)", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11 },
+      { id: "f28_net_p62", name: "Aleendar (s1_eu)", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11 },
+    ],
+    [group("f28_net", "g1", "Archive", 2, COA)],
+  ),
+];
+
+const createPlayerDoubleClaimSnapshots = () => [
+  snapshot(
+    "claim-old-eu1",
+    1000,
+    "s1_eu",
+    [{ id: "s1_eu_p900", name: "Old X", server: "s1_eu", guildSegment: "g1", guildName: "Archive" }],
+    [group("s1_eu", "g1", "Archive", 1, COA)],
+  ),
+  snapshot(
+    "claim-new-f28",
+    2000,
+    "f28_net",
+    [
+      { id: "f28_net_p900", name: "Old X (s1_eu)", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11 },
+      { id: "f28_net_p901", name: "Old X (s1_eu)", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11 },
+    ],
+    [group("f28_net", "g1", "Archive", 2, COA)],
+  ),
+];
+
+const createNoHistoricalObservationSnapshots = () => [
+  snapshot(
+    "lookup-old-eu1",
+    1000,
+    "s1_eu",
+    [{ id: "s1_eu_p1", name: "Alice", server: "s1_eu", guildSegment: "g1", guildName: "Archive" }],
+    [group("s1_eu", "g1", "Archive", 1, COA)],
+  ),
+  snapshot(
+    "lookup-new-f28",
+    2000,
+    "f28_net",
+    [{ id: "f28_net_p76550", name: "Milfiway (s1eu)", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11, classId: "8" }],
+    [group("f28_net", "g1", "Archive", 1, COA)],
+  ),
+];
+
+const createUnsafeRenameSnapshots = () => [
+  snapshot(
+    "rename-old-eu1",
+    1000,
+    "s1_eu",
+    [{ id: "s1_eu_p1", name: "ArchiveName", server: "s1_eu", guildSegment: "g1", guildName: "Archive" }],
+    [group("s1_eu", "g1", "Archive", 1, COA)],
+  ),
+  snapshot(
+    "rename-new-f28",
+    2000,
+    "f28_net",
+    [{ id: "f28_net_p76551", name: "BrandNewName", server: "f28_net", guildSegment: "g1", guildName: "Archive", level: 11, classId: "2" }],
+    [group("f28_net", "g1", "Archive", 1, COA)],
+  ),
+];
+
+const createWeakOnlyPlayerSnapshots = (candidateCount: number) => [
+  snapshot(
+    `weak-old-eu2-${candidateCount}`,
+    Date.parse("2026-01-02T12:00:09.395Z"),
+    "s2_eu",
+    Array.from({ length: candidateCount }, (_, index) => ({
+      id: `s2_eu_p17795${index}`,
+      name: `Darth Monk ${index + 1}`,
+      server: "s2_eu",
+      guildSegment: `old_g${index}`,
+      guildName: "Archive",
+      level: 10,
+      classId: "8",
+    })),
+    [group("s2_eu", "old_g1", "Archive", candidateCount, COA)],
+  ),
+  snapshot(
+    `weak-new-f28-${candidateCount}`,
+    Date.parse("2026-09-05T09:10:55.210Z"),
+    "f28_net",
+    [{ id: `f28_net_p18171${candidateCount}`, name: "Luzie", server: "f28_net", guildSegment: "new_g1", guildName: "50Todsünden", level: 384, classId: "8" }],
+    [group("f28_net", "new_g1", "50Todsünden", 1, OTHER_COA)],
+  ),
+];
+
+const createSinglePlausiblePlayerSnapshots = () => [
+  snapshot(
+    "plausible-old-eu2",
+    Date.parse("2026-01-02T12:00:09.395Z"),
+    "s2_eu",
+    [{ id: "s2_eu_p177952", name: "Darth Monk", server: "s2_eu", guildSegment: "shared_g1", guildName: "50Todsünden", level: 10, classId: "8" }],
+    [group("s2_eu", "shared_g1", "50Todsünden", 1, COA)],
+  ),
+  snapshot(
+    "plausible-new-f28",
+    Date.parse("2026-09-05T09:10:55.210Z"),
+    "f28_net",
+    [{ id: "f28_net_p181717", name: "Luzie", server: "f28_net", guildSegment: "shared_g1", guildName: "50Todsünden", level: 384, classId: "8" }],
+    [group("f28_net", "shared_g1", "50Todsünden", 1, COA)],
+  ),
+];
+
 const dbSuffix = Date.now();
 const playerDb = `fusion-identity-management-player-${dbSuffix}`;
 const guildDb = `fusion-identity-management-guild-${dbSuffix}`;
@@ -147,6 +267,31 @@ assert.ok(knights.memberMigrationEdges.some((edge) => edge.oldGuildIdentifier ==
 
 const readyPlayers = report.items.filter((item) => item.entityType === "player" && item.status === "ready");
 assert.equal(readyPlayers.length, 5);
+const readyAlice = report.items.find((item) => item.currentIdentifier === "f28_net_p901");
+const readyBob = report.items.find((item) => item.currentIdentifier === "f28_net_p902");
+assert.equal(readyAlice?.candidates.length, 1);
+assert.equal(readyAlice?.candidates[0]?.historicalIdentifier, "s1_eu_p1");
+const firstAliceObservation = readyAlice?.observations.reduce((earliest, observation) =>
+  observation.timestamp < earliest.timestamp ? observation : earliest,
+);
+const latestAliceObservation = readyAlice?.observations.at(-1);
+const clonedFirstAliceObservation = firstAliceObservation ? structuredClone(firstAliceObservation) : null;
+const clonedLatestAliceObservation = latestAliceObservation ? structuredClone(latestAliceObservation) : null;
+assert.equal(readyAlice?.observations.length, 2);
+assert.equal(readyAlice?.firstSeen, 2000);
+assert.equal(clonedFirstAliceObservation?.timestamp, 2000);
+assert.equal(clonedFirstAliceObservation?.classId, "1");
+assert.equal(clonedFirstAliceObservation?.level, 11);
+assert.equal(clonedFirstAliceObservation?.guildName, "Knights");
+assert.equal(readyAlice?.lastSeen, 3000);
+assert.equal(clonedLatestAliceObservation?.timestamp, 3000);
+assert.equal(clonedLatestAliceObservation?.classId, "1");
+assert.equal(clonedLatestAliceObservation?.level, 12);
+assert.equal(clonedLatestAliceObservation?.guildName, "Knights");
+assert.equal(
+  readyBob?.candidates.some((candidate) => candidate.historicalIdentifier === "s1_eu_p1"),
+  false,
+);
 
 const mergeResult = await mergeReadyFusionIdentityItems(report, { playerStore, guildStore });
 assert.equal(mergeResult.players, 5);
@@ -181,7 +326,7 @@ report = await buildFusionIdentityManagementReportFromSnapshots({
   guildStore: rejectGuildStore,
 });
 const rejectedAlice = report.items.find((item) => item.currentIdentifier === "f28_net_p901");
-assert.equal(rejectedAlice?.status, "review");
+assert.equal(rejectedAlice?.status, "unresolved");
 assert.equal(rejectedAlice?.candidates[0]?.rejected, true);
 assert.equal(rejectedAlice?.readyCandidateIdentifier, null);
 const rejectedKnights = report.items.find((item) => item.currentIdentifier === "f28_g9");
@@ -210,17 +355,179 @@ assert.equal(
   false,
 );
 
+const mikaPlayerDb = `fusion-identity-management-player-mika-${dbSuffix}`;
+const mikaGuildDb = `fusion-identity-management-guild-mika-${dbSuffix}`;
+await deleteDB(mikaPlayerDb);
+await deleteDB(mikaGuildDb);
+const mikaPlayerStore = createPlayerIdentityStore({ dbName: mikaPlayerDb });
+const mikaGuildStore = createGuildIdentityStore({ dbName: mikaGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createMikaReservationSnapshots(),
+  playerStore: mikaPlayerStore,
+  guildStore: mikaGuildStore,
+});
+const mika = report.items.find((item) => item.currentIdentifier === "f28_net_p61");
+const aleendar = report.items.find((item) => item.currentIdentifier === "f28_net_p62");
+assert.equal(mika?.status, "ready");
+assert.equal(mika?.readyCandidateIdentifier, "s1_eu_p61");
+assert.deepEqual(
+  mika?.candidates.map((candidate) => candidate.historicalIdentifier),
+  ["s1_eu_p61"],
+);
+assert.equal(aleendar?.status, "ready");
+assert.equal(
+  aleendar?.candidates.some((candidate) => candidate.historicalIdentifier === "s1_eu_p61"),
+  false,
+);
+
+const doubleClaimPlayerDb = `fusion-identity-management-player-double-claim-${dbSuffix}`;
+const doubleClaimGuildDb = `fusion-identity-management-guild-double-claim-${dbSuffix}`;
+await deleteDB(doubleClaimPlayerDb);
+await deleteDB(doubleClaimGuildDb);
+const doubleClaimPlayerStore = createPlayerIdentityStore({ dbName: doubleClaimPlayerDb });
+const doubleClaimGuildStore = createGuildIdentityStore({ dbName: doubleClaimGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createPlayerDoubleClaimSnapshots(),
+  playerStore: doubleClaimPlayerStore,
+  guildStore: doubleClaimGuildStore,
+});
+const doubleClaimPlayers = report.items.filter((item) => item.entityType === "player" && item.currentIdentifier.startsWith("f28_net_p90"));
+assert.equal(doubleClaimPlayers.length, 2);
+doubleClaimPlayers.forEach((item) => {
+  assert.equal(item.status, "review");
+  assert.ok(item.reasons.includes("historical identity is claimed by multiple current identities"));
+  assert.ok(item.candidates.some((candidate) => candidate.historicalIdentifier === "s1_eu_p900"));
+});
+
+const noObservationPlayerDb = `fusion-identity-management-player-no-observation-${dbSuffix}`;
+const noObservationGuildDb = `fusion-identity-management-guild-no-observation-${dbSuffix}`;
+await deleteDB(noObservationPlayerDb);
+await deleteDB(noObservationGuildDb);
+const noObservationPlayerStore = createPlayerIdentityStore({ dbName: noObservationPlayerDb });
+const noObservationGuildStore = createGuildIdentityStore({ dbName: noObservationGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createNoHistoricalObservationSnapshots(),
+  playerStore: noObservationPlayerStore,
+  guildStore: noObservationGuildStore,
+});
+const milfiway = report.items.find((item) => item.currentIdentifier === "f28_net_p76550");
+assert.equal(milfiway?.status, "noHistoricalObservation");
+assert.equal(milfiway?.reasonCodes[0], "no-historical-observation");
+assert.equal(milfiway?.diagnostics?.reliableHistoricalLookup?.baseName, "Milfiway");
+assert.equal(milfiway?.diagnostics?.historicalSnapshotCount, 1);
+assert.equal(report.summary.ready + report.summary.review + report.summary.unresolved + report.summary.noHistoricalObservation + report.summary.noHistory + report.summary.completed, report.summary.total);
+
+const unsafeRenamePlayerDb = `fusion-identity-management-player-unsafe-rename-${dbSuffix}`;
+const unsafeRenameGuildDb = `fusion-identity-management-guild-unsafe-rename-${dbSuffix}`;
+await deleteDB(unsafeRenamePlayerDb);
+await deleteDB(unsafeRenameGuildDb);
+const unsafeRenamePlayerStore = createPlayerIdentityStore({ dbName: unsafeRenamePlayerDb });
+const unsafeRenameGuildStore = createGuildIdentityStore({ dbName: unsafeRenameGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createUnsafeRenameSnapshots(),
+  playerStore: unsafeRenamePlayerStore,
+  guildStore: unsafeRenameGuildStore,
+});
+const unsafeRename = report.items.find((item) => item.currentIdentifier === "f28_net_p76551");
+assert.equal(unsafeRename?.status, "unresolved");
+assert.notEqual(unsafeRename?.status, "noHistoricalObservation");
+
+const singleWeakPlayerDb = `fusion-identity-management-player-single-weak-${dbSuffix}`;
+const singleWeakGuildDb = `fusion-identity-management-guild-single-weak-${dbSuffix}`;
+await deleteDB(singleWeakPlayerDb);
+await deleteDB(singleWeakGuildDb);
+const singleWeakPlayerStore = createPlayerIdentityStore({ dbName: singleWeakPlayerDb });
+const singleWeakGuildStore = createGuildIdentityStore({ dbName: singleWeakGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createWeakOnlyPlayerSnapshots(1),
+  playerStore: singleWeakPlayerStore,
+  guildStore: singleWeakGuildStore,
+});
+const singleWeak = report.items.find((item) => item.currentIdentifier === "f28_net_p181711");
+assert.equal(singleWeak?.status, "unresolved");
+assert.equal(singleWeak?.reasonCodes[0], "no-actionable-candidate");
+assert.equal(singleWeak?.candidates.length, 0);
+assert.equal(singleWeak?.diagnostics?.candidatePipeline.candidatesAfterExclusions, 1);
+assert.equal(singleWeak?.diagnostics?.candidatePipeline.candidatesAfterReservations, 0);
+assert.equal(singleWeak?.diagnostics?.candidatePipeline.finalCandidates, 0);
+
+const multipleWeakPlayerDb = `fusion-identity-management-player-multiple-weak-${dbSuffix}`;
+const multipleWeakGuildDb = `fusion-identity-management-guild-multiple-weak-${dbSuffix}`;
+await deleteDB(multipleWeakPlayerDb);
+await deleteDB(multipleWeakGuildDb);
+const multipleWeakPlayerStore = createPlayerIdentityStore({ dbName: multipleWeakPlayerDb });
+const multipleWeakGuildStore = createGuildIdentityStore({ dbName: multipleWeakGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createWeakOnlyPlayerSnapshots(10),
+  playerStore: multipleWeakPlayerStore,
+  guildStore: multipleWeakGuildStore,
+});
+const multipleWeak = report.items.find((item) => item.currentIdentifier === "f28_net_p1817110");
+assert.equal(multipleWeak?.status, "unresolved");
+assert.equal(multipleWeak?.reasonCodes[0], "no-actionable-candidate");
+assert.equal(multipleWeak?.candidates.length, 0);
+assert.equal(multipleWeak?.diagnostics?.candidatePipeline.candidatesAfterExclusions, 10);
+assert.equal(multipleWeak?.diagnostics?.candidatePipeline.candidatesAfterReservations, 0);
+assert.equal(multipleWeak?.diagnostics?.candidatePipeline.finalCandidates, 0);
+
+const plausiblePlayerDb = `fusion-identity-management-player-plausible-${dbSuffix}`;
+const plausibleGuildDb = `fusion-identity-management-guild-plausible-${dbSuffix}`;
+await deleteDB(plausiblePlayerDb);
+await deleteDB(plausibleGuildDb);
+const plausiblePlayerStore = createPlayerIdentityStore({ dbName: plausiblePlayerDb });
+const plausibleGuildStore = createGuildIdentityStore({ dbName: plausibleGuildDb });
+report = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots: createSinglePlausiblePlayerSnapshots(),
+  playerStore: plausiblePlayerStore,
+  guildStore: plausibleGuildStore,
+});
+const plausible = report.items.find((item) => item.currentIdentifier === "f28_net_p181717");
+assert.equal(plausible?.status, "review");
+assert.equal(plausible?.reasonCodes[0], "insufficient-continuity");
+assert.equal(plausible?.readyCandidateIdentifier, null);
+assert.equal(plausible?.candidates.length, 1);
+assert.equal(plausible?.candidates[0]?.historicalIdentifier, "s2_eu_p177952");
+assert.equal(plausible?.candidates[0]?.entityType === "player" ? plausible.candidates[0].evidence.classification : null, "plausible");
+
 await playerStore.close();
 await guildStore.close();
 await rejectPlayerStore.close();
 await rejectGuildStore.close();
 await collisionPlayerStore.close();
 await collisionGuildStore.close();
+await mikaPlayerStore.close();
+await mikaGuildStore.close();
+await doubleClaimPlayerStore.close();
+await doubleClaimGuildStore.close();
+await noObservationPlayerStore.close();
+await noObservationGuildStore.close();
+await unsafeRenamePlayerStore.close();
+await unsafeRenameGuildStore.close();
+await singleWeakPlayerStore.close();
+await singleWeakGuildStore.close();
+await multipleWeakPlayerStore.close();
+await multipleWeakGuildStore.close();
+await plausiblePlayerStore.close();
+await plausibleGuildStore.close();
 await deleteDB(playerDb);
 await deleteDB(guildDb);
 await deleteDB(rejectPlayerDb);
 await deleteDB(rejectGuildDb);
 await deleteDB(collisionPlayerDb);
 await deleteDB(collisionGuildDb);
+await deleteDB(mikaPlayerDb);
+await deleteDB(mikaGuildDb);
+await deleteDB(doubleClaimPlayerDb);
+await deleteDB(doubleClaimGuildDb);
+await deleteDB(noObservationPlayerDb);
+await deleteDB(noObservationGuildDb);
+await deleteDB(unsafeRenamePlayerDb);
+await deleteDB(unsafeRenameGuildDb);
+await deleteDB(singleWeakPlayerDb);
+await deleteDB(singleWeakGuildDb);
+await deleteDB(multipleWeakPlayerDb);
+await deleteDB(multipleWeakGuildDb);
+await deleteDB(plausiblePlayerDb);
+await deleteDB(plausibleGuildDb);
 
 console.log("fusionIdentityManagement test passed");

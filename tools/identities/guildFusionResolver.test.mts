@@ -63,6 +63,50 @@ const mapMembers = (oldPrefix: string, newPrefix: string, count: number, oldOffs
 }
 
 {
+  const hangoverMembers = ids("hangover_old", 25);
+  const sladkyMembers = ids("sladky_old", 7);
+  const result = resolveGuildFusions({
+    historicalGuildObservations: [
+      oldGuild({
+        guildIdentifier: "eu1_hangover",
+        name: "Hangover",
+        coa: COA_A,
+        memberIdentifiers: hangoverMembers,
+        memberCount: hangoverMembers.length,
+      }),
+      oldGuild({
+        guildIdentifier: "eu1_sladky",
+        name: "Sladky domov",
+        coa: null,
+        memberIdentifiers: sladkyMembers,
+        memberCount: sladkyMembers.length,
+      }),
+    ],
+    newGuildObservations: [
+      newGuild({
+        guildIdentifier: "f28_hangover",
+        name: "Hangover",
+        coa: COA_A,
+        memberIdentifiers: [...ids("hangover_new", 25), ...ids("sladky_new", 7)],
+        memberCount: 32,
+      }),
+    ],
+    highConfidencePlayerMatches: [
+      ...mapMembers("hangover_old", "hangover_new", 25),
+      ...mapMembers("sladky_old", "sladky_new", 7),
+    ],
+  }).results[0];
+
+  assert.equal(result.status, "autoEligible");
+  assert.equal(result.identityCandidates.length, 1);
+  assert.equal(result.identityCandidates[0]?.oldGuildIdentifier, "eu1_hangover");
+  assert.equal(result.identityCandidates[0]?.autoEligible, true);
+  assert.equal(result.memberMigrationEdges.length, 1);
+  assert.equal(result.memberMigrationEdges[0]?.oldGuildIdentifier, "eu1_sladky");
+  assert.equal(result.memberMigrationEdges[0]?.matchedMemberCount, 7);
+}
+
+{
   const result = resolveGuildFusions({
     historicalGuildObservations: [oldGuild({ name: "Old A", coa: null })],
     newGuildObservations: [newGuild({ name: "New A", coa: null })],
@@ -148,6 +192,22 @@ const mapMembers = (oldPrefix: string, newPrefix: string, count: number, oldOffs
     newGuildObservations: [
       newGuild({ guildIdentifier: "f28_g1", name: "Split Guild", coa: COA_A, memberIdentifiers: ids("f28a", 4) }),
       newGuild({ guildIdentifier: "f28_g2", name: "Other Split", coa: null, memberIdentifiers: ids("f28b", 4) }),
+    ],
+    highConfidencePlayerMatches: [...mapMembers("eu1", "f28a", 4), ...mapMembers("eu1", "f28b", 3, 4)],
+  });
+
+  const first = result.results.find((entry) => entry.newGuild.guildIdentifier === "f28_g1");
+  assert.equal(first?.status, "autoEligible");
+  assert.equal(first?.splitCandidate, false);
+  assert.equal(first?.identityCandidates[0]?.autoEligible, true);
+}
+
+{
+  const result = resolveGuildFusions({
+    historicalGuildObservations: [oldGuild({ guildIdentifier: "eu1_g1", name: "Split Guild", coa: COA_A, memberIdentifiers: ids("eu1", 8) })],
+    newGuildObservations: [
+      newGuild({ guildIdentifier: "f28_g1", name: "Split Guild", coa: COA_A, memberIdentifiers: ids("f28a", 4) }),
+      newGuild({ guildIdentifier: "f28_g2", name: "Split Guild", coa: COA_A, memberIdentifiers: ids("f28b", 4) }),
     ],
     highConfidencePlayerMatches: [...mapMembers("eu1", "f28a", 4), ...mapMembers("eu1", "f28b", 3, 4)],
   });
