@@ -1,0 +1,251 @@
+# Player Evidence Priority Analysis
+Report generated: 2026-09-20T14:27:02.195Z
+Scan root=D:/SFDataHub/Guild Analytics/public/scans
+Snapshots=18
+
+## A. Evidence Hierarchy Today
+Current resolver hard-rejects class mismatch, reliable level regression, base-stat regression, and origin mismatch.
+Extreme positive level progression is now plausibility evidence: it warns on protected strong matches and removes only weak cleanup candidates.
+Strong identity is derived from current evidence such as exact/fusion-base name or semantic-ready continuity, not from previous Ready status.
+Previous counts: {"ready":1242,"unresolved":2,"review":46,"noHistory":1,"noHistoricalObservation":2}
+Current counts: {"ready":1251,"unresolved":2,"review":37,"noHistory":1,"noHistoricalObservation":2}
+
+## Jurik Joriksson
+current=f28_net_p1473 name=Jurik Joriksson statusToday=ready statusPrevious=ready previousReady=s1_eu_p2248 readyToday=s1_eu_p2248
+reasonCodesToday=none reasonsToday=numeric origin resolved to EU1 from player history || one or more candidate identities are reserved by other ready assignments
+origin=EU1 originSource=numeric previousStatus=high-confidence currentStatus=high-confidence
+reservationForPreviousReady=s1_eu_p2248 ownersToday=Jurik Joriksson(f28_net_p1473)
+levelRegressionCandidates=1 Spikey[s1_eu_p17514]
+Current observations:
+- 2026-02-21T14:44:11.553Z server=F28 name=Jurik Joriksson class=7 level=595 guild=g179 baseAvailability=available base=[2509,69444,2533,26043,2028]
+- 2026-04-03T10:11:29.955Z server=F28 name=Jurik Joriksson class=7 level=600 guild=g179 baseAvailability=available base=[2514,77851,2538,28476,2033]
+- 2026-09-05T09:10:55.210Z server=F28 name=Jurik Joriksson class=7 level=618 guild=g9108 baseAvailability=available base=[2544,103964,2574,46727,2069]
+Candidate pipeline focus:
+- Jurik Joriksson s1_eu_p2248 rejected=false reasons=none origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=65 comp=0 adjusted=65 elapsed=21.18 base=true fortress=true pets=true exact=true baseName=false previousReady=true hardContradiction=false strongIdentity=true
+  selectedPre=2026-01-31T10:18:13.890Z server=EU1 name=Jurik Joriksson class=7 level=530 guild=g252 baseAvailability=available base=[2419,66003,2443,23823,1935]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Jurik Joriksson class=7 level=595 guild=g179 baseAvailability=available base=[2509,69444,2533,26043,2028]
+  base attributes:
+  - STR.base pre=2419 post=2509 delta=90 availability=available regression=false
+  - DEX.base pre=66003 post=69444 delta=3441 availability=available regression=false
+  - INT.base pre=2443 post=2533 delta=90 availability=available regression=false
+  - CON.base pre=23823 post=26043 delta=2220 availability=available regression=false
+  - LUC.base pre=1935 post=2028 delta=93 availability=available regression=false
+  historical observations:
+  - 2025-01-01T17:13:09.390Z server=EU1 name=Jurik Joriksson class=7 level=475 guild=g10 baseAvailability=available base=[2393,21362,2408,17660,1876]
+  - 2025-02-01T13:58:40.631Z server=EU1 name=Jurik Joriksson class=7 level=479 guild=g10 baseAvailability=available base=[2393,24077,2408,17663,1876]
+  - 2025-03-01T13:52:28.450Z server=EU1 name=Jurik Joriksson class=7 level=484 guild=g10 baseAvailability=available base=[2393,26825,2408,17666,1876]
+  - 2025-04-05T13:05:34.118Z server=EU1 name=Jurik Joriksson class=7 level=490 guild=g10 baseAvailability=available base=[2393,31045,2411,17666,1876]
+  - 2025-05-03T11:55:37.999Z server=EU1 name=Jurik Joriksson class=7 level=493 guild=g10 baseAvailability=available base=[2399,34141,2411,17666,1876]
+  - 2025-06-07T11:35:05.522Z server=EU1 name=Jurik Joriksson class=7 level=498 guild=g10 baseAvailability=available base=[2399,38034,2414,17668,1879]
+  - 2025-07-05T14:46:50.827Z server=EU1 name=Jurik Joriksson class=7 level=502 guild=g83 baseAvailability=available base=[2404,41753,2419,17673,1884]
+  - 2025-08-01T17:03:38.452Z server=EU1 name=Jurik Joriksson class=7 level=505 guild=g83 baseAvailability=available base=[2404,45371,2422,17673,1884]
+  - 2025-09-06T11:05:18.451Z server=EU1 name=Jurik Joriksson class=7 level=510 guild=g83 baseAvailability=available base=[2404,50406,2422,17673,1887]
+  - 2025-10-03T19:29:53.050Z server=EU1 name=Jurik Joriksson class=7 level=514 guild=g83 baseAvailability=available base=[2404,51780,2425,19991,1887]
+  - 2025-11-01T13:23:41.934Z server=EU1 name=Jurik Joriksson class=7 level=519 guild=g83 baseAvailability=available base=[2404,51799,2425,23105,1887]
+  - 2025-12-06T09:22:59.276Z server=EU1 name=Jurik Joriksson class=7 level=522 guild=g252 baseAvailability=available base=[2404,56942,2425,23808,1907]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Jurik Joriksson class=7 level=527 guild=g252 baseAvailability=available base=[2414,61241,2435,23818,1930]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Jurik Joriksson class=7 level=527 guild=g252 baseAvailability=available base=[2414,61241,2435,23818,1930]
+  - 2026-01-02T12:00:09.395Z server=EU1 name=Jurik Joriksson class=7 level=527 guild=g252 baseAvailability=available base=[2414,61241,2435,23818,1930]
+  - 2026-01-31T10:18:13.890Z server=EU1 name=Jurik Joriksson class=7 level=530 guild=g252 baseAvailability=available base=[2419,66003,2443,23823,1935]
+Simulation: status=ready winner=s1_eu_p2248 reason=unique strong identity without hard contradiction; progression warning only
+
+## Derton
+current=f28_net_p198659 name=Derton statusToday=ready statusPrevious=ready previousReady=s3_eu_p236532 readyToday=s3_eu_p236532
+reasonCodesToday=none reasonsToday=fusion lineage produced EU1, EU2, EU3, EU4
+origin=EU1,EU2,EU3,EU4 originSource=fusionLineage previousStatus=high-confidence currentStatus=high-confidence
+reservationForPreviousReady=s3_eu_p236532 ownersToday=Derton(f28_net_p198659)
+levelRegressionCandidates=4670 Darth Monk[s4_eu_p25896], john b[s4_eu_p18], Vaaz[s4_eu_p1362], tros69cnik[s4_eu_p6808], macfit[s4_eu_p6504], Mika[s4_eu_p61], Luciana[s4_eu_p14667], Azula[s4_eu_p1027]
+Current observations:
+- 2026-02-21T14:44:11.553Z server=F28 name=Derton class=4 level=290 guild=g9126 baseAvailability=available base=[1572,3460,2476,2145,2151]
+Candidate pipeline focus:
+- Funerid Mulistox s3_eu_p236532 rejected=false reasons=none origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=289 comp=6 adjusted=283 elapsed=21.18 base=true fortress=true pets=null exact=false baseName=false previousReady=true hardContradiction=false strongIdentity=true
+  selectedPre=2026-01-31T10:18:13.890Z server=EU3 name=Funerid Mulistox class=4 level=1 guild=n/a baseAvailability=available base=[9,19,12,13,13]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Derton class=4 level=290 guild=g9126 baseAvailability=available base=[1572,3460,2476,2145,2151]
+  base attributes:
+  - STR.base pre=9 post=1572 delta=1563 availability=available regression=false
+  - DEX.base pre=19 post=3460 delta=3441 availability=available regression=false
+  - INT.base pre=12 post=2476 delta=2464 availability=available regression=false
+  - CON.base pre=13 post=2145 delta=2132 availability=available regression=false
+  - LUC.base pre=13 post=2151 delta=2138 availability=available regression=false
+  historical observations:
+  - 2025-10-03T19:29:53.050Z server=EU3 name=Funerid Mulistox class=4 level=1 guild=n/a baseAvailability=available base=[9,19,12,13,13]
+  - 2026-01-31T10:18:13.890Z server=EU3 name=Funerid Mulistox class=4 level=1 guild=n/a baseAvailability=available base=[9,19,12,13,13]
+Simulation: status=ready winner=s3_eu_p236532 reason=unique strong identity without hard contradiction; progression warning only
+
+## Zachi
+current=f28_net_p234559 name=Zachi statusToday=ready statusPrevious=ready previousReady=s3_eu_p130868 readyToday=s3_eu_p130868
+reasonCodesToday=none reasonsToday=numeric origin resolved to EU3 from player history || one or more candidate identities are reserved by other ready assignments
+origin=EU3 originSource=numeric previousStatus=ambiguous currentStatus=high-confidence
+reservationForPreviousReady=s3_eu_p130868 ownersToday=Zachi(f28_net_p234559)
+levelRegressionCandidates=0 none
+Current observations:
+- 2026-02-21T14:44:11.553Z server=F28 name=Zachi class=6 level=588 guild=g15060 baseAvailability=available base=[71145,2278,2275,40005,2777]
+- 2026-04-03T10:11:29.955Z server=F28 name=Zachi class=6 level=593 guild=g15060 baseAvailability=available base=[80000,2324,2284,40772,2843]
+- 2026-09-05T09:10:55.210Z server=F28 name=Zachi class=6 level=611 guild=g15060 baseAvailability=available base=[101920,2454,2469,58936,2968]
+Candidate pipeline focus:
+- Zachii s3_eu_p130868 rejected=false reasons=none origin=true class=true levelMonotonic=true progression=normal raw=12 comp=6 adjusted=6 elapsed=21.18 base=true fortress=true pets=true exact=false baseName=false previousReady=true hardContradiction=false strongIdentity=true
+  selectedPre=2026-01-31T10:18:13.890Z server=EU3 name=Zachii class=6 level=576 guild=g4877 baseAvailability=available base=[60010,2227,2267,36773,2733]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Zachi class=6 level=588 guild=g15060 baseAvailability=available base=[71145,2278,2275,40005,2777]
+  base attributes:
+  - STR.base pre=60010 post=71145 delta=11135 availability=available regression=false
+  - DEX.base pre=2227 post=2278 delta=51 availability=available regression=false
+  - INT.base pre=2267 post=2275 delta=8 availability=available regression=false
+  - CON.base pre=36773 post=40005 delta=3232 availability=available regression=false
+  - LUC.base pre=2733 post=2777 delta=44 availability=available regression=false
+  historical observations:
+  - 2025-01-01T17:13:09.390Z server=EU3 name=Zachii class=6 level=467 guild=g4877 baseAvailability=available base=[22526,2003,2141,10155,2284]
+  - 2025-02-01T13:58:40.631Z server=EU3 name=Zachii class=6 level=473 guild=g4877 baseAvailability=available base=[25000,2003,2144,10304,2284]
+  - 2025-03-01T13:52:28.450Z server=EU3 name=Zachii class=6 level=477 guild=g4877 baseAvailability=available base=[25005,2011,2149,12832,2290]
+  - 2025-04-05T13:05:34.118Z server=EU3 name=Zachii class=6 level=482 guild=g4877 baseAvailability=available base=[28528,2014,2149,13000,2307]
+  - 2025-05-03T11:55:37.999Z server=EU3 name=Zachii class=6 level=486 guild=g4877 baseAvailability=available base=[30010,2014,2152,14215,2307]
+  - 2025-06-07T11:35:05.522Z server=EU3 name=Zachii class=6 level=491 guild=g4877 baseAvailability=available base=[32840,2017,2153,15000,2322]
+  - 2025-07-05T14:46:50.827Z server=EU3 name=Zachii class=6 level=536 guild=g4877 baseAvailability=available base=[35850,2085,2218,17334,2387]
+  - 2025-08-01T17:03:38.452Z server=EU3 name=Zachii class=6 level=544 guild=g4877 baseAvailability=available base=[37749,2098,2231,20010,2397]
+  - 2025-09-06T11:05:18.451Z server=EU3 name=Zachii class=6 level=554 guild=g4877 baseAvailability=available base=[44627,2119,2251,20030,2426]
+  - 2025-10-03T19:29:53.050Z server=EU3 name=Zachii class=6 level=559 guild=g4877 baseAvailability=available base=[45012,2126,2251,25318,2482]
+  - 2025-11-01T13:23:41.934Z server=EU3 name=Zachii class=6 level=564 guild=g4877 baseAvailability=available base=[45811,2135,2259,30000,2497]
+  - 2025-12-06T09:22:59.276Z server=EU3 name=Zachii class=6 level=569 guild=g4877 baseAvailability=available base=[51803,2135,2259,32000,2526]
+  - 2026-01-02T11:20:57.223Z server=EU3 name=Zachii class=6 level=573 guild=g4877 baseAvailability=available base=[55070,2151,2264,35000,2617]
+  - 2026-01-02T11:20:57.223Z server=EU3 name=Zachii class=6 level=573 guild=g4877 baseAvailability=available base=[55070,2151,2264,35000,2617]
+  - 2026-01-02T11:20:57.223Z server=EU3 name=Zachii class=6 level=573 guild=g4877 baseAvailability=available base=[55070,2151,2264,35000,2617]
+  - 2026-01-02T12:00:09.395Z server=EU3 name=Zachii class=6 level=573 guild=g4877 baseAvailability=available base=[55070,2151,2264,35000,2617]
+  - 2026-01-31T10:18:13.890Z server=EU3 name=Zachii class=6 level=576 guild=g4877 baseAvailability=available base=[60010,2227,2267,36773,2733]
+Simulation: status=ready winner=s3_eu_p130868 reason=unique strong identity without hard contradiction; progression warning only
+
+## Hardiy
+current=f28_net_p4809 name=Hardiy statusToday=ready statusPrevious=ready previousReady=s1_eu_p7344 readyToday=s1_eu_p7344
+reasonCodesToday=none reasonsToday=numeric origin resolved to EU1 from player history
+origin=EU1 originSource=numeric previousStatus=high-confidence currentStatus=high-confidence
+reservationForPreviousReady=s1_eu_p7344 ownersToday=Hardiy(f28_net_p4809)
+levelRegressionCandidates=17 dex0n[s1_eu_p3336], Yeji[s1_eu_p26525], Mama Morpheus[s1_eu_p2225], Remilia[s1_eu_p13771], Thomas AAnderson[s1_eu_p7540], Spikey[s1_eu_p17514], Attempt[s1_eu_p18599], Niekukesi[s1_eu_p12599]
+Current observations:
+- 2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+- 2026-04-03T10:11:29.955Z server=F28 name=Hardiy class=1 level=594 guild=g22 baseAvailability=available base=[111111,1247,1160,46563,2265]
+- 2026-09-05T09:10:55.210Z server=F28 name=Hardiy class=1 level=611 guild=g22 baseAvailability=available base=[134112,1296,1206,68671,2321]
+Candidate pipeline focus:
+- Darth Monk s1_eu_p217868 rejected=true reasons=level-progression-extreme origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=578 comp=0 adjusted=578 elapsed=50.11 base=true fortress=true pets=null exact=false baseName=false previousReady=false hardContradiction=false strongIdentity=true
+  selectedPre=2026-01-02T12:00:09.395Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+  base attributes:
+  - STR.base pre=46 post=100453 delta=100407 availability=available regression=false
+  - DEX.base pre=23 post=1239 delta=1216 availability=available regression=false
+  - INT.base pre=22 post=1160 delta=1138 availability=available regression=false
+  - CON.base pre=19 post=45431 delta=45412 availability=available regression=false
+  - LUC.base pre=15 post=2252 delta=2237 availability=available regression=false
+  historical observations:
+  - 2025-01-01T17:13:09.390Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[41,15,14,14,10]
+  - 2025-02-01T13:58:40.631Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[41,15,14,14,10]
+  - 2025-03-01T13:52:28.450Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[41,15,14,14,10]
+  - 2025-04-05T13:05:34.118Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[41,15,17,14,10]
+  - 2025-05-03T11:55:37.999Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[41,18,17,14,10]
+  - 2025-06-07T11:35:05.522Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2025-07-05T14:46:50.827Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2025-08-01T17:03:38.452Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2025-09-06T11:05:18.451Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2025-11-01T13:23:41.934Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2025-12-06T09:22:59.276Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+  - 2026-01-02T12:00:09.395Z server=EU1 name=Darth Monk class=1 level=11 guild=n/a baseAvailability=available base=[46,23,22,19,15]
+- HardiyDK s1_eu_p7344 rejected=false reasons=none origin=true class=true levelMonotonic=true progression=normal raw=3 comp=0 adjusted=3 elapsed=21.18 base=true fortress=true pets=true exact=false baseName=false previousReady=true hardContradiction=false strongIdentity=true
+  selectedPre=2026-01-31T10:18:13.890Z server=EU1 name=HardiyDK class=1 level=586 guild=g29 baseAvailability=available base=[95081,1239,1160,45018,2252]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+  base attributes:
+  - STR.base pre=95081 post=100453 delta=5372 availability=available regression=false
+  - DEX.base pre=1239 post=1239 delta=0 availability=available regression=false
+  - INT.base pre=1160 post=1160 delta=0 availability=available regression=false
+  - CON.base pre=45018 post=45431 delta=413 availability=available regression=false
+  - LUC.base pre=2252 post=2252 delta=0 availability=available regression=false
+  historical observations:
+  - 2025-01-01T17:13:09.390Z server=EU1 name=HardiyDK class=1 level=517 guild=g29 baseAvailability=available base=[39786,1146,1094,10073,2162]
+  - 2025-02-01T13:58:40.631Z server=EU1 name=HardiyDK class=1 level=521 guild=g29 baseAvailability=available base=[44462,1149,1097,10085,2162]
+  - 2025-03-01T13:52:28.450Z server=EU1 name=HardiyDK class=1 level=527 guild=g29 baseAvailability=available base=[49094,1149,1097,10086,2165]
+  - 2025-04-05T13:05:34.118Z server=EU1 name=HardiyDK class=1 level=532 guild=g29 baseAvailability=available base=[50023,1153,1101,15860,2165]
+  - 2025-05-03T11:55:37.999Z server=EU1 name=HardiyDK class=1 level=537 guild=g29 baseAvailability=available base=[50029,1161,1106,21202,2170]
+  - 2025-06-07T11:35:05.522Z server=EU1 name=HardiyDK class=1 level=542 guild=g29 baseAvailability=available base=[50046,1169,1111,28138,2178]
+  - 2025-07-05T14:46:50.827Z server=EU1 name=HardiyDK class=1 level=545 guild=g29 baseAvailability=available base=[52177,1169,1114,32176,2178]
+  - 2025-08-01T17:03:38.452Z server=EU1 name=HardiyDK class=1 level=557 guild=g29 baseAvailability=available base=[56435,1194,1134,34701,2198]
+  - 2025-09-06T11:05:18.451Z server=EU1 name=HardiyDK class=1 level=564 guild=g29 baseAvailability=available base=[63782,1206,1134,36240,2201]
+  - 2025-10-03T19:29:53.050Z server=EU1 name=HardiyDK class=1 level=569 guild=g29 baseAvailability=available base=[69654,1216,1147,37593,2226]
+  - 2025-11-01T13:23:41.934Z server=EU1 name=HardiyDK class=1 level=572 guild=g29 baseAvailability=available base=[77192,1219,1147,37601,2226]
+  - 2025-12-06T09:22:59.276Z server=EU1 name=HardiyDK class=1 level=577 guild=g29 baseAvailability=available base=[80000,1219,1147,43824,2242]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=HardiyDK class=1 level=583 guild=g29 baseAvailability=available base=[86729,1236,1157,45017,2252]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=HardiyDK class=1 level=583 guild=g29 baseAvailability=available base=[86729,1236,1157,45017,2252]
+  - 2026-01-02T12:00:09.395Z server=EU1 name=HardiyDK class=1 level=583 guild=g29 baseAvailability=available base=[86729,1236,1157,45017,2252]
+  - 2026-01-31T10:18:13.890Z server=EU1 name=HardiyDK class=1 level=586 guild=g29 baseAvailability=available base=[95081,1239,1160,45018,2252]
+- Matti s1_eu_p18023 rejected=true reasons=level-progression-extreme origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=140 comp=0 adjusted=140 elapsed=50.11 base=true fortress=false pets=true exact=false baseName=false previousReady=false hardContradiction=false strongIdentity=false
+  selectedPre=2026-01-02T12:00:09.395Z server=EU1 name=Matti class=1 level=449 guild=g270 baseAvailability=available base=[12111,473,492,11780,1130]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+  base attributes:
+  - STR.base pre=12111 post=100453 delta=88342 availability=available regression=false
+  - DEX.base pre=473 post=1239 delta=766 availability=available regression=false
+  - INT.base pre=492 post=1160 delta=668 availability=available regression=false
+  - CON.base pre=11780 post=45431 delta=33651 availability=available regression=false
+  - LUC.base pre=1130 post=2252 delta=1122 availability=available regression=false
+  historical observations:
+  - 2025-01-01T17:13:09.390Z server=EU1 name=Matti class=1 level=416 guild=g270 baseAvailability=available base=[6645,435,442,6459,1080]
+  - 2025-04-05T13:05:34.118Z server=EU1 name=Matti class=1 level=428 guild=g270 baseAvailability=available base=[8001,448,458,7777,1096]
+  - 2025-05-03T11:55:37.999Z server=EU1 name=Matti class=1 level=431 guild=g270 baseAvailability=available base=[8610,451,458,8386,1099]
+  - 2025-06-07T11:35:05.522Z server=EU1 name=Matti class=1 level=435 guild=g270 baseAvailability=available base=[9254,451,461,9021,1099]
+  - 2025-07-05T14:46:50.827Z server=EU1 name=Matti class=1 level=437 guild=g270 baseAvailability=available base=[9951,451,464,9677,1099]
+  - 2025-08-01T17:03:38.452Z server=EU1 name=Matti class=1 level=438 guild=g270 baseAvailability=available base=[10066,459,472,9782,1110]
+  - 2025-09-06T11:05:18.451Z server=EU1 name=Matti class=1 level=442 guild=g270 baseAvailability=available base=[11041,462,475,10728,1113]
+  - 2025-10-03T19:29:53.050Z server=EU1 name=Matti class=1 level=443 guild=g270 baseAvailability=available base=[11047,462,478,10728,1116]
+  - 2025-11-01T13:23:41.934Z server=EU1 name=Matti class=1 level=445 guild=g270 baseAvailability=available base=[11662,465,481,11338,1119]
+  - 2025-12-06T09:22:59.276Z server=EU1 name=Matti class=1 level=448 guild=g270 baseAvailability=available base=[12100,468,481,11775,1122]
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Matti class=1 level=449 guild=g270 baseAvailability=available base=[12111,473,492,11780,1130]
+  - 2026-01-02T12:00:09.395Z server=EU1 name=Matti class=1 level=449 guild=g270 baseAvailability=available base=[12111,473,492,11780,1130]
+- Rover s1_eu_p6149 rejected=true reasons=level-progression-extreme origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=180 comp=0 adjusted=180 elapsed=50.11 base=true fortress=false pets=true exact=false baseName=false previousReady=false hardContradiction=false strongIdentity=false
+  selectedPre=2026-01-02T12:00:09.395Z server=EU1 name=Rover class=1 level=409 guild=g8274 baseAvailability=available base=[10025,870,870,8803,1600]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+  base attributes:
+  - STR.base pre=10025 post=100453 delta=90428 availability=available regression=false
+  - DEX.base pre=870 post=1239 delta=369 availability=available regression=false
+  - INT.base pre=870 post=1160 delta=290 availability=available regression=false
+  - CON.base pre=8803 post=45431 delta=36628 availability=available regression=false
+  - LUC.base pre=1600 post=2252 delta=652 availability=available regression=false
+  historical observations:
+  - 2026-01-02T11:20:57.223Z server=EU1 name=Rover class=1 level=409 guild=g8274 baseAvailability=available base=[10025,870,870,8803,1600]
+  - 2026-01-02T12:00:09.395Z server=EU1 name=Rover class=1 level=409 guild=g8274 baseAvailability=available base=[10025,870,870,8803,1600]
+- Svenner1986 s1_eu_p154287 rejected=true reasons=level-progression-extreme origin=true class=true levelMonotonic=true progression=extreme-contradiction raw=158 comp=0 adjusted=158 elapsed=21.18 base=true fortress=false pets=true exact=false baseName=false previousReady=false hardContradiction=false strongIdentity=false
+  selectedPre=2026-01-31T10:18:13.890Z server=EU1 name=Svenner1986 class=1 level=431 guild=g3090 baseAvailability=available base=[4366,1141,1159,3676,1127]
+  selectedPost=2026-02-21T14:44:11.553Z server=F28 name=Hardiy class=1 level=589 guild=g22 baseAvailability=available base=[100453,1239,1160,45431,2252]
+  base attributes:
+  - STR.base pre=4366 post=100453 delta=96087 availability=available regression=false
+  - DEX.base pre=1141 post=1239 delta=98 availability=available regression=false
+  - INT.base pre=1159 post=1160 delta=1 availability=available regression=false
+  - CON.base pre=3676 post=45431 delta=41755 availability=available regression=false
+  - LUC.base pre=1127 post=2252 delta=1125 availability=available regression=false
+  historical observations:
+  - 2026-01-31T10:18:13.890Z server=EU1 name=Svenner1986 class=1 level=431 guild=g3090 baseAvailability=available base=[4366,1141,1159,3676,1127]
+Simulation: status=ready winner=s1_eu_p7344 reason=unique strong identity without hard contradiction; progression warning only
+
+## F. Base Stats Positive Controls
+previousReadyMatchesCompared=1242
+baseAttributeCellsCompared=6210
+positiveBaseRegressionCells=0
+previousReadyMatchesWithAnyHardContradiction=0
+
+## G. Base Regression False Candidates
+falseCandidatesCompared=228716
+falseCandidatesWithAnyBaseRegression=166577
+reviewPlayersAffectedByBaseRegression=1292
+
+## H. Current Ready Warning Cases
+previousReadyExtremeProgressionWithoutHardContradiction=3
+- Jurik Joriksson current=f28_net_p1473 historical=Jurik Joriksson s1_eu_p2248 progression=extreme-contradiction raw=65 adjusted=65 strong exact=true baseName=false previousReady=true semantic=true
+- zarzarTY current=f28_net_p26977 historical=zarzarTY s1_eu_p48897 progression=extreme-contradiction raw=48 adjusted=48 strong exact=true baseName=false previousReady=true semantic=true
+- Derton current=f28_net_p198659 historical=Funerid Mulistox s3_eu_p236532 progression=extreme-contradiction raw=289 adjusted=283 strong exact=false baseName=false previousReady=true semantic=true
+
+## I. Simulated New Hierarchy Summary
+Jurik Joriksson: product=ready simulated=ready winner=s1_eu_p2248 reason=unique strong identity without hard contradiction; progression warning only
+Derton: product=ready simulated=ready winner=s3_eu_p236532 reason=unique strong identity without hard contradiction; progression warning only
+Zachi: product=ready simulated=ready winner=s3_eu_p130868 reason=unique strong identity without hard contradiction; progression warning only
+Hardiy: product=ready simulated=ready winner=s1_eu_p7344 reason=unique strong identity without hard contradiction; progression warning only
+
+## J. Implemented Hierarchy
+Class mismatch, reliable level regression, and any reliable individual base-stat regression are hard contradictions.
+Extreme positive progression is warning-only for protected strong identity matches and cleanup evidence for weak alternatives.
+Global assignment/reservation still runs after candidate evaluation; strong-winner protection does not override assignment conflicts.
+Ready items do not carry progression or reservation reason codes after recompute.
+No Historical Observation remains reserved for missing matching observations, not for candidates eliminated by contradictions.

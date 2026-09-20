@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
 import GuildContextBar from "../../components/guilds/GuildContextBar";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import { getClassMetaById } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
 import {
@@ -2067,7 +2068,11 @@ export default function GuildHubFightTracking() {
     return (
       <ContentShell centerFramed={false}>
         <div className={styles.page}>
-          <section className={styles.emptyState}>Fight Tracker wird geladen...</section>
+          <DataHubLoadingState
+            variant="page"
+            title="Fight Tracker wird geladen"
+            message="Lokale Fight-Tracker-Übersicht wird gelesen."
+          />
         </div>
       </ContentShell>
     );
@@ -2095,7 +2100,10 @@ export default function GuildHubFightTracking() {
         {storeError ? <section className={styles.emptyState}>{storeError}</section> : null}
 
         {trackerDetailLoading ? (
-          <section className={styles.emptyState}>Tracker wird geladen...</section>
+          <DataHubLoadingState
+            title="Tracker wird geladen"
+            message="Lokale Fight-Tracker-Details werden gelesen."
+          />
         ) : !tracker ? (
           <TrackerSelectionPanel
             summaries={trackerSummaries}

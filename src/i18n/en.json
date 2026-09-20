@@ -1374,6 +1374,94 @@
       "credit": "Credit to {{discord}}."
     }
   },
+  "dungeonLibrary": {
+    "title": "Dungeon Library",
+    "subtitle": "Technical Vertical Slice",
+    "aria": {
+      "bookshelf": "Dungeon Library bookshelf"
+    },
+    "worlds": {
+      "lightWorld": "Light World",
+      "shadowWorld": "Shadow World",
+      "classWorld": "Class World",
+      "fairyTower": "Fairy Tower",
+      "continuousLoop": "Continuous Loop of Idols",
+      "twister": "Twister",
+      "sandstorm": "Sandstorm"
+    },
+    "book": {
+      "floorCount": "{{count}} Floors",
+      "dungeonCount": "{{count}} Dungeons",
+      "overviewPageNote": "Overview {{current}} / {{total}} · Page {{page}}",
+      "floorRangeOverviewNote": "Floors {{start}}-{{end}} · Overview {{current}} / {{total}}",
+      "rangeOverviewPageNote": "Floor ranges {{current}} / {{total}} · Page {{page}}",
+      "selectorPageNote": "Selector {{current}} / {{total}}",
+      "pageNote": "Page {{page}}",
+      "floorRangeTitle": "Floors {{start}}-{{end}}",
+      "floorGridAria": "{{title}} floors",
+      "floorRangeAria": "{{title}} floors {{start}}-{{end}}"
+    },
+    "navigation": {
+      "floorRanges": "Floor Ranges",
+      "floors": "Floors",
+      "floorOverview": "Floor Overview",
+      "dungeonOverview": "Dungeon Overview",
+      "backToLibrary": "Back to Dungeon Library"
+    },
+    "fallbacks": {
+      "dungeon": "Dungeon {{dungeonId}}",
+      "enemy": "Enemy ID {{enemyId}}"
+    },
+    "detail": {
+      "unknownClass": "Unknown class",
+      "monsterArtworkAria": "Monster artwork for enemy {{enemyId}}",
+      "noArtworkAria": "No artwork available for enemy {{enemyId}}",
+      "loadingArtwork": "Loading artwork...",
+      "artworkUnavailable": "Artwork unavailable",
+      "monsterImageAlt": "Monster {{enemyId}}",
+      "levelShort": "Lvl {{level}}",
+      "statsUnavailable": "Stats unavailable",
+      "enemyStatsAria": "Enemy stats",
+      "statIconAlt": "{{stat}} icon",
+      "enemyDamageAria": "Enemy damage",
+      "minDamage": "Min Damage",
+      "maxDamage": "Max Damage",
+      "hpUnavailable": "HP unavailable",
+      "hpAria": "HP: {{value}}",
+      "hpValue": "HP: {{value}}",
+      "floorCounter": "Floor {{current}} / {{total}}",
+      "lore": "Lore",
+      "loreUnavailable": "Not available yet.",
+      "enemyId": "Enemy ID {{enemyId}}"
+    },
+    "classes": {
+      "warrior": "Warrior",
+      "mage": "Mage",
+      "scout": "Scout",
+      "assassin": "Assassin",
+      "demon-hunter": "Demon Hunter",
+      "berserker": "Berserker",
+      "battle-mage": "Battle Mage",
+      "druid": "Druid",
+      "bard": "Bard",
+      "necromancer": "Necromancer",
+      "paladin": "Paladin",
+      "plague-doctor": "Plague Doctor"
+    }
+  },
+  "flipbook": {
+    "errors": {
+      "missingSlug": "Missing flipbook slug.",
+      "manifestNotFound": "Flipbook manifest was not found.",
+      "loadFailed": "Flipbook could not be loaded."
+    },
+    "loading": "Loading flipbook...",
+    "noPages": "No flipbook pages available.",
+    "previous": "Previous",
+    "next": "Next",
+    "fullscreen": "Fullscreen",
+    "pageIndicator": "Page {{current}} / {{total}}"
+  },
   "guide": {
     "status": {
       "label": "Status",

@@ -15,6 +15,7 @@ import { GemCalculator, type GemSimState } from "../../components/calculators/Ge
 import { MaxItemStatsCalculator } from "../../components/guidehub/calculators/MaxItemStatsCalculator";
 import { UnderworldProPackSkipOrder } from "../../components/guidehub/calculators/UnderworldProPackSkipOrder";
 import DungeonPauseOpenXPCalculator from "../../components/calculators/DungeonPauseOpenXPCalculator";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import HudBox from "../../components/ui/hud/box/HudBox";
 import InfographicsGallery from "./Infographics/InfographicsGallery";
 import styles from "./GuideHubV2.module.css";
@@ -1298,12 +1299,11 @@ const GuideHubV2: React.FC = () => {
                 isLoading ? styles.viewerLoadingOverlayVisible : ""
               }`}
             >
-              <div className={styles.loadingState}>
-                <div className={styles.loadingOverlayContent}>
-                  <span className={styles.loadingSpinner} aria-hidden />
-                  <span>{t("guides.v2.loading", { defaultValue: "Loading guide..." })}</span>
-                </div>
-              </div>
+              <DataHubLoadingState
+                variant="overlay"
+                title="GuideHub"
+                message={t("guides.v2.loading", { defaultValue: "Loading guide..." })}
+              />
             </div>
           </div>
         </section>

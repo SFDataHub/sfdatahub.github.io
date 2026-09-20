@@ -1,21 +1,29 @@
 .dungeon-library {
   position: relative;
-  min-height: min(780px, calc(100vh - 180px));
+  min-height: 0;
+  padding: 0.75rem;
   color: #f5f9ff;
 }
 
 .library-shelf {
-  min-height: 420px;
-  display: grid;
-  align-items: end;
+  min-height: 0;
   padding: clamp(24px, 5vw, 56px);
-  border: 1px solid rgba(43, 76, 115, 0.8);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(14, 29, 47, 0.55), rgba(8, 18, 33, 0.85)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 72px);
-  box-shadow: inset 0 -34px 0 rgba(35, 25, 18, 0.38);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.library-shelf-scroll {
+  margin-top: -18px;
+  padding-top: 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-color: rgba(138, 165, 196, 0.38) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dungeon-library.is-opened .library-shelf {
@@ -25,19 +33,48 @@
 }
 
 .shelf-row {
-  min-height: 220px;
+  --library-book-width: clamp(148px, 16vw, 164px);
+  --library-book-height: clamp(224px, 26vw, 252px);
+  --library-shelf-side-padding: clamp(32px, 5vw, 64px);
+  --library-shelf-visible-top-offset: 10.75%;
+  --library-shelf-fine-offset: clamp(12px, 1.5vw, 18px);
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+}
+
+.shelf-books {
+  position: relative;
+  z-index: 1;
   display: flex;
+  flex-wrap: nowrap;
   align-items: end;
+  justify-content: center;
   gap: 18px;
-  padding: 0 0 18px;
-  border-bottom: 18px solid rgba(83, 55, 31, 0.82);
-  box-shadow: 0 16px 24px rgba(0, 0, 0, 0.28);
+  padding: 0 var(--library-shelf-side-padding);
+}
+
+.shelf-visual {
+  position: relative;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2170 / 725;
+  margin-top: calc(-1 * var(--library-shelf-visible-top-offset) - var(--library-shelf-fine-offset));
+  pointer-events: none;
+  background: url("./assets/dungeon-library-shelf.png") center bottom / contain no-repeat;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.32));
 }
 
 .library-book {
   position: relative;
-  width: clamp(116px, 18vw, 156px);
-  height: clamp(196px, 28vw, 248px);
+  z-index: 1;
+  flex: 0 0 var(--library-book-width);
+  width: var(--library-book-width);
+  height: var(--library-book-height);
   padding: 24px 16px 20px 28px;
   display: flex;
   flex-direction: column;
@@ -58,6 +95,7 @@
 }
 
 .library-book:hover {
+  z-index: 2;
   transform: perspective(700px) rotateY(-6deg) translate3d(0, -7px, 0) scale(1.025);
   box-shadow:
     20px 26px 34px rgba(0, 0, 0, 0.46),
@@ -75,6 +113,42 @@
     linear-gradient(145deg, #6f2237, #943855 42%, #263d64);
 }
 
+.light-world-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.18), transparent 16%, rgba(255, 255, 255, 0.1) 72%, rgba(0, 0, 0, 0.14)),
+    linear-gradient(145deg, #7b5630, #b57d3d 44%, #315b70);
+}
+
+.shadow-world-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.25), transparent 16%, rgba(255, 255, 255, 0.07) 72%, rgba(0, 0, 0, 0.2)),
+    linear-gradient(145deg, #252336, #4b3b65 44%, #6a334d);
+}
+
+.fairy-tower-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2), transparent 16%, rgba(255, 255, 255, 0.08) 72%, rgba(0, 0, 0, 0.16)),
+    linear-gradient(145deg, #5f3824, #8c6841 46%, #385e57);
+}
+
+.continuous-loop-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2), transparent 16%, rgba(255, 255, 255, 0.08) 72%, rgba(0, 0, 0, 0.17)),
+    linear-gradient(145deg, #3b3d68, #77528a 45%, #9b5f43);
+}
+
+.twister-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 16%, rgba(255, 255, 255, 0.08) 72%, rgba(0, 0, 0, 0.18)),
+    linear-gradient(145deg, #4b345f, #7c4b78 45%, #315a68);
+}
+
+.sandstorm-book {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2), transparent 16%, rgba(255, 255, 255, 0.09) 72%, rgba(0, 0, 0, 0.16)),
+    linear-gradient(145deg, #765026, #b2773b 46%, #6f5d3b);
+}
+
 .book-spine {
   position: absolute;
   inset: 0 auto 0 0;
@@ -84,9 +158,11 @@
 }
 
 .book-title {
-  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  font-size: clamp(1rem, 1.1vw + 0.78rem, 1.28rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .book-subtitle {
@@ -135,8 +211,8 @@
   position: absolute;
   z-index: 10;
   transform-style: preserve-3d;
-  transform-origin: left center;
-  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center top;
+  transform: translate3d(0, 0, 0) scale(var(--book-scale, 1));
   transition: transform 620ms cubic-bezier(0.18, 0.84, 0.24, 1);
   pointer-events: none;
 }
@@ -180,11 +256,11 @@
 }
 
 .book-reader-overlay.is-opening .book-stage.is-centered {
-  transform: translate3d(0, 0, 0) scale(1);
+  transform: translate3d(0, 0, 0) scale(var(--book-scale, 1));
 }
 
 .book-reader-overlay.is-opening .book-stage.is-centered.is-cover-centered {
-  transform: translate3d(var(--stage-cover-shift), 0, 0) scale(1);
+  transform: translate3d(var(--stage-cover-shift), 0, 0) scale(var(--book-scale, 1));
 }
 
 .content-flipbook-layer {
@@ -243,6 +319,8 @@
   box-sizing: border-box;
   width: 100%;
   height: 100%;
+  --dungeon-page-edge-padding: clamp(38px, 3.2vw, 52px);
+  --dungeon-page-spine-padding: clamp(56px, 4vw, 70px);
   padding: clamp(28px, 5vw, 54px);
   display: flex;
   flex-direction: column;
@@ -389,25 +467,504 @@
 }
 
 .enemy-detail {
-  margin-top: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  gap: 12px;
-  max-width: 460px;
-  padding: 24px;
-  border: 1px solid rgba(100, 64, 23, 0.28);
-  border-radius: 8px;
-  background: rgba(255, 251, 229, 0.46);
-  box-shadow: inset 0 0 28px rgba(105, 72, 30, 0.09);
+  grid-template-rows: auto auto auto auto;
+  align-items: start;
+  justify-items: center;
+  gap: clamp(8px, 1.5vw, 12px);
+  width: min(100%, 720px);
+  margin: 0 auto;
 }
 
-.enemy-detail span {
+.enemy-detail-heading {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.enemy-detail-title-group {
+  min-width: 0;
+}
+
+.enemy-detail-title-group h1 {
+  margin: 0;
+  max-width: 100%;
+  color: #312112;
+  font-size: clamp(1.7rem, 3.5vw, 2.9rem);
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.enemy-detail-monster-name {
+  margin: 5px 0 0;
+  color: rgba(68, 43, 20, 0.72);
+  font-size: clamp(0.98rem, 1.55vw, 1.2rem);
+  font-weight: 800;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.enemy-detail-floor {
   color: #6f4723;
-  font-size: 1.2rem;
+  font-size: clamp(0.9rem, 1.3vw, 1.08rem);
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.enemy-detail-reference {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+  gap: clamp(12px, 1.7vw, 18px);
+  align-items: start;
+}
+
+.enemy-detail-media {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.enemy-detail-art {
+  position: relative;
+  width: min(100%, 268px);
+  aspect-ratio: 1;
+  min-height: 170px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(100, 64, 23, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 248, 220, 0.16);
+  box-shadow: 0 8px 18px rgba(75, 48, 18, 0.1);
+  overflow: hidden;
+}
+
+.enemy-detail-image {
+  display: block;
+  max-width: 94%;
+  max-height: calc(100% - 42px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.enemy-detail-image-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  color: rgba(72, 49, 27, 0.58);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.enemy-detail-art-meta {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.enemy-detail-level {
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(100, 64, 23, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 249, 224, 0.84);
+  color: #3f2a17;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(75, 48, 18, 0.12);
+}
+
+.enemy-detail-class-badge {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(100, 64, 23, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 249, 224, 0.88);
+  box-shadow: 0 4px 10px rgba(75, 48, 18, 0.12);
+}
+
+.enemy-detail-class-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.enemy-detail-class-fallback {
+  color: #3f2a17;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.enemy-detail-hp,
+.enemy-detail-stats,
+.enemy-detail-lore {
+  box-sizing: border-box;
+  border: 1px solid rgba(100, 64, 23, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 251, 229, 0.42);
+  box-shadow: 0 8px 16px rgba(75, 48, 18, 0.08);
+}
+
+.enemy-detail-hp {
+  width: 100%;
+  padding: 8px 10px;
+  color: #3a2818;
+  font-size: clamp(0.9rem, 1.4vw, 1rem);
+  font-weight: 800;
+}
+
+.enemy-detail-hp-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 1;
+}
+
+.enemy-detail-hp-track {
+  position: relative;
+  height: 12px;
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(34, 97, 52, 0.28);
+  border-radius: 999px;
+  background: rgba(43, 88, 47, 0.12);
+}
+
+.enemy-detail-hp-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f8d49, #6fcf75);
+}
+
+.enemy-detail-hp-empty {
+  display: grid;
+  place-items: center;
+  min-height: 52px;
+  color: rgba(72, 49, 27, 0.62);
+  text-align: center;
+}
+
+.enemy-detail-stats {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dungeon-attribute-bar-row {
+  display: grid;
+  grid-template-columns: minmax(52px, auto) minmax(0, 1fr) minmax(74px, max-content);
+  gap: 8px;
+  align-items: center;
+  color: #332315;
+}
+
+.dungeon-attribute-bar-label {
+  width: 58px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dungeon-attribute-bar-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.dungeon-attribute-bar-icon-image {
+  width: 25px;
+  height: 25px;
+  display: block;
+  object-fit: contain;
+}
+
+.dungeon-attribute-bar-name {
+  color: #5f3d1e;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dungeon-attribute-bar-track {
+  position: relative;
+  min-width: 0;
+  height: 11px;
+  overflow: hidden;
+  border: 1px solid rgba(109, 75, 36, 0.22);
+  border-radius: 999px;
+  background: rgba(154, 113, 58, 0.13);
+}
+
+.dungeon-attribute-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  border-radius: inherit;
+  background: #76542f;
+  transform-origin: left center;
+  transition: transform 250ms ease;
+  will-change: transform;
+}
+
+.dungeon-attribute-bar--book .dungeon-attribute-bar-track {
+  border-color: rgba(112, 78, 37, 0.24);
+  background: rgba(128, 86, 38, 0.12);
+  box-shadow: inset 0 1px 2px rgba(80, 49, 19, 0.08);
+}
+
+.dungeon-attribute-bar--book .dungeon-attribute-bar-fill {
+  background: var(--pp-stat-accent, #76542f);
+}
+
+.dungeon-attribute-bar-values {
+  min-width: 74px;
+  max-width: 100%;
+  text-align: right;
+}
+
+.dungeon-attribute-bar-value {
+  color: #21160d;
+  font-size: clamp(0.86rem, 1.15vw, 0.98rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.enemy-detail-damage {
+  margin: 2px 0 0;
+  padding: 8px 0 0;
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid rgba(100, 64, 23, 0.18);
+}
+
+.enemy-detail-damage-row {
+  display: grid;
+  grid-template-columns: max-content minmax(76px, max-content);
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  color: #332315;
+  font-size: clamp(0.82rem, 1.25vw, 0.96rem);
+  line-height: 1.1;
+}
+
+@media (min-width: 1024px) {
+  .dungeon-book-page {
+    --dungeon-page-edge-padding: 46px;
+    --dungeon-page-spine-padding: 64px;
+    padding-block: 42px;
+    padding-inline: var(--dungeon-page-edge-padding);
+    gap: 22px;
+  }
+
+  .dungeon-book-page[class~="--left"] {
+    padding-left: var(--dungeon-page-edge-padding);
+    padding-right: var(--dungeon-page-spine-padding);
+  }
+
+  .dungeon-book-page[class~="--right"] {
+    padding-left: var(--dungeon-page-spine-padding);
+    padding-right: var(--dungeon-page-edge-padding);
+  }
+
+  .dungeon-book-page h1 {
+    font-size: 3.05rem;
+    line-height: 1;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: manual;
+  }
+
+  .world-dungeon-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .floor-grid {
+    grid-template-columns: repeat(5, minmax(48px, 1fr));
+    gap: 12px;
+    max-width: 520px;
+  }
+
+  .enemy-detail {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .enemy-detail-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .enemy-detail-floor {
+    padding-inline-start: 8px;
+    font-size: 0.98rem;
+  }
+
+  .enemy-detail-title-group h1,
+  .enemy-detail-monster-name {
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: manual;
+  }
+
+  .enemy-detail-title-group h1 {
+    font-size: 2.38rem;
+    line-height: 1.02;
+  }
+
+  .enemy-detail-monster-name {
+    font-size: 1.05rem;
+    line-height: 1.08;
+  }
+
+  .enemy-detail-reference {
+    grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+    gap: 16px;
+  }
+
+  .enemy-detail-art {
+    width: min(100%, 268px);
+    min-height: 170px;
+  }
+
+  .enemy-detail-hp {
+    font-size: 0.98rem;
+  }
+
+  .enemy-detail-stats {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .enemy-detail-hp-label,
+  .enemy-detail-hp-label span,
+  .enemy-detail-damage-row dt,
+  .enemy-detail-damage-row dd {
+    white-space: nowrap;
+  }
+
+  .dungeon-attribute-bar-row {
+    grid-template-columns: minmax(56px, auto) minmax(0, 1fr) max-content;
+    gap: 8px;
+  }
+
+  .dungeon-attribute-bar-values,
+  .enemy-detail-damage-row dd {
+    min-width: 64px;
+  }
+
+  .dungeon-attribute-bar-value {
+    font-size: 0.94rem;
+  }
+
+  .enemy-detail-damage-row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 14px;
+    font-size: 0.92rem;
+  }
+
+  .enemy-detail-damage-row dt {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .enemy-detail-lore h2 {
+    font-size: 1.08rem;
+  }
+
+  .enemy-detail-id {
+    font-size: 0.88rem;
+  }
+
+  .dungeon-book-cover-title {
+    font-size: 3.35rem;
+  }
+}
+
+.enemy-detail-damage-row dt {
   font-weight: 700;
 }
 
-.enemy-detail strong {
-  font-size: clamp(1.6rem, 4vw, 2.8rem);
+.enemy-detail-damage-row dd {
+  margin: 0;
+  color: #21160d;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  text-align: right;
+}
+
+.enemy-detail-stats-empty {
+  min-height: 120px;
+  place-items: center;
+  color: rgba(72, 49, 27, 0.62);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.enemy-detail-lore {
+  width: 100%;
+  padding: 10px 12px;
+}
+
+.enemy-detail-lore h2 {
+  margin: 0 0 6px;
+  color: #312112;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  line-height: 1;
+}
+
+.enemy-detail-lore p {
+  margin: 0;
+  color: rgba(49, 33, 18, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.enemy-detail-id {
+  color: rgba(49, 33, 18, 0.66);
+  font-size: clamp(0.82rem, 1.2vw, 0.95rem);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
 }
 
 .dungeon-book-cover-page {
@@ -574,12 +1131,7 @@
 }
 
 @media (max-width: 760px) {
-  .dungeon-library {
-    min-height: 680px;
-  }
-
   .library-shelf {
-    min-height: 320px;
     padding: 22px;
   }
 
@@ -605,6 +1157,56 @@
   .dungeon-book-page {
     padding: 24px;
     gap: 16px;
+  }
+
+  .enemy-detail {
+    gap: 10px;
+    width: min(100%, 300px);
+  }
+
+  .enemy-detail-heading {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .enemy-detail-floor {
+    text-align: left;
+  }
+
+  .enemy-detail-reference {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .enemy-detail-art {
+    width: min(100%, 238px);
+    min-height: 150px;
+  }
+
+  .enemy-detail-stats {
+    padding: 9px 10px;
+    gap: 6px;
+  }
+
+  .dungeon-attribute-bar-row {
+    grid-template-columns: auto minmax(86px, 1fr) minmax(64px, auto);
+    gap: 8px;
+  }
+
+  .dungeon-attribute-bar-values {
+    min-width: 68px;
+  }
+
+  .enemy-detail-damage-row {
+    font-size: 0.84rem;
+  }
+
+  .enemy-detail-lore {
+    padding: 9px 10px;
+  }
+
+  .enemy-detail-lore p {
+    font-size: 0.84rem;
   }
 
   .book-stage::before,
@@ -647,6 +1249,12 @@
       inset 0 10px 15px rgba(255, 251, 232, 0.1),
       inset 0 -11px 18px rgba(102, 66, 28, 0.06),
       inset 0 0 0 1px rgba(255, 255, 255, 0.27);
+  }
+}
+
+@media (min-width: 768px) {
+  .dungeon-library {
+    padding: 1rem;
   }
 }
 

@@ -352,7 +352,6 @@
   cursor: not-allowed;
 }
 
-.loadingState,
 .emptyState {
   border: 1px solid var(--line);
   background: var(--tile);

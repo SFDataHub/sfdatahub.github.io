@@ -1,0 +1,138 @@
+# Fusion Compensation Analysis
+Report generated: 2026-09-19T14:18:58.148Z
+
+## A. Source And Scope
+Guild Analytics root=D:/SFDataHub/Guild Analytics
+Scan root=D:/SFDataHub/Guild Analytics/public/scans
+Main repo checked=src/data/serverRegistry.ts, src/data/serverFusions.ts
+This report is read-only analysis. No product resolver, registry, UI, raw scan, or Firestore data was changed.
+
+## B. Existing Guild Analytics Compensation Code
+src/routes/Ranking.tsx: COMP_FACTOR=0.0003168 line=30; COMP_DIVISOR=60.38647 line=31; SERVER_MONTHS line=32; compBonus line=55; formulaFound=true; mathFloorFound=true; launchDateTextFound=false
+src/routes/Dashboard.tsx: COMP_FACTOR=0.0003168 line=22; COMP_DIVISOR=60.38647 line=23; SERVER_MONTHS line=24; compBonus line=206; formulaFound=true; mathFloorFound=true; launchDateTextFound=false
+src/ui/tables/RankingTable.tsx: COMP_FACTOR=0.0003168 line=40; COMP_DIVISOR=60.38647 line=41; SERVER_MONTHS line=42; compBonus line=120; formulaFound=true; mathFloorFound=true; launchDateTextFound=false
+Formula implemented in those files: compBonus = Math.floor((gold(level) / COMP_DIVISOR) * COMP_FACTOR * month).
+This is a gold/base-stats compensation display calculation. It is not a player level compensation helper.
+
+## C. Launch Data And Month Values
+| Origin | Guild Analytics SERVER_MONTHS alias | Guild Analytics adjusted months | Inferred producer-note levels |
+| --- | --- | ---: | ---: |
+| EU1 | s1_eu | 0.0 | 0 |
+| EU2 | s2_eu | 1.5 | 3 |
+| EU3 | s3_eu | 3.0 | 6 |
+| EU4 | s4_eu | 4.5 | 9 |
+Guild Analytics does not calculate these months from launch dates in the inspected source files; the half-month values are hardcoded.
+Main repo serverRegistry/serverFusions currently contains the EU1-EU4 -> F28 relationship but no launchDate metadata.
+src/data/serverRegistry.ts: mentionsOrigins=true mentionsTarget=true launchDateTextFound=false
+src/data/serverFusions.ts: mentionsOrigins=true mentionsTarget=true launchDateTextFound=false
+
+## D. Month Rounding Behavior
+Guild Analytics only floors the gold/base-stat compensation after multiplying by month; it does not contain a raw-month rounding helper.
+Producer/user floor-half interpretation: adjustedMonths = Math.floor(rawMonths * 2) / 2; levels = Math.floor(rawMonths * 2).
+rawMonths=0.24 -> adjustedMonths=0.0 -> levels=0
+rawMonths=0.49 -> adjustedMonths=0.0 -> levels=0
+rawMonths=0.50 -> adjustedMonths=0.5 -> levels=1
+rawMonths=0.74 -> adjustedMonths=0.5 -> levels=1
+rawMonths=0.99 -> adjustedMonths=0.5 -> levels=1
+rawMonths=1.01 -> adjustedMonths=1.0 -> levels=2
+rawMonths=1.49 -> adjustedMonths=1.0 -> levels=2
+rawMonths=1.51 -> adjustedMonths=1.5 -> levels=3
+rawMonths=5.80 -> adjustedMonths=5.5 -> levels=11
+
+## E. EU1-EU4 -> F28 Level Compensation Inference
+Using the hardcoded Guild Analytics adjusted month table and the producer note 'rounded half months x2 = levels':
+EU1: adjustedMonths=0.0 -> inferredLevels=0
+EU2: adjustedMonths=1.5 -> inferredLevels=3
+EU3: adjustedMonths=3.0 -> inferredLevels=6
+EU4: adjustedMonths=4.5 -> inferredLevels=9
+
+## F. Empirical High-Level Medians Adjusted By Inferred Compensation
+| Bucket | Origin | Observed median gain | Inferred compensation | Adjusted median gain |
+| --- | --- | ---: | ---: | ---: |
+| 500-549 | EU1 | 3 | 0 | 3 |
+| 500-549 | EU2 | 6 | 3 | 3 |
+| 500-549 | EU3 | 10 | 6 | 4 |
+| 500-549 | EU4 | 13 | 9 | 4 |
+500-549 spread: raw=10 adjusted=1
+| 550-599 | EU1 | 4 | 0 | 4 |
+| 550-599 | EU2 | 8 | 3 | 5 |
+| 550-599 | EU3 | 11 | 6 | 5 |
+| 550-599 | EU4 | 15 | 9 | 6 |
+550-599 spread: raw=11 adjusted=2
+
+## G. Positive-Control Dataset
+snapshots=18
+historicalPlayerObservations=49789
+currentPlayerObservations=2963
+playerItems=1293
+positiveControls=214
+Comparison remains latest reliable pre-fusion level -> earliest reliable post-fusion level.
+EU1 raw gain n=66 min=1 median=11 p75=29 p90=39 p95=41 p99=296 max=296
+EU1 adjusted gain n=66 min=1 median=11 p75=29 p90=39 p95=41 p99=296 max=296
+EU2 raw gain n=45 min=4 median=6 p75=8 p90=27 p95=30 p99=73 max=73
+EU2 adjusted gain n=45 min=1 median=3 p75=5 p90=24 p95=27 p99=70 max=70
+EU3 raw gain n=68 min=8 median=12 p75=33 p90=43 p95=52 p99=289 max=289
+EU3 adjusted gain n=68 min=2 median=6 p75=27 p90=37 p95=46 p99=283 max=283
+EU4 raw gain n=35 min=9 median=15 p75=40 p90=43 p95=45 p99=148 max=148
+EU4 adjusted gain n=35 min=0 median=6 p75=31 p90=34 p95=36 p99=139 max=139
+
+## H. 520+ Adjusted Values
+520+ count=25
+520+ raw gain n=25 min=3 median=11 p75=12 p90=13 p95=14 p99=15 max=15
+520+ adjusted gain n=25 min=2 median=4 p75=5 p90=7 p95=11 p99=11 max=11
+520+ raw gain30 n=25 min=4.25 median=14.16 p75=16.99 p90=18.41 p95=19.83 p99=21.24 max=21.24
+520+ adjusted gain30 n=25 min=2.83 median=5.66 p75=7.08 p90=8.50 p95=8.50 p99=9.91 max=9.91
+EU1 520+ count=6 adjusted gain n=6 min=3 median=4 p75=11 p90=11 p95=11 p99=11 max=11
+EU1 520+ adjusted gain30 n=6 min=4.25 median=5.32 p75=5.66 p90=6.58 p95=6.58 p99=6.58 max=6.58
+EU2 520+ count=4 adjusted gain n=4 min=3 median=3 p75=5 p90=5 p95=5 p99=5 max=5
+EU2 520+ adjusted gain30 n=4 min=4.25 median=4.25 p75=7.08 p90=7.08 p95=7.08 p99=7.08 max=7.08
+EU3 520+ count=10 adjusted gain n=10 min=3 median=5 p75=6 p90=6 p95=7 p99=7 max=7
+EU3 520+ adjusted gain30 n=10 min=4.25 median=7.08 p75=8.50 p90=8.50 p95=9.91 p99=9.91 max=9.91
+EU4 520+ count=5 adjusted gain n=5 min=2 median=4 p75=5 p90=6 p95=6 p99=6 max=6
+EU4 520+ adjusted gain30 n=5 min=2.83 median=5.66 p75=7.08 p90=8.50 p95=8.50 p99=8.50 max=8.50
+
+## I. Origin x High-Level Bucket Validation From Current Positive Controls
+| Origin | Bucket | n | raw median | compensation | adjusted median |
+| --- | --- | ---: | ---: | ---: | ---: |
+| EU1 | 500-549 | 8 | 3 | 0 | 3 |
+| EU2 | 500-549 | 4 | 6 | 3 | 3 |
+| EU3 | 500-549 | 12 | 10 | 6 | 4 |
+| EU4 | 500-549 | 5 | 13 | 9 | 4 |
+| EU1 | 550-599 | 3 | 4 | 0 | 4 |
+| EU2 | 550-599 | 3 | 8 | 3 | 5 |
+| EU3 | 550-599 | 3 | 11 | 6 | 5 |
+| EU4 | 550-599 | 1 | 15 | 9 | 6 |
+| EU1 | 600+ | 0 | n/a | 0 | n/a |
+| EU2 | 600+ | 0 | n/a | 3 | n/a |
+| EU3 | 600+ | 0 | n/a | 6 | n/a |
+| EU4 | 600+ | 0 | n/a | 9 | n/a |
+
+## J. Hardiy Candidate Matrix With Compensation
+| Candidate | Origin | Pre | Post | Days | Raw gain | Compensation | Adjusted gain | Adjusted gain/day |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Darth Monk | EU1 | 11 | 589 | 50.11 | 578 | 0 | 578 | 11.534 |
+| Keith K | EU1 | 406 | 589 | 21.18 | 183 | 0 | 183 | 8.638 |
+| Rover | EU1 | 409 | 589 | 50.11 | 180 | 0 | 180 | 3.592 |
+| Svenner1986 | EU1 | 431 | 589 | 21.18 | 158 | 0 | 158 | 7.458 |
+| Cynik | EU1 | 442 | 589 | 140.80 | 147 | 0 | 147 | 1.044 |
+| Matti | EU1 | 449 | 589 | 50.11 | 140 | 0 | 140 | 2.794 |
+| TiWine | EU1 | 497 | 589 | 21.18 | 92 | 0 | 92 | 4.343 |
+| Oliork | EU1 | 513 | 589 | 21.18 | 76 | 0 | 76 | 3.587 |
+| HardiyDK | EU1 | 586 | 589 | 21.18 | 3 | 0 | 3 | 0.142 |
+
+## K. Hardiy Focus Cases
+Darth Monk origin=EU1 pre=11@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 rawGain=578 comp=0 adjustedGain=578 adjustedGain/day=11.534
+Rover origin=EU1 pre=409@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 rawGain=180 comp=0 adjustedGain=180 adjustedGain/day=3.592
+Svenner1986 origin=EU1 pre=431@2026-01-31T10:18:13.890Z post=589@2026-02-21T14:44:11.553Z days=21.18 rawGain=158 comp=0 adjustedGain=158 adjustedGain/day=7.458
+Matti origin=EU1 pre=449@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 rawGain=140 comp=0 adjustedGain=140 adjustedGain/day=2.794
+HardiyDK origin=EU1 pre=586@2026-01-31T10:18:13.890Z post=589@2026-02-21T14:44:11.553Z days=21.18 rawGain=3 comp=0 adjustedGain=3 adjustedGain/day=0.142
+HardiyDK/f28_net_p4809 is EU1, so inferred compensation is 0: 586 -> 589 remains rawGain=3 and adjustedGain=3.
+
+## L. Gold Compensation Relevance
+The discovered Guild Analytics compensation is based on gold(level), COMP_DIVISOR, COMP_FACTOR, and SERVER_MONTHS.
+It adjusts displayed base-stat/gold-equivalent values, not player identity level progression. It should not be imported into the identity resolver as-is.
+
+## M. Recommendation
+Add explicit launchDate/effectiveAt metadata in the main repo before implementing official level compensation.
+A safe future helper can derive oldest origin launch date for a fusion target, compute raw month difference, floor to half-months, then convert to level compensation as Math.floor(rawMonths * 2).
+Until official Playa level compensation details are confirmed, use the inferred 0/3/6/9 levels only as analysis evidence, not as production resolver behavior.

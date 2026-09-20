@@ -321,39 +321,6 @@
   margin: 0;
 }
 
-.loadingOverlay {
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 10px;
-  background: rgba(7, 14, 23, 0.45);
-  pointer-events: none;
-}
-
-.loadingSpinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid rgba(157, 183, 219, 0.35);
-  border-top-color: rgba(190, 217, 255, 0.95);
-  border-radius: 50%;
-  animation: chartSpin 0.9s linear infinite;
-}
-
-.loadingText {
-  margin: 0;
-  font-size: 0.82rem;
-  color: #cfdef5;
-}
-
-@keyframes chartSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .tooltipCard {
   border: 1px solid #476894;
   border-radius: 10px;

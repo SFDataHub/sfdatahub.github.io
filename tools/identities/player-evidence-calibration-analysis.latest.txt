@@ -1,0 +1,148 @@
+# Player Evidence Calibration Analysis
+
+Scope: read-only analysis for EU1-EU4 -> F28 player fusion evidence. No resolver/UI/store/raw-scan mutation.
+Snapshots=18 currentObservations=2963 historicalObservations=49789
+Player baseline: ready=1251 review=37 unresolved=2 noHistoricalObservation=2 noHistory=1
+Related prior tools considered: playerEvidencePriorityAnalysis.mts, remainingPlayerReviewAnalysis.mts, playerLevelProgressionByOriginAnalysis.mts, hardiyAssignmentAndLevelProgressionAnalysis.mts, fusionSemanticEvidenceAnalysis.mts, fusionObservationHistoryAnalysis.mts
+
+## A. Dataset and controls
+Positive controls=1247
+- P1-name-anchor: 1201
+- P2-semantic-ready: 45
+- P3-rename-ground-truth: 1
+Hard false/ambiguous controls=799
+False controls are restricted to review-pool candidates with same origin, same class, no level regression, and base monotonicity. Trivial origin/class rejects are excluded.
+
+## B. Current evidence families and proposed hard separation
+- Origin: reliable mismatch remains hardContradiction; resolved match is eligibility/weakSupport rather than identity evidence.
+- Class: mismatch remains hardContradiction; same class is eligibility/weakSupport.
+- Level monotonicity: regression remains hardContradiction; monotonic alone is weakSupport at most.
+- Level progression: normal/plausible-burst/extreme are plausibility modifiers, not identity anchors.
+- Base attributes: monotonicity is separate from unchanged-stat/fingerprint evidence.
+- Fortress/Pets: availability-aware continuity evidence; missing is neutral.
+- Logical guild continuity: availability-aware support signal; missing/unresolved is neutral.
+- Exact name / fusion base name / name history: direct identity anchors when not contradicted.
+- Assignment/reservation: global conflict control, not per-candidate support evidence.
+
+## C. Evidence collision metrics
+Exact name: positives=1147/1247 (92.0%) falseControls=1/799 (0.1%) collision=1 suggested=identityAnchor
+Fusion base name: positives=55/1247 (4.4%) falseControls=0/799 (0.0%) collision=0 suggested=identityAnchor
+Same logical guild by name: positives=742/1247 (59.5%) falseControls=30/799 (3.8%) collision=30 suggested=support
+Level monotonicity: positives=1247/1247 (100.0%) falseControls=799/799 (100.0%) collision=799 suggested=neutral
+Level progression normal: positives=1147/1247 (92.0%) falseControls=210/799 (26.3%) collision=210 suggested=support
+Level progression plausible-burst: positives=88/1247 (7.1%) falseControls=450/799 (56.3%) collision=450 suggested=weakContradiction
+Level progression extreme: positives=3/1247 (0.2%) falseControls=2/799 (0.3%) collision=2 suggested=weakContradiction
+Base monotonicity: positives=1247/1247 (100.0%) falseControls=799/799 (100.0%) collision=799 suggested=neutral
+Base ordering stable: positives=1075/1247 (86.2%) falseControls=204/799 (25.5%) collision=204 suggested=support
+3+ unchanged base stats: positives=189/1247 (15.2%) falseControls=1/799 (0.1%) collision=1 suggested=strongSupport
+2 unchanged secondary base stats: positives=211/1247 (16.9%) falseControls=2/799 (0.3%) collision=2 suggested=strongSupport
+Main/constitution ratio stable within 5%: positives=447/1247 (35.8%) falseControls=81/799 (10.1%) collision=81 suggested=weakSupport
+Secondary pair ratio stable within 5%: positives=1209/1247 (97.0%) falseControls=564/799 (70.6%) collision=564 suggested=weakSupport
+Luck/constitution ratio stable within 5%: positives=443/1247 (35.5%) falseControls=53/799 (6.6%) collision=53 suggested=weakSupport
+Fortress continuity: positives=949/1247 (76.1%) falseControls=85/799 (10.6%) collision=85 suggested=support
+Pet continuity: positives=1246/1247 (99.9%) falseControls=735/799 (92.0%) collision=735 suggested=weakSupport
+
+## D. Base attribute distributions
+Unchanged base stat count
+| value | Positive Matches | False Candidates |
+| ---: | ---: | ---: |
+| 0 | 805 | 796 |
+| 1 | 62 | 1 |
+| 2 | 191 | 1 |
+| 3 | 160 | 0 |
+| 4 | 29 | 0 |
+| 5 | 0 | 1 |
+| n/a | 0 | 0 |
+
+Per-attribute unchanged and median delta:
+| attribute | positive unchanged | false unchanged | positive median delta | false median delta |
+| --- | ---: | ---: | ---: | ---: |
+| STR.base | 228/1247 (18.3%) | 2/799 (0.3%) | 34 | 1489 |
+| DEX.base | 205/1247 (16.4%) | 2/799 (0.3%) | 21 | 1624 |
+| INT.base | 195/1247 (15.6%) | 1/799 (0.1%) | 29 | 1922 |
+| CON.base | 95/1247 (7.6%) | 1/799 (0.1%) | 1832 | 6957 |
+| LUC.base | 317/1247 (25.4%) | 2/799 (0.3%) | 6 | 656 |
+
+Relative delta median by attribute:
+| attribute | positive median relative delta | false median relative delta |
+| --- | ---: | ---: |
+| STR.base | 1.49% | 109.20% |
+| DEX.base | 1.04% | 123.06% |
+| INT.base | 1.26% | 87.23% |
+| CON.base | 11.53% | 112.51% |
+| LUC.base | 0.33% | 40.73% |
+
+## E. Fortress, pets, guild availability
+Guild: positive available=1230/1247 (98.6%) true=742 contradiction=488; false available=550/799 (68.8%) true=30 contradiction=520
+Fortress: positive available=951/1247 (76.3%) true=949 contradiction=2; false available=315/799 (39.4%) true=85 contradiction=230
+Pets: positive available=1246/1247 (99.9%) true=1246 contradiction=0; false available=793/799 (99.2%) true=735 contradiction=58
+Missing/unavailable guild, fortress, or pets should remain neutral.
+
+## F. F2PKrümel / Erdkrümel deep dive
+F2PKrümel viable candidates=27
+1. F2Pkrümel -> teijha (s3_eu_p113091) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+7442 DEX+682 INT+691 CON+10557 LUC+327
+2. F2Pkrümel -> Baranar (s3_eu_p138533) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+17993 DEX+202 INT+181 CON+18000 LUC+317
+3. F2Pkrümel -> Türelüres (s3_eu_p52318) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+13253 DEX+1105 INT+1109 CON+17684 LUC+229
+4. F2Pkrümel -> Yrkzem (s3_eu_p121904) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+9630 DEX+503 INT+480 CON+19100 LUC+333
+5. F2Pkrümel -> noV0 (s3_eu_p22801) progression=normal baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+9719 DEX+1291 INT+1274 CON+22750 LUC+724
+6. [GROUND TRUTH] F2Pkrümel -> Erdkrümel (s3_eu_p72909) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=true guild=same fortress=n/a pets=true STR+14214 DEX+123 INT+114 CON+14214 LUC+135
+7. F2Pkrümel -> Calexico (s3_eu_p5589) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+20674 DEX+243 INT+234 CON+20773 LUC+24
+8. F2Pkrümel -> RumliBáttya (s3_eu_p40112) progression=normal baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+11238 DEX+1323 INT+1310 CON+11238 LUC+648
+9. F2Pkrümel -> Baster (s3_eu_p84063) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+17930 DEX+233 INT+221 CON+20228 LUC+141
+10. F2Pkrümel -> Colith (s3_eu_p200078) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+18691 DEX+1311 INT+1281 CON+22311 LUC+162
+11. F2Pkrümel -> Prznitel (s3_eu_p55668) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+22668 DEX+579 INT+473 CON+23161 LUC+104
+12. F2Pkrümel -> Mary Howler (s3_eu_p51821) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=true guild=different-or-missing fortress=n/a pets=true STR+21116 DEX+649 INT+689 CON+21116 LUC+475
+13. F2Pkrümel -> Nakoruru (s3_eu_p14778) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+16634 DEX+1286 INT+1263 CON+19853 LUC+317
+14. F2Pkrümel -> NICKNAME07 (s3_eu_p72580) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+19777 DEX+71 INT+52 CON+19798 LUC+24
+15. F2Pkrümel -> Sakura Mondstern (s3_eu_p1063) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+20990 DEX+1231 INT+1250 CON+21269 LUC+592
+16. F2Pkrümel -> Shirexx97 (s3_eu_p91701) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+23624 DEX+566 INT+591 CON+23622 LUC+937
+17. F2Pkrümel -> Lisaa (s3_eu_p75473) progression=insufficient-sample baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+24814 DEX+617 INT+573 CON+25411 LUC+256
+18. F2Pkrümel -> TrickingGod (s3_eu_p131151) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+24571 DEX+849 INT+827 CON+23773 LUC+956
+19. F2Pkrümel -> Isair (s3_eu_p111096) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+18963 DEX+339 INT+87 CON+26063 LUC+434
+20. F2Pkrümel -> vojtulek (s3_eu_p123011) progression=insufficient-sample baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+20521 DEX+288 INT+237 CON+25173 LUC+30
+21. F2Pkrümel -> BIG WHITE BOB (s3_eu_p150719) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+23713 DEX+323 INT+228 CON+25732 LUC+320
+22. F2Pkrümel -> fredd (s3_eu_p41873) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+15489 DEX+196 INT+225 CON+25965 LUC+701
+23. F2Pkrümel -> MentalZero (s3_eu_p250747) progression=insufficient-sample baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+25000 DEX+1466 INT+1463 CON+25473 LUC+1420
+24. F2Pkrümel -> Magnus Bane (s3_eu_p170196) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+24664 DEX+912 INT+853 CON+20218 LUC+10
+25. F2Pkrümel -> Goegre (s3_eu_p2165) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+21995 DEX+535 INT+579 CON+28142 LUC+281
+26. F2Pkrümel -> Bemogi Vemostis (s3_eu_p36559) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+22063 DEX+353 INT+335 CON+25603 LUC+474
+27. F2Pkrümel -> Liannah (s3_eu_p128787) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=different-or-missing fortress=n/a pets=true STR+23023 DEX+318 INT+429 CON+23474 LUC+145
+
+Erdkrümel ordinal position:
+- Base unchanged count: 0 -> common/no separation (27/27 share this count)
+- Guild continuity: shared with 4 others
+- Level progression: plausible-burst
+- Name evidence: exact=false fusionBase=false -> weak for rename case
+- Fortress evidence: unavailable -> neutral here
+- Pets evidence: true
+
+Same-guild candidate subset:
+1. F2Pkrümel -> Yrkzem (s3_eu_p121904) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+9630 DEX+503 INT+480 CON+19100 LUC+333
+2. [GROUND TRUTH] F2Pkrümel -> Erdkrümel (s3_eu_p72909) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=true guild=same fortress=n/a pets=true STR+14214 DEX+123 INT+114 CON+14214 LUC+135
+3. F2Pkrümel -> Colith (s3_eu_p200078) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+18691 DEX+1311 INT+1281 CON+22311 LUC+162
+4. F2Pkrümel -> NICKNAME07 (s3_eu_p72580) progression=plausible-burst baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+19777 DEX+71 INT+52 CON+19798 LUC+24
+5. F2Pkrümel -> MentalZero (s3_eu_p250747) progression=insufficient-sample baseMonotonic=true unchanged=none orderingStable=false guild=same fortress=n/a pets=true STR+25000 DEX+1466 INT+1463 CON+25473 LUC+1420
+
+## G. Ordinal evidence calibration draft
+| Evidence family | Proposed ordinal category | Rationale |
+| --- | --- | --- |
+| Class mismatch / reliable origin mismatch / reliable level regression / individual base-stat regression | hardContradiction | Already product hard rejects and should stay outside support weighting. |
+| Exact name / fusion base name | identityAnchor | Direct identity signal; still subject to hard contradictions and assignment conflicts. |
+| 3+ unchanged base stats, especially secondary stats | strongSupport candidate | More specific than monotonicity; keep empirical guard because false collisions still exist. |
+| Same confirmed logical guild | support candidate | Useful reducer, but F2PKrümel still has a same-guild collision set. |
+| Fortress continuity | support/strongSupport candidate when available | Often decisive for semantic-ready cases, but unavailable must stay neutral. |
+| Pet continuity | weakSupport/support candidate | Helpful but can collide across hard false controls. |
+| Base monotonicity | neutral eligibility / weakSupport only in combination | Too broad; all difficult false controls pass. |
+| Base ordering / simple ratios | diagnostic weakSupport | Needs combination with unchanged stats or guild; not an anchor alone. |
+| Level monotonicity | neutral eligibility | All difficult false controls pass; hard only on regression. |
+| Normal level progression | support modifier | Can break ties in current product logic, but not an identity anchor. |
+| Plausible burst | neutral/weakSupport | Acceptable but less selective than normal progression. |
+| Extreme positive progression | weakContradiction unless protected by identityAnchor/strong semantic evidence | Current warning/cleanup role is supported conceptually. |
+
+## H. Resolver architecture recommendation
+1. Keep hardContradictions as an independent gate before any positive evidence hierarchy.
+2. Represent evidence as named ordinal chips, not additive numeric weights.
+3. Split baseAttributesConsistent into baseMonotonicity plus fingerprint features: unchanged count, unchanged secondary stats, ordering, and small ratio checks.
+4. Treat missing guild/fortress/pets as neutral, never negative.
+5. Let assignment/reservation stay as global conflict handling after candidate evidence classification.
+6. Validate any future Ready rule against both positive controls and this review false-control pool before enabling it.

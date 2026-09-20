@@ -1045,6 +1045,94 @@
     "moreResults": "Další výsledky... stiskni Enter",
     "recentLabel": "Nedávné"
   },
+  "dungeonLibrary": {
+    "title": "Knihovna dungeonů",
+    "subtitle": "Technický vertikální řez",
+    "aria": {
+      "bookshelf": "Police knihovny dungeonů"
+    },
+    "worlds": {
+      "lightWorld": "Svět světla",
+      "shadowWorld": "Svět stínů",
+      "classWorld": "Svět tříd",
+      "fairyTower": "Věž víl",
+      "continuousLoop": "Nekonečná smyčka idolů",
+      "twister": "Vír",
+      "sandstorm": "Písečná bouře"
+    },
+    "book": {
+      "floorCount": "{{count}} pater",
+      "dungeonCount": "{{count}} dungeonu",
+      "overviewPageNote": "Přehled {{current}} / {{total}} · Strana {{page}}",
+      "floorRangeOverviewNote": "Patra {{start}}-{{end}} · Přehled {{current}} / {{total}}",
+      "rangeOverviewPageNote": "Rozsahy pater {{current}} / {{total}} · Strana {{page}}",
+      "selectorPageNote": "Výběr {{current}} / {{total}}",
+      "pageNote": "Strana {{page}}",
+      "floorRangeTitle": "Patra {{start}}-{{end}}",
+      "floorGridAria": "{{title}} patra",
+      "floorRangeAria": "{{title}} patra {{start}}-{{end}}"
+    },
+    "navigation": {
+      "floorRanges": "Rozsahy pater",
+      "floors": "Patra",
+      "floorOverview": "Přehled pater",
+      "dungeonOverview": "Přehled dungeonů",
+      "backToLibrary": "Zpět do knihovny dungeonů"
+    },
+    "fallbacks": {
+      "dungeon": "Dungeon {{dungeonId}}",
+      "enemy": "ID protivníka {{enemyId}}"
+    },
+    "detail": {
+      "unknownClass": "Neznámá třída",
+      "monsterArtworkAria": "Obrázek monstra pro protivníka {{enemyId}}",
+      "noArtworkAria": "Obrázek pro protivníka {{enemyId}} není dostupný",
+      "loadingArtwork": "Načítá se obrázek...",
+      "artworkUnavailable": "Obrázek není dostupný",
+      "monsterImageAlt": "Monstrum {{enemyId}}",
+      "levelShort": "Úroveň {{level}}",
+      "statsUnavailable": "Staty nejsou dostupné",
+      "enemyStatsAria": "Staty protivníka",
+      "statIconAlt": "Ikona {{stat}}",
+      "enemyDamageAria": "Poškození protivníka",
+      "minDamage": "Min. poškození",
+      "maxDamage": "Max. poškození",
+      "hpUnavailable": "HP není dostupné",
+      "hpAria": "HP: {{value}}",
+      "hpValue": "HP: {{value}}",
+      "floorCounter": "Patro {{current}} / {{total}}",
+      "lore": "Příběh",
+      "loreUnavailable": "Zatím není dostupné.",
+      "enemyId": "ID protivníka {{enemyId}}"
+    },
+    "classes": {
+      "warrior": "Válečník",
+      "mage": "Mág",
+      "scout": "Průzkumník",
+      "assassin": "Asasin",
+      "demon-hunter": "Lovec démonů",
+      "berserker": "Berserker",
+      "battle-mage": "Bojový mág",
+      "druid": "Druid",
+      "bard": "Bard",
+      "necromancer": "Nekromant",
+      "paladin": "Paladin",
+      "plague-doctor": "Morový doktor"
+    }
+  },
+  "flipbook": {
+    "errors": {
+      "missingSlug": "Chybí slug flipbooku.",
+      "manifestNotFound": "Manifest flipbooku nebyl nalezen.",
+      "loadFailed": "Flipbook se nepodařilo načíst."
+    },
+    "loading": "Načítá se flipbook...",
+    "noPages": "Nejsou dostupné žádné strany flipbooku.",
+    "previous": "Zpět",
+    "next": "Další",
+    "fullscreen": "Celá obrazovka",
+    "pageIndicator": "Strana {{current}} / {{total}}"
+  },
   "footer": {
     "about": {
       "title": "O SFDataHub",

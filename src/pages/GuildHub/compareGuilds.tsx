@@ -1,6 +1,7 @@
 import React from "react";
 import ContentShell from "../../components/ContentShell";
 import GuildContextBar from "../../components/guilds/GuildContextBar";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import AnchoredLineChart from "../../components/ui/charts/AnchoredLineChart";
 import {
   collectionGroup,
@@ -454,7 +455,12 @@ function GuildDevelopmentOverview({
   } else if (!activeGuild) {
     body = <GuildDevelopmentEmptyState message="Waehle im Guild Hub eine Gilde aus." />;
   } else if (loading) {
-    body = <GuildDevelopmentEmptyState message="Lokale Scans werden geladen." />;
+    body = (
+      <DataHubLoadingState
+        title="Lokale Scans werden geladen"
+        message="Guild-Analytics-Zeitreihe wird vorbereitet."
+      />
+    );
   } else if (error) {
     body = <GuildDevelopmentEmptyState message={error} />;
   } else if (!series.allPoints.length) {
@@ -956,7 +962,12 @@ function FightParticipationOverviewBody({
     return <GuildDevelopmentEmptyState message="Waehle im Guild Hub eine Gilde aus." />;
   }
   if (loading) {
-    return <GuildDevelopmentEmptyState message="Fight-Daten werden geladen." />;
+    return (
+      <DataHubLoadingState
+        title="Fight-Daten werden geladen"
+        message="Fight-Tracker-Zeitreihe wird vorbereitet."
+      />
+    );
   }
   if (error) {
     return <GuildDevelopmentEmptyState message={error} />;
@@ -1305,7 +1316,12 @@ function GuildProgressAnalytics({
   if (!activeGuild) {
     body = <GuildDevelopmentEmptyState message="Waehle im Guild Hub eine Gilde aus." />;
   } else if (loading) {
-    body = <GuildDevelopmentEmptyState message="Lokale Scans werden geladen." />;
+    body = (
+      <DataHubLoadingState
+        title="Lokale Scans werden geladen"
+        message="Guild-Fortschritt wird vorbereitet."
+      />
+    );
   } else if (error) {
     body = <GuildDevelopmentEmptyState message={error} />;
   } else if (!matchingSeries.allPoints.length) {

@@ -1,0 +1,205 @@
+# Player Level Progression By Origin Analysis
+Report generated: 2026-09-19T13:52:59.807Z
+
+## A. Dataset
+scans=18
+historicalPlayerObservations=49789
+currentPlayerObservations=2963
+playerItems=1293
+positiveControls=214
+falseControls=2034
+comparison=latest reliable pre-fusion level -> earliest reliable post-fusion level
+levelAvailability=available numeric levels only; missing/unsupported/invalid pairs excluded
+
+## B. Origin Distribution
+EU1 gain n=66 min=1 median=11 p75=29 p90=39 p95=41 p99=296 max=296
+EU1 gain/day n=66 min=0.011 median=0.142 p75=0.183 p90=0.219 p95=0.236 p99=1.364 max=1.364
+EU2 gain n=45 min=4 median=6 p75=8 p90=27 p95=30 p99=73 max=73
+EU2 gain/day n=45 min=0.111 median=0.283 p75=0.330 p90=0.378 p95=0.378 p99=0.472 max=0.472
+EU3 gain n=68 min=8 median=12 p75=33 p90=43 p95=52 p99=289 max=289
+EU3 gain/day n=68 min=0.129 median=0.472 p75=0.566 p90=0.708 p95=1.133 p99=13.642 max=13.642
+EU4 gain n=35 min=9 median=15 p75=40 p90=43 p95=45 p99=148 max=148
+EU4 gain/day n=35 min=0.114 median=0.425 p75=0.566 p90=0.708 p95=0.755 p99=0.802 max=0.802
+
+## C. Level Bucket Distribution
+1-99 gain n=2 min=289 median=289 p75=296 p90=296 p95=296 p99=296 max=296
+1-99 gain/day n=2 min=1.364 median=1.364 p75=13.642 p90=13.642 p95=13.642 p99=13.642 max=13.642
+100-199 gain n=0 min=n/a median=n/a p75=n/a p90=n/a p95=n/a p99=n/a max=n/a
+100-199 gain/day n=0 min=n/a median=n/a p75=n/a p90=n/a p95=n/a p99=n/a max=n/a
+200-299 gain n=2 min=22 median=22 p75=148 p90=148 p95=148 p99=148 max=148
+200-299 gain/day n=2 min=0.356 median=0.356 p75=1.038 p90=1.038 p95=1.038 p99=1.038 max=1.038
+300-392 gain n=6 min=9 median=24 p75=40 p90=64 p95=64 p99=64 max=64
+300-392 gain/day n=6 min=0.129 median=0.295 p75=0.802 p90=1.133 p95=1.133 p99=1.133 max=1.133
+393-449 gain n=58 min=1 median=27 p75=36 p90=43 p95=45 p99=52 max=52
+393-449 gain/day n=58 min=0.011 median=0.178 p75=0.236 p90=0.425 p95=0.519 p99=0.708 max=0.708
+450-499 gain n=107 min=2 median=11 p75=19 p90=39 p95=43 p99=55 max=73
+450-499 gain/day n=107 min=0.094 median=0.283 p75=0.472 p90=0.566 p95=0.708 p99=1.652 max=2.360
+500-549 gain n=29 min=2 median=10 p75=12 p90=14 p95=14 p99=28 max=28
+500-549 gain/day n=29 min=0.094 median=0.425 p75=0.519 p90=0.614 p95=0.661 p99=0.661 max=0.661
+550-599 gain n=10 min=3 median=8 p75=11 p90=12 p95=15 p99=15 max=15
+550-599 gain/day n=10 min=0.142 median=0.378 p75=0.519 p90=0.566 p95=0.708 p99=0.708 max=0.708
+600+ gain n=0 min=n/a median=n/a p75=n/a p90=n/a p95=n/a p99=n/a max=n/a
+600+ gain/day n=0 min=n/a median=n/a p75=n/a p90=n/a p95=n/a p99=n/a max=n/a
+
+## D. Origin x Bucket Matrix
+| Origin | Bucket | n | median gain | p90 | p95 | p99 | max | median/day | p95/day | max/day |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| EU1 | 1-99 | 1 | 296 | 296 | 296 | 296 | 296 | 1.364 | 1.364 | 1.364 |
+| EU1 | 100-199 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU1 | 200-299 | 1 | 22 | 22 | 22 | 22 | 22 | 1.038 | 1.038 | 1.038 |
+| EU1 | 300-392 | 1 | 40 | 40 | 40 | 40 | 40 | 0.184 | 0.184 | 0.184 |
+| EU1 | 393-449 | 23 | 29 | 41 | 45 | 49 | 49 | 0.147 | 0.226 | 0.231 |
+| EU1 | 450-499 | 29 | 7 | 33 | 34 | 39 | 39 | 0.134 | 0.194 | 0.330 |
+| EU1 | 500-549 | 8 | 3 | 11 | 11 | 11 | 11 | 0.142 | 0.236 | 0.236 |
+| EU1 | 550-599 | 3 | 4 | 11 | 11 | 11 | 11 | 0.189 | 0.219 | 0.219 |
+| EU1 | 600+ | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU2 | 1-99 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU2 | 100-199 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU2 | 200-299 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU2 | 300-392 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU2 | 393-449 | 14 | 7 | 30 | 36 | 36 | 36 | 0.189 | 0.378 | 0.378 |
+| EU2 | 450-499 | 24 | 6 | 10 | 24 | 73 | 73 | 0.283 | 0.425 | 0.472 |
+| EU2 | 500-549 | 4 | 6 | 7 | 7 | 7 | 7 | 0.283 | 0.330 | 0.330 |
+| EU2 | 550-599 | 3 | 8 | 8 | 8 | 8 | 8 | 0.378 | 0.378 | 0.378 |
+| EU2 | 600+ | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU3 | 1-99 | 1 | 289 | 289 | 289 | 289 | 289 | 13.642 | 13.642 | 13.642 |
+| EU3 | 100-199 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU3 | 200-299 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU3 | 300-392 | 3 | 28 | 64 | 64 | 64 | 64 | 0.295 | 1.133 | 1.133 |
+| EU3 | 393-449 | 9 | 34 | 52 | 52 | 52 | 52 | 0.189 | 0.708 | 0.708 |
+| EU3 | 450-499 | 40 | 12 | 40 | 50 | 55 | 55 | 0.472 | 0.708 | 2.360 |
+| EU3 | 500-549 | 12 | 10 | 13 | 14 | 14 | 14 | 0.472 | 0.661 | 0.661 |
+| EU3 | 550-599 | 3 | 11 | 12 | 12 | 12 | 12 | 0.519 | 0.566 | 0.566 |
+| EU3 | 600+ | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU4 | 1-99 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU4 | 100-199 | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| EU4 | 200-299 | 1 | 148 | 148 | 148 | 148 | 148 | 0.356 | 0.356 | 0.356 |
+| EU4 | 300-392 | 2 | 9 | 17 | 17 | 17 | 17 | 0.425 | 0.802 | 0.802 |
+| EU4 | 393-449 | 12 | 14 | 43 | 43 | 43 | 43 | 0.198 | 0.661 | 0.661 |
+| EU4 | 450-499 | 14 | 16 | 43 | 45 | 45 | 45 | 0.207 | 0.755 | 0.755 |
+| EU4 | 500-549 | 5 | 13 | 28 | 28 | 28 | 28 | 0.566 | 0.661 | 0.661 |
+| EU4 | 550-599 | 1 | 15 | 15 | 15 | 15 | 15 | 0.708 | 0.708 | 0.708 |
+| EU4 | 600+ | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+
+## E. 520+ Results
+520+ count=25
+520+ gain n=25 min=3 median=11 p75=12 p90=13 p95=14 p99=15 max=15
+520+ gain30 n=25 min=4.25 median=14.16 p75=16.99 p90=18.41 p95=19.83 p99=21.24 max=21.24
+EU1 520+ count=6
+EU1 520+ gain30 n=6 min=4.25 median=5.32 p75=5.66 p90=6.58 p95=6.58 p99=6.58 max=6.58
+User context check: 3-5 levels/month is broadly near the lower/normal part of EU1 520+; observed outliers exceed it and need burst/compensation caution.
+
+## F. Empirical Fusion Compensation Signal
+Observed offsets are empirical medians only, NOT the official Playa compensation formula.
+500-549: EU1 n=8 median=3 offsetVsEU1=0; EU2 n=4 median=6 offsetVsEU1=3; EU3 n=12 median=10 offsetVsEU1=7; EU4 n=5 median=13 offsetVsEU1=10
+550-599: EU1 n=3 median=4 offsetVsEU1=0; EU2 n=3 median=8 offsetVsEU1=4; EU3 n=3 median=11 offsetVsEU1=7; EU4 n=1 median=15 offsetVsEU1=11
+600+: EU1 n=0 median=n/a offsetVsEU1=n/a; EU2 n=0 median=n/a offsetVsEU1=n/a; EU3 n=0 median=n/a offsetVsEU1=n/a; EU4 n=0 median=n/a offsetVsEU1=n/a
+
+## G. Extreme Legitimate Matches
+1. john b <= john b origin=EU4 bucket=500-549 pre=508@2026-01-02T12:00:09.395Z post=536@2026-09-05T09:10:55.210Z days=245.88 gain=28 gainDay=0.114 gain30=3.42 interpretation=data shows a legitimate ready match; cause not inferred
+2. Milfiway (s4eu) <= Milfiway origin=EU4 bucket=550-599 pre=553@2026-01-31T10:18:13.890Z post=568@2026-02-21T14:44:11.553Z days=21.18 gain=15 gainDay=0.708 gain30=21.24 interpretation=data shows a legitimate ready match; cause not inferred
+3. Future <= Future origin=EU4 bucket=500-549 pre=534@2026-01-31T10:18:13.890Z post=548@2026-02-21T14:44:11.553Z days=21.18 gain=14 gainDay=0.661 gain30=19.83 interpretation=data shows a legitimate ready match; cause not inferred
+4. sbs <= sbs origin=EU3 bucket=500-549 pre=515@2026-01-31T10:18:13.890Z post=529@2026-02-21T14:44:11.553Z days=21.18 gain=14 gainDay=0.661 gain30=19.83 interpretation=data shows a legitimate ready match; cause not inferred
+5. Dulakod Pumugas <= Dulakod Pumugas origin=EU3 bucket=500-549 pre=521@2026-01-31T10:18:13.890Z post=534@2026-02-21T14:44:11.553Z days=21.18 gain=13 gainDay=0.614 gain30=18.41 interpretation=data shows a legitimate ready match; cause not inferred
+6. Jojdo <= Jojdo origin=EU4 bucket=500-549 pre=528@2026-01-31T10:18:13.890Z post=541@2026-02-21T14:44:11.553Z days=21.18 gain=13 gainDay=0.614 gain30=18.41 interpretation=data shows a legitimate ready match; cause not inferred
+7. Baxtalo <= Baxtalo origin=EU3 bucket=500-549 pre=534@2026-01-31T10:18:13.890Z post=546@2026-02-21T14:44:11.553Z days=21.18 gain=12 gainDay=0.566 gain30=16.99 interpretation=data shows a legitimate ready match; cause not inferred
+8. Lucinda <= Lucinda origin=EU3 bucket=550-599 pre=551@2026-01-31T10:18:13.890Z post=563@2026-02-21T14:44:11.553Z days=21.18 gain=12 gainDay=0.566 gain30=16.99 interpretation=data shows a legitimate ready match; cause not inferred
+9. réyalsrá <= réyalsrá origin=EU4 bucket=500-549 pre=529@2026-01-31T10:18:13.890Z post=541@2026-02-21T14:44:11.553Z days=21.18 gain=12 gainDay=0.566 gain30=16.99 interpretation=data shows a legitimate ready match; cause not inferred
+10. Wokasz <= Wokasz origin=EU3 bucket=500-549 pre=507@2026-01-31T10:18:13.890Z post=519@2026-02-21T14:44:11.553Z days=21.18 gain=12 gainDay=0.566 gain30=16.99 interpretation=data shows a legitimate ready match; cause not inferred
+11. BubuSenpai <= BubuSenpai origin=EU3 bucket=550-599 pre=565@2026-01-31T10:18:13.890Z post=576@2026-02-21T14:44:11.553Z days=21.18 gain=11 gainDay=0.519 gain30=15.58 interpretation=data shows a legitimate ready match; cause not inferred
+12. DERAusgestorbene <= DERAusgestorbene origin=EU3 bucket=550-599 pre=565@2026-01-31T10:18:13.890Z post=576@2026-02-21T14:44:11.553Z days=21.18 gain=11 gainDay=0.519 gain30=15.58 interpretation=data shows a legitimate ready match; cause not inferred
+13. Macziano <= Macziano origin=EU3 bucket=500-549 pre=507@2026-01-31T10:18:13.890Z post=518@2026-02-21T14:44:11.553Z days=21.18 gain=11 gainDay=0.519 gain30=15.58 interpretation=data shows a legitimate ready match; cause not inferred
+14. Pfiffikus76 <= Pfiffikus76 origin=EU4 bucket=500-549 pre=542@2026-01-31T10:18:13.890Z post=553@2026-02-21T14:44:11.553Z days=21.18 gain=11 gainDay=0.519 gain30=15.58 interpretation=data shows a legitimate ready match; cause not inferred
+15. Zemus <= Zemus origin=EU3 bucket=500-549 pre=532@2026-01-31T10:18:13.890Z post=543@2026-02-21T14:44:11.553Z days=21.18 gain=11 gainDay=0.519 gain30=15.58 interpretation=data shows a legitimate ready match; cause not inferred
+16. Dzbanan <= Dzbanan origin=EU1 bucket=550-599 pre=551@2026-01-02T12:00:09.395Z post=562@2026-02-21T14:44:11.553Z days=50.11 gain=11 gainDay=0.219 gain30=6.58 interpretation=data shows a legitimate ready match; cause not inferred
+17. Don Devil <= Don Devil origin=EU1 bucket=500-549 pre=523@2026-01-31T10:18:13.890Z post=534@2026-04-03T10:11:29.955Z days=62.00 gain=11 gainDay=0.177 gain30=5.32 interpretation=data shows a legitimate ready match; cause not inferred
+18. alex1952 <= alex1952 origin=EU3 bucket=500-549 pre=526@2026-01-31T10:18:13.890Z post=536@2026-02-21T14:44:11.553Z days=21.18 gain=10 gainDay=0.472 gain30=14.16 interpretation=data shows a legitimate ready match; cause not inferred
+19. Chlup <= Chlup origin=EU3 bucket=500-549 pre=528@2026-01-31T10:18:13.890Z post=538@2026-02-21T14:44:11.553Z days=21.18 gain=10 gainDay=0.472 gain30=14.16 interpretation=data shows a legitimate ready match; cause not inferred
+20. heresio <= heresio origin=EU3 bucket=500-549 pre=512@2026-01-31T10:18:13.890Z post=522@2026-02-21T14:44:11.553Z days=21.18 gain=10 gainDay=0.472 gain30=14.16 interpretation=data shows a legitimate ready match; cause not inferred
+
+## H. False Candidate Separation
+| Origin | Bucket | positive n | false n | within p95 | within p99 | above p99 | extreme beyond positive range | insufficient sample |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| EU1 | 1-99 | 1 | 12 | 0 | 0 | 0 | 0 | 12 |
+| EU1 | 100-199 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU1 | 200-299 | 1 | 2 | 0 | 0 | 0 | 0 | 2 |
+| EU1 | 300-392 | 1 | 10 | 0 | 0 | 0 | 0 | 10 |
+| EU1 | 393-449 | 23 | 589 | 66 | 7 | 0 | 516 | 0 |
+| EU1 | 450-499 | 29 | 374 | 29 | 9 | 0 | 336 | 0 |
+| EU1 | 500-549 | 8 | 120 | 0 | 0 | 0 | 0 | 120 |
+| EU1 | 550-599 | 3 | 40 | 0 | 0 | 0 | 0 | 40 |
+| EU1 | 600+ | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU2 | 1-99 | 0 | 4 | 0 | 0 | 0 | 0 | 4 |
+| EU2 | 100-199 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU2 | 200-299 | 0 | 2 | 0 | 0 | 0 | 0 | 2 |
+| EU2 | 300-392 | 0 | 120 | 0 | 0 | 0 | 0 | 120 |
+| EU2 | 393-449 | 14 | 123 | 4 | 0 | 0 | 119 | 0 |
+| EU2 | 450-499 | 24 | 47 | 0 | 0 | 0 | 47 | 0 |
+| EU2 | 500-549 | 4 | 13 | 0 | 0 | 0 | 0 | 13 |
+| EU2 | 550-599 | 3 | 11 | 0 | 0 | 0 | 0 | 11 |
+| EU2 | 600+ | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU3 | 1-99 | 1 | 1 | 0 | 0 | 0 | 0 | 1 |
+| EU3 | 100-199 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU3 | 200-299 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU3 | 300-392 | 3 | 25 | 0 | 0 | 0 | 0 | 25 |
+| EU3 | 393-449 | 9 | 158 | 0 | 0 | 0 | 0 | 158 |
+| EU3 | 450-499 | 40 | 54 | 13 | 5 | 0 | 36 | 0 |
+| EU3 | 500-549 | 12 | 9 | 2 | 0 | 0 | 7 | 0 |
+| EU3 | 550-599 | 3 | 2 | 0 | 0 | 0 | 0 | 2 |
+| EU3 | 600+ | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU4 | 1-99 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU4 | 100-199 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| EU4 | 200-299 | 1 | 4 | 0 | 0 | 0 | 0 | 4 |
+| EU4 | 300-392 | 2 | 85 | 0 | 0 | 0 | 0 | 85 |
+| EU4 | 393-449 | 12 | 177 | 20 | 0 | 0 | 157 | 0 |
+| EU4 | 450-499 | 14 | 37 | 12 | 0 | 0 | 25 | 0 |
+| EU4 | 500-549 | 5 | 11 | 0 | 0 | 0 | 0 | 11 |
+| EU4 | 550-599 | 1 | 4 | 0 | 0 | 0 | 0 | 4 |
+| EU4 | 600+ | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+Totals: withinP95=146 withinP99=21 aboveP99=0 extreme=1243 insufficientSample=624
+
+## I. Hardiy Candidate Matrix
+Hardiy earliest reliable post=589 @ 2026-02-21T14:44:11.553Z
+| Candidate | Origin | Pre Level | Post Level | Days | Gain | Gain/day | Origin bucket | Reference | Positive percentile | Category |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | --- |
+| Darth Monk | EU1 | 11 | 589 | 50.11 | 578 | 11.534 | 1-99 | EU1/all buckets n=66 | 100.0 | extreme progression contradiction |
+| Keith K | EU1 | 406 | 589 | 21.18 | 183 | 8.638 | 393-449 | EU1/393-449 n=23 | 100.0 | extreme progression contradiction |
+| Rover | EU1 | 409 | 589 | 50.11 | 180 | 3.592 | 393-449 | EU1/393-449 n=23 | 100.0 | extreme progression contradiction |
+| Svenner1986 | EU1 | 431 | 589 | 21.18 | 158 | 7.458 | 393-449 | EU1/393-449 n=23 | 100.0 | extreme progression contradiction |
+| Cynik | EU1 | 442 | 589 | 140.80 | 147 | 1.044 | 393-449 | EU1/393-449 n=23 | 100.0 | extreme progression contradiction |
+| Matti | EU1 | 449 | 589 | 50.11 | 140 | 2.794 | 393-449 | EU1/393-449 n=23 | 100.0 | extreme progression contradiction |
+| TiWine | EU1 | 497 | 589 | 21.18 | 92 | 4.343 | 450-499 | EU1/450-499 n=29 | 100.0 | extreme progression contradiction |
+| Oliork | EU1 | 513 | 589 | 21.18 | 76 | 3.587 | 500-549 | all origins/500-549 n=29 | 100.0 | extreme progression contradiction |
+| HardiyDK | EU1 | 586 | 589 | 21.18 | 3 | 0.142 | 550-599 | all origins/550-599 n=10 | 10.0 | normal progression |
+
+## J. HardiyDK
+Hardiy <= HardiyDK origin=EU1 bucket=550-599 pre=586@2026-01-31T10:18:13.890Z post=589@2026-02-21T14:44:11.553Z days=21.18 gain=3 gainDay=0.142 gain30=4.25
+EU1/550-599 reference n=3 min=3 median=4 p75=11 p90=11 p95=11 p99=11 max=11
+EU1/550-599 gain/day reference n=3 min=0.142 median=0.189 p75=0.219 p90=0.219 p95=0.219 p99=0.219 max=0.219
+category=insufficient sample gainPercentile=33.3
+
+## K. Darth Monk / Matti / Rover / Svenner1986
+Darth Monk: Hardiy <= Darth Monk origin=EU1 bucket=1-99 pre=11@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 gain=578 gainDay=11.534 gain30=346.01 reference=EU1/all buckets n=66 category=extreme progression contradiction gainPercentile=100.0 ratePercentile=100.0
+Rover: Hardiy <= Rover origin=EU1 bucket=393-449 pre=409@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 gain=180 gainDay=3.592 gain30=107.75 reference=EU1/393-449 n=23 category=extreme progression contradiction gainPercentile=100.0 ratePercentile=100.0
+Svenner1986: Hardiy <= Svenner1986 origin=EU1 bucket=393-449 pre=431@2026-01-31T10:18:13.890Z post=589@2026-02-21T14:44:11.553Z days=21.18 gain=158 gainDay=7.458 gain30=223.75 reference=EU1/393-449 n=23 category=extreme progression contradiction gainPercentile=100.0 ratePercentile=100.0
+Matti: Hardiy <= Matti origin=EU1 bucket=393-449 pre=449@2026-01-02T12:00:09.395Z post=589@2026-02-21T14:44:11.553Z days=50.11 gain=140 gainDay=2.794 gain30=83.81 reference=EU1/393-449 n=23 category=extreme progression contradiction gainPercentile=100.0 ratePercentile=100.0
+HardiyDK: Hardiy <= HardiyDK origin=EU1 bucket=550-599 pre=586@2026-01-31T10:18:13.890Z post=589@2026-02-21T14:44:11.553Z days=21.18 gain=3 gainDay=0.142 gain30=4.25 reference=all origins/550-599 n=10 category=normal progression gainPercentile=10.0 ratePercentile=10.0
+
+## L. Counterfactual Review Impact
+reviewPlayersAffected=43
+reviewsWithExactly1CandidateRemaining=12
+reviewsStillAmbiguous=29
+reviewsWith0CandidatesRemaining=2
+If 0 candidates remain, historical observations still existed; the diagnostic outcome would be unresolved, not No Historical Observation.
+
+## M. Recommended Resolver Rule
+Recommendation: implement levelProgression as bucket-aware evidence first, not as a naive hard max-level rule.
+Use same-origin + pre-level bucket positive controls where sample size is sufficient; otherwise mark insufficient sample or fall back only as supporting evidence.
+Suggested categories: normal progression, plausible burst, extreme progression contradiction, insufficient sample, unavailable.
+For high-level EU1 candidates, extreme progression beyond observed positive range is a strong contradiction signal; HardiyDK is normal, while Darth Monk/Rover/Svenner1986 are extreme under current diagnostics.
+Do not implement official compensation adjustment until the Playa fusion compensation formula is provided.
+
+## N. Open Question
+Need official/known Playa fusion compensation formula from user.
+Community level curve context: XP curve peaks around Level 393 and declines afterward; gold curve is not relevant for Player Identity Level Progression.
+Goldcurve: not relevant for Player Identity Level Progression.

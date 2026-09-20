@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { doc, getDoc } from "firebase/firestore";
 import HeroPanel from "../../components/player-profile/HeroPanel";
+import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import {
   ChartsTab,
   ComparisonTab,
@@ -654,7 +655,13 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
 
   return (
     <div className="player-profile">
-      {loading && !snapshot && <div className="player-profile__loading">Spielerprofil wird geladen …</div>}
+      {loading && !snapshot && (
+        <DataHubLoadingState
+          variant="page"
+          title="Spielerprofil wird geladen"
+          message="Profil-Daten werden gelesen."
+        />
+      )}
 
       {!loading && (!snapshot || !viewModel) && renderNotFound()}
 

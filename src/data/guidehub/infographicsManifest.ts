@@ -198,4 +198,47 @@ export const INFOGRAPHICS_ITEMS: InfographicsItem[] = [
     filterA: "Guides",
     filterB: "Steps",
   },
+  // Resource drops
+  {
+    key: "dice-game-rewards",
+    title: "Dice Game Rewards",
+    assetKey: "dicegameresources",
+    filterA: "Dice Game",
+    filterB: "Rewards",
+  },
+  {
+    key: "fortress-resources-drops",
+    title: "Fortress Resources - Dice, Wheel & Quest Drops",
+    assetKey: "fortressresourcesdrops",
+    filterA: "Fortress",
+    filterB: "Resources",
+  },
+  {
+    key: "fortress-resources-expedition-capacity",
+    title: "Fortress Resources - Expedition & Capacity",
+    assetKey: "fortressresourcesexpeditioncapacity",
+    filterA: "Fortress",
+    filterB: "Resources",
+  },
+  {
+    key: "underworld-resources-drops",
+    title: "Underworld Resources - Dice, Wheel & Quest Drops",
+    assetKey: "underworldresourcesdrops",
+    filterA: "Underworld",
+    filterB: "Resources",
+  },
+  {
+    key: "underworld-resources-expedition-production",
+    title: "Underworld Resources - Expedition, Max Souls & Production",
+    assetKey: "underworldresourcesexpeditionproduction",
+    filterA: "Underworld",
+    filterB: "Resources",
+  },
+  {
+    key: "wheel-rewards",
+    title: "Wheel Rewards",
+    assetKey: "wheelresources",
+    filterA: "Wheel",
+    filterB: "Rewards",
+  },
 ];

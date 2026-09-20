@@ -339,7 +339,7 @@ const hasIdentityContinuityEvidence = (
 ) => {
   if (exactName || sameCoA) return true;
   if (flowEvidence.matchedMemberCount <= SMALL_MIGRATION_MAX_MATCHED_MEMBERS) return false;
-  return flowEvidence.isUniqueOldTop || flowEvidence.isUniqueNewTop || flowEvidence.mutualDominant;
+  return flowEvidence.mutualDominant;
 };
 
 const createMigrationEdge = (flow: Flow, evidence: GuildFusionFlowEvidence): GuildFusionMigrationEdge => ({
@@ -493,39 +493,26 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
     return { newGuild, identityCandidates: sortCandidates(identityCandidates), memberMigrationEdges };
   });
 
-  const strictContinuityCountsByOld = new Map<string, number>();
-  const strictContinuityCountsByNew = new Map<string, number>();
+  const identityContinuityCountsByOld = new Map<string, number>();
   relationDrafts.forEach((draft) => {
     draft.identityCandidates.forEach((candidate) => {
-      const strict =
-        candidate.exactName &&
-        candidate.sameCoA &&
-        candidate.mutualDominant &&
-        candidate.matchedMemberCount >= AUTO_ELIGIBLE_MIN_MATCHED_MEMBERS;
-      if (!strict) return;
       const oldKey = normalizeIdentifierKey(candidate.oldGuildIdentifier);
-      const newKey = normalizeIdentifierKey(candidate.newGuildIdentifier);
-      strictContinuityCountsByOld.set(oldKey, (strictContinuityCountsByOld.get(oldKey) ?? 0) + 1);
-      strictContinuityCountsByNew.set(newKey, (strictContinuityCountsByNew.get(newKey) ?? 0) + 1);
+      identityContinuityCountsByOld.set(oldKey, (identityContinuityCountsByOld.get(oldKey) ?? 0) + 1);
     });
   });
 
   const results = relationDrafts.map((draft): GuildFusionGuildResult => {
     const identityCandidates = sortCandidates(
       draft.identityCandidates.map((candidate) => {
-        const splitRelevant = candidate.splitEvidence.relevant;
-        const convergenceRelevant = candidate.convergenceEvidence.relevant;
-        const strictConflict =
-          (strictContinuityCountsByOld.get(normalizeIdentifierKey(candidate.oldGuildIdentifier)) ?? 0) > 1 ||
-          (strictContinuityCountsByNew.get(normalizeIdentifierKey(candidate.newGuildIdentifier)) ?? 0) > 1;
+        const hasIdentityAssignmentConflict =
+          draft.identityCandidates.length > 1 ||
+          (identityContinuityCountsByOld.get(normalizeIdentifierKey(candidate.oldGuildIdentifier)) ?? 0) > 1;
         const autoEligible =
           candidate.exactName &&
           candidate.sameCoA &&
           candidate.mutualDominant &&
           candidate.matchedMemberCount >= AUTO_ELIGIBLE_MIN_MATCHED_MEMBERS &&
-          !strictConflict &&
-          !splitRelevant &&
-          !convergenceRelevant;
+          !hasIdentityAssignmentConflict;
         return {
           ...candidate,
           autoEligible,
@@ -534,11 +521,16 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
       }),
     );
     const flowSummary = createFlowSummary(draft.newGuild, byNew, byOld, identityCandidates);
-    const splitCandidate = flowSummary.hasSplitEvidence;
-    const convergenceCandidate = flowSummary.hasConvergenceEvidence;
+    const splitCandidate = identityCandidates.some(
+      (candidate) => (identityContinuityCountsByOld.get(normalizeIdentifierKey(candidate.oldGuildIdentifier)) ?? 0) > 1,
+    );
+    const convergenceCandidate = identityCandidates.length > 1;
+    flowSummary.hasSplitEvidence = splitCandidate;
+    flowSummary.hasConvergenceEvidence = convergenceCandidate;
+    const hasSingleAutoIdentity = identityCandidates.filter((candidate) => candidate.autoEligible).length === 1 && identityCandidates.length === 1;
     const status: GuildFusionStatus = !hasHistoricalData
       ? "noHistoricalData"
-      : identityCandidates.some((candidate) => candidate.autoEligible)
+      : hasSingleAutoIdentity
         ? "autoEligible"
         : convergenceCandidate
           ? "convergence"
