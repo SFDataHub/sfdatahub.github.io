@@ -193,7 +193,7 @@ export const readSfPlayerLevel = (player: unknown): number | null => {
 
 const readClassIdForPlayerStats = (row: Record<string, unknown>, saveArray: unknown[] | null): string | null => {
   const portraitArray = toNumberArrayForPortrait(saveArray);
-  const portrait = portraitArray && portraitArray.length > 0 ? extractPortraitFromSaveArray(portraitArray) : null;
+  const portrait = portraitArray && portraitArray.length > 0 ? extractPortraitFromSaveArray(portraitArray, row) : null;
   const direct =
     pickGenericPlayerString(row, ["classId", "Class ID", "class", "Class", "className", "Class Name"]) ??
     normalizeStringValue(portrait?.classId);
@@ -958,12 +958,13 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
   const timestamp = parseFiniteNumber(raw.timestamp);
   const fortressRank = parseFiniteNumber(raw.fortressrank);
   const version = parseFiniteNumber(raw.version);
+  const saveVersion = parseFiniteNumber(raw.saveVersion);
   const webshopId = parseWebshopId(raw.webshopid);
   const saveModel = parseSaveModel(saveArrayForModel);
 
   let portrait = null;
   if (saveArrayForModel && saveArrayForModel.length > 0) {
-    portrait = extractPortraitFromSaveArray(saveArrayForModel);
+    portrait = extractPortraitFromSaveArray(saveArrayForModel, raw);
   }
 
   return {
@@ -971,6 +972,7 @@ const toOwnPlayer = (player: unknown): SfJsonOwnPlayer | null => {
     playerId,
     server,
     portrait,
+    ...(saveVersion != null ? { saveVersion } : {}),
     saveArray,
     saveString,
     ...(saveModel ? { saveModel } : {}),

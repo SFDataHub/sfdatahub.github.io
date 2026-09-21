@@ -1,0 +1,192 @@
+# Guild Evidence V3 Analysis
+
+Generated: 2026-09-21T12:36:03.657Z
+
+## A. Dataset
+Scans loaded: 18
+Scope: EU1-EU4 -> F28
+Historical snapshots: 15, post-fusion snapshots: 3
+Fusion boundary used by V2 fallback: latest historical < earliest post-fusion observation; earliest post-fusion guild timestamp=2026-02-21T14:44:11.553Z
+Current F28 guilds: 27
+Historical latest-pre-fusion guilds: 263
+Guild management status: ready=15 review=12 unresolved=0 noHistoricalObservation=0 noHistory=0 completed=0
+High-confidence player matches passed to Guild V2 resolver: 1239
+
+## B. Player Identity Coverage
+Ready/completed logical player IDs usable for guild evidence: 6175
+Latest historical guild coverage: members=1326/2942 (45%) leaders=32/61 officers=118/265 normal=1176/2616
+Earliest current guild coverage: members=1226/1275 (96%) leaders=25/26 officers=97/101 normal=1104/1148
+Only Ready/Completed player identities are counted. Plausible/weak player candidates are intentionally excluded from guild evidence.
+
+## C. Current Guild-V2 Pipeline
+1. Current and historical guild observations are grouped by physical guild identifier.
+2. V2 selects the latest historical observation before the earliest post-fusion guild timestamp and current F28 observations.
+3. High-confidence Player identities build old-member -> new-member flow edges.
+4. Identity candidates are created when exact name, same CoA, or sufficiently large mutual-dominant member flow exists.
+5. Other member flows remain memberMigrationEdges.
+6. split/convergence are derived from old/new top-flow conflicts.
+7. autoEligible requires exact name + same CoA + mutual dominant flow + at least 3 matched players + no assignment conflict.
+8. Management ready is currently equivalent to one active autoEligible guild identity; otherwise active identity candidates become review.
+9. Management does recompute after reservation cleanup, but it only promotes candidates whose existing `ready` flag is true. For guilds, that flag is still the strict V2 autoEligible predicate, not a V3 evidence classification.
+
+## D. Exact Guild Name
+Current guilds with historical exact-name hit: 24/27
+Current guilds with multiple historical exact-name hits: 1
+Positive controls with exact-name candidate evidence: 4/7
+Negative controls with exact-name candidate evidence: 0/3
+Recommendation: exact guild name is support/strongSupport when paired with flow or CoA, but not a standalone identity anchor.
+
+## E. CoA
+Current guilds with historical same-CoA hit: 19/27
+Current guilds with multiple historical same-CoA hits: 0
+Current guilds with historical exact-name + same-CoA hit: 17/27
+Current guilds with multiple exact-name + same-CoA hits: 0
+Positive controls with same-CoA candidate evidence: 4/7
+Negative controls with same-CoA candidate evidence: 0/3
+Recommendation: same CoA is support only. CoA changes exist in positive controls, and CoA collision/borrowed continuity can occur.
+
+## F. Leader Continuity
+Positive controls with same resolved leader: 5/7
+Positive controls with unresolved leader comparison: 1/7
+Negative controls with same resolved leader: 0/3
+Leader continuity is high-value strongSupport when resolved. Different leader should remain warning/neutral, not hard reject, because leadership can change and migration can move officers without preserving guild identity.
+
+## G. Officer / Leadership Core
+Positive controls with officer/core overlap: 5/7
+Negative controls with officer/core overlap: 1/3
+Officer/core continuity should be support/strongSupport by overlap size, but not a standalone Ready gate: one negative migration control also carries officer/core overlap.
+
+## H. Member Flow
+Ground-truth rows with identity candidate: 6/10
+Ground-truth rows represented only as migration edge: 3/10
+Positive controls with mutual dominant candidate flow: 5/7
+Negative controls with migration flow but no identity candidate: 3/3
+Member flow is necessary evidence for many cases, but it must remain separate from identity. Dead End and GenerationZ demonstrate that largest or large flow is not the same as guild identity.
+
+## I. Guild Progression
+- treasure: available=636/636 distinct=10 mostCommon=100 (620)
+- instructor: available=636/636 distinct=10 mostCommon=100 (623)
+- knights: available=636/636 distinct=62 mostCommon=1000 (432)
+- raid: available=636/636 distinct=61 mostCommon=97 (49)
+- portalFloor: available=636/636 distinct=3 mostCommon=50 (634)
+- hydra: available=636/636 distinct=19 mostCommon=10 (101)
+- guildPet: available=636/636 distinct=196 mostCommon=504 (11)
+- honor: available=636/636 distinct=563 mostCommon=20956 (3)
+- rank: available=636/636 distinct=23 mostCommon=2 (73)
+Recommendation: guild progression is weakSupport/support only. Bonuses, portal, and knights are heavily maxed/colliding; honor, rank, hydra, pet level are useful sanity context but not hard requirements.
+
+## J. Ground Truth Matrix
+| Pair | Kind | Current | Historical | V2 result | V2 relation | Sim V3 | Exact | CoA | Leader | Officers | Core | Members | Mutual | Progression |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |
+| Magic Mushrooms | positive | f28_g6 | eu1_g8 | ready | identityCandidate | anchored | true | true | same | 4/4 | 5 | 42 | true | ok=9 regress=0 |
+| Hangover | positive | f28_g32 | eu1_g43 | ready | identityCandidate | anchored | true | true | same | 1/1 | 2 | 32 | true | ok=9 regress=0 |
+| ARMIA POLSKA | positive | missing | eu3_g975 | missing | none | rejected | false | false | n/a | 0/0 | 0 | 0 | false | ok=0 regress=0 |
+| Dead End -> Erben im Wandel | positive | f28_g14265 | eu4_g14 | review | identityCandidate | plausible | false | true | different | 0/4 | 0 | 9 | false | ok=8 regress=1 |
+| Die Legion -> Legion Z | positive | f28_g15060 | eu3_g4877 | review | identityCandidate | strong | false | false | same | 3/3 | 4 | 28 | true | ok=9 regress=0 |
+| Los Kneipos | positive | f28_g5741 | eu2_g469 | ready | identityCandidate | anchored | true | true | same | 4/4 | 5 | 18 | true | ok=8 regress=1 |
+| Der weiße Lotus | positive | f28_g10394 | eu3_g2087 | review | identityCandidate | strong | true | false | same | 1/1 | 2 | 44 | true | ok=9 regress=0 |
+| GenerationZ -> Legion Z | negative | f28_g15060 | eu4_g1352 | review | migrationEdge | rejected | false | false | different | 4/4 | 5 | 20 | false | ok=8 regress=1 |
+| GenerationZ -> Erben im Wandel | negative | f28_g14265 | eu4_g1352 | review | migrationEdge | rejected | false | false | different | 0/4 | 0 | 1 | false | ok=6 regress=3 |
+| Dead End -> Legion Z | negative | f28_g15060 | eu4_g14 | review | migrationEdge | rejected | false | false | different | 0/4 | 0 | 2 | false | ok=8 regress=1 |
+
+## K. ARMIA POLSKA
+Current: missing missing first=missing
+Historical: eu3_g975 ARMIA POLSKA latest=2026-01-02T12:00:09.395Z
+Generated identity candidates=0, visible candidates after management filtering/reservation=0, migrationEdges=0
+Pipeline counts: initial=n/a afterExclusions=n/a afterReservations=n/a final=n/a
+Resolver status=missing, management status=missing, reason=none
+candidate=missing
+leader=n/a oldLeader=n/a newLeader=n/a officers=0/0->0 coreOverlap=0
+progression old=null new=null nonDecreasing=none regressions=none
+Simulated V3 classification=rejected; simulated ready=no
+Migration edges from historical ARMIA in loaded scans: none
+Finding: the loaded local scan root contains historical EU3 ARMIA POLSKA, but no current F28 guild observation named ARMIA POLSKA. The UI-reported ARMIA Review state cannot be fully reproduced from these snapshots alone.
+Code-level root-cause for the described UI case: if a guild has exact name + mutual dominant flow + 3 matched players but no same CoA, V2 keeps it Review because guild autoEligible still requires same CoA; management recompute then reuses that strict ready flag.
+
+## L. Dead End -> Erben im Wandel
+Relation: candidate=eu4_g14 oldName=Dead End matched=9 oldShare=23% newShare=15% exact=false coa=true mutual=false auto=false review=true split=true convergence=true; leader=different oldLeader=Vaaz newLeader=Undercover officers=0/4->2 coreOverlap=0; progression regressions=honor
+Incoming member sources: Welten im Wandel:11, Dead End:9, Exil:8, MenGroup:6, Rebirth:4, Der weiße Lotus:4, Asylum:3, The Void:2, Los Kneipos:2, Sladký domov:2, Poena Capitis:1, TeufelsBrut:1, WollMilchSäue:1, FASNE MJUTY:1, Die Legion:1, ThunderStorm:1, Kotlíkov:1, GenerationZ:1
+Finding: Dead End is the guardrail against using largest member source as identity definition. Same CoA and historical/first-post structure can carry identity even when another source contributes more members.
+
+## M. Die Legion -> Legion Z vs GenerationZ -> Legion Z
+Die Legion: candidate=eu3_g4877 oldName=Die Legion matched=28 oldShare=64% newShare=45% exact=false coa=false mutual=true auto=false review=true split=true convergence=true; relation=identityCandidate; class=strong; leader=same oldLeader=Noescape1234 newLeader=Noescape1234 officers=3/3->8 coreOverlap=4
+GenerationZ false control: migration matched=20 mutual=false; relation=migrationEdge; class=rejected; leader=different oldLeader=xllBoyka newLeader=Noescape1234 officers=4/4->8 coreOverlap=5
+Finding: Legion Z has a valid Die Legion identity candidate while GenerationZ remains migration evidence. This is the clearest separation of large member movement from guild identity.
+
+## N. Guild Evidence Strength Recommendation
+| Signal | Availability / Observation | Positive controls | False controls | Recommended strength |
+| --- | --- | --- | --- | --- |
+| Exact guild name | Useful but not globally unique | Magic, Hangover, ARMIA, Kneipos, Lotus | can appear in noisy candidate pools | support; strongSupport with flow |
+| Same CoA | Useful continuity artifact but not mandatory | Magic, Hangover, Dead End | CoA can collide/change | support |
+| Exact name + CoA | Lower collision than either alone | Magic, Hangover, Kneipos | still must pass assignment checks | strongSupport/anchored with mutual flow |
+| Mutual dominant member flow | Strong for stable continuations | Magic, Hangover, ARMIA, Lotus | majority flow can still be migration | strongSupport only with direct identity signal |
+| Leader continuity | High value when resolved | not reliably measurable here | leader can change | strongSupport, never hard reject |
+| Officer/core continuity | Potentially robust structural signal | limited by current player coverage | migration can include officers | support/strongSupport by overlap |
+| Normal member flow | Explains movement | all controls contextualize it | GenerationZ -> Legion Z | weakSupport/support; migration edge if no direct identity signal |
+| Guild progression | Broad availability, many collisions | sanity check | maxed values collide heavily | weakSupport/support only |
+
+## O. Candidate Classification Recommendation
+anchored: exact name + same CoA + mutual dominant flow + minimum matched core, then pass assignment/reservation.
+strong: exact name + mutual dominant flow, same CoA + strong flow, or resolved leadership/officer continuity.
+plausible: direct identity signal without enough strength for automatic assignment.
+weak: member movement or weak compatibility without real identity continuity; do not show as normal Review identity candidate.
+rejected: no actionable identity evidence or contradicted/reserved/rejected relation.
+Candidate class totals in current guild pool: anchored=16 strong=7 plausible=9 weak=0 rejected=0
+
+## P. Review Pool Breakdown
+- assignment conflict: 9
+- only plausible: 2
+- single strong: 1
+
+- CZSK Elite (f28_g9207): candidates=1, migrations=21, conflict=true, classes=strong, coverage=members=50/50 (100%) leaders=1/1 officers=3/3 normal=46/46, details=CZSK Elite:strong:matched=43:exact=true:coa=false:mutual=true
+- Der weiße Lotus (f28_g10394): candidates=1, migrations=15, conflict=true, classes=strong, coverage=members=48/50 (96%) leaders=1/1 officers=1/1 normal=46/48, details=Der weiße Lotus:strong:matched=44:exact=true:coa=false:mutual=true
+- Erben im Wandel (f28_g14265): candidates=1, migrations=36, conflict=true, classes=plausible, coverage=members=50/50 (100%) leaders=1/1 officers=2/2 normal=47/47, details=Dead End:plausible:matched=13:exact=false:coa=true:mutual=false
+- Legion Z (f28_g15060): candidates=2, migrations=12, conflict=true, classes=strong,strong, coverage=members=50/50 (100%) leaders=1/1 officers=8/8 normal=41/41, details=GenerationZ:strong:matched=22:exact=false:coa=true:mutual=false; Die Legion:strong:matched=28:exact=false:coa=false:mutual=true
+- Przymierze (f28_g586): candidates=2, migrations=10, conflict=true, classes=plausible,strong, coverage=members=48/50 (96%) leaders=1/1 officers=6/6 normal=41/43, details=Przymierze:plausible:matched=1:exact=true:coa=false:mutual=false; Dark Phoenix:strong:matched=25:exact=false:coa=false:mutual=true
+- Růženky (f28_g9698): candidates=1, migrations=7, conflict=false, classes=strong, coverage=members=48/50 (96%) leaders=1/1 officers=2/2 normal=45/47, details=Růženky:strong:matched=32:exact=true:coa=false:mutual=true
+- Seelen im Wandel (f28_g62): candidates=1, migrations=35, conflict=true, classes=plausible, coverage=members=46/50 (92%) leaders=1/1 officers=1/1 normal=44/48, details=Exil:plausible:matched=24:exact=false:coa=false:mutual=true
+- Welten im Wandel (f28_g9108): candidates=3, migrations=15, conflict=true, classes=anchored,plausible,plausible, coverage=members=50/50 (100%) leaders=1/1 officers=4/4 normal=45/45, details=Welten im Wandel:anchored:matched=29:exact=true:coa=true:mutual=true; Welten im Wandel:plausible:matched=0:exact=true:coa=false:mutual=false; Welten im Wandel:plausible:matched=0:exact=true:coa=false:mutual=false
+- Die Legion (f28_g11896): candidates=2, migrations=30, conflict=true, classes=plausible,plausible, coverage=members=48/50 (96%) leaders=1/1 officers=3/3 normal=44/46, details=Die Legion:plausible:matched=10:exact=true:coa=true:mutual=false; ThunderStorm:plausible:matched=15:exact=false:coa=false:mutual=true
+- FASNE MJUTY (f28_g9166): candidates=1, migrations=7, conflict=true, classes=strong, coverage=members=49/50 (98%) leaders=1/1 officers=5/5 normal=43/44, details=FASNE MJUTY:strong:matched=45:exact=true:coa=false:mutual=true
+- M d I (f28_g2647): candidates=1, migrations=1, conflict=false, classes=plausible, coverage=members=0/0 (n/a) leaders=0/0 officers=0/0 normal=0/0, details=M d I:plausible:matched=0:exact=true:coa=false:mutual=false
+- Sladký domov (f28_g9126): candidates=1, migrations=8, conflict=false, classes=plausible, coverage=members=17/27 (63%) leaders=1/1 officers=5/5 normal=11/21, details=Sladký domov:plausible:matched=6:exact=true:coa=false:mutual=false
+
+## Q. Potential Safe Promotions
+Potentially auto-resolvable under simulated strong/anchored one-to-one rule: 1/12
+- Růženky: candidate=Růženky classes=strong
+
+## R. Assignment / Reservation Design
+Historical guilds claimed by multiple current identity candidates: 23
+- eu1_g8: 3 current candidates
+- eu1_g29: 3 current candidates
+- eu1_g43: 3 current candidates
+- eu1_g83: 3 current candidates
+- eu1_g113: 3 current candidates
+- eu1_g152: 3 current candidates
+- eu1_g252: 2 current candidates
+- eu1_g1024: 2 current candidates
+- eu1_g1206: 2 current candidates
+- eu2_g2: 2 current candidates
+- eu2_g20: 3 current candidates
+- eu2_g39: 3 current candidates
+- eu2_g469: 2 current candidates
+- eu3_g1: 3 current candidates
+- eu1_g1033: 3 current candidates
+- eu4_g324: 3 current candidates
+- eu3_g72: 2 current candidates
+- eu3_g126: 3 current candidates
+- eu3_g2087: 3 current candidates
+- eu3_g4877: 5 current candidates
+Design: reserve a historical guild only after an assignment-free strong/anchored decision. Remove/rescore weaker claims against that historical guild as migration edges. If two current guilds have similarly strong identity claims, mark assignment conflict and keep Review.
+
+## S. Circular Evidence Guard
+Pass 1 should resolve Player identities from independent player evidence only. Pass 2 may use Ready/Completed players as guild evidence. Pass 3 may confirm Guild identities. A later optional Player refinement pass may use confirmed Guild identity, but those refined players must not be fed back into the same Guild pass.
+
+## T. Guild Resolver V3 Specification
+1. Model guild evidence as ordinal entries: neutral, weakSupport, support, strongSupport, anchor, warning.
+2. Build identity candidates only from direct identity evidence; keep migration edges separate.
+3. Classify candidates as rejected, weak, plausible, strong, anchored.
+4. Apply one-to-one historical reservation after classification, not before evidence is visible.
+5. Recompute final status from the final candidate pool: Ready for exactly one assignment-free strong/anchored candidate; Review for multiple/actionable conflict; Unresolved when historical data exists but no actionable identity remains; No Historical Data only when coverage is absent.
+6. Keep leader/officer continuity optional and non-blocking until coverage is demonstrably reliable.
+7. Treat first post-fusion observations as primary identity evidence and later observations as migration/rename/context evidence.
