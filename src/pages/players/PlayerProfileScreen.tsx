@@ -112,6 +112,7 @@ type PlayerSnapshot = {
   lastScanDays?: number | null;
   values: Record<string, any>;
   portraitConfig?: Partial<PortraitOptions>;
+  saveVersion?: number | null;
   saveArray?: number[] | null;
   saveString?: string | null;
 };
@@ -214,6 +215,9 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           (typeof data.saveString === "string" && data.saveString) ||
           (typeof values?.saveString === "string" && values.saveString) ||
           undefined;
+        const saveVersion =
+          toNum(data.saveVersion ?? values?.saveVersion ?? values?.SaveVersion ?? values?.["Save Version"]) ??
+          null;
 
         const playerIdValue = String((data as any)?.playerId ?? id).trim() || id;
         const level = toNum(data.level ?? values?.Level) ?? null;
@@ -284,6 +288,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           lastScanDays,
           values,
           portraitConfig,
+          saveVersion,
           saveArray,
           saveString,
         };
@@ -830,10 +835,21 @@ const buildPortraitConfig = (
     snapshot.portraitConfig && Object.keys(snapshot.portraitConfig).length > 0;
 
   if (Array.isArray(snapshot.saveArray) && snapshot.saveArray.length > 0) {
-    base = createPortraitOptionsFromSaveArray(snapshot.saveArray);
+    base = createPortraitOptionsFromSaveArray(snapshot.saveArray, {
+      own: 1,
+      saveVersion: snapshot.saveVersion,
+      save: snapshot.saveArray,
+    });
   } else if (snapshot.saveString) {
     const parsed = parseSaveStringToArray(snapshot.saveString);
-    base = parsed.length > 0 ? createPortraitOptionsFromSaveArray(parsed) : undefined;
+    base =
+      parsed.length > 0
+        ? createPortraitOptionsFromSaveArray(parsed, {
+            own: 1,
+            saveVersion: snapshot.saveVersion,
+            save: parsed,
+          })
+        : undefined;
   } else if (hasInlinePortrait) {
     base = { ...snapshot.portraitConfig } as PortraitOptions;
   }

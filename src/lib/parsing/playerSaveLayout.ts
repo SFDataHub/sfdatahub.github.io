@@ -1,4 +1,4 @@
-import { parseSaveStringToArray } from "./extractPortrait";
+import { parseSaveStringToArray } from "./saveString";
 
 export type SfPlayerSaveLayout = "currentCompact" | "legacyOwn" | "legacyOther" | "unknown";
 

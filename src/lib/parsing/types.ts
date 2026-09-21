@@ -294,6 +294,7 @@ export type SfJsonOwnPlayer = {
   playerId: number;
   server: string;
   portrait: SfJsonPortrait | null;
+  saveVersion?: number;
   saveArray?: number[];
   saveString?: string;
   saveModel?: SfJsonSaveModel;
