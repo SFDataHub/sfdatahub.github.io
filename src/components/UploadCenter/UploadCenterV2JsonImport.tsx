@@ -7,9 +7,18 @@ import {
 } from "../../lib/parsing";
 import PortraitPreview from "../avatar/PortraitPreview";
 import {
+  createAvatarSnapshotPortraitFromSfJsonPortrait,
   createPortraitOptionsFromAvatarSnapshot,
   saveAvatarSnapshotForIdentifier,
 } from "../../lib/firebase/avatarSnapshots";
+import {
+  AVATAR_SEARCH_RESULT_LIMIT,
+  buildAvatarImportPlayerEntries,
+  filterAvatarImportPlayerEntries,
+  getImportablePortrait,
+  getPortraitStatusLabel,
+  normalizeAvatarEntry,
+} from "./avatarImportPlayers";
 import { mergeCoaStringIntoMembersSummaryLatest } from "../../lib/import/importer";
 import {
   isFirestoreReadTraceEnabled,
@@ -786,6 +795,8 @@ export default function UploadCenterV2JsonImport() {
   const [parseError, setParseError] = React.useState<string | null>(null);
   const [importMode, setImportMode] = React.useState<ImportMode>("mapping");
   const [selectedIdentifier, setSelectedIdentifier] = React.useState("");
+  const [avatarSearchQuery, setAvatarSearchQuery] = React.useState("");
+  const [selectedAvatarKey, setSelectedAvatarKey] = React.useState("");
   const [tableMode, setTableMode] = React.useState<TableMode>("overview");
   const [avatarSectionOpen, setAvatarSectionOpen] = React.useState(false);
   const [coaImportStatus, setCoaImportStatus] = React.useState<string | null>(null);
@@ -808,6 +819,12 @@ export default function UploadCenterV2JsonImport() {
       setCoaImportError(null);
       setAvatarImportStatus(null);
       setAvatarImportError(null);
+      setRawJson(null);
+      setRawGuildSaveTokens([]);
+      setParseResult(null);
+      setSelectedIdentifier("");
+      setSelectedAvatarKey("");
+      setAvatarSearchQuery("");
     } catch (error) {
       console.error("[UploadCenterV2] Could not read JSON file", error);
       setParseError("Could not read the selected JSON file.");
@@ -837,17 +854,16 @@ export default function UploadCenterV2JsonImport() {
       setCoaImportError(null);
       setAvatarImportStatus(null);
       setAvatarImportError(null);
+      setAvatarSearchQuery("");
 
-      if (parsed.ownPlayers.length === 0) {
-        setParseStatus(`Parsed ${parsed.playersCount} players. No own player found (expected \"own\": 1).`);
-        setSelectedIdentifier("");
-        return;
-      }
+      const avatarEntries = buildAvatarImportPlayerEntries(parsedJson);
+      const firstAvatarKey = avatarEntries[0]?.key ?? "";
+      setSelectedAvatarKey(firstAvatarKey);
 
-      const nextIdentifier = parsed.ownPlayers[0].identifier;
+      const nextIdentifier = parsed.ownPlayers[0]?.identifier ?? "";
       setSelectedIdentifier(nextIdentifier);
       setParseStatus(
-        `Parsed ${parsed.playersCount} players. Own players found: ${parsed.ownPlayers.length}.`,
+        `Parsed ${parsed.playersCount} players. ${avatarEntries.length} players contain usable portrait data.`,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -857,12 +873,46 @@ export default function UploadCenterV2JsonImport() {
       setRawGuildSaveTokens([]);
       setParseResult(null);
       setSelectedIdentifier("");
+      setSelectedAvatarKey("");
+      setAvatarSearchQuery("");
       setCoaImportStatus(null);
       setCoaImportError(null);
       setAvatarImportStatus(null);
       setAvatarImportError(null);
     }
   };
+
+  const avatarPlayerEntries = React.useMemo(
+    () => buildAvatarImportPlayerEntries(rawJson),
+    [rawJson],
+  );
+  const avatarPortraitsAvailable = avatarPlayerEntries.length;
+  const filteredAvatarPlayerEntries = React.useMemo(
+    () => filterAvatarImportPlayerEntries(avatarPlayerEntries, avatarSearchQuery),
+    [avatarPlayerEntries, avatarSearchQuery],
+  );
+  const visibleAvatarPlayerEntries = React.useMemo(
+    () => filteredAvatarPlayerEntries.slice(0, AVATAR_SEARCH_RESULT_LIMIT),
+    [filteredAvatarPlayerEntries],
+  );
+  const selectedAvatarEntry = React.useMemo(() => {
+    if (!selectedAvatarKey) return null;
+    return avatarPlayerEntries.find((entry) => entry.key === selectedAvatarKey) ?? null;
+  }, [avatarPlayerEntries, selectedAvatarKey]);
+  const selectedAvatarNormalized = React.useMemo(
+    () => normalizeAvatarEntry(selectedAvatarEntry),
+    [selectedAvatarEntry],
+  );
+  const selectedAvatarPortrait = React.useMemo(
+    () => getImportablePortrait(selectedAvatarNormalized),
+    [selectedAvatarNormalized],
+  );
+
+  React.useEffect(() => {
+    if (!selectedAvatarKey) return;
+    if (avatarPlayerEntries.some((entry) => entry.key === selectedAvatarKey)) return;
+    setSelectedAvatarKey("");
+  }, [avatarPlayerEntries, selectedAvatarKey]);
 
   const selectedPlayer = React.useMemo(() => {
     if (!parseResult || parseResult.ownPlayers.length === 0) return null;
@@ -994,15 +1044,18 @@ export default function UploadCenterV2JsonImport() {
       return;
     }
 
-    if (!selectedPlayer) {
-      setAvatarImportError("No own player available in parsed JSON.");
+    if (!selectedAvatarEntry) {
+      setAvatarImportError("Select a player to import avatar data.");
       return;
     }
 
-    if (!selectedPlayer.portrait) {
-      setAvatarImportError("Selected own player has no portrait save data.");
+    if (!selectedAvatarPortrait) {
+      setAvatarImportError(`Selected player is not importable. Portrait status: ${getPortraitStatusLabel(selectedAvatarNormalized)}.`);
       return;
     }
+
+    const playerId = selectedAvatarNormalized?.identity.id ?? selectedAvatarEntry.playerId ?? 0;
+    const server = selectedAvatarNormalized?.identity.server ?? selectedAvatarEntry.server ?? "";
 
     if (!user?.id) {
       setAvatarImportError("Missing authenticated user id.");
@@ -1013,14 +1066,14 @@ export default function UploadCenterV2JsonImport() {
     try {
       await saveAvatarSnapshotForIdentifier({
         userId: user.id,
-        identifier: selectedPlayer.identifier,
-        playerId: selectedPlayer.playerId,
-        server: selectedPlayer.server,
+        identifier: selectedAvatarEntry.identifier,
+        playerId,
+        server,
         source: "scanUpload",
-        portrait: selectedPlayer.portrait,
+        portrait: createAvatarSnapshotPortraitFromSfJsonPortrait(selectedAvatarPortrait),
       });
       setAvatarImportStatus(
-        `Avatar imported for ${selectedPlayer.name || selectedPlayer.identifier} (${selectedPlayer.server}).`,
+        `Avatar imported for ${selectedAvatarEntry.name || selectedAvatarEntry.identifier} (${server || "unknown-server"}).`,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1028,17 +1081,17 @@ export default function UploadCenterV2JsonImport() {
     } finally {
       setIsAvatarImporting(false);
     }
-  }, [parseResult, selectedPlayer, user?.id]);
+  }, [parseResult, selectedAvatarEntry, selectedAvatarNormalized, selectedAvatarPortrait, user?.id]);
   const avatarPreviewConfig = React.useMemo(() => {
-    if (!selectedPlayer?.portrait) return null;
+    if (!selectedAvatarEntry || !selectedAvatarPortrait) return null;
     return createPortraitOptionsFromAvatarSnapshot({
-      playerId: selectedPlayer.playerId,
-      server: selectedPlayer.server,
-      portrait: selectedPlayer.portrait,
+      playerId: selectedAvatarNormalized?.identity.id ?? selectedAvatarEntry.playerId ?? 0,
+      server: selectedAvatarNormalized?.identity.server ?? selectedAvatarEntry.server ?? "",
+      portrait: createAvatarSnapshotPortraitFromSfJsonPortrait(selectedAvatarPortrait),
       updatedAt: null,
       hasPortraitData: true,
     });
-  }, [selectedPlayer]);
+  }, [selectedAvatarEntry, selectedAvatarNormalized, selectedAvatarPortrait]);
 
   const parserCoveredSaveFields = React.useMemo(() => {
     const covered = new Set<number>();
@@ -1136,12 +1189,18 @@ export default function UploadCenterV2JsonImport() {
           setJsonInput(event.target.value);
           setParseError(null);
           setParseStatus(null);
+          setRawJson(null);
+          setRawGuildSaveTokens([]);
+          setParseResult(null);
+          setSelectedIdentifier("");
+          setSelectedAvatarKey("");
+          setAvatarSearchQuery("");
           setCoaImportStatus(null);
           setCoaImportError(null);
           setAvatarImportStatus(null);
           setAvatarImportError(null);
         }}
-        placeholder='Paste full SF JSON here (requires "players" with at least one entry where "own": 1).'
+        placeholder='Paste full SF JSON here (requires "players" with complete player saves for avatar import).'
         rows={10}
       />
 
@@ -1186,13 +1245,19 @@ export default function UploadCenterV2JsonImport() {
             <div className={styles.summaryValue}>{parseResult.playersCount}</div>
           </div>
           <div className={styles.summaryCard}>
-            <div className={styles.summaryLabel}>Own Players Found</div>
-            <div className={styles.summaryValue}>{parseResult.ownPlayers.length}</div>
+            <div className={styles.summaryLabel}>Portraits Available</div>
+            <div className={styles.summaryValue}>{avatarPortraitsAvailable}</div>
           </div>
           <div className={styles.summaryCard}>
             <div className={styles.summaryLabel}>Selected Player</div>
             <div className={styles.summaryValue}>
-              {selectedPlayer ? getPlayerLabel(selectedPlayer) : "none"}
+              {importMode === "avatar_import"
+                ? selectedAvatarEntry
+                  ? selectedAvatarEntry.name || selectedAvatarEntry.identifier
+                  : "none"
+                : selectedPlayer
+                  ? getPlayerLabel(selectedPlayer)
+                  : "none"}
             </div>
           </div>
           <div className={styles.summaryCard}>
@@ -1202,7 +1267,7 @@ export default function UploadCenterV2JsonImport() {
         </div>
       )}
 
-      {parseResult && parseResult.ownPlayers.length > 1 && (
+      {parseResult && importMode !== "avatar_import" && parseResult.ownPlayers.length > 1 && (
         <div className={styles.selectionRow}>
           <label htmlFor="uc-v2-player-select" className={styles.selectionLabel}>
             Own player
@@ -1494,32 +1559,157 @@ export default function UploadCenterV2JsonImport() {
         )
       ) : parseResult ? (
         <div className={styles.importCard}>
-          <div className={styles.importRow}>
-            <span className={styles.importLabel}>Selected Player</span>
-            <span className={styles.summaryValue}>{selectedPlayer ? getPlayerLabel(selectedPlayer) : "(missing)"}</span>
+          <div className={styles.avatarSearchBlock}>
+            <label htmlFor="uc-v2-avatar-search" className={styles.selectionLabel}>
+              Search player...
+            </label>
+            <input
+              id="uc-v2-avatar-search"
+              className={styles.searchInput}
+              value={avatarSearchQuery}
+              onChange={(event) => setAvatarSearchQuery(event.target.value)}
+              placeholder="Search player..."
+            />
+            <div className={styles.searchMeta}>
+              {filteredAvatarPlayerEntries.length === 0
+                ? "No matching players with complete portrait-capable saves."
+                : visibleAvatarPlayerEntries.length < filteredAvatarPlayerEntries.length
+                  ? `Showing first ${visibleAvatarPlayerEntries.length} of ${filteredAvatarPlayerEntries.length} matches`
+                  : `${filteredAvatarPlayerEntries.length} matching player${filteredAvatarPlayerEntries.length === 1 ? "" : "s"}`}
+            </div>
+            {visibleAvatarPlayerEntries.length > 0 && (
+              <div className={styles.avatarResultList}>
+                {visibleAvatarPlayerEntries.map((entry) => (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    className={`${styles.avatarResultButton} ${entry.key === selectedAvatarKey ? styles.avatarResultButtonActive : ""}`}
+                    onClick={() => {
+                      setSelectedAvatarKey(entry.key);
+                      setAvatarImportStatus(null);
+                      setAvatarImportError(null);
+                    }}
+                  >
+                    <span className={styles.avatarResultMain}>
+                      <span className={styles.avatarResultName}>{entry.name || "Unnamed"}</span>
+                      <span className={styles.avatarResultBadge}>{entry.own ? "Own" : "Other"}</span>
+                    </span>
+                    <span className={styles.avatarResultMeta}>
+                      {[
+                        entry.level == null ? null : `Level ${entry.level}`,
+                        entry.classLabel,
+                        entry.server,
+                        entry.guildName,
+                      ].filter(Boolean).join(" - ") || "No metadata"}
+                    </span>
+                    <span className={styles.avatarResultIdentifier}>{entry.identifier}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className={styles.importRow}>
-            <span className={styles.importLabel}>Avatar Identifier</span>
-            <span className={styles.summaryValueMono}>{selectedPlayer?.identifier ?? "(missing)"}</span>
-          </div>
-          <div className={styles.importRow}>
-            <span className={styles.importLabel}>Portrait Data</span>
-            <span className={selectedPlayer?.portrait ? styles.badgeOk : styles.badgeMissing}>
-              {selectedPlayer?.portrait ? "ok" : "missing"}
-            </span>
-          </div>
-          {selectedPlayer?.portrait && avatarPreviewConfig && (
+
+          {!selectedAvatarEntry ? (
+            <div className={styles.emptyState}>Select a player to preview portrait data.</div>
+          ) : (
+            <>
+              <div className={styles.importRow}>
+                <span className={styles.importLabel}>Selected Player</span>
+                <span className={styles.summaryValue}>{selectedAvatarEntry.name || selectedAvatarEntry.identifier}</span>
+              </div>
+              <div className={styles.importRow}>
+                <span className={styles.importLabel}>Avatar Identifier</span>
+                <span className={styles.summaryValueMono}>{selectedAvatarEntry.identifier}</span>
+              </div>
+              <div className={styles.avatarDebugGrid}>
+                <div>
+                  <span className={styles.importLabel}>Server</span>
+                  <span className={styles.summaryValue}>{selectedAvatarEntry.server ?? "(missing)"}</span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Level</span>
+                  <span className={styles.summaryValue}>{selectedAvatarEntry.level ?? "(missing)"}</span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Class</span>
+                  <span className={styles.summaryValue}>
+                    {selectedAvatarNormalized?.identity.class ?? selectedAvatarEntry.classId ?? "(missing)"}
+                    {selectedAvatarEntry.classLabel ? ` - ${selectedAvatarEntry.classLabel}` : ""}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Race</span>
+                  <span className={styles.summaryValue}>
+                    {selectedAvatarNormalized?.identity.race ?? "(missing)"}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Gender</span>
+                  <span className={styles.summaryValue}>
+                    {selectedAvatarNormalized?.identity.gender ?? "(missing)"}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Own / Other</span>
+                  <span className={styles.summaryValue}>{selectedAvatarEntry.own ? "Own" : "Other"}</span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Layout</span>
+                  <span className={styles.summaryValueMono}>
+                    {selectedAvatarNormalized?.metadata.layout ?? selectedAvatarEntry.layout}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Portrait Status</span>
+                  <span className={selectedAvatarPortrait ? styles.badgeOk : styles.badgeMissing}>
+                    {getPortraitStatusLabel(selectedAvatarNormalized)}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Special Portrait</span>
+                  <span className={styles.summaryValueMono}>
+                    {selectedAvatarPortrait
+                      ? `${selectedAvatarPortrait.appearance.specialPortrait.active ? "active" : "inactive"}${
+                          selectedAvatarPortrait.appearance.specialPortrait.id == null
+                            ? ""
+                            : ` / ${selectedAvatarPortrait.appearance.specialPortrait.id}`
+                        }`
+                      : "(unavailable)"}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.importLabel}>Frame</span>
+                  <span className={styles.summaryValueMono}>
+                    {selectedAvatarNormalized?.portrait?.frame
+                      ? `${selectedAvatarNormalized.portrait.frame.status}${
+                          selectedAvatarNormalized.portrait.frame.frameId == null
+                            ? " / fallback"
+                            : ` / ${selectedAvatarNormalized.portrait.frame.frameId}`
+                        }`
+                      : "(missing)"}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {selectedAvatarEntry && selectedAvatarPortrait && avatarPreviewConfig ? (
             <div className={styles.importPreviewWrap}>
               <span className={styles.importLabel}>Preview</span>
               <div className={styles.importPreviewBox}>
                 <PortraitPreview
                   config={avatarPreviewConfig}
-                  label={selectedPlayer.name || selectedPlayer.identifier}
-                  fallbackLabel={selectedPlayer.name || selectedPlayer.identifier}
+                  label={selectedAvatarEntry.name || selectedAvatarEntry.identifier}
+                  fallbackLabel={selectedAvatarEntry.name || selectedAvatarEntry.identifier}
+                  canvasId={`PortraitCanvasUploadCenterAvatar-${selectedAvatarEntry.rawIndex}`}
                 />
               </div>
             </div>
-          )}
+          ) : selectedAvatarEntry ? (
+            <div className={styles.emptyState}>
+              Portrait preview unavailable for this player. Status: {getPortraitStatusLabel(selectedAvatarNormalized)}.
+            </div>
+          ) : null}
           {!!avatarImportStatus && <p className={styles.statusOk}>{avatarImportStatus}</p>}
           {!!avatarImportError && <p className={styles.statusError}>{avatarImportError}</p>}
           <div className={styles.importActions}>
@@ -1527,7 +1717,7 @@ export default function UploadCenterV2JsonImport() {
               type="button"
               className={styles.parseButton}
               onClick={handleAvatarImport}
-              disabled={isAvatarImporting || !selectedPlayer?.portrait || !selectedPlayer || !user?.id}
+              disabled={isAvatarImporting || !selectedAvatarEntry || !selectedAvatarPortrait || !user?.id}
             >
               {isAvatarImporting ? "Importing..." : "Import Avatar"}
             </button>

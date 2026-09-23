@@ -94,12 +94,13 @@
 
 .confirmOverlay {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   z-index: 80;
   display: grid;
   place-items: center;
   padding: 20px;
   background: rgba(3, 10, 18, 0.68);
+  box-sizing: border-box;
 }
 
 .confirmDialog {

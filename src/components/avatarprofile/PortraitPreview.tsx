@@ -41,21 +41,33 @@ const roundSpecial = (value: number) => {
   const rounded = Math.round(Number(value));
   return Number.isFinite(rounded) ? rounded : 0;
 };
+const sanitizeBeard = (value: number) => {
+  const rounded = Math.round(Number(value));
+  if (!Number.isFinite(rounded) || rounded <= 0 || rounded === 99) return 0;
+  return Math.min(rounded, 15);
+};
+const sanitizeHorn = (value: number, race: number, genderName: PortraitOptions["genderName"]) => {
+  if (race !== 8) return 0;
+  const maxHorn = genderName === "female" ? 4 : 11;
+  return clampPositive(value, maxHorn);
+};
 
 const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
   const merged = { ...DEFAULT_PORTRAIT, ...(config || {}) };
+  const genderName = merged.genderName === "female" ? "female" : "male";
+  const race = clampPositive(merged.race, 8);
   return {
     ...merged,
     class: clampPositive(merged.class, 15),
-    race: clampPositive(merged.race, 8),
+    race,
     mouth: clampPositive(merged.mouth, 30),
     hair: clampPositive(merged.hair, 40),
     hairColor: clampPositive(merged.hairColor, 12),
-    horn: clampPositive(merged.horn, 10),
+    horn: sanitizeHorn(merged.horn, race, genderName),
     hornColor: clampPositive(merged.hornColor, 10),
     brows: clampPositive(merged.brows, 10),
     eyes: clampPositive(merged.eyes, 20),
-    beard: clampPositive(merged.beard, 15),
+    beard: sanitizeBeard(merged.beard),
     nose: clampPositive(merged.nose, 10),
     ears: clampPositive(merged.ears, 10),
     extra: clampPositive(merged.extra, 20),
@@ -64,7 +76,7 @@ const sanitizeConfig = (config?: Partial<PortraitOptions>): PortraitOptions => {
     background: "",
     frame: merged.frame ?? DEFAULT_PORTRAIT.frame,
     mirrorHorizontal: merged.mirrorHorizontal ?? DEFAULT_PORTRAIT.mirrorHorizontal,
-    genderName: merged.genderName === "female" ? "female" : "male",
+    genderName,
   };
 };
 

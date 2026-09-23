@@ -709,11 +709,12 @@
 
 .overlay {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(5, 12, 22, 0.75);
   display: grid;
   place-items: center;
   z-index: 2000;
+  box-sizing: border-box;
 }
 
 .overlayPanel {
@@ -723,7 +724,7 @@
   padding: 0;
   max-width: min(900px, 90vw);
   width: min(900px, 90vw);
-  max-height: 90vh;
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)));
   display: grid;
   gap: 12px;
   position: relative;

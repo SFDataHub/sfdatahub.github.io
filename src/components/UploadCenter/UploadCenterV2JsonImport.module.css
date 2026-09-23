@@ -187,6 +187,107 @@
   font-size: 0.9rem;
 }
 
+.avatarSearchBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.searchInput {
+  border: 1px solid #2b4c73;
+  background: #0f2238;
+  color: #f5f9ff;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 0.92rem;
+}
+
+.searchInput:focus {
+  outline: 2px solid #3c79b8;
+  outline-offset: 1px;
+}
+
+.searchMeta {
+  color: #9fb6ce;
+  font-size: 0.8rem;
+}
+
+.avatarResultList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.avatarResultButton {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #24456e;
+  background: #0f2238;
+  color: #d6e4f7;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.avatarResultButton:hover {
+  background: #17304c;
+}
+
+.avatarResultButtonActive {
+  border-color: #2e75f0;
+  box-shadow: inset 0 0 0 1px rgba(46, 117, 240, 0.5);
+}
+
+.avatarResultMain {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.avatarResultName {
+  color: #f5f9ff;
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.avatarResultBadge {
+  border: 1px solid #35547b;
+  border-radius: 999px;
+  color: #b7cce4;
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.avatarResultMeta {
+  color: #b0c4d9;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.avatarResultIdentifier {
+  color: #8fb2d8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.avatarDebugGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  border: 1px solid #24456e;
+  border-radius: 10px;
+  background: #0f2238;
+  padding: 10px;
+}
+
 .tableWrap {
   border: 1px solid #2b4c73;
   border-radius: 12px;

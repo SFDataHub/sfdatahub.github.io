@@ -1,0 +1,124 @@
+# Guild Evidence V3.1 Calibration
+
+Generated: 2026-09-21T18:18:42.419Z
+Scan root: D:/SFDataHub/Guild Analytics/public/scans
+
+## A. Non-Ready Inventory
+Guild status counts: ready=25 review=2 unresolved=0 noHistoricalObservation=0 noHistory=0 completed=0
+Non-ready analyzed from current report: 2 (review=2, unresolved=0)
+Note: expected task baseline was 8; current scan/report produced 2.
+
+### 1. Die Legion
+current=f28_g11896 server=F28 firstSeen=2026-02-21T14:44:11.553Z observations=2
+status=review reasonCodes=insufficient-continuity reasons=a historical guild has multiple relevant post-fusion destinations
+resolverStatuses=reviewRequired exactHistoricalEntitiesInLineage=1
+flowSources=ThunderStorm:11, Marathon Runners:1, TeufelsBrut:1, The Void:1, WollMilchSäue:1, Die Legion:1, Ballers:1, MenGroup:1
+flowDestinations=Legion Z:28, Seelen im Wandel:7
+Relations:
+- identity candidate: Die Legion (eu3_g4877, EU3) class=strong exact=yes fusionBase=no coa=yes matched=10 oldShare=23% newShare=21% oldTop=no newTop=no mutual=no secondSource=10 sourceRatio=1.00 leader=different officers=0 core=0 reserved=no assignmentConflict=yes occurrences=1 families=Name+CoA+Member Structure evidence=[exact-name:strongSupport:Exact guild name; unique-exact-name:strongSupport:Unique exact guild name; same-coa:support:Same CoA; member-flow:support:10 matched players; leader-continuity:warning:Different resolved leader; assignment:warning:Historical guild claimed elsewhere]
+- migration edge: ThunderStorm (eu4_g12, EU4) class=migration exact=no fusionBase=no coa=no matched=11 oldShare=35% newShare=61% oldTop=yes newTop=yes mutual=yes secondSource=1 sourceRatio=11.00 leader=different officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+- migration edge: Marathon Runners (eu1_g113, EU1) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=3% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=different officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+- migration edge: TeufelsBrut (eu1_g192, EU1) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=33% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=unavailable officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+- migration edge: The Void (eu2_g39, EU2) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=2% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=different officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+- migration edge: WollMilchSäue (eu2_g5616, EU2) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=14% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=unavailable officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+- migration edge: Ballers (eu3_g5287, EU3) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=2% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=different officers=0 core=0 reserved=no assignmentConflict=no occurrences=2 families=Member Structure evidence=[none]
+- migration edge: MenGroup (eu4_g60, EU4) class=migration exact=no fusionBase=no coa=no matched=1 oldShare=9% newShare=6% oldTop=no newTop=no mutual=no secondSource=1 sourceRatio=1.00 leader=unavailable officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Member Structure evidence=[none]
+Simulations:
+- A. Unique exact name + no strong/anchored competitor: ready; winner=Die Legion; reason=single promoted candidate without strong/anchored competitor
+- B. Exact name + meaningful member continuity: ready; winner=Die Legion; reason=single promoted candidate without strong/anchored competitor
+- C. Rename via CoA + substantial member continuity: review; winner=none; reason=promoted candidates=0
+- D. Structural rename without name/CoA: review; winner=none; reason=direct identity candidates present=1
+- E. Candidate-class dominance hierarchy: ready; winner=Die Legion; reason=single top class candidate under class hierarchy
+
+### 2. M d I
+current=f28_g2647 server=F28 firstSeen=2026-02-21T14:44:11.553Z observations=1
+status=review reasonCodes=insufficient-continuity reasons=historical guild candidates were found, but none is strong enough for automatic linking
+resolverStatuses=reviewRequired exactHistoricalEntitiesInLineage=1
+flowSources=none
+flowDestinations=none
+Relations:
+- identity candidate: M d I (eu1_g5007, EU1) class=plausible exact=yes fusionBase=no coa=no matched=0 oldShare=0% newShare=0% oldTop=no newTop=no mutual=no secondSource=0 sourceRatio=inf leader=unavailable officers=0 core=0 reserved=no assignmentConflict=no occurrences=1 families=Name evidence=[exact-name:support:Exact guild name; unique-exact-name:support:Unique exact guild name]
+Simulations:
+- A. Unique exact name + no strong/anchored competitor: ready; winner=M d I; reason=single promoted candidate without strong/anchored competitor
+- B. Exact name + meaningful member continuity: review; winner=none; reason=promoted candidates=0
+- C. Rename via CoA + substantial member continuity: review; winner=none; reason=promoted candidates=0
+- D. Structural rename without name/CoA: review; winner=none; reason=direct identity candidates present=1
+- E. Candidate-class dominance hierarchy: review; winner=none; reason=top class plausible remains below strong
+
+## B. Duplicate Relation Rows
+- Die Legion: duplicate display groups=1
+  Ballers: samePhysical=yes rows=Ballers/eu3_g5287/migration edge/matched=1; Ballers/eu3_g5287/migration edge/matched=1
+- M d I: duplicate display groups=0
+Finding: duplicate-looking rows must be interpreted by historical guild identifier. Same display name does not automatically mean duplicated flow; this report exposes whether the physical identifier is identical.
+
+## C. Exact Name Calibration
+Current guilds with exact historical entity count > 0: 24
+Unique exact historical entity: 23
+Duplicated exact historical entities: 1
+Unique exact + member continuity: 22
+Unique exact without member continuity: 1
+- Glücksbärchies: current guild not present in report
+- Sladký domov: status=ready exactHistoricalEntities=1 candidates=Sladký domov:strong:matched=6:exact=yes
+- Die Legion: status=review exactHistoricalEntities=1 candidates=Die Legion:strong:matched=10:exact=yes
+- Magic Mushrooms: status=ready exactHistoricalEntities=1 candidates=Magic Mushrooms:anchored:matched=46:exact=yes
+- Hangover: status=ready exactHistoricalEntities=1 candidates=Hangover:anchored:matched=35:exact=yes
+- ARMIA POLSKA: current guild not present in report
+- CZSK Elite: status=ready exactHistoricalEntities=1 candidates=CZSK Elite:strong:matched=43:exact=yes
+- Der weiße Lotus: status=ready exactHistoricalEntities=1 candidates=Der weiße Lotus:strong:matched=44:exact=yes
+Recommendation: unique exact name is materially stronger than generic exact name, but should be promoted only when it has member continuity or no stronger competing direct-evidence family.
+
+## D. Exact Name + Member Continuity
+- Die Legion: exactRows=1 Die Legion:strong:matched=10:families=Name+CoA+Member Structure
+Recommendation: exact name + any resolved member core looks reliable for the listed review cases, but exact-only with zero members is a weaker collision class.
+
+## E. Same CoA + Rename
+Recommendation: same CoA alone remains insufficient. Same CoA + substantial core is useful rename evidence, especially when the chosen identity is not the largest member source.
+
+## F. Leader Difference
+Candidate relations with different resolved leader in non-ready pool: 1
+- Die Legion -> Die Legion: class=strong matched=10 families=Name+CoA+Member Structure
+Ready candidate relations with different resolved leader: 5
+Finding: Different leader is emitted as warning evidence. It does not directly hard-reject or cap classification; the positive evidence thresholds determine whether a candidate reaches strong/anchored.
+
+## G. Leadership Positive Evidence
+Recommendation: leader continuity should remain positive strong evidence, but leader/officer movement without name/CoA/member dominance can still be migration noise.
+
+## H. Candidate-Class Dominance
+Anchored candidates with weaker competitors in non-ready pool: 0
+Finding: current status logic treats any remaining actionable identity candidate as convergence (`identityCandidates.length > 1`), so lower-class competitors block an anchored candidate.
+Recommendation: simulate a class hierarchy for final winner selection. Same-class competitors should still block; lower-class competitors should block only when they carry independent strong evidence families or assignment conflict.
+
+## I. Structural Continuity Without Name/CoA
+- Die Legion: ThunderStorm:migration edge:matched=11:oldShare=35%:newShare=61%:mutual=yes:second=1:ratio=11.00:delta=10; Marathon Runners:migration edge:matched=1:oldShare=3%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0; TeufelsBrut:migration edge:matched=1:oldShare=33%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0; The Void:migration edge:matched=1:oldShare=2%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0; WollMilchSäue:migration edge:matched=1:oldShare=14%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0; Ballers:migration edge:matched=1:oldShare=2%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0; MenGroup:migration edge:matched=1:oldShare=9%:newShare=6%:mutual=no:second=1:ratio=1.00:delta=0
+Recommendation: structural rename evidence should require bidirectional dominance, substantial absolute core, both shares around or above 30%, and a clear runner-up gap. It should only fire when no direct identity candidate exists, so largest-source evidence does not override name/CoA continuity.
+
+## J. GenerationZ Negative Control
+- current=Die Legion old=Die Legion relation=identity candidate class=strong matched=10 oldShare=23% newShare=21% oldTop=no newTop=no mutual=no leader=different officers=0 coa=yes exact=yes
+- current=Legion Z status=ready old=GenerationZ relation=identity candidate class=strong matched=22 oldShare=54% newShare=44% oldTop=yes newTop=no mutual=no leader=different officers=4 coa=yes exact=no
+- current=Legion Z status=ready old=Die Legion relation=identity candidate class=strong matched=21 oldShare=64% newShare=44% oldTop=yes newTop=yes mutual=yes leader=same officers=2 coa=no exact=no
+- current=Legion Z status=ready old=GenerationZ relation=migration edge class=migration matched=20 oldShare=49% newShare=32% oldTop=yes newTop=no mutual=no leader=different officers=4 coa=yes exact=no
+Target distinction: GenerationZ should remain migration unless it also meets the strict structural rename gate; direct evidence from Die Legion must outrank larger unrelated member movement.
+
+## K. Large Migration-Only Relations
+- ThunderStorm -> Die Legion: matched=11 oldShare=35% newShare=61% mutual=yes exact=no coa=no leader=different families=Member Structure
+
+## L. Evidence Family Audit
+Plausible candidates with 2+ independent families: 0
+Strong/anchored candidates with only 1 family: 0
+
+## M. Variant Summary
+Variant A: simulated ready=2/2 -> Die Legion:Die Legion, M d I:M d I
+Variant B: simulated ready=1/2 -> Die Legion:Die Legion
+Variant C: simulated ready=0/2 -> none
+Variant D: simulated ready=0/2 -> none
+Variant E: simulated ready=1/2 -> Die Legion:Die Legion
+Ready-control check: all variants are evaluated only on current non-ready guilds here; they do not alter the existing 19 ready records. A production change should still include a full ready-regression assertion.
+
+## N. V3.1 Recommendations
+1. Do not use largest member source as identity. Dead End -> Erben im Wandel remains the guardrail.
+2. Add a relevant-competitor concept before final status: lower-class candidates should not automatically block anchored winners.
+3. Consider upgrading unique exact name + member continuity to strong when there is no same/equal-class competitor.
+4. Consider same CoA + substantial member core as strong rename evidence when no direct-name competitor exists.
+5. Add structural rename as a narrow gate: substantial absolute core, both shares around 30%+, mutual dominance, clear runner-up gap, and no direct identity candidate on the current guild.
+6. Keep Different resolved leader as warning/neutral; it should not cap otherwise strong Guild continuity.
+7. Keep leader continuity positive, but audit leader-only strong candidates against migration false controls before auto-ready.

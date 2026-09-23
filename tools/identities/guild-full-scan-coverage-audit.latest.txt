@@ -1,0 +1,312 @@
+# Guild Full-9-Scan Coverage Audit
+
+Generated: 2026-09-21T20:02:23.006Z
+Scan root: D:/SFDataHub/Guild Analytics/public/scans
+
+## A. Full Scan Inventory
+- files_2026_09_21_19_34_46_651.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\files_2026_09_21_19_34_46_651.json
+  label: 2026-09-19 F28 current
+  snapshot=files_2026_09_21_19_34_46_651.json::1789853514199 timestamp=2026-09-19T21:31:54.199Z servers=F28 players=990 guilds=67 role=current F28
+- files_2026_09_15_18_38_34_197.json (fallback for requested files_2026_09_06_17_12_58_946.json)
+  path: D:\SFDataHub\Guild Analytics\public\scans\files_2026_09_15_18_38_34_197.json
+  label: 2026-09-05 F28 current
+  snapshot=files_2026_09_15_18_38_34_197.json::1788599455210 timestamp=2026-09-05T09:10:55.210Z servers=F28 players=996 guilds=20 role=current F28
+- files_2026_09_15_18_35_12_488.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\files_2026_09_15_18_35_12_488.json
+  label: 2026-04-03 F27/F28 mixed current
+  snapshot=files_2026_09_15_18_35_12_488.json::1775211089955 timestamp=2026-04-03T10:11:29.955Z servers=F28 players=1492 guilds=30 role=current F28
+- serverscan_eu_1_2_3_4_date_31_01_26.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_31_01_26.json
+  label: 2026-01-31 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_31_01_26.json::1769854693890 timestamp=2026-01-31T10:18:13.890Z servers=EU1,EU2,EU3,EU4 players=1993 guilds=43 role=historical
+- serverscan_eu_1_2_3_4_date_2_1_26.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_2_1_26.json
+  label: 2026-01-02 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_2_1_26.json::1767355209395 timestamp=2026-01-02T12:00:09.395Z servers=EU1,EU2,EU3,EU4 players=3177 guilds=161 role=historical
+- serverscan_eu_1_2_3_4_date_5_12_25.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_5_12_25.json
+  label: 2025-12-06 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_5_12_25.json::1765012979276 timestamp=2025-12-06T09:22:59.276Z servers=EU1,EU2,EU3,EU4 players=3163 guilds=164 role=historical
+- serverscan_eu_1_2_3_4_date_1_11_25.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_1_11_25.json
+  label: 2025-11-01 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_1_11_25.json::1762003421934 timestamp=2025-11-01T13:23:41.934Z servers=EU1,EU2,EU3,EU4 players=3168 guilds=160 role=historical
+- serverscan_eu_1_2_3_4_date_7_6_25.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_7_6_25.json
+  label: 2025-06-07 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_7_6_25.json::1749296105522 timestamp=2025-06-07T11:35:05.522Z servers=EU1,EU2,EU3,EU4 players=3283 guilds=168 role=historical
+- serverscan_eu_1_2_3_4_date_1_1_25.json
+  path: D:\SFDataHub\Guild Analytics\public\scans\serverscan_eu_1_2_3_4_date_1_1_25.json
+  label: 2025-01-01 EU1-EU4 historical
+  snapshot=serverscan_eu_1_2_3_4_date_1_1_25.json::1735751589390 timestamp=2025-01-01T17:13:09.390Z servers=EU1,EU2,EU3,EU4 players=3271 guilds=164 role=historical
+
+## B. Browser-vs-Tool Dataset Mismatch
+Browser-style logical snapshots in this audit: 9; physical files: 9.
+Management scope reports 6 historical and 3 F28 post-fusion snapshots because multi-server physical files are classified by contained observations, not by filename count.
+Earlier real-scan tools scanned the whole public scan root and did not pin the newly supplied 19.09 file set; the full browser-like population appears only when the exact physical files above are loaded together.
+
+## C. F27/F28 Mixed Scan
+files_2026_09_15_18_35_12_488.json F27 guild observations=0 F28 guild observations=20
+F27 observations entering F28 current pool=0
+F27 observations entering F28 historical pool=0
+
+## D. Full Current Guild Count
+unique physical current F28 guild IDs=69
+observed in 1 scan=46, observed in 2 scans=8, observed in 3+ scans=15
+
+## E. Full Status Counts
+ready=46, review=16, unresolved=7
+
+## F. Non-Ready Guild Inventory
+- BlackDagger f28_g18118 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=member migrations found, but no continuity evidence candidates=0 migrations=1 assignment=false reserved=false
+- BractwoMroku f28_g17651 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Crafts Army f28_g16298 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Cuddugunnu f28_g2799 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- DIRTY BANDOLEROS f28_g10518 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=member migrations found, but no continuity evidence candidates=0 migrations=1 assignment=false reserved=false
+- Empire f28_g254 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Fenki Kopytne f28_g105 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Glücksbärchies f28_g2400 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=1 assignment=false reserved=false
+- Goldener Apfel f28_g2158 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=1 assignment=false reserved=false
+- Killerblättchen f28_g11933 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Kockák f28_g228 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Krawler Nest f28_g9483 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Lonely Souls f28_g101 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Lost Forest f28_g3551 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- LostShadows f28_g9170 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Makio f28_g18082 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=no plausible identity continuity evidence candidates=0 migrations=0 assignment=false reserved=false
+- Mandalorians f28_g412 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- może kiedyś f28_g18423 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=member migrations found, but no continuity evidence candidates=0 migrations=1 assignment=false reserved=false
+- Nicht aufgeben f28_g18200 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=member migrations found, but no continuity evidence candidates=0 migrations=1 assignment=false reserved=false
+- pomalu cz f28_g3202 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Toss a Coin CZ02 f28_g1762 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false
+- Welt im Wandel f28_g590 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=unresolved reason=member migrations found, but no continuity evidence candidates=0 migrations=2 assignment=false reserved=false
+- Die Legion f28_g11896 observations=1 first=2026-04-03T10:11:29.955Z last=2026-04-03T10:11:29.955Z status=unresolved reason=a historical guild has multiple relevant post-fusion destinations|one or more candidate identities are reserved by other ready assignments candidates=0 migrations=14 assignment=false reserved=false
+
+## G. Single-Candidate Reviews
+total=16
+groups=B exact+unique+high-relative+no-CoA=13, C exact+unique+weak-relative+no-CoA=3
+- BractwoMroku f28_g17651 group=C exact+unique+weak-relative+no-CoA
+  historical=BractwoMroku eu4_g5731 origin=EU4 class=plausible exact=true unique=true base=false sameCoA=false matched=0 oldRoster=1 newRoster=1 oldShare=0% newShare=0% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Crafts Army f28_g16298 group=B exact+unique+high-relative+no-CoA
+  historical=Crafts Army eu4_g3397 origin=EU4 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=12 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Cuddugunnu f28_g2799 group=B exact+unique+high-relative+no-CoA
+  historical=Cuddugunnu eu1_g5287 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=10 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Empire f28_g254 group=B exact+unique+high-relative+no-CoA
+  historical=Empire eu1_g374 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=9 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Fenki Kopytne f28_g105 group=B exact+unique+high-relative+no-CoA
+  historical=Fenki Kopytne eu1_g146 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=2 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Glücksbärchies f28_g2400 group=B exact+unique+high-relative+no-CoA
+  historical=Glücksbärchies eu1_g4433 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=7 newRoster=2 oldShare=100% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Goldener Apfel f28_g2158 group=C exact+unique+weak-relative+no-CoA
+  historical=Goldener Apfel eu1_g3982 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=0 oldRoster=1 newRoster=1 oldShare=0% newShare=0% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Killerblättchen f28_g11933 group=B exact+unique+high-relative+no-CoA
+  historical=Killerblättchen eu3_g4946 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Kockák f28_g228 group=B exact+unique+high-relative+no-CoA
+  historical=Kockák eu1_g333 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Krawler Nest f28_g9483 group=C exact+unique+weak-relative+no-CoA
+  historical=Krawler Nest eu3_g498 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=0 oldRoster=20 newRoster=1 oldShare=0% newShare=0% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Lonely Souls f28_g101 group=B exact+unique+high-relative+no-CoA
+  historical=Lonely Souls eu1_g140 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=13 newRoster=2 oldShare=66.7% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Lost Forest f28_g3551 group=B exact+unique+high-relative+no-CoA
+  historical=Lost Forest eu1_g6621 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=7 newRoster=2 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- LostShadows f28_g9170 group=B exact+unique+high-relative+no-CoA
+  historical=LostShadows eu3_g79 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=31 newRoster=3 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Mandalorians f28_g412 group=B exact+unique+high-relative+no-CoA
+  historical=Mandalorians eu1_g678 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- pomalu cz f28_g3202 group=B exact+unique+high-relative+no-CoA
+  historical=pomalu cz eu1_g6039 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Toss a Coin CZ02 f28_g1762 group=B exact+unique+high-relative+no-CoA
+  historical=Toss a Coin CZ02 eu1_g3270 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+
+## H. Small Guild Analysis
+relative buckets: 0 members=4, 1 member + both shares >=50%=3, 1 member + both shares 100%=12, 1 member + thin shares=3, 2 members=3, 3+ members=40
+- historical size >5: ready=47, review=11
+- historical size 1: ready=2, review=2
+- historical size 2: review=1
+- historical size 3-5: review=2
+Exact+Unique with matched>0 and both shares >=50% by status: ready=34, review=13
+  50Todsünden f28_g9255: status=ready historical=50Todsünden eu3_g184 origin=EU3 class=anchored exact=true unique=true base=false sameCoA=true matched=26 oldRoster=49 newRoster=50 oldShare=92.9% newShare=57.8% leader=same officers=1 core=2 relevantCompetitor=false assignment=false reserved=false
+  ARMIA POLSKA f28_g9772: status=ready historical=ARMIA POLSKA eu3_g975 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=3 oldRoster=19 newRoster=6 oldShare=100% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Asylum f28_g179: status=ready historical=Asylum eu1_g252 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=38 oldRoster=49 newRoster=50 oldShare=84.4% newShare=77.6% leader=same officers=3 core=4 relevantCompetitor=false assignment=false reserved=false
+  Ballers f28_g12128: status=ready historical=Ballers eu3_g5287 origin=EU3 class=anchored exact=true unique=true base=false sameCoA=true matched=34 oldRoster=50 newRoster=50 oldShare=94.4% newShare=69.4% leader=same officers=0 core=1 relevantCompetitor=false assignment=false reserved=false
+  CÉH f28_g9549: status=ready historical=CÉH eu3_g597 origin=EU3 class=anchored exact=true unique=true base=false sameCoA=true matched=7 oldRoster=50 newRoster=10 oldShare=100% newShare=77.8% leader=unavailable officers=2 core=2 relevantCompetitor=false assignment=false reserved=false
+  Crafts Army f28_g16298: status=review historical=Crafts Army eu4_g3397 origin=EU4 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=12 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Cuddugunnu f28_g2799: status=review historical=Cuddugunnu eu1_g5287 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=10 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  CZSK Elite f28_g9207: status=ready historical=CZSK Elite eu3_g126 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=40 oldRoster=50 newRoster=50 oldShare=100% newShare=87% leader=same officers=2 core=3 relevantCompetitor=false assignment=false reserved=false
+  Dead Valley f28_g1661: status=ready historical=Dead Valley eu1_g3090 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=32 oldRoster=50 newRoster=50 oldShare=94.1% newShare=71.1% leader=unavailable officers=3 core=3 relevantCompetitor=false assignment=false reserved=false
+  Der weiße Lotus f28_g10394: status=ready historical=Der weiße Lotus eu3_g2087 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=43 oldRoster=50 newRoster=50 oldShare=91.5% newShare=87.8% leader=same officers=1 core=2 relevantCompetitor=false assignment=false reserved=false
+  Empire f28_g254: status=review historical=Empire eu1_g374 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=9 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  EpicOwnedInkasso f28_g9535: status=ready historical=EpicOwnedInkasso eu3_g577 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=3 oldRoster=48 newRoster=4 oldShare=60% newShare=75% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Evropská Unie f28_g859: status=ready historical=Evropská Unie eu1_g1515 origin=EU1 class=strong exact=true unique=true base=false sameCoA=false matched=4 oldRoster=30 newRoster=4 oldShare=50% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  FASNE MJUTY f28_g9166: status=ready historical=FASNE MJUTY eu3_g72 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=43 oldRoster=50 newRoster=50 oldShare=95.6% newShare=91.5% leader=same officers=3 core=4 relevantCompetitor=false assignment=false reserved=false
+  fearless frenzy f28_g166: status=ready historical=fearless frenzy eu1_g234 origin=EU1 class=strong exact=true unique=true base=false sameCoA=false matched=3 oldRoster=39 newRoster=3 oldShare=50% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Fenki Kopytne f28_g105: status=review historical=Fenki Kopytne eu1_g146 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=2 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Glücksbärchies f28_g2400: status=review historical=Glücksbärchies eu1_g4433 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=7 newRoster=2 oldShare=100% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Hangover f28_g32: status=ready historical=Hangover eu1_g43 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=32 oldRoster=50 newRoster=50 oldShare=84.2% newShare=65.3% leader=same officers=1 core=2 relevantCompetitor=false assignment=false reserved=false
+  IMPERIUM f28_g110: status=ready historical=IMPERIUM eu1_g152 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=33 oldRoster=42 newRoster=50 oldShare=86.8% newShare=71.7% leader=same officers=2 core=3 relevantCompetitor=false assignment=false reserved=false
+  Kampfkekse f28_g14501: status=ready historical=Kampfkekse eu4_g346 origin=EU4 class=anchored exact=true unique=true base=false sameCoA=true matched=31 oldRoster=49 newRoster=49 oldShare=91.2% newShare=68.9% leader=different officers=4 core=6 relevantCompetitor=false assignment=false reserved=false
+  Killerblättchen f28_g11933: status=review historical=Killerblättchen eu3_g4946 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Klan Loki f28_g396: status=ready historical=Klan Loki eu1_g644 origin=EU1 class=strong exact=true unique=true base=false sameCoA=false matched=4 oldRoster=10 newRoster=4 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Kockák f28_g228: status=review historical=Kockák eu1_g333 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Kotlíkov f28_g14561: status=ready historical=Kotlíkov eu4_g460 origin=EU4 class=anchored exact=true unique=true base=false sameCoA=true matched=11 oldRoster=50 newRoster=13 oldShare=73.3% newShare=91.7% leader=same officers=3 core=4 relevantCompetitor=false assignment=false reserved=false
+  Lonely Souls f28_g101: status=review historical=Lonely Souls eu1_g140 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=13 newRoster=2 oldShare=66.7% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Lost Forest f28_g3551: status=review historical=Lost Forest eu1_g6621 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=7 newRoster=2 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  LostShadows f28_g9170: status=review historical=LostShadows eu3_g79 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=31 newRoster=3 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  LOVE DREAMS f28_g5422: status=ready historical=LOVE DREAMS eu2_g2 origin=EU2 class=anchored exact=true unique=true base=false sameCoA=true matched=32 oldRoster=50 newRoster=50 oldShare=94.1% newShare=69.6% leader=unavailable officers=1 core=2 relevantCompetitor=false assignment=false reserved=false
+  Love is Anime f28_g14708: status=ready historical=Love is Anime eu4_g690 origin=EU4 class=strong exact=true unique=true base=false sameCoA=false matched=5 oldRoster=48 newRoster=6 oldShare=100% newShare=100% leader=same officers=3 core=4 relevantCompetitor=false assignment=false reserved=false
+  M d I f28_g2647: status=ready historical=M d I eu1_g5007 origin=EU1 class=strong exact=true unique=true base=false sameCoA=false matched=5 oldRoster=27 newRoster=8 oldShare=71.4% newShare=71.4% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Magic Mushrooms f28_g6: status=ready historical=Magic Mushrooms eu1_g8 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=43 oldRoster=50 newRoster=50 oldShare=97.7% newShare=95.6% leader=same officers=4 core=5 relevantCompetitor=false assignment=false reserved=false
+  Mandalorians f28_g412: status=review historical=Mandalorians eu1_g678 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Marathon Runners f28_g86: status=ready historical=Marathon Runners eu1_g113 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=35 oldRoster=50 newRoster=50 oldShare=97.2% newShare=83.3% leader=different officers=8 core=9 relevantCompetitor=false assignment=false reserved=false
+  Ordnungsamt f28_g5512: status=ready historical=Ordnungsamt eu2_g117 origin=EU2 class=strong exact=true unique=true base=false sameCoA=true matched=1 oldRoster=50 newRoster=3 oldShare=50% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Planschbecken f28_g17061: status=ready historical=Planschbecken eu4_g4673 origin=EU4 class=strong exact=true unique=true base=false sameCoA=true matched=1 oldRoster=13 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=1 relevantCompetitor=false assignment=false reserved=false
+  Poena Capitis f28_g22: status=ready historical=Poena Capitis eu1_g29 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=33 oldRoster=50 newRoster=50 oldShare=75% newShare=70.2% leader=same officers=1 core=2 relevantCompetitor=false assignment=false reserved=false
+  pomalu cz f28_g3202: status=review historical=pomalu cz eu1_g6039 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Power Bangers f28_g5541: status=ready historical=Power Bangers eu2_g153 origin=EU2 class=anchored exact=true unique=true base=false sameCoA=true matched=6 oldRoster=50 newRoster=12 oldShare=66.7% newShare=54.5% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Rebirth f28_g5439: status=ready historical=Rebirth eu2_g20 origin=EU2 class=anchored exact=true unique=true base=false sameCoA=true matched=28 oldRoster=50 newRoster=50 oldShare=73.7% newShare=60.9% leader=unavailable officers=2 core=3 relevantCompetitor=false assignment=false reserved=false
+  Růženky f28_g9698: status=ready historical=Růženky eu3_g848 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=32 oldRoster=49 newRoster=50 oldShare=100% newShare=66.7% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Strohhutpiraten f28_g190: status=ready historical=Strohhutpiraten eu1_g270 origin=EU1 class=strong exact=true unique=true base=false sameCoA=false matched=8 oldRoster=27 newRoster=9 oldShare=80% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  TaylorGang f28_g15532: status=ready historical=TaylorGang eu4_g2147 origin=EU4 class=strong exact=true unique=true base=false sameCoA=true matched=1 oldRoster=16 newRoster=1 oldShare=50% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  TeufelsBrut f28_g138: status=ready historical=TeufelsBrut eu1_g192 origin=EU1 class=anchored exact=true unique=true base=false sameCoA=true matched=13 oldRoster=50 newRoster=13 oldShare=86.7% newShare=100% leader=unavailable officers=3 core=3 relevantCompetitor=false assignment=false reserved=false
+  Toss a Coin CZ02 f28_g1762: status=review historical=Toss a Coin CZ02 eu1_g3270 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Váňovci f28_g11497: status=ready historical=Váňovci eu3_g4136 origin=EU3 class=strong exact=true unique=true base=false sameCoA=false matched=5 oldRoster=35 newRoster=5 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Without Mercy f28_g14331: status=ready historical=Without Mercy eu4_g99 origin=EU4 class=anchored exact=true unique=true base=false sameCoA=true matched=10 oldRoster=49 newRoster=13 oldShare=100% newShare=76.9% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+  Los Kneipos f28_g5741: status=ready historical=Los Kneipos eu2_g469 origin=EU2 class=anchored exact=true unique=true base=false sameCoA=true matched=43 oldRoster=50 newRoster=50 oldShare=93.5% newShare=93.5% leader=same officers=4 core=5 relevantCompetitor=false assignment=false reserved=false
+
+## I. Browser Example Profiles
+- Ordnungsamt: Ordnungsamt f28_g5512 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=ready reason=single strong historical guild identity after competitor filtering candidates=1 migrations=1 assignment=false reserved=false historical=Ordnungsamt eu2_g117 origin=EU2 class=strong exact=true unique=true base=false sameCoA=true matched=1 oldRoster=50 newRoster=3 oldShare=50% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Crafts Army: Crafts Army f28_g16298 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Crafts Army eu4_g3397 origin=EU4 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=12 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Mandalorians: Mandalorians f28_g412 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Mandalorians eu1_g678 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Empire: Empire f28_g254 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Empire eu1_g374 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=9 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Fenki Kopytne: Fenki Kopytne f28_g105 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Fenki Kopytne eu1_g146 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=2 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Glücksbärchies: Glücksbärchies f28_g2400 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=1 assignment=false reserved=false historical=Glücksbärchies eu1_g4433 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=7 newRoster=2 oldShare=100% newShare=50% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Goldener Apfel: Goldener Apfel f28_g2158 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=1 assignment=false reserved=false historical=Goldener Apfel eu1_g3982 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=0 oldRoster=1 newRoster=1 oldShare=0% newShare=0% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Killerblättchen: Killerblättchen f28_g11933 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Killerblättchen eu3_g4946 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Kocák: missing in loaded 9-file dataset
+- Koc: Kockák f28_g228 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Kockák eu1_g333 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=8 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Krawler Nest: Krawler Nest f28_g9483 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Krawler Nest eu3_g498 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=0 oldRoster=20 newRoster=1 oldShare=0% newShare=0% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Lonely Souls: Lonely Souls f28_g101 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Lonely Souls eu1_g140 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=13 newRoster=2 oldShare=66.7% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Lost Forest: Lost Forest f28_g3551 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Lost Forest eu1_g6621 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=2 oldRoster=7 newRoster=2 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- LostShadows: LostShadows f28_g9170 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=LostShadows eu3_g79 origin=EU3 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=31 newRoster=3 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- pomalu cz: pomalu cz f28_g3202 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=pomalu cz eu1_g6039 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- TaylorGang: TaylorGang f28_g15532 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=ready reason=single strong historical guild identity after competitor filtering candidates=1 migrations=0 assignment=false reserved=false historical=TaylorGang eu4_g2147 origin=EU4 class=strong exact=true unique=true base=false sameCoA=true matched=1 oldRoster=16 newRoster=1 oldShare=50% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- Toss a Coin CZ02: Toss a Coin CZ02 f28_g1762 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=review reason=historical guild identity found, but direct continuity is insufficient for automatic linking candidates=1 migrations=0 assignment=false reserved=false historical=Toss a Coin CZ02 eu1_g3270 origin=EU1 class=plausible exact=true unique=true base=false sameCoA=false matched=1 oldRoster=3 newRoster=1 oldShare=100% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+- WollMilchSäue: WollMilchSäue f28_g8267 observations=1 first=2026-09-19T21:31:54.199Z last=2026-09-19T21:31:54.199Z status=ready reason=single strong historical guild identity after competitor filtering candidates=1 migrations=0 assignment=false reserved=false historical=WollMilchSäue eu2_g5616 origin=EU2 class=strong exact=true unique=true base=false sameCoA=true matched=2 oldRoster=49 newRoster=2 oldShare=28.6% newShare=100% leader=unavailable officers=0 core=0 relevantCompetitor=false assignment=false reserved=false
+
+## J. Exact Name Collision
+- 50Todsünden f28_g9255 -> 50Todsünden eu3_g184: exactHistoricalEntities=1 uniqueExactName=true
+- ARMIA POLSKA f28_g9772 -> ARMIA POLSKA eu3_g975: exactHistoricalEntities=1 uniqueExactName=true
+- Asylum f28_g179 -> Asylum eu1_g252: exactHistoricalEntities=1 uniqueExactName=true
+- Ballers f28_g12128 -> Ballers eu3_g5287: exactHistoricalEntities=1 uniqueExactName=true
+- BractwoMroku f28_g17651 -> BractwoMroku eu4_g5731: exactHistoricalEntities=1 uniqueExactName=true
+- CÉH f28_g9549 -> CÉH eu3_g597: exactHistoricalEntities=1 uniqueExactName=true
+- Crafts Army f28_g16298 -> Crafts Army eu4_g3397: exactHistoricalEntities=1 uniqueExactName=true
+- Cuddugunnu f28_g2799 -> Cuddugunnu eu1_g5287: exactHistoricalEntities=1 uniqueExactName=true
+- CZSK Elite f28_g9207 -> CZSK Elite eu3_g126: exactHistoricalEntities=1 uniqueExactName=true
+- Dead Valley f28_g1661 -> Dead Valley eu1_g3090: exactHistoricalEntities=1 uniqueExactName=true
+- Der weiße Lotus f28_g10394 -> Der weiße Lotus eu3_g2087: exactHistoricalEntities=1 uniqueExactName=true
+- Empire f28_g254 -> Empire eu1_g374: exactHistoricalEntities=1 uniqueExactName=true
+- EpicOwnedInkasso f28_g9535 -> EpicOwnedInkasso eu3_g577: exactHistoricalEntities=1 uniqueExactName=true
+- Evropská Unie f28_g859 -> Evropská Unie eu1_g1515: exactHistoricalEntities=1 uniqueExactName=true
+- EXODIA f28_g14 -> EXODIA eu1_g20: exactHistoricalEntities=1 uniqueExactName=true
+- FASNE MJUTY f28_g9166 -> FASNE MJUTY eu3_g72: exactHistoricalEntities=1 uniqueExactName=true
+- fearless frenzy f28_g166 -> fearless frenzy eu1_g234: exactHistoricalEntities=1 uniqueExactName=true
+- Fenki Kopytne f28_g105 -> Fenki Kopytne eu1_g146: exactHistoricalEntities=1 uniqueExactName=true
+- Glücksbärchies f28_g2400 -> Glücksbärchies eu1_g4433: exactHistoricalEntities=1 uniqueExactName=true
+- Goldener Apfel f28_g2158 -> Goldener Apfel eu1_g3982: exactHistoricalEntities=1 uniqueExactName=true
+- Hangover f28_g32 -> Hangover eu1_g43: exactHistoricalEntities=1 uniqueExactName=true
+- Hungarian Knight f28_g14269 -> Hungarian Knight eu4_g18: exactHistoricalEntities=1 uniqueExactName=true
+- IMPERIUM f28_g110 -> IMPERIUM eu1_g152: exactHistoricalEntities=1 uniqueExactName=true
+- Kampfkekse f28_g14501 -> Kampfkekse eu4_g346: exactHistoricalEntities=1 uniqueExactName=true
+- Killerblättchen f28_g11933 -> Killerblättchen eu3_g4946: exactHistoricalEntities=1 uniqueExactName=true
+- Klan Loki f28_g396 -> Klan Loki eu1_g644: exactHistoricalEntities=1 uniqueExactName=true
+- Kockák f28_g228 -> Kockák eu1_g333: exactHistoricalEntities=1 uniqueExactName=true
+- Kotlíkov f28_g14561 -> Kotlíkov eu4_g460: exactHistoricalEntities=1 uniqueExactName=true
+- Krawler Nest f28_g9483 -> Krawler Nest eu3_g498: exactHistoricalEntities=1 uniqueExactName=true
+- Lonely Souls f28_g101 -> Lonely Souls eu1_g140: exactHistoricalEntities=1 uniqueExactName=true
+- Lost Forest f28_g3551 -> Lost Forest eu1_g6621: exactHistoricalEntities=1 uniqueExactName=true
+- LostShadows f28_g9170 -> LostShadows eu3_g79: exactHistoricalEntities=1 uniqueExactName=true
+- LOVE DREAMS f28_g5422 -> LOVE DREAMS eu2_g2: exactHistoricalEntities=1 uniqueExactName=true
+- Love is Anime f28_g14708 -> Love is Anime eu4_g690: exactHistoricalEntities=1 uniqueExactName=true
+- M d I f28_g2647 -> M d I eu1_g5007: exactHistoricalEntities=1 uniqueExactName=true
+- Magic Mushrooms f28_g6 -> Magic Mushrooms eu1_g8: exactHistoricalEntities=1 uniqueExactName=true
+- Mandalorians f28_g412 -> Mandalorians eu1_g678: exactHistoricalEntities=1 uniqueExactName=true
+- Marathon Runners f28_g86 -> Marathon Runners eu1_g113: exactHistoricalEntities=1 uniqueExactName=true
+- Ordnungsamt f28_g5512 -> Ordnungsamt eu2_g117: exactHistoricalEntities=1 uniqueExactName=true
+- Planschbecken f28_g17061 -> Planschbecken eu4_g4673: exactHistoricalEntities=1 uniqueExactName=true
+- Poena Capitis f28_g22 -> Poena Capitis eu1_g29: exactHistoricalEntities=1 uniqueExactName=true
+- POHODA f28_g6422 -> POHODA eu2_g1798: exactHistoricalEntities=1 uniqueExactName=true
+- pomalu cz f28_g3202 -> pomalu cz eu1_g6039: exactHistoricalEntities=1 uniqueExactName=true
+- Power Bangers f28_g5541 -> Power Bangers eu2_g153: exactHistoricalEntities=1 uniqueExactName=true
+- Przymierze f28_g586 -> Przymierze eu1_g1024: exactHistoricalEntities=1 uniqueExactName=true
+- Rebirth f28_g5439 -> Rebirth eu2_g20: exactHistoricalEntities=1 uniqueExactName=true
+- Růženky f28_g9698 -> Růženky eu3_g848: exactHistoricalEntities=1 uniqueExactName=true
+- Strohhutpiraten f28_g190 -> Strohhutpiraten eu1_g270: exactHistoricalEntities=1 uniqueExactName=true
+- TaylorGang f28_g15532 -> TaylorGang eu4_g2147: exactHistoricalEntities=1 uniqueExactName=true
+- TeufelsBrut f28_g138 -> TeufelsBrut eu1_g192: exactHistoricalEntities=1 uniqueExactName=true
+- The Void f28_g5452 -> The Void eu2_g39: exactHistoricalEntities=1 uniqueExactName=true
+- Toss a Coin CZ02 f28_g1762 -> Toss a Coin CZ02 eu1_g3270: exactHistoricalEntities=1 uniqueExactName=true
+- Váňovci f28_g11497 -> Váňovci eu3_g4136: exactHistoricalEntities=1 uniqueExactName=true
+- Welten im Wandel f28_g9108 -> Welten im Wandel eu3_g1: exactHistoricalEntities=3 uniqueExactName=false
+- Welten im Wandel f28_g9108 -> Welten im Wandel eu1_g1033: exactHistoricalEntities=3 uniqueExactName=false
+- Without Mercy f28_g14331 -> Without Mercy eu4_g99: exactHistoricalEntities=1 uniqueExactName=true
+- WollMilchSäue f28_g8267 -> WollMilchSäue eu2_g5616: exactHistoricalEntities=1 uniqueExactName=true
+- Los Kneipos f28_g5741 -> Los Kneipos eu2_g469: exactHistoricalEntities=1 uniqueExactName=true
+
+## K. CoA Availability
+CoA unavailable=33, sameCoA available true=28, sameCoA different=4
+
+## L. Physical Dedupe
+final duplicate identity candidate physical pairs=0
+final duplicate migration physical pairs=0
+raw cross-snapshot duplicate identity pair occurrences=25
+raw cross-snapshot duplicate migration pair occurrences=157
+Final UI/management relations are deduped; raw cross-snapshot duplicates are expected before current observation aggregation.
+
+## M. Current/Historical Observation Aggregation
+current F28 guild observations=107; unique current guild items=69
+historical guild observations=860; unique historical physical guild IDs=227
+Management groups current observations by physical guild identifier and resolver histories group historical observations by physical guild identifier; repeated observations do not become multiple final cards.
+
+## N. V3.3 Simulations
+- Variant A: Complete Small-Roster Continuity: Exact + Unique + 100%/100% + matched > 0
+  simulated ready=57 review=5 unresolved=7
+  promoted=Crafts Army(f28_g16298), Cuddugunnu(f28_g2799), Empire(f28_g254), Fenki Kopytne(f28_g105), Killerblättchen(f28_g11933), Kockák(f28_g228), Lost Forest(f28_g3551), LostShadows(f28_g9170), Mandalorians(f28_g412), pomalu cz(f28_g3202), Toss a Coin CZ02(f28_g1762)
+- Variant B: Near-complete Small-Roster Continuity: Exact + Unique + both shares >=75%
+  simulated ready=57 review=5 unresolved=7
+  promoted=Crafts Army(f28_g16298), Cuddugunnu(f28_g2799), Empire(f28_g254), Fenki Kopytne(f28_g105), Killerblättchen(f28_g11933), Kockák(f28_g228), Lost Forest(f28_g3551), LostShadows(f28_g9170), Mandalorians(f28_g412), pomalu cz(f28_g3202), Toss a Coin CZ02(f28_g1762)
+- Variant C: Relative Continuity replaces absolute >=3 for small cores: Exact + Unique + both shares >=50%
+  simulated ready=59 review=3 unresolved=7
+  promoted=Crafts Army(f28_g16298), Cuddugunnu(f28_g2799), Empire(f28_g254), Fenki Kopytne(f28_g105), Glücksbärchies(f28_g2400), Killerblättchen(f28_g11933), Kockák(f28_g228), Lonely Souls(f28_g101), Lost Forest(f28_g3551), LostShadows(f28_g9170), Mandalorians(f28_g412), pomalu cz(f28_g3202), Toss a Coin CZ02(f28_g1762)
+- Variant D: Exact + Unique without member core remains plausible
+  simulated ready=46 review=16 unresolved=7
+  promoted=none
+- Variant E: Full roster but name collision does not promote
+  simulated ready=46 review=16 unresolved=7
+  promoted=none
+
+## O. False Positive Controls
+- Die Legion -> Legion Z eu3_g4877->f28_g15060: exact=false unique=false matched=19 oldShare=61.3% newShare=41.3% class=strong auto=true
+GenerationZ negative control is not promoted by relative Exact+Unique simulations because it is not an exact unique direct-name relation to Legion Z.
+
+## P. Existing Ground Truth
+- Erben im Wandel: f28_g14265 status=ready ready=eu4_g14 candidates=1
+- Seelen im Wandel: f28_g62 status=ready ready=eu1_g83 candidates=1
+- Marathon Runners: f28_g86 status=ready ready=eu1_g113 candidates=2
+- Welten im Wandel: f28_g9108 status=ready ready=eu3_g1 candidates=2
+- Sladký domov: missing
+- Legion Z: f28_g15060 status=ready ready=eu3_g4877 candidates=1
+- M d I: f28_g2647 status=ready ready=eu1_g5007 candidates=1
+- Die Legion: f28_g11896 status=unresolved ready=none candidates=0
+
+## Q. Recommended Final Guild Rules
+1. Exact + Unique + 100%/100% roster continuity with matched > 0 should be eligible for `strong`, provided there is no name collision, assignment conflict, or relevant competitor.
+2. A single matched player should count as a complete member core only when it explains 100% of both the latest historical roster and the current roster; otherwise it remains supporting evidence.
+3. For 2-3 member guilds, use relative bidirectional continuity as an alternative to absolute >=3: require Exact + Unique plus high oldShare and newShare. The full-dataset simulation suggests >=75% is the conservative near-complete threshold; >=50% is a broader candidate that should be reviewed before implementation.
+4. Same CoA remains an independent direct-evidence family. When CoA is present and same, V3.2 already handles small 1-member cores; when CoA is missing/unavailable, complete relative roster continuity can substitute as member evidence, not as CoA evidence.
+5. Correct remaining reviews are assignment conflicts, exact-name collisions, exact-only with no member core, and genuinely competitive multi-candidate cases.
+
+## R. Simulated Final Status
+Recommended conservative Variant A final: ready=57 review=5 unresolved=7
+Promotions: Crafts Army f28_g16298, Cuddugunnu f28_g2799, Empire f28_g254, Fenki Kopytne f28_g105, Killerblättchen f28_g11933, Kockák f28_g228, Lost Forest f28_g3551, LostShadows f28_g9170, Mandalorians f28_g412, pomalu cz f28_g3202, Toss a Coin CZ02 f28_g1762

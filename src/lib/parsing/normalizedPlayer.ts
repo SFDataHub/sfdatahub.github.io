@@ -7,6 +7,8 @@ import {
   readSfSaveNumber,
   type SfPlayerSaveLayout,
 } from "./playerSaveLayout";
+import { extractPortraitFromSaveArrayWithLayout } from "./portraitSaveLayout";
+import type { SfJsonPortrait } from "./types";
 import { normalizeSfPlayerItems, type NormalizedPlayerItems } from "./normalizedItem";
 import {
   normalizeSfPlayerPets,
@@ -53,6 +55,19 @@ export type NormalizedPlayerGuildReference = {
   server: string | null;
 };
 
+export type NormalizedPlayerPortraitUnavailable = {
+  status: "rosterOnly" | "unsupported" | "missing" | "invalid";
+  layout: SfPlayerSaveLayout;
+  appearance: null;
+  frame: {
+    status: "unsupported" | "missing";
+    frameId: null;
+  };
+  metadata: {
+    reason: string;
+  };
+};
+
 export type NormalizedPlayer = {
   identity: {
     id: number | null;
@@ -66,6 +81,7 @@ export type NormalizedPlayer = {
     own: boolean;
   };
   guild: NormalizedPlayerGuildReference;
+  portrait: SfJsonPortrait | NormalizedPlayerPortraitUnavailable;
   progression: {
     level: number | null;
     xp: number | null;
@@ -261,7 +277,9 @@ const markStringField = (
 
 const genderFromByte = (value: number | null): "male" | "female" | null => {
   if (value == null) return null;
-  return value === 1 || value === 2 ? "female" : "male";
+  if (value === 1) return "male";
+  if (value === 2) return "female";
+  return null;
 };
 
 const progressionIndexesByLayout: Record<
@@ -342,6 +360,21 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
   const race = indexes ? readField(saveArray, indexes.race, "identity.race", fields, lowerShortReader) : null;
   const genderByte = indexes ? readField(saveArray, indexes.gender, "identity.gender", fields, { read: readSfSaveByte }) : null;
   const gender = genderFromByte(genderByte);
+  const portrait =
+    saveArray && layout !== "unknown"
+      ? extractPortraitFromSaveArrayWithLayout(saveArray as number[], layout)
+      : {
+          status: saveArray ? "unsupported" : "rosterOnly",
+          layout,
+          appearance: null,
+          frame: {
+            status: "unsupported",
+            frameId: null,
+          },
+          metadata: {
+            reason: saveArray ? "unsupported-layout" : "no-full-player-save",
+          },
+        } satisfies NormalizedPlayerPortraitUnavailable;
 
   const progressionIndexes = layout === "unknown" ? null : progressionIndexesByLayout[layout];
   const progression = {
@@ -428,6 +461,7 @@ export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlaye
       name: guildName,
       server: guildServer,
     },
+    portrait,
     progression,
     attributes,
     combat,

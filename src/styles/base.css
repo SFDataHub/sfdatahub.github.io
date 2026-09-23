@@ -10,6 +10,10 @@
   --sidebar-total-w: var(--sidebar-w);
   /* Globaler Zusatzabstand unten für alle Seiten (klein, auch ohne Footer) */
   --content-bottom-pad: 24px; /* Desktop-Default */
+  --app-topbar-h: var(--topbar-h, 90px);
+  --app-overlay-top: var(--app-topbar-h);
+  --app-overlay-inset: var(--app-overlay-top) 0 0 0;
+  --app-overlay-padding: 16px;
 }
 
 /* Logo-Dock über Topbar, transparent, nur Positionierung */
@@ -152,8 +156,12 @@ body::-webkit-scrollbar{
   background: rgba(120, 168, 226, 0.72);
 }
 
-/* Höhe der globalen Topbar (für die Shell-Höhe) */
-#app-shell { --app-topbar-h: 72px; }
+/* Höhe der globalen Topbar und daraus abgeleitete Overlay-Safe-Area */
+#app-shell {
+  --app-topbar-h: var(--topbar-h, 90px);
+  --app-overlay-top: var(--app-topbar-h);
+  --app-overlay-inset: var(--app-overlay-top) 0 0 0;
+}
 
 /* Responsive: noch etwas kompakter unten auf kleinen Screens */
 @media (max-width: 768px){

@@ -1,20 +1,24 @@
 .backdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--app-overlay-padding, 16px);
   overflow-y: auto;
   background: rgba(3, 10, 18, 0.76);
   backdrop-filter: blur(8px);
+  box-sizing: border-box;
 }
 
 .panel {
   position: relative;
   width: min(980px, calc(100vw - 32px));
-  height: min(760px, calc(100dvh - 32px));
+  height: min(
+    760px,
+    calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px)
+  );
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -805,7 +809,10 @@
 .detailsPanel {
   position: relative;
   width: min(1080px, calc(100vw - 32px));
-  height: min(820px, calc(100dvh - 32px));
+  height: min(
+    820px,
+    calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px)
+  );
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1299,13 +1306,13 @@
 
   .panel {
     width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
+    height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 16px);
     border-radius: 14px;
   }
 
   .detailsPanel {
     width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
+    height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 16px);
     border-radius: 14px;
   }
 
@@ -1367,13 +1374,13 @@
 
   .panel {
     width: calc(100vw - 12px);
-    height: calc(100dvh - 12px);
+    height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 12px);
     border-radius: 12px;
   }
 
   .detailsPanel {
     width: calc(100vw - 12px);
-    height: calc(100dvh - 12px);
+    height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 12px);
     border-radius: 12px;
   }
 

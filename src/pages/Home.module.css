@@ -400,8 +400,8 @@
 .liveDescription { grid-column: 1 / -1; font-size: 12px; color: #B0C4D9; line-height: 1.35; }
 
 /* ---------- Modal (Schedule) ---------- */
-.modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; z-index: 1000; }
-.modal { width: min(100vw - 32px, 980px); max-height: 80vh; overflow: auto; background: #1A2F4A; border: 1px solid #2B4C73; border-radius: 16px; }
+.modalOverlay { position: fixed; inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0); background: rgba(0,0,0,0.5); display: grid; place-items: center; z-index: 1000; box-sizing: border-box; }
+.modal { width: min(100vw - 32px, 980px); max-height: min(80vh, calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px)); overflow: auto; background: #1A2F4A; border: 1px solid #2B4C73; border-radius: 16px; }
 .modalHeader { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #2B4C73; }
 .modalTitle { font-weight: 600; color: #F5F9FF; }
 .closeBtn { background: #254364; color: #E7F1FF; border: 1px solid #2B4C73; border-radius: 8px; padding: 6px 10px; }

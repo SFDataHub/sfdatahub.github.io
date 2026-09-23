@@ -619,8 +619,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let response = await fetch(SESSION_ENDPOINT, {
         credentials: "include",
       });
-      if (response.status === 401 && allowRefreshRetry) {
-        const refreshed = await refreshSessionCookie();
+      let didAttemptRefresh = false;
+      const tryRefreshSession = async () => {
+        if (!allowRefreshRetry || didAttemptRefresh) return false;
+        didAttemptRefresh = true;
+        return refreshSessionCookie();
+      };
+
+      if (response.status === 401) {
+        const refreshed = await tryRefreshSession();
         if (refreshed) {
           response = await fetch(SESSION_ENDPOINT, {
             credentials: "include",
@@ -632,7 +639,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(`Failed to fetch session (${response.status})`);
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      if (!(data?.authenticated && data.user)) {
+        const refreshed = await tryRefreshSession();
+        if (refreshed) {
+          response = await fetch(SESSION_ENDPOINT, {
+            credentials: "include",
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to fetch session (${response.status})`);
+          }
+          data = await response.json();
+        }
+      }
       handleSessionResponse(data);
       return !!(data?.authenticated && data.user);
     } catch (error) {

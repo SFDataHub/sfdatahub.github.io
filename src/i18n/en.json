@@ -1207,7 +1207,7 @@
       "freshnessLabel": "Data freshness",
       "freshnessBody": "Data is refreshed regularly. You will see the exact scan time directly inside top lists and profiles."
     },
-        "dataFreshness": {
+    "dataFreshness": {
       "title": "How up to date is the data?",
       "body": "SFDataHub relies on community scans. Some servers (for example many EU servers) are scanned roughly once per month by us and a few helpers – depending on our free time. Other servers (for example fusion servers) are scanned by other community projects and may have longer gaps between scans.\n\nThis means there can be several weeks or even months between two scans. You can always see the exact data age from the \"Last scan: …\" hint in top lists and profiles.\n\nIf you want your own profile to be more up to date, you can link your SFDataHub account and upload your own scans. That way you keep your profile fresh and help the overall database stay more current for the whole community."
     },
@@ -1447,6 +1447,290 @@
       "necromancer": "Necromancer",
       "paladin": "Paladin",
       "plague-doctor": "Plague Doctor"
+    }
+  },
+  "fusionIdentity": {
+    "memberSelection": {
+      "reviewCount": "{{count}} review",
+      "showReviewMembers": "Show {{count}} {{guildName}} members that need review",
+      "selectedMembers": "Selected members",
+      "contextReview": "{{count}} review members from {{guildName}}",
+      "removeMember": "Remove {{name}} from selected members",
+      "clearSelection": "Clear"
+    },
+    "evidenceHelp": {
+      "ranks": {
+        "identityAnchor": {
+          "title": "Anchored evidence",
+          "description": "A direct identity anchor. This is the strongest kind of positive signal, but it is still checked against contradictions and assignment conflicts."
+        },
+        "strongSupport": {
+          "title": "Strong support",
+          "description": "A reliable signal that strongly supports the candidate, especially when it is independent from other evidence."
+        },
+        "support": {
+          "title": "Plausible support",
+          "description": "A useful positive signal. It can support a match, but usually needs other evidence around it."
+        },
+        "weakSupport": {
+          "title": "Weak support",
+          "description": "Compatible evidence that is too thin, generic or low coverage to carry a match by itself."
+        },
+        "neutral": {
+          "title": "Neutral context",
+          "description": "Contextual information that does not meaningfully support or reject the candidate on its own."
+        },
+        "warning": {
+          "title": "Warning",
+          "description": "A signal that reduces confidence or needs human attention, without always rejecting the candidate."
+        },
+        "strongContradiction": {
+          "title": "Strong contradiction",
+          "description": "A serious conflict with the candidate. It usually blocks automatic matching unless other logic handles the case explicitly."
+        },
+        "hardContradiction": {
+          "title": "Hard contradiction",
+          "description": "A blocker-level conflict such as incompatible origin, class or impossible progression."
+        }
+      },
+      "classification": {
+        "rejected": {
+          "title": "Rejected candidate",
+          "description": "The candidate conflicts with required identity constraints or was explicitly rejected.",
+          "effect": "It is kept out of automatic linking."
+        },
+        "weak": {
+          "title": "Weak candidate",
+          "description": "The candidate has only light or generic supporting evidence.",
+          "effect": "It can explain why the candidate appears, but normally remains review-only."
+        },
+        "plausible": {
+          "title": "Plausible candidate",
+          "description": "The candidate has a reasonable evidence pattern, but it is not strong enough for a hands-off decision.",
+          "effect": "Useful for review, especially when combined with independent signals."
+        },
+        "strong": {
+          "title": "Strong candidate",
+          "description": "Several meaningful signals point to the same historical identity.",
+          "effect": "Often enough for Ready if the candidate is not contested and coverage is sufficient."
+        },
+        "anchored": {
+          "title": "Anchored candidate",
+          "description": "The candidate has one or more high-value identity anchors.",
+          "effect": "Can become Ready when contradictions, conflicts and coverage checks also pass."
+        }
+      },
+      "player": {
+        "originCompatibility": {
+          "title": "Origin compatibility",
+          "description": "Checks whether the historical and current player origin data can belong to the same identity.",
+          "effect": "Compatible origin is context. Origin mismatch is a hard contradiction."
+        },
+        "classCompatibility": {
+          "title": "Class compatibility",
+          "description": "Compares the player class across historical and current observations.",
+          "effect": "Same class is context. Different class is usually a hard reject."
+        },
+        "levelMonotonicity": {
+          "title": "Level monotonicity",
+          "description": "Checks that level does not move backwards across time.",
+          "effect": "A level drop is strong negative evidence.",
+          "caution": "Missing or sparse scans can make progression harder to judge, but they do not turn a regression into positive evidence."
+        },
+        "levelProgression": {
+          "title": "Level progression",
+          "description": "Judges whether the level gain between scans looks normal, plausible or extreme.",
+          "effect": "Normal progression supports a match; extreme progression can contradict it."
+        },
+        "baseMonotonicity": {
+          "title": "Base stat monotonicity",
+          "description": "Checks that base attributes do not decrease in impossible ways.",
+          "effect": "Stable or increasing stats fit continuity; regressions block or weaken a candidate."
+        },
+        "baseUnchangedStats": {
+          "title": "Unchanged base stats",
+          "description": "Several unchanged base stats create a strong fingerprint for the same player.",
+          "effect": "This is strong support because exact stat stability is hard to reproduce accidentally."
+        },
+        "baseSecondaryStability": {
+          "title": "Secondary base stability",
+          "description": "Unchanged secondary base stats give another fingerprint-style continuity signal.",
+          "effect": "This strengthens a player match when combined with other evidence."
+        },
+        "baseOrdering": {
+          "title": "Base stat ordering",
+          "description": "The relative ordering of base stats stayed consistent.",
+          "effect": "Supports continuity, but is weaker than unchanged exact values."
+        },
+        "fortressContinuity": {
+          "title": "Fortress continuity",
+          "description": "Compares fortress-related state across scans.",
+          "effect": "Continuity can strongly support a player match.",
+          "caution": "A difference may simply be unavailable or non-decisive depending on the data."
+        },
+        "petContinuity": {
+          "title": "Pet continuity",
+          "description": "Compares pet-related progress as a light continuity signal.",
+          "effect": "Helpful context, but generally weak by itself."
+        },
+        "portraitContinuity": {
+          "title": "Portrait continuity",
+          "description": "Compares the normalized player appearance from parsed portrait data.",
+          "effect": "An exact match is usually weak support. It becomes normal support only when all relevant competing candidates have comparable portrait data and exactly one of them matches.",
+          "caution": "Portraits are not percentage confidence, can be changed by players, and different players can share the same appearance. Race, gender, class, frame and horn color are not part of this comparison."
+        },
+        "guildContinuity": {
+          "title": "Guild continuity",
+          "description": "Checks whether the player remains connected to the same resolved guild identity.",
+          "effect": "Supports player continuity, especially alongside direct player evidence."
+        },
+        "exactName": {
+          "title": "Exact name",
+          "description": "The normalized historical and current player names match exactly.",
+          "effect": "A direct identity anchor, unless contradicted by required player properties."
+        },
+        "fusionBaseName": {
+          "title": "Fusion base name",
+          "description": "The current fusion name preserves the historical base name pattern.",
+          "effect": "A strong direct identity anchor for migrated player names."
+        },
+        "assignment": {
+          "title": "Assignment state",
+          "description": "Shows whether this historical identity is already assigned elsewhere.",
+          "effect": "Assignment conflicts prevent unsafe automatic linking."
+        }
+      },
+      "guild": {
+        "exactName": {
+          "title": "Exact guild name",
+          "description": "The normalized historical and current guild names match.",
+          "effect": "Supports the candidate, but common names still need corroboration."
+        },
+        "uniqueExactName": {
+          "title": "Unique exact guild name",
+          "description": "The exact historical guild name points to a unique current candidate in the covered pool.",
+          "effect": "Stronger than a plain exact name because ambiguity is lower."
+        },
+        "fusionBaseName": {
+          "title": "Fusion base guild name",
+          "description": "The current guild name preserves the historical base-name pattern after fusion.",
+          "effect": "Strong support for continuity across the fusion."
+        },
+        "sameCoa": {
+          "title": "Same CoA",
+          "description": "The guild crest data stayed consistent between historical and current observations.",
+          "effect": "A useful independent guild signal.",
+          "caution": "CoA alone is not treated as proof of identity."
+        },
+        "memberFlow": {
+          "title": "Member flow",
+          "description": "Resolved member identities are compared between old and current guilds.",
+          "effect": "High, mutual and dominant flow is one of the strongest guild continuity signals.",
+          "caution": "Matched players count reliable identity matches, not the total roster size."
+        },
+        "structuralRename": {
+          "title": "Structural rename",
+          "description": "Member continuity indicates the guild persisted even though the name changed.",
+          "effect": "Strong support because structure survives a rename."
+        },
+        "leaderContinuity": {
+          "title": "Leader continuity",
+          "description": "Compares the resolved leader identity when leader observations are available.",
+          "effect": "Same resolved leader strongly supports continuity.",
+          "caution": "Unavailable leader continuity is not proof against a match; a different resolved leader needs review."
+        },
+        "officerContinuity": {
+          "title": "Officer continuity",
+          "description": "Compares resolved officer identities across old and current guilds.",
+          "effect": "One continued officer supports a match; multiple officers strengthen it."
+        },
+        "leadershipCore": {
+          "title": "Leadership core",
+          "description": "Looks for a broader pattern of continued leadership identities.",
+          "effect": "Useful independent support for guild continuity."
+        },
+        "guildProgression": {
+          "title": "Guild progression",
+          "description": "Checks whether guild-level progression is compatible across the available scans.",
+          "effect": "Usually a weak support signal because many guilds can progress similarly."
+        },
+        "assignment": {
+          "title": "Assignment conflict",
+          "description": "The historical guild identity is already claimed by another current identity.",
+          "effect": "Prevents automatic linking and leaves the candidate for review."
+        }
+      },
+      "reject": {
+        "hardRejectEffect": "This rejects the player candidate for automatic matching.",
+        "differentClass": {
+          "title": "Different class",
+          "description": "The historical and current player classes do not match."
+        },
+        "levelDrop": {
+          "title": "Level drop",
+          "description": "The current level is lower than a later historical observation would allow."
+        },
+        "levelRegression": {
+          "title": "Level regression",
+          "description": "The level sequence moves backwards across observations."
+        },
+        "levelProgressionExtreme": {
+          "title": "Extreme level progression",
+          "description": "The observed level increase is too large for normal continuity.",
+          "effect": "This strongly contradicts the candidate and usually keeps it out of automatic linking."
+        },
+        "originMismatch": {
+          "title": "Origin mismatch",
+          "description": "The migration origin does not fit the historical identity."
+        },
+        "baseAttributesContradiction": {
+          "title": "Base attributes contradiction",
+          "description": "Base attributes conflict with expected monotonic growth."
+        },
+        "baseStatRegression": {
+          "title": "Base stat regression",
+          "description": "A specific base stat regressed in a way that contradicts player continuity."
+        }
+      },
+      "guideSignals": {
+        "playerExactName": "Player exact name",
+        "playerFusionBaseName": "Player fusion base name",
+        "baseUnchangedStats": "3+ unchanged base stats",
+        "baseSecondaryStability": "2 unchanged secondary base stats",
+        "fortressContinuity": "Fortress continuity",
+        "normalLevelProgression": "Normal level progression",
+        "baseOrdering": "Base-stat ordering stable",
+        "guildContinuity": "Guild continuity",
+        "plausibleLevelBurst": "Plausible level burst",
+        "petContinuity": "Pet continuity",
+        "portraitContinuity": "Portrait continuity",
+        "originCompatible": "Origin compatible",
+        "classCompatible": "Class compatible",
+        "levelNonDecreasing": "Level non-decreasing",
+        "baseNonDecreasing": "Base stats non-decreasing",
+        "fortressDiffers": "Fortress differs",
+        "unusuallyHighLevelProgression": "Unusually high level progression",
+        "classContradiction": "Class contradiction",
+        "levelRegression": "Level regression",
+        "baseRegression": "Base-stat regression",
+        "originMismatch": "Origin mismatch",
+        "guildExactName": "Guild exact name",
+        "uniqueGuildExactName": "Unique exact guild name",
+        "guildFusionBaseName": "Guild fusion base name",
+        "structuralRename": "Structural rename",
+        "mutualDominantMemberFlow": "Mutual dominant member flow",
+        "leaderContinuity": "Leader continuity",
+        "multipleContinuedOfficers": "Multiple continued officers",
+        "sameCoa": "Same CoA",
+        "guildMemberFlow": "Guild member flow",
+        "continuedOfficer": "Continued officer",
+        "leadershipCore": "Leadership core",
+        "smallMemberFlow": "Small member flow",
+        "guildProgression": "Guild progression",
+        "leaderUnavailable": "Leader continuity unavailable",
+        "differentLeader": "Different resolved leader",
+        "guildAssignment": "Assignment conflict"
+      }
     }
   },
   "flipbook": {

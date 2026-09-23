@@ -997,11 +997,12 @@
   align-items: center;
   background: rgba(3, 10, 18, 0.72);
   display: flex;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   justify-content: center;
   padding: 16px;
   position: fixed;
   z-index: 2200;
+  box-sizing: border-box;
 }
 
 .memberDeleteConfirmDialog {
@@ -1247,18 +1248,19 @@
   background: rgba(3, 10, 18, 0.75);
   backdrop-filter: blur(8px);
   display: flex;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   justify-content: center;
   padding: clamp(16px, 5vw, 64px);
   position: fixed;
   z-index: 2000;
+  box-sizing: border-box;
 }
 
 .functionOverlay {
   --function-overlay-x-gap: clamp(16px, 5vw, 64px);
   --function-overlay-y-gap: clamp(16px, 2.5vw, 32px);
   box-sizing: border-box;
-  padding: calc(var(--topbar-h, 0px) + var(--function-overlay-y-gap)) var(--function-overlay-x-gap)
+  padding: var(--function-overlay-y-gap) var(--function-overlay-x-gap)
     var(--function-overlay-y-gap) calc(var(--app-shell-left, 0px) + var(--function-overlay-x-gap));
 }
 
@@ -1273,7 +1275,10 @@
   color: #d5e2ff;
   display: flex;
   flex-direction: column;
-  max-height: min(680px, calc(100vh - 32px));
+  max-height: min(
+    680px,
+    calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px)
+  );
   max-width: 520px;
   min-height: 0;
   overflow: hidden;
@@ -2649,7 +2654,7 @@
 
   .syncOverlay {
     box-sizing: border-box;
-    inset: var(--topbar-h) 0 0 0;
+    inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
     min-height: 0;
     padding: 12px;
   }

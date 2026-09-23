@@ -48,6 +48,10 @@ const setAttributeBlock = (save: unknown[], baseStart: number, bonusStart: numbe
   assert.equal(normalized.identity.class, 3);
   assert.equal(normalized.identity.race, 2);
   assert.equal(normalized.identity.gender, "female");
+  assert.equal(normalized.portrait.status, "available");
+  assert.equal(normalized.portrait.appearance?.classId, normalized.identity.class);
+  assert.equal(normalized.portrait.appearance?.raceId, normalized.identity.race);
+  assert.equal(normalized.portrait.appearance?.gender, normalized.identity.gender);
   assert.equal(normalized.identity.own, true);
   assert.deepEqual(normalized.progression, { level: 412, xp: 1000, xpNext: 2000, honor: 3000, rank: 44 });
   assert.deepEqual(
@@ -89,6 +93,9 @@ const setAttributeBlock = (save: unknown[], baseStart: number, bonusStart: numbe
   assert.equal(normalized.identity.id, 77);
   assert.equal(normalized.identity.class, 5);
   assert.equal(normalized.identity.race, 6);
+  assert.equal(normalized.identity.gender, "male");
+  assert.equal(normalized.portrait.status, "available");
+  assert.equal(normalized.portrait.appearance?.gender, "male");
   assert.equal(normalized.progression.level, 500);
   assert.deepEqual(
     (({ base, bonus, purchased }) => ({ base, bonus, purchased }))(normalized.attributes.luck),
@@ -124,7 +131,9 @@ const setAttributeBlock = (save: unknown[], baseStart: number, bonusStart: numbe
   assert.equal(normalized.metadata.layout, "legacyOther");
   assert.equal(normalized.identity.id, 88);
   assert.equal(normalized.identity.identifier, "s9_p88");
-  assert.equal(normalized.identity.gender, "male");
+  assert.equal(normalized.identity.gender, null);
+  assert.equal(normalized.portrait.status, "available");
+  assert.equal(normalized.portrait.appearance?.gender, null);
   assert.equal(normalized.progression.level, 277);
   assert.deepEqual(
     (({ base, bonus, purchased }) => ({ base, bonus, purchased }))(normalized.attributes.strength),
@@ -161,6 +170,7 @@ const setAttributeBlock = (save: unknown[], baseStart: number, bonusStart: numbe
   const normalized = normalizeSfPlayerCharacterCore({ own: 1, identifier: "s1_p123" });
 
   assert.equal(normalized.metadata.layout, "unknown");
+  assert.equal(normalized.portrait.status, "rosterOnly");
   assert.equal(normalized.identity.id, 123);
   assert.equal(normalized.metadata.fields["identity.id"]?.status, "available");
   assert.equal(normalized.metadata.fields["identity.id"]?.provenance, "derived");

@@ -2,6 +2,10 @@ import { classifyPlayerLevelProgression, type PlayerLevelProgressionEvidence } f
 import { getClassMetaById } from "../../data/classes";
 import { getFusionLevelCompensation } from "../servers/fusionCompensation";
 import { getFusionEvent, getFusionOrigins, resolveServer } from "../servers/serverResolver";
+import {
+  comparePlayerPortraitAppearance,
+  type PlayerPortraitAppearanceSummary,
+} from "./playerPortraitAppearance";
 
 export type PlayerFusionOriginSource =
   | "numeric"
@@ -50,6 +54,7 @@ export type PlayerFusionEvidenceEntryType =
   | "base-ordering"
   | "fortress-continuity"
   | "pet-continuity"
+  | "portrait-continuity"
   | "guild-continuity"
   | "exact-name"
   | "fusion-base-name"
@@ -80,6 +85,7 @@ export type PlayerFusionSemanticSummary = {
   baseAttributes?: PlayerFusionSemanticVector;
   fortress?: PlayerFusionSemanticVector;
   pets?: PlayerFusionSemanticVector;
+  portrait?: PlayerPortraitAppearanceSummary;
 };
 
 export type PlayerFusionEvidence = {
@@ -93,6 +99,8 @@ export type PlayerFusionEvidence = {
   baseFingerprint: PlayerFusionBaseFingerprint;
   fortressContinuity: boolean | null;
   petContinuity: boolean | null;
+  portraitContinuity: boolean | null;
+  portraitDiscriminating: boolean | null;
   levelProgression: PlayerLevelProgressionEvidence;
   entries: PlayerFusionEvidenceEntry[];
 };
@@ -164,6 +172,7 @@ export type PlayerFusionResolverInput = {
   newObservations: PlayerFusionObservation[];
   levelRegressionMode?: PlayerFusionLevelRegressionMode;
   enableLevelProgressionEvidence?: boolean;
+  enablePortraitEvidence?: boolean;
 };
 
 export type PlayerFusionResolverResult = {
@@ -402,6 +411,47 @@ const hasReliableLevel = (observation: PlayerFusionObservation) => {
   return observation.levelAvailability == null || observation.levelAvailability === "available";
 };
 
+export const selectReliableFusionBoundaryObservations = <T extends { timestamp: number }>(input: {
+  historicalObservations: T[];
+  currentObservations: T[];
+  fusionEventTimestamp: number | null;
+  isReliable: (observation: T) => boolean;
+}) => {
+  const fusionEventTimestamp = input.fusionEventTimestamp;
+  const currentByTime = [...input.currentObservations].sort((left, right) => left.timestamp - right.timestamp);
+  const earliestCurrent =
+    fusionEventTimestamp == null
+      ? currentByTime[0] ?? null
+      : currentByTime.find((observation) => observation.timestamp >= fusionEventTimestamp) ?? null;
+  const earliestReliableCurrent =
+    currentByTime.find(
+      (observation) =>
+        input.isReliable(observation) &&
+        (fusionEventTimestamp == null || observation.timestamp >= fusionEventTimestamp),
+    ) ?? null;
+  const boundaryCurrent = earliestReliableCurrent ?? earliestCurrent;
+  const eligibleHistorical = input.historicalObservations.filter((observation) =>
+    fusionEventTimestamp != null
+      ? observation.timestamp < fusionEventTimestamp
+      : boundaryCurrent == null || observation.timestamp < boundaryCurrent.timestamp,
+  );
+  const historicalPool = eligibleHistorical.length ? eligibleHistorical : input.historicalObservations;
+  const latestHistoricalBeforeBoundary =
+    [...historicalPool].sort((left, right) => right.timestamp - left.timestamp)[0] ?? null;
+  const latestReliableHistorical =
+    [...historicalPool]
+      .filter(input.isReliable)
+      .sort((left, right) => right.timestamp - left.timestamp)[0] ?? null;
+
+  return {
+    historicalObservation: latestReliableHistorical,
+    currentObservation: earliestReliableCurrent,
+    fallbackHistoricalObservation: latestReliableHistorical ?? latestHistoricalBeforeBoundary,
+    fallbackCurrentObservation: earliestReliableCurrent ?? earliestCurrent,
+    hasReliableBoundary: Boolean(latestReliableHistorical && earliestReliableCurrent),
+  };
+};
+
 const selectLevelComparison = (
   history: PlayerHistory,
   newHistory: PlayerHistory,
@@ -439,50 +489,49 @@ const selectLevelComparison = (
     };
   }
 
-  const earliestNew =
-    fusionEventTimestamp == null
-      ? earliestObservation(newHistory)
-      : [...newHistory.observations].sort(compareByTimestamp).find((observation) => observation.timestamp >= fusionEventTimestamp) ?? null;
-  const earliestReliableNew =
-    [...newHistory.observations]
-      .sort(compareByTimestamp)
-      .find((observation) => hasReliableLevel(observation) && (fusionEventTimestamp == null || observation.timestamp >= fusionEventTimestamp)) ?? null;
-  const boundaryNew = earliestReliableNew ?? earliestNew;
-  const eligible = history.observations.filter(
-    (observation) =>
-      fusionEventTimestamp != null
-        ? observation.timestamp < fusionEventTimestamp
-        : boundaryNew == null || observation.timestamp < boundaryNew.timestamp,
-  );
-  const latestHistoricalBeforeBoundary = (eligible.length ? eligible : history.observations)
-    .sort((left, right) => right.timestamp - left.timestamp)[0] ?? null;
-  const latestReliableHistorical = [...(eligible.length ? eligible : history.observations)]
-    .filter(hasReliableLevel)
-    .sort((left, right) => right.timestamp - left.timestamp)[0] ?? null;
-
-  const oldLevel = latestReliableHistorical?.level ?? null;
-  const newLevel = earliestReliableNew?.level ?? null;
+  const boundary = selectReliableFusionBoundaryObservations({
+    historicalObservations: history.observations,
+    currentObservations: newHistory.observations,
+    fusionEventTimestamp,
+    isReliable: hasReliableLevel,
+  });
+  const oldLevel = boundary.historicalObservation?.level ?? null;
+  const newLevel = boundary.currentObservation?.level ?? null;
   const levelConsistent = oldLevel != null && newLevel != null ? newLevel >= oldLevel : null;
 
   return {
-    observation: latestReliableHistorical ?? latestHistoricalBeforeBoundary,
-    newObservation: earliestReliableNew ?? earliestNew,
+    observation: boundary.fallbackHistoricalObservation,
+    newObservation: boundary.fallbackCurrentObservation,
     levelConsistent,
-    hasReliableLevelBoundary: Boolean(latestReliableHistorical && earliestReliableNew),
+    hasReliableLevelBoundary: boundary.hasReliableBoundary,
     notes: [] as string[],
   };
 };
 
+type PlayerFusionSemanticVectorField = Exclude<keyof PlayerFusionSemanticSummary, "portrait">;
+
 const findSemanticVector = (
   observations: PlayerFusionObservation[],
-  field: keyof PlayerFusionSemanticSummary,
+  field: PlayerFusionSemanticVectorField,
   direction: "latest" | "earliest",
-) => {
+): PlayerFusionSemanticVector | null => {
   const sorted = direction === "latest" ? sortDescendingByTimestamp(observations) : [...observations].sort(compareByTimestamp);
   return sorted.find((observation) => observation.semantic?.[field]?.availability === "available" && observation.semantic[field]?.values)?.semantic?.[
     field
   ] ?? null;
 };
+
+const hasReliableSemanticVector = (
+  observation: PlayerFusionObservation,
+  field: PlayerFusionSemanticVectorField,
+) =>
+  observation.semantic?.[field]?.availability === "available" &&
+  Boolean(observation.semantic[field]?.values?.length);
+
+const semanticVectorFromObservation = (
+  observation: PlayerFusionObservation | null,
+  field: PlayerFusionSemanticVectorField,
+) => observation?.semantic?.[field] ?? null;
 
 const compareSemanticVector = (
   oldVector: PlayerFusionSemanticVector | null,
@@ -503,6 +552,36 @@ const compareSemanticVector = (
     return oldValue == null || newValue == null || newValue >= oldValue;
   });
 };
+
+const findPortraitSummary = (
+  observations: PlayerFusionObservation[],
+  direction: "latest" | "earliest",
+) => {
+  const sorted =
+    direction === "latest"
+      ? sortDescendingByTimestamp(observations)
+      : [...observations].sort(compareByTimestamp);
+  return (
+    sorted.find(
+      (observation) =>
+        observation.semantic?.portrait?.availability === "available" &&
+        observation.semantic.portrait.fingerprint,
+    )?.semantic?.portrait ?? null
+  );
+};
+
+const portraitEvidenceDetail = (input: {
+  comparison: "exact" | "different";
+  discriminating: boolean;
+  comparableCandidateCount: number;
+  exactMatchCandidateCount: number;
+}) =>
+  [
+    `comparison=${input.comparison}`,
+    `discriminating=${input.discriminating}`,
+    `comparableCandidateCount=${input.comparableCandidateCount}`,
+    `exactMatchCandidateCount=${input.exactMatchCandidateCount}`,
+  ].join(" · ");
 
 const BASE_ATTRIBUTE_LABELS = ["STR", "DEX", "INT", "CON", "LUC"] as const;
 const BASE_ATTRIBUTE_INDEX = {
@@ -589,7 +668,7 @@ const classifyEvidenceEntries = (
   if (strongSupportCount > 0 && (weakLevelProgression || strongContradictionCount > 0)) return "strong";
   if (strongSupportCount > 1) return "strong";
   if (supportCount > 0 || strongSupportCount > 0) return "plausible";
-  if (weakSupportCount > 0) return "plausible";
+  if (weakSupportCount > 1) return "plausible";
   return "weak";
 };
 
@@ -661,11 +740,21 @@ const createCandidate = (
   if (levelProgression.category === "extreme-contradiction") {
     notes.push("compensation-adjusted level progression is unusually high; treated as plausibility evidence");
   }
-  const oldBaseVector = findSemanticVector(history.observations, "baseAttributes", "latest");
-  const newBaseVector = findSemanticVector(newHistory.observations, "baseAttributes", "earliest");
+  const baseBoundary = selectReliableFusionBoundaryObservations({
+    historicalObservations: history.observations,
+    currentObservations: newHistory.observations,
+    fusionEventTimestamp,
+    isReliable: (observation) => hasReliableSemanticVector(observation, "baseAttributes"),
+  });
+  const oldBaseVector = semanticVectorFromObservation(baseBoundary.historicalObservation, "baseAttributes");
+  const newBaseVector = semanticVectorFromObservation(baseBoundary.currentObservation, "baseAttributes");
   const baseAttributesConsistent = compareSemanticVector(oldBaseVector, newBaseVector);
   if (baseAttributesConsistent === false) rejectReasons.push("base-stat-regression");
-  const baseFingerprint = createBaseFingerprint(oldBaseVector, newBaseVector, oldObservation?.classId ?? selected.newObservation?.classId);
+  const baseFingerprint = createBaseFingerprint(
+    oldBaseVector,
+    newBaseVector,
+    baseBoundary.historicalObservation?.classId ?? oldObservation?.classId ?? selected.newObservation?.classId,
+  );
   const fortressContinuity = compareSemanticVector(
     findSemanticVector(history.observations, "fortress", "latest"),
     findSemanticVector(newHistory.observations, "fortress", "earliest"),
@@ -674,6 +763,13 @@ const createCandidate = (
     findSemanticVector(history.observations, "pets", "latest"),
     findSemanticVector(newHistory.observations, "pets", "earliest"),
   );
+  const portraitComparison = comparePlayerPortraitAppearance(
+    findPortraitSummary(history.observations, "latest"),
+    findPortraitSummary(newHistory.observations, "earliest"),
+  );
+  const portraitContinuity = portraitComparison.comparable
+    ? portraitComparison.exact
+    : null;
   const entries: PlayerFusionEvidenceEntry[] = [];
   pushEvidence(entries, {
     type: "origin-compatibility",
@@ -823,6 +919,8 @@ const createCandidate = (
       baseFingerprint,
       fortressContinuity,
       petContinuity,
+      portraitContinuity,
+      portraitDiscriminating: null,
       levelProgression,
       entries,
     },
@@ -869,6 +967,79 @@ const buildReliableHistoricalLookup = (
   };
 };
 
+const isActionableClassification = (
+  classification: PlayerFusionCandidateClassification,
+) =>
+  classification === "plausible" ||
+  classification === "strong" ||
+  classification === "anchored";
+
+const applyPortraitEvidence = (
+  candidates: PlayerFusionCandidate[],
+  enabled: boolean,
+) => {
+  if (!enabled) return candidates;
+
+  const relevantCandidates = candidates.filter(
+    (candidate) =>
+      !candidate.rejected && isActionableClassification(candidate.classification),
+  );
+  const comparableRelevantCandidates = relevantCandidates.filter(
+    (candidate) => candidate.evidence.portraitContinuity != null,
+  );
+  const exactRelevantMatches = comparableRelevantCandidates.filter(
+    (candidate) => candidate.evidence.portraitContinuity === true,
+  );
+  const hasDiscriminatingExactMatch =
+    relevantCandidates.length > 1 &&
+    comparableRelevantCandidates.length === relevantCandidates.length &&
+    exactRelevantMatches.length === 1;
+  const discriminatingIdentifier = hasDiscriminatingExactMatch
+    ? normalizeIdentifierKey(exactRelevantMatches[0]?.oldIdentifier)
+    : null;
+
+  return candidates.map((candidate) => {
+    if (candidate.rejected || candidate.evidence.portraitContinuity == null) {
+      return candidate;
+    }
+
+    const discriminating =
+      candidate.evidence.portraitContinuity === true &&
+      discriminatingIdentifier === normalizeIdentifierKey(candidate.oldIdentifier);
+    const portraitEntry: PlayerFusionEvidenceEntry = {
+      type: "portrait-continuity",
+      strength:
+        candidate.evidence.portraitContinuity === true
+          ? discriminating
+            ? "support"
+            : "weakSupport"
+          : "neutral",
+      availability: "available",
+      label:
+        candidate.evidence.portraitContinuity === true
+          ? "Portrait continuity"
+          : "Portrait differs",
+      detail: portraitEvidenceDetail({
+        comparison:
+          candidate.evidence.portraitContinuity === true ? "exact" : "different",
+        discriminating,
+        comparableCandidateCount: comparableRelevantCandidates.length,
+        exactMatchCandidateCount: exactRelevantMatches.length,
+      }),
+    };
+    const entries = [...candidate.evidence.entries, portraitEntry];
+    return {
+      ...candidate,
+      evidence: {
+        ...candidate.evidence,
+        portraitDiscriminating: discriminating,
+        entries,
+      },
+      classification: classifyEvidenceEntries(entries, candidate.rejectReasons),
+    };
+  });
+};
+
 export const hasPlayerFusionEvidenceStrength = (
   candidate: PlayerFusionCandidate,
   strength: PlayerFusionEvidenceStrength,
@@ -907,8 +1078,7 @@ export const isPlayerFusionStrongIdentityCandidate = (candidate: PlayerFusionCan
   isSemanticReadyCandidate(candidate);
 
 export const isPlayerFusionActionableIdentityCandidate = (candidate: PlayerFusionCandidate) =>
-  !candidate.rejected &&
-  (candidate.classification === "plausible" || candidate.classification === "strong" || candidate.classification === "anchored");
+  !candidate.rejected && isActionableClassification(candidate.classification);
 
 export const isPlayerFusionReadyCandidate = (candidate: PlayerFusionCandidate) =>
   !candidate.rejected && (candidate.classification === "anchored" || candidate.classification === "strong");
@@ -986,6 +1156,7 @@ export const resolvePlayerFusions = (input: PlayerFusionResolverInput): PlayerFu
   const newHistories = buildHistories(input.newObservations);
   const levelRegressionMode = input.levelRegressionMode ?? "strict-boundary";
   const enableLevelProgressionEvidence = input.enableLevelProgressionEvidence ?? true;
+  const enablePortraitEvidence = input.enablePortraitEvidence ?? true;
   const initialResults = newHistories.map((newHistory): PlayerFusionPlayerResult => {
     const latest = latestObservation(newHistory) ?? newHistory.observations[0];
     const origin = resolveOriginsForNewHistory(newHistory);
@@ -994,8 +1165,11 @@ export const resolvePlayerFusions = (input: PlayerFusionResolverInput): PlayerFu
       ? histories.filter((history) => history.server && originServers.has(history.server))
       : [];
     const candidates = applyLevelProgressionCleanup(
-      matchingHistories.map((history) =>
-        createCandidate(history, newHistory, originServers, levelRegressionMode, enableLevelProgressionEvidence),
+      applyPortraitEvidence(
+        matchingHistories.map((history) =>
+          createCandidate(history, newHistory, originServers, levelRegressionMode, enableLevelProgressionEvidence),
+        ),
+        enablePortraitEvidence,
       ),
     );
     const candidatesAfterHardCompatibility = candidates.filter((candidate) => !hasHardCompatibilityRejection(candidate)).length;

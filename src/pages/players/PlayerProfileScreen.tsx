@@ -833,11 +833,14 @@ const buildPortraitConfig = (
   let base: PortraitOptions | undefined;
   const hasInlinePortrait =
     snapshot.portraitConfig && Object.keys(snapshot.portraitConfig).length > 0;
+  const sourceContext = {
+    own: snapshot.values?.own,
+    saveVersion: snapshot.saveVersion,
+  };
 
   if (Array.isArray(snapshot.saveArray) && snapshot.saveArray.length > 0) {
     base = createPortraitOptionsFromSaveArray(snapshot.saveArray, {
-      own: 1,
-      saveVersion: snapshot.saveVersion,
+      ...sourceContext,
       save: snapshot.saveArray,
     });
   } else if (snapshot.saveString) {
@@ -845,8 +848,7 @@ const buildPortraitConfig = (
     base =
       parsed.length > 0
         ? createPortraitOptionsFromSaveArray(parsed, {
-            own: 1,
-            saveVersion: snapshot.saveVersion,
+            ...sourceContext,
             save: parsed,
           })
         : undefined;

@@ -1172,12 +1172,13 @@
 
 .sheetOverlay {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(5, 9, 18, 0.75);
   display: flex;
   justify-content: center;
   align-items: flex-end;
   padding: 16px;
+  box-sizing: border-box;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -1196,7 +1197,7 @@
   background: rgba(10, 18, 34, 0.98);
   border: 1px solid rgba(123, 162, 214, 0.3);
   padding: 20px;
-  max-height: 90vh;
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px);
   overflow-y: auto;
 }
 

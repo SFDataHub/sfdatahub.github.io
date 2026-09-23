@@ -41,7 +41,23 @@ const setCompactPortrait = (
 
 const assertPortraitValues = (
   portrait: SfJsonPortrait,
-  expected: Omit<SfJsonPortrait, "frameId" | "hornColor"> & { frameId?: number; hornColor?: number },
+  expected: Pick<
+    SfJsonPortrait,
+    | "genderName"
+    | "classId"
+    | "raceId"
+    | "mouth"
+    | "hair"
+    | "hairColor"
+    | "brows"
+    | "eyes"
+    | "beard"
+    | "nose"
+    | "ears"
+    | "extra"
+    | "horn"
+    | "special"
+  > & { frameId?: number; hornColor?: number },
 ) => {
   assert.equal(portrait.genderName, expected.genderName);
   assert.equal(portrait.classId, expected.classId);
@@ -62,7 +78,7 @@ const assertPortraitValues = (
 };
 
 const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: PortraitOptions) => {
-  assert.equal(render.genderName, portrait.genderName);
+  assert.equal(render.genderName, portrait.genderName ?? "male");
   assert.equal(render.class, portrait.classId);
   assert.equal(render.race, portrait.raceId);
   assert.equal(render.mouth, portrait.mouth);
@@ -75,7 +91,7 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
   assert.equal(render.ears, portrait.ears);
   assert.equal(render.extra, portrait.extra);
   assert.equal(render.horn, portrait.horn);
-  assert.equal(render.hornColor, portrait.hornColor);
+  if (portrait.appearance.horn.renderable) assert.equal(render.hornColor, portrait.hornColor);
   assert.equal(render.special, portrait.special);
 };
 
@@ -115,9 +131,12 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
     nose: 1,
     ears: 2,
     extra: 8,
-    horn: 1,
+    horn: 0,
     special: 0,
   });
+  assert.deepEqual(portrait.appearance.special2, { raw: 1, style: 1, color: 0 });
+  assert.equal(portrait.appearance.horn.supported, false);
+  assert.equal(portrait.frame.status, "unsupported");
   assertRendererMatchesDecoded(portrait, render);
 
   const parsed = parseSfJson({
@@ -216,9 +235,10 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
     nose: 4,
     ears: 1,
     extra: 6,
-    horn: 7,
+    horn: 0,
     special: 0,
   });
+  assert.equal(portrait.appearance.horn.supported, false);
   assertRendererMatchesDecoded(portrait, render);
 }
 
@@ -255,11 +275,13 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
     nose: 6,
     ears: 4,
     extra: 2,
-    horn: 5,
+    horn: 0,
     special: 0,
     hornColor: 1,
     frameId: 50,
   });
+  assert.equal(portrait.frame.status, "available");
+  assert.equal(portrait.frame.frameId, 50);
   assertRendererMatchesDecoded(portrait, render);
   assert.equal(render.frame, "worldBossFrameGold");
 }
@@ -286,7 +308,7 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
   const portrait = extractPortraitFromSaveArray(save, context);
   const render = createPortraitOptionsFromSaveArray(save, context);
   assertPortraitValues(portrait, {
-    genderName: "male",
+    genderName: null,
     classId: 8,
     raceId: 4,
     mouth: 11,
@@ -298,11 +320,103 @@ const assertRendererMatchesDecoded = (portrait: SfJsonPortrait, render: Portrait
     nose: 5,
     ears: 3,
     extra: 9,
-    horn: 2,
-    hornColor: 4,
+    horn: 0,
     special: 0,
   });
+  assert.equal(portrait.appearance.special2.raw, 202);
+  assert.equal(portrait.appearance.horn.supported, false);
+  assert.equal(portrait.frame.status, "unsupported");
   assertRendererMatchesDecoded(portrait, render);
+
+  const withoutSource = extractPortraitFromSaveArray(save);
+  assert.equal(withoutSource.layout, "legacyOther");
+  assert.equal(withoutSource.mouth, portrait.mouth);
+  assert.equal(withoutSource.hair, portrait.hair);
+}
+
+for (const beardRaw of [99, 199, 299, 399, 499]) {
+  const save = Array.from({ length: 70 }, () => 0);
+  setCompactPortrait(save, {
+    mouth: 1,
+    hairRaw: 401,
+    browsRaw: 302,
+    eyes: 1,
+    beardRaw,
+    nose: 1,
+    ears: 1,
+    extra: 0,
+    hornRaw: 0,
+    special: 0,
+    race: 1,
+    gender: 1,
+    classId: 1,
+  });
+
+  const portrait = extractPortraitFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  const render = createPortraitOptionsFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  assert.equal(portrait.appearance.beard.none, true);
+  assert.equal(portrait.appearance.beard.style, null);
+  assert.equal(portrait.beard, 0);
+  assert.equal(portrait.beardColor, Math.floor(beardRaw / 100));
+  assert.equal(render.beard, 0);
+}
+
+{
+  const save = Array.from({ length: 70 }, () => 0);
+  setCompactPortrait(save, {
+    mouth: 9,
+    hairRaw: 308,
+    browsRaw: 304,
+    eyes: 3,
+    beardRaw: 305,
+    nose: 3,
+    ears: 2,
+    extra: 16,
+    hornRaw: 11,
+    special: -301,
+    race: 8,
+    gender: 1,
+    classId: 6,
+  });
+
+  const portrait = extractPortraitFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  const render = createPortraitOptionsFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  assert.equal(portrait.appearance.horn.supported, true);
+  assert.equal(portrait.appearance.horn.renderable, true);
+  assert.equal(portrait.horn, 11);
+  assert.equal(render.horn, 11);
+  assert.equal(portrait.appearance.specialPortrait.active, true);
+  assert.equal(portrait.appearance.specialPortrait.id, 301);
+  assert.equal(portrait.special, -301);
+  assert.equal(render.special, -301);
+}
+
+{
+  const save = Array.from({ length: 70 }, () => 0);
+  setCompactPortrait(save, {
+    mouth: 8,
+    hairRaw: 205,
+    browsRaw: 104,
+    eyes: 3,
+    beardRaw: 0,
+    nose: 2,
+    ears: 1,
+    extra: 9,
+    hornRaw: 5,
+    special: 7,
+    race: 8,
+    gender: 2,
+    classId: 6,
+  });
+
+  const portrait = extractPortraitFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  const render = createPortraitOptionsFromSaveArray(save, { own: 1, saveVersion: 2, save });
+  assert.equal(portrait.appearance.horn.supported, true);
+  assert.equal(portrait.appearance.horn.renderable, false);
+  assert.equal(portrait.horn, 0);
+  assert.equal(render.horn, 0);
+  assert.equal(portrait.appearance.specialPortrait.status, "unsupportedPositive");
+  assert.equal(portrait.special, 0);
 }
 
 console.log("portraitSaveLayout.test.mts passed");

@@ -3,9 +3,10 @@ import { db } from "../firebase";
 import type { PortraitOptions } from "../../components/player-profile/types";
 import { DEFAULT_PORTRAIT } from "../../components/player-profile/types";
 import { traceGetDoc, type FirestoreTraceScope } from "../debug/firestoreReadTrace";
+import type { SfJsonPortrait } from "../parsing/types";
 
 export type AvatarSnapshotPortrait = {
-  genderName: "male" | "female";
+  genderName: "male" | "female" | null;
   classId: number;
   raceId: number;
   mouth: number;
@@ -44,6 +45,32 @@ const toNumber = (value: unknown, fallback = 0) => {
 
 const hasPortraitValues = (raw: any) =>
   raw && typeof raw === "object" && Object.values(raw).some((v) => v !== undefined && v !== null);
+
+const toGenderName = (value: unknown): AvatarSnapshotPortrait["genderName"] => {
+  if (value === "male" || value === "female") return value;
+  return null;
+};
+
+export const createAvatarSnapshotPortraitFromSfJsonPortrait = (
+  portrait: SfJsonPortrait,
+): AvatarSnapshotPortrait => ({
+  genderName: portrait.genderName,
+  classId: portrait.classId,
+  raceId: portrait.raceId,
+  mouth: portrait.mouth,
+  hair: portrait.hair,
+  hairColor: portrait.hairColor,
+  horn: portrait.horn,
+  hornColor: portrait.hornColor,
+  brows: portrait.brows,
+  eyes: portrait.eyes,
+  beard: portrait.beard,
+  nose: portrait.nose,
+  ears: portrait.ears,
+  extra: portrait.extra,
+  special: portrait.special,
+  frameId: portrait.frame.frameId ?? 0,
+});
 
 const avatarCache = new Map<string, AvatarSnapshot | null>();
 const AVATAR_CACHE_PREFIX = "avatar-cache:";
@@ -126,7 +153,7 @@ export const fetchAvatarSnapshotByIdentifier = async (
   const hasPortraitData = hasPortraitValues(portraitRaw);
 
   const portrait: AvatarSnapshotPortrait = {
-    genderName: portraitRaw?.genderName === "female" ? "female" : "male",
+    genderName: toGenderName(portraitRaw?.genderName),
     classId: toNumber(portraitRaw?.classId),
     raceId: toNumber(portraitRaw?.raceId),
     mouth: toNumber(portraitRaw?.mouth),

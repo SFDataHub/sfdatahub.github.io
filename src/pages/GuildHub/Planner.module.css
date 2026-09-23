@@ -340,11 +340,12 @@
 
 .sheetBackdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(6, 10, 22, 0.6);
   z-index: 40;
   display: flex;
   align-items: flex-end;
+  box-sizing: border-box;
 }
 
 .sheet {
@@ -353,7 +354,7 @@
   background: #0e1a2c;
   border: 1px solid #2b4c73;
   padding: 12px 16px 24px;
-  max-height: 90vh;
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)));
   display: flex;
   flex-direction: column;
 }
@@ -403,11 +404,12 @@
 
 .overlay {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(6, 10, 22, 0.6);
   z-index: 50;
   display: flex;
   justify-content: flex-end;
+  box-sizing: border-box;
 }
 
 .panel {
@@ -484,18 +486,19 @@
 
 .formOverlay {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(6, 10, 22, 0.6);
   z-index: 60;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 16px;
+  box-sizing: border-box;
 }
 
 .formPanel {
   width: min(520px, 100%);
-  max-height: 90vh;
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px);
   overflow: auto;
   background: #0c1627;
   border: 1px solid #2b4c73;
