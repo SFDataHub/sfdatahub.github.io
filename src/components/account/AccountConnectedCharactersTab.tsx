@@ -3,7 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import type { AuthUser, LinkedPlayer } from "../../lib/auth/types";
 import { AUTH_BASE_URL } from "../../lib/auth/config";
-import { saveAvatarSnapshotForIdentifier } from "../../lib/firebase/avatarSnapshots";
+import {
+  createAvatarSnapshotPortraitFromSfJsonPortrait,
+  saveAvatarSnapshotForIdentifier,
+} from "../../lib/firebase/avatarSnapshots";
 import { parseSfJson, type SfJsonOwnPlayer } from "../../lib/parsing";
 import accountStyles from "../../pages/Settings/AccountSettingsPage.module.css";
 import styles from "./AccountConnectedCharactersTab.module.css";
@@ -183,7 +186,7 @@ const AccountConnectedCharactersTab: React.FC<AccountConnectedCharactersTabProps
         playerId: selectedPlayer.playerId,
         server: selectedPlayer.server,
         source: "connectChar",
-        portrait: selectedPlayer.portrait,
+        portrait: createAvatarSnapshotPortraitFromSfJsonPortrait(selectedPlayer.portrait),
       });
 
       setAvatarImportStatus(

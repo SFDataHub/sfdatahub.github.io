@@ -1,18 +1,62 @@
 export type SfJsonPortrait = {
-  genderName: "male" | "female";
+  status: "available" | "partial" | "unsupported" | "missing" | "invalid" | "rosterOnly";
+  layout: "currentCompact" | "legacyOwn" | "legacyOther" | "unknown";
+  appearance: {
+    classId: number;
+    raceId: number;
+    gender: "male" | "female" | null;
+    mouth: number;
+    hair: { style: number; color: number };
+    brows: { style: number; color: number };
+    eyes: number;
+    beard: { style: number | null; color: number; none: boolean };
+    nose: number;
+    ears: number;
+    extra: number;
+    special2: { raw: number; style: number; color: number };
+    horn: {
+      supported: boolean;
+      renderable: boolean;
+      style: number | null;
+      color: number | null;
+      colorSource: "rendererDerivedHairColor" | "fixedFemaleDemon" | null;
+    };
+    specialPortrait: {
+      active: boolean;
+      id: number | null;
+      sourceValue: number;
+      status: "inactive" | "active" | "unsupportedPositive";
+    };
+  };
+  frame: {
+    status: "available" | "unsupported" | "missing";
+    frameId: number | null;
+  };
+  metadata: {
+    hairColorSource: "raw";
+    browsColorSource: "raw";
+    beardColorSource: "raw";
+    hornColorSource: "rendererDerived" | "none";
+    compatibilityFrameIdFallback: number;
+  };
+  genderName: "male" | "female" | null;
   classId: number;
   raceId: number;
   mouth: number;
   hair: number;
   hairColor: number;
+  browsColor: number;
   horn: number;
   hornColor: number;
   brows: number;
   eyes: number;
   beard: number;
+  beardColor: number;
+  beardNone: boolean;
   nose: number;
   ears: number;
   extra: number;
+  special2: number;
   special: number;
   frameId: number;
 };

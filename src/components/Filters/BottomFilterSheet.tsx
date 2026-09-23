@@ -158,8 +158,12 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
 
 /* ---------- Styles ---------- */
 const backdrop: React.CSSProperties = {
-  position: "fixed", inset: 0, background: PALETTE.backdrop, zIndex: 60,
+  position: "fixed",
+  inset: "var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0)",
+  background: PALETTE.backdrop,
+  zIndex: 60,
   display: "grid", alignItems: "end",
+  boxSizing: "border-box",
 };
 
 const panel: React.CSSProperties = {

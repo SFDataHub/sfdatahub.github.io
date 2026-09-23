@@ -1,4 +1,5 @@
 import type { FusionIdentityManagementReport } from "./fusionIdentityManagement";
+import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
 import type {
   FusionIdentityProgress,
   FusionIdentityWorkerRequest,
@@ -35,6 +36,7 @@ export type FusionIdentityWorkerRun = {
 
 type StartFusionIdentityWorkerRunOptions = {
   requestId?: string;
+  scope?: FusionIdentityAnalysisScope;
   workerFactory?: () => FusionIdentityWorkerLike;
   onProgress?: (progress: FusionIdentityProgress) => void;
 };
@@ -104,7 +106,11 @@ export const startFusionIdentityWorkerRun = (
 
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "build-report", requestId });
+    worker.postMessage(
+      options.scope
+        ? { type: "build-report", requestId, scope: options.scope }
+        : { type: "build-report", requestId },
+    );
   });
 
   return {

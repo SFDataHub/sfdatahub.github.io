@@ -22,8 +22,8 @@ type PortraitIndexes = {
   nose: number;
   ears: number;
   extra: number;
-  horn: number;
-  special: number;
+  special2: number;
+  portrait: number;
   race: number;
   gender: number;
   class: number;
@@ -39,8 +39,8 @@ const LEGACY_OWN_PORTRAIT_INDEXES: PortraitIndexes = {
   nose: 22,
   ears: 23,
   extra: 24,
-  horn: 25,
-  special: 26,
+  special2: 25,
+  portrait: 26,
   race: 27,
   gender: 28,
   class: 29,
@@ -56,8 +56,8 @@ const COMPACT_PORTRAIT_INDEXES: PortraitIndexes = {
   nose: 13,
   ears: 14,
   extra: 15,
-  horn: 16,
-  special: 17,
+  special2: 16,
+  portrait: 17,
   race: 18,
   gender: 19,
   class: 20,
@@ -85,6 +85,10 @@ export const resolvePortraitSaveLayout = (
     if (layout !== "unknown") return layout;
   }
 
+  if (save.length === 70) return "currentCompact";
+  if (save.length >= 650) return "legacyOwn";
+  if (save.length >= 256) return "legacyOther";
+
   return "legacyOwn";
 };
 
@@ -94,11 +98,49 @@ const getPortraitIndexes = (layout: SfPlayerSaveLayout): PortraitIndexes => {
 };
 
 const resolveGenderName = (
-  layout: SfPlayerSaveLayout,
   genderByte: number,
 ): SfJsonPortrait["genderName"] => {
-  if (layout === "currentCompact") return genderByte === 2 ? "female" : "male";
-  return genderByte === 1 || genderByte === 2 ? "female" : "male";
+  if (genderByte === 1) return "male";
+  if (genderByte === 2) return "female";
+  return null;
+};
+
+const positiveModulo100 = (value: number) => Math.max(value % 100, 0);
+
+const colorPrefix = (value: number) => Math.floor(value / 100);
+
+const isDemon = (raceId: number) => raceId === 8;
+
+const resolveHorn = (
+  raceId: number,
+  genderName: SfJsonPortrait["genderName"],
+  special2Style: number,
+  rendererHairColor: number,
+): SfJsonPortrait["appearance"]["horn"] => {
+  if (!isDemon(raceId) || (genderName !== "male" && genderName !== "female")) {
+    return {
+      supported: false,
+      renderable: false,
+      style: null,
+      color: null,
+      colorSource: null,
+    };
+  }
+
+  const maxStyle = genderName === "female" ? 4 : 11;
+  const renderable = special2Style > 0 && special2Style <= maxStyle;
+
+  return {
+    supported: true,
+    renderable,
+    style: renderable ? special2Style : null,
+    color: renderable ? (genderName === "female" ? 1 : rendererHairColor) : null,
+    colorSource: renderable
+      ? genderName === "female"
+        ? "fixedFemaleDemon"
+        : "rendererDerivedHairColor"
+      : null,
+  };
 };
 
 export const extractPortraitFromSaveArrayWithLayout = (
@@ -108,32 +150,105 @@ export const extractPortraitFromSaveArrayWithLayout = (
   const layout = resolvePortraitSaveLayout(save, source);
   const indexes = getPortraitIndexes(layout);
   const hairRaw = safeValue(save, indexes.hair);
+  const browsRaw = safeValue(save, indexes.brows);
   const beardRaw = safeValue(save, indexes.beard);
-  const hornRaw = safeValue(save, indexes.horn);
-  const specialRaw = safeValue(save, indexes.special);
+  const special2Raw = safeValue(save, indexes.special2);
+  const portraitRaw = safeValue(save, indexes.portrait);
   const genderByte = safeValue(save, indexes.gender) & 0xff;
 
-  const hairColorBase = Math.floor(hairRaw / 100);
-  const hairColor = Math.max(hairColorBase, 1);
-  const hornColorBase = Math.floor(hairRaw / 100);
-  const genderName = resolveGenderName(layout, genderByte);
+  const hairColor = colorPrefix(hairRaw);
+  const rendererHairColor = Math.max(hairColor, 1);
+  const browsColor = colorPrefix(browsRaw);
+  const beardColor = colorPrefix(beardRaw);
+  const special2Style = positiveModulo100(special2Raw);
+  const special2Color = colorPrefix(special2Raw);
+  const beardStyle = positiveModulo100(beardRaw);
+  const beardNone = beardStyle === 99;
+  const genderName = resolveGenderName(genderByte);
+  const raceId = safeValue(save, indexes.race) & 0xffff;
+  const classId = safeValue(save, indexes.class) & 0xffff;
+  const horn = resolveHorn(raceId, genderName, special2Style, rendererHairColor);
+  const specialPortrait =
+    portraitRaw < 0
+      ? {
+          active: true,
+          id: Math.abs(portraitRaw),
+          sourceValue: portraitRaw,
+          status: "active" as const,
+        }
+      : portraitRaw > 0
+        ? {
+            active: false,
+            id: null,
+            sourceValue: portraitRaw,
+            status: "unsupportedPositive" as const,
+          }
+        : {
+            active: false,
+            id: null,
+            sourceValue: portraitRaw,
+            status: "inactive" as const,
+          };
+  const frameId = indexes.frameId == null ? null : safeValue(save, indexes.frameId);
+  const frameStatus = indexes.frameId == null ? "unsupported" : frameId == null ? "missing" : "available";
 
   return {
+    status: layout === "unknown" ? "unsupported" : "available",
+    layout,
+    appearance: {
+      classId,
+      raceId,
+      gender: genderName,
+      mouth: safeValue(save, indexes.mouth),
+      hair: { style: positiveModulo100(hairRaw), color: hairColor },
+      brows: { style: positiveModulo100(browsRaw), color: browsColor },
+      eyes: safeValue(save, indexes.eyes),
+      beard: {
+        style: beardNone ? null : beardStyle,
+        color: beardColor,
+        none: beardNone,
+      },
+      nose: safeValue(save, indexes.nose),
+      ears: safeValue(save, indexes.ears),
+      extra: safeValue(save, indexes.extra),
+      special2: {
+        raw: special2Raw,
+        style: special2Style,
+        color: special2Color,
+      },
+      horn,
+      specialPortrait,
+    },
+    frame: {
+      status: frameStatus,
+      frameId,
+    },
+    metadata: {
+      hairColorSource: "raw",
+      browsColorSource: "raw",
+      beardColorSource: "raw",
+      hornColorSource: horn.colorSource == null ? "none" : "rendererDerived",
+      compatibilityFrameIdFallback: 0,
+    },
     genderName,
-    classId: safeValue(save, indexes.class) & 0xffff,
-    raceId: safeValue(save, indexes.race) & 0xffff,
+    classId,
+    raceId,
     mouth: safeValue(save, indexes.mouth),
-    hair: Math.max(hairRaw % 100, 0),
-    brows: Math.max(safeValue(save, indexes.brows) % 100, 0),
+    hair: positiveModulo100(hairRaw),
+    brows: positiveModulo100(browsRaw),
     eyes: safeValue(save, indexes.eyes),
-    beard: Math.max(beardRaw % 100, 0),
+    beard: beardNone ? 0 : beardStyle,
+    beardColor,
+    beardNone,
     nose: safeValue(save, indexes.nose),
     ears: safeValue(save, indexes.ears),
     extra: safeValue(save, indexes.extra),
-    horn: Math.max(hornRaw % 100, 0),
-    special: Math.min(specialRaw, 0),
+    horn: horn.renderable ? horn.style ?? 0 : 0,
+    special2: special2Raw,
+    special: specialPortrait.active ? specialPortrait.sourceValue : 0,
     hairColor,
-    hornColor: genderName === "female" ? 1 : hornColorBase === 0 ? hairColor : hornColorBase,
-    frameId: indexes.frameId == null ? 0 : safeValue(save, indexes.frameId),
+    browsColor,
+    hornColor: horn.color ?? 1,
+    frameId: frameId ?? 0,
   };
 };

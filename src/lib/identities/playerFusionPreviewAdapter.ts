@@ -25,6 +25,7 @@ import {
   type PlayerFusionPlayerResult,
   type PlayerFusionSemanticVector,
 } from "./playerFusionResolver";
+import { createPlayerPortraitAppearanceSummary } from "./playerPortraitAppearance";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -160,6 +161,7 @@ export const createPlayerFusionSemanticSummary = (player: JsonRecord | null) => 
     baseAttributes,
     fortress,
     pets,
+    portrait: createPlayerPortraitAppearanceSummary(normalized.portrait),
   };
 };
 
@@ -317,12 +319,18 @@ export const createFusionIdentityGuildObservations = (
 
     observation.name = observation.name ?? member.guildName;
     observation.memberIdentifiers.push(member.memberRef);
+    if (member.guildRole === "leader") {
+      observation.leaderIdentifier = observation.leaderIdentifier ?? member.memberRef;
+    } else if (member.guildRole === "officer") {
+      observation.officerIdentifiers = [...(observation.officerIdentifiers ?? []), member.memberRef];
+    }
     guilds.set(guildIdentifier, observation);
   });
 
   return [...guilds.values()].map((guild) => ({
     ...guild,
     memberIdentifiers: [...new Set(guild.memberIdentifiers)],
+    officerIdentifiers: [...new Set(guild.officerIdentifiers ?? [])],
     memberCount: guild.memberCount ?? guild.memberIdentifiers.length,
   }));
 };

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
+  isPlayerFusionActionableIdentityCandidate,
   isPlayerFusionReadyCandidate,
   resolvePlayerFusions,
+  selectReliableFusionBoundaryObservations,
   selectPlayerFusionReadyCandidates,
   type PlayerFusionCandidate,
   type PlayerFusionCandidateClassification,
@@ -11,6 +13,10 @@ import {
   type PlayerFusionSemanticSummary,
   type PlayerFusionObservation,
 } from "../../src/lib/identities/playerFusionResolver.ts";
+import type {
+  PlayerPortraitAppearanceFingerprint,
+  PlayerPortraitAppearanceSummary,
+} from "../../src/lib/identities/playerPortraitAppearance.ts";
 
 const semantic = (
   baseAttributes: number[] | null,
@@ -22,6 +28,46 @@ const semantic = (
   },
   ...overrides,
 });
+
+const portraitFingerprint = (
+  overrides: Partial<PlayerPortraitAppearanceFingerprint> = {},
+): PlayerPortraitAppearanceFingerprint => ({
+  mouth: 1,
+  hairStyle: 2,
+  hairColor: 3,
+  browsStyle: 4,
+  browsColor: 5,
+  eyes: 6,
+  beardNone: false,
+  beardStyle: 7,
+  beardColor: 8,
+  nose: 9,
+  ears: 10,
+  extra: 11,
+  hornStyle: 12,
+  specialPortraitActive: false,
+  specialPortraitId: null,
+  ...overrides,
+});
+
+const portrait = (
+  overrides: Partial<PlayerPortraitAppearanceFingerprint> = {},
+): PlayerPortraitAppearanceSummary => ({
+  availability: "available",
+  layout: "currentCompact",
+  fingerprint: portraitFingerprint(overrides),
+});
+
+const unavailablePortrait = (
+  availability: Exclude<PlayerPortraitAppearanceSummary["availability"], "available"> = "missing",
+): PlayerPortraitAppearanceSummary => ({
+  availability,
+  layout: "unknown",
+  fingerprint: null,
+});
+
+const portraitEntry = (candidate: PlayerFusionCandidate) =>
+  candidate.evidence.entries.find((entry) => entry.type === "portrait-continuity") ?? null;
 
 const historical = (
   identifier: string,
@@ -80,6 +126,7 @@ const EXPECTED_EVIDENCE_TYPES = new Set<PlayerFusionEvidenceEntryType>([
   "base-ordering",
   "fortress-continuity",
   "pet-continuity",
+  "portrait-continuity",
   "guild-continuity",
   "exact-name",
   "fusion-base-name",
@@ -339,6 +386,139 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   assert.equal(result.status, "high-confidence");
   assert.equal(result.candidates[0]?.rejected, false);
   assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, null);
+}
+
+{
+  const preBoundary = { id: "pre", timestamp: Date.parse("2026-05-01T00:00:00Z"), reliable: true };
+  const postBoundaryHistorical = { id: "historical-post", timestamp: Date.parse("2026-08-01T00:00:00Z"), reliable: true };
+  const beforeCurrent = { id: "current-pre", timestamp: Date.parse("2026-05-25T00:00:00Z"), reliable: true };
+  const postCurrent = { id: "current-post", timestamp: Date.parse("2026-06-05T00:00:00Z"), reliable: true };
+
+  const boundary = selectReliableFusionBoundaryObservations({
+    historicalObservations: [preBoundary, postBoundaryHistorical],
+    currentObservations: [beforeCurrent, postCurrent],
+    fusionEventTimestamp: Date.parse("2026-06-01T00:00:00Z"),
+    isReliable: (observation) => observation.reliable,
+  });
+
+  assert.equal(boundary.historicalObservation?.id, "pre");
+  assert.equal(boundary.currentObservation?.id, "current-post");
+  assert.equal(boundary.fallbackHistoricalObservation?.id, "pre");
+  assert.equal(boundary.fallbackCurrentObservation?.id, "current-post");
+}
+
+{
+  const preBoundary = { id: "pre", timestamp: Date.parse("2026-01-01T00:00:00Z"), reliable: true };
+  const postBoundaryHistorical = { id: "historical-post", timestamp: Date.parse("2026-03-01T00:00:00Z"), reliable: true };
+  const firstCurrent = { id: "current-first", timestamp: Date.parse("2026-02-01T00:00:00Z"), reliable: true };
+
+  const boundary = selectReliableFusionBoundaryObservations({
+    historicalObservations: [preBoundary, postBoundaryHistorical],
+    currentObservations: [firstCurrent],
+    fusionEventTimestamp: null,
+    isReliable: (observation) => observation.reliable,
+  });
+
+  assert.equal(boundary.historicalObservation?.id, "pre");
+  assert.equal(boundary.currentObservation?.id, "current-first");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("base_boundary_heal", {
+        name: "Boundary Heal",
+        timestamp: Date.parse("2026-01-01T10:00:00Z"),
+        semantic: semantic([100, 7000, 100, 100, 100]),
+      }),
+      historical("base_boundary_heal", {
+        name: "Boundary Heal",
+        timestamp: Date.parse("2026-03-01T10:00:00Z"),
+        semantic: semantic([100, 6000, 100, 100, 100]),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "Boundary Heal",
+        timestamp: Date.parse("2026-02-01T10:00:00Z"),
+        semantic: semantic([100, 6500, 100, 100, 100]),
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "unresolved");
+  assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, false);
+  assert.deepEqual(result.candidates[0]?.rejectReasons, ["base-stat-regression"]);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("base_boundary_false_reject", {
+        name: "Boundary Valid",
+        timestamp: Date.parse("2026-01-01T10:00:00Z"),
+        semantic: semantic([100, 6000, 100, 100, 100]),
+      }),
+      historical("base_boundary_false_reject", {
+        name: "Boundary Valid",
+        timestamp: Date.parse("2026-03-01T10:00:00Z"),
+        semantic: semantic([100, 7500, 100, 100, 100]),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "Boundary Valid",
+        timestamp: Date.parse("2026-02-01T10:00:00Z"),
+        semantic: semantic([100, 6500, 100, 100, 100]),
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.candidates[0]?.rejected, false);
+  assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, true);
+  assert.deepEqual(result.candidates[0]?.rejectReasons, []);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("base_boundary_availability", {
+        name: "Boundary Availability",
+        timestamp: Date.parse("2026-01-01T10:00:00Z"),
+        semantic: semantic([100, 6000, 100, 100, 100]),
+      }),
+      historical("base_boundary_availability", {
+        name: "Boundary Availability",
+        timestamp: Date.parse("2026-01-31T10:00:00Z"),
+        semantic: semantic(null, {
+          baseAttributes: { availability: "missing", values: null },
+        }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "Boundary Availability",
+        timestamp: Date.parse("2026-02-01T10:00:00Z"),
+        semantic: semantic(null, {
+          baseAttributes: { availability: "missing", values: null },
+        }),
+      }),
+      post({
+        name: "Boundary Availability",
+        timestamp: Date.parse("2026-02-02T10:00:00Z"),
+        semantic: semantic([100, 6500, 100, 100, 100]),
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.candidates[0]?.rejected, false);
+  assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, true);
+  assert.deepEqual(result.candidates[0]?.rejectReasons, []);
 }
 
 {
@@ -629,6 +809,259 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   assert.equal(result.status, "high-confidence");
   assert.equal(result.candidates[0]?.evidence.levelProgression.category, "insufficient-sample");
   assert.equal(result.candidates[0]?.rejected, false);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("single_pet_support", {
+        name: "Old Pet",
+        level: 500,
+        semantic: semantic(null, {
+          pets: { availability: "available", values: [3, 2, 1] },
+        }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Pet",
+        level: 501,
+        semantic: semantic(null, {
+          pets: { availability: "available", values: [3, 2, 1] },
+        }),
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  const candidate = result.candidates[0]!;
+  assert.equal(result.status, "candidate");
+  assert.equal(candidate.classification, "weak");
+  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
+  assert.deepEqual(
+    candidate.evidence.entries.filter((entry) => entry.strength === "weakSupport").map((entry) => entry.type),
+    ["pet-continuity"],
+  );
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("single_portrait_support", {
+        name: "Old Portrait Only",
+        level: 500,
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait Only",
+        level: 501,
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  const candidate = result.candidates[0]!;
+  assert.equal(result.status, "candidate");
+  assert.equal(candidate.classification, "weak");
+  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
+  assert.equal(portraitEntry(candidate)?.strength, "weakSupport");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("s3_eu_p48915", {
+        name: "Danko369CZ",
+        classId: "8",
+        level: 392,
+        timestamp: Date.parse("2025-11-01T13:23:41.934Z"),
+        semantic: semantic(null, {
+          pets: { availability: "available", values: [12, 8, 5] },
+        }),
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "f28_net_p207342",
+        name: "iksor EU3",
+        classId: "8",
+        level: 586,
+        timestamp: Date.parse("2026-04-03T10:11:29.955Z"),
+        originNumericId: 462,
+        semantic: semantic(null, {
+          pets: { availability: "available", values: [12, 8, 5] },
+        }),
+      }),
+    ],
+  }).results[0];
+
+  const candidate = result.candidates[0]!;
+  assert.equal(result.newIdentifier, "f28_net_p207342");
+  assert.equal(candidate.oldIdentifier, "s3_eu_p48915");
+  assert.equal(candidate.evidence.levelProgression.category, "insufficient-sample");
+  assert.equal(candidate.classification, "weak");
+  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
+  assert.deepEqual(
+    candidate.evidence.entries.filter((entry) => entry.strength === "weakSupport").map((entry) => entry.type),
+    ["pet-continuity"],
+  );
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_single", {
+        name: "Old Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  const entry = portraitEntry(result.candidates[0]!);
+  assert.equal(result.candidates[0]?.evidence.portraitContinuity, true);
+  assert.equal(result.candidates[0]?.evidence.portraitDiscriminating, false);
+  assert.equal(entry?.strength, "weakSupport");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_match", {
+        name: "Old Portrait Match",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+      historical("portrait_other", {
+        name: "Old Portrait Other",
+        semantic: semantic(null, { portrait: portrait({ mouth: 20 }) }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  const match = result.candidates.find((candidate) => candidate.oldIdentifier === "portrait_match")!;
+  const other = result.candidates.find((candidate) => candidate.oldIdentifier === "portrait_other")!;
+  assert.equal(match.evidence.portraitContinuity, true);
+  assert.equal(match.evidence.portraitDiscriminating, true);
+  assert.equal(portraitEntry(match)?.strength, "support");
+  assert.equal(other.evidence.portraitContinuity, false);
+  assert.equal(other.evidence.portraitDiscriminating, false);
+  assert.equal(portraitEntry(other)?.strength, "neutral");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_collision_a", {
+        name: "Old Portrait A",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+      historical("portrait_collision_b", {
+        name: "Old Portrait B",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(
+    result.candidates.every((candidate) => candidate.evidence.portraitContinuity === true),
+    true,
+  );
+  assert.equal(
+    result.candidates.every((candidate) => portraitEntry(candidate)?.strength === "weakSupport"),
+    true,
+  );
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_available", {
+        name: "Old Portrait Available",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+      historical("portrait_unavailable", {
+        name: "Old Portrait Unavailable",
+        semantic: semantic(null, { portrait: unavailablePortrait("rosterOnly") }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  const available = result.candidates.find((candidate) => candidate.oldIdentifier === "portrait_available")!;
+  const unavailable = result.candidates.find((candidate) => candidate.oldIdentifier === "portrait_unavailable")!;
+  assert.equal(available.evidence.portraitContinuity, true);
+  assert.equal(available.evidence.portraitDiscriminating, false);
+  assert.equal(portraitEntry(available)?.strength, "weakSupport");
+  assert.equal(unavailable.evidence.portraitContinuity, null);
+  assert.equal(portraitEntry(unavailable), null);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_mismatch", {
+        name: "Old Portrait",
+        semantic: semantic(null, { portrait: portrait({ hairColor: 21 }) }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  assert.equal(result.candidates[0]?.evidence.portraitContinuity, false);
+  assert.equal(result.candidates[0]?.evidence.portraitDiscriminating, false);
+  assert.equal(portraitEntry(result.candidates[0]!)?.strength, "neutral");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("portrait_missing", {
+        name: "Old Portrait",
+        semantic: semantic(null, { portrait: unavailablePortrait("missing") }),
+      }),
+    ],
+    newObservations: [
+      post({
+        name: "New Portrait",
+        semantic: semantic(null, { portrait: portrait() }),
+      }),
+    ],
+  }).results[0];
+
+  assert.equal(result.candidates[0]?.evidence.portraitContinuity, null);
+  assert.equal(result.candidates[0]?.evidence.portraitDiscriminating, null);
+  assert.equal(portraitEntry(result.candidates[0]!), null);
 }
 
 {

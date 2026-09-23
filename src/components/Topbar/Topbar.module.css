@@ -461,7 +461,7 @@
 
 .settingsOverlayBackdrop{
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   z-index: 2000;
   background: rgba(3, 10, 18, 0.75);
   backdrop-filter: blur(8px);
@@ -470,11 +470,12 @@
   justify-content: center;
   padding: 16px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .settingsOverlayPanel{
   width: min(520px, 100%);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px);
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--tile);
@@ -632,7 +633,7 @@
 
 .favoritesOverlayBackdrop{
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   z-index: 2000;
   background: rgba(3, 10, 18, 0.75);
   backdrop-filter: blur(8px);
@@ -641,11 +642,12 @@
   justify-content: center;
   padding: 16px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .favoritesOverlayPanel{
   width: min(760px, 100%);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px);
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--tile);

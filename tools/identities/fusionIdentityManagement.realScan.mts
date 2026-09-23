@@ -9,9 +9,15 @@ import { normalizeGuildScanMembers } from "../../src/lib/guilds/guildScanNormali
 import type { GuildHubLogicalScanSnapshot } from "../../src/lib/guilds/localScanLibrary.ts";
 import {
   buildFusionIdentityManagementReportFromSnapshots,
+  type FusionIdentityManagementItem,
   type FusionIdentityManagementStatus,
 } from "../../src/lib/identities/fusionIdentityManagement.ts";
 import { createGuildIdentityStore } from "../../src/lib/identities/guildIdentityStore.ts";
+import type {
+  GuildFusionCandidateClassification,
+  GuildFusionEvidenceEntryType,
+  GuildFusionEvidenceStrength,
+} from "../../src/lib/identities/guildFusionResolver.ts";
 import { createPlayerIdentityStore } from "../../src/lib/identities/playerIdentityStore.ts";
 import { createFusionIdentityObservations } from "../../src/lib/identities/playerFusionPreviewAdapter.ts";
 import {
@@ -34,9 +40,26 @@ const GUILD_CASES: Array<{
 }> = [
   { label: "Magic Mushrooms", currentName: "Magic Mushrooms", historicalId: "eu1_g8", expectedStatus: "ready", expectedReady: true },
   { label: "Hangover", currentName: "Hangover", expectedStatus: "ready", expectedReady: true },
-  { label: "Dead End -> Erben im Wandel", currentName: "Erben im Wandel", historicalId: "eu4_g14", expectedStatus: "review" },
-  { label: "Die Legion -> Legion Z", currentName: "Legion Z", historicalId: "eu3_g4877", expectedStatus: "review" },
-  { label: "GenerationZ -> Legion Z", currentName: "Legion Z", historicalId: "eu4_g1352" },
+  { label: "Dead End -> Erben im Wandel", currentName: "Erben im Wandel", historicalId: "eu4_g14", expectedStatus: "ready", expectedReady: true },
+  { label: "Die Legion -> Legion Z", currentName: "Legion Z", historicalId: "eu3_g4877", expectedStatus: "ready", expectedReady: true },
+  { label: "GenerationZ -> Legion Z", currentName: "Legion Z", historicalId: "eu4_g1352", expectedReady: false },
+  { label: "Marathon Runners", currentName: "Marathon Runners", historicalId: "eu1_g113", expectedStatus: "ready", expectedReady: true },
+  { label: "Welten im Wandel", currentName: "Welten im Wandel", historicalId: "eu3_g1", expectedStatus: "ready", expectedReady: true },
+  { label: "Exil -> Seelen im Wandel", currentName: "Seelen im Wandel", historicalId: "eu1_g83", expectedStatus: "ready", expectedReady: true },
+  { label: "Die Legion exact current", currentName: "Die Legion", historicalId: "eu3_g4877", expectedStatus: "review", expectedReady: false },
+  { label: "Sladky domov", currentName: "Sladký domov", historicalId: "eu3_g22", expectedStatus: "ready", expectedReady: true },
+];
+
+const BROWSER_GUILD_CASE_NAMES = [
+  "Lonely Souls",
+  "Lost Forest",
+  "LostShadows",
+  "Mandalorians",
+  "Ordnungsamt",
+  "pomalu cz",
+  "TaylorGang",
+  "Toss a Coin CZ02",
+  "WollMilchSäue",
 ];
 
 const asRecord = (value: unknown): JsonRecord | null =>
@@ -101,6 +124,60 @@ const countByStatus = (statuses: FusionIdentityManagementStatus[]) =>
     {} as Record<FusionIdentityManagementStatus, number>,
   );
 
+const describeGuildEvidenceGroup = (item: FusionIdentityManagementItem) => {
+  const candidate = item.candidates[0];
+  if (candidate?.entityType !== "guild") return "none";
+  const evidence = candidate.evidence;
+  const hasMemberContinuity = evidence.matchedMemberCount > 0;
+  if (evidence.structuralRename || (!evidence.exactName && !evidence.sameCoA && hasMemberContinuity)) return "F rename/structural";
+  if (evidence.exactName && evidence.uniqueExactName && evidence.sameCoA && hasMemberContinuity) return "A exact+unique+coa+members";
+  if (evidence.exactName && evidence.uniqueExactName && !evidence.sameCoA && hasMemberContinuity) return "B exact+unique+members";
+  if (evidence.exactName && evidence.sameCoA && !evidence.uniqueExactName) return "C exact+coa+collision";
+  if (evidence.uniqueExactName && !evidence.sameCoA && !hasMemberContinuity) return "D unique exact thin";
+  if (evidence.exactName) return "E exact only";
+  return "F rename/structural";
+};
+
+const summarizeGuildCandidate = (item: FusionIdentityManagementItem) => {
+  const candidate = item.candidates[0];
+  if (candidate?.entityType !== "guild") return "candidate=none";
+  const evidence = candidate.evidence;
+  const leadership =
+    evidence.leadership.sameLogicalLeader == null
+      ? "unavailable"
+      : evidence.leadership.sameLogicalLeader
+        ? "same"
+        : "different";
+  return [
+    `candidate=${candidate.historicalName ?? "unknown"} ${candidate.historicalIdentifier}`,
+    `ready=${candidate.ready}`,
+    `class=${evidence.classification}`,
+    `exact=${evidence.exactName}`,
+    `unique=${evidence.uniqueExactName}`,
+    `base=${evidence.fusionBaseName}`,
+    `coa=${evidence.sameCoA}`,
+    `matched=${evidence.matchedMemberCount}`,
+    `oldShare=${evidence.oldShare.toFixed(3)}`,
+    `newShare=${evidence.newShare.toFixed(3)}`,
+    `leadership=${leadership}`,
+    `assignmentConflict=${evidence.assignmentConflict}`,
+    `reserved=${evidence.reservedByReadyAssignment}`,
+  ].join(" ");
+};
+
+const findDuplicateGuildMigrationEdges = (items: FusionIdentityManagementItem[]) =>
+  items.flatMap((item) => {
+    if (item.entityType !== "guild") return [];
+    const counts = new Map<string, number>();
+    item.memberMigrationEdges.forEach((edge) => {
+      const key = normalizeKey(edge.oldGuildIdentifier);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([oldGuildIdentifier, count]) => ({ item, oldGuildIdentifier, count }));
+  });
+
 const ORIGIN_SERVER_CODES = new Set(["EU1", "EU2", "EU3", "EU4"]);
 const TARGET_SERVER_CODE = "F28";
 const resolveServerCode = (value: unknown) => resolveServer(String(value ?? ""))?.code ?? null;
@@ -131,9 +208,38 @@ const EXPECTED_PLAYER_EVIDENCE_TYPES = new Set<PlayerFusionEvidenceEntryType>([
   "base-ordering",
   "fortress-continuity",
   "pet-continuity",
+  "portrait-continuity",
   "guild-continuity",
   "exact-name",
   "fusion-base-name",
+  "assignment",
+]);
+const EXPECTED_GUILD_CANDIDATE_CLASSIFICATIONS = new Set<GuildFusionCandidateClassification>([
+  "rejected",
+  "weak",
+  "plausible",
+  "strong",
+  "anchored",
+]);
+const EXPECTED_GUILD_EVIDENCE_STRENGTHS = new Set<GuildFusionEvidenceStrength>([
+  "neutral",
+  "weakSupport",
+  "support",
+  "strongSupport",
+  "identityAnchor",
+  "warning",
+]);
+const EXPECTED_GUILD_EVIDENCE_TYPES = new Set<GuildFusionEvidenceEntryType>([
+  "exact-name",
+  "unique-exact-name",
+  "fusion-base-name",
+  "same-coa",
+  "member-flow",
+  "structural-rename",
+  "leader-continuity",
+  "officer-continuity",
+  "leadership-core",
+  "guild-progression",
   "assignment",
 ]);
 
@@ -150,15 +256,22 @@ const playerStore = createPlayerIdentityStore({ dbName: `fusion-real-player-${su
 const guildStore = createGuildIdentityStore({ dbName: `fusion-real-guild-${suffix}` });
 
 const report = await buildFusionIdentityManagementReportFromSnapshots({ snapshots, playerStore, guildStore });
+const prePortraitReport = await buildFusionIdentityManagementReportFromSnapshots(
+  { snapshots, playerStore, guildStore },
+  { enablePlayerPortraitEvidence: false },
+);
 const previousReport = await buildFusionIdentityManagementReportFromSnapshots(
   { snapshots, playerStore, guildStore },
   { enablePlayerLevelProgressionEvidence: false },
 );
 const playerItems = report.items.filter((item) => item.entityType === "player");
 const guildItems = report.items.filter((item) => item.entityType === "guild");
+const prePortraitPlayerItems = prePortraitReport.items.filter((item) => item.entityType === "player");
 const previousPlayerItems = previousReport.items.filter((item) => item.entityType === "player");
+const prePortraitPlayerById = new Map(prePortraitPlayerItems.map((item) => [item.id, item]));
 const previousPlayerById = new Map(previousPlayerItems.map((item) => [item.id, item]));
 const playerCounts = countByStatus(playerItems.map((item) => item.status));
+const prePortraitPlayerCounts = countByStatus(prePortraitPlayerItems.map((item) => item.status));
 const previousPlayerCounts = countByStatus(previousPlayerItems.map((item) => item.status));
 const guildCounts = countByStatus(guildItems.map((item) => item.status));
 const levelRegressionRemovedTotal = playerItems.reduce(
@@ -179,6 +292,8 @@ const previousStatusAffected = (status: FusionIdentityManagementStatus) =>
   playerItemsWithLevelProgressionRemoved.filter((item) => previousPlayerById.get(item.id)?.status === status).length;
 const transitionCount = (from: FusionIdentityManagementStatus, to: FusionIdentityManagementStatus) =>
   playerItems.filter((item) => previousPlayerById.get(item.id)?.status === from && item.status === to).length;
+const portraitTransitionCount = (from: FusionIdentityManagementStatus, to: FusionIdentityManagementStatus) =>
+  playerItems.filter((item) => prePortraitPlayerById.get(item.id)?.status === from && item.status === to).length;
 const previousReviewItems = previousPlayerItems.filter((item) => item.status === "review");
 const previousReviewDeltas = previousReviewItems.reduce(
   (counts, previousItem) => {
@@ -201,6 +316,11 @@ const currentPlayerObservations = allPlayerObservations.filter(
 const strictPlayerResults = resolvePlayerFusions({
   historicalObservations: historicalPlayerObservations,
   newObservations: currentPlayerObservations,
+}).results;
+const prePortraitPlayerResults = resolvePlayerFusions({
+  historicalObservations: historicalPlayerObservations,
+  newObservations: currentPlayerObservations,
+  enablePortraitEvidence: false,
 }).results;
 const legacyPlayerResults = resolvePlayerFusions({
   historicalObservations: historicalPlayerObservations,
@@ -230,7 +350,149 @@ const playerEvidenceAudit = strictPlayerResults.reduce(
     missingLabel: 0,
   },
 );
+const guildEvidenceAudit = guildItems.reduce(
+  (audit, item) => {
+    item.candidates.forEach((candidate) => {
+      if (candidate.entityType !== "guild") return;
+      audit.candidates += 1;
+      if (!candidate.evidence.classification) audit.missingClassification += 1;
+      if (!candidate.evidence.classification || !EXPECTED_GUILD_CANDIDATE_CLASSIFICATIONS.has(candidate.evidence.classification)) {
+        audit.missingOrUnknownClassification += 1;
+      }
+      if (!candidate.evidence.classification || !EXPECTED_GUILD_CANDIDATE_CLASSIFICATIONS.has(candidate.evidence.classification)) {
+        audit.uiUnclassified += 1;
+      }
+      candidate.evidence.evidenceEntries.forEach((entry) => {
+        audit.entries += 1;
+        if (!entry.type || !EXPECTED_GUILD_EVIDENCE_TYPES.has(entry.type)) audit.missingOrUnknownType += 1;
+        if (!entry.strength || !EXPECTED_GUILD_EVIDENCE_STRENGTHS.has(entry.strength)) audit.missingOrUnknownStrength += 1;
+        if (typeof entry.label !== "string" || !entry.label.trim()) audit.missingLabel += 1;
+      });
+    });
+    return audit;
+  },
+  {
+    candidates: 0,
+    entries: 0,
+    missingClassification: 0,
+    missingOrUnknownClassification: 0,
+    uiUnclassified: 0,
+    missingOrUnknownType: 0,
+    missingOrUnknownStrength: 0,
+    missingLabel: 0,
+  },
+);
+const guildCandidateClassCounts = guildItems.reduce(
+  (counts, item) => {
+    item.candidates.forEach((candidate) => {
+      if (candidate.entityType !== "guild") return;
+      counts[candidate.evidence.classification] = (counts[candidate.evidence.classification] ?? 0) + 1;
+    });
+    return counts;
+  },
+  {} as Record<GuildFusionCandidateClassification, number>,
+);
+const singleCandidateReviewGuilds = guildItems.filter(
+  (item) => item.status === "review" && item.entityType === "guild" && item.candidates.filter((candidate) => candidate.entityType === "guild").length === 1,
+);
+const singleCandidateReviewGroups = singleCandidateReviewGuilds.reduce(
+  (counts, item) => {
+    const group = describeGuildEvidenceGroup(item);
+    counts[group] = (counts[group] ?? 0) + 1;
+    return counts;
+  },
+  {} as Record<string, number>,
+);
+const forbiddenSingleDirectReviews = singleCandidateReviewGuilds.filter((item) => {
+  const candidate = item.candidates[0];
+  return (
+    candidate?.entityType === "guild" &&
+    candidate.evidence.exactName &&
+    candidate.evidence.uniqueExactName &&
+    candidate.evidence.sameCoA &&
+    candidate.evidence.matchedMemberCount > 0 &&
+    !candidate.evidence.assignmentConflict &&
+    !candidate.evidence.reservedByReadyAssignment
+  );
+});
+const reviewWithOneStrongCandidate = singleCandidateReviewGuilds.filter((item) => item.candidates[0]?.entityType === "guild" && item.candidates[0].evidence.classification === "strong");
+const reviewWithOnePlausibleCandidate = singleCandidateReviewGuilds.filter((item) => item.candidates[0]?.entityType === "guild" && item.candidates[0].evidence.classification === "plausible");
+const reviewWithRelevantCompetitors = guildItems.filter(
+  (item) => item.status === "review" && item.candidates.some((candidate) => candidate.entityType === "guild" && candidate.evidence.relevantCompetitor),
+);
+const reviewDueAssignmentConflict = guildItems.filter(
+  (item) => item.status === "review" && item.candidates.some((candidate) => candidate.entityType === "guild" && candidate.evidence.assignmentConflict),
+);
+const duplicateGuildMigrationEdges = findDuplicateGuildMigrationEdges(guildItems);
 const strictResultByIdentifier = new Map(strictPlayerResults.map((result) => [normalizeKey(result.newIdentifier), result]));
+const prePortraitResultByIdentifier = new Map(prePortraitPlayerResults.map((result) => [normalizeKey(result.newIdentifier), result]));
+const portraitEvidenceAudit = strictPlayerResults.reduce(
+  (audit, result) => {
+    result.candidates.forEach((candidate) => {
+      const entry = candidate.evidence.entries.find((evidence) => evidence.type === "portrait-continuity");
+      if (candidate.evidence.portraitContinuity == null) {
+        audit.unavailable += 1;
+        return;
+      }
+      audit.comparable += 1;
+      if (candidate.evidence.portraitContinuity) audit.exact += 1;
+      else audit.different += 1;
+      if (entry?.strength === "support") audit.support += 1;
+      if (entry?.strength === "weakSupport") audit.weakSupport += 1;
+      if (entry?.strength === "neutral") audit.neutral += 1;
+    });
+    return audit;
+  },
+  { comparable: 0, exact: 0, different: 0, unavailable: 0, support: 0, weakSupport: 0, neutral: 0 },
+);
+const isActionablePlayerCandidate = (classification: PlayerFusionCandidateClassification) =>
+  classification === "plausible" || classification === "strong" || classification === "anchored";
+const portraitAmbiguityAudit = prePortraitPlayerResults.reduce(
+  (audit, preResult) => {
+    const preRelevant = preResult.candidates.filter((candidate) => !candidate.rejected && isActionablePlayerCandidate(candidate.classification));
+    if (preRelevant.length <= 1) return audit;
+    const afterResult = strictResultByIdentifier.get(normalizeKey(preResult.newIdentifier));
+    const afterCandidatesByOldId = new Map(afterResult?.candidates.map((candidate) => [normalizeKey(candidate.oldIdentifier), candidate]) ?? []);
+    const afterRelevant = preRelevant
+      .map((candidate) => afterCandidatesByOldId.get(normalizeKey(candidate.oldIdentifier)))
+      .filter(Boolean);
+    const comparable = afterRelevant.filter((candidate) => candidate.evidence.portraitContinuity != null).length;
+    const exact = afterRelevant.filter((candidate) => candidate.evidence.portraitContinuity === true).length;
+    audit.sets += 1;
+    audit.candidates += preRelevant.length;
+    if (comparable === preRelevant.length) audit.allComparable += 1;
+    if (exact === 1 && comparable === preRelevant.length) audit.discriminating += 1;
+    if (exact > 1) audit.collisions += 1;
+    if (comparable < preRelevant.length) audit.incompleteComparable += 1;
+    return audit;
+  },
+  { sets: 0, candidates: 0, allComparable: 0, discriminating: 0, collisions: 0, incompleteComparable: 0 },
+);
+const portraitClassificationDeltas = prePortraitPlayerResults.reduce(
+  (counts, preResult) => {
+    const afterResult = strictResultByIdentifier.get(normalizeKey(preResult.newIdentifier));
+    if (!afterResult) return counts;
+    const afterCandidatesByOldId = new Map(afterResult.candidates.map((candidate) => [normalizeKey(candidate.oldIdentifier), candidate]));
+    preResult.candidates.forEach((preCandidate) => {
+      const afterCandidate = afterCandidatesByOldId.get(normalizeKey(preCandidate.oldIdentifier));
+      if (!afterCandidate || afterCandidate.classification === preCandidate.classification) return;
+      const key = `${preCandidate.classification}->${afterCandidate.classification}`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    });
+    return counts;
+  },
+  {} as Record<string, number>,
+);
+const portraitReadyControls = playerItems.reduce(
+  (counts, item) => {
+    const previous = prePortraitPlayerById.get(item.id);
+    if (previous?.status === "ready" && item.status !== "ready") counts.readyRegressions += 1;
+    if (previous?.status === "review" && item.status === "ready") counts.reviewPromotions += 1;
+    if (previous?.status === "ready" && item.status === "ready") counts.readyStable += 1;
+    return counts;
+  },
+  { readyRegressions: 0, reviewPromotions: 0, readyStable: 0 },
+);
 const readyRegressions = playerItems
   .map((item) => ({ item, previous: previousPlayerById.get(item.id) ?? null }))
   .filter(({ item, previous }) => previous?.status === "ready" && item.status !== "ready");
@@ -266,6 +528,9 @@ console.log(
   `Previous players ready=${previousPlayerCounts.ready ?? 0} review=${previousPlayerCounts.review ?? 0} unresolved=${previousPlayerCounts.unresolved ?? 0} noHistoricalObservation=${previousPlayerCounts.noHistoricalObservation ?? 0} noHistory=${previousPlayerCounts.noHistory ?? 0} completed=${previousPlayerCounts.completed ?? 0}`,
 );
 console.log(
+  `Pre-portrait players ready=${prePortraitPlayerCounts.ready ?? 0} review=${prePortraitPlayerCounts.review ?? 0} unresolved=${prePortraitPlayerCounts.unresolved ?? 0} noHistoricalObservation=${prePortraitPlayerCounts.noHistoricalObservation ?? 0} noHistory=${prePortraitPlayerCounts.noHistory ?? 0} completed=${prePortraitPlayerCounts.completed ?? 0}`,
+);
+console.log(
   `Guilds ready=${guildCounts.ready ?? 0} review=${guildCounts.review ?? 0} unresolved=${guildCounts.unresolved ?? 0} noHistoricalObservation=${guildCounts.noHistoricalObservation ?? 0} noHistory=${guildCounts.noHistory ?? 0} completed=${guildCounts.completed ?? 0}`,
 );
 console.log(`level-contradiction candidates removed = ${levelRegressionRemovedTotal}`);
@@ -274,10 +539,47 @@ console.log(
   `player evidence schema audit: candidates=${playerEvidenceAudit.candidates} entries=${playerEvidenceAudit.entries} missingOrUnknownClassification=${playerEvidenceAudit.missingOrUnknownClassification} missingOrUnknownType=${playerEvidenceAudit.missingOrUnknownType} missingOrUnknownStrength=${playerEvidenceAudit.missingOrUnknownStrength} missingLabel=${playerEvidenceAudit.missingLabel}`,
 );
 console.log(
+  `guild evidence schema audit: candidates=${guildEvidenceAudit.candidates} entries=${guildEvidenceAudit.entries} missingClassification=${guildEvidenceAudit.missingClassification} missingOrUnknownClassification=${guildEvidenceAudit.missingOrUnknownClassification} uiUnclassified=${guildEvidenceAudit.uiUnclassified} missingOrUnknownType=${guildEvidenceAudit.missingOrUnknownType} missingOrUnknownStrength=${guildEvidenceAudit.missingOrUnknownStrength} missingLabel=${guildEvidenceAudit.missingLabel}`,
+);
+console.log(
+  `guild candidate classes: anchored=${guildCandidateClassCounts.anchored ?? 0} strong=${guildCandidateClassCounts.strong ?? 0} plausible=${guildCandidateClassCounts.plausible ?? 0} weak=${guildCandidateClassCounts.weak ?? 0}`,
+);
+console.log(
+  `guild review audit: singleCandidate=${singleCandidateReviewGuilds.length} oneStrong=${reviewWithOneStrongCandidate.length} onePlausible=${reviewWithOnePlausibleCandidate.length} relevantCompetitors=${reviewWithRelevantCompetitors.length} assignmentConflict=${reviewDueAssignmentConflict.length}`,
+);
+console.log(`single-candidate review evidence groups: ${Object.entries(singleCandidateReviewGroups).map(([group, count]) => `${group}=${count}`).join(", ") || "none"}`);
+singleCandidateReviewGuilds.forEach((item) => {
+  console.log(`  singleReview ${item.currentName ?? "unknown"} ${item.currentIdentifier} group=${describeGuildEvidenceGroup(item)} ${summarizeGuildCandidate(item)} reasons=${item.reasons.join("|") || item.reasonCodes.join("|") || "none"}`);
+});
+console.log(`duplicate guild migration physical relations: ${duplicateGuildMigrationEdges.length}`);
+duplicateGuildMigrationEdges.forEach(({ item, oldGuildIdentifier, count }) => {
+  console.log(`  duplicateMigration current=${item.currentName ?? "unknown"} ${item.currentIdentifier} historical=${oldGuildIdentifier} count=${count}`);
+});
+console.log("Browser simple guild cases:");
+BROWSER_GUILD_CASE_NAMES.forEach((name) => {
+  const item = guildItems.find((entry) => normalizeKey(entry.currentName) === normalizeKey(name));
+  console.log(`- ${name}: current=${item?.currentIdentifier ?? "missing"} status=${item?.status ?? "missing"} candidates=${item?.candidates.length ?? 0} ${item ? summarizeGuildCandidate(item) : ""}`);
+});
+console.log(
   `previous Ready affected? ${previousStatusAffected("ready")} | previous Review affected? ${previousStatusAffected("review")} | previous Unresolved affected? ${previousStatusAffected("unresolved")}`,
 );
 console.log(
   `status transitions: Ready->Ready=${transitionCount("ready", "ready")} Ready->Review=${transitionCount("ready", "review")} Ready->Unresolved=${transitionCount("ready", "unresolved")} Review->Ready=${transitionCount("review", "ready")} Review->Review=${transitionCount("review", "review")} Review->Unresolved=${transitionCount("review", "unresolved")}`,
+);
+console.log(
+  `portrait status transitions: Ready->Ready=${portraitTransitionCount("ready", "ready")} Ready->Review=${portraitTransitionCount("ready", "review")} Ready->Unresolved=${portraitTransitionCount("ready", "unresolved")} Review->Ready=${portraitTransitionCount("review", "ready")} Review->Review=${portraitTransitionCount("review", "review")} Review->Unresolved=${portraitTransitionCount("review", "unresolved")}`,
+);
+console.log(
+  `portrait evidence counts: comparable=${portraitEvidenceAudit.comparable} exact=${portraitEvidenceAudit.exact} different=${portraitEvidenceAudit.different} unavailable=${portraitEvidenceAudit.unavailable} support=${portraitEvidenceAudit.support} weakSupport=${portraitEvidenceAudit.weakSupport} neutral=${portraitEvidenceAudit.neutral}`,
+);
+console.log(
+  `portrait ambiguity audit: sets=${portraitAmbiguityAudit.sets} candidates=${portraitAmbiguityAudit.candidates} allComparable=${portraitAmbiguityAudit.allComparable} discriminating=${portraitAmbiguityAudit.discriminating} collisions=${portraitAmbiguityAudit.collisions} incompleteComparable=${portraitAmbiguityAudit.incompleteComparable}`,
+);
+console.log(
+  `portrait classification deltas: ${Object.entries(portraitClassificationDeltas).map(([delta, count]) => `${delta}=${count}`).join(", ") || "none"}`,
+);
+console.log(
+  `portrait ready controls: readyStable=${portraitReadyControls.readyStable} readyRegressions=${portraitReadyControls.readyRegressions} reviewPromotions=${portraitReadyControls.reviewPromotions}`,
 );
 console.log("Ready regressions:");
 readyRegressions.forEach(({ item, previous }) => {
@@ -301,6 +603,18 @@ assert.equal(playerEvidenceAudit.missingOrUnknownClassification, 0, "real-scan c
 assert.equal(playerEvidenceAudit.missingOrUnknownType, 0, "real-scan evidence entries should have known types");
 assert.equal(playerEvidenceAudit.missingOrUnknownStrength, 0, "real-scan evidence entries should have known strengths");
 assert.equal(playerEvidenceAudit.missingLabel, 0, "real-scan evidence entries should have labels");
+assert.equal(guildEvidenceAudit.missingClassification, 0, "current guild candidates should have classification");
+assert.equal(guildEvidenceAudit.missingOrUnknownClassification, 0, "current guild candidates should have known classifications");
+assert.equal(guildEvidenceAudit.uiUnclassified, 0, "current guild candidates should not render as unclassified");
+assert.equal(guildEvidenceAudit.missingOrUnknownType, 0, "current guild evidence entries should have known types");
+assert.equal(guildEvidenceAudit.missingOrUnknownStrength, 0, "current guild evidence entries should have known strengths");
+assert.equal(guildEvidenceAudit.missingLabel, 0, "current guild evidence entries should have labels");
+assert.equal(
+  forbiddenSingleDirectReviews.length,
+  0,
+  "single exact+unique+same-CoA guild review with positive continuity and no assignment conflict should be promoted",
+);
+assert.equal(duplicateGuildMigrationEdges.length, 0, "guild migration edges should be unique by physical historical guild per current guild");
 assert.equal(
   report.summary.ready + report.summary.review + report.summary.unresolved + report.summary.noHistoricalObservation + report.summary.noHistory + report.summary.completed,
   report.summary.total,
@@ -377,6 +691,29 @@ const semanticDifferentiated = playerItems
 const historyCases = playerItems
   .filter((item) => item.status === "ready" && item.observations.length > 1 && item.candidates.some((candidate) => candidate.entityType === "player" && candidate.ready))
   .slice(0, 6);
+const knownPortraitCases = [
+  {
+    label: "heizRON / Heiznor",
+    currentNames: new Set(["heizron"]),
+    historicalNames: new Set(["heiznor"]),
+  },
+  {
+    label: "F2PKruemel / Erdkruemel",
+    currentNames: new Set(["f2pkrümel", "f2pkrumel", "f2pkruemel"]),
+    historicalNames: new Set(["erdkrümel", "erdkrumel", "erdkruemel"]),
+  },
+].map((knownCase) => {
+  const item = playerItems.find(
+    (entry) =>
+      knownCase.currentNames.has(normalizeKey(entry.currentName)) ||
+      entry.candidates.some((candidate) => knownCase.historicalNames.has(normalizeKey(candidate.historicalName))),
+  );
+  const result = item ? strictResultByIdentifier.get(normalizeKey(item.currentIdentifier)) : null;
+  const candidate = result?.candidates.find((entry) => knownCase.historicalNames.has(normalizeKey(entry.oldName))) ?? null;
+  const portrait = candidate?.evidence.entries.find((entry) => entry.type === "portrait-continuity") ?? null;
+  const preItem = item ? prePortraitPlayerById.get(item.id) : null;
+  return { knownCase, item, preItem, candidate, portrait };
+});
 console.log("Ground-truth player cases:");
 console.log(
   `- Mika: current=${mika?.currentIdentifier ?? "missing"} status=${mika?.status ?? "missing"} ready=${mika?.readyCandidateIdentifier ?? "missing"} candidates=${mika?.candidates.length ?? 0}`,
@@ -441,6 +778,12 @@ console.log("History-aware cases:");
 historyCases.forEach((item) => {
   console.log(
     `- ${item.currentName ?? item.currentIdentifier}: current=${item.currentIdentifier} status=${item.status} ready=${item.readyCandidateIdentifier ?? "missing"} observations=${item.observations.length}`,
+  );
+});
+console.log("Known portrait cases:");
+knownPortraitCases.forEach(({ knownCase, item, preItem, candidate, portrait }) => {
+  console.log(
+    `- ${knownCase.label}: current=${item?.currentName ?? "missing"} status=${preItem?.status ?? "missing"}->${item?.status ?? "missing"} historical=${candidate?.oldName ?? candidate?.oldIdentifier ?? "missing"} classification=${candidate?.classification ?? "missing"} portrait=${candidate?.evidence.portraitContinuity ?? "unavailable"} portraitRank=${portrait?.strength ?? "none"} detail=${portrait?.detail ?? "none"}`,
   );
 });
 assert.ok(mika, "expected Mika in global player pool");

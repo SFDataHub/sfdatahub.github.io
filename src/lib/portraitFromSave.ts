@@ -29,7 +29,7 @@ const DEFAULT_PORTRAIT_OPTIONS: PortraitOptions = {
   mirrorHorizontal: true,
 };
 
-const mapFrameIdToName = (frameId: number): PortraitOptions["frame"] => {
+const mapFrameIdToName = (frameId: number | null | undefined): PortraitOptions["frame"] => {
   switch (frameId) {
     case 1:
       return "goldenFrame";
@@ -55,24 +55,27 @@ export function createPortraitOptionsFromSaveArray(
   source?: PortraitSaveLayoutSource,
 ): PortraitOptions {
   const decoded = extractPortraitFromSaveArray(save, source);
+  const appearance = decoded.appearance;
+  const rendererHairColor = appearance.hair.color > 0 ? appearance.hair.color : DEFAULT_PORTRAIT_OPTIONS.hairColor;
+  const rendererHornColor = appearance.horn.color ?? (appearance.gender === "female" ? 1 : rendererHairColor);
   const portrait: PortraitOptions = {
     ...DEFAULT_PORTRAIT_OPTIONS,
-    genderName: decoded.genderName,
-    class: decoded.classId,
-    race: decoded.raceId,
-    mouth: decoded.mouth,
-    hair: decoded.hair,
-    brows: decoded.brows,
-    eyes: decoded.eyes,
-    beard: decoded.beard,
-    nose: decoded.nose,
-    ears: decoded.ears,
-    extra: decoded.extra,
-    horn: decoded.horn,
-    special: decoded.special,
-    hairColor: decoded.hairColor,
-    hornColor: decoded.hornColor,
-    frame: mapFrameIdToName(decoded.frameId),
+    genderName: appearance.gender ?? DEFAULT_PORTRAIT_OPTIONS.genderName,
+    class: appearance.classId,
+    race: appearance.raceId,
+    mouth: appearance.mouth,
+    hair: appearance.hair.style,
+    brows: appearance.brows.style,
+    eyes: appearance.eyes,
+    beard: appearance.beard.none ? 0 : appearance.beard.style ?? 0,
+    nose: appearance.nose,
+    ears: appearance.ears,
+    extra: appearance.extra,
+    horn: appearance.horn.renderable ? appearance.horn.style ?? 0 : 0,
+    special: appearance.specialPortrait.active ? appearance.specialPortrait.sourceValue : 0,
+    hairColor: rendererHairColor,
+    hornColor: rendererHornColor,
+    frame: mapFrameIdToName(decoded.frame.frameId),
   };
 
   return portrait;

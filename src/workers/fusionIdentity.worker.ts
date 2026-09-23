@@ -1,4 +1,5 @@
 import { loadFusionIdentityManagementReport } from "../lib/identities/fusionIdentityManagement";
+import type { FusionIdentityAnalysisScope } from "../lib/identities/fusionIdentityScopes";
 import type {
   FusionIdentityProgress,
   FusionIdentityProgressPhase,
@@ -44,7 +45,10 @@ const createTimingTracker = () => {
 
 const serializeError = (error: unknown) => (error instanceof Error ? error.message : "Could not build fusion identity report.");
 
-const runBuildReport = async (requestId: string) => {
+const runBuildReport = async (
+  requestId: string,
+  scope?: FusionIdentityAnalysisScope,
+) => {
   activeRequestId = requestId;
   cancelledRequests.delete(requestId);
   const timings = createTimingTracker();
@@ -58,7 +62,10 @@ const runBuildReport = async (requestId: string) => {
   };
 
   try {
-    const report = await loadFusionIdentityManagementReport({}, { onProgress: emitProgress });
+    const report = await loadFusionIdentityManagementReport(
+      {},
+      { onProgress: emitProgress, scope },
+    );
     if (cancelledRequests.has(requestId) || activeRequestId !== requestId) {
       postWorkerMessage({ type: "cancelled", requestId });
       return;
@@ -90,6 +97,6 @@ globalThis.addEventListener("message", (event: MessageEvent<FusionIdentityWorker
     cancelledRequests.add(activeRequestId);
   }
 
-  void runBuildReport(request.requestId);
+  void runBuildReport(request.requestId, request.scope);
 });
 

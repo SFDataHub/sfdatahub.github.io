@@ -195,8 +195,12 @@ export default function ServerSheet({
 
 /* ---------- Styles (inline, 1:1 aus deiner Datei) ---------- */
 const backdropStyle: React.CSSProperties = {
-  position: "fixed", inset: 0, background: PALETTE.backdrop, zIndex: 50,
+  position: "fixed",
+  inset: "var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0)",
+  background: PALETTE.backdrop,
+  zIndex: 50,
   display: "grid", placeItems: "center", padding: 16,
+  boxSizing: "border-box",
 };
 
 const modalStyle: React.CSSProperties = {

@@ -1,4 +1,5 @@
 import type { FusionIdentityManagementReport } from "./fusionIdentityManagement";
+import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
 
 export type FusionIdentityProgressPhase =
   | "loading"
@@ -27,6 +28,7 @@ export type FusionIdentityWorkerRequest =
   | {
       type: "build-report";
       requestId: string;
+      scope?: FusionIdentityAnalysisScope;
     }
   | {
       type: "cancel";

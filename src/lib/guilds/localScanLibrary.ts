@@ -780,7 +780,14 @@ function createSnapshotRawData(raw: NormalizedRawScanRecord, bucket: LogicalTime
   };
 }
 
-export function deriveGuildHubLogicalScanSnapshots(scan: GuildHubLocalScan): GuildHubLogicalScanSnapshot[] {
+export function deriveGuildHubLogicalScanSnapshots(
+  scan: GuildHubLocalScan,
+  optionsOrIndex:
+    | { onNormalizedSnapshotCreated?: (durationMs: number) => void }
+    | number = {},
+): GuildHubLogicalScanSnapshot[] {
+  const options =
+    typeof optionsOrIndex === "number" ? {} : optionsOrIndex;
   const raw = getScanRawData(scan);
   if (!raw) return [];
 
@@ -789,7 +796,9 @@ export function deriveGuildHubLogicalScanSnapshots(scan: GuildHubLocalScan): Gui
     if (!timestamp) return [];
 
     const rawData = createSnapshotRawData(raw, bucket);
+    const normalizedStartedAt = performance.now();
     const normalizedMembers = normalizeGuildScanMembers(rawData);
+    options.onNormalizedSnapshotCreated?.(performance.now() - normalizedStartedAt);
     const servers = extractServers(rawData);
     const guildCount = countScanGuilds(rawData, normalizedMembers);
 

@@ -1,15 +1,16 @@
 .backdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
   background: rgba(3, 10, 20, 0.7);
   display: grid;
   place-items: center;
   z-index: 9999;
+  box-sizing: border-box;
 }
 
 .panel {
   width: min(920px, 92vw);
-  max-height: 86vh;
+  max-height: min(86vh, calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px));
   background: #152A42;
   border: 1px solid #2B4C73;
   border-radius: 16px;
@@ -62,6 +63,9 @@
 .content {
   padding: 16px;
   overflow: auto;
-  max-height: calc(86vh - 56px);
+  max-height: min(
+    calc(86vh - 56px),
+    calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 88px)
+  );
   color: #FFFFFF;
 }
