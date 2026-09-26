@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  derivePlayerHistoricalCorridor,
   isPlayerFusionActionableIdentityCandidate,
   isPlayerFusionReadyCandidate,
   resolvePlayerFusions,
@@ -10,9 +11,11 @@ import {
   type PlayerFusionCandidateClassification,
   type PlayerFusionEvidenceEntryType,
   type PlayerFusionEvidenceStrength,
+  type PlayerFusionResolverLiveDiagnostic,
   type PlayerFusionSemanticSummary,
   type PlayerFusionObservation,
 } from "../../src/lib/identities/playerFusionResolver.ts";
+import { resolveServer } from "../../src/lib/servers/serverResolver.ts";
 import type {
   PlayerPortraitAppearanceFingerprint,
   PlayerPortraitAppearanceSummary,
@@ -183,8 +186,12 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.rejected, true);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["different-class"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 1);
+  assert.deepEqual(result.diagnostics.rejectReasonCounts, { "different-class": 1 });
+  assert.equal(result.diagnostics.earlyClassRejectedCandidates, 1);
+  assert.equal(result.diagnostics.fullCandidatesMaterialized, 0);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated, 0);
 }
 
 {
@@ -194,8 +201,9 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.rejected, true);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["level-regression"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 1);
+  assert.deepEqual(result.diagnostics.rejectReasonCounts, { "level-regression": 1 });
 }
 
 {
@@ -317,11 +325,8 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
 
   assert.equal(result.status, "high-confidence");
   assert.equal(result.candidates.find((candidate) => candidate.oldIdentifier === "s3_eu_p53199")?.evidence.baseAttributesConsistent, true);
-  assert.equal(result.candidates.find((candidate) => candidate.oldIdentifier === "s3_eu_p53200")?.rejected, true);
-  assert.deepEqual(
-    result.candidates.find((candidate) => candidate.oldIdentifier === "s3_eu_p53200")?.rejectReasons,
-    ["base-stat-regression"],
-  );
+  assert.equal(result.candidates.find((candidate) => candidate.oldIdentifier === "s3_eu_p53200"), undefined);
+  assert.equal(result.diagnostics.rejectReasonCounts["base-stat-regression"], 1);
   assert.equal(
     isPlayerFusionReadyCandidate(result.candidates.find((candidate) => candidate.oldIdentifier === "s3_eu_p53199")!),
     true,
@@ -343,9 +348,9 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.rejected, true);
-  assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, false);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["base-stat-regression"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 1);
+  assert.equal(result.diagnostics.rejectReasonCounts["base-stat-regression"], 1);
 }
 
 {
@@ -448,8 +453,8 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.evidence.baseAttributesConsistent, false);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["base-stat-regression"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.rejectReasonCounts["base-stat-regression"], 1);
 }
 
 {
@@ -577,10 +582,8 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.rejected, true);
-  assert.equal(result.candidates[0]?.oldLevel, 520);
-  assert.equal(result.candidates[0]?.evidence.levelConsistent, false);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["level-regression"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.rejectReasonCounts["level-regression"], 1);
 }
 
 {
@@ -653,9 +656,8 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   }).results[0];
 
   assert.equal(result.status, "unresolved");
-  assert.equal(result.candidates[0]?.oldLevel, 510);
-  assert.equal(result.candidates[0]?.evidence.levelConsistent, false);
-  assert.deepEqual(result.candidates[0]?.rejectReasons, ["level-regression"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.rejectReasonCounts["level-regression"], 1);
 }
 
 {
@@ -726,11 +728,9 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
   assert.equal(result.status, "high-confidence");
   assert.equal(hardiy?.rejected, false);
   assert.equal(hardiy?.evidence.levelProgression.category, "normal");
-  assert.equal(darth?.rejected, true);
-  assert.equal(darth?.evidence.levelProgression.category, "extreme-contradiction");
-  assert.deepEqual(darth?.rejectReasons, ["level-progression-extreme"]);
-  assert.equal(matti?.rejected, true);
-  assert.deepEqual(matti?.rejectReasons, ["level-progression-extreme"]);
+  assert.equal(darth, undefined);
+  assert.equal(matti, undefined);
+  assert.equal(result.diagnostics.rejectReasonCounts["level-progression-extreme"], 2);
 }
 
 {
@@ -834,14 +834,10 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
     enableLevelProgressionEvidence: false,
   }).results[0];
 
-  const candidate = result.candidates[0]!;
   assert.equal(result.status, "candidate");
-  assert.equal(candidate.classification, "weak");
-  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
-  assert.deepEqual(
-    candidate.evidence.entries.filter((entry) => entry.strength === "weakSupport").map((entry) => entry.type),
-    ["pet-continuity"],
-  );
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 1);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated > 0, true);
 }
 
 {
@@ -863,11 +859,10 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
     enableLevelProgressionEvidence: false,
   }).results[0];
 
-  const candidate = result.candidates[0]!;
   assert.equal(result.status, "candidate");
-  assert.equal(candidate.classification, "weak");
-  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
-  assert.equal(portraitEntry(candidate)?.strength, "weakSupport");
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 1);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated > 0, true);
 }
 
 {
@@ -898,16 +893,10 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
     ],
   }).results[0];
 
-  const candidate = result.candidates[0]!;
   assert.equal(result.newIdentifier, "f28_net_p207342");
-  assert.equal(candidate.oldIdentifier, "s3_eu_p48915");
-  assert.equal(candidate.evidence.levelProgression.category, "insufficient-sample");
-  assert.equal(candidate.classification, "weak");
-  assert.equal(isPlayerFusionActionableIdentityCandidate(candidate), false);
-  assert.deepEqual(
-    candidate.evidence.entries.filter((entry) => entry.strength === "weakSupport").map((entry) => entry.type),
-    ["pet-continuity"],
-  );
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 1);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated > 0, true);
 }
 
 {
@@ -1065,6 +1054,580 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
 }
 
 {
+  const es10NumericId = resolveServer("ES10")?.numericId;
+  assert.ok(es10NumericId != null, "expected ES10 numeric id in registry");
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("f5_fu_p77", {
+        server: "F5",
+        timestamp: Date.parse("2025-01-10T10:00:00Z"),
+        name: "Stage Hero",
+        level: 110,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        timestamp: Date.parse("2025-05-10T10:00:00Z"),
+        name: "Stage Hero",
+        level: 120,
+        originNumericId: es10NumericId,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.originSource, "numeric");
+  assert.deepEqual(result.resolvedOriginServers, ["ES10"]);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0]?.oldIdentifier, "f5_fu_p77");
+  assert.equal(result.candidates[0]?.oldServer, "F5");
+  assert.equal(result.candidates[0]?.oldLevel, 110);
+  assert.equal(result.candidates[0]?.historyObservationCount, 1);
+  assert.equal(result.candidates[0]?.evidence.originMatches, true);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("s10_es_p1", {
+        server: "ES10",
+        timestamp: Date.parse("2024-01-10T10:00:00Z"),
+        name: "Stage Hero",
+        level: 100,
+      }),
+      historical("f5_fu_p77", {
+        server: "F5",
+        timestamp: Date.parse("2025-01-10T10:00:00Z"),
+        name: "Stage Hero",
+        level: 110,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        timestamp: Date.parse("2025-05-10T10:00:00Z"),
+        name: "Stage Hero",
+        level: 120,
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.originSource, "fusionLineage");
+  assert.deepEqual(result.resolvedOriginServers, ["ES10", "F5"]);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0]?.oldIdentifier, "s10_es_p1");
+  assert.equal(result.candidates[0]?.historyObservationCount, 2);
+  assert.equal(result.candidates[0]?.evidence.exactName, true);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("f4_sibling_p1", {
+        server: "F4",
+        timestamp: Date.parse("2025-01-10T10:00:00Z"),
+        name: "Sibling Hero",
+        level: 110,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        timestamp: Date.parse("2025-05-10T10:00:00Z"),
+        name: "Sibling Hero (ES10)",
+        level: 120,
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5", "F4"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.originSource, "fusionSuffix");
+  assert.deepEqual(result.resolvedOriginServers, ["ES10"]);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.diagnostics.historicalPoolSize, 0);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("s10_es_p1", {
+        server: "ES10",
+        timestamp: Date.parse("2024-01-10T10:00:00Z"),
+        name: "Missing Step Hero",
+        level: 100,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        timestamp: Date.parse("2025-05-10T10:00:00Z"),
+        name: "Missing Step Hero (ES10)",
+        level: 120,
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.candidates[0]?.oldIdentifier, "s10_es_p1");
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("f5_legacy_p1", {
+        server: "F5",
+        timestamp: Date.parse("2025-01-10T10:00:00Z"),
+        name: "Legacy Step Hero",
+        level: 110,
+        originNumericId: null,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        timestamp: Date.parse("2025-05-10T10:00:00Z"),
+        name: "Legacy Step Hero (ES10)",
+        level: 120,
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.originSource, "fusionSuffix");
+  assert.equal(result.candidates[0]?.oldIdentifier, "f5_legacy_p1");
+  assert.equal(result.candidates[0]?.evidence.fusionBaseName, true);
+}
+
+{
+  const corridor = derivePlayerHistoricalCorridor(
+    {
+      resolvedOriginServerCodes: ["ES10"],
+      targetServerCode: "MAERWYNN",
+      scope: {
+        targetServerCode: "MAERWYNN",
+        historicalServerCodes: ["ES10", "F1", "F2", "F5"],
+        boundaryEffectiveDate: null,
+      },
+    },
+    ((serverCode: string) =>
+      serverCode === "ES10"
+        ? [
+            { code: "ES10" },
+            { code: "F1" },
+            { code: "F2" },
+            { code: "F5" },
+            { code: "MAERWYNN" },
+          ]
+        : [{ code: serverCode }]) as never,
+  );
+
+  assert.deepEqual(corridor, ["ES10", "F1", "F2", "F5"]);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("s10_es_p1", {
+        server: "ES10",
+        name: "Scope Hero",
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "maerwynn_p1",
+        server: "MAERWYNN",
+        name: "Scope Hero (EU1)",
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+      boundaryEffectiveDate: "2025-04-25",
+    },
+  }).results[0];
+
+  assert.equal(result.originSource, "fusionLineage");
+  assert.deepEqual(result.resolvedOriginServers, ["ES10", "F5"]);
+  assert.equal(result.candidates[0]?.evidence.fusionBaseName, false);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: Array.from({ length: 40 }, (_, index) =>
+      historical(`weak_p${index}`, {
+        server: "EU3",
+        name: `Weak Candidate ${index}`,
+        classId: "7",
+        level: 100,
+      }),
+    ),
+    newObservations: [
+      post({
+        identifier: "f28_net_p_weak",
+        server: "F28",
+        name: "No Actionable Match",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.diagnostics.candidatesGeneratedInitially, 40);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 40);
+  assert.equal(result.diagnostics.candidatesRetainedAfterEvaluation, 0);
+  assert.equal(result.diagnostics.candidatesDiscardedAfterEvaluation, 40);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated > 0, true);
+  assert.equal(result.diagnostics.evidenceEntriesRetained, 0);
+  assert.equal(result.candidates.length, 0);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: Array.from({ length: 30 }, (_, index) =>
+      historical(`rejected_p${index}`, {
+        server: "EU3",
+        name: `Rejected Candidate ${index}`,
+        classId: "1",
+        level: 100,
+      }),
+    ),
+    newObservations: [
+      post({
+        identifier: "f28_net_p_rejected",
+        server: "F28",
+        name: "Rejected Pool",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "unresolved");
+  assert.equal(result.diagnostics.candidatesGeneratedInitially, 30);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 30);
+  assert.equal(result.diagnostics.rejectReasonCounts["different-class"], 30);
+  assert.equal(result.diagnostics.candidatesRetainedAfterEvaluation, 0);
+  assert.equal(result.candidates.length, 0);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: Array.from({ length: 30 }, (_, index) =>
+      historical(`anchored_p${index}`, {
+        server: "EU3",
+        name: "Shared Anchor",
+        classId: "7",
+        level: 100 + index,
+      }),
+    ),
+    newObservations: [
+      post({
+        identifier: "f28_net_p_anchored_many",
+        server: "F28",
+        name: "Shared Anchor",
+        classId: "7",
+        level: 300,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.diagnostics.candidatesGeneratedInitially, 30);
+  assert.equal(result.diagnostics.candidateClassificationCounts.anchored, 30);
+  assert.equal(result.diagnostics.candidatesRetainedAfterEvaluation, 25);
+  assert.equal(result.candidates.length, 25);
+  assert.equal(result.candidates.every((candidate) => candidate.classification === "anchored"), true);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("anchored_winner", {
+        server: "EU3",
+        name: "Single Anchor",
+        classId: "7",
+        level: 100,
+      }),
+      ...Array.from({ length: 20 }, (_, index) =>
+        historical(`weak_competitor_${index}`, {
+          server: "EU3",
+          name: `Weak Competitor ${index}`,
+          classId: "7",
+          level: 100,
+        }),
+      ),
+    ],
+    newObservations: [
+      post({
+        identifier: "f28_net_p_anchor",
+        server: "F28",
+        name: "Single Anchor",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "high-confidence");
+  assert.equal(result.diagnostics.candidatesGeneratedInitially, 21);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 20);
+  assert.equal(result.diagnostics.candidateClassificationCounts.anchored, 1);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0]?.oldIdentifier, "anchored_winner");
+}
+
+{
+  const historicalObservations = [
+    ...Array.from({ length: 100 }, (_, index) =>
+      historical(`class_bucket_warrior_${index}`, {
+        server: "EU3",
+        name: `Warrior Candidate ${index}`,
+        classId: "7",
+        level: 100,
+      }),
+    ),
+    ...Array.from({ length: 100 }, (_, index) =>
+      historical(`class_bucket_mage_${index}`, {
+        server: "EU3",
+        name: `Mage Candidate ${index}`,
+        classId: "2",
+        level: 100,
+      }),
+    ),
+    ...Array.from({ length: 100 }, (_, index) =>
+      historical(`class_bucket_scout_${index}`, {
+        server: "EU3",
+        name: `Scout Candidate ${index}`,
+        classId: "3",
+        level: 100,
+      }),
+    ),
+    ...Array.from({ length: 10 }, (_, index) =>
+      historical(`class_bucket_unknown_${index}`, {
+        server: "EU3",
+        name: `Unknown Class Candidate ${index}`,
+        classId: null,
+        level: 100,
+      }),
+    ),
+  ];
+  const result = resolvePlayerFusions({
+    historicalObservations,
+    newObservations: [
+      post({
+        identifier: "f28_net_p_class_bucket",
+        server: "F28",
+        name: "Class Bucket Current",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.diagnostics.corridorHistoriesConsidered, 310);
+  assert.equal(result.diagnostics.candidatesGeneratedInitially, 310);
+  assert.equal(result.diagnostics.earlyClassRejectedCandidates, 200);
+  assert.equal(result.diagnostics.earlyHardRejectedCandidates, 200);
+  assert.equal(result.diagnostics.fullCandidatesMaterialized, 110);
+  assert.equal(result.diagnostics.fullCandidatesEvaluated, 110);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 200);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 110);
+  assert.equal(result.diagnostics.rejectReasonCounts["different-class"], 200);
+  assert.equal(result.diagnostics.candidatesRetainedAfterEvaluation, 0);
+  assert.equal(result.diagnostics.evidenceEntriesGenerated > 0, true);
+  assert.equal(result.diagnostics.evidenceEntriesRetained, 0);
+  assert.equal(result.candidates.length, 0);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("missing_class_candidate", {
+        server: "EU3",
+        name: "Missing Class Candidate",
+        classId: null,
+        level: 100,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "f28_net_p_missing_class",
+        server: "F28",
+        name: "Different Current Name",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(result.diagnostics.earlyClassRejectedCandidates, 0);
+  assert.equal(result.diagnostics.fullCandidatesMaterialized, 1);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 1);
+}
+
+{
+  const result = resolvePlayerFusions({
+    historicalObservations: [
+      historical("fr5_same_class", {
+        server: "FR5",
+        name: "FR5 Same Class",
+        classId: "7",
+        level: 100,
+      }),
+      historical("fr5_different_class", {
+        server: "FR5",
+        name: "FR5 Different Class",
+        classId: "1",
+        level: 100,
+      }),
+      historical("fr5_unknown_class", {
+        server: "FR5",
+        name: "FR5 Unknown Class",
+        classId: null,
+        level: 100,
+      }),
+      historical("f6_same_class", {
+        server: "F6",
+        name: "F6 Same Class",
+        classId: "7",
+        level: 100,
+      }),
+      historical("f6_different_class", {
+        server: "F6",
+        name: "F6 Different Class",
+        classId: "1",
+        level: 100,
+      }),
+      historical("f6_unknown_class", {
+        server: "F6",
+        name: "F6 Unknown Class",
+        classId: null,
+        level: 100,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "stumblesteppe_p_multistage",
+        server: "STUMBLESTEPPE",
+        name: "Current Multi Stage (FR5)",
+        classId: "7",
+        level: 200,
+        originNumericId: null,
+      }),
+    ],
+    scope: {
+      targetServerCode: "STUMBLESTEPPE",
+      historicalServerCodes: ["FR5", "F6"],
+      boundaryEffectiveDate: "2025-05-01",
+    },
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.deepEqual(result.resolvedOriginServers, ["FR5"]);
+  assert.equal(result.diagnostics.corridorHistoriesConsidered, 6);
+  assert.equal(result.diagnostics.earlyClassRejectedCandidates, 2);
+  assert.equal(result.diagnostics.fullCandidatesMaterialized, 4);
+  assert.equal(result.diagnostics.candidateClassificationCounts.weak, 4);
+  assert.equal(result.diagnostics.candidateClassificationCounts.rejected, 2);
+}
+
+{
+  const renameResult = resolvePlayerFusions({
+    historicalObservations: [
+      historical("rename_candidate", {
+        server: "EU3",
+        name: "Old Rename",
+        classId: "7",
+        level: 100,
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "f28_net_p_rename_candidate",
+        server: "F28",
+        name: "New Rename",
+        classId: "7",
+        level: 200,
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+  const guildChangeResult = resolvePlayerFusions({
+    historicalObservations: [
+      historical("guild_change_candidate", {
+        server: "EU3",
+        name: "Guild Change",
+        classId: "7",
+        level: 100,
+        guildIdentifier: "old_guild",
+      }),
+    ],
+    newObservations: [
+      post({
+        identifier: "f28_net_p_guild_change_candidate",
+        server: "F28",
+        name: "Guild Change",
+        classId: "7",
+        level: 200,
+        guildIdentifier: "new_guild",
+      }),
+    ],
+    enableLevelProgressionEvidence: false,
+  }).results[0];
+
+  assert.equal(renameResult.diagnostics.earlyClassRejectedCandidates, 0);
+  assert.equal(renameResult.diagnostics.fullCandidatesMaterialized, 1);
+  assert.equal(renameResult.diagnostics.candidateClassificationCounts.weak, 1);
+  assert.equal(guildChangeResult.diagnostics.earlyClassRejectedCandidates, 0);
+  assert.equal(guildChangeResult.diagnostics.fullCandidatesMaterialized, 1);
+  assert.equal(guildChangeResult.diagnostics.candidateClassificationCounts.anchored, 1);
+}
+
+{
   const schemaResults = [
     resolvePlayerFusions({
       historicalObservations: [
@@ -1104,8 +1667,81 @@ const assertCandidateEvidenceSchema = (candidates: PlayerFusionCandidate[]) => {
 
   assertCandidateEvidenceSchema(schemaCandidates);
   EXPECTED_EVIDENCE_STRENGTHS.forEach((strength) => {
+    if (strength === "hardContradiction" || strength === "strongContradiction") return;
     assert.ok(schemaStrengths.has(strength), `schema fixture should cover ${strength}`);
   });
+  assert.equal(schemaResults[1]?.diagnostics.candidateClassificationCounts.rejected, 1);
+  assert.equal(schemaResults[1]?.diagnostics.rejectReasonCounts["different-class"], 1);
+  assert.equal((schemaResults[2]?.diagnostics.evidenceEntriesGenerated ?? 0) > 0, true);
+}
+
+{
+  const progress: Array<{ current: number; total: number }> = [];
+  resolvePlayerFusions({
+    historicalObservations: [historical("s3_eu_progress_anchor")],
+    newObservations: Array.from({ length: 120 }, (_, index) =>
+      post({
+        identifier: `f28_net_progress_${index + 1}`,
+        name: `Progress ${index + 1}`,
+        originNumericId: null,
+      }),
+    ),
+    onProgress: (entry) => progress.push(entry),
+  });
+
+  assert.ok(
+    progress.some((entry) => entry.current > 0 && entry.current < entry.total),
+    "player resolver emits real intermediate progress",
+  );
+  assert.deepEqual(progress.at(-1), { current: 120, total: 120 });
+}
+
+{
+  const liveDiagnostics: PlayerFusionResolverLiveDiagnostic[] = [];
+  const historicalObservations = Array.from({ length: 120 }, (_, index) =>
+    historical(`perf_${index + 1}`, {
+      server: `EU${(index % 4) + 1}`,
+      name: `Perf ${index + 1}`,
+      classId: String((index % 8) + 1),
+    }),
+  );
+  const newObservations = Array.from({ length: 8 }, (_, index) =>
+    post({
+      identifier: `f28_net_perf_${index + 1}`,
+      name: `Perf ${index + 1}`,
+      classId: String((index % 8) + 1),
+      originNumericId: null,
+    }),
+  );
+
+  resolvePlayerFusions({
+    historicalObservations,
+    newObservations,
+    scope: {
+      targetServerCode: "F28",
+      historicalServerCodes: ["EU1", "EU2", "EU3", "EU4"],
+      boundaryEffectiveDate: "2026-02-06",
+    },
+    onLiveDiagnostics: (diagnostic) => liveDiagnostics.push(diagnostic),
+  });
+
+  const indexBuildDiagnostics = liveDiagnostics.filter(
+    (diagnostic) => diagnostic.event === "historical-index-build-finished",
+  );
+  const lookupDiagnostics = liveDiagnostics.filter(
+    (diagnostic) => diagnostic.event === "candidate-histories-history-scan-finished",
+  );
+
+  assert.equal(indexBuildDiagnostics.length, 1);
+  assert.equal(indexBuildDiagnostics[0]?.nestedFullHistoryScans, 0);
+  assert.ok(
+    (indexBuildDiagnostics[0]?.candidateHistoryComparisons ?? Number.POSITIVE_INFINITY) <=
+      historicalObservations.length,
+    "historical index compares name-bucketed histories once, not current x historical",
+  );
+  assert.ok(lookupDiagnostics.length >= 1);
+  assert.equal(lookupDiagnostics[0]?.nestedFullHistoryScans, 0);
+  assert.equal(lookupDiagnostics[0]?.candidateHistoryComparisons, 0);
 }
 
 console.log("playerFusionResolver test passed");

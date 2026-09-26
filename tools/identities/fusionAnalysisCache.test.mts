@@ -8,16 +8,12 @@ import {
   isFusionResolverVersionCompatible,
   type FusionIdentityAnalysisCacheEntry,
 } from "../../src/lib/identities/fusionAnalysisCache.ts";
-import type { FusionIdentityAnalysisScope } from "../../src/lib/identities/fusionIdentityScopes.ts";
+import { listFusionIdentityAnalysisScopes } from "../../src/lib/identities/fusionIdentityScopes.ts";
 
-const scope: FusionIdentityAnalysisScope = {
-  id: "F28",
-  label: "EU1-EU4 -> F28",
-  targetServerCode: "F28",
-  targetServerName: "Fusion 28",
-  originServerCodes: ["EU1", "EU2", "EU3", "EU4"],
-  originServerNames: ["EU 1", "EU 2", "EU 3", "EU 4"],
-};
+const scope = listFusionIdentityAnalysisScopes({ atDate: "2026-09-24" }).find(
+  (entry) => entry.targetServerCode === "F28",
+);
+assert.ok(scope);
 
 const report = {
   scope: {

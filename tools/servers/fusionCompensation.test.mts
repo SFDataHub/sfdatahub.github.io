@@ -6,6 +6,7 @@ import {
   calculateThirtyDayMonthDifference,
   floorToPreviousHalfMonth,
   getFusionLevelCompensation,
+  getFusionPathLevelCompensation,
 } from "../../src/lib/servers/fusionCompensation.ts";
 
 const levelFromMonths = (months: number) => Math.floor(months * 2);
@@ -33,6 +34,41 @@ assert.equal(eu1.available && eu1.compensationLevels, 0);
 assert.equal(eu2.available && eu2.compensationLevels, 3);
 assert.equal(eu3.available && eu3.compensationLevels, 6);
 assert.equal(eu4.available && eu4.compensationLevels, 9);
+
+const eu2Path = getFusionPathLevelCompensation("EU2", "F28");
+assert.equal(eu2Path.available && eu2Path.compensationLevels, 3);
+
+const es10ToMaerwynn = getFusionPathLevelCompensation("ES10", "MAERWYNN");
+assert.equal(es10ToMaerwynn.available && es10ToMaerwynn.compensationPolicy, "none");
+assert.equal(es10ToMaerwynn.available && es10ToMaerwynn.compensationLevels, 0);
+
+const br1ToMaerwynn = getFusionPathLevelCompensation("BR1", "MAERWYNN");
+assert.equal(br1ToMaerwynn.available && br1ToMaerwynn.compensationPolicy, "none");
+assert.equal(br1ToMaerwynn.available && br1ToMaerwynn.compensationLevels, 0);
+
+assert.deepEqual(getFusionPathLevelCompensation("W46", "F24"), {
+  available: false,
+  reason: "unknown-compensation-policy",
+  originServer: "W46",
+  destinationServer: "F24",
+});
+
+assert.deepEqual(getFusionLevelCompensation("W46", "F24"), {
+  available: false,
+  reason: "unknown-compensation-policy",
+  originServer: "W46",
+  destinationServer: "F24",
+});
+
+const firstStageToMaerwynn = getFusionLevelCompensation("F1", "MAERWYNN");
+assert.equal(firstStageToMaerwynn.available && firstStageToMaerwynn.compensationPolicy, "none");
+assert.equal(firstStageToMaerwynn.available && firstStageToMaerwynn.compensationApplicable, false);
+assert.deepEqual(getFusionLevelCompensation("BR1", "MAERWYNN"), {
+  available: false,
+  reason: "origin-not-in-fusion-group",
+  originServer: "BR1",
+  destinationServer: "MAERWYNN",
+});
 
 const originWithoutDate: LocalServerDefinition = {
   code: "EU2",
@@ -83,6 +119,12 @@ assert.deepEqual(calculateFusionLevelCompensationFromOrigins(originWithoutDate, 
   rawMonthDifference: null,
   flooredHalfMonths: null,
   compensationLevels: 0,
+});
+assert.deepEqual(calculateFusionLevelCompensationFromOrigins(originWithoutDate, destination, [oldest, originWithoutDate], "unknown"), {
+  available: false,
+  reason: "unknown-compensation-policy",
+  originServer: "EU2",
+  destinationServer: "F28",
 });
 
 console.log("fusionCompensation test passed");

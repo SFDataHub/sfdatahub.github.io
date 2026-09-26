@@ -1,0 +1,41 @@
+.root {
+  position: relative;
+  width: var(--combined-potion-size, 320px);
+  aspect-ratio: 1.08;
+  display: block;
+  isolation: isolate;
+}
+
+.potion {
+  position: absolute;
+  left: var(--potion-x);
+  top: var(--potion-y);
+  width: var(--potion-width);
+  z-index: var(--potion-z);
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--potion-rotate))
+    scaleX(var(--potion-flip-x));
+  transform-origin: 50% 50%;
+  filter:
+    drop-shadow(0 12px 12px rgba(0, 0, 0, 0.42))
+    drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
+  image-rendering: auto;
+  user-select: none;
+  pointer-events: none;
+}
+
+.fallback {
+  position: absolute;
+  left: var(--potion-x);
+  top: var(--potion-y);
+  width: var(--potion-width);
+  aspect-ratio: 1;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--potion-rotate))
+    scaleX(var(--potion-flip-x));
+  border: 1px dashed rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}

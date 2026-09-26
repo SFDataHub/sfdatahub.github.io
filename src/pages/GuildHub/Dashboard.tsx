@@ -6,7 +6,6 @@ import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import { getClassMetaById, iconForClassName, type ClassMeta } from "../../data/classes";
-import { guildIconByIdentifier } from "../../data/guilds";
 import { SERVER_BY_ID } from "../../data/servers";
 import {
   getGuildHubLocalScan,
@@ -17,10 +16,15 @@ import {
   type GuildHubLocalScan,
   type GuildHubScanSummary,
 } from "../../lib/guilds/localScanLibrary";
+import { normalizeGuildScanMembers, type NormalizedGuildMember, type NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
 import type { GuildAnalyticsMemberSnapshot } from "../../lib/guilds/localGuildAnalyticsStore";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { toDriveThumbProxy } from "../../lib/urls";
+import { useGuildEmblemVisual } from "../../components/guilds/GuildEmblem";
+import LocalPlayerProfileOverlay from "../../components/local-player-profile/LocalPlayerProfileOverlay";
+import type { LocalPlayerProfileModel } from "../../components/local-player-profile/types";
+import { buildLocalPlayerProfileModel } from "./localPlayerProfileAdapter";
 import { useGuildHubSelection, type GuildHubSelectedGuild } from "./hooks/useGuildHubSelection";
 import styles from "./Dashboard.module.css";
 
@@ -39,6 +43,15 @@ type LocalMember = {
   hofRank: number | null;
   baseMain: number | null;
   totalStats: number | null;
+  guildRole?: NormalizedGuildRole;
+  localRef?: {
+    sourceScanId: string;
+    sourcePlayerKey: string;
+    identifier: string | null;
+    playerId: string | null;
+    server: string | null;
+    matchedByNameFallback: boolean;
+  };
 };
 
 type LocalGuildScanView = {
@@ -52,6 +65,7 @@ type LocalGuildScanView = {
     hofRank: number | null;
   };
   members: LocalMember[];
+  playerLookup: Map<string, JsonRecord>;
 };
 
 type DashboardGuildSource = {
@@ -85,6 +99,7 @@ type TransferSummary = {
 export default function GuildHubDashboard() {
   const { activeGuild } = useGuildHubSelection();
   const scanState = useDashboardScans(activeGuild);
+  const [selectedLocalProfile, setSelectedLocalProfile] = React.useState<LocalPlayerProfileModel | null>(null);
 
   const latest = scanState.latest;
   const comparison = React.useMemo(() => {
@@ -97,12 +112,35 @@ export default function GuildHubDashboard() {
     if (!latest || !comparison || !scanState.comparisonMembers) return null;
     return buildTransferSummary(latest.members, scanState.comparisonMembers);
   }, [comparison, latest, scanState.comparisonMembers]);
+  const handleMemberClick = React.useCallback(
+    (member: LocalMember) => {
+      if (!latest || !member.localRef) return;
+      const rawPlayer = latest.playerLookup.get(member.localRef.sourcePlayerKey);
+      if (!rawPlayer) return;
+
+      const profile = buildLocalPlayerProfileModel({
+        rawPlayer,
+        sourceScanId: latest.source.sourceScanId,
+        sourcePlayerKey: member.localRef.sourcePlayerKey,
+        scannedAtMs: latest.scannedAtMs,
+        scannedAtIso: latest.scannedAtIso,
+        guild: latest.guild,
+        guildRole: member.guildRole ?? null,
+      });
+      setSelectedLocalProfile(profile);
+    },
+    [latest],
+  );
+
+  React.useEffect(() => {
+    setSelectedLocalProfile(null);
+  }, [activeGuild?.id, latest?.source.sourceScanId, latest?.scannedAtMs]);
 
   return (
     <ContentShell centerFramed={false}>
       <div className={styles.page}>
         <div className={styles.topbar}>
-          <GuildContextBar />
+          <GuildContextBar useImageFallback={false} />
           <SectionDividerHeader title="Dashboard" className={styles.divider} />
         </div>
 
@@ -130,7 +168,7 @@ export default function GuildHubDashboard() {
           <div className={styles.dashboardGrid}>
             <div className={styles.leftColumn}>
               <GuildOverviewCard guild={activeGuild} latest={latest} scanCount={scanState.sources.length} />
-              <MemberListCard members={latest.members} />
+              <MemberListCard members={latest.members} onMemberClick={handleMemberClick} />
             </div>
             <div className={styles.rightColumn}>
               <KpiPanel latest={latest} scanCount={scanState.sources.length} />
@@ -138,6 +176,11 @@ export default function GuildHubDashboard() {
             </div>
           </div>
         )}
+        <LocalPlayerProfileOverlay
+          isOpen={Boolean(selectedLocalProfile)}
+          profile={selectedLocalProfile}
+          onClose={() => setSelectedLocalProfile(null)}
+        />
       </div>
     </ContentShell>
   );
@@ -337,8 +380,12 @@ function GuildOverviewCard({
   latest: LocalGuildScanView;
   scanCount: number;
 }) {
-  const emblem = guildIconByIdentifier(guild.logoIdentifier, 160);
   const guildName = latest.guild.name ?? guild.name;
+  const { visualEmblemUrl } = useGuildEmblemVisual({
+    coaString: latest.source.guild.coaString,
+    emblemUrl: null,
+    name: guildName,
+  });
   const serverLabel = formatServerLabel(latest.guild.server ?? guild.server);
   const memberCount = latest.guild.memberCount ?? latest.members.length;
 
@@ -346,8 +393,8 @@ function GuildOverviewCard({
     <section className={styles.panel}>
       <div className={styles.guildHero}>
         <div className={styles.guildEmblem}>
-          {emblem.thumb ? (
-            <img src={emblem.thumb} alt={`${guildName} Wappen`} />
+          {visualEmblemUrl ? (
+            <img src={visualEmblemUrl} alt={`${guildName} Wappen`} />
           ) : (
             <span>{guildName.trim().charAt(0).toUpperCase() || "G"}</span>
           )}
@@ -371,16 +418,14 @@ function GuildOverviewCard({
   );
 }
 
-function MemberListCard({ members }: { members: LocalMember[] }) {
-  const sorted = React.useMemo(
-    () =>
-      [...members].sort(
-        (a, b) =>
-          (b.level ?? -1) - (a.level ?? -1) ||
-          a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      ),
-    [members],
-  );
+function MemberListCard({
+  members,
+  onMemberClick,
+}: {
+  members: LocalMember[];
+  onMemberClick: (member: LocalMember) => void;
+}) {
+  const sorted = React.useMemo(() => sortMembersByFightTrackerParticipationDefault(members), [members]);
 
   return (
     <section className={`${styles.panel} ${styles.memberPanel}`}>
@@ -395,7 +440,7 @@ function MemberListCard({ members }: { members: LocalMember[] }) {
       {sorted.length ? (
         <div className={styles.memberList}>
           {sorted.map((member) => (
-            <MemberRow key={member.key} member={member} />
+            <MemberRow key={member.key} member={member} onClick={onMemberClick} />
           ))}
         </div>
       ) : (
@@ -405,7 +450,31 @@ function MemberListCard({ members }: { members: LocalMember[] }) {
   );
 }
 
-function MemberRow({ member }: { member: LocalMember }) {
+const sortMembersByFightTrackerParticipationDefault = <
+  T extends { guildRole?: NormalizedGuildRole; level: number | null; name: string },
+>(
+  members: T[],
+) =>
+  [...members].sort((a, b) => {
+    const byName = () => a.name.localeCompare(b.name, "de-DE", { sensitivity: "base" });
+    const roleOrder: Record<Exclude<NormalizedGuildRole, null>, number> = { leader: 0, officer: 1, member: 2 };
+    const aRole = a.guildRole ? roleOrder[a.guildRole] : 3;
+    const bRole = b.guildRole ? roleOrder[b.guildRole] : 3;
+    if (aRole !== bRole) return aRole - bRole;
+
+    const aLevel = a.level;
+    const bLevel = b.level;
+    const aLevelMissing = aLevel == null;
+    const bLevelMissing = bLevel == null;
+    if (aLevelMissing || bLevelMissing) {
+      if (aLevelMissing && bLevelMissing) return byName();
+      return aLevelMissing ? 1 : -1;
+    }
+
+    return bLevel - aLevel || byName();
+  });
+
+function MemberRow({ member, onClick }: { member: LocalMember; onClick: (member: LocalMember) => void }) {
   const secondary = [
     member.classLabel ?? "Klasse unbekannt",
     typeof member.level === "number" ? `Lv. ${formatInteger(member.level)}` : null,
@@ -418,7 +487,7 @@ function MemberRow({ member }: { member: LocalMember }) {
         : null;
 
   return (
-    <div className={styles.memberRow}>
+    <button type="button" className={styles.memberRow} onClick={() => onClick(member)}>
       <ClassIcon classLabel={member.classLabel} classMeta={member.classMeta} fallbackText={member.name} />
       <div className={styles.memberIdentity}>
         <span className={styles.memberName}>{member.name}</span>
@@ -428,7 +497,7 @@ function MemberRow({ member }: { member: LocalMember }) {
         <span>{score ?? "-"}</span>
         <small>Ehre/HoF</small>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -637,10 +706,18 @@ function buildGuildScanView(
   const activeServer = normalizeServerForCompare(activeGuild.server);
   const activeGuildSegment = normalizeGuildSegment(activeGuild.guildId) ?? normalizeGuildSegment(activeGuild.logoIdentifier);
   const group = raw.groups.find((entry) => isGroupMatch(entry, activeGuild, activeServer, activeGuildSegment)) ?? null;
-  const members = raw.players
-    .filter((entry) => isPlayerInGuild(entry, activeGuild, activeServer, activeGuildSegment))
-    .map((entry) => toLocalMember(entry, activeServer))
+  const normalizedMembers = normalizeGuildScanMembers(raw);
+  const normalizedByRef = new Map(normalizedMembers.map((member) => [member.memberRef.toLowerCase(), member]));
+  const matchingPlayers = raw.players.filter((entry) => isPlayerInGuild(entry, activeGuild, activeServer, activeGuildSegment));
+  const nameCounts = buildPlayerNameCounts(matchingPlayers);
+  const playerLookup = new Map<string, JsonRecord>();
+  const members = matchingPlayers
+    .map((entry) => toLocalMember(entry, activeServer, source.sourceScanId, nameCounts, normalizedByRef))
     .filter((member): member is LocalMember => Boolean(member));
+  members.forEach((member) => {
+    const rawPlayer = matchingPlayers.find((entry) => member.localRef?.sourcePlayerKey === resolveLocalPlayerKey(entry, activeServer, source.sourceScanId, nameCounts));
+    if (rawPlayer && member.localRef) playerLookup.set(member.localRef.sourcePlayerKey, rawPlayer);
+  });
 
   return {
     source,
@@ -659,6 +736,7 @@ function buildGuildScanView(
         (group ? readNumber(group, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank", "guildRank"]) : null),
     },
     members,
+    playerLookup,
   };
 }
 
@@ -721,28 +799,77 @@ function isPlayerInGuild(
   return Boolean(playerGuildName && normalizeLoose(playerGuildName) === normalizeLoose(activeGuild.name) && serverMatches);
 }
 
-function toLocalMember(player: JsonRecord, fallbackServer: string | null): LocalMember | null {
+function toLocalMember(
+  player: JsonRecord,
+  fallbackServer: string | null,
+  sourceScanId: string,
+  nameCounts: Map<string, number>,
+  normalizedByRef: Map<string, NormalizedGuildMember>,
+): LocalMember | null {
   const identifier = readString(player, ["identifier", "Identifier"]);
   const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
   const server = normalizeServerForCompare(
     readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(identifier) ?? fallbackServer,
   );
-  const key = identifier ? identifier.toLowerCase() : playerId && server ? `${server}_p${playerId}` : playerId;
+  const key = resolveLocalPlayerKey(player, fallbackServer, sourceScanId, nameCounts);
   if (!key) return null;
 
   const rawClassLabel = readString(player, ["class", "Class", "className", "Class Name"]);
-  const classMeta = getClassMetaById(rawClassLabel);
+  const normalized = normalizedByRef.get(key.toLowerCase()) ?? null;
+  const classMeta = getClassMetaById(normalized?.classId ?? rawClassLabel);
   return {
     key,
-    name: readString(player, ["name", "Name", "playerName", "Player Name"]) ?? key,
-    classLabel: classMeta?.label ?? normalizeMemberClassLabel(rawClassLabel),
+    name: readString(player, ["name", "Name", "playerName", "Player Name"]) ?? normalized?.name ?? key,
+    classLabel: classMeta?.label ?? normalizeMemberClassLabel(normalized?.classId ?? rawClassLabel),
     classMeta,
-    level: readNumber(player, ["level", "Level"]),
+    level: normalized?.level ?? readNumber(player, ["level", "Level"]),
     honor: readNumber(player, ["honor", "Honor", "honour", "Honour", "arenaHonor", "Ehre"]),
     hofRank: readNumber(player, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank"]),
-    baseMain: readNumber(player, ["baseMain", "Base Main", "Base"]),
-    totalStats: readNumber(player, ["totalStats", "Total Stats", "Total"]),
+    baseMain: normalized?.baseStats ?? readNumber(player, ["baseMain", "Base Main", "Base"]),
+    totalStats: normalized?.totalStats ?? readNumber(player, ["totalStats", "Total Stats", "Total"]),
+    guildRole: normalized?.guildRole ?? null,
+    localRef: {
+      sourceScanId,
+      sourcePlayerKey: key,
+      identifier,
+      playerId,
+      server,
+      matchedByNameFallback: !identifier && !(playerId && server),
+    },
   };
+}
+
+function buildPlayerNameCounts(players: JsonRecord[]) {
+  const counts = new Map<string, number>();
+  players.forEach((player) => {
+    const name = readString(player, ["name", "Name", "playerName", "Player Name"]);
+    const key = name ? normalizeLoose(name) : "";
+    if (!key) return;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  return counts;
+}
+
+function resolveLocalPlayerKey(
+  player: JsonRecord,
+  fallbackServer: string | null,
+  sourceScanId: string,
+  nameCounts: Map<string, number>,
+) {
+  const identifier = readString(player, ["identifier", "Identifier"]);
+  if (identifier) return identifier.toLowerCase();
+
+  const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
+  const server = normalizeServerForCompare(
+    readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(identifier) ?? fallbackServer,
+  );
+  if (playerId && server) return `${server}_p${playerId}`;
+
+  const name = readString(player, ["name", "Name", "playerName", "Player Name"]);
+  const nameKey = name ? normalizeLoose(name) : "";
+  if (nameKey && nameCounts.get(nameKey) === 1) return `${sourceScanId}:name:${nameKey}`;
+
+  return null;
 }
 
 function buildTransferSummary(latest: LocalMember[], previous: LocalMember[]): TransferSummary {

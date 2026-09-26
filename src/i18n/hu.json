@@ -39,6 +39,7 @@
     "users": "Felhasználók",
     "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
+    "scanCoverage": "Scan Coverage",
     "visitorAnalytics": "Visitor Analytics",
     "profile": "Profil",
     "account": "Fiók",
@@ -1062,20 +1063,25 @@
       "floorCount": "{{count}} szint",
       "dungeonCount": "{{count}} kazamata",
       "overviewPageNote": "Áttekintés {{current}} / {{total}} · Oldal {{page}}",
+      "worldIndexPageNote": "Világáttekintés {{current}} / {{total}} · Oldal {{page}}",
       "floorRangeOverviewNote": "Szintek {{start}}-{{end}} · Áttekintés {{current}} / {{total}}",
       "rangeOverviewPageNote": "Szinttartomanyok {{current}} / {{total}} · Oldal {{page}}",
       "selectorPageNote": "Választó {{current}} / {{total}}",
       "pageNote": "Oldal {{page}}",
+      "floorLabel": "Szint {{floor}}",
       "floorRangeTitle": "Szintek {{start}}-{{end}}",
       "floorGridAria": "{{title}} szintjei",
+      "floorTileAria": "{{dungeon}}, {{floor}}. szint: {{monster}}",
       "floorRangeAria": "{{title}} szintjei {{start}}-{{end}}"
     },
     "navigation": {
       "floorRanges": "Szinttartományok",
       "floors": "Szintek",
+      "worldOverview": "Világáttekintés",
       "floorOverview": "Szintáttekintés",
       "dungeonOverview": "Kazamata-áttekintés",
-      "backToLibrary": "Vissza a Kazamatakönyvtárhoz"
+      "backToLibrary": "Vissza a könyvtárhoz",
+      "backToLibraryShort": "Könyvtár"
     },
     "fallbacks": {
       "dungeon": "Kazamata {{dungeonId}}",
@@ -1088,6 +1094,10 @@
       "loadingArtwork": "Kép betöltése...",
       "artworkUnavailable": "Kép nem érhető el",
       "monsterImageAlt": "Szörny {{enemyId}}",
+      "openMonsterImage": "Szörnykép megnyitása",
+      "closeMonsterImage": "Kép bezárása",
+      "loadingMonsterImage": "Kép betöltése...",
+      "monsterImageUnavailable": "Kép nem érhető el",
       "levelShort": "Szint {{level}}",
       "statsUnavailable": "Statok nem érhetőek el",
       "enemyStatsAria": "Ellenfél statjai",
@@ -1116,6 +1126,50 @@
       "necromancer": "Nekromanta",
       "paladin": "Paladin",
       "plague-doctor": "Pestisdoktor"
+    }
+  },
+  "fusionIdentity": {
+    "loading": {
+      "title": "{{targetServerCode}} elemzése",
+      "phases": {
+        "loading": "Helyi szkenek betöltése",
+        "preparingScanPool": "Fusion szkenkészlet előkészítése",
+        "filteringScope": "Fusion scope szűrése",
+        "normalizing": "Identitásadatok normalizálása",
+        "preparingHistories": "Identitástörténetek előkészítése",
+        "matchingPlayers": "Játékosok párosítása",
+        "matchingGuilds": "Céhek párosítása",
+        "finalizing": "Elemzés lezárása",
+        "done": "A fusion identitásjelentés készen áll",
+        "fallback": "Fusion identitások feldolgozása"
+      }
+    }
+  },
+  "scanCoverage": {
+    "loading": {
+      "title": "Szkenlefedettség előkészítése",
+      "phases": {
+        "loading-local-scans": "Helyi szkenek betöltése",
+        "mapping-snapshots": "Részszkenek és szerverek hozzárendelése",
+        "evaluating-players": "Játékosok kiértékelése",
+        "building-coverage": "Szkenlefedettség létrehozása",
+        "done": "A szkenlefedettség készen áll"
+      }
+    },
+    "errors": {
+      "loadScans": "A helyi szkeneket nem sikerült betölteni.",
+      "loadSelectedScan": "A kiválasztott szkent nem sikerült betölteni.",
+      "buildCoverage": "A szkenlefedettséget nem sikerült létrehozni."
+    },
+    "quickInfo": {
+      "playersInScan": "Játékosok a szkenben",
+      "playersInRange": "Játékosok az ellenőrzött tartományban",
+      "missingPlayers": "Hiányzó játékosok",
+      "rangeMeta": "{{server}} · Ellenőrzött tartomány 1–{{limit}}"
+    },
+    "table": {
+      "missingExplanation": "A hiányzó játékosokat az üres HoF-ranghelyek alapján ismerjük fel.",
+      "missingPlayer": "Hiányzó játékos"
     }
   },
   "flipbook": {

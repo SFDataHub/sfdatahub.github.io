@@ -5,6 +5,7 @@ import type { HeroAction, HeroPanelData } from "./types";
 import { CLASSES } from "../../data/classes";
 import { toDriveThumbProxy } from "../../lib/urls";
 import { guideAssetByKey } from "../../data/guidehub/assets";
+import { resolvePotionAssetKey } from "../potions/potionAssets";
 import PlayerAttributeBars from "./AttributeBars/PlayerAttributeBars";
 import Tooltip from "../ui/Tooltip/Tooltip";
 import { HexGauge } from "../ui/HexGauge";
@@ -204,31 +205,6 @@ function HeroPanel({ data, loading, onAction, favoriteControl }: HeroPanelProps)
     });
   }, [data.metrics, data.totalStatsValue, mode, totalBaseStatsLabel, totalStatsLabel]);
   const potionSlots = data.potionsSlots ?? [];
-  const resolvePotionAssetKey = (typeRaw: string | null | undefined, sizeRaw: number | null | undefined) => {
-    const sizeVal = typeof sizeRaw === "number" && Number.isFinite(sizeRaw) ? Math.round(sizeRaw) : null;
-    const tier =
-      sizeVal === 10 ? "small" : sizeVal === 15 ? "medium" : sizeVal === 25 ? "big" : null;
-    const type = (typeRaw || "").toLowerCase().trim();
-    if (!type) return null;
-    if (type === "life") return "eternalpotion";
-    const baseMap: Record<string, string> = {
-      strength: "strength",
-      dexterity: "dexterity",
-      intelligence: "int",
-      constitution: "con",
-      luck: "luckpot",
-    };
-    const base = baseMap[type];
-    if (!base || !tier) return null;
-    if (base === "luckpot") {
-      // prefer luckpot*, fall back to legacy luck* keys
-      const preferred = `luckpot${tier}`;
-      const legacy = `luck${tier}`;
-      const hasPreferred = !!guideAssetByKey(preferred, 128).id;
-      return hasPreferred ? preferred : legacy;
-    }
-    return `${base}${tier}`;
-  };
   const mountAssetThumb = useMemo(() => {
     const alignmentByRace: Record<string, "good" | "evil"> = {
       Human: "good",

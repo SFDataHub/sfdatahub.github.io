@@ -1,5 +1,7 @@
 import type { FusionIdentityManagementReport } from "./fusionIdentityManagement";
+import type { FusionIdentityScopeInventory } from "./fusionDashboardInventory";
 import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
+import { FusionIdentityScopeNotLocallyMatchableError } from "./fusionScopeMatchability";
 import type {
   FusionIdentityProgress,
   FusionIdentityWorkerRequest,
@@ -37,6 +39,7 @@ export type FusionIdentityWorkerRun = {
 type StartFusionIdentityWorkerRunOptions = {
   requestId?: string;
   scope?: FusionIdentityAnalysisScope;
+  scopeInventory?: FusionIdentityScopeInventory;
   workerFactory?: () => FusionIdentityWorkerLike;
   onProgress?: (progress: FusionIdentityProgress) => void;
 };
@@ -54,6 +57,20 @@ export const startFusionIdentityWorkerRun = (
   options: StartFusionIdentityWorkerRunOptions = {},
 ): FusionIdentityWorkerRun => {
   const requestId = options.requestId ?? createRequestId();
+  const scope = options.scopeInventory?.scope ?? options.scope;
+  if (options.scopeInventory && !options.scopeInventory.isLocallyMatchable) {
+    const error = new FusionIdentityScopeNotLocallyMatchableError(
+      options.scopeInventory.scope.targetServerCode,
+    );
+    return {
+      requestId,
+      promise: Promise.reject(error),
+      cancel() {
+        // No worker was started.
+      },
+    };
+  }
+
   const worker = (options.workerFactory ?? createFusionIdentityWorker)();
   let settled = false;
   let handleMessage: (event: MessageEvent<FusionIdentityWorkerResponse>) => void = () => undefined;
@@ -68,8 +85,10 @@ export const startFusionIdentityWorkerRun = (
 
   const promise = new Promise<FusionIdentityWorkerRunResult>((resolve, reject) => {
     rejectRun = reject;
+    const requestStartedAt = performance.now();
 
     handleMessage = (event: MessageEvent<FusionIdentityWorkerResponse>) => {
+      const messageReceivedAt = performance.now();
       const message = event.data;
       if (message.requestId !== requestId || settled) return;
 
@@ -82,7 +101,31 @@ export const startFusionIdentityWorkerRun = (
       cleanup();
 
       if (message.type === "complete") {
-        resolve({ report: message.report, timings: message.timings });
+        const workerComputeMs =
+          message.timings.find((timing) => timing.phase === "worker:compute")?.durationMs ??
+          message.timings.find((timing) => timing.phase === "total")?.durationMs ??
+          0;
+        const workerRoundTripMs = messageReceivedAt - requestStartedAt;
+        const responseAcceptedStartedAt = performance.now();
+        const timings = [
+          ...message.timings,
+          {
+            phase: "client:worker-roundtrip",
+            durationMs: workerRoundTripMs,
+            count: 1,
+          },
+          {
+            phase: "client:transfer-and-queue",
+            durationMs: Math.max(0, workerRoundTripMs - workerComputeMs),
+            count: 1,
+          },
+          {
+            phase: "client:response-accepted",
+            durationMs: performance.now() - responseAcceptedStartedAt,
+            count: 1,
+          },
+        ];
+        resolve({ report: message.report, timings });
         worker.terminate();
         return;
       }
@@ -107,8 +150,8 @@ export const startFusionIdentityWorkerRun = (
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
     worker.postMessage(
-      options.scope
-        ? { type: "build-report", requestId, scope: options.scope }
+      scope
+        ? { type: "build-report", requestId, scope }
         : { type: "build-report", requestId },
     );
   });

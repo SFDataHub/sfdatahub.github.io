@@ -251,11 +251,30 @@
   grid-template-columns: 38px minmax(0, 1fr) minmax(70px, auto);
   gap: 10px;
   align-items: center;
+  width: 100%;
   min-width: 0;
   border: 1px solid rgba(43, 76, 115, 0.68);
   border-radius: 8px;
   background: #102238;
+  color: inherit;
+  font: inherit;
   padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.memberRow:hover,
+.memberRow:focus-visible {
+  border-color: rgba(92, 139, 198, 0.88);
+  background: #143052;
+}
+
+.memberRow:focus-visible {
+  outline: 2px solid rgba(92, 139, 198, 0.55);
+  outline-offset: 2px;
 }
 
 .classIcon {

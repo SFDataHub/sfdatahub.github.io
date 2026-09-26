@@ -39,6 +39,7 @@
     "users": "Users",
     "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
+    "scanCoverage": "Scan Coverage",
     "visitorAnalytics": "Visitor Analytics",
     "profile": "Profile",
     "account": "Account",
@@ -1393,20 +1394,25 @@
       "floorCount": "{{count}} Floors",
       "dungeonCount": "{{count}} Dungeons",
       "overviewPageNote": "Overview {{current}} / {{total}} · Page {{page}}",
+      "worldIndexPageNote": "World Overview {{current}} / {{total}} · Page {{page}}",
       "floorRangeOverviewNote": "Floors {{start}}-{{end}} · Overview {{current}} / {{total}}",
       "rangeOverviewPageNote": "Floor ranges {{current}} / {{total}} · Page {{page}}",
       "selectorPageNote": "Selector {{current}} / {{total}}",
       "pageNote": "Page {{page}}",
+      "floorLabel": "Floor {{floor}}",
       "floorRangeTitle": "Floors {{start}}-{{end}}",
       "floorGridAria": "{{title}} floors",
+      "floorTileAria": "{{dungeon}}, floor {{floor}}: {{monster}}",
       "floorRangeAria": "{{title}} floors {{start}}-{{end}}"
     },
     "navigation": {
       "floorRanges": "Floor Ranges",
       "floors": "Floors",
+      "worldOverview": "World Overview",
       "floorOverview": "Floor Overview",
       "dungeonOverview": "Dungeon Overview",
-      "backToLibrary": "Back to Dungeon Library"
+      "backToLibrary": "Back to Library",
+      "backToLibraryShort": "Library"
     },
     "fallbacks": {
       "dungeon": "Dungeon {{dungeonId}}",
@@ -1419,6 +1425,10 @@
       "loadingArtwork": "Loading artwork...",
       "artworkUnavailable": "Artwork unavailable",
       "monsterImageAlt": "Monster {{enemyId}}",
+      "openMonsterImage": "Open monster image",
+      "closeMonsterImage": "Close image",
+      "loadingMonsterImage": "Loading image...",
+      "monsterImageUnavailable": "Image unavailable",
       "levelShort": "Lvl {{level}}",
       "statsUnavailable": "Stats unavailable",
       "enemyStatsAria": "Enemy stats",
@@ -1450,6 +1460,21 @@
     }
   },
   "fusionIdentity": {
+    "loading": {
+      "title": "Analyzing {{targetServerCode}}",
+      "phases": {
+        "loading": "Loading local scans",
+        "preparingScanPool": "Preparing fusion scan pool",
+        "filteringScope": "Filtering fusion scope",
+        "normalizing": "Normalizing identity data",
+        "preparingHistories": "Preparing identity histories",
+        "matchingPlayers": "Matching players",
+        "matchingGuilds": "Matching guilds",
+        "finalizing": "Finalizing analysis",
+        "done": "Fusion identity report ready",
+        "fallback": "Resolving fusion identities"
+      }
+    },
     "memberSelection": {
       "reviewCount": "{{count}} review",
       "showReviewMembers": "Show {{count}} {{guildName}} members that need review",
@@ -1731,6 +1756,33 @@
         "differentLeader": "Different resolved leader",
         "guildAssignment": "Assignment conflict"
       }
+    }
+  },
+  "scanCoverage": {
+    "loading": {
+      "title": "Preparing scan coverage",
+      "phases": {
+        "loading-local-scans": "Loading local scans",
+        "mapping-snapshots": "Mapping partial scans and servers",
+        "evaluating-players": "Evaluating players",
+        "building-coverage": "Building scan coverage",
+        "done": "Scan coverage is ready"
+      }
+    },
+    "errors": {
+      "loadScans": "Local scans could not be loaded.",
+      "loadSelectedScan": "The selected scan could not be loaded.",
+      "buildCoverage": "Scan coverage could not be built."
+    },
+    "quickInfo": {
+      "playersInScan": "Players in scan",
+      "playersInRange": "Players in check range",
+      "missingPlayers": "Missing players",
+      "rangeMeta": "{{server}} · Check range 1–{{limit}}"
+    },
+    "table": {
+      "missingExplanation": "Missing players are detected from unoccupied Hall of Fame ranks.",
+      "missingPlayer": "Missing player"
     }
   },
   "flipbook": {

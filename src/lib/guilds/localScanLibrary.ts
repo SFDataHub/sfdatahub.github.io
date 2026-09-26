@@ -17,6 +17,8 @@ import {
   summarizeGuildCoverage,
   type GuildCoverageSummary,
 } from "./guildCoverage";
+import { LOCAL_SERVER_FUSION_EVENTS } from "../../data/serverFusions";
+import { resolveServer } from "../servers/serverResolver";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 import { parsers } from "../import/parsers";
 import { parseSfJson } from "../parsing/parseSfJson";
@@ -33,7 +35,7 @@ const STATE_STORE = "state";
 const GUILD_SELECTION_STATE_KEY = "guild-selection";
 const GUILD_HUB_SCANS_MIGRATION_KEY = "migration.guildHubScans";
 const LOCAL_SCAN_LIBRARY_CHANGE_EVENT = "sfdatahub:local-scans-changed";
-export const GUILD_HUB_SCAN_SUMMARY_VERSION = 3;
+export const GUILD_HUB_SCAN_SUMMARY_VERSION = 5;
 
 type JsonRecord = Record<string, unknown>;
 type RawScanRecord = JsonRecord & {
@@ -94,6 +96,21 @@ export type GuildHubLogicalScanSnapshot = {
   sourceImportedAt: string;
 };
 
+export type GuildHubFusionInventorySlice = {
+  id: string;
+  snapshotId: string;
+  sourceScanId: string;
+  sourceScanFilename: string;
+  sourceImportedAt: string;
+  timestamp: string;
+  timestampMs: number;
+  server: string;
+  playerCount: number;
+  guildCount: number;
+  playerIdentifiers?: string[];
+  guildIdentifiers?: string[];
+};
+
 export type GuildHubLocalServerOption = {
   id: string;
   rawServers: string[];
@@ -134,6 +151,7 @@ export type GuildHubScanSummary = {
   guildCount: number;
   guilds: GuildHubLocalGuildIdentity[];
   guildCoverage: GuildCoverageSummary;
+  fusionInventorySlices?: GuildHubFusionInventorySlice[];
   isMergedBundle?: boolean;
   isScanSlot?: boolean;
   scanSlotStatus?: GuildHubScanSlotStatus;
@@ -142,6 +160,15 @@ export type GuildHubScanSummary = {
   analyticsEnabled?: boolean;
   contentHash?: string;
   summaryVersion: number;
+};
+
+export type GuildHubScanSummaryBackfillResult = {
+  orphanSummaryCount: number;
+  rebuiltSummaryCount: number;
+};
+
+export type ListGuildHubScanSummariesOptions = {
+  ensureCurrent?: boolean;
 };
 
 export type GuildHubSelectionGuild = {
@@ -1359,6 +1386,136 @@ function parseTimeOrZero(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const fusionInventoryTargetServerCodes = new Set<string>(
+  LOCAL_SERVER_FUSION_EVENTS.map((event) => event.target),
+);
+
+const resolveFusionInventoryServerCode = (server: unknown) => {
+  const resolved = resolveServer(String(server ?? ""))?.code;
+  if (resolved) return resolved;
+  const normalized = normalizeLocalServer(server);
+  return normalized ? normalized.toUpperCase() : null;
+};
+
+const shouldPersistFusionInventoryIdentifiers = (server: unknown) => {
+  const serverCode = resolveFusionInventoryServerCode(server);
+  return serverCode ? fusionInventoryTargetServerCodes.has(serverCode) : false;
+};
+
+const buildFusionInventoryGuildIdentifier = (
+  server: string | null,
+  segment: string | null,
+  name: string | null,
+) => {
+  if (segment) return server ? `${server.toLowerCase()}_${segment}` : segment;
+  const nameKey = String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+  return nameKey ? `${server?.toLowerCase() ?? "unknown"}_name_${nameKey}` : null;
+};
+
+function createFusionInventorySlices(
+  snapshots: readonly GuildHubLogicalScanSnapshot[],
+): GuildHubFusionInventorySlice[] {
+  const slices: GuildHubFusionInventorySlice[] = [];
+
+  snapshots.forEach((snapshot) => {
+    const byServer = new Map<
+      string,
+      {
+        server: string;
+        playerIdentifiers: Set<string>;
+        guildIdentifiers: Set<string>;
+      }
+    >();
+    const ensureSlice = (server: unknown) => {
+      const normalized = normalizeLocalServer(server);
+      if (!normalized) return null;
+      const key = normalized.toLowerCase();
+      const existing = byServer.get(key);
+      if (existing) return existing;
+      const created = {
+        server: normalized,
+        playerIdentifiers: new Set<string>(),
+        guildIdentifiers: new Set<string>(),
+      };
+      byServer.set(key, created);
+      return created;
+    };
+
+    snapshot.servers.forEach(ensureSlice);
+
+    snapshot.normalizedMembers.forEach((member) => {
+      const slice = ensureSlice(member.server);
+      if (!slice) return;
+      const memberRef = toTrimmedString(member.memberRef);
+      if (memberRef) slice.playerIdentifiers.add(memberRef);
+      const guildIdentifier = buildFusionInventoryGuildIdentifier(
+        normalizeLocalServer(member.server),
+        normalizeGuildSegmentForScan(member.guildSegment ?? member.groupSegment),
+        member.guildName,
+      );
+      if (guildIdentifier) slice.guildIdentifiers.add(guildIdentifier);
+    });
+
+    snapshot.groups.forEach((group) => {
+      if (!isRecord(group)) return;
+      const rawIdentifier = toTrimmedString(
+        pickFirst(group, [
+          "guildIdentifier",
+          "Guild Identifier",
+          "identifier",
+          "Identifier",
+          "groupIdentifier",
+          "groupId",
+          "guildId",
+          "id",
+        ]),
+      );
+      const server = normalizeLocalServer(
+        pickFirst(group, ["server", "Server", "prefix", "world", "realm"]) ??
+          rawIdentifier?.match(/^(.+)_g[^_]+$/i)?.[1],
+      );
+      const slice = ensureSlice(server);
+      if (!slice) return;
+      const guildIdentifier = buildFusionInventoryGuildIdentifier(
+        server,
+        normalizeGuildSegmentForScan(rawIdentifier),
+        toTrimmedString(pickFirst(group, ["name", "Name", "groupname", "groupName", "guildName", "guild"])),
+      );
+      if (guildIdentifier) slice.guildIdentifiers.add(guildIdentifier);
+    });
+
+    [...byServer.values()]
+      .sort((left, right) => left.server.localeCompare(right.server, undefined, { sensitivity: "base" }))
+      .forEach((slice) => {
+        const playerIdentifiers = [...slice.playerIdentifiers].sort((left, right) =>
+          left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }),
+        );
+        const guildIdentifiers = [...slice.guildIdentifiers].sort((left, right) =>
+          left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }),
+        );
+        const persistIdentifiers = shouldPersistFusionInventoryIdentifiers(slice.server);
+        slices.push({
+          id: `${snapshot.id}::${slice.server}`,
+          snapshotId: snapshot.id,
+          sourceScanId: snapshot.sourceScanId,
+          sourceScanFilename: snapshot.sourceScanFilename,
+          sourceImportedAt: snapshot.sourceImportedAt,
+          timestamp: snapshot.timestamp,
+          timestampMs: snapshot.timestampMs,
+          server: slice.server,
+          playerCount: slice.playerIdentifiers.size,
+          guildCount: slice.guildIdentifiers.size,
+          ...(persistIdentifiers ? { playerIdentifiers, guildIdentifiers } : {}),
+        });
+      });
+  });
+
+  return slices;
+}
+
 function createGuildHubScanSummary(scan: GuildHubLocalScan): GuildHubScanSummary {
   const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
   const guildCoverage = summarizeGuildCoverage(deriveGuildCoverageForLogicalSnapshots(snapshots));
@@ -1399,6 +1556,7 @@ function createGuildHubScanSummary(scan: GuildHubLocalScan): GuildHubScanSummary
     guildCount,
     guilds: collectGuildIdentitiesForScan(scan),
     guildCoverage,
+    fusionInventorySlices: createFusionInventorySlices(snapshots),
     ...(scan.isMergedBundle ? { isMergedBundle: true } : {}),
     ...(scan.isScanSlot ? { isScanSlot: true } : {}),
     ...(scan.scanSlotStatus ? { scanSlotStatus: scan.scanSlotStatus } : {}),
@@ -1457,6 +1615,17 @@ async function putGuildHubScanSummary(db: IDBPDatabase<LocalScanDb>, scan: Guild
 }
 
 function isCurrentGuildHubScanSummary(summary: GuildHubScanSummary | undefined) {
+  const hasCurrentFusionInventorySliceSchema =
+    Array.isArray(summary?.fusionInventorySlices) &&
+    summary.fusionInventorySlices.every((slice) => {
+      const hasPlayerIdentifiers = Array.isArray(slice.playerIdentifiers);
+      const hasGuildIdentifiers = Array.isArray(slice.guildIdentifiers);
+      if (shouldPersistFusionInventoryIdentifiers(slice.server)) {
+        return hasPlayerIdentifiers && hasGuildIdentifiers;
+      }
+      return !hasPlayerIdentifiers && !hasGuildIdentifiers;
+    });
+
   return (
     summary?.summaryVersion === GUILD_HUB_SCAN_SUMMARY_VERSION &&
     typeof summary.contentHash === "string" &&
@@ -1464,11 +1633,12 @@ function isCurrentGuildHubScanSummary(summary: GuildHubScanSummary | undefined) 
     typeof summary.guildCoverage.incompleteGuildSnapshotCount === "number" &&
     typeof summary.guildCoverage.overcountGuildSnapshotCount === "number" &&
     typeof summary.guildCoverage.unknownGuildSnapshotCount === "number" &&
-    Array.isArray(summary.guildCoverage.byServer)
+    Array.isArray(summary.guildCoverage.byServer) &&
+    hasCurrentFusionInventorySliceSchema
   );
 }
 
-export async function ensureGuildHubScanSummaries() {
+export async function ensureGuildHubScanSummaries(): Promise<GuildHubScanSummaryBackfillResult> {
   const db = await getLocalScanDb();
   const scanKeys = (await db.getAllKeys(SCAN_STORE)).map(String);
   const summaryKeys = (await db.getAllKeys(SCAN_SUMMARY_STORE)).map(String);
@@ -1482,7 +1652,9 @@ export async function ensureGuildHubScanSummaries() {
     .map((summary) => summary.sourceScanId);
   const rebuildKeys = [...new Set([...missingSummaryKeys, ...staleSummaryKeys])];
 
-  if (!orphanSummaryKeys.length && !rebuildKeys.length) return;
+  if (!orphanSummaryKeys.length && !rebuildKeys.length) {
+    return { orphanSummaryCount: 0, rebuiltSummaryCount: 0 };
+  }
 
   for (const orphanKey of orphanSummaryKeys) {
     await db.delete(SCAN_SUMMARY_STORE, orphanKey);
@@ -1491,15 +1663,22 @@ export async function ensureGuildHubScanSummaries() {
   for (const key of rebuildKeys) {
     const scan = await db.get(SCAN_STORE, key);
     if (scan) {
-      const normalized = await persistScanNormalizationIfNeeded(db, scan);
+      const normalized = normalizeStoredScan(scan);
       await putGuildHubScanSummary(db, normalized);
       await yieldToBrowser();
     }
   }
+
+  return {
+    orphanSummaryCount: orphanSummaryKeys.length,
+    rebuiltSummaryCount: rebuildKeys.length,
+  };
 }
 
-export async function listGuildHubScanSummaries() {
-  await ensureGuildHubScanSummaries();
+export async function listGuildHubScanSummaries(options: ListGuildHubScanSummariesOptions = {}) {
+  if (options.ensureCurrent !== false) {
+    await ensureGuildHubScanSummaries();
+  }
   const db = await getLocalScanDb();
   return (await db.getAll(SCAN_SUMMARY_STORE)).sort(compareScanSummaries);
 }

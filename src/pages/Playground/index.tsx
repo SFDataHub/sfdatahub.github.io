@@ -102,6 +102,20 @@ export default function PlaygroundIndex() {
             </NavLink>
 
             <NavLink
+              to="player-cards"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Player Cards
+            </NavLink>
+
+            <NavLink
+              to="potion-icons"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Tränke-Icons
+            </NavLink>
+
+            <NavLink
               to="gamified"
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >

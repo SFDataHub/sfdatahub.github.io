@@ -1,12 +1,13 @@
 import type { LocalServerFusionCompensationPolicy } from "../../data/serverFusions";
 import type { LocalServerDefinition } from "../../data/serverRegistry";
-import { getFusionEvent, getFusionOrigins, resolveServer } from "./serverResolver";
+import { getDirectFusionDestination, getDirectFusionOrigins, getFusionEvent, resolveServer } from "./serverResolver";
 
 export type FusionCompensationUnavailableReason =
   | "unknown-origin"
   | "unknown-destination"
   | "origin-not-in-fusion-group"
   | "unknown-fusion-lineage"
+  | "unknown-compensation-policy"
   | "missing-release-date"
   | "invalid-release-date";
 
@@ -74,6 +75,15 @@ export const calculateFusionLevelCompensationFromOrigins = (
     return {
       available: false,
       reason: "origin-not-in-fusion-group",
+      originServer: origin.code,
+      destinationServer: destination.code,
+    };
+  }
+
+  if (compensationPolicy === "unknown") {
+    return {
+      available: false,
+      reason: "unknown-compensation-policy",
       originServer: origin.code,
       destinationServer: destination.code,
     };
@@ -170,9 +180,83 @@ export const getFusionLevelCompensation = (
   const result = calculateFusionLevelCompensationFromOrigins(
     origin,
     destination,
-    getFusionOrigins(destination.code),
+    getDirectFusionOrigins(destination.code),
     compensationPolicy,
   );
   cache.set(cacheKey, result);
   return result;
+};
+
+export const getFusionPathLevelCompensation = (
+  originInput: string | number | null | undefined,
+  destinationInput: string | number | null | undefined,
+): FusionLevelCompensationResult => {
+  const origin = resolveServer(originInput);
+  const destination = resolveServer(destinationInput);
+  if (!origin) return { available: false, reason: "unknown-origin", originServer: null, destinationServer: destination?.code ?? null };
+  if (!destination) return { available: false, reason: "unknown-destination", originServer: origin.code, destinationServer: null };
+  if (origin.code === destination.code) {
+    return {
+      available: true,
+      compensationPolicy: "none",
+      compensationApplicable: false,
+      originServer: origin.code,
+      destinationServer: destination.code,
+      oldestOriginServer: null,
+      originReleaseDate: origin.releaseDate ?? null,
+      oldestReleaseDate: null,
+      rawMonthDifference: null,
+      flooredHalfMonths: null,
+      compensationLevels: 0,
+    };
+  }
+
+  let current = origin;
+  let compensationLevels = 0;
+  const visited = new Set<string>();
+  while (!visited.has(current.code)) {
+    visited.add(current.code);
+    const next = getDirectFusionDestination(current.code);
+    if (!next) {
+      return {
+        available: false,
+        reason: "unknown-fusion-lineage",
+        originServer: origin.code,
+        destinationServer: destination.code,
+      };
+    }
+
+    const step = getFusionLevelCompensation(current.code, next.code);
+    if (!step.available) {
+      return {
+        ...step,
+        originServer: origin.code,
+        destinationServer: destination.code,
+      };
+    }
+    compensationLevels += step.compensationLevels;
+    if (next.code === destination.code) {
+      return {
+        available: true,
+        compensationPolicy: compensationLevels > 0 ? "levelGoldV1" : "none",
+        compensationApplicable: compensationLevels > 0,
+        originServer: origin.code,
+        destinationServer: destination.code,
+        oldestOriginServer: null,
+        originReleaseDate: origin.releaseDate ?? null,
+        oldestReleaseDate: null,
+        rawMonthDifference: null,
+        flooredHalfMonths: null,
+        compensationLevels,
+      };
+    }
+    current = next;
+  }
+
+  return {
+    available: false,
+    reason: "unknown-fusion-lineage",
+    originServer: origin.code,
+    destinationServer: destination.code,
+  };
 };

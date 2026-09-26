@@ -5,6 +5,9 @@ import {
   startFusionIdentityWorkerRun,
   type FusionIdentityWorkerLike,
 } from "../../src/lib/identities/fusionIdentityWorkerClient.ts";
+import { listFusionIdentityAnalysisScopes } from "../../src/lib/identities/fusionIdentityScopes.ts";
+import { FusionIdentityScopeNotLocallyMatchableError } from "../../src/lib/identities/fusionScopeMatchability.ts";
+import type { FusionIdentityScopeInventory } from "../../src/lib/identities/fusionDashboardInventory.ts";
 import type {
   FusionIdentityWorkerRequest,
   FusionIdentityWorkerResponse,
@@ -30,6 +33,11 @@ const emptyReport = {
   currentAliases: [],
   historicalAliases: [],
 };
+
+const f28Scope = listFusionIdentityAnalysisScopes({ atDate: "2026-09-24" }).find(
+  (scope) => scope.targetServerCode === "F28",
+);
+assert.ok(f28Scope);
 
 const guildClassificationReport = {
   ...emptyReport,
@@ -173,31 +181,42 @@ class FakeWorker implements FusionIdentityWorkerLike {
   const run = startFusionIdentityWorkerRun({
     requestId: "scoped",
     workerFactory: () => worker,
-    scope: {
-      id: "F28",
-      label: "EU1-EU4 -> F28",
-      targetServerCode: "F28",
-      targetServerName: "Fusion 28",
-      originServerCodes: ["EU1", "EU2", "EU3", "EU4"],
-      originServerNames: ["EU 1", "EU 2", "EU 3", "EU 4"],
-    },
+    scope: f28Scope,
   });
   assert.deepEqual(worker.messages, [
     {
       type: "build-report",
       requestId: "scoped",
-      scope: {
-        id: "F28",
-        label: "EU1-EU4 -> F28",
-        targetServerCode: "F28",
-        targetServerName: "Fusion 28",
-        originServerCodes: ["EU1", "EU2", "EU3", "EU4"],
-        originServerNames: ["EU 1", "EU 2", "EU 3", "EU 4"],
-      },
+      scope: f28Scope,
     },
   ]);
   run.cancel();
   await assert.rejects(run.promise, FusionIdentityWorkerCancelledError);
+}
+
+{
+  const worker = new FakeWorker();
+  const run = startFusionIdentityWorkerRun({
+    requestId: "not-matchable",
+    workerFactory: () => worker,
+    scopeInventory: {
+      scope: f28Scope,
+      isLocallyMatchable: false,
+      hasHistoricalObservations: true,
+      hasCurrentTargetObservations: false,
+      scanFingerprint: "x",
+      relevantSnapshotIds: [],
+      newestRelevantScanTimestamp: null,
+      latestAnalyzedScanTimestamp: null,
+      newObservationCount: 0,
+      coverage: [],
+      currentPlayerIdentifiers: [],
+      currentGuildIdentifiers: [],
+    } satisfies FusionIdentityScopeInventory,
+  });
+  await assert.rejects(run.promise, FusionIdentityScopeNotLocallyMatchableError);
+  assert.deepEqual(worker.messages, []);
+  assert.equal(worker.terminated, false);
 }
 
 {
@@ -223,6 +242,21 @@ class FakeWorker implements FusionIdentityWorkerLike {
   worker.emit({ type: "complete", requestId: "b", report: emptyReport, timings: [] });
   await run.promise;
   assert.deepEqual(progressMessages, ["Loading local scans"]);
+}
+
+{
+  const worker = new FakeWorker();
+  const progressMessages: string[] = [];
+  const run = startFusionIdentityWorkerRun({
+    requestId: "fresh-request",
+    workerFactory: () => worker,
+    onProgress: (progress) => progressMessages.push(progress.message),
+  });
+  worker.emit({ type: "progress", requestId: "stale-request", progress: { phase: "loading", message: "Stale progress" } });
+  worker.emit({ type: "progress", requestId: "fresh-request", progress: { phase: "loading", message: "Fresh progress" } });
+  worker.emit({ type: "complete", requestId: "fresh-request", report: emptyReport, timings: [] });
+  await run.promise;
+  assert.deepEqual(progressMessages, ["Fresh progress"]);
 }
 
 {

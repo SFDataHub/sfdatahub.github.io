@@ -15,6 +15,12 @@ type FlipbookManifest = {
   pages: PageEntry[];
 };
 
+type ToolbarAction = {
+  label: string;
+  shortLabel?: string;
+  onClick: () => void;
+};
+
 type Props = {
   slug?: string;
   htmlPages?: React.ReactNode[];
@@ -35,11 +41,8 @@ type Props = {
   visualState?: "cover" | "opening" | "reading";
   flippingTime?: number;
   syncPageIndex?: number | null;
-  toolbarBackAction?: {
-    label: string;
-    shortLabel?: string;
-    onClick: () => void;
-  };
+  toolbarBackAction?: ToolbarAction;
+  toolbarLibraryAction?: ToolbarAction;
   noSound?: boolean;
 };
 
@@ -75,6 +78,17 @@ const offPageFlipEvent = (pf: PageFlip | null | undefined, event: string) => {
 };
 const getPageFlipCurrentIndex = (pf: PageFlip | null | undefined) =>
   (pf as any)?.getCurrentPageIndex?.();
+const FLIP_INTERACTIVE_SELECTOR =
+  'button, a, input, select, textarea, summary, [role="button"], [data-flip-interactive]';
+
+function isFlipInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(FLIP_INTERACTIVE_SELECTOR));
+}
+
+const resetHoverCurl = (pf: PageFlip | null | undefined) => {
+  if ((pf as any)?.getState?.() !== "fold_corner") return;
+  try { (pf as any)?.getFlipController?.()?.stopMove?.(); } catch {}
+};
 
 /* ========================================================================== */
 /*  Singleton (persistiert über React Mount/Unmount hinweg)                   */
@@ -164,6 +178,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   flippingTime,
   syncPageIndex = null,
   toolbarBackAction,
+  toolbarLibraryAction,
   noSound = true,
 }) => {
   const { t } = useTranslation();
@@ -188,6 +203,7 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   const [isFlipping, setIsFlipping] = useState(false);
   const bookFlippingClass = bookMode && isFlipping ? styles.bookFlippingState : "";
   const [currentPage0, setCurrentPage0] = useState(0);
+  const wasOverFlipInteractiveRef = useRef(false);
 
   // Props via Refs – keine Re-Init bei Referenzwechsel
   const readyRef = useRef<Props["onReady"]>();
@@ -454,6 +470,63 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
     } catch {}
   }, [syncPageIndex]);
 
+  useEffect(() => {
+    if (!isHtmlMode) return;
+    const pageElements = (((singleton.pf as any)?.getPageCollection?.()?.getPages?.() ?? []) as any[])
+      .map((page) => page?.getElement?.())
+      .filter((element): element is HTMLElement => element instanceof HTMLElement);
+    if (!pageElements.length) return;
+
+    const onInteractiveGestureStart = (event: Event) => {
+      if (!isFlipInteractiveTarget(event.target)) return;
+
+      resetHoverCurl(singleton.pf);
+      wasOverFlipInteractiveRef.current = true;
+      event.stopPropagation();
+    };
+
+    pageElements.forEach((element) => {
+      element.addEventListener("mousedown", onInteractiveGestureStart);
+      element.addEventListener("touchstart", onInteractiveGestureStart);
+    });
+
+    return () => {
+      pageElements.forEach((element) => {
+        element.removeEventListener("mousedown", onInteractiveGestureStart);
+        element.removeEventListener("touchstart", onInteractiveGestureStart);
+      });
+    };
+  }, [htmlPages, htmlPagesKey, isHtmlMode]);
+
+  useEffect(() => {
+    const onMouseMoveCapture = (event: MouseEvent) => {
+      const wrap = wrapRef.current;
+      const target = event.target;
+      if (!wrap || !(target instanceof Node) || !wrap.contains(target)) {
+        wasOverFlipInteractiveRef.current = false;
+        return;
+      }
+
+      if (!isFlipInteractiveTarget(target)) {
+        wasOverFlipInteractiveRef.current = false;
+        return;
+      }
+
+      const pf = singleton.pf;
+      const flipState = (pf as any)?.getState?.();
+      if (flipState === "user_fold" || flipState === "flipping") return;
+
+      event.stopImmediatePropagation();
+      if (!wasOverFlipInteractiveRef.current) {
+        resetHoverCurl(pf);
+      }
+      wasOverFlipInteractiveRef.current = true;
+    };
+
+    window.addEventListener("mousemove", onMouseMoveCapture, { capture: true });
+    return () => window.removeEventListener("mousemove", onMouseMoveCapture, { capture: true });
+  }, []);
+
   const flipPrev = () => {
     if ((singleton.pf as any)?.getCurrentPageIndex?.() <= minPageIndex) {
       singleton.pf?.turnToPage(minPageIndex, "hard");
@@ -463,6 +536,20 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   };
   const flipNext = () => singleton.pf?.flipNext();
   const visiblePage = clamp(currentPage0 - displayPageOffset + 1, 1, Math.max(1, visiblePageCount));
+  const hasDungeonHudOrder = Boolean(toolbarLibraryAction);
+  const hudClassName = `${styles.hud} ${toolbarBackAction || toolbarLibraryAction ? styles.hudWithBackAction : ""}`;
+
+  const renderToolbarAction = (action: ToolbarAction) => (
+    <button
+      className={`${styles.hBtn} ${styles.backActionBtn}`}
+      onClick={action.onClick}
+      aria-label={action.label}
+      title={action.label}
+    >
+      <span className={styles.backActionLabel}>{action.label}</span>
+      <span className={styles.backActionShortLabel}>{action.shortLabel ?? action.label}</span>
+    </button>
+  );
 
   const enterFullscreen = () => {
     const wrap = wrapRef.current;
@@ -490,29 +577,39 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
         )}
       </div>
 
-      {showHud && <div className={`${styles.hud} ${toolbarBackAction ? styles.hudWithBackAction : ""}`}>
-        {toolbarBackAction && (
-          <button
-            className={`${styles.hBtn} ${styles.backActionBtn}`}
-            onClick={toolbarBackAction.onClick}
-            aria-label={toolbarBackAction.label}
-            title={toolbarBackAction.label}
-          >
-            <span className={styles.backActionLabel}>{toolbarBackAction.label}</span>
-            <span className={styles.backActionShortLabel}>{toolbarBackAction.shortLabel ?? toolbarBackAction.label}</span>
-          </button>
+      {showHud && <div className={hudClassName}>
+        {hasDungeonHudOrder ? (
+          <>
+            <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
+            <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
+            <div className={styles.hText}>
+              <span className={styles.title}>{bookTitle}</span>
+              <span className={styles.sep}>·</span>
+              <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
+            </div>
+            <div className={styles.spacer} />
+            {toolbarLibraryAction && renderToolbarAction(toolbarLibraryAction)}
+            {toolbarBackAction && renderToolbarAction(toolbarBackAction)}
+            {supportsFullscreen() && (
+              <button className={styles.hBtn} onClick={enterFullscreen} aria-label={t("flipbook.fullscreen")}>⤢</button>
+            )}
+          </>
+        ) : (
+          <>
+            {toolbarBackAction && renderToolbarAction(toolbarBackAction)}
+            <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
+            <div className={styles.hText}>
+              <span className={styles.title}>{bookTitle}</span>
+              <span className={styles.sep}>·</span>
+              <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
+            </div>
+            <div className={styles.spacer} />
+            {supportsFullscreen() && (
+              <button className={styles.hBtn} onClick={enterFullscreen} aria-label={t("flipbook.fullscreen")}>⤢</button>
+            )}
+            <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
+          </>
         )}
-        <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
-        <div className={styles.hText}>
-          <span className={styles.title}>{bookTitle}</span>
-          <span className={styles.sep}>·</span>
-          <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
-        </div>
-        <div className={styles.spacer} />
-        {supportsFullscreen() && (
-          <button className={styles.hBtn} onClick={enterFullscreen} aria-label={t("flipbook.fullscreen")}>⤢</button>
-        )}
-        <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
       </div>}
     </div>
   );
