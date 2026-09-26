@@ -697,6 +697,75 @@ const mapMembers = (oldPrefix: string, newPrefix: string, count: number, oldOffs
 
 {
   const result = resolveGuildFusions({
+    historicalGuildObservations: [
+      oldGuild({
+        guildIdentifier: "s10_es_g42",
+        serverCode: "ES10",
+        name: "The Brotherhood",
+        coa: null,
+        memberIdentifiers: [],
+        memberCount: 0,
+      }),
+    ],
+    newGuildObservations: [
+      newGuild({
+        guildIdentifier: "maerwynn_g42",
+        serverCode: "MAERWYNN",
+        name: "The Brotherhood (ES10)",
+        coa: null,
+        memberIdentifiers: [],
+        memberCount: 0,
+      }),
+    ],
+    highConfidencePlayerMatches: [],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+    },
+  }).results[0];
+
+  assert.equal(result.status, "autoEligible");
+  assert.equal(result.identityCandidates[0]?.fusionBaseName, true);
+  assert.equal(result.identityCandidates[0]?.fusionBaseNameOrigin, "ES10");
+  assert.equal(result.reliableHistoricalLookup?.originServer, "ES10");
+}
+
+{
+  const result = resolveGuildFusions({
+    historicalGuildObservations: [
+      oldGuild({
+        guildIdentifier: "s10_es_g42",
+        serverCode: "ES10",
+        name: "The Brotherhood",
+        coa: null,
+        memberIdentifiers: [],
+        memberCount: 0,
+      }),
+    ],
+    newGuildObservations: [
+      newGuild({
+        guildIdentifier: "maerwynn_g42",
+        serverCode: "MAERWYNN",
+        name: "The Brotherhood (EU1)",
+        coa: null,
+        memberIdentifiers: [],
+        memberCount: 0,
+      }),
+    ],
+    highConfidencePlayerMatches: [],
+    scope: {
+      targetServerCode: "MAERWYNN",
+      historicalServerCodes: ["ES10", "F5"],
+    },
+  }).results[0];
+
+  assert.equal(result.status, "unresolved");
+  assert.equal(result.identityCandidates.length, 0);
+  assert.equal(result.reliableHistoricalLookup, null);
+}
+
+{
+  const result = resolveGuildFusions({
     historicalGuildObservations: [],
     newGuildObservations: [newGuild()],
     highConfidencePlayerMatches: [],
@@ -715,6 +784,30 @@ const mapMembers = (oldPrefix: string, newPrefix: string, count: number, oldOffs
 
   assert.equal(result.status, "unresolved");
   assert.equal(result.identityCandidates.length, 0);
+}
+
+{
+  const progress: Array<{ current: number; total: number }> = [];
+  resolveGuildFusions({
+    historicalGuildObservations: [oldGuild({ guildIdentifier: "eu1_progress_anchor" })],
+    newGuildObservations: Array.from({ length: 60 }, (_, index) =>
+      newGuild({
+        guildIdentifier: `f28_progress_${index + 1}`,
+        name: `Progress ${index + 1}`,
+        coa: null,
+        memberIdentifiers: [],
+        memberCount: 0,
+      }),
+    ),
+    highConfidencePlayerMatches: [],
+    onProgress: (entry) => progress.push(entry),
+  });
+
+  assert.ok(
+    progress.some((entry) => entry.current > 0 && entry.current < entry.total),
+    "guild resolver emits real intermediate progress",
+  );
+  assert.deepEqual(progress.at(-1), { current: 60, total: 60 });
 }
 
 console.log("guildFusionResolver V3 test passed");

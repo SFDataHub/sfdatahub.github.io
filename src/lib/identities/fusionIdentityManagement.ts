@@ -9,10 +9,13 @@ import {
   createFusionIdentityObservations,
 } from "./playerFusionPreviewAdapter";
 import {
-  getDefaultFusionIdentityAnalysisScope,
   isServerInFusionIdentityScope,
   type FusionIdentityAnalysisScope,
 } from "./fusionIdentityScopes";
+import {
+  FusionIdentityScopeNotLocallyMatchableError,
+  getFusionIdentityScopeLocalMatchability,
+} from "./fusionScopeMatchability";
 import {
   createGuildIdentityStore,
   getGuildAliases,
@@ -48,19 +51,27 @@ import {
   type GuildFusionPlayerMatch,
   type GuildFusionGuildResult,
   type GuildFusionObservation,
+  type GuildFusionResolverDiagnostics,
 } from "./guildFusionResolver";
 import {
-  getPlayerFusionClassificationRank,
+  derivePlayerHistoricalCorridor,
   hasPlayerFusionHardContradiction,
   isPlayerFusionActionableIdentityCandidate,
   isPlayerFusionReadyCandidate,
   resolvePlayerFusions,
+  selectPlayerFusionManagementCandidates,
   selectPlayerFusionReadyCandidates,
   type PlayerFusionCandidate,
   type PlayerFusionObservation,
   type PlayerFusionPlayerResult,
+  type PlayerFusionResolverDiagnostics,
+  type PlayerFusionResolverLiveDiagnostic,
+  type PlayerFusionScopeContext,
 } from "./playerFusionResolver";
-import type { FusionIdentityProgress } from "./fusionIdentityWorkerTypes";
+import type {
+  FusionIdentityProgress,
+  FusionIdentityWorkerTiming,
+} from "./fusionIdentityWorkerTypes";
 
 export type FusionIdentityEntityType = "player" | "guild";
 export type FusionIdentityManagementStatus =
@@ -276,27 +287,317 @@ export type FusionIdentityManagementInput = FusionIdentityManagementStores & {
 
 export type FusionIdentityManagementBuildOptions = {
   onProgress?: (progress: FusionIdentityProgress) => void;
+  onTiming?: (timing: FusionIdentityWorkerTiming) => void;
   enablePlayerLevelProgressionEvidence?: boolean;
   enablePlayerPortraitEvidence?: boolean;
   scope?: FusionIdentityAnalysisScope;
+  scanPoolLastItemProcessedAt?: number;
+  scanPoolPhaseFinishedAt?: number;
 };
 
 const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"];
 const TARGET_SERVER_CODE = "F28";
-const ORIGIN_SERVER_CODE_SET = new Set(ORIGIN_SERVER_CODES);
 
 const getFallbackFusionIdentityScope = (): FusionIdentityAnalysisScope => ({
   id: TARGET_SERVER_CODE,
+  eventId: "fusion-f28",
   label: "EU1-EU4 -> F28",
   originServerCodes: ORIGIN_SERVER_CODES,
   originServerNames: ORIGIN_SERVER_CODES,
+  directOriginServerCodes: ORIGIN_SERVER_CODES,
+  directOriginServerNames: ORIGIN_SERVER_CODES,
+  transitiveOriginServerCodes: ORIGIN_SERVER_CODES,
+  lineageServerCodes: [...ORIGIN_SERVER_CODES, TARGET_SERVER_CODE],
+  intermediateServerCodes: [],
+  ancestorEvents: [
+    {
+      eventId: "fusion-f28",
+      targetServerCode: TARGET_SERVER_CODE,
+      originServerCodes: ORIGIN_SERVER_CODES,
+      effectiveDate: "2026-02-06",
+      temporalStatus: "effective",
+    },
+  ],
+  effectiveDate: "2026-02-06",
+  temporalStatus: "effective",
+  isCurrentTerminalTarget: true,
+  analysisSupported: true,
   targetServerCode: TARGET_SERVER_CODE,
   targetServerName: TARGET_SERVER_CODE,
 });
 
 const resolveBuildScope = (
   scope: FusionIdentityAnalysisScope | null | undefined,
-) => scope ?? getDefaultFusionIdentityAnalysisScope() ?? getFallbackFusionIdentityScope();
+) => scope ?? getFallbackFusionIdentityScope();
+
+const FUSION_IDENTITY_RESOLUTION_PROGRESS_BATCH_SIZE = 50;
+
+const createBatchedFusionIdentityProgressEmitter = (input: {
+  phase: FusionIdentityProgress["phase"];
+  total: number;
+  message: string;
+  emitProgress: (progress: FusionIdentityProgress) => void;
+}) => {
+  let lastEmittedCurrent = -1;
+  return (current: number, force = false) => {
+    const boundedCurrent = Math.max(0, Math.min(current, input.total));
+    const shouldEmit =
+      force ||
+      boundedCurrent === 0 ||
+      boundedCurrent === input.total ||
+      boundedCurrent - lastEmittedCurrent >= FUSION_IDENTITY_RESOLUTION_PROGRESS_BATCH_SIZE;
+    if (!shouldEmit) return;
+    lastEmittedCurrent = boundedCurrent;
+    input.emitProgress({
+      phase: input.phase,
+      current: boundedCurrent,
+      total: input.total,
+      message: input.message,
+    });
+  };
+};
+
+const isFusionIdentityDevDiagnosticsEnabled = () =>
+  Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
+
+const roundDuration = (durationMs: number | null) =>
+  durationMs == null ? null : Math.round(durationMs);
+
+const recordFusionIdentityTiming = (
+  options: FusionIdentityManagementBuildOptions,
+  phase: string,
+  startedAt: number,
+  count?: number,
+) => {
+  options.onTiming?.({
+    phase,
+    durationMs: performance.now() - startedAt,
+    ...(count == null ? {} : { count }),
+  });
+};
+
+const recordFusionIdentityTimingDuration = (
+  options: FusionIdentityManagementBuildOptions,
+  phase: string,
+  durationMs: number,
+  count?: number,
+) => {
+  options.onTiming?.({
+    phase,
+    durationMs,
+    ...(count == null ? {} : { count }),
+  });
+};
+
+const playerResolutionLiveDiagnosticLabel = (
+  diagnostic: PlayerFusionResolverLiveDiagnostic,
+) => {
+  const playerLabel = diagnostic.playerIndex
+    ? `player ${diagnostic.playerIndex}`
+    : "player";
+  if (diagnostic.event === "player-resolution-entered")
+    return "player-resolution entered";
+  if (diagnostic.event === "history-preparation-started")
+    return "history preparation started";
+  if (diagnostic.event === "history-preparation-finished")
+    return "history preparation finished";
+  if (diagnostic.event === "historical-index-build-finished")
+    return "historical index built";
+  if (diagnostic.event === "player-retention-checkpoint")
+    return `retention checkpoint ${diagnostic.processedPlayers ?? "?"} players`;
+  if (diagnostic.event === "player-started")
+    return `${playerLabel} started`;
+  if (diagnostic.event === "candidate-histories-started")
+    return `buildCandidateHistories ${playerLabel} started`;
+  if (diagnostic.event === "candidate-histories-origin-filter-finished")
+    return `buildCandidateHistories ${playerLabel} origin/scope filtering finished`;
+  if (diagnostic.event === "candidate-histories-history-scan-finished")
+    return `buildCandidateHistories ${playerLabel} historical-history scan finished`;
+  if (diagnostic.event === "candidate-histories-finished")
+    return `buildCandidateHistories ${playerLabel} finished`;
+  if (diagnostic.event === "player-candidate-count")
+    return `${playerLabel} candidate count`;
+  if (diagnostic.event === "player-finished")
+    return `${playerLabel} finished`;
+  return "first progress callback emitted";
+};
+
+const compactLiveDiagnosticDetails = (
+  diagnostic: PlayerFusionResolverLiveDiagnostic,
+) => {
+  const details = {
+    durationMs: roundDuration(diagnostic.durationMs ?? null),
+    historicalHistoriesTotal: diagnostic.historicalHistoriesTotal,
+    scopeHistoricalHistories: diagnostic.scopeHistoricalHistories,
+    candidateHistoriesBeforeFiltering:
+      diagnostic.candidateHistoriesBeforeFiltering,
+    candidateHistoriesAfterBasicFiltering:
+      diagnostic.candidateHistoriesAfterBasicFiltering,
+    corridorHistoriesConsidered: diagnostic.corridorHistoriesConsidered,
+    earlyHardRejectedCandidates: diagnostic.earlyHardRejectedCandidates,
+    earlyClassRejectedCandidates: diagnostic.earlyClassRejectedCandidates,
+    earlyLevelRejectedCandidates: diagnostic.earlyLevelRejectedCandidates,
+    earlyBaseRejectedCandidates: diagnostic.earlyBaseRejectedCandidates,
+    fullCandidatesMaterialized: diagnostic.fullCandidatesMaterialized,
+    fullCandidatesEvaluated: diagnostic.fullCandidatesEvaluated,
+    finalCandidateCount: diagnostic.finalCandidateCount,
+    nestedFullHistoryScans: diagnostic.nestedFullHistoryScans,
+    candidateHistoryComparisons: diagnostic.candidateHistoryComparisons,
+    relatedByHistoryKeyFullScanComparisons:
+      diagnostic.relatedByHistoryKeyFullScanComparisons,
+    historicalIndexPhases: diagnostic.historicalIndexPhases,
+    historiesByServerBucketCount: diagnostic.historiesByServerBucketCount,
+    historiesByServerTotalReferences: diagnostic.historiesByServerTotalReferences,
+    historiesByServerLargestBucket: diagnostic.historiesByServerLargestBucket,
+    historiesByServerAndClassBucketCount: diagnostic.historiesByServerAndClassBucketCount,
+    historiesByServerAndClassTotalReferences: diagnostic.historiesByServerAndClassTotalReferences,
+    historiesByServerAndClassLargestBucket: diagnostic.historiesByServerAndClassLargestBucket,
+    historiesByServerWithUnreliableClassBucketCount:
+      diagnostic.historiesByServerWithUnreliableClassBucketCount,
+    historiesByServerWithUnreliableClassTotalReferences:
+      diagnostic.historiesByServerWithUnreliableClassTotalReferences,
+    historiesByServerWithUnreliableClassLargestBucket:
+      diagnostic.historiesByServerWithUnreliableClassLargestBucket,
+    historiesByServerAndNameBucketCount: diagnostic.historiesByServerAndNameBucketCount,
+    historiesByServerAndNameTotalReferences: diagnostic.historiesByServerAndNameTotalReferences,
+    historiesByServerAndNameLargestBucket: diagnostic.historiesByServerAndNameLargestBucket,
+    relatedByHistoryKeyCount: diagnostic.relatedByHistoryKeyCount,
+    relatedByHistoryKeyTotalReferences: diagnostic.relatedByHistoryKeyTotalReferences,
+    relatedByHistoryKeyMedianReferences: diagnostic.relatedByHistoryKeyMedianReferences,
+    relatedByHistoryKeyP95References: diagnostic.relatedByHistoryKeyP95References,
+    relatedByHistoryKeyMaxReferences: diagnostic.relatedByHistoryKeyMaxReferences,
+    lineageRelationCacheEntries: diagnostic.lineageRelationCacheEntries,
+    processedPlayers: diagnostic.processedPlayers,
+    corridorHistoriesConsideredCumulative:
+      diagnostic.corridorHistoriesConsideredCumulative,
+    generatedCandidatesCumulative: diagnostic.generatedCandidatesCumulative,
+    earlyHardRejectedCandidatesCumulative:
+      diagnostic.earlyHardRejectedCandidatesCumulative,
+    earlyClassRejectedCandidatesCumulative:
+      diagnostic.earlyClassRejectedCandidatesCumulative,
+    earlyLevelRejectedCandidatesCumulative:
+      diagnostic.earlyLevelRejectedCandidatesCumulative,
+    earlyBaseRejectedCandidatesCumulative:
+      diagnostic.earlyBaseRejectedCandidatesCumulative,
+    fullCandidatesMaterializedCumulative:
+      diagnostic.fullCandidatesMaterializedCumulative,
+    fullCandidatesEvaluatedCumulative:
+      diagnostic.fullCandidatesEvaluatedCumulative,
+    retainedCandidatesCumulative: diagnostic.retainedCandidatesCumulative,
+    discardedAfterEvaluationCumulative: diagnostic.discardedAfterEvaluationCumulative,
+    actionableCandidatesCumulative: diagnostic.actionableCandidatesCumulative,
+    weakCandidatesEvaluated: diagnostic.weakCandidatesEvaluated,
+    rejectedCandidatesEvaluated: diagnostic.rejectedCandidatesEvaluated,
+    rejectedCandidatesRetained: diagnostic.rejectedCandidatesRetained,
+    weakCandidatesRetained: diagnostic.weakCandidatesRetained,
+    plausibleCandidatesRetained: diagnostic.plausibleCandidatesRetained,
+    strongCandidatesRetained: diagnostic.strongCandidatesRetained,
+    anchoredCandidatesRetained: diagnostic.anchoredCandidatesRetained,
+    evidenceEntriesGenerated: diagnostic.evidenceEntriesGenerated,
+    evidenceEntriesRetained: diagnostic.evidenceEntriesRetained,
+    maxCandidatesForOnePlayer: diagnostic.maxCandidatesForOnePlayer,
+    medianRetainedCandidatesPerPlayer: diagnostic.medianRetainedCandidatesPerPlayer,
+    usedJSHeapSizeMb: diagnostic.usedJSHeapSizeMb,
+    totalJSHeapSizeMb: diagnostic.totalJSHeapSizeMb,
+    jsHeapSizeLimitMb: diagnostic.jsHeapSizeLimitMb,
+  };
+  return Object.fromEntries(
+    Object.entries(details).filter(([, value]) => value != null),
+  );
+};
+
+const createPlayerResolutionLiveDiagnosticsLogger = (input: {
+  targetServerCode: string;
+  startedAt: number;
+}) => {
+  if (!isFusionIdentityDevDiagnosticsEnabled()) return undefined;
+  return (diagnostic: PlayerFusionResolverLiveDiagnostic) => {
+    const elapsedMs = Math.round(performance.now() - input.startedAt);
+    const details = compactLiveDiagnosticDetails(diagnostic);
+    const message = [
+      `[Fusion Identity][${input.targetServerCode}]`,
+      playerResolutionLiveDiagnosticLabel(diagnostic),
+      `+${elapsedMs}ms`,
+    ].join(" ");
+    if (Object.keys(details).length) {
+      console.debug(message, details);
+      return;
+    }
+    console.debug(message);
+  };
+};
+
+const reportPlayerResolutionDiagnostics = (input: {
+  targetServerCode: string;
+  phaseTimeToFirstProgressMs: number | null;
+  diagnostics: PlayerFusionResolverDiagnostics;
+}) => {
+  if (!isFusionIdentityDevDiagnosticsEnabled()) return;
+  const { diagnostics } = input;
+  console.groupCollapsed(
+    `[Fusion Identity] player-resolution diagnostics ${input.targetServerCode}`,
+    `timeToFirstProgress=${roundDuration(input.phaseTimeToFirstProgressMs)}ms`,
+  );
+  console.table([
+    {
+      metric: "observations",
+      historical: diagnostics.historicalObservationCount,
+      current: diagnostics.currentObservationCount,
+    },
+    {
+      metric: "histories",
+      historical: diagnostics.historicalHistoryCount,
+      current: diagnostics.currentHistoryCount,
+    },
+  ]);
+  console.table([
+    {
+      metric: "historyPreparationMs",
+      value: roundDuration(diagnostics.historyPreparationMs),
+    },
+    {
+      metric: "timeToFirstPlayerStartMs",
+      value: roundDuration(diagnostics.timeToFirstPlayerStartMs),
+    },
+    {
+      metric: "timeToFirstPlayerCompletedMs",
+      value: roundDuration(diagnostics.timeToFirstPlayerCompletedMs),
+    },
+    {
+      metric: "phaseTimeToFirstProgressMs",
+      value: roundDuration(input.phaseTimeToFirstProgressMs),
+    },
+    {
+      metric: "playerLoopMs",
+      value: roundDuration(diagnostics.playerLoopMs),
+    },
+    {
+      metric: "totalMs",
+      value: roundDuration(diagnostics.totalMs),
+    },
+  ]);
+  console.table([
+    { metric: "corridor considered", ...diagnostics.corridorHistoriesConsidered },
+    { metric: "early hard rejected", ...diagnostics.earlyHardRejectedCandidates },
+    { metric: "early class rejected", ...diagnostics.earlyClassRejectedCandidates },
+    { metric: "early level rejected", ...diagnostics.earlyLevelRejectedCandidates },
+    { metric: "early base rejected", ...diagnostics.earlyBaseRejectedCandidates },
+    { metric: "full materialized", ...diagnostics.fullCandidatesMaterialized },
+    { metric: "full evaluated", ...diagnostics.fullCandidatesEvaluated },
+    { metric: "generated", ...diagnostics.candidatesGeneratedInitially },
+    { metric: "afterHardCompatibility", ...diagnostics.candidatesAfterHardCompatibility },
+    { metric: "afterHardFilters", ...diagnostics.candidatesAfterHardFilters },
+    { metric: "actionable", ...diagnostics.actionableCandidates },
+  ]);
+  if (diagnostics.pipeline) {
+    console.table(diagnostics.pipeline.historicalIndexPhases);
+    console.table([diagnostics.pipeline.candidateFlow]);
+    console.table([diagnostics.pipeline.precheckAudit]);
+    console.table(diagnostics.pipeline.stageTimings);
+    console.table(diagnostics.pipeline.candidatePoolBuckets);
+  }
+  console.groupEnd();
+};
 
 const normalizeIdentifierKey = (value: unknown) =>
   String(value ?? "")
@@ -670,33 +971,7 @@ const buildHighConfidencePlayerMatches = (
 
 const selectManagementPlayerCandidates = (
   candidates: PlayerFusionCandidate[],
-) =>
-  [...candidates]
-    .filter(
-      (candidate) =>
-        isPlayerFusionActionableIdentityCandidate(candidate) &&
-        !candidate.rejectReasons.includes("level-regression") &&
-        !candidate.rejectReasons.includes("level-progression-extreme"),
-    )
-    .sort(
-      (left, right) =>
-        getPlayerFusionClassificationRank(right.classification) -
-          getPlayerFusionClassificationRank(left.classification) ||
-        Number(right.evidence.sameGuild === true) -
-          Number(left.evidence.sameGuild === true) ||
-        Number((right.evidence.baseFingerprint.unchangedCount ?? 0) >= 3) -
-          Number((left.evidence.baseFingerprint.unchangedCount ?? 0) >= 3) ||
-        Number(right.evidence.fortressContinuity === true) -
-          Number(left.evidence.fortressContinuity === true) ||
-        Number(right.evidence.levelProgression.category === "normal") -
-          Number(left.evidence.levelProgression.category === "normal") ||
-        (right.oldLevel ?? 0) - (left.oldLevel ?? 0) ||
-        left.oldIdentifier.localeCompare(right.oldIdentifier, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-    )
-    .slice(0, 25);
+) => selectPlayerFusionManagementCandidates(candidates);
 
 type IdentityStoreState = {
   aliasEntityIdByKey: Map<string, string>;
@@ -883,13 +1158,9 @@ const createPipelineDiagnostics = (
     result?.candidatesAfterHardFilters ??
     0,
   candidatesRejectedByLevelRegression:
-    result?.candidates.filter((candidate) =>
-      candidate.rejectReasons.includes("level-regression"),
-    ).length ?? 0,
+    result?.diagnostics.rejectReasonCounts["level-regression"] ?? 0,
   candidatesRejectedByLevelProgression:
-    result?.candidates.filter((candidate) =>
-      candidate.rejectReasons.includes("level-progression-extreme"),
-    ).length ?? 0,
+    result?.diagnostics.rejectReasonCounts["level-progression-extreme"] ?? 0,
   candidatesAfterExclusions,
   candidatesAfterReservations,
   finalCandidates,
@@ -898,6 +1169,7 @@ const createPipelineDiagnostics = (
 const createPlayerDiagnostics = ({
   result,
   reasonCode,
+  originServerCodes,
   historicalSnapshotCount,
   candidatesAfterExclusions,
   candidatesAfterReservations,
@@ -905,13 +1177,14 @@ const createPlayerDiagnostics = ({
 }: {
   result: PlayerFusionPlayerResult | null | undefined;
   reasonCode: FusionIdentityManagementReasonCode;
+  originServerCodes: string[];
   historicalSnapshotCount: number;
   candidatesAfterExclusions: number;
   candidatesAfterReservations: number;
   finalCandidates: number;
 }): FusionIdentityManagementDiagnostics => ({
   reasonCode,
-  originServerCodes: result?.resolvedOriginServers ?? [],
+  originServerCodes,
   historicalSnapshotCount,
   reliableHistoricalLookup:
     result?.diagnostics.reliableHistoricalLookup ?? null,
@@ -928,7 +1201,7 @@ const createGuildDiagnostics = (
   historicalSnapshotCount: number,
   pipeline: FusionIdentityCandidatePipelineDiagnostics,
   reliableHistoricalLookup: FusionIdentityHistoricalLookupDiagnostics | null = null,
-  originServerCodes: string[] = ORIGIN_SERVER_CODES,
+  originServerCodes: string[] = [],
 ): FusionIdentityManagementDiagnostics => ({
   reasonCode,
   originServerCodes,
@@ -1217,6 +1490,7 @@ const buildPlayerItems = async (
   stores: { playerStore: PlayerIdentityManagementStore },
   identityState: IdentityStoreState,
   historicalPlayerSnapshotCountsByServer: Map<string, number>,
+  resolverScope: PlayerFusionScopeContext,
 ) => {
   const currentLinkReads = [...currentObservationsByIdentifier.values()].map(
     (observations) => {
@@ -1316,7 +1590,33 @@ const buildPlayerItems = async (
         const activeActionableCandidates = activeCandidates.filter(
           isActionableManagementCandidate,
         );
-        const originServerCodes = result?.resolvedOriginServers ?? [];
+        const evaluatedClassificationCounts =
+          result?.diagnostics.candidateClassificationCounts;
+        const evaluatedRejectReasonCounts =
+          result?.diagnostics.rejectReasonCounts;
+        const hasEvaluatedWeakCandidate =
+          (evaluatedClassificationCounts?.weak ?? 0) > 0;
+        const hasEvaluatedLevelRegression =
+          (evaluatedRejectReasonCounts?.["level-regression"] ?? 0) > 0 ||
+          hasLevelRegression(allCandidates);
+        const hasEvaluatedLevelProgressionContradiction =
+          (evaluatedRejectReasonCounts?.["level-progression-extreme"] ?? 0) >
+            0 || hasLevelProgressionContradiction(allCandidates);
+        const hasEvaluatedSemanticContradiction =
+          (evaluatedRejectReasonCounts?.["base-stat-regression"] ?? 0) > 0 ||
+          (evaluatedRejectReasonCounts?.["base-attributes-contradiction"] ??
+            0) > 0 ||
+          hasSemanticContradiction(allCandidates);
+        const hasEvaluatedRejectedCandidate =
+          (evaluatedClassificationCounts?.rejected ?? 0) > 0 ||
+          hasRejectedCandidate(allCandidates);
+        const originServerCodes = result
+          ? derivePlayerHistoricalCorridor({
+              resolvedOriginServerCodes: result.resolvedOriginServers,
+              targetServerCode: result.currentServer ?? resolverScope.targetServerCode,
+              scope: resolverScope,
+            })
+          : [];
         const historicalSnapshotCount = sumOriginCoverage(
           originServerCodes,
           historicalPlayerSnapshotCountsByServer,
@@ -1324,9 +1624,13 @@ const buildPlayerItems = async (
         const reliableLookup =
           result?.diagnostics.reliableHistoricalLookup ?? null;
         const hasHistoricalScanCoverage = historicalSnapshotCount > 0;
-        const candidatesAfterExclusions = allCandidates.filter(
+        const retainedCandidatesAfterExclusions = allCandidates.filter(
           (candidate) => !candidate.rejected,
         ).length;
+        const candidatesAfterExclusions = Math.max(
+          retainedCandidatesAfterExclusions,
+          result?.diagnostics.candidatesAfterSemanticEvaluation ?? 0,
+        );
         const reasonCode: FusionIdentityManagementReasonCode =
           completedHistorical.length
             ? "no-viable-candidate"
@@ -1337,7 +1641,7 @@ const buildPlayerItems = async (
                     "player",
                     activeActionableCandidates,
                   )
-                : activeCandidates.length
+                : activeCandidates.length || hasEvaluatedWeakCandidate
                   ? "no-actionable-candidate"
                   : result?.status === "no-predecessor" ||
                       (originServerCodes.length > 0 &&
@@ -1347,13 +1651,13 @@ const buildPlayerItems = async (
                         hasHistoricalScanCoverage &&
                         reliableLookup.compatibleClassObservationCount === 0
                       ? "no-historical-observation"
-                      : hasLevelRegression(allCandidates)
+                      : hasEvaluatedLevelRegression
                         ? "level-regression"
-                        : hasLevelProgressionContradiction(allCandidates)
+                        : hasEvaluatedLevelProgressionContradiction
                           ? "level-progression-contradiction"
-                          : hasSemanticContradiction(allCandidates)
+                          : hasEvaluatedSemanticContradiction
                             ? "semantic-contradictions"
-                            : hasRejectedCandidate(allCandidates)
+                            : hasEvaluatedRejectedCandidate
                               ? "rejected-by-exclusion"
                               : "no-viable-candidate";
         const status: FusionIdentityManagementStatus =
@@ -1426,6 +1730,7 @@ const buildPlayerItems = async (
           diagnostics: createPlayerDiagnostics({
             result,
             reasonCode,
+            originServerCodes,
             historicalSnapshotCount,
             candidatesAfterExclusions,
             candidatesAfterReservations: activeActionableCandidates.length,
@@ -1691,19 +1996,24 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
   input: FusionIdentityManagementInput,
   options: FusionIdentityManagementBuildOptions = {},
 ): Promise<FusionIdentityManagementReport> {
+  const reportBuildStartedAt = performance.now();
   const emitProgress = options.onProgress ?? (() => undefined);
   const scopeDefinition = resolveBuildScope(options.scope);
-  const originServerCodeSet = new Set(scopeDefinition.originServerCodes);
+  const historicalServerCodeSet = new Set(
+    (scopeDefinition.lineageServerCodes.length
+      ? scopeDefinition.lineageServerCodes
+      : scopeDefinition.originServerCodes
+    ).filter((serverCode) => serverCode !== scopeDefinition.targetServerCode),
+  );
   const targetServerCode = scopeDefinition.targetServerCode;
+  const resolverScope = {
+    targetServerCode,
+    historicalServerCodes: [...historicalServerCodeSet],
+    boundaryEffectiveDate: scopeDefinition.effectiveDate ?? null,
+  };
   const snapshots = [...input.snapshots].sort(
     (left, right) => left.timestampMs - right.timestampMs,
   );
-  emitProgress({
-    phase: "preparing",
-    current: snapshots.length,
-    total: snapshots.length,
-    message: `Preparing ${snapshots.length} local scan snapshots`,
-  });
   const playerStore: PlayerIdentityManagementStore = input.playerStore ?? {
     getPlayerIdentity,
     getPlayerAliases,
@@ -1731,9 +2041,24 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
   const historicalPlayerSnapshotCountsByServer = new Map<string, number>();
   const historicalGuildSnapshotServers = new Set<string>();
 
+  const snapshotNormalizationStartedAt = performance.now();
+  emitProgress({
+    phase: "normalizing",
+    current: 0,
+    total: snapshots.length,
+    message: "Normalizing identity data",
+  });
+  let playerObservationNormalizationMs = 0;
+  let guildObservationNormalizationMs = 0;
   snapshots.forEach((snapshot, index) => {
+    const playerObservationNormalizationStartedAt = performance.now();
     const players = createFusionIdentityObservations(snapshot);
+    playerObservationNormalizationMs +=
+      performance.now() - playerObservationNormalizationStartedAt;
+    const guildObservationNormalizationStartedAt = performance.now();
     const guilds = createFusionIdentityGuildObservations(snapshot);
+    guildObservationNormalizationMs +=
+      performance.now() - guildObservationNormalizationStartedAt;
     allPlayerObservations.push(...players);
     allGuildObservations.push(...guilds);
 
@@ -1747,10 +2072,10 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
       );
     const hasHistoricalData =
       players.some((observation) =>
-        originServerCodeSet.has(resolveServerCode(observation.server) ?? ""),
+        historicalServerCodeSet.has(resolveServerCode(observation.server) ?? ""),
       ) ||
       guilds.some((observation) =>
-        originServerCodeSet.has(observation.serverCode ?? ""),
+        historicalServerCodeSet.has(observation.serverCode ?? ""),
       );
     if (hasPostFusionData) postFusionSnapshots.push(snapshot);
     if (hasHistoricalData) {
@@ -1759,7 +2084,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
         players
           .map((observation) => resolveServerCode(observation.server))
           .filter((server): server is string =>
-            originServerCodeSet.has(server ?? ""),
+            historicalServerCodeSet.has(server ?? ""),
           ),
       ).forEach((server) =>
         historicalPlayerSnapshotCountsByServer.set(
@@ -1771,7 +2096,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
         guilds
           .map((observation) => observation.serverCode)
           .filter((server): server is string =>
-            originServerCodeSet.has(server ?? ""),
+            historicalServerCodeSet.has(server ?? ""),
           ),
       ).forEach((server) =>
         historicalGuildSnapshotServers.add(`${server}:${snapshot.timestampMs}`),
@@ -1782,70 +2107,211 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
       phase: "normalizing",
       current: index + 1,
       total: snapshots.length,
-      message: "Normalizing local scan snapshots",
+      message: "Normalizing identity data",
     });
   });
+  recordFusionIdentityTiming(
+    options,
+    "management:snapshot-normalization",
+    snapshotNormalizationStartedAt,
+    snapshots.length,
+  );
+  recordFusionIdentityTimingDuration(
+    options,
+    "management:player-observation-normalization",
+    playerObservationNormalizationMs,
+    allPlayerObservations.length,
+  );
+  recordFusionIdentityTimingDuration(
+    options,
+    "management:guild-observation-normalization",
+    guildObservationNormalizationMs,
+    allGuildObservations.length,
+  );
 
+  emitProgress({
+    phase: "preparing-histories",
+    message: "Preparing identity histories",
+  });
+  const observationPartitionStartedAt = performance.now();
   const historicalPlayerObservations = allPlayerObservations.filter(
     (observation) =>
-      originServerCodeSet.has(resolveServerCode(observation.server) ?? ""),
+      historicalServerCodeSet.has(resolveServerCode(observation.server) ?? ""),
   );
   const currentPlayerObservations = allPlayerObservations.filter(
     (observation) =>
       resolveServerCode(observation.server) === targetServerCode,
   );
   const historicalGuildObservations = allGuildObservations.filter(
-    (observation) => originServerCodeSet.has(observation.serverCode ?? ""),
+    (observation) => historicalServerCodeSet.has(observation.serverCode ?? ""),
   );
   const currentGuildObservations = allGuildObservations.filter(
     (observation) => observation.serverCode === targetServerCode,
   );
+  recordFusionIdentityTiming(
+    options,
+    "management:observation-partitioning",
+    observationPartitionStartedAt,
+    allPlayerObservations.length + allGuildObservations.length,
+  );
+  const localMatchabilityStartedAt = performance.now();
+  const localMatchability = getFusionIdentityScopeLocalMatchability(
+    scopeDefinition,
+    [
+      ...allPlayerObservations.map((observation) => ({
+        serverCode: resolveServerCode(observation.server),
+        timestampMs: observation.timestamp,
+        playerCount: 1,
+      })),
+      ...allGuildObservations.map((observation) => ({
+        serverCode: observation.serverCode,
+        timestampMs: observation.timestamp,
+        guildCount: 1,
+      })),
+    ],
+  );
+  recordFusionIdentityTiming(
+    options,
+    "management:local-matchability",
+    localMatchabilityStartedAt,
+    allPlayerObservations.length + allGuildObservations.length,
+  );
 
-  if (!currentPlayerObservations.length && !currentGuildObservations.length) {
-    return createEmptyReport(
-      snapshots,
-      scopeDefinition,
-      allPlayerObservations.length,
-      allGuildObservations.length,
+  if (!localMatchability.isLocallyMatchable) {
+    throw new FusionIdentityScopeNotLocallyMatchableError(
+      scopeDefinition.targetServerCode,
+      localMatchability,
     );
   }
 
+  const playerHistoryPreparationStartedAt = performance.now();
   const currentPlayersByIdentifier = groupPlayerObservations(
     currentPlayerObservations,
   );
+  recordFusionIdentityTiming(
+    options,
+    "management:player-history-preparation",
+    playerHistoryPreparationStartedAt,
+    currentPlayersByIdentifier.size,
+  );
   emitProgress({
-    phase: "player-histories",
+    phase: "preparing-histories",
     current: currentPlayersByIdentifier.size,
     total: currentPlayersByIdentifier.size,
-    message: "Building player observation histories",
+    message: "Preparing identity histories",
   });
 
-  emitProgress({
+  const emitPlayerResolutionProgress = createBatchedFusionIdentityProgressEmitter({
     phase: "player-resolution",
-    current: 0,
     total: currentPlayersByIdentifier.size,
     message: "Resolving player identities",
+    emitProgress,
   });
+  const playerResolutionPhaseStartedAt = performance.now();
+  if (options.scanPoolLastItemProcessedAt != null) {
+    recordFusionIdentityTimingDuration(
+      options,
+      "management:scan-pool-last-counter-to-player-resolution",
+      playerResolutionPhaseStartedAt - options.scanPoolLastItemProcessedAt,
+      1,
+    );
+  }
+  if (options.scanPoolPhaseFinishedAt != null) {
+    recordFusionIdentityTimingDuration(
+      options,
+      "management:scan-pool-finished-to-player-resolution",
+      playerResolutionPhaseStartedAt - options.scanPoolPhaseFinishedAt,
+      1,
+    );
+  }
+  const emitPlayerResolutionLiveDiagnostics =
+    createPlayerResolutionLiveDiagnosticsLogger({
+      targetServerCode,
+      startedAt: playerResolutionPhaseStartedAt,
+    });
+  const enablePlayerPipelineDiagnostics = isFusionIdentityDevDiagnosticsEnabled();
+  let firstPlayerResolutionProgressAt: number | null = null;
+  emitPlayerResolutionLiveDiagnostics?.({
+    event: "player-resolution-entered",
+  });
+  emitPlayerResolutionProgress(0, true);
+  const playerResolutionStartedAt = performance.now();
   const playerResults = resolvePlayerFusions({
     historicalObservations: historicalPlayerObservations,
     newObservations: currentPlayerObservations,
+    scope: resolverScope,
     enableLevelProgressionEvidence:
       options.enablePlayerLevelProgressionEvidence,
     enablePortraitEvidence: options.enablePlayerPortraitEvidence,
+    enablePipelineDiagnostics: enablePlayerPipelineDiagnostics,
+    onProgress: (progress) => {
+      firstPlayerResolutionProgressAt ??= performance.now();
+      emitPlayerResolutionProgress(progress.current);
+    },
+    onLiveDiagnostics: emitPlayerResolutionLiveDiagnostics,
+    onDiagnostics: (diagnostics) =>
+      reportPlayerResolutionDiagnostics({
+        targetServerCode,
+        phaseTimeToFirstProgressMs:
+          firstPlayerResolutionProgressAt == null
+            ? null
+            : firstPlayerResolutionProgressAt - playerResolutionPhaseStartedAt,
+        diagnostics,
+      }),
   }).results;
-  emitProgress({
-    phase: "player-resolution",
-    current: playerResults.length,
-    total: currentPlayersByIdentifier.size,
-    message: "Resolved player identities",
-  });
+  recordFusionIdentityTiming(
+    options,
+    "management:player-resolution",
+    playerResolutionStartedAt,
+    currentPlayersByIdentifier.size,
+  );
+  emitPlayerResolutionProgress(playerResults.length, true);
 
+  const highConfidenceStartedAt = performance.now();
   const highConfidencePlayerMatches =
     buildHighConfidencePlayerMatches(playerResults);
+  recordFusionIdentityTiming(
+    options,
+    "management:player-cross-evidence-index",
+    highConfidenceStartedAt,
+    highConfidencePlayerMatches.length,
+  );
+  const guildHistoryPreparationStartedAt = performance.now();
   const currentGuildsByIdentifier = groupGuildObservations(
     currentGuildObservations,
   );
+  const historicalGuildHistoriesByIdentifier = groupGuildObservations(
+    historicalGuildObservations,
+  );
+  recordFusionIdentityTiming(
+    options,
+    "management:guild-history-preparation",
+    guildHistoryPreparationStartedAt,
+    currentGuildsByIdentifier.size + historicalGuildHistoriesByIdentifier.size,
+  );
   const guildResults: GuildFusionGuildResult[] = [];
+  const processedCurrentGuildIdentifiers = new Set<string>();
+  const guildResolverDiagnostics = {
+    calls: 0,
+    currentGuilds: 0,
+    historicalGuildHistories: 0,
+    historicalGuildsBeforeBoundary: 0,
+    guildCandidatesGenerated: 0,
+    guildCandidatesEvaluated: 0,
+    guildCandidatesRetained: 0,
+    memberFlowCalls: 0,
+    memberFlowTotalMs: 0,
+    memberComparisons: 0,
+    flowCount: 0,
+  };
+  const emitGuildResolutionProgress = createBatchedFusionIdentityProgressEmitter({
+    phase: "guild-resolution",
+    total: currentGuildsByIdentifier.size,
+    message: "Resolving guild identities",
+    emitProgress,
+  });
+  emitGuildResolutionProgress(0, true);
+  const guildResolutionStartedAt = performance.now();
   postFusionSnapshots.forEach((snapshot, index) => {
     const snapshotTimestamp = snapshot.timestampMs;
     const newGuildObservations = createFusionIdentityGuildObservations(
@@ -1859,27 +2325,79 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
           ),
           newGuildObservations,
           highConfidencePlayerMatches,
+          scope: resolverScope,
+          onDiagnostics: (diagnostics: GuildFusionResolverDiagnostics) => {
+            guildResolverDiagnostics.calls += 1;
+            guildResolverDiagnostics.currentGuilds += diagnostics.currentGuilds;
+            guildResolverDiagnostics.historicalGuildHistories += diagnostics.historicalGuildHistories;
+            guildResolverDiagnostics.historicalGuildsBeforeBoundary += diagnostics.historicalGuildsBeforeBoundary;
+            guildResolverDiagnostics.guildCandidatesGenerated += diagnostics.guildCandidatesGenerated;
+            guildResolverDiagnostics.guildCandidatesEvaluated += diagnostics.guildCandidatesEvaluated;
+            guildResolverDiagnostics.guildCandidatesRetained += diagnostics.guildCandidatesRetained;
+            guildResolverDiagnostics.memberFlowCalls += diagnostics.memberFlowCalls;
+            guildResolverDiagnostics.memberFlowTotalMs += diagnostics.memberFlowTotalMs;
+            guildResolverDiagnostics.memberComparisons += diagnostics.memberComparisons;
+            guildResolverDiagnostics.flowCount += diagnostics.flowCount;
+          },
+          onProgress: (progress) => {
+            const guildIdentifier =
+              newGuildObservations[progress.current - 1]?.guildIdentifier;
+            if (guildIdentifier)
+              processedCurrentGuildIdentifiers.add(guildIdentifier);
+            emitGuildResolutionProgress(processedCurrentGuildIdentifiers.size);
+          },
         }).results,
       );
     }
-    emitProgress({
-      phase: "guild-resolution",
-      current: index + 1,
-      total: postFusionSnapshots.length,
-      message: "Resolving guild identities",
-    });
+    if (!newGuildObservations.length && index + 1 === postFusionSnapshots.length)
+      emitGuildResolutionProgress(currentGuildsByIdentifier.size, true);
+  });
+  emitGuildResolutionProgress(currentGuildsByIdentifier.size, true);
+  recordFusionIdentityTiming(
+    options,
+    "management:guild-resolution",
+    guildResolutionStartedAt,
+    currentGuildsByIdentifier.size,
+  );
+  options.onTiming?.({
+    phase: "guild:member-flow",
+    durationMs: guildResolverDiagnostics.memberFlowTotalMs,
+    count: guildResolverDiagnostics.memberFlowCalls,
+  });
+  options.onTiming?.({
+    phase: "guild:candidates-generated",
+    durationMs: 0,
+    count: guildResolverDiagnostics.guildCandidatesGenerated,
+  });
+  options.onTiming?.({
+    phase: "guild:candidates-retained",
+    durationMs: 0,
+    count: guildResolverDiagnostics.guildCandidatesRetained,
+  });
+  options.onTiming?.({
+    phase: "guild:member-comparisons",
+    durationMs: 0,
+    count: guildResolverDiagnostics.memberComparisons,
   });
 
   emitProgress({
-    phase: "assignment",
-    message: "Reading confirmed identity links and exclusions",
+    phase: "finalizing",
+    message: "Finalizing analysis",
   });
+  const assignmentStateStartedAt = performance.now();
   const [playerIdentityState, guildIdentityState] = await Promise.all([
     loadPlayerIdentityState(playerStore),
     loadGuildIdentityState(guildStore),
   ]);
+  recordFusionIdentityTiming(
+    options,
+    "management:assignment-state-load",
+    assignmentStateStartedAt,
+    2,
+  );
 
-  emitProgress({ phase: "report", message: "Building management report" });
+  emitProgress({ phase: "finalizing", message: "Finalizing analysis" });
+  const reportAggregationStartedAt = performance.now();
   const [
     playerItems,
     guildItems,
@@ -1888,57 +2406,96 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
     currentGuildAliases,
     historicalGuildAliases,
   ] = await Promise.all([
-    buildPlayerItems(
-      currentPlayersByIdentifier,
-      playerResults,
-      { playerStore },
-      playerIdentityState,
-      historicalPlayerSnapshotCountsByServer,
-    ),
-    buildGuildItems(
-      currentGuildsByIdentifier,
-      guildResults,
-      { guildStore },
-      guildIdentityState,
-      historicalGuildSnapshotServers.size,
-      scopeDefinition.originServerCodes,
-    ),
-    buildAliasOptions(
-      "player",
-      currentPlayerObservations,
-      async (identifier) =>
-        readLinkedAliasesFromState(playerIdentityState, identifier).entityId,
-    ),
-    buildAliasOptions(
-      "player",
-      historicalPlayerObservations,
-      async (identifier) =>
-        readLinkedAliasesFromState(playerIdentityState, identifier).entityId,
-    ),
-    buildAliasOptions(
-      "guild",
-      currentGuildObservations,
-      async (identifier) =>
-        readLinkedAliasesFromState(guildIdentityState, identifier).entityId,
-    ),
-    buildAliasOptions(
-      "guild",
-      historicalGuildObservations,
-      async (identifier) =>
-        readLinkedAliasesFromState(guildIdentityState, identifier).entityId,
-    ),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildPlayerItems(
+        currentPlayersByIdentifier,
+        playerResults,
+        { playerStore },
+        playerIdentityState,
+        historicalPlayerSnapshotCountsByServer,
+        resolverScope,
+      );
+      recordFusionIdentityTiming(options, "management:player-aggregation", startedAt, result.length);
+      return result;
+    })(),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildGuildItems(
+        currentGuildsByIdentifier,
+        guildResults,
+        { guildStore },
+        guildIdentityState,
+        historicalGuildSnapshotServers.size,
+        [...historicalServerCodeSet],
+      );
+      recordFusionIdentityTiming(options, "management:guild-aggregation", startedAt, result.length);
+      return result;
+    })(),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildAliasOptions(
+        "player",
+        currentPlayerObservations,
+        async (identifier) =>
+          readLinkedAliasesFromState(playerIdentityState, identifier).entityId,
+      );
+      recordFusionIdentityTiming(options, "management:current-player-alias-build", startedAt, result.length);
+      return result;
+    })(),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildAliasOptions(
+        "player",
+        historicalPlayerObservations,
+        async (identifier) =>
+          readLinkedAliasesFromState(playerIdentityState, identifier).entityId,
+      );
+      recordFusionIdentityTiming(options, "management:historical-player-alias-build", startedAt, result.length);
+      return result;
+    })(),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildAliasOptions(
+        "guild",
+        currentGuildObservations,
+        async (identifier) =>
+          readLinkedAliasesFromState(guildIdentityState, identifier).entityId,
+      );
+      recordFusionIdentityTiming(options, "management:current-guild-alias-build", startedAt, result.length);
+      return result;
+    })(),
+    (async () => {
+      const startedAt = performance.now();
+      const result = await buildAliasOptions(
+        "guild",
+        historicalGuildObservations,
+        async (identifier) =>
+          readLinkedAliasesFromState(guildIdentityState, identifier).entityId,
+      );
+      recordFusionIdentityTiming(options, "management:historical-guild-alias-build", startedAt, result.length);
+      return result;
+    })(),
   ]);
+  recordFusionIdentityTiming(
+    options,
+    "management:report-aggregation",
+    reportAggregationStartedAt,
+    playerItems.length + guildItems.length,
+  );
 
+  const finalAssemblyStartedAt = performance.now();
   const items = [...playerItems, ...guildItems];
   emitProgress({
-    phase: "assignment",
-    message: "Applying global ready reservations",
+    phase: "finalizing",
+    message: "Finalizing analysis",
   });
   applyGlobalAssignmentResolution(items);
   attachGuildMemberStatusSummaries(items, currentGuildsByIdentifier);
   items.sort(compareByLatestThenName);
+  recordFusionIdentityTiming(options, "management:final-result-assembly", finalAssemblyStartedAt, items.length);
 
-  return {
+  const report = {
     scope: {
       label: scopeDefinition.label,
       originServerCodes: scopeDefinition.originServerCodes,
@@ -1971,34 +2528,69 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
       ...historicalGuildAliases,
     ].sort((left, right) => right.lastSeen - left.lastSeen),
   };
+  recordFusionIdentityTiming(options, "management:build-report-total", reportBuildStartedAt, items.length);
+  return report;
 }
 
 export async function loadFusionIdentityManagementReport(
   stores: FusionIdentityManagementStores = {},
   options: FusionIdentityManagementBuildOptions = {},
 ): Promise<FusionIdentityManagementReport> {
+  const totalStartedAt = performance.now();
   const scopeDefinition = resolveBuildScope(options.scope);
   options.onProgress?.({ phase: "loading", message: "Loading local scans" });
+  const scanLoadStartedAt = performance.now();
   const scans = await listSfDataHubLocalScansReadOnly();
+  recordFusionIdentityTiming(
+    options,
+    "management:local-scan-load",
+    scanLoadStartedAt,
+    scans.length,
+  );
   options.onProgress?.({
-    phase: "preparing",
+    phase: "preparing-scan-pool",
     current: 0,
     total: scans.length,
     message: "Preparing fusion scan pool",
   });
   const snapshots: GuildHubLogicalScanSnapshot[] = [];
+  const snapshotDerivationStartedAt = performance.now();
+  let scanPoolLastItemProcessedAt: number | undefined;
   scans.forEach((scan, index) => {
     snapshots.push(...deriveGuildHubLogicalScanSnapshots(scan));
     options.onProgress?.({
-      phase: "preparing",
+      phase: "preparing-scan-pool",
       current: index + 1,
       total: scans.length,
       message: "Preparing fusion scan pool",
     });
+    if (index + 1 === scans.length)
+      scanPoolLastItemProcessedAt = performance.now();
   });
+  recordFusionIdentityTiming(
+    options,
+    "management:logical-snapshot-derivation",
+    snapshotDerivationStartedAt,
+    scans.length,
+  );
+  recordFusionIdentityTimingDuration(
+    options,
+    "management:logical-snapshot-output",
+    0,
+    snapshots.length,
+  );
+  options.onProgress?.({
+    phase: "filtering-scope",
+    message: "Filtering fusion scope",
+  });
+  const scopeFilteringStartedAt = performance.now();
+  let scopeFilteringObservationExtractionMs = 0;
   const scopedSnapshots = snapshots.filter((snapshot) => {
+    const observationExtractionStartedAt = performance.now();
     const players = createFusionIdentityObservations(snapshot);
     const guilds = createFusionIdentityGuildObservations(snapshot);
+    scopeFilteringObservationExtractionMs +=
+      performance.now() - observationExtractionStartedAt;
     return (
       players.some((observation) =>
         isServerInFusionIdentityScope(
@@ -2011,10 +2603,38 @@ export async function loadFusionIdentityManagementReport(
       )
     );
   });
-  return buildFusionIdentityManagementReportFromSnapshots(
-    { snapshots: scopedSnapshots, ...stores },
-    { ...options, scope: scopeDefinition },
+  recordFusionIdentityTiming(
+    options,
+    "management:scope-filtering",
+    scopeFilteringStartedAt,
+    scopedSnapshots.length,
   );
+  recordFusionIdentityTimingDuration(
+    options,
+    "management:scope-filtering-observation-extraction",
+    scopeFilteringObservationExtractionMs,
+    snapshots.length,
+  );
+  const scanPoolPhaseFinishedAt = performance.now();
+  if (scanPoolLastItemProcessedAt != null) {
+    recordFusionIdentityTimingDuration(
+      options,
+      "management:scan-pool-post-counter-work",
+      scanPoolPhaseFinishedAt - scanPoolLastItemProcessedAt,
+      scans.length,
+    );
+  }
+  const report = await buildFusionIdentityManagementReportFromSnapshots(
+    { snapshots: scopedSnapshots, ...stores },
+    {
+      ...options,
+      scope: scopeDefinition,
+      scanPoolLastItemProcessedAt,
+      scanPoolPhaseFinishedAt,
+    },
+  );
+  recordFusionIdentityTiming(options, "management:load-total", totalStartedAt, 1);
+  return report;
 }
 
 export async function confirmFusionIdentityLink(

@@ -48,6 +48,10 @@ import {
   type GuildAnalyticsDerivedData,
 } from "../../lib/guilds/localGuildAnalyticsStore";
 import {
+  loadIdentityResolutionSnapshot,
+  type IdentityResolutionSnapshot,
+} from "../../lib/identities/identityResolution";
+import {
   buildLocalFightParticipationSeries,
   type FightParticipationSeries,
 } from "../../lib/guilds/localFightAnalytics";
@@ -252,6 +256,7 @@ export default function GuildHubCompareGuilds() {
           <GuildDevelopmentOverview
             activeGuild={activeGuild}
             analyticsData={localScanState.analyticsData}
+            identityResolutionSnapshot={localScanState.identityResolutionSnapshot}
             loading={localScanState.loading}
             error={localScanState.error}
             metricKey={overviewMetric}
@@ -268,6 +273,7 @@ export default function GuildHubCompareGuilds() {
           <GuildProgressAnalytics
             activeGuild={activeGuild}
             analyticsData={localScanState.analyticsData}
+            identityResolutionSnapshot={localScanState.identityResolutionSnapshot}
             loading={localScanState.loading}
             error={localScanState.error}
             periodKey={progressPeriod}
@@ -333,9 +339,10 @@ export default function GuildHubCompareGuilds() {
 function useGuildAnalyticsLocalScans() {
   const [state, setState] = React.useState<{
     analyticsData: GuildAnalyticsDerivedData;
+    identityResolutionSnapshot: IdentityResolutionSnapshot | null;
     loading: boolean;
     error: string | null;
-  }>({ analyticsData: EMPTY_GUILD_ANALYTICS_DATA, loading: true, error: null });
+  }>({ analyticsData: EMPTY_GUILD_ANALYTICS_DATA, identityResolutionSnapshot: null, loading: true, error: null });
 
   React.useEffect(() => {
     let cancelled = false;
@@ -344,16 +351,23 @@ function useGuildAnalyticsLocalScans() {
       setState((current) => ({ ...current, loading: true, error: null }));
       listGuildHubScanSummaries()
         .then(async (summaries) => {
-          const analyticsData = await ensureGuildAnalyticsDerivedDataFromSummaries(summaries, {
-            loadSourceById: getGuildHubLocalScan,
-          });
-          if (!cancelled) setState({ analyticsData, loading: false, error: null });
+          const [analyticsData, identityResolutionSnapshot] = await Promise.all([
+            ensureGuildAnalyticsDerivedDataFromSummaries(summaries, {
+              loadSourceById: getGuildHubLocalScan,
+            }),
+            loadIdentityResolutionSnapshot().catch((error) => {
+              console.warn("[GuildHubAnalytics] failed to load identity resolution snapshot", error);
+              return null;
+            }),
+          ]);
+          if (!cancelled) setState({ analyticsData, identityResolutionSnapshot, loading: false, error: null });
         })
         .catch((error) => {
           console.error("[GuildHubAnalytics] failed to load local analytics data", error);
           if (!cancelled) {
             setState({
               analyticsData: EMPTY_GUILD_ANALYTICS_DATA,
+              identityResolutionSnapshot: null,
               loading: false,
               error: "Lokale Analytics-Daten konnten nicht geladen werden.",
             });
@@ -376,6 +390,7 @@ function useGuildAnalyticsLocalScans() {
 function GuildDevelopmentOverview({
   activeGuild,
   analyticsData,
+  identityResolutionSnapshot,
   loading,
   error,
   metricKey,
@@ -388,6 +403,7 @@ function GuildDevelopmentOverview({
 }: {
   activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"];
   analyticsData: GuildAnalyticsDerivedData;
+  identityResolutionSnapshot: IdentityResolutionSnapshot | null;
   loading: boolean;
   error: string | null;
   metricKey: GuildAnalyticsMetricKey;
@@ -410,8 +426,9 @@ function GuildDevelopmentOverview({
         supportsPlayerComparison ? metric.key : "avgLevel",
         rangeKey,
         selectedPlayerIds,
+        identityResolutionSnapshot,
       ),
-    [activeGuild, analyticsData, supportsPlayerComparison, metric.key, rangeKey, selectedPlayerIds],
+    [activeGuild, analyticsData, supportsPlayerComparison, metric.key, rangeKey, selectedPlayerIds, identityResolutionSnapshot],
   );
   const series = React.useMemo(
     () =>
@@ -419,8 +436,8 @@ function GuildDevelopmentOverview({
         ? { allPoints: [], visiblePoints: [], timeDomain: null }
         : supportsPlayerComparison
           ? playerComparison.guildSeries
-          : buildGuildAnalyticsSeries(analyticsData, activeGuild, scanMetricKey, rangeKey),
-    [activeGuild, analyticsData, scanMetricKey, rangeKey, isFightParticipation, supportsPlayerComparison, playerComparison],
+          : buildGuildAnalyticsSeries(analyticsData, activeGuild, scanMetricKey, rangeKey, identityResolutionSnapshot),
+    [activeGuild, analyticsData, scanMetricKey, rangeKey, isFightParticipation, supportsPlayerComparison, playerComparison, identityResolutionSnapshot],
   );
   const fightState = useFightParticipationAnalytics(activeGuild, rangeKey, isFightParticipation);
   const visiblePoints = series.visiblePoints;
@@ -1291,6 +1308,7 @@ function GuildDevelopmentStat({ label, value }: { label: string; value: string }
 function GuildProgressAnalytics({
   activeGuild,
   analyticsData,
+  identityResolutionSnapshot,
   loading,
   error,
   periodKey,
@@ -1298,18 +1316,19 @@ function GuildProgressAnalytics({
 }: {
   activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"];
   analyticsData: GuildAnalyticsDerivedData;
+  identityResolutionSnapshot: IdentityResolutionSnapshot | null;
   loading: boolean;
   error: string | null;
   periodKey: GuildAnalyticsProgressPeriodKey;
   onPeriodChange: (period: GuildAnalyticsProgressPeriodKey) => void;
 }) {
   const report = React.useMemo(
-    () => buildGuildAnalyticsProgressReport(analyticsData, activeGuild, periodKey),
-    [activeGuild, analyticsData, periodKey],
+    () => buildGuildAnalyticsProgressReport(analyticsData, activeGuild, periodKey, identityResolutionSnapshot),
+    [activeGuild, analyticsData, periodKey, identityResolutionSnapshot],
   );
   const matchingSeries = React.useMemo(
-    () => buildGuildAnalyticsSeries(analyticsData, activeGuild, "memberCount", "all"),
-    [activeGuild, analyticsData],
+    () => buildGuildAnalyticsSeries(analyticsData, activeGuild, "memberCount", "all", identityResolutionSnapshot),
+    [activeGuild, analyticsData, identityResolutionSnapshot],
   );
 
   let body: React.ReactNode;

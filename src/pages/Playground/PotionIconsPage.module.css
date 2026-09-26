@@ -1,0 +1,57 @@
+.page {
+  display: grid;
+  gap: 18px;
+  min-height: 520px;
+}
+
+.header {
+  display: grid;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  color: #f5f9ff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 0;
+  color: #b0c4d9;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.previewStage {
+  display: grid;
+  min-height: 430px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    #0b1422;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  background-size: 24px 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 44px rgba(0, 0, 0, 0.26);
+}
+
+.previewIcon {
+  width: min(440px, 82vw);
+}
+
+@media (max-width: 760px) {
+  .page {
+    min-height: 420px;
+  }
+
+  .previewStage {
+    min-height: 330px;
+  }
+}

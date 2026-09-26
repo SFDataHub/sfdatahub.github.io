@@ -12,8 +12,10 @@ import {
   type FusionIdentityAnalysisCacheLookup,
   type FusionIdentityAnalysisCacheState,
 } from "../../lib/identities/fusionAnalysisCache";
+import { getFusionIdentityAnalyzeActionState } from "../../lib/identities/fusionIdentityAnalyzeAction";
 import {
   buildFusionIdentityScopeIdentityState,
+  normalizeFusionIdentityScopeInventory,
   type FusionIdentityDashboardInventory,
   type FusionIdentityDashboardInventoryProgress,
   type FusionIdentityDashboardInventoryTiming,
@@ -336,6 +338,81 @@ const reportDashboardInventoryTimings = (
   console.groupEnd();
 };
 
+const reportFusionIdentityWorkerTimings = (
+  targetServerCode: string,
+  timings: FusionIdentityWorkerTiming[],
+) => {
+  if (!import.meta.env.DEV || !timings.length) return;
+  const workerCompute = timings.find((timing) => timing.phase === "worker:compute");
+  const roundTrip = timings.find((timing) => timing.phase === "client:worker-roundtrip");
+  const knownWorkerPhaseNames = new Set([
+    "management:local-scan-load",
+    "management:logical-snapshot-derivation",
+    "management:scope-filtering",
+    "management:build-report-total",
+  ]);
+  const sumKnownPhasesMs = timings
+    .filter((timing) => knownWorkerPhaseNames.has(timing.phase))
+    .reduce((sum, timing) => sum + timing.durationMs, 0);
+  const workerComputeMs = workerCompute?.durationMs ?? 0;
+  const unattributedMs = Math.max(0, workerComputeMs - sumKnownPhasesMs);
+  const textLines = [
+    `[Fusion Identity] worker phase diagnostics ${targetServerCode}`,
+    `workerComputeMs=${Math.round(workerComputeMs)}ms`,
+    `sumKnownPhasesMs=${Math.round(sumKnownPhasesMs)}ms`,
+    `unattributedMs=${Math.round(unattributedMs)}ms`,
+    ...timings.map((timing) => {
+      const countText = timing.count == null ? "" : ` count=${timing.count}`;
+      return `${timing.phase}=${Math.round(timing.durationMs)}ms${countText}`;
+    }),
+  ];
+  console.groupCollapsed(
+    `[Fusion Identity] worker phase diagnostics ${targetServerCode}`,
+    workerCompute ? `compute=${formatDuration(workerCompute.durationMs)}` : "",
+    roundTrip ? `roundtrip=${formatDuration(roundTrip.durationMs)}` : "",
+  );
+  console.log(textLines.join("\n"));
+  console.table(
+    timings.map((timing) => ({
+      phase: timing.phase,
+      durationMs: Math.round(timing.durationMs),
+      count: timing.count ?? "",
+    })),
+  );
+  console.groupEnd();
+};
+
+const getFusionIdentityProgressMessageKey = (
+  phase: FusionIdentityProgress["phase"] | undefined,
+) => {
+  switch (phase) {
+    case "loading":
+      return "fusionIdentity.loading.phases.loading";
+    case "preparing":
+    case "preparing-scan-pool":
+      return "fusionIdentity.loading.phases.preparingScanPool";
+    case "filtering-scope":
+      return "fusionIdentity.loading.phases.filteringScope";
+    case "normalizing":
+      return "fusionIdentity.loading.phases.normalizing";
+    case "player-histories":
+    case "preparing-histories":
+      return "fusionIdentity.loading.phases.preparingHistories";
+    case "player-resolution":
+      return "fusionIdentity.loading.phases.matchingPlayers";
+    case "guild-resolution":
+      return "fusionIdentity.loading.phases.matchingGuilds";
+    case "assignment":
+    case "report":
+    case "finalizing":
+      return "fusionIdentity.loading.phases.finalizing";
+    case "done":
+      return "fusionIdentity.loading.phases.done";
+    default:
+      return "fusionIdentity.loading.phases.fallback";
+  }
+};
+
 type FusionIdentityDashboardScopeModel = {
   inventory: FusionIdentityScopeInventory;
   identityState: FusionIdentityScopeIdentityState;
@@ -416,7 +493,10 @@ function useFusionIdentityDashboard() {
     try {
       const inventoryResult = await run.promise;
       if (activeInventoryRequestIdRef.current !== run.requestId) return;
-      const { inventory } = inventoryResult;
+      const inventory = {
+        ...inventoryResult.inventory,
+        scopes: inventoryResult.inventory.scopes.map(normalizeFusionIdentityScopeInventory),
+      };
       const nextTimings = [...inventoryResult.timings];
       const scopes = await Promise.all(
         inventory.scopes.map(async (scopeInventory) => {
@@ -520,6 +600,33 @@ function useFusionIdentityDashboard() {
   const analyzeScope = React.useCallback(
     async (scopeModel: FusionIdentityDashboardScopeModel) => {
       const { scope } = scopeModel.inventory;
+      const actionState = getFusionIdentityAnalyzeActionState({
+        analysisSupported: scope.analysisSupported,
+        isLocallyMatchable: scopeModel.inventory.isLocallyMatchable,
+        hasCurrentInputData: hasFusionAnalysisInputData(scopeModel),
+        cacheState: scopeModel.cacheState,
+      });
+      if (!actionState.enabled) {
+        if (actionState.reason === "fresh" || actionState.reason === "running")
+          return null;
+        const message =
+          actionState.reason === "unsupported"
+            ? `Full identity analysis is not enabled for ${scope.targetServerCode} yet.`
+            : !scopeModel.inventory.hasHistoricalObservations
+              ? `No historical ${scope.targetServerCode} lineage observations are available before this fusion.`
+              : !scopeModel.inventory.hasCurrentTargetObservations
+                ? `No current ${scope.targetServerCode} observations are available after this fusion.`
+                : actionState.reason === "no-current-data"
+                  ? `No current ${scope.targetServerCode} observations are available after this fusion.`
+                  : `${scope.targetServerCode} is not locally matchable yet.`;
+        setDashboard((current) =>
+          updateDashboardScope(current, scope.id, {
+            cacheState: "never-analyzed",
+            error: message,
+          }),
+        );
+        return null;
+      }
       runRef.current?.cancel();
       setDashboard((current) =>
         updateDashboardScope(current, scope.id, {
@@ -535,7 +642,7 @@ function useFusionIdentityDashboard() {
       setTimings([]);
 
       const run = startFusionIdentityWorkerRun({
-        scope,
+        scopeInventory: scopeModel.inventory,
         onProgress(nextProgress) {
           if (activeRequestIdRef.current === run.requestId)
             setProgress(nextProgress);
@@ -547,6 +654,8 @@ function useFusionIdentityDashboard() {
       try {
         const result = await run.promise;
         if (activeRequestIdRef.current !== run.requestId) return null;
+        const nextTimings = [...result.timings];
+        const cacheWriteStartedAt = performance.now();
         await writeFusionIdentityAnalysisCache({
           scope,
           scanFingerprint: scopeModel.inventory.scanFingerprint,
@@ -554,10 +663,29 @@ function useFusionIdentityDashboard() {
           report: result.report,
           timings: result.timings,
         });
+        nextTimings.push({
+          phase: "main:analysis-cache-write",
+          durationMs: performance.now() - cacheWriteStartedAt,
+          count: 1,
+        });
+        const reactStateStartedAt = performance.now();
         setReport(result.report);
-        setTimings(result.timings);
+        setTimings(nextTimings);
         setProgress({ phase: "done", message: "Fusion identity report ready" });
+        nextTimings.push({
+          phase: "main:react-state-enqueue",
+          durationMs: performance.now() - reactStateStartedAt,
+          count: 1,
+        });
+        const dashboardRefreshStartedAt = performance.now();
         await refreshDashboard();
+        nextTimings.push({
+          phase: "main:dashboard-refresh-after-analysis",
+          durationMs: performance.now() - dashboardRefreshStartedAt,
+          count: 1,
+        });
+        setTimings([...nextTimings]);
+        reportFusionIdentityWorkerTimings(scope.targetServerCode, nextTimings);
         return result.report;
       } catch (loadError) {
         if (activeRequestIdRef.current !== run.requestId) return null;
@@ -2331,11 +2459,32 @@ const isCacheStaleDueToCompatibility = (
   cache.staleReason !== "scan-fingerprint";
 
 const canOpenFusionWorkspace = (model: FusionIdentityDashboardScopeModel) =>
-  model.cacheState === "fresh" && Boolean(model.cache.freshEntry);
+  model.inventory.scope.analysisSupported &&
+  model.inventory.isLocallyMatchable &&
+  model.cacheState === "fresh" &&
+  Boolean(model.cache.freshEntry);
 
 const getOpenableFusionWorkspaceEntry = (
   model: FusionIdentityDashboardScopeModel,
 ) => (canOpenFusionWorkspace(model) ? model.cache.freshEntry : null);
+
+const hasFusionAnalysisInputData = (model: FusionIdentityDashboardScopeModel) =>
+  Boolean(
+    model.inventory.currentPlayerIdentifiers.length ||
+      model.inventory.currentGuildIdentifiers.length,
+  );
+
+const canClickAnalyzeFusionScope = (
+  model: FusionIdentityDashboardScopeModel,
+  isAnyAnalysisRunning: boolean,
+) =>
+  getFusionIdentityAnalyzeActionState({
+    analysisSupported: model.inventory.scope.analysisSupported,
+    isLocallyMatchable: model.inventory.isLocallyMatchable,
+    hasCurrentInputData: hasFusionAnalysisInputData(model),
+    cacheState: model.cacheState,
+    isAnyAnalysisRunning,
+  }).enabled;
 
 const cacheStatusLabel = (
   state: FusionIdentityAnalysisCacheState,
@@ -2361,8 +2510,17 @@ const cacheStatusClassName = (state: FusionIdentityAnalysisCacheState) => {
 
 const roleLabel = (role: FusionIdentityScopeInventory["coverage"][number]["role"]) => {
   if (role === "current-target") return "Current target";
+  if (role === "intermediate-fusion-target") return "Intermediate target";
   if (role === "historical-origin") return "Historical origin";
-  return "Outside selected scope";
+  if (role === "transitive-historical-origin") return "Transitive origin";
+  return "Out of scope";
+};
+
+const scopeTemporalLabel = (scope: FusionIdentityScopeInventory["scope"]) => {
+  if (scope.temporalStatus === "future") return "Future event";
+  if (scope.temporalStatus === "unknown-date") return "Unknown date";
+  if (scope.isCurrentTerminalTarget) return "Current terminal";
+  return "Historical intermediate";
 };
 
 const buildReportEntitySummary = (
@@ -2443,9 +2601,7 @@ function ScanCoverageAccordion({
         return (
           <div
             key={server.serverCode}
-            className={`${styles.coverageRow} ${
-              server.includedInScope ? "" : styles.coverageRowMuted
-            }`}
+            className={styles.coverageRow}
           >
             <button
               type="button"
@@ -2525,16 +2681,32 @@ export default function FusionIdentityPage() {
     string | null
   >(null);
 
+  const locallyMatchableScopes = React.useMemo(
+    () => dashboard.scopes.filter((scope) => scope.inventory.isLocallyMatchable),
+    [dashboard.scopes],
+  );
+
   React.useEffect(() => {
-    if (selectedDashboardScopeId || !dashboard.scopes.length) return;
-    setSelectedDashboardScopeId(dashboard.scopes[0].inventory.scope.id);
-  }, [dashboard.scopes, selectedDashboardScopeId]);
+    if (!locallyMatchableScopes.length) {
+      if (selectedDashboardScopeId) setSelectedDashboardScopeId(null);
+      return;
+    }
+    if (
+      selectedDashboardScopeId &&
+      locallyMatchableScopes.some(
+        (scope) => scope.inventory.scope.id === selectedDashboardScopeId,
+      )
+    ) {
+      return;
+    }
+    setSelectedDashboardScopeId(locallyMatchableScopes[0].inventory.scope.id);
+  }, [locallyMatchableScopes, selectedDashboardScopeId]);
 
   const selectedDashboardScope =
-    dashboard.scopes.find(
+    locallyMatchableScopes.find(
       (scope) => scope.inventory.scope.id === selectedDashboardScopeId,
     ) ??
-    dashboard.scopes[0] ??
+    locallyMatchableScopes[0] ??
     null;
 
   const expandedCoverageServerSet = React.useMemo(
@@ -2766,15 +2938,15 @@ export default function FusionIdentityPage() {
       );
     }
 
-    if (!dashboard.scopes.length) {
+    if (!locallyMatchableScopes.length) {
       return (
         <div className={styles.emptyState}>
-          No supported fusion scope detected for the available registry.
+          No locally matchable fusion scope detected for the available scans.
         </div>
       );
     }
 
-    const model = selectedDashboardScope ?? dashboard.scopes[0];
+    const model = selectedDashboardScope ?? locallyMatchableScopes[0];
     const scope = model.inventory.scope;
     const previousEntry = model.cache.previousEntry;
     const openableEntry = getOpenableFusionWorkspaceEntry(model);
@@ -2782,11 +2954,19 @@ export default function FusionIdentityPage() {
     const analyzedAt = previousEntry?.analyzedAt
       ? Date.parse(previousEntry.analyzedAt)
       : null;
-    const analyzeLabel = isCacheStaleDueToNewScan(model.cache)
-      ? "Analyze new data"
-      : isCacheStaleDueToCompatibility(model.cache)
-        ? "Re-analyze"
-        : `Analyze ${scope.targetServerCode}`;
+    const analyzeLabel = !scope.analysisSupported
+      ? "Analysis not enabled yet"
+      : !model.inventory.isLocallyMatchable
+        ? "Not locally matchable"
+      : !hasFusionAnalysisInputData(model)
+        ? "No current data"
+      : model.cacheState === "fresh"
+        ? "Analysis up to date"
+      : isCacheStaleDueToNewScan(model.cache)
+        ? "Analyze new data"
+        : isCacheStaleDueToCompatibility(model.cache)
+          ? "Re-analyze"
+          : `Analyze ${scope.targetServerCode}`;
 
     return (
       <div className={styles.dashboard}>
@@ -2814,7 +2994,7 @@ export default function FusionIdentityPage() {
           >
             All Matches
           </button>
-          {dashboard.scopes.map((entry) => (
+          {locallyMatchableScopes.map((entry) => (
             <button
               key={entry.inventory.scope.id}
               type="button"
@@ -2838,17 +3018,27 @@ export default function FusionIdentityPage() {
               <div>
                 <h3>{scope.targetServerCode}</h3>
                 <p>
-                  {scope.originServerCodes.join(", ")} -&gt;{" "}
+                  {scope.directOriginServerCodes.join(", ")} -&gt;{" "}
                   {scope.targetServerCode}
                 </p>
               </div>
-              <span
-                className={`${styles.statusBadge} ${cacheStatusClassName(
-                  model.cacheState,
-                )}`}
-              >
-                {cacheStatusLabel(model.cacheState, model.cache)}
-              </span>
+              <div className={styles.statusCluster}>
+                <span className={`${styles.statusBadge} ${styles.statusNative}`}>
+                  {scopeTemporalLabel(scope)}
+                </span>
+                {!scope.analysisSupported ? (
+                  <span className={`${styles.statusBadge} ${styles.statusAmbiguous}`}>
+                    Inventory only
+                  </span>
+                ) : null}
+                <span
+                  className={`${styles.statusBadge} ${cacheStatusClassName(
+                    model.cacheState,
+                  )}`}
+                >
+                  {cacheStatusLabel(model.cacheState, model.cache)}
+                </span>
+              </div>
             </div>
 
             {model.error ? (
@@ -2857,8 +3047,10 @@ export default function FusionIdentityPage() {
 
             {running ? (
               <DataHubLoadingState
-                title={`Analyzing ${scope.targetServerCode}`}
-                message={progress?.message ?? "Resolving fusion identities"}
+                title={t("fusionIdentity.loading.title", {
+                  targetServerCode: scope.targetServerCode,
+                })}
+                message={t(getFusionIdentityProgressMessageKey(progress?.phase))}
                 current={progress?.current}
                 total={progress?.total}
               />
@@ -2874,16 +3066,16 @@ export default function FusionIdentityPage() {
                 <strong>{formatDate(model.inventory.newestRelevantScanTimestamp)}</strong>
               </div>
               <div>
-                <span>Open current players</span>
+                <span>Current players</span>
                 <strong>{formatNumber(model.identityState.openCurrentPlayers)}</strong>
               </div>
               <div>
-                <span>Open current guilds</span>
+                <span>Current guilds</span>
                 <strong>{formatNumber(model.identityState.openCurrentGuilds)}</strong>
               </div>
             </div>
 
-            {previousEntry ? (
+            {previousEntry && scope.analysisSupported ? (
               <div className={styles.analysisBlock}>
                 <div className={styles.metaLine}>
                   Last analyzed: {formatDate(analyzedAt)} · cache{" "}
@@ -2899,7 +3091,9 @@ export default function FusionIdentityPage() {
               </div>
             ) : (
               <div className={styles.emptyState}>
-                {scope.targetServerCode} has not been analyzed yet.
+                {scope.analysisSupported
+                  ? `${scope.targetServerCode} has not been analyzed yet.`
+                  : `${scope.targetServerCode} is available for inventory coverage only.`}
               </div>
             )}
 
@@ -2917,7 +3111,7 @@ export default function FusionIdentityPage() {
                 type="button"
                 className={styles.closeButton}
                 onClick={() => void runScopeAnalysis(model)}
-                disabled={Boolean(runningScopeId)}
+                disabled={!canClickAnalyzeFusionScope(model, Boolean(runningScopeId))}
               >
                 <Search size={15} aria-hidden /> {analyzeLabel}
               </button>

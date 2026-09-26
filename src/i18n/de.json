@@ -39,6 +39,7 @@
     "users": "Nutzer",
     "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
+    "scanCoverage": "Scan-Abdeckung",
     "visitorAnalytics": "Visitor Analytics",
     "profile": "Profil",
     "account": "Account",
@@ -1370,10 +1371,10 @@
     }
   },
   "dungeonLibrary": {
-    "title": "Dungeon Library",
-    "subtitle": "Technischer Vertical Slice",
+    "title": "Dungeonbibliothek",
+    "subtitle": "Technischer Vertikalschnitt",
     "aria": {
-      "bookshelf": "Bücherregal der Dungeon Library"
+      "bookshelf": "Bücherregal der Dungeonbibliothek"
     },
     "worlds": {
       "lightWorld": "Lichtwelt",
@@ -1388,20 +1389,25 @@
       "floorCount": "{{count}} Ebenen",
       "dungeonCount": "{{count}} Dungeons",
       "overviewPageNote": "Übersicht {{current}} / {{total}} · Seite {{page}}",
+      "worldIndexPageNote": "Weltübersicht {{current}} / {{total}} · Seite {{page}}",
       "floorRangeOverviewNote": "Ebenen {{start}}-{{end}} · Übersicht {{current}} / {{total}}",
       "rangeOverviewPageNote": "Bereiche {{current}} / {{total}} · Seite {{page}}",
       "selectorPageNote": "Auswahl {{current}} / {{total}}",
       "pageNote": "Seite {{page}}",
+      "floorLabel": "Ebene {{floor}}",
       "floorRangeTitle": "Ebenen {{start}}-{{end}}",
       "floorGridAria": "{{title}} Ebenen",
+      "floorTileAria": "{{dungeon}}, Ebene {{floor}}: {{monster}}",
       "floorRangeAria": "{{title}} Ebenen {{start}}-{{end}}"
     },
     "navigation": {
       "floorRanges": "Bereiche",
       "floors": "Ebenen",
+      "worldOverview": "Weltübersicht",
       "floorOverview": "Ebenen-Übersicht",
       "dungeonOverview": "Dungeon-Übersicht",
-      "backToLibrary": "Zurück zur Dungeon Library"
+      "backToLibrary": "Zurück zur Bibliothek",
+      "backToLibraryShort": "Regal"
     },
     "fallbacks": {
       "dungeon": "Dungeon {{dungeonId}}",
@@ -1414,10 +1420,14 @@
       "loadingArtwork": "Grafik wird geladen...",
       "artworkUnavailable": "Grafik nicht verfügbar",
       "monsterImageAlt": "Monster {{enemyId}}",
-      "levelShort": "Lvl {{level}}",
-      "statsUnavailable": "Stats nicht verfügbar",
-      "enemyStatsAria": "Gegner-Stats",
-      "statIconAlt": "{{stat}} Icon",
+      "openMonsterImage": "Monsterbild öffnen",
+      "closeMonsterImage": "Bild schließen",
+      "loadingMonsterImage": "Bild wird geladen...",
+      "monsterImageUnavailable": "Bild nicht verfügbar",
+      "levelShort": "St. {{level}}",
+      "statsUnavailable": "Werte nicht verfügbar",
+      "enemyStatsAria": "Gegnerwerte",
+      "statIconAlt": "{{stat}}-Symbol",
       "enemyDamageAria": "Gegnerschaden",
       "minDamage": "Min. Schaden",
       "maxDamage": "Max. Schaden",
@@ -1425,7 +1435,7 @@
       "hpAria": "HP: {{value}}",
       "hpValue": "HP: {{value}}",
       "floorCounter": "Ebene {{current}} / {{total}}",
-      "lore": "Lore",
+      "lore": "Hintergrund",
       "loreUnavailable": "Noch nicht verfügbar.",
       "enemyId": "Gegner-ID {{enemyId}}"
     },
@@ -1442,6 +1452,50 @@
       "necromancer": "Nekromant",
       "paladin": "Paladin",
       "plague-doctor": "Pestdoktor"
+    }
+  },
+  "fusionIdentity": {
+    "loading": {
+      "title": "{{targetServerCode}} wird analysiert",
+      "phases": {
+        "loading": "Lokale Scans werden geladen",
+        "preparingScanPool": "Fusion-Scan-Pool wird vorbereitet",
+        "filteringScope": "Fusion-Scope wird gefiltert",
+        "normalizing": "Identitätsdaten werden normalisiert",
+        "preparingHistories": "Identitätsverläufe werden vorbereitet",
+        "matchingPlayers": "Spieler werden abgeglichen",
+        "matchingGuilds": "Gilden werden abgeglichen",
+        "finalizing": "Analyse wird abgeschlossen",
+        "done": "Fusion-Identitätsbericht ist bereit",
+        "fallback": "Fusion-Identitäten werden aufgelöst"
+      }
+    }
+  },
+  "scanCoverage": {
+    "loading": {
+      "title": "Scan-Abdeckung wird vorbereitet",
+      "phases": {
+        "loading-local-scans": "Lokale Scans werden geladen",
+        "mapping-snapshots": "Teilscans und Server werden zugeordnet",
+        "evaluating-players": "Spieler werden ausgewertet",
+        "building-coverage": "Scan-Abdeckung wird erstellt",
+        "done": "Scan-Abdeckung ist bereit"
+      }
+    },
+    "errors": {
+      "loadScans": "Lokale Scans konnten nicht geladen werden.",
+      "loadSelectedScan": "Der ausgewählte Scan konnte nicht geladen werden.",
+      "buildCoverage": "Die Scan-Abdeckung konnte nicht erstellt werden."
+    },
+    "quickInfo": {
+      "playersInScan": "Spieler im Scan",
+      "playersInRange": "Spieler im Prüfbereich",
+      "missingPlayers": "Fehlende Spieler",
+      "rangeMeta": "{{server}} · Prüfbereich 1–{{limit}}"
+    },
+    "table": {
+      "missingExplanation": "Fehlende Spieler werden anhand unbelegter Hof-Rangplätze erkannt.",
+      "missingPlayer": "Fehlender Spieler"
     }
   },
   "flipbook": {

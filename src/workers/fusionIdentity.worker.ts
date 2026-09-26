@@ -19,13 +19,17 @@ const createTimingTracker = () => {
   const totalStartedAt = performance.now();
   let activePhase: FusionIdentityProgressPhase | null = null;
   let activePhaseStartedAt = totalStartedAt;
-  const durations = new Map<FusionIdentityProgressPhase | "total", number>();
+  const durations = new Map<FusionIdentityWorkerTiming["phase"], number>();
+  const extraTimings: FusionIdentityWorkerTiming[] = [];
 
-  const addDuration = (phase: FusionIdentityProgressPhase | "total", durationMs: number) => {
+  const addDuration = (phase: FusionIdentityWorkerTiming["phase"], durationMs: number) => {
     durations.set(phase, (durations.get(phase) ?? 0) + durationMs);
   };
 
   return {
+    add(timing: FusionIdentityWorkerTiming) {
+      extraTimings.push(timing);
+    },
     mark(progress: FusionIdentityProgress) {
       const now = performance.now();
       if (activePhase && activePhase !== progress.phase) {
@@ -38,7 +42,10 @@ const createTimingTracker = () => {
       const now = performance.now();
       if (activePhase) addDuration(activePhase, now - activePhaseStartedAt);
       addDuration("total", now - totalStartedAt);
-      return [...durations.entries()].map(([phase, durationMs]) => ({ phase, durationMs }));
+      return [
+        ...[...durations.entries()].map(([phase, durationMs]) => ({ phase, durationMs })),
+        ...extraTimings,
+      ];
     },
   };
 };
@@ -49,6 +56,7 @@ const runBuildReport = async (
   requestId: string,
   scope?: FusionIdentityAnalysisScope,
 ) => {
+  const workerRequestStartedAt = performance.now();
   activeRequestId = requestId;
   cancelledRequests.delete(requestId);
   const timings = createTimingTracker();
@@ -64,14 +72,25 @@ const runBuildReport = async (
   try {
     const report = await loadFusionIdentityManagementReport(
       {},
-      { onProgress: emitProgress, scope },
+      {
+        onProgress: emitProgress,
+        onTiming: (timing) => timings.add(timing),
+        scope,
+      },
     );
     if (cancelledRequests.has(requestId) || activeRequestId !== requestId) {
       postWorkerMessage({ type: "cancelled", requestId });
       return;
     }
     emitProgress({ phase: "done", message: "Fusion identity report ready" });
-    postWorkerMessage({ type: "complete", requestId, report, timings: timings.finish() });
+    const workerComputeFinishedAt = performance.now();
+    const finalTimings = timings.finish();
+    finalTimings.push({
+      phase: "worker:compute",
+      durationMs: workerComputeFinishedAt - workerRequestStartedAt,
+      count: 1,
+    });
+    postWorkerMessage({ type: "complete", requestId, report, timings: finalTimings });
   } catch (error) {
     if (cancelledRequests.has(requestId) || activeRequestId !== requestId) {
       postWorkerMessage({ type: "cancelled", requestId });

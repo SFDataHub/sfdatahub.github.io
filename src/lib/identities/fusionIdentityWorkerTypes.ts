@@ -4,12 +4,16 @@ import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
 export type FusionIdentityProgressPhase =
   | "loading"
   | "preparing"
+  | "preparing-scan-pool"
+  | "filtering-scope"
   | "normalizing"
   | "player-histories"
+  | "preparing-histories"
   | "player-resolution"
   | "guild-resolution"
   | "assignment"
   | "report"
+  | "finalizing"
   | "done";
 
 export type FusionIdentityProgress = {
@@ -20,8 +24,9 @@ export type FusionIdentityProgress = {
 };
 
 export type FusionIdentityWorkerTiming = {
-  phase: FusionIdentityProgressPhase | "total";
+  phase: FusionIdentityProgressPhase | "total" | (string & {});
   durationMs: number;
+  count?: number;
 };
 
 export type FusionIdentityWorkerRequest =
@@ -57,4 +62,3 @@ export type FusionIdentityWorkerResponse =
       type: "cancelled";
       requestId: string;
     };
-

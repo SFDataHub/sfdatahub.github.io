@@ -39,6 +39,7 @@
     "users": "Uživatelé",
     "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
+    "scanCoverage": "Scan Coverage",
     "visitorAnalytics": "Visitor Analytics",
     "profile": "Profil",
     "account": "Účet",
@@ -1064,20 +1065,25 @@
       "floorCount": "{{count}} pater",
       "dungeonCount": "{{count}} dungeonu",
       "overviewPageNote": "Přehled {{current}} / {{total}} · Strana {{page}}",
+      "worldIndexPageNote": "Přehled světa {{current}} / {{total}} · Strana {{page}}",
       "floorRangeOverviewNote": "Patra {{start}}-{{end}} · Přehled {{current}} / {{total}}",
       "rangeOverviewPageNote": "Rozsahy pater {{current}} / {{total}} · Strana {{page}}",
       "selectorPageNote": "Výběr {{current}} / {{total}}",
       "pageNote": "Strana {{page}}",
+      "floorLabel": "Patro {{floor}}",
       "floorRangeTitle": "Patra {{start}}-{{end}}",
       "floorGridAria": "{{title}} patra",
+      "floorTileAria": "{{dungeon}}, patro {{floor}}: {{monster}}",
       "floorRangeAria": "{{title}} patra {{start}}-{{end}}"
     },
     "navigation": {
       "floorRanges": "Rozsahy pater",
       "floors": "Patra",
+      "worldOverview": "Přehled světa",
       "floorOverview": "Přehled pater",
       "dungeonOverview": "Přehled dungeonů",
-      "backToLibrary": "Zpět do knihovny dungeonů"
+      "backToLibrary": "Zpět do knihovny",
+      "backToLibraryShort": "Knihovna"
     },
     "fallbacks": {
       "dungeon": "Dungeon {{dungeonId}}",
@@ -1090,6 +1096,10 @@
       "loadingArtwork": "Načítá se obrázek...",
       "artworkUnavailable": "Obrázek není dostupný",
       "monsterImageAlt": "Monstrum {{enemyId}}",
+      "openMonsterImage": "Otevřít obrázek monstra",
+      "closeMonsterImage": "Zavřít obrázek",
+      "loadingMonsterImage": "Načítá se obrázek...",
+      "monsterImageUnavailable": "Obrázek není dostupný",
       "levelShort": "Úroveň {{level}}",
       "statsUnavailable": "Staty nejsou dostupné",
       "enemyStatsAria": "Staty protivníka",
@@ -1118,6 +1128,50 @@
       "necromancer": "Nekromant",
       "paladin": "Paladin",
       "plague-doctor": "Morový doktor"
+    }
+  },
+  "fusionIdentity": {
+    "loading": {
+      "title": "Analyzuje se {{targetServerCode}}",
+      "phases": {
+        "loading": "Načítají se lokální skeny",
+        "preparingScanPool": "Připravuje se fond fusion skenů",
+        "filteringScope": "Filtruje se fusion rozsah",
+        "normalizing": "Normalizují se data identit",
+        "preparingHistories": "Připravují se historie identit",
+        "matchingPlayers": "Párují se hráči",
+        "matchingGuilds": "Párují se gildy",
+        "finalizing": "Dokončuje se analýza",
+        "done": "Report fusion identit je připravený",
+        "fallback": "Vyhodnocují se fusion identity"
+      }
+    }
+  },
+  "scanCoverage": {
+    "loading": {
+      "title": "Připravuje se pokrytí skenu",
+      "phases": {
+        "loading-local-scans": "Načítají se lokální skeny",
+        "mapping-snapshots": "Přiřazují se dílčí skeny a servery",
+        "evaluating-players": "Vyhodnocují se hráči",
+        "building-coverage": "Vytváří se pokrytí skenu",
+        "done": "Pokrytí skenu je připravené"
+      }
+    },
+    "errors": {
+      "loadScans": "Lokální skeny se nepodařilo načíst.",
+      "loadSelectedScan": "Vybraný sken se nepodařilo načíst.",
+      "buildCoverage": "Pokrytí skenu se nepodařilo vytvořit."
+    },
+    "quickInfo": {
+      "playersInScan": "Hráči ve skenu",
+      "playersInRange": "Hráči v kontrolovaném rozsahu",
+      "missingPlayers": "Chybějící hráči",
+      "rangeMeta": "{{server}} · Kontrolovaný rozsah 1–{{limit}}"
+    },
+    "table": {
+      "missingExplanation": "Chybějící hráči se zjišťují podle neobsazených pozic v Síni slávy.",
+      "missingPlayer": "Chybějící hráč"
     }
   },
   "flipbook": {

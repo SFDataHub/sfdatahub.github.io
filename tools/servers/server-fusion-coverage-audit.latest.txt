@@ -1,0 +1,656 @@
+# Server / Fusion Coverage Audit
+Generated: 2026-09-23
+Mode: local runtime foundation audit. Dashboard, matching, workers, and UI copy remain out of scope.
+
+## A. Local Server Registry
+| code | displayName | host | numericId | aliases | releaseDate | type | region | active |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 123PLAYGAMES | 123PLAYGAMES | 123playgames.sfgame.gr | 142 |  |  | origin | GR | false |
+| AE1 | AE 1 | s1.sfgame.ae | 36 | s1_ae, s1ae |  | origin | AE | false |
+| AE2 | AE 2 | s2.sfgame.ae | 65 | s2_ae, s2ae |  | origin | AE | false |
+| AM1 | AM 1 | am1.sfgame.net | 521 | am1_am, am1am |  | origin | AM | true |
+| BLACKFOREST | Black Forest | blackforest.sfgame.net | 545 | blackforest_net, blackforestnet, BLACK_FOREST |  | named | Fusion | true |
+| BR1 | BR 1 | s1.sfgame.com.br | 90 | s1_br, s1br |  | origin | BR | false |
+| BR2 | BR 2 | s2.sfgame.com.br | 183 | s2_br, s2br |  | origin | BR | false |
+| BUFFED | BUFFED | buffed.sfgame.de | 2 |  |  | origin | DE | false |
+| CA1 | CA 1 | s1.sfgame.ca | 194 | s1_ca, s1ca |  | origin | CA | false |
+| CL1 | CL 1 | s1.sfgame.cl | 25 | s1_cl, s1cl |  | origin | CL | false |
+| CL2 | CL 2 | s2.sfgame.cl | 73 | s2_cl, s2cl |  | origin | CL | false |
+| CZ1 | CZ 1 | s1.sfgame.cz | 28 | s1_cz, s1cz |  | origin | CZ | false |
+| CZ2 | CZ 2 | s2.sfgame.cz | 37 | s2_cz, s2cz |  | origin | CZ | false |
+| CZ3 | CZ 3 | s3.sfgame.cz | 41 | s3_cz, s3cz |  | origin | CZ | false |
+| CZ4 | CZ 4 | s4.sfgame.cz | 48 | s4_cz, s4cz |  | origin | CZ | false |
+| CZ5 | CZ 5 | s5.sfgame.cz | 60 | s5_cz, s5cz |  | origin | CZ | false |
+| CZ6 | CZ 6 | s6.sfgame.cz | 74 | s6_cz, s6cz |  | origin | CZ | false |
+| CZ7 | CZ 7 | s7.sfgame.cz | 93 | s7_cz, s7cz |  | origin | CZ | false |
+| CZ8 | CZ 8 | s8.sfgame.cz | 116 | s8_cz, s8cz |  | origin | CZ | false |
+| CZ9 | CZ 9 | s9.sfgame.cz | 149 | s9_cz, s9cz |  | origin | CZ | false |
+| CZ10 | CZ 10 | s10.sfgame.cz | 168 | s10_cz, s10cz |  | origin | CZ | false |
+| CZ11 | CZ 11 | s11.sfgame.cz | 198 | s11_cz, s11cz |  | origin | CZ | false |
+| CZ12 | CZ 12 | s12.sfgame.cz | 213 | s12_cz, s12cz |  | origin | CZ | false |
+| CZ13 | CZ 13 | s13.sfgame.cz | 220 | s13_cz, s13cz |  | origin | CZ | false |
+| CZ14 | CZ 14 | s14.sfgame.cz | 243 | s14_cz, s14cz |  | origin | CZ | false |
+| CZ15 | CZ 15 | s15.sfgame.cz | 252 | s15_cz, s15cz |  | origin | CZ | false |
+| CZ16 | CZ 16 | s16.sfgame.cz | 267 | s16_cz, s16cz |  | origin | CZ | false |
+| CZ17 | CZ 17 | s17.sfgame.cz | 271 | s17_cz, s17cz |  | origin | CZ | false |
+| CZ18 | CZ 18 | s18.sfgame.cz | 277 | s18_cz, s18cz |  | origin | CZ | false |
+| CZ19 | CZ 19 | s19.sfgame.cz | 281 | s19_cz, s19cz |  | origin | CZ | false |
+| CZ20 | CZ 20 | s20.sfgame.cz | 285 | s20_cz, s20cz |  | origin | CZ | false |
+| CZ21 | CZ 21 | s21.sfgame.cz | 293 | s21_cz, s21cz |  | origin | CZ | false |
+| CZ22 | CZ 22 | s22.sfgame.cz | 308 | s22_cz, s22cz |  | origin | CZ | false |
+| CZ23 | CZ 23 | s23.sfgame.cz | 312 | s23_cz, s23cz |  | origin | CZ | false |
+| CZ24 | CZ 24 | s24.sfgame.cz | 316 | s24_cz, s24cz |  | origin | CZ | false |
+| CZ25 | CZ 25 | s25.sfgame.cz | 323 | s25_cz, s25cz |  | origin | CZ | false |
+| CZ26 | CZ 26 | s26.sfgame.cz | 335 | s26_cz, s26cz |  | origin | CZ | false |
+| CZ27 | CZ 27 | s27.sfgame.cz | 339 | s27_cz, s27cz |  | origin | CZ | false |
+| CZ28 | CZ 28 | s28.sfgame.cz | 349 | s28_cz, s28cz |  | origin | CZ | false |
+| CZ29 | CZ 29 | s29.sfgame.cz | 364 | s29_cz, s29cz |  | origin | CZ | false |
+| CZ30 | CZ 30 | s30.sfgame.cz | 389 | s30_cz, s30cz |  | origin | CZ | false |
+| CZ31 | CZ 31 | s31.sfgame.cz | 395 | s31_cz, s31cz |  | origin | CZ | false |
+| CZ32 | CZ 32 | s32.sfgame.cz | 408 | s32_cz, s32cz |  | origin | CZ | false |
+| CZ33 | CZ 33 | s33.sfgame.cz | 418 | s33_cz, s33cz |  | origin | CZ | false |
+| CZ34 | CZ 34 | s34.sfgame.cz | 427 | s34_cz, s34cz |  | origin | CZ | false |
+| CZ35 | CZ 35 | s35.sfgame.cz | 443 | s35_cz, s35cz |  | origin | CZ | false |
+| DE1 | DE 1 | s1.sfgame.de | 1 | s1_de, s1de |  | origin | DE | false |
+| DE2 | DE 2 | s2.sfgame.de | 3 | s2_de, s2de |  | origin | DE | false |
+| DE3 | DE 3 | s3.sfgame.de | 9 | s3_de, s3de |  | origin | DE | false |
+| DE4 | DE 4 | s4.sfgame.de | 12 | s4_de, s4de |  | origin | DE | false |
+| DE5 | DE 5 | s5.sfgame.de | 14 | s5_de, s5de |  | origin | DE | false |
+| DE6 | DE 6 | s6.sfgame.de | 15 | s6_de, s6de |  | origin | DE | false |
+| DE7 | DE 7 | s7.sfgame.de | 20 | s7_de, s7de |  | origin | DE | false |
+| DE8 | DE 8 | s8.sfgame.de | 31 | s8_de, s8de |  | origin | DE | false |
+| DE9 | DE 9 | s9.sfgame.de | 39 | s9_de, s9de |  | origin | DE | false |
+| DE10 | DE 10 | s10.sfgame.de | 45 | s10_de, s10de |  | origin | DE | false |
+| DE11 | DE 11 | s11.sfgame.de | 57 | s11_de, s11de |  | origin | DE | false |
+| DE12 | DE 12 | s12.sfgame.de | 61 | s12_de, s12de |  | origin | DE | false |
+| DE13 | DE 13 | s13.sfgame.de | 77 | s13_de, s13de |  | origin | DE | false |
+| DE14 | DE 14 | s14.sfgame.de | 102 | s14_de, s14de |  | origin | DE | false |
+| DE15 | DE 15 | s15.sfgame.de | 121 | s15_de, s15de |  | origin | DE | false |
+| DE16 | DE 16 | s16.sfgame.de | 147 | s16_de, s16de |  | origin | DE | false |
+| DE17 | DE 17 | s17.sfgame.de | 165 | s17_de, s17de |  | origin | DE | false |
+| DE18 | DE 18 | s18.sfgame.de | 196 | s18_de, s18de |  | origin | DE | false |
+| DE19 | DE 19 | s19.sfgame.de | 210 | s19_de, s19de |  | origin | DE | false |
+| DE20 | DE 20 | s20.sfgame.de | 217 | s20_de, s20de |  | origin | DE | false |
+| DE21 | DE 21 | s21.sfgame.de | 234 | s21_de, s21de |  | origin | DE | false |
+| DE22 | DE 22 | s22.sfgame.de | 240 | s22_de, s22de |  | origin | DE | false |
+| DE23 | DE 23 | s23.sfgame.de | 248 | s23_de, s23de |  | origin | DE | false |
+| DE24 | DE 24 | s24.sfgame.de | 254 | s24_de, s24de |  | origin | DE | false |
+| DE25 | DE 25 | s25.sfgame.de | 264 | s25_de, s25de |  | origin | DE | false |
+| DE26 | DE 26 | s26.sfgame.de | 269 | s26_de, s26de |  | origin | DE | false |
+| DE27 | DE 27 | s27.sfgame.de | 273 | s27_de, s27de |  | origin | DE | false |
+| DE28 | DE 28 | s28.sfgame.de | 279 | s28_de, s28de |  | origin | DE | false |
+| DE29 | DE 29 | s29.sfgame.de | 282 | s29_de, s29de |  | origin | DE | false |
+| DE30 | DE 30 | s30.sfgame.de | 289 | s30_de, s30de |  | origin | DE | false |
+| DE31 | DE 31 | s31.sfgame.de | 306 | s31_de, s31de |  | origin | DE | false |
+| DE32 | DE 32 | s32.sfgame.de | 310 | s32_de, s32de |  | origin | DE | false |
+| DE33 | DE 33 | s33.sfgame.de | 315 | s33_de, s33de |  | origin | DE | false |
+| DE34 | DE 34 | s34.sfgame.de | 320 | s34_de, s34de |  | origin | DE | false |
+| DE35 | DE 35 | s35.sfgame.de | 333 | s35_de, s35de |  | origin | DE | false |
+| DE36 | DE 36 | s36.sfgame.de | 338 | s36_de, s36de |  | origin | DE | false |
+| DE37 | DE 37 | s37.sfgame.de | 347 | s37_de, s37de |  | origin | DE | false |
+| DE38 | DE 38 | s38.sfgame.de | 383 | s38_de, s38de |  | origin | DE | false |
+| DE39 | DE 39 | s39.sfgame.de | 393 | s39_de, s39de |  | origin | DE | false |
+| DE40 | DE 40 | s40.sfgame.de | 406 | s40_de, s40de |  | origin | DE | false |
+| DE41 | DE 41 | s41.sfgame.de | 415 | s41_de, s41de |  | origin | DE | false |
+| DE42 | DE 42 | s42.sfgame.de | 425 | s42_de, s42de |  | origin | DE | false |
+| DE43 | DE 43 | s43.sfgame.de | 441 | s43_de, s43de |  | origin | DE | false |
+| DK1 | DK 1 | s1.sfgame.dk | 69 | s1_dk, s1dk |  | origin | DK | false |
+| DK2 | DK 2 | s2.sfgame.dk | 166 | s2_dk, s2dk |  | origin | DK | false |
+| ES1 | ES 1 | s1.sfgame.es | 19 | s1_es, s1es |  | origin | ES | false |
+| ES2 | ES 2 | s2.sfgame.es | 30 | s2_es, s2es |  | origin | ES | false |
+| ES3 | ES 3 | s3.sfgame.es | 53 | s3_es, s3es |  | origin | ES | false |
+| ES4 | ES 4 | s4.sfgame.es | 63 | s4_es, s4es |  | origin | ES | false |
+| ES5 | ES 5 | s5.sfgame.es | 91 | s5_es, s5es |  | origin | ES | false |
+| ES6 | ES 6 | s6.sfgame.es | 123 | s6_es, s6es |  | origin | ES | false |
+| ES7 | ES 7 | s7.sfgame.es | 180 | s7_es, s7es |  | origin | ES | false |
+| ES8 | ES 8 | s8.sfgame.es | 235 | s8_es, s8es |  | origin | ES | false |
+| ES9 | ES 9 | s9.sfgame.es | 258 | s9_es, s9es |  | origin | ES | false |
+| ES10 | ES 10 | s10.sfgame.es | 274 | s10_es, s10es |  | origin | ES | false |
+| ES11 | ES 11 | s11.sfgame.es | 288 | s11_es, s11es |  | origin | ES | false |
+| ES12 | ES 12 | s12.sfgame.es | 398 | s12_es, s12es |  | origin | ES | false |
+| EU1 | EU 1 | s1.sfgame.eu | 458 | s1_eu, s1eu | 2023-01-06 | origin | EU | false |
+| EU2 | EU 2 | s2.sfgame.eu | 460 | s2_eu, s2eu | 2023-02-24 | origin | EU | false |
+| EU3 | EU 3 | s3.sfgame.eu | 462 | s3_eu, s3eu | 2023-04-14 | origin | EU | false |
+| EU4 | EU 4 | s4.sfgame.eu | 464 | s4_eu, s4eu | 2023-05-26 | origin | EU | false |
+| EU5 | EU 5 | s5.sfgame.eu | 466 | s5_eu, s5eu |  | origin | EU | true |
+| EU6 | EU 6 | s6.sfgame.eu | 472 | s6_eu, s6eu |  | origin | EU | true |
+| EU7 | EU 7 | s7.sfgame.eu | 475 | s7_eu, s7eu |  | origin | EU | true |
+| EU8 | EU 8 | s8.sfgame.eu | 479 | s8_eu, s8eu |  | origin | EU | true |
+| EU9 | EU 9 | s9.sfgame.eu | 480 | s9_eu, s9eu |  | origin | EU | true |
+| EU10 | EU 10 | s10.sfgame.eu | 496 | s10_eu, s10eu |  | origin | EU | true |
+| EU11 | EU 11 | s11.sfgame.eu | 499 | s11_eu, s11eu |  | origin | EU | true |
+| EU12 | EU 12 | s12.sfgame.eu | 515 | s12_eu, s12eu |  | origin | EU | true |
+| EU13 | EU 13 | s13.sfgame.eu | 517 | s13_eu, s13eu |  | origin | EU | true |
+| EU14 | EU 14 | s14.sfgame.eu | 518 | s14_eu, s14eu |  | origin | EU | true |
+| EU15 | EU 15 | s15.sfgame.eu | 519 | s15_eu, s15eu |  | origin | EU | true |
+| EU16 | EU 16 | s16.sfgame.eu | 520 | s16_eu, s16eu |  | origin | EU | true |
+| EU17 | EU 17 | s17.sfgame.eu | 528 | s17_eu, s17eu |  | origin | EU | true |
+| EU18 | EU 18 | s18.sfgame.eu | 531 | s18_eu, s18eu |  | origin | EU | true |
+| EU19 | EU 19 | s19.sfgame.eu | 534 | s19_eu, s19eu |  | origin | EU | true |
+| EU20 | EU 20 | s20.sfgame.eu | 537 | s20_eu, s20eu |  | origin | EU | true |
+| EU21 | EU 21 | s21.sfgame.eu | 538 | s21_eu, s21eu |  | origin | EU | true |
+| EU22 | EU 22 | s22.sfgame.eu | 541 | s22_eu, s22eu |  | origin | EU | true |
+| EU23 | EU 23 | s23.sfgame.eu | 542 | s23_eu, s23eu |  | origin | EU | true |
+| EU24 | EU 24 | s24.sfgame.eu | 547 | s24_eu, s24eu |  | origin | EU | true |
+| EU25 | EU 25 | s25.sfgame.eu | 548 | s25_eu, s25eu |  | origin | EU | true |
+| EU26 | EU 26 | s26.sfgame.eu | 551 | s26_eu, s26eu |  | origin | EU | true |
+| EU27 | EU 27 | s27.sfgame.eu | 553 | s27_eu, s27eu |  | origin | EU | true |
+| EU28 | EU 28 | s28.sfgame.eu | 557 | s28_eu, s28eu |  | origin | EU | true |
+| EU29 | EU 29 | s29.sfgame.eu | 559 | s29_eu, s29eu |  | origin | EU | true |
+| EU30 | EU 30 | s30.sfgame.eu | 561 | s30_eu, s30eu |  | origin | EU | true |
+| EU31 | EU 31 | s31.sfgame.eu | 562 | s31_eu, s31eu |  | origin | EU | false |
+| F1 | Fusion 1 | f1.sfgame.net | 469 | f1_fu, f1fu, f1_net, f1net |  | fusion | Fusion | false |
+| F2 | Fusion 2 | f2.sfgame.net | 473 | f2_fu, f2fu, f2_net, f2net |  | fusion | Fusion | false |
+| F3 | Fusion 3 | f3.sfgame.net | 474 | f3_fu, f3fu, f3_net, f3net |  | fusion | Fusion | false |
+| F4 | Fusion 4 | f4.sfgame.net | 476 | f4_fu, f4fu, f4_net, f4net |  | fusion | Fusion | false |
+| F5 | Fusion 5 | f5.sfgame.net | 477 | f5_fu, f5fu, f5_net, f5net |  | fusion | Fusion | false |
+| F6 | Fusion 6 | f6.sfgame.net | 478 | f6_fu, f6fu, f6_net, f6net |  | fusion | Fusion | false |
+| F7 | Fusion 7 | f7.sfgame.net | 481 | f7_fu, f7fu, f7_net, f7net |  | fusion | Fusion | false |
+| F8 | Fusion 8 | f8.sfgame.net | 482 | f8_fu, f8fu, f8_net, f8net |  | fusion | Fusion | true |
+| F9 | Fusion 9 | f9.sfgame.net | 483 | f9_fu, f9fu, f9_net, f9net |  | fusion | Fusion | true |
+| F10 | Fusion 10 | f10.sfgame.net | 484 | f10_fu, f10fu, f10_net, f10net |  | fusion | Fusion | false |
+| F11 | Fusion 11 | f11.sfgame.net | 485 | f11_fu, f11fu, f11_net, f11net |  | fusion | Fusion | true |
+| F12 | Fusion 12 | f12.sfgame.net | 486 | f12_fu, f12fu, f12_net, f12net |  | fusion | Fusion | false |
+| F13 | Fusion 13 | f13.sfgame.net | 487 | f13_fu, f13fu, f13_net, f13net |  | fusion | Fusion | false |
+| F14 | Fusion 14 | f14.sfgame.net | 488 | f14_fu, f14fu, f14_net, f14net |  | fusion | Fusion | true |
+| F15 | Fusion 15 | f15.sfgame.net | 489 | f15_fu, f15fu, f15_net, f15net |  | fusion | Fusion | false |
+| F16 | Fusion 16 | f16.sfgame.net | 490 | f16_fu, f16fu, f16_net, f16net |  | fusion | Fusion | false |
+| F17 | Fusion 17 | f17.sfgame.net | 491 | f17_fu, f17fu, f17_net, f17net |  | fusion | Fusion | true |
+| F18 | Fusion 18 | f18.sfgame.net | 492 | f18_fu, f18fu, f18_net, f18net |  | fusion | Fusion | false |
+| F19 | Fusion 19 | f19.sfgame.net | 493 | f19_fu, f19fu, f19_net, f19net |  | fusion | Fusion | true |
+| F20 | Fusion 20 | f20.sfgame.net | 494 | f20_fu, f20fu, f20_net, f20net |  | fusion | Fusion | false |
+| F21 | Fusion 21 | f21.sfgame.net | 495 | f21_fu, f21fu, f21_net, f21net |  | fusion | Fusion | true |
+| F22 | Fusion 22 | f22.sfgame.net | 500 | f22_fu, f22fu, f22_net, f22net |  | fusion | Fusion | true |
+| F23 | Fusion 23 | f23.sfgame.net | 501 | f23_fu, f23fu, f23_net, f23net |  | fusion | Fusion | true |
+| F24 | Fusion 24 | f24.sfgame.net | 502 | f24_fu, f24fu, f24_net, f24net |  | fusion | Fusion | true |
+| F25 | Fusion 25 | f25.sfgame.net | 529 | f25_fu, f25fu, f25_net, f25net |  | fusion | Fusion | true |
+| F26 | Fusion 26 | f26.sfgame.net | 530 | f26_fu, f26fu, f26_net, f26net |  | fusion | Fusion | true |
+| F27 | Fusion 27 | f27.sfgame.net | 539 | f27_fu, f27fu, f27_net, f27net |  | fusion | Fusion | true |
+| F28 | Fusion 28 | f28.sfgame.net | 549 | f28_fu, f28fu, f28_net, f28net |  | fusion | Fusion | true |
+| F29 | Fusion 29 | f29.sfgame.net | 550 | f29_fu, f29fu, f29_net, f29net |  | fusion | Fusion | false |
+| FR1 | FR 1 | s1.sfgame.fr | 13 | s1_fr, s1fr |  | origin | FR | false |
+| FR2 | FR 2 | s2.sfgame.fr | 17 | s2_fr, s2fr |  | origin | FR | false |
+| FR3 | FR 3 | s3.sfgame.fr | 32 | s3_fr, s3fr |  | origin | FR | false |
+| FR4 | FR 4 | s4.sfgame.fr | 42 | s4_fr, s4fr |  | origin | FR | false |
+| FR5 | FR 5 | s5.sfgame.fr | 62 | s5_fr, s5fr |  | origin | FR | false |
+| FR6 | FR 6 | s6.sfgame.fr | 103 | s6_fr, s6fr |  | origin | FR | false |
+| FR7 | FR 7 | s7.sfgame.fr | 146 | s7_fr, s7fr |  | origin | FR | false |
+| FR8 | FR 8 | s8.sfgame.fr | 218 | s8_fr, s8fr |  | origin | FR | false |
+| FR9 | FR 9 | s9.sfgame.fr | 255 | s9_fr, s9fr |  | origin | FR | false |
+| FR10 | FR 10 | s10.sfgame.fr | 272 | s10_fr, s10fr |  | origin | FR | false |
+| FR11 | FR 11 | s11.sfgame.fr | 283 | s11_fr, s11fr |  | origin | FR | false |
+| FR12 | FR 12 | s12.sfgame.fr | 321 | s12_fr, s12fr |  | origin | FR | false |
+| FR13 | FR 13 | s13.sfgame.fr | 342 | s13_fr, s13fr |  | origin | FR | false |
+| FR14 | FR 14 | s14.sfgame.fr | 416 | s14_fr, s14fr |  | origin | FR | false |
+| FR15 | FR 15 | s15.sfgame.fr | 426 | s15_fr, s15fr |  | origin | FR | false |
+| GAMONA | GAMONA | gamona.sfgame.de | 5 |  |  | origin | DE | false |
+| GNAROGRIM | Gnarogrim | gnarogrim.sfgame.net | 546 | gnarogrim_net, gnarogrimnet, GRANOGRIM, granogrim_net |  | named | Fusion | true |
+| GR1 | GR 1 | s1.sfgame.gr | 23 | s1_gr, s1gr |  | origin | GR | false |
+| GR2 | GR 2 | s2.sfgame.gr | 55 | s2_gr, s2gr |  | origin | GR | false |
+| GR3 | GR 3 | s3.sfgame.gr | 124 | s3_gr, s3gr |  | origin | GR | false |
+| GR4 | GR 4 | s4.sfgame.gr | 236 | s4_gr, s4gr |  | origin | GR | false |
+| GR5 | GR 5 | s5.sfgame.gr | 265 | s5_gr, s5gr |  | origin | GR | false |
+| GR6 | GR 6 | s6.sfgame.gr | 290 | s6_gr, s6gr |  | origin | GR | false |
+| HU1 | HU 1 | s1.sfgame.hu | 27 | s1_hu, s1hu |  | origin | HU | false |
+| HU2 | HU 2 | s2.sfgame.hu | 40 | s2_hu, s2hu |  | origin | HU | false |
+| HU3 | HU 3 | s3.sfgame.hu | 49 | s3_hu, s3hu |  | origin | HU | false |
+| HU4 | HU 4 | s4.sfgame.hu | 64 | s4_hu, s4hu |  | origin | HU | false |
+| HU5 | HU 5 | s5.sfgame.hu | 105 | s5_hu, s5hu |  | origin | HU | false |
+| HU6 | HU 6 | s6.sfgame.hu | 150 | s6_hu, s6hu |  | origin | HU | false |
+| HU7 | HU 7 | s7.sfgame.hu | 214 | s7_hu, s7hu |  | origin | HU | false |
+| HU8 | HU 8 | s8.sfgame.hu | 244 | s8_hu, s8hu |  | origin | HU | false |
+| HU9 | HU 9 | s9.sfgame.hu | 268 | s9_hu, s9hu |  | origin | HU | false |
+| HU10 | HU 10 | s10.sfgame.hu | 278 | s10_hu, s10hu |  | origin | HU | false |
+| HU11 | HU 11 | s11.sfgame.hu | 294 | s11_hu, s11hu |  | origin | HU | false |
+| HU12 | HU 12 | s12.sfgame.hu | 313 | s12_hu, s12hu |  | origin | HU | false |
+| HU13 | HU 13 | s13.sfgame.hu | 324 | s13_hu, s13hu |  | origin | HU | false |
+| HU14 | HU 14 | s14.sfgame.hu | 341 | s14_hu, s14hu |  | origin | HU | false |
+| HU15 | HU 15 | s15.sfgame.hu | 350 | s15_hu, s15hu |  | origin | HU | false |
+| HU16 | HU 16 | s16.sfgame.hu | 365 | s16_hu, s16hu |  | origin | HU | false |
+| HU17 | HU 17 | s17.sfgame.hu | 407 | s17_hu, s17hu |  | origin | HU | false |
+| HU18 | HU 18 | s18.sfgame.hu | 419 | s18_hu, s18hu |  | origin | HU | false |
+| HU19 | HU 19 | s19.sfgame.hu | 428 | s19_hu, s19hu |  | origin | HU | false |
+| HU20 | HU 20 | s20.sfgame.hu | 444 | s20_hu, s20hu |  | origin | HU | false |
+| IN1 | IN 1 | s1.sfgame.in | 195 | s1_in, s1in |  | origin | IN | false |
+| INGAME | INGAME | ingame.sfgame.de | 8 |  |  | origin | DE | false |
+| IT1 | IT 1 | s1.sfgame.it | 18 | s1_it, s1it |  | origin | IT | false |
+| IT2 | IT 2 | s2.sfgame.it | 29 | s2_it, s2it |  | origin | IT | false |
+| IT3 | IT 3 | s3.sfgame.it | 54 | s3_it, s3it |  | origin | IT | false |
+| IT4 | IT 4 | s4.sfgame.it | 104 | s4_it, s4it |  | origin | IT | false |
+| IT5 | IT 5 | s5.sfgame.it | 181 | s5_it, s5it |  | origin | IT | false |
+| IT6 | IT 6 | s6.sfgame.it | 257 | s6_it, s6it |  | origin | IT | false |
+| IT7 | IT 7 | s7.sfgame.it | 287 | s7_it, s7it |  | origin | IT | false |
+| IT8 | IT 8 | s8.sfgame.it | 401 | s8_it, s8it |  | origin | IT | false |
+| JP1 | JP 1 | s1.sfgame.jp | 22 | s1_jp, s1jp |  | origin | JP | false |
+| MAERWYNN | Maerwynn | maerwynn.sfgame.net | 533 | maerwynn_net, maerwynnnet |  | named | Fusion | true |
+| MINIJUEGOS | MINIJUEGOS | minijuegos.sfgame.es | 21 |  |  | origin | ES | false |
+| MX1 | MX 1 | s1.sfgame.mx | 50 | s1_mx, s1mx |  | origin | MX | false |
+| NL1 | NL 1 | s1.sfgame.nl | 11 | s1_nl, s1nl |  | origin | NL | false |
+| NL2 | NL 2 | s2.sfgame.nl | 56 | s2_nl, s2nl |  | origin | NL | false |
+| NL3 | NL 3 | s3.sfgame.nl | 256 | s3_nl, s3nl |  | origin | NL | false |
+| PL1 | PL 1 | s1.sfgame.pl | 26 | s1_pl, s1pl |  | origin | PL | false |
+| PL2 | PL 2 | s2.sfgame.pl | 34 | s2_pl, s2pl |  | origin | PL | false |
+| PL3 | PL 3 | s3.sfgame.pl | 35 | s3_pl, s3pl |  | origin | PL | false |
+| PL4 | PL 4 | s4.sfgame.pl | 38 | s4_pl, s4pl |  | origin | PL | false |
+| PL5 | PL 5 | s5.sfgame.pl | 43 | s5_pl, s5pl |  | origin | PL | false |
+| PL6 | PL 6 | s6.sfgame.pl | 46 | s6_pl, s6pl |  | origin | PL | false |
+| PL7 | PL 7 | s7.sfgame.pl | 52 | s7_pl, s7pl |  | origin | PL | false |
+| PL8 | PL 8 | s8.sfgame.pl | 67 | s8_pl, s8pl |  | origin | PL | false |
+| PL9 | PL 9 | s9.sfgame.pl | 79 | s9_pl, s9pl |  | origin | PL | false |
+| PL10 | PL 10 | s10.sfgame.pl | 100 | s10_pl, s10pl |  | origin | PL | false |
+| PL11 | PL 11 | s11.sfgame.pl | 122 | s11_pl, s11pl |  | origin | PL | false |
+| PL12 | PL 12 | s12.sfgame.pl | 148 | s12_pl, s12pl |  | origin | PL | false |
+| PL13 | PL 13 | s13.sfgame.pl | 167 | s13_pl, s13pl |  | origin | PL | false |
+| PL14 | PL 14 | s14.sfgame.pl | 197 | s14_pl, s14pl |  | origin | PL | false |
+| PL15 | PL 15 | s15.sfgame.pl | 212 | s15_pl, s15pl |  | origin | PL | false |
+| PL16 | PL 16 | s16.sfgame.pl | 219 | s16_pl, s16pl |  | origin | PL | false |
+| PL17 | PL 17 | s17.sfgame.pl | 237 | s17_pl, s17pl |  | origin | PL | false |
+| PL18 | PL 18 | s18.sfgame.pl | 242 | s18_pl, s18pl |  | origin | PL | false |
+| PL19 | PL 19 | s19.sfgame.pl | 249 | s19_pl, s19pl |  | origin | PL | false |
+| PL20 | PL 20 | s20.sfgame.pl | 259 | s20_pl, s20pl |  | origin | PL | false |
+| PL21 | PL 21 | s21.sfgame.pl | 266 | s21_pl, s21pl |  | origin | PL | false |
+| PL22 | PL 22 | s22.sfgame.pl | 270 | s22_pl, s22pl |  | origin | PL | false |
+| PL23 | PL 23 | s23.sfgame.pl | 276 | s23_pl, s23pl |  | origin | PL | false |
+| PL24 | PL 24 | s24.sfgame.pl | 280 | s24_pl, s24pl |  | origin | PL | false |
+| PL25 | PL 25 | s25.sfgame.pl | 284 | s25_pl, s25pl |  | origin | PL | false |
+| PL26 | PL 26 | s26.sfgame.pl | 292 | s26_pl, s26pl |  | origin | PL | false |
+| PL27 | PL 27 | s27.sfgame.pl | 307 | s27_pl, s27pl |  | origin | PL | false |
+| PL28 | PL 28 | s28.sfgame.pl | 311 | s28_pl, s28pl |  | origin | PL | false |
+| PL29 | PL 29 | s29.sfgame.pl | 317 | s29_pl, s29pl |  | origin | PL | false |
+| PL30 | PL 30 | s30.sfgame.pl | 322 | s30_pl, s30pl |  | origin | PL | false |
+| PL31 | PL 31 | s31.sfgame.pl | 334 | s31_pl, s31pl |  | origin | PL | false |
+| PL32 | PL 32 | s32.sfgame.pl | 340 | s32_pl, s32pl |  | origin | PL | false |
+| PL33 | PL 33 | s33.sfgame.pl | 348 | s33_pl, s33pl |  | origin | PL | false |
+| PL34 | PL 34 | s34.sfgame.pl | 366 | s34_pl, s34pl |  | origin | PL | false |
+| PL35 | PL 35 | s35.sfgame.pl | 388 | s35_pl, s35pl |  | origin | PL | false |
+| PL36 | PL 36 | s36.sfgame.pl | 394 | s36_pl, s36pl |  | origin | PL | false |
+| PL37 | PL 37 | s37.sfgame.pl | 405 | s37_pl, s37pl |  | origin | PL | false |
+| PL38 | PL 38 | s38.sfgame.pl | 417 | s38_pl, s38pl |  | origin | PL | false |
+| PL39 | PL 39 | s39.sfgame.pl | 429 | s39_pl, s39pl |  | origin | PL | false |
+| PL40 | PL 40 | s40.sfgame.pl | 442 | s40_pl, s40pl |  | origin | PL | false |
+| PT1 | PT 1 | s1.sfgame.com.pt | 24 | s1_pt, s1pt |  | origin | PT | false |
+| PT2 | PT 2 | s2.sfgame.com.pt | 51 | s2_pt, s2pt |  | origin | PT | false |
+| PT3 | PT 3 | s3.sfgame.com.pt | 92 | s3_pt, s3pt |  | origin | PT | false |
+| PT4 | PT 4 | s4.sfgame.com.pt | 126 | s4_pt, s4pt |  | origin | PT | false |
+| PT5 | PT 5 | s5.sfgame.com.pt | 199 | s5_pt, s5pt |  | origin | PT | false |
+| PT6 | PT 6 | s6.sfgame.com.pt | 241 | s6_pt, s6pt |  | origin | PT | false |
+| PT7 | PT 7 | s7.sfgame.com.pt | 275 | s7_pt, s7pt |  | origin | PT | false |
+| PT8 | PT 8 | s8.sfgame.com.pt | 291 | s8_pt, s8pt |  | origin | PT | false |
+| RO1 | RO 1 | s1.sfgame.ro | 193 | s1_ro, s1ro |  | origin | RO | false |
+| RTL | RTL | rtl.sfgame.de | 164 |  |  | origin | DE | false |
+| RTL2 | RTL 2 | rtl2.sfgame.de | 4 |  |  | origin | DE | false |
+| RU1 | RU 1 | s1.sfgame.ru | 70 | s1_ru, s1ru |  | origin | RU | false |
+| SE1 | SE 1 | s1.sfgame.se | 72 | s1_se, s1se |  | origin | SE | false |
+| SE2 | SE 2 | s2.sfgame.se | 172 | s2_se, s2se |  | origin | SE | false |
+| SEVENGAMES | SEVENGAMES | sevengames.sfgame.de | 89 |  |  | origin | DE | false |
+| SK1 | SK 1 | s1.sfgame.sk | 247 | s1_sk, s1sk |  | origin | SK | false |
+| SK2 | SK 2 | s2.sfgame.sk | 296 | s2_sk, s2sk |  | origin | SK | false |
+| SK3 | SK 3 | s3.sfgame.sk | 319 | s3_sk, s3sk |  | origin | SK | false |
+| SPEED | SPEED | speed.sfgame.net | 440 |  |  | origin | XX | true |
+| STUMBLESTEPPE | Stumble Steppe | stumblesteppe.sfgame.net | 560 | stumblesteppe_net, stumblesteppenet, STUMPLESTEPPE, stumplesteppe_net |  | named | Fusion | true |
+| TR1 | TR 1 | s1.sfgame.web.tr | 71 | s1_tr, s1tr |  | origin | TR | false |
+| TR2 | TR 2 | s2.sfgame.web.tr | 78 | s2_tr, s2tr |  | origin | TR | false |
+| TR3 | TR 3 | s3.sfgame.web.tr | 94 | s3_tr, s3tr |  | origin | TR | false |
+| TR4 | TR 4 | s4.sfgame.web.tr | 200 | s4_tr, s4tr |  | origin | TR | false |
+| TR5 | TR 5 | s5.sfgame.web.tr | 260 | s5_tr, s5tr |  | origin | TR | false |
+| TR6 | TR 6 | s6.sfgame.web.tr | 295 | s6_tr, s6tr |  | origin | TR | false |
+| TV2 | TV 2 | tv2.sfgame.dk | 201 |  |  | origin | DK | false |
+| UK1 | UK 1 | s1.sfgame.co.uk | 16 | s1_uk, s1uk |  | origin | UK | false |
+| UK2 | UK 2 | s2.sfgame.co.uk | 182 | s2_uk, s2uk |  | origin | UK | false |
+| US1 | US 1 | s1.sfgame.us | 10 | s1_us, s1us |  | origin | US | false |
+| US2 | US 2 | s2.sfgame.us | 33 | s2_us, s2us |  | origin | US | false |
+| US3 | US 3 | s3.sfgame.us | 66 | s3_us, s3us |  | origin | US | false |
+| US4 | US 4 | s4.sfgame.us | 117 | s4_us, s4us |  | origin | US | false |
+| US5 | US 5 | s5.sfgame.us | 133 | s5_us, s5us |  | origin | US | false |
+| US6 | US 6 | s6.sfgame.us | 144 | s6_us, s6us |  | origin | US | false |
+| US7 | US 7 | s7.sfgame.us | 154 | s7_us, s7us |  | origin | US | false |
+| US8 | US 8 | s8.sfgame.us | 211 | s8_us, s8us |  | origin | US | false |
+| US9 | US 9 | s9.sfgame.us | 251 | s9_us, s9us |  | origin | US | false |
+| US10 | US 10 | s10.sfgame.us | 286 | s10_us, s10us |  | origin | US | false |
+| W1 | World 1 | w1.sfgame.net | 344 | w1_xx, w1xx, INT1 |  | origin | International | false |
+| W2 | World 2 | w2.sfgame.net | 345 | w2_xx, w2xx, INT2 |  | origin | International | false |
+| W3 | World 3 | w3.sfgame.net | 346 | w3_xx, w3xx, INT3 |  | origin | International | false |
+| W4 | World 4 | w4.sfgame.net | 352 | w4_xx, w4xx, INT4 |  | origin | International | false |
+| W5 | World 5 | w5.sfgame.net | 353 | w5_xx, w5xx, INT5 |  | origin | International | false |
+| W6 | World 6 | w6.sfgame.net | 354 | w6_xx, w6xx, INT6 |  | origin | International | false |
+| W7 | World 7 | w7.sfgame.net | 355 | w7_xx, w7xx, INT7 |  | origin | International | false |
+| W8 | World 8 | w8.sfgame.net | 356 | w8_xx, w8xx, INT8 |  | origin | International | false |
+| W9 | World 9 | w9.sfgame.net | 357 | w9_xx, w9xx, INT9 |  | origin | International | false |
+| W10 | World 10 | w10.sfgame.net | 358 | w10_xx, w10xx, INT10 |  | origin | International | false |
+| W11 | World 11 | w11.sfgame.net | 360 | w11_xx, w11xx, INT11 |  | origin | International | false |
+| W12 | World 12 | w12.sfgame.net | 361 | w12_xx, w12xx, INT12 |  | origin | International | false |
+| W13 | World 13 | w13.sfgame.net | 362 | w13_xx, w13xx, INT13 |  | origin | International | false |
+| W14 | World 14 | w14.sfgame.net | 363 | w14_xx, w14xx, INT14 |  | origin | International | false |
+| W15 | World 15 | w15.sfgame.net | 367 | w15_xx, w15xx, INT15 |  | origin | International | false |
+| W16 | World 16 | w16.sfgame.net | 368 | w16_xx, w16xx, INT16 |  | origin | International | false |
+| W17 | World 17 | w17.sfgame.net | 371 | w17_xx, w17xx, INT17 |  | origin | International | false |
+| W18 | World 18 | w18.sfgame.net | 374 | w18_xx, w18xx, INT18 |  | origin | International | false |
+| W19 | World 19 | w19.sfgame.net | 376 | w19_xx, w19xx, INT19 |  | origin | International | false |
+| W20 | World 20 | w20.sfgame.net | 378 | w20_xx, w20xx, INT20 |  | origin | International | false |
+| W21 | World 21 | w21.sfgame.net | 379 | w21_xx, w21xx, INT21 |  | origin | International | false |
+| W22 | World 22 | w22.sfgame.net | 380 | w22_xx, w22xx, INT22 |  | origin | International | false |
+| W23 | World 23 | w23.sfgame.net | 381 | w23_xx, w23xx, INT23 |  | origin | International | false |
+| W24 | World 24 | w24.sfgame.net | 382 | w24_xx, w24xx, INT24 |  | origin | International | false |
+| W25 | World 25 | w25.sfgame.net | 384 | w25_xx, w25xx, INT25 |  | origin | International | false |
+| W26 | World 26 | w26.sfgame.net | 386 | w26_xx, w26xx, INT26 |  | origin | International | false |
+| W27 | World 27 | w27.sfgame.net | 387 | w27_xx, w27xx, INT27 |  | origin | International | false |
+| W28 | World 28 | w28.sfgame.net | 390 | w28_xx, w28xx, INT28 |  | origin | International | false |
+| W30 | World 30 | w30.sfgame.net | 391 | w30_xx, w30xx, INT30 |  | origin | International | false |
+| W31 | World 31 | w31.sfgame.net | 392 | w31_xx, w31xx, INT31 |  | origin | International | false |
+| W32 | World 32 | w32.sfgame.net | 397 | w32_xx, w32xx, INT32 |  | origin | International | false |
+| W33 | World 33 | w33.sfgame.net | 399 | w33_xx, w33xx, INT33 |  | origin | International | false |
+| W34 | World 34 | w34.sfgame.net | 400 | w34_xx, w34xx, INT34 |  | origin | International | false |
+| W35 | World 35 | w35.sfgame.net | 404 | w35_xx, w35xx, INT35 |  | origin | International | false |
+| W36 | World 36 | w36.sfgame.net | 409 | w36_xx, w36xx, INT36 |  | origin | International | false |
+| W37 | World 37 | w37.sfgame.net | 410 | w37_xx, w37xx, INT37 |  | origin | International | false |
+| W38 | World 38 | w38.sfgame.net | 411 | w38_xx, w38xx, INT38 |  | origin | International | false |
+| W39 | World 39 | w39.sfgame.net | 413 | w39_xx, w39xx, INT39 |  | origin | International | false |
+| W40 | World 40 | w40.sfgame.net | 420 | w40_xx, w40xx, INT40 |  | origin | International | false |
+| W41 | World 41 | w41.sfgame.net | 422 | w41_xx, w41xx, INT41 |  | origin | International | false |
+| W42 | World 42 | w42.sfgame.net | 423 | w42_xx, w42xx, INT42 |  | origin | International | false |
+| W43 | World 43 | w43.sfgame.net | 424 | w43_xx, w43xx, INT43 |  | origin | International | false |
+| W44 | World 44 | w44.sfgame.net | 431 | w44_xx, w44xx, INT44 |  | origin | International | false |
+| W45 | World 45 | w45.sfgame.net | 432 | w45_xx, w45xx, INT45 |  | origin | International | false |
+| W46 | World 46 | w46.sfgame.net | 433 | w46_xx, w46xx, INT46 |  | origin | International | false |
+| W47 | World 47 | w47.sfgame.net | 434 | w47_xx, w47xx, INT47 |  | origin | International | false |
+| W48 | World 48 | w48.sfgame.net | 435 | w48_xx, w48xx, INT48 |  | origin | International | false |
+| W49 | World 49 | w49.sfgame.net | 436 | w49_xx, w49xx, INT49 |  | origin | International | false |
+| W50 | World 50 | w50.sfgame.net | 438 | w50_xx, w50xx, INT50 |  | origin | International | false |
+| W51 | World 51 | w51.sfgame.net | 439 | w51_xx, w51xx, INT51 |  | origin | International | false |
+| W52 | World 52 | w52.sfgame.net | 445 | w52_xx, w52xx, INT52 |  | origin | International | false |
+| W53 | World 53 | w53.sfgame.net | 446 | w53_xx, w53xx, INT53 |  | origin | International | false |
+| W54 | World 54 | w54.sfgame.net | 447 | w54_xx, w54xx, INT54 |  | origin | International | false |
+| W55 | World 55 | w55.sfgame.net | 448 | w55_xx, w55xx, INT55 |  | origin | International | false |
+| W56 | World 56 | w56.sfgame.net | 451 | w56_xx, w56xx, INT56 |  | origin | International | false |
+| W57 | World 57 | w57.sfgame.net | 453 | w57_xx, w57xx, INT57 |  | origin | International | false |
+| W58 | World 58 | w58.sfgame.net | 454 | w58_xx, w58xx, INT58 |  | origin | International | false |
+| W59 | World 59 | w59.sfgame.net | 455 | w59_xx, w59xx, INT59 |  | origin | International | false |
+| W60 | World 60 | w60.sfgame.net | 456 | w60_xx, w60xx, INT60 |  | origin | International | false |
+| WP | WP | wp.sfgame.pl | 47 |  |  | origin | PL | false |
+| XCHAR | XCHAR | xchar.sfgame.de | 7 |  |  | origin | DE | false |
+
+Local registry coverage: 363 servers; releaseDate known for 4; numericId known for 363.
+
+## B. Local Fusion Events
+| event | origins | target | effectiveDate | compensationPolicy |
+| --- | --- | --- | --- | --- |
+| fusion-blackforest | F7, F10, F13 | BLACKFOREST | 2026-05-08 | unknown |
+| fusion-f1 | BR1, BR2, CA1, CL1, CL2, MX1, US1, US2, US3, US4, US5, US6, US7, US8, US9, US10 | F1 | 2023-07-26 | none |
+| fusion-f2 | AE1, AE2, DK1, DK2, IN1, JP1, NL1, NL2, NL3, RO1, RU1, SE1, SE2, TV2, UK1, UK2 | F2 | 2023-09-08 | none |
+| fusion-f3 | IT1, IT2, IT3, IT4, IT5, IT6, IT7, IT8 | F3 | 2023-10-13 | none |
+| fusion-f4 | 123PLAYGAMES, GR1, GR2, GR3, GR4, GR5, GR6, PT1, PT2, PT3, PT4, PT5, PT6, PT7, PT8, TR1, TR2, TR3, TR4, TR5, TR6 | F4 | 2023-10-20 | none |
+| fusion-f5 | ES1, ES2, ES3, ES4, ES5, ES6, ES7, ES8, ES9, ES10, ES11, ES12, MINIJUEGOS | F5 | 2023-10-27 | none |
+| fusion-f6 | FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13 | F6 | 2023-11-10 | none |
+| fusion-f7 | PL7, PL8, PL9, PL10, PL11, PL12, PL13, PL14, PL15, PL16, PL17 | F7 | 2023-12-08 | none |
+| fusion-f8 | DE5, DE6, DE7, DE8, DE9, DE10, DE11, DE12 | F8 | 2024-01-12 | none |
+| fusion-f9 | DE25, DE26, DE27, DE28, DE29, DE30, DE31, DE32, DE33, DE34, DE35, DE36, DE37 | F9 | 2024-01-19 | none |
+| fusion-f10 | PL18, PL19, PL20, PL21, PL22, PL23, PL24, PL25, PL26, PL27, PL28, PL29, PL30, PL31, PL32, PL33 | F10 | 2024-01-26 | none |
+| fusion-f11 | DE13, DE14, DE15, DE16, DE17, DE18, DE19, DE20, DE21, DE22, DE23, DE24, RTL, SEVENGAMES | F11 | 2024-01-26 | none |
+| fusion-f12 | W1, W2, W3, W4, W5 | F12 | 2024-01-26 | none |
+| fusion-f13 | PL1, PL2, PL3, PL4, PL5, PL6, WP | F13 | 2024-02-02 | none |
+| fusion-f14 | W15, W16, W17, W18, W19, W20, W21 | F14 | 2024-02-02 | none |
+| fusion-f15 | CZ17, CZ18, CZ19, CZ20, CZ21, CZ22, CZ23, CZ24, CZ25, CZ26, CZ27, CZ28, SK2, SK3 | F15 | 2024-02-02 | none |
+| fusion-f16 | CZ6, CZ7, CZ8, CZ9, CZ10, CZ11, CZ12, CZ13, CZ14, CZ15, CZ16, SK1 | F16 | 2024-02-09 | none |
+| fusion-f17 | BUFFED, DE1, DE2, DE3, DE4, GAMONA, INGAME, RTL2, XCHAR | F17 | 2024-02-09 | none |
+| fusion-f18 | CZ1, CZ2, CZ3, CZ4, CZ5 | F18 | 2024-02-09 | none |
+| fusion-f19 | HU1, HU2, HU3, HU4, HU5, HU6, HU7, HU8, HU9, HU10, HU11, HU12, HU13, HU14, HU15 | F19 | 2024-02-16 | none |
+| fusion-f20 | CZ29, HU16, PL34, W6, W7, W8, W9, W10, W11, W12, W13, W14 | F20 | 2024-02-16 | none |
+| fusion-f21 | CZ30, DE38, PL35, W22, W23, W24, W25, W26, W27, W28, W30 | F21 | 2024-02-16 | none |
+| fusion-f22 | CZ31, CZ32, DE39, DE40, HU17, PL36, PL37, W31, W32, W33, W34, W35, W36, W37 | F22 | 2024-03-15 | none |
+| fusion-f23 | CZ33, CZ34, DE41, DE42, FR14, FR15, HU18, HU19, PL38, PL39, W38, W39, W40, W41, W42, W43, W44, W45 | F23 | 2024-10-11 | none |
+| fusion-f24 | W46, W47, W48, W49, W50 | F24 | 2025-02-07 | unknown |
+| fusion-f25 | CZ35, DE43, HU20, PL40, W51, W52 | F25 | 2025-02-07 | unknown |
+| fusion-f26 | W53, W54, W55, W56 | F26 | 2025-03-07 | unknown |
+| fusion-f27 | W57, W58, W59, W60 | F27 | 2025-08-01 | unknown |
+| fusion-f28 | EU1, EU2, EU3, EU4 | F28 | 2026-02-06 | levelGoldV1 |
+| fusion-f29 | EU5, EU6, EU7, EU8 | F29 | 2026-10-16 | unknown |
+| fusion-gnarogrim | F15, F16, F18 | GNAROGRIM | 2026-06-05 | unknown |
+| fusion-maerwynn | F1, F2, F3, F4, F5 | MAERWYNN | 2025-04-25 | none |
+| fusion-stumblesteppe | F6, F12, F20 | STUMBLESTEPPE | 2026-07-10 | unknown |
+
+Local fusion coverage: 33 multi-origin events; future events: fusion-f29; unknown compensation policies: 8; missing effective dates: none.
+
+## C. Local Graph Validation
+| check | result |
+| --- | --- |
+| duplicate codes | none |
+| duplicate hosts | none |
+| duplicate numeric IDs | none |
+| schema/graph issues | none |
+
+## D. F28 / EU Hardcode Audit
+| file | line | hardcode type | needs refactor? | context |
+| --- | --- | --- | --- | --- |
+| src/data/serverFusions.ts | 3 | fixture/local registry | no/implied by context | export type LocalServerFusionCompensationPolicy = "none" \| "levelGoldV1" \| "unknown"; |
+| src/data/serverFusions.ts | 10 | fixture/local registry | no/implied by context | compensationPolicy: LocalServerFusionCompensationPolicy; |
+| src/data/serverFusions.ts | 25 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 32 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 39 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 46 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 53 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 60 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 67 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 74 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 81 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 88 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 95 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 102 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 109 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 116 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 123 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 130 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 137 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 144 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 151 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 158 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 165 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 172 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 179 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 186 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 193 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 200 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 207 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 214 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 218 | fixture/local registry | no/implied by context | origins: ["EU1", "EU2", "EU3", "EU4"], |
+| src/data/serverFusions.ts | 219 | fixture/local registry | no/implied by context | target: "F28", |
+| src/data/serverFusions.ts | 221 | fixture/local registry | no/implied by context | compensationPolicy: "levelGoldV1", |
+| src/data/serverFusions.ts | 228 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 235 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 242 | fixture/local registry | no/implied by context | compensationPolicy: "none", |
+| src/data/serverFusions.ts | 249 | fixture/local registry | no/implied by context | compensationPolicy: "unknown", |
+| src/data/serverFusions.ts | 253 | fixture/local registry | no/implied by context | const F28_COMPATIBILITY_EVENT = LOCAL_SERVER_FUSION_EVENTS.find((event) => event.target === "F28")!; |
+| src/data/serverFusions.ts | 259 | fixture/local registry | no/implied by context | { from: "EU1", to: "F28", fusionEvent: F28_COMPATIBILITY_EVENT }, |
+| src/data/serverFusions.ts | 260 | fixture/local registry | no/implied by context | { from: "EU2", to: "F28", fusionEvent: F28_COMPATIBILITY_EVENT }, |
+| src/data/serverFusions.ts | 261 | fixture/local registry | no/implied by context | { from: "EU3", to: "F28", fusionEvent: F28_COMPATIBILITY_EVENT }, |
+| src/data/serverFusions.ts | 262 | fixture/local registry | no/implied by context | { from: "EU4", to: "F28", fusionEvent: F28_COMPATIBILITY_EVENT }, |
+| src/data/serverRegistry.ts | 1151 | fixture/local registry | no/implied by context | code: "EU1", |
+| src/data/serverRegistry.ts | 1163 | fixture/local registry | no/implied by context | code: "EU2", |
+| src/data/serverRegistry.ts | 1175 | fixture/local registry | no/implied by context | code: "EU3", |
+| src/data/serverRegistry.ts | 1187 | fixture/local registry | no/implied by context | code: "EU4", |
+| src/data/serverRegistry.ts | 1793 | fixture/local registry | no/implied by context | code: "F28", |
+| src/lib/identities/fusionIdentityManagement.ts | 284 | product scope/copy | yes | const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"]; |
+| src/lib/identities/fusionIdentityManagement.ts | 285 | product scope/copy | yes | const TARGET_SERVER_CODE = "F28"; |
+| src/lib/identities/fusionIdentityManagement.ts | 290 | product scope/copy | yes | label: "EU1-EU4 -> F28", |
+| src/lib/identities/playerFusionPreviewAdapter.ts | 56 | product scope/copy | yes | const SUPPORTED_ORIGIN_CODES = new Set(["EU1", "EU2", "EU3", "EU4"]); |
+| src/lib/identities/playerFusionPreviewAdapter.ts | 57 | product scope/copy | yes | const SUPPORTED_POST_FUSION_CODE = "F28"; |
+| src/pages/Scans/FusionIdentity.tsx | 1404 | product scope/copy | yes | The system compares historical identities from EU1-EU4 with |
+| src/pages/Scans/FusionIdentity.tsx | 1405 | product scope/copy | yes | current F28 identities. It collects independent evidence, |
+| src/pages/Scans/FusionIdentity.tsx | 2099 | product scope/copy | yes | Current F28 alias |
+| tools/identities/currentPlayerDetailRegression.mts | 23 | analysis tool scope | later, if reused | const TARGET_SERVER_CODE = "F28"; |
+| tools/identities/fusionAnalysisCache.test.mts | 14 | fixture/local registry | later, if reused | id: "F28", |
+| tools/identities/fusionAnalysisCache.test.mts | 15 | fixture/local registry | later, if reused | label: "EU1-EU4 -> F28", |
+| tools/identities/fusionAnalysisCache.test.mts | 16 | fixture/local registry | later, if reused | targetServerCode: "F28", |
+| tools/identities/fusionAnalysisCache.test.mts | 18 | fixture/local registry | later, if reused | originServerCodes: ["EU1", "EU2", "EU3", "EU4"], |
+| tools/identities/fusionCompensationAnalysis.mts | 83 | analysis tool scope | later, if reused | const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"] as const; |
+| tools/identities/fusionCompensationAnalysis.mts | 85 | analysis tool scope | later, if reused | const TARGET_SERVER_CODE = "F28"; |
+| tools/identities/fusionCompensationAnalysis.mts | 89 | analysis tool scope | later, if reused | { bucket: "500-549", EU1: 3, EU2: 6, EU3: 10, EU4: 13 }, |
+| tools/identities/fusionCompensationAnalysis.mts | 90 | analysis tool scope | later, if reused | { bucket: "550-599", EU1: 4, EU2: 8, EU3: 11, EU4: 15 }, |
+| tools/identities/fusionCompensationAnalysis.mts | 167 | analysis tool scope | later, if reused | mentionsTarget: /F28\|f28_net/.test(source), |
+| tools/identities/fusionCompensationAnalysis.mts | 474 | analysis tool scope | later, if reused | line("Main repo serverRegistry/serverFusions currently contains the EU1-EU4 -> F28 relationship but no launchDate metadata."); |
+| tools/identities/fusionCompensationAnalysis.mts | 488 | analysis tool scope | later, if reused | line("## E. EU1-EU4 -> F28 Level Compensation Inference"); |
+| tools/identities/fusionCompensationAnalysis.mts | 572 | analysis tool scope | later, if reused | line("HardiyDK/f28_net_p4809 is EU1, so inferred compensation is 0: 586 -> 589 remains rawGain=3 and adjustedGain=3."); |
+| tools/identities/fusionDashboardInventory.test.mts | 61 | fixture/local registry | later, if reused | const scope = inventory.scopes.find((entry) => entry.scope.targetServerCode === "F28"); |
+| tools/identities/fusionDashboardInventory.test.mts | 88 | fixture/local registry | later, if reused | const scope = inventory.scopes.find((entry) => entry.scope.targetServerCode === "F28"); |
+| tools/identities/fusionDashboardInventory.test.mts | 90 | fixture/local registry | later, if reused | assert.equal(inventory.coverage.some((entry) => entry.serverCode === "EU1"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 91 | fixture/local registry | later, if reused | assert.equal(inventory.coverage.some((entry) => entry.serverCode === "F28"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 94 | fixture/local registry | later, if reused | assert.equal(scope.coverage.find((entry) => entry.serverCode === "EU1")?.role, "historical-origin"); |
+| tools/identities/fusionDashboardInventory.test.mts | 95 | fixture/local registry | later, if reused | assert.equal(scope.coverage.find((entry) => entry.serverCode === "F28")?.role, "current-target"); |
+| tools/identities/fusionDashboardInventory.test.mts | 205 | fixture/local registry | later, if reused | assert.equal(scope.relevantSnapshotIds.includes("mixed-foreign-first::F28"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 253 | fixture/local registry | later, if reused | assert.equal(scope.relevantSnapshotIds.includes("all-origins::EU1"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 254 | fixture/local registry | later, if reused | assert.equal(scope.relevantSnapshotIds.includes("all-origins::EU2"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 255 | fixture/local registry | later, if reused | assert.equal(scope.relevantSnapshotIds.includes("all-origins::EU3"), true); |
+| tools/identities/fusionDashboardInventory.test.mts | 256 | fixture/local registry | later, if reused | assert.equal(scope.relevantSnapshotIds.includes("all-origins::EU4"), true); |
+| tools/identities/fusionIdentityManagement.realScan.mts | 181 | analysis tool scope | later, if reused | const ORIGIN_SERVER_CODES = new Set(["EU1", "EU2", "EU3", "EU4"]); |
+Hardcode findings shown: 80 of 289 non-incidental matches.
+
+## E. Existing Firestore `servers` Registry Snapshot
+No Firestore snapshot found. Expected optional input: .tmp/sfdatahub-firestore-servers.json
+
+## F. Official sfgame.net Config Snapshot
+| target host | target code | target numericId | publish/open time | origin count | origin hosts |
+| --- | --- | --- | --- | --- | --- |
+| blackforest.sfgame.net | BLACKFOREST | 545 | 2026-05-08 14:00:00 | 3 | f7.sfgame.net, f10.sfgame.net, f13.sfgame.net |
+| f1.sfgame.net | F1 | 469 | 2023-07-26 20:00:00 | 16 | s1.sfgame.com.br, s2.sfgame.com.br, s1.sfgame.ca, s1.sfgame.cl, s2.sfgame.cl, s1.sfgame.mx, s1.sfgame.us, s2.sfgame.us, ... (16 total) |
+| f2.sfgame.net | F2 | 473 | 2023-09-08 14:00:00 | 16 | s1.sfgame.ae, s2.sfgame.ae, s1.sfgame.dk, s2.sfgame.dk, tv2.sfgame.dk, s1.sfgame.co.uk, s2.sfgame.co.uk, s1.sfgame.in, ... (16 total) |
+| f3.sfgame.net | F3 | 474 | 2023-10-13 14:00:00 | 8 | s1.sfgame.it, s2.sfgame.it, s3.sfgame.it, s4.sfgame.it, s5.sfgame.it, s6.sfgame.it, s7.sfgame.it, s8.sfgame.it |
+| f4.sfgame.net | F4 | 476 | 2023-10-20 14:00:00 | 21 | s1.sfgame.gr, s2.sfgame.gr, s3.sfgame.gr, s4.sfgame.gr, s5.sfgame.gr, s6.sfgame.gr, 123playgames.sfgame.gr, s1.sfgame.com.pt, ... (21 total) |
+| f5.sfgame.net | F5 | 477 | 2023-10-27 14:00:00 | 13 | s1.sfgame.es, s2.sfgame.es, s3.sfgame.es, s4.sfgame.es, s5.sfgame.es, s6.sfgame.es, s7.sfgame.es, s8.sfgame.es, ... (13 total) |
+| f6.sfgame.net | F6 | 478 | 2023-11-10 15:00:00 | 13 | s1.sfgame.fr, s2.sfgame.fr, s3.sfgame.fr, s4.sfgame.fr, s5.sfgame.fr, s6.sfgame.fr, s7.sfgame.fr, s8.sfgame.fr, ... (13 total) |
+| f7.sfgame.net | F7 | 481 | 2023-12-08 15:00:00 | 11 | s7.sfgame.pl, s8.sfgame.pl, s9.sfgame.pl, s10.sfgame.pl, s11.sfgame.pl, s12.sfgame.pl, s13.sfgame.pl, s14.sfgame.pl, ... (11 total) |
+| f8.sfgame.net | F8 | 482 | 2024-01-12 15:00:00 | 8 | s5.sfgame.de, s6.sfgame.de, s7.sfgame.de, s8.sfgame.de, s9.sfgame.de, s10.sfgame.de, s11.sfgame.de, s12.sfgame.de |
+| f9.sfgame.net | F9 | 483 | 2024-01-19 15:00:00 | 13 | s25.sfgame.de, s26.sfgame.de, s27.sfgame.de, s28.sfgame.de, s29.sfgame.de, s30.sfgame.de, s31.sfgame.de, s32.sfgame.de, ... (13 total) |
+| f10.sfgame.net | F10 | 484 | 2024-01-26 15:00:00 | 16 | s18.sfgame.pl, s19.sfgame.pl, s20.sfgame.pl, s21.sfgame.pl, s22.sfgame.pl, s23.sfgame.pl, s24.sfgame.pl, s25.sfgame.pl, ... (16 total) |
+| f11.sfgame.net | F11 | 485 | 2024-01-26 15:00:00 | 14 | s13.sfgame.de, s14.sfgame.de, s15.sfgame.de, s16.sfgame.de, s17.sfgame.de, s18.sfgame.de, s19.sfgame.de, s20.sfgame.de, ... (14 total) |
+| f12.sfgame.net | F12 | 486 | 2024-01-26 15:00:00 | 5 | w1.sfgame.net, w2.sfgame.net, w3.sfgame.net, w4.sfgame.net, w5.sfgame.net |
+| f13.sfgame.net | F13 | 487 | 2024-02-02 15:00:00 | 7 | s1.sfgame.pl, s2.sfgame.pl, s3.sfgame.pl, s4.sfgame.pl, s5.sfgame.pl, s6.sfgame.pl, wp.sfgame.pl |
+| f14.sfgame.net | F14 | 488 | 2024-02-02 15:00:00 | 7 | w15.sfgame.net, w16.sfgame.net, w17.sfgame.net, w18.sfgame.net, w19.sfgame.net, w20.sfgame.net, w21.sfgame.net |
+| f15.sfgame.net | F15 | 489 | 2024-02-02 15:00:00 | 14 | s17.sfgame.cz, s18.sfgame.cz, s19.sfgame.cz, s20.sfgame.cz, s21.sfgame.cz, s22.sfgame.cz, s23.sfgame.cz, s24.sfgame.cz, ... (14 total) |
+| f16.sfgame.net | F16 | 490 | 2024-02-09 15:00:00 | 12 | s6.sfgame.cz, s7.sfgame.cz, s8.sfgame.cz, s9.sfgame.cz, s10.sfgame.cz, s11.sfgame.cz, s12.sfgame.cz, s13.sfgame.cz, ... (12 total) |
+| f17.sfgame.net | F17 | 491 | 2024-02-09 15:00:00 | 9 | s1.sfgame.de, s2.sfgame.de, s3.sfgame.de, s4.sfgame.de, buffed.sfgame.de, rtl2.sfgame.de, gamona.sfgame.de, xchar.sfgame.de, ... (9 total) |
+| f18.sfgame.net | F18 | 492 | 2024-02-09 15:00:00 | 5 | s1.sfgame.cz, s2.sfgame.cz, s3.sfgame.cz, s4.sfgame.cz, s5.sfgame.cz |
+| f19.sfgame.net | F19 | 493 | 2024-02-16 15:00:00 | 15 | s1.sfgame.hu, s2.sfgame.hu, s3.sfgame.hu, s4.sfgame.hu, s5.sfgame.hu, s6.sfgame.hu, s7.sfgame.hu, s8.sfgame.hu, ... (15 total) |
+| f20.sfgame.net | F20 | 494 | 2024-02-16 15:00:00 | 12 | s29.sfgame.cz, s16.sfgame.hu, s34.sfgame.pl, w6.sfgame.net, w7.sfgame.net, w8.sfgame.net, w9.sfgame.net, w10.sfgame.net, ... (12 total) |
+| f21.sfgame.net | F21 | 495 | 2024-02-16 15:00:00 | 11 | s30.sfgame.cz, s38.sfgame.de, s35.sfgame.pl, w22.sfgame.net, w23.sfgame.net, w24.sfgame.net, w25.sfgame.net, w26.sfgame.net, ... (11 total) |
+| f22.sfgame.net | F22 | 500 | 2024-03-15 15:00:00 | 14 | s31.sfgame.cz, s32.sfgame.cz, s39.sfgame.de, s40.sfgame.de, s17.sfgame.hu, s36.sfgame.pl, s37.sfgame.pl, w31.sfgame.net, ... (14 total) |
+| f23.sfgame.net | F23 | 501 | 2024-10-11 14:00:00 | 18 | s33.sfgame.cz, s34.sfgame.cz, s41.sfgame.de, s42.sfgame.de, s14.sfgame.fr, s15.sfgame.fr, s18.sfgame.hu, s19.sfgame.hu, ... (18 total) |
+| f24.sfgame.net | F24 | 502 | 2025-02-07 15:00:00 | 5 | w46.sfgame.net, w47.sfgame.net, w48.sfgame.net, w49.sfgame.net, w50.sfgame.net |
+| f25.sfgame.net | F25 | 529 | 2025-02-07 15:00:00 | 6 | s35.sfgame.cz, s43.sfgame.de, s20.sfgame.hu, s40.sfgame.pl, w51.sfgame.net, w52.sfgame.net |
+| f26.sfgame.net | F26 | 530 | 2025-03-07 15:00:00 | 4 | w53.sfgame.net, w54.sfgame.net, w55.sfgame.net, w56.sfgame.net |
+| f27.sfgame.net | F27 | 539 | 2025-08-01 14:00:00 | 4 | w57.sfgame.net, w58.sfgame.net, w59.sfgame.net, w60.sfgame.net |
+| f28.sfgame.net | F28 | 549 | 2026-02-06 15:00:00 | 4 | s1.sfgame.eu, s2.sfgame.eu, s3.sfgame.eu, s4.sfgame.eu |
+| f29.sfgame.net | F29 | 550 | 2026-10-16 15:00:00 | 4 | s5.sfgame.eu, s6.sfgame.eu, s7.sfgame.eu, s8.sfgame.eu |
+| gnarogrim.sfgame.net | GNAROGRIM | 546 | 2026-06-05 14:00:00 | 3 | f15.sfgame.net, f16.sfgame.net, f18.sfgame.net |
+| maerwynn.sfgame.net | MAERWYNN | 533 | 2025-04-25 14:00:00 | 5 | f1.sfgame.net, f2.sfgame.net, f3.sfgame.net, f4.sfgame.net, f5.sfgame.net |
+| stumblesteppe.sfgame.net | STUMBLESTEPPE | 560 | 2026-07-10 14:00:00 | 3 | f6.sfgame.net, f12.sfgame.net, f20.sfgame.net |
+
+Official config coverage: 363 servers total; 33 fusion/named target groups. Fusion-related hosts missing from local registry: 0.
+Important current/future config facts: f28.sfgame.net numericId=549, p=2026-02-06 15:00:00; f29.sfgame.net numericId=550, p=2026-10-16 15:00:00, origins EU5-EU8 with migration cutoff 2026-10-15 21:59:59. F29 is future relative to 2026-09-23.
+
+## G. Other In-Repo Server Sources
+| source | coverage | notes |
+| --- | --- | --- |
+| src/data/servers.ts | 51 picker entries | UI/toplist picker only; intentionally not authoritative for resolver coverage. |
+| src/pages/servers/overview/serversOverview.config.ts | 351 nodes; 53 entrypoints | Broad fusion tree sketch through F27 plus Maerwynn/Black Forest/Granogrim; no numeric IDs, hosts, release dates, effective dates, or source metadata. It says screenshot-derived and should not become authoritative without verification. |
+| tools/backfill-monthly-*.mts | named read aliases | Maintains read aliases for MAERWYNN, BLACKFOREST, GNAROGRIM, STUMBLESTEPPE/STUMPLESTEPPE; these are currently outside serverResolver. |
+| Firestore servers | snapshot unavailable | Manually maintained operational registry; no releaseDate/aliases in snapshot. |
+
+## H. Coverage Matrix: Local vs Firestore vs Official Config
+| server | local | firestore | official config | numericId local/firestore/config | host local/firestore/config |
+| --- | --- | --- | --- | --- | --- |
+| BLACKFOREST | yes | no | yes | 545//545 | blackforest.sfgame.net//blackforest.sfgame.net |
+| EU1 | yes | no | yes | 458//458 | s1.sfgame.eu//s1.sfgame.eu |
+| EU2 | yes | no | yes | 460//460 | s2.sfgame.eu//s2.sfgame.eu |
+| EU3 | yes | no | yes | 462//462 | s3.sfgame.eu//s3.sfgame.eu |
+| EU4 | yes | no | yes | 464//464 | s4.sfgame.eu//s4.sfgame.eu |
+| EU5 | yes | no | yes | 466//466 | s5.sfgame.eu//s5.sfgame.eu |
+| EU6 | yes | no | yes | 472//472 | s6.sfgame.eu//s6.sfgame.eu |
+| EU7 | yes | no | yes | 475//475 | s7.sfgame.eu//s7.sfgame.eu |
+| EU8 | yes | no | yes | 479//479 | s8.sfgame.eu//s8.sfgame.eu |
+| EU9 | yes | no | yes | 480//480 | s9.sfgame.eu//s9.sfgame.eu |
+| EU10 | yes | no | yes | 496//496 | s10.sfgame.eu//s10.sfgame.eu |
+| EU11 | yes | no | yes | 499//499 | s11.sfgame.eu//s11.sfgame.eu |
+| EU12 | yes | no | yes | 515//515 | s12.sfgame.eu//s12.sfgame.eu |
+| EU13 | yes | no | yes | 517//517 | s13.sfgame.eu//s13.sfgame.eu |
+| EU14 | yes | no | yes | 518//518 | s14.sfgame.eu//s14.sfgame.eu |
+| EU15 | yes | no | yes | 519//519 | s15.sfgame.eu//s15.sfgame.eu |
+| EU16 | yes | no | yes | 520//520 | s16.sfgame.eu//s16.sfgame.eu |
+| EU17 | yes | no | yes | 528//528 | s17.sfgame.eu//s17.sfgame.eu |
+| EU18 | yes | no | yes | 531//531 | s18.sfgame.eu//s18.sfgame.eu |
+| EU19 | yes | no | yes | 534//534 | s19.sfgame.eu//s19.sfgame.eu |
+| EU20 | yes | no | yes | 537//537 | s20.sfgame.eu//s20.sfgame.eu |
+| EU21 | yes | no | yes | 538//538 | s21.sfgame.eu//s21.sfgame.eu |
+| EU22 | yes | no | yes | 541//541 | s22.sfgame.eu//s22.sfgame.eu |
+| EU23 | yes | no | yes | 542//542 | s23.sfgame.eu//s23.sfgame.eu |
+| EU24 | yes | no | yes | 547//547 | s24.sfgame.eu//s24.sfgame.eu |
+| EU25 | yes | no | yes | 548//548 | s25.sfgame.eu//s25.sfgame.eu |
+| EU26 | yes | no | yes | 551//551 | s26.sfgame.eu//s26.sfgame.eu |
+| EU27 | yes | no | yes | 553//553 | s27.sfgame.eu//s27.sfgame.eu |
+| EU28 | yes | no | yes | 557//557 | s28.sfgame.eu//s28.sfgame.eu |
+| EU29 | yes | no | yes | 559//559 | s29.sfgame.eu//s29.sfgame.eu |
+| EU30 | yes | no | yes | 561//561 | s30.sfgame.eu//s30.sfgame.eu |
+| EU31 | yes | no | yes | 562//562 | s31.sfgame.eu//s31.sfgame.eu |
+| F1 | yes | no | yes | 469//469 | f1.sfgame.net//f1.sfgame.net |
+| F2 | yes | no | yes | 473//473 | f2.sfgame.net//f2.sfgame.net |
+| F3 | yes | no | yes | 474//474 | f3.sfgame.net//f3.sfgame.net |
+| F4 | yes | no | yes | 476//476 | f4.sfgame.net//f4.sfgame.net |
+| F5 | yes | no | yes | 477//477 | f5.sfgame.net//f5.sfgame.net |
+| F6 | yes | no | yes | 478//478 | f6.sfgame.net//f6.sfgame.net |
+| F7 | yes | no | yes | 481//481 | f7.sfgame.net//f7.sfgame.net |
+| F8 | yes | no | yes | 482//482 | f8.sfgame.net//f8.sfgame.net |
+| F9 | yes | no | yes | 483//483 | f9.sfgame.net//f9.sfgame.net |
+| F10 | yes | no | yes | 484//484 | f10.sfgame.net//f10.sfgame.net |
+| F11 | yes | no | yes | 485//485 | f11.sfgame.net//f11.sfgame.net |
+| F12 | yes | no | yes | 486//486 | f12.sfgame.net//f12.sfgame.net |
+| F13 | yes | no | yes | 487//487 | f13.sfgame.net//f13.sfgame.net |
+| F14 | yes | no | yes | 488//488 | f14.sfgame.net//f14.sfgame.net |
+| F15 | yes | no | yes | 489//489 | f15.sfgame.net//f15.sfgame.net |
+| F16 | yes | no | yes | 490//490 | f16.sfgame.net//f16.sfgame.net |
+| F17 | yes | no | yes | 491//491 | f17.sfgame.net//f17.sfgame.net |
+| F18 | yes | no | yes | 492//492 | f18.sfgame.net//f18.sfgame.net |
+| F19 | yes | no | yes | 493//493 | f19.sfgame.net//f19.sfgame.net |
+| F20 | yes | no | yes | 494//494 | f20.sfgame.net//f20.sfgame.net |
+| F21 | yes | no | yes | 495//495 | f21.sfgame.net//f21.sfgame.net |
+| F22 | yes | no | yes | 500//500 | f22.sfgame.net//f22.sfgame.net |
+| F23 | yes | no | yes | 501//501 | f23.sfgame.net//f23.sfgame.net |
+| F24 | yes | no | yes | 502//502 | f24.sfgame.net//f24.sfgame.net |
+| F25 | yes | no | yes | 529//529 | f25.sfgame.net//f25.sfgame.net |
+| F26 | yes | no | yes | 530//530 | f26.sfgame.net//f26.sfgame.net |
+| F27 | yes | no | yes | 539//539 | f27.sfgame.net//f27.sfgame.net |
+| F28 | yes | no | yes | 549//549 | f28.sfgame.net//f28.sfgame.net |
+| F29 | yes | no | yes | 550//550 | f29.sfgame.net//f29.sfgame.net |
+| GNAROGRIM | yes | no | yes | 546//546 | gnarogrim.sfgame.net//gnarogrim.sfgame.net |
+| MAERWYNN | yes | no | yes | 533//533 | maerwynn.sfgame.net//maerwynn.sfgame.net |
+| STUMBLESTEPPE | yes | no | yes | 560//560 | stumblesteppe.sfgame.net//stumblesteppe.sfgame.net |
+
+## I. Compensation Matrix and Policy Findings
+| event | policy | oldest origin | release dates complete? | formula applicable? | evidence/confidence |
+| --- | --- | --- | --- | --- | --- |
+| F1-F23 | none or historical coupon only | varies | not required for levelGoldV1 | no | Project assumption; needs event-by-event confirmation for exact wording. |
+| F24-F27 | unknown | event-specific | not used until policy confirmed | no | Policy remains explicit unknown; no F24+ heuristic is applied. |
+| F28 | levelGoldV1 | EU1 | yes for EU1-EU4 | yes | Existing local validated EU release dates and F28 behavior preserved as regression baseline. |
+| Maerwynn | none | F1 | ambiguous | no | Steam announcement explicitly says no compensation other than usual fusion coupon for fusion-of-fused-worlds. |
+| Blackforest/Gnarogrim/Stumble Steppe | unknown | fusion targets | ambiguous | unknown | Need official announcement pages to confirm whether Maerwynn rule was repeated. |
+| F29 | unknown | EU5 | release dates needed for EU5-EU8 if policy changes | no | Official config schedules event for 2026-10-16; compensation remains unknown until event-specific confirmation. |
+
+Current helper status: fusionCompensation.ts evaluates compensation against the direct FusionEvent participant set and refuses unknown policies instead of inferring them from dates or ancestry.
+
+## J. Missing Data
+Blocking unknowns:
+- ReleaseDate coverage remains intentionally limited to currently validated EU1-EU4 values.
+- Compensation policy is not explicit per event except F28 local relations; Blackforest/Gnarogrim/Stumble Steppe/F29 need official announcement verification.
+- Named server canonicalization conflict: official/config uses blackforest and stumblesteppe hosts; local backfill code accepts BLACKFOREST, BLACK_FOREST, STUMBLESTEPPE and typo STUMPLESTEPPE; overview uses BLACK_FOREST and GRANOGRIM.
+
+Non-blocking unknowns:
+- Missing release dates on policy=none/unknown events do not block resolution.
+- UI picker completeness is separate from resolver completeness; obsolete fusion targets need to remain resolvable but do not all need dashboard tiles.
+- Raw scan values should remain raw; resolver aliases can grow without rewriting imported scans.
+
+## K. Data Model Recommendation
+Implemented foundation: ServerDefinition has hosts[] and aliases[], numericId stays optional, type/active semantics are explicit, and releaseDate remains optional.
+Implemented foundation: FusionEvent is event-shaped with id, origins[], target, effectiveDate?, and explicit compensationPolicy.
+Implemented foundation: Resolver validation checks unknown endpoints, cycles, duplicate outgoing origin events, duplicate event ids, duplicate targets, duplicate hosts, duplicate aliases, and duplicate numeric IDs.
+
+## L. Implementation Phases
+Completed in this block: canonical aliases, bulk local registry from official config, FusionEvent model, DAG validation, direct/transitive lineage helpers, future event status, and event-bound compensation policy handling.
+Next block should integrate this foundation into Fusion Identity dashboard/matching scopes deliberately, replacing the temporary F28-only compatibility adapter only after UI and worker behavior are covered.
+

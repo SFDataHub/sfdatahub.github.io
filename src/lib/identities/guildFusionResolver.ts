@@ -202,15 +202,41 @@ export type GuildFusionResolverInput = {
   historicalGuildObservations: GuildFusionObservation[];
   newGuildObservations: GuildFusionObservation[];
   highConfidencePlayerMatches: GuildFusionPlayerMatch[];
+  scope?: GuildFusionScopeContext;
+  onProgress?: (progress: GuildFusionResolverProgress) => void;
+  onDiagnostics?: (diagnostics: GuildFusionResolverDiagnostics) => void;
+};
+
+export type GuildFusionResolverProgress = {
+  current: number;
+  total: number;
 };
 
 export type GuildFusionResolverResult = {
   results: GuildFusionGuildResult[];
 };
 
+export type GuildFusionResolverDiagnostics = {
+  currentGuilds: number;
+  historicalGuildHistories: number;
+  historicalGuildsBeforeBoundary: number;
+  guildCandidatesGenerated: number;
+  guildCandidatesEvaluated: number;
+  guildCandidatesRetained: number;
+  memberFlowCalls: number;
+  memberFlowTotalMs: number;
+  memberComparisons: number;
+  flowCount: number;
+};
+
 type GuildHistory = {
   guildIdentifier: string;
   observations: GuildFusionObservation[];
+};
+
+export type GuildFusionScopeContext = {
+  targetServerCode: string;
+  historicalServerCodes: string[];
 };
 
 type Flow = {
@@ -277,13 +303,27 @@ const readGuildFusionSuffix = (name: string | null | undefined) => {
   return server ? { baseName: match[1].trim(), server } : null;
 };
 
-const getValidFusionBaseNameEvidence = (oldGuild: GuildFusionObservation, newGuild: GuildFusionObservation) => {
+const validFusionBaseNameServers = (
+  newServer: string,
+  scope: GuildFusionScopeContext | undefined,
+) =>
+  new Set(
+    scope?.historicalServerCodes.length
+      ? scope.historicalServerCodes
+      : getFusionOrigins(newServer).map((server) => server.code),
+  );
+
+const getValidFusionBaseNameEvidence = (
+  oldGuild: GuildFusionObservation,
+  newGuild: GuildFusionObservation,
+  scope?: GuildFusionScopeContext,
+) => {
   const suffix = readGuildFusionSuffix(newGuild.name);
   const newServer = resolveServerCode(newGuild.serverCode);
   const oldServer = resolveServerCode(oldGuild.serverCode);
   if (!suffix || !newServer || !oldServer) return null;
 
-  const validOriginServers = new Set(getFusionOrigins(newServer).map((server) => server.code));
+  const validOriginServers = validFusionBaseNameServers(newServer, scope);
   if (!validOriginServers.has(suffix.server) || suffix.server !== oldServer) return null;
   if (normalizeNameKey(suffix.baseName) !== normalizeNameKey(oldGuild.name)) return null;
 
@@ -293,12 +333,13 @@ const getValidFusionBaseNameEvidence = (oldGuild: GuildFusionObservation, newGui
 const getReliableFusionBaseNameLookup = (
   newGuild: GuildFusionObservation,
   oldGuilds: GuildFusionObservation[],
+  scope?: GuildFusionScopeContext,
 ): GuildFusionReliableHistoricalLookup | null => {
   const suffix = readGuildFusionSuffix(newGuild.name);
   const newServer = resolveServerCode(newGuild.serverCode);
   if (!suffix || !newServer) return null;
 
-  const validOriginServers = new Set(getFusionOrigins(newServer).map((server) => server.code));
+  const validOriginServers = validFusionBaseNameServers(newServer, scope);
   if (!validOriginServers.has(suffix.server)) return null;
 
   const matchingObservationCount = oldGuilds.filter(
@@ -1035,6 +1076,12 @@ const createReasons = (
 };
 
 export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusionResolverResult => {
+  const scope = input.scope
+    ? {
+        ...input.scope,
+        historicalServerCodes: [...new Set(input.scope.historicalServerCodes)],
+      }
+    : undefined;
   const histories = buildHistories(input.historicalGuildObservations);
   const newGuilds = [...input.newGuildObservations].sort((left, right) =>
     left.guildIdentifier.localeCompare(right.guildIdentifier, undefined, { numeric: true, sensitivity: "base" }),
@@ -1045,6 +1092,7 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
     .map((history) => selectLatestBefore(history.observations, Number.isFinite(beforeTimestamp) ? beforeTimestamp : Infinity))
     .filter((guild): guild is GuildFusionObservation => Boolean(guild));
   const historicalNameCounts = createLatestHistoricalNameCounts(oldGuilds);
+  const memberFlowStartedAt = performance.now();
   const oldMembership = buildLatestOldMembership(histories, Number.isFinite(beforeTimestamp) ? beforeTimestamp : Infinity);
   const newMembership = buildCurrentMembership(newGuilds);
   const flows = [...buildMatchedMemberEdges(oldMembership, newMembership, input.highConfidencePlayerMatches).values()];
@@ -1052,18 +1100,22 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
   const flowEvidenceByKey = new Map(
     flows.map((flow) => [createEdgeKey(flow.oldGuild.guildIdentifier, flow.newGuild.guildIdentifier), createFlowEvidence(flow, byOld, byNew)]),
   );
+  const memberFlowTotalMs = performance.now() - memberFlowStartedAt;
   const logicalPlayerByIdentifier = createLogicalPlayerLookup(input.highConfidencePlayerMatches);
+  let guildCandidatesEvaluated = 0;
+  let guildCandidatesRetained = 0;
 
-  const relationDrafts = mergeRelationDraftsByNewGuild(newGuilds.map((newGuild): RelationDraft => {
+  const relationDrafts = mergeRelationDraftsByNewGuild(newGuilds.map((newGuild, index): RelationDraft => {
     const hasDirectIdentityCandidateForCurrent = oldGuilds.some((oldGuild) => {
       const oldName = normalizeNameKey(oldGuild.name);
       const newName = normalizeNameKey(newGuild.name);
       return (
         Boolean(oldName && newName && oldName === newName) ||
-        Boolean(getValidFusionBaseNameEvidence(oldGuild, newGuild)) ||
+        Boolean(getValidFusionBaseNameEvidence(oldGuild, newGuild, scope)) ||
         Boolean(oldGuild.coa && newGuild.coa && oldGuild.coa === newGuild.coa)
       );
     });
+    guildCandidatesEvaluated += oldGuilds.length;
     const identityCandidates = oldGuilds.flatMap((oldGuild): GuildFusionCandidate[] => {
       const edgeKey = createEdgeKey(oldGuild.guildIdentifier, newGuild.guildIdentifier);
       const flow = flows.find((entry) => createEdgeKey(entry.oldGuild.guildIdentifier, entry.newGuild.guildIdentifier) === edgeKey);
@@ -1072,7 +1124,7 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
       const newName = normalizeNameKey(newGuild.name);
       const exactName = Boolean(oldName && newName && oldName === newName);
       const uniqueExactName = Boolean(exactName && oldName && (historicalNameCounts.get(oldName) ?? 0) === 1);
-      const fusionBaseNameEvidence = getValidFusionBaseNameEvidence(oldGuild, newGuild);
+      const fusionBaseNameEvidence = getValidFusionBaseNameEvidence(oldGuild, newGuild, scope);
       const fusionBaseName = Boolean(fusionBaseNameEvidence);
       const fusionBaseNameOrigin = fusionBaseNameEvidence?.server ?? null;
       const sameCoA = Boolean(oldGuild.coa && newGuild.coa && oldGuild.coa === newGuild.coa);
@@ -1143,6 +1195,7 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
         },
       ];
     });
+    guildCandidatesRetained += identityCandidates.length;
 
     const candidateKeys = new Set(
       identityCandidates
@@ -1155,7 +1208,9 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
         .map((flow) => createMigrationEdge(flow, flowEvidenceByKey.get(createEdgeKey(flow.oldGuild.guildIdentifier, flow.newGuild.guildIdentifier)) ?? emptyFlowEvidence())),
     );
 
-    return { newGuild, identityCandidates: sortCandidates(identityCandidates), memberMigrationEdges };
+    const draft = { newGuild, identityCandidates: sortCandidates(identityCandidates), memberMigrationEdges };
+    input.onProgress?.({ current: index + 1, total: newGuilds.length });
+    return draft;
   }));
 
   const strongContinuityCountsByOld = new Map<string, number>();
@@ -1181,7 +1236,7 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
   });
 
   const results = relationDrafts.map((draft): GuildFusionGuildResult => {
-    const reliableHistoricalLookup = getReliableFusionBaseNameLookup(draft.newGuild, oldGuilds);
+    const reliableHistoricalLookup = getReliableFusionBaseNameLookup(draft.newGuild, oldGuilds, scope);
     const recomputedCandidates = sortCandidates(
       draft.identityCandidates.map((candidate) => {
         const oldKey = normalizeIdentifierKey(candidate.oldGuildIdentifier);
@@ -1322,6 +1377,19 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
       reasons: createReasons(status, identityCandidates, memberMigrationEdges),
       reliableHistoricalLookup,
     };
+  });
+
+  input.onDiagnostics?.({
+    currentGuilds: newGuilds.length,
+    historicalGuildHistories: histories.length,
+    historicalGuildsBeforeBoundary: oldGuilds.length,
+    guildCandidatesGenerated: guildCandidatesEvaluated,
+    guildCandidatesEvaluated,
+    guildCandidatesRetained,
+    memberFlowCalls: 1,
+    memberFlowTotalMs,
+    memberComparisons: input.highConfidencePlayerMatches.length,
+    flowCount: flows.length,
   });
 
   return { results };

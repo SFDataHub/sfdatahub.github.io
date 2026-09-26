@@ -558,6 +558,13 @@
   text-transform: uppercase;
 }
 
+.statusCluster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .statusHigh {
   border-color: rgba(92, 198, 137, 0.55);
   color: #b7f5cf;
@@ -1064,6 +1071,10 @@
 
   .statusBadge {
     justify-self: start;
+  }
+
+  .statusCluster {
+    justify-content: flex-start;
   }
 
   .actionBar,

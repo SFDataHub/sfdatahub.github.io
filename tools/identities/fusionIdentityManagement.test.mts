@@ -11,6 +11,8 @@ import {
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
 } from "../../src/lib/identities/fusionIdentityManagement.ts";
+import { listFusionIdentityAnalysisScopes } from "../../src/lib/identities/fusionIdentityScopes.ts";
+import { FusionIdentityScopeNotLocallyMatchableError } from "../../src/lib/identities/fusionScopeMatchability.ts";
 import { createGuildIdentityStore } from "../../src/lib/identities/guildIdentityStore.ts";
 import { createPlayerIdentityStore } from "../../src/lib/identities/playerIdentityStore.ts";
 
@@ -63,16 +65,27 @@ const group = (
   coaString,
 });
 
+const normalizeFixtureTimestamp = (timestampMs: number, server: string) => {
+  if (timestampMs > 1_000_000_000_000) return timestampMs;
+  const base =
+    server === "f28_net"
+      ? Date.parse("2026-02-07T12:00:00Z")
+      : Date.parse("2026-01-01T12:00:00Z");
+  return base + timestampMs;
+};
+
 const snapshot = (
   id: string,
   timestampMs: number,
   server: string,
   members: MemberInput[],
   groups: unknown[],
-): GuildHubLogicalScanSnapshot => ({
+): GuildHubLogicalScanSnapshot => {
+  const normalizedTimestampMs = normalizeFixtureTimestamp(timestampMs, server);
+  return {
   id,
-  timestamp: new Date(timestampMs).toISOString(),
-  timestampMs,
+  timestamp: new Date(normalizedTimestampMs).toISOString(),
+  timestampMs: normalizedTimestampMs,
   players: members.map((entry) => ({ identifier: entry.id })),
   groups,
   servers: [server],
@@ -83,8 +96,9 @@ const snapshot = (
   normalizedMembers: members.map(member),
   sourceScanId: id,
   sourceScanFilename: `${id}.json`,
-  sourceImportedAt: new Date(timestampMs).toISOString(),
-});
+  sourceImportedAt: new Date(normalizedTimestampMs).toISOString(),
+  };
+};
 
 const createSnapshots = () => [
   snapshot(
@@ -699,6 +713,108 @@ const createGuildFusionBaseMissingSnapshots = () => [
   ),
 ];
 
+const maerwynnScope = {
+  id: "MAERWYNN",
+  eventId: "fusion-maerwynn",
+  label: "ES10/F4/F5 -> MAERWYNN",
+  originServerCodes: ["ES10", "F4", "F5"],
+  originServerNames: ["ES10", "F4", "F5"],
+  directOriginServerCodes: ["F4", "F5"],
+  directOriginServerNames: ["F4", "F5"],
+  transitiveOriginServerCodes: ["ES10", "F4", "F5"],
+  lineageServerCodes: ["ES10", "F4", "F5", "MAERWYNN"],
+  intermediateServerCodes: ["F5"],
+  ancestorEvents: [
+    {
+      eventId: "fusion-maerwynn",
+      targetServerCode: "MAERWYNN",
+      originServerCodes: ["F4", "F5"],
+      effectiveDate: "2025-04-25",
+      temporalStatus: "effective" as const,
+    },
+  ],
+  effectiveDate: "2025-04-25",
+  temporalStatus: "effective" as const,
+  isCurrentTerminalTarget: true,
+  analysisSupported: true,
+  targetServerCode: "MAERWYNN",
+  targetServerName: "MAERWYNN",
+};
+
+const createMaerwynnCorridorCoverageSnapshots = () => [
+  snapshot(
+    "corridor-coverage-f5",
+    Date.parse("2025-01-10T10:00:00Z"),
+    "F5",
+    [
+      {
+        id: "f5_p77",
+        name: "Corridor Hero",
+        server: "F5",
+        guildSegment: "g5",
+        guildName: "F5 Guild",
+        classId: "1",
+        level: 110,
+      },
+    ],
+    [group("F5", "g5", "F5 Guild", 1, COA)],
+  ),
+  snapshot(
+    "corridor-coverage-maerwynn",
+    Date.parse("2025-05-10T10:00:00Z"),
+    "MAERWYNN",
+    [
+      {
+        id: "maerwynn_p1",
+        name: "Corridor Hero (ES10)",
+        server: "MAERWYNN",
+        guildSegment: "g533",
+        guildName: "Current Guild",
+        classId: "2",
+        level: 120,
+      },
+    ],
+    [group("MAERWYNN", "g533", "Current Guild", 1, OTHER_COA)],
+  ),
+];
+
+const createMaerwynnSiblingCoverageSnapshots = () => [
+  snapshot(
+    "sibling-coverage-f4",
+    Date.parse("2025-01-10T10:00:00Z"),
+    "F4",
+    [
+      {
+        id: "f4_p77",
+        name: "Corridor Hero",
+        server: "F4",
+        guildSegment: "g4",
+        guildName: "F4 Guild",
+        classId: "1",
+        level: 110,
+      },
+    ],
+    [group("F4", "g4", "F4 Guild", 1, COA)],
+  ),
+  snapshot(
+    "sibling-coverage-maerwynn",
+    Date.parse("2025-05-10T10:00:00Z"),
+    "MAERWYNN",
+    [
+      {
+        id: "maerwynn_p1",
+        name: "Corridor Hero (ES10)",
+        server: "MAERWYNN",
+        guildSegment: "g533",
+        guildName: "Current Guild",
+        classId: "2",
+        level: 120,
+      },
+    ],
+    [group("MAERWYNN", "g533", "Current Guild", 1, OTHER_COA)],
+  ),
+];
+
 const dbSuffix = Date.now();
 const playerDb = `fusion-identity-management-player-${dbSuffix}`;
 const guildDb = `fusion-identity-management-guild-${dbSuffix}`;
@@ -774,13 +890,13 @@ const clonedLatestAliceObservation = latestAliceObservation
   ? structuredClone(latestAliceObservation)
   : null;
 assert.equal(readyAlice?.observations.length, 2);
-assert.equal(readyAlice?.firstSeen, 2000);
-assert.equal(clonedFirstAliceObservation?.timestamp, 2000);
+assert.equal(readyAlice?.firstSeen, normalizeFixtureTimestamp(2000, "f28_net"));
+assert.equal(clonedFirstAliceObservation?.timestamp, normalizeFixtureTimestamp(2000, "f28_net"));
 assert.equal(clonedFirstAliceObservation?.classId, "1");
 assert.equal(clonedFirstAliceObservation?.level, 11);
 assert.equal(clonedFirstAliceObservation?.guildName, "Knights");
-assert.equal(readyAlice?.lastSeen, 3000);
-assert.equal(clonedLatestAliceObservation?.timestamp, 3000);
+assert.equal(readyAlice?.lastSeen, normalizeFixtureTimestamp(3000, "f28_net"));
+assert.equal(clonedLatestAliceObservation?.timestamp, normalizeFixtureTimestamp(3000, "f28_net"));
 assert.equal(clonedLatestAliceObservation?.classId, "1");
 assert.equal(clonedLatestAliceObservation?.level, 12);
 assert.equal(clonedLatestAliceObservation?.guildName, "Knights");
@@ -1376,6 +1492,216 @@ assert.equal(
     ?.matchingObservationCount,
   0,
 );
+
+{
+  const corridorPlayerDb = `fusion-identity-management-player-corridor-${dbSuffix}`;
+  const corridorGuildDb = `fusion-identity-management-guild-corridor-${dbSuffix}`;
+  await deleteDB(corridorPlayerDb);
+  await deleteDB(corridorGuildDb);
+  const corridorPlayerStore = createPlayerIdentityStore({
+    dbName: corridorPlayerDb,
+  });
+  const corridorGuildStore = createGuildIdentityStore({
+    dbName: corridorGuildDb,
+  });
+  const corridorReport = await buildFusionIdentityManagementReportFromSnapshots(
+    {
+      snapshots: createMaerwynnCorridorCoverageSnapshots(),
+      playerStore: corridorPlayerStore,
+      guildStore: corridorGuildStore,
+    },
+    { scope: maerwynnScope },
+  );
+  const corridorPlayer = corridorReport.items.find(
+    (item) =>
+      item.entityType === "player" &&
+      item.currentIdentifier === "maerwynn_p1",
+  );
+
+  assert.notEqual(corridorPlayer?.status, "noHistory");
+  assert.equal(corridorPlayer?.status, "noHistoricalObservation");
+  assert.equal(corridorPlayer?.reasonCodes[0], "no-historical-observation");
+  assert.deepEqual(corridorPlayer?.diagnostics?.originServerCodes, [
+    "ES10",
+    "F5",
+  ]);
+  assert.equal(corridorPlayer?.diagnostics?.historicalSnapshotCount, 1);
+  assert.equal(
+    corridorPlayer?.diagnostics?.reliableHistoricalLookup
+      ?.matchingObservationCount,
+    1,
+  );
+  assert.equal(
+    corridorPlayer?.diagnostics?.reliableHistoricalLookup
+      ?.compatibleClassObservationCount,
+    0,
+  );
+}
+
+{
+  const siblingPlayerDb = `fusion-identity-management-player-sibling-${dbSuffix}`;
+  const siblingGuildDb = `fusion-identity-management-guild-sibling-${dbSuffix}`;
+  await deleteDB(siblingPlayerDb);
+  await deleteDB(siblingGuildDb);
+  const siblingPlayerStore = createPlayerIdentityStore({
+    dbName: siblingPlayerDb,
+  });
+  const siblingGuildStore = createGuildIdentityStore({
+    dbName: siblingGuildDb,
+  });
+  const siblingReport = await buildFusionIdentityManagementReportFromSnapshots(
+    {
+      snapshots: createMaerwynnSiblingCoverageSnapshots(),
+      playerStore: siblingPlayerStore,
+      guildStore: siblingGuildStore,
+    },
+    { scope: maerwynnScope },
+  );
+  const siblingPlayer = siblingReport.items.find(
+    (item) =>
+      item.entityType === "player" &&
+      item.currentIdentifier === "maerwynn_p1",
+  );
+
+  assert.equal(siblingPlayer?.status, "noHistory");
+  assert.equal(siblingPlayer?.reasonCodes[0], "no-historical-scans");
+  assert.deepEqual(siblingPlayer?.diagnostics?.originServerCodes, [
+    "ES10",
+    "F5",
+  ]);
+  assert.equal(siblingPlayer?.diagnostics?.historicalSnapshotCount, 0);
+}
+
+{
+  const f27Scope = listFusionIdentityAnalysisScopes({ atDate: "2026-09-24" }).find(
+    (scope) => scope.targetServerCode === "F27",
+  );
+  assert.ok(f27Scope);
+  await assert.rejects(
+    buildFusionIdentityManagementReportFromSnapshots(
+      {
+        snapshots: [
+          snapshot(
+            "f27-current-only",
+            Date.parse("2025-09-01T12:00:00Z"),
+            "f27_fu",
+            [
+              {
+                id: "f27_fu_p1",
+                name: "Current Only",
+                server: "f27_fu",
+                guildSegment: "g27",
+                guildName: "Current Only",
+              },
+            ],
+            [group("f27_fu", "g27", "Current Only", 1, COA)],
+          ),
+        ],
+        playerStore,
+        guildStore,
+      },
+      { scope: f27Scope },
+    ),
+    FusionIdentityScopeNotLocallyMatchableError,
+  );
+}
+
+{
+  const progressEvents: Array<{
+    phase: string;
+    current?: number;
+    total?: number;
+  }> = [];
+  const oldMembers = Array.from({ length: 120 }, (_, index) => {
+    const guildNumber = Math.floor(index / 2) + 1;
+    return {
+      id: `s1_eu_progress_${index + 1}`,
+      name: `Progress ${index + 1}`,
+      server: "s1_eu",
+      guildSegment: `g${guildNumber}`,
+      guildName: `Progress Guild ${guildNumber}`,
+    };
+  });
+  const currentMembers = Array.from({ length: 120 }, (_, index) => {
+    const guildNumber = Math.floor(index / 2) + 1;
+    return {
+      id: `f28_net_progress_${index + 1}`,
+      name: `Progress ${index + 1} (s1_eu)`,
+      server: "f28_net",
+      guildSegment: `g${guildNumber}`,
+      guildName: `Progress Guild ${guildNumber}`,
+      level: 11,
+    };
+  });
+  const oldGroups = Array.from({ length: 60 }, (_, index) =>
+    group(
+      "s1_eu",
+      `g${index + 1}`,
+      `Progress Guild ${index + 1}`,
+      2,
+      COA,
+    ),
+  );
+  const currentGroups = Array.from({ length: 60 }, (_, index) =>
+    group(
+      "f28_net",
+      `g${index + 1}`,
+      `Progress Guild ${index + 1}`,
+      2,
+      COA,
+    ),
+  );
+
+  await buildFusionIdentityManagementReportFromSnapshots(
+    {
+      snapshots: [
+        snapshot("progress-old", 1000, "s1_eu", oldMembers, oldGroups),
+        snapshot("progress-current", 2000, "f28_net", currentMembers, currentGroups),
+      ],
+      playerStore,
+      guildStore,
+    },
+    {
+      onProgress: (progress) => progressEvents.push(progress),
+    },
+  );
+
+  const playerProgress = progressEvents.filter(
+    (entry) => entry.phase === "player-resolution",
+  );
+  assert.deepEqual(playerProgress[0], {
+    phase: "player-resolution",
+    current: 0,
+    total: 120,
+    message: "Resolving player identities",
+  });
+  assert.ok(
+    playerProgress.some(
+      (entry) => (entry.current ?? 0) > 0 && (entry.current ?? 0) < (entry.total ?? 0),
+    ),
+    "management emits intermediate player progress",
+  );
+  assert.equal(playerProgress.at(-1)?.current, 120);
+  assert.equal(playerProgress.at(-1)?.total, 120);
+
+  const guildProgress = progressEvents.filter(
+    (entry) => entry.phase === "guild-resolution",
+  );
+  assert.deepEqual(guildProgress[0], {
+    phase: "guild-resolution",
+    current: 0,
+    total: 60,
+    message: "Resolving guild identities",
+  });
+  assert.ok(
+    guildProgress.some(
+      (entry) => (entry.current ?? 0) > 0 && (entry.current ?? 0) < (entry.total ?? 0),
+    ),
+    "management emits intermediate guild progress",
+  );
+  assert.equal(guildProgress.at(-1)?.current, 60);
+  assert.equal(guildProgress.at(-1)?.total, 60);
+}
 
 await playerStore.close();
 await guildStore.close();

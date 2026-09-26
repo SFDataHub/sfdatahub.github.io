@@ -15,6 +15,12 @@
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
+@media (min-width: 1024px) {
+  .library-shelf {
+    padding-inline: 0;
+  }
+}
+
 .library-shelf-scroll {
   margin-top: -18px;
   padding-top: 18px;
@@ -184,27 +190,11 @@
   backdrop-filter: blur(1.5px);
 }
 
-.reader-close-button {
-  position: absolute;
-  z-index: 30;
-  top: clamp(14px, 3vw, 28px);
-  right: clamp(14px, 3vw, 32px);
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(176, 196, 217, 0.38);
-  border-radius: 8px;
-  background: rgba(13, 24, 38, 0.82);
-  color: #f5f9ff;
-  font-size: 1.8rem;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
-}
-
-.reader-close-button:hover {
-  background: rgba(42, 76, 114, 0.92);
+.book-reader-stage-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
 }
 
 .book-stage {
@@ -251,15 +241,18 @@
     4px 5px 0 rgba(30, 18, 24, 0.22);
 }
 
-.book-reader-overlay.is-opening .book-stage {
+.book-reader-overlay.is-opening .book-stage,
+.book-reader-stage-layer.is-opening .book-stage {
   transform: translate3d(var(--stage-start-x), var(--stage-start-y), 0) scale(var(--stage-start-scale));
 }
 
-.book-reader-overlay.is-opening .book-stage.is-centered {
+.book-reader-overlay.is-opening .book-stage.is-centered,
+.book-reader-stage-layer.is-opening .book-stage.is-centered {
   transform: translate3d(0, 0, 0) scale(var(--book-scale, 1));
 }
 
-.book-reader-overlay.is-opening .book-stage.is-centered.is-cover-centered {
+.book-reader-overlay.is-opening .book-stage.is-centered.is-cover-centered,
+.book-reader-stage-layer.is-opening .book-stage.is-centered.is-cover-centered {
   transform: translate3d(var(--stage-cover-shift), 0, 0) scale(var(--book-scale, 1));
 }
 
@@ -275,12 +268,14 @@
   transition: opacity 160ms ease;
 }
 
-.book-reader-overlay.is-reading .content-flipbook-layer {
+.book-reader-overlay.is-reading .content-flipbook-layer,
+.book-reader-stage-layer.is-reading .content-flipbook-layer {
   opacity: 1;
   pointer-events: auto;
 }
 
-.book-reader-overlay.is-opening .content-flipbook-layer {
+.book-reader-overlay.is-opening .content-flipbook-layer,
+.book-reader-stage-layer.is-opening .content-flipbook-layer {
   opacity: 1;
   pointer-events: none;
 }
@@ -466,6 +461,129 @@
   font-weight: 800;
 }
 
+.world-index-page {
+  gap: 12px;
+}
+
+.world-index-page h1 {
+  margin-bottom: 0;
+  font-size: 2.45rem;
+}
+
+.world-index-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-height: 0;
+}
+
+.world-index-section {
+  display: grid;
+  gap: 7px;
+}
+
+.world-index-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.world-index-title {
+  margin: 0;
+  color: #2c2216;
+  font-size: 1rem;
+  line-height: 1.12;
+  letter-spacing: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+
+.world-index-section-meta {
+  flex: 0 0 auto;
+  color: #7c4e23;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.world-index-floor-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 8px;
+}
+
+.world-index-floor-tile {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  aspect-ratio: 1 / 0.78;
+  padding: 0;
+  border: 1px solid rgba(100, 64, 23, 0.28);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255, 250, 219, 0.96), rgba(211, 178, 117, 0.52) 58%, rgba(95, 58, 25, 0.24));
+  color: #2c2216;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  overflow: hidden;
+  box-shadow: 0 6px 12px rgba(75, 48, 18, 0.1);
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.world-index-floor-tile:hover {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 240, 0.98), rgba(224, 194, 132, 0.58) 58%, rgba(95, 58, 25, 0.28));
+  transform: translateY(-2px);
+  box-shadow: 0 10px 16px rgba(75, 48, 18, 0.16);
+}
+
+.world-index-floor-number {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.62rem;
+  font-weight: 900;
+  line-height: 1;
+  -webkit-text-stroke: 2.1px rgba(255, 255, 255, 1);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.65),
+    0 0 6px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -50%);
+}
+
+.world-index-floor-image-frame {
+  position: absolute;
+  inset: 4px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.world-index-floor-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 5px rgba(62, 38, 14, 0.24));
+}
+
+.world-index-floor-image-fallback {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(100, 64, 23, 0.14);
+  color: #7c4e23;
+  font-weight: 900;
+}
+
 .enemy-detail {
   flex: 1 1 auto;
   min-height: 0;
@@ -549,12 +667,37 @@
   overflow: hidden;
 }
 
+.enemy-detail-image-button {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
+}
+
+.enemy-detail-image-button:focus-visible {
+  outline: 2px solid rgba(40, 91, 143, 0.72);
+  outline-offset: -5px;
+}
+
+.enemy-detail-image-button:hover .enemy-detail-image,
+.enemy-detail-image-button:focus-visible .enemy-detail-image {
+  filter: saturate(1.06) contrast(1.03);
+}
+
 .enemy-detail-image {
   display: block;
-  max-width: 94%;
-  max-height: calc(100% - 42px);
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
@@ -612,6 +755,70 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+.monster-image-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: rgba(4, 8, 14, 0.64);
+  pointer-events: auto;
+}
+
+.monster-image-zoom-frame {
+  position: relative;
+  width: min(92vw, 960px);
+  height: min(86vh, 960px);
+  display: grid;
+  place-items: center;
+}
+
+.monster-image-zoom-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 24px 50px rgba(0, 0, 0, 0.5));
+}
+
+.monster-image-zoom-close {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(226, 236, 248, 0.48);
+  border-radius: 8px;
+  background: rgba(9, 15, 24, 0.72);
+  color: #f7fbff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+}
+
+.monster-image-zoom-close:hover,
+.monster-image-zoom-close:focus-visible {
+  background: rgba(25, 45, 68, 0.88);
+}
+
+.monster-image-zoom-status {
+  min-width: min(72vw, 360px);
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: rgba(245, 249, 255, 0.9);
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.58);
 }
 
 .enemy-detail-class-fallback {
@@ -809,6 +1016,10 @@
     overflow-wrap: normal;
     word-break: normal;
     hyphens: manual;
+  }
+
+  .world-index-page h1 {
+    font-size: 2.45rem;
   }
 
   .world-dungeon-grid {
@@ -1135,11 +1346,6 @@
     padding: 22px;
   }
 
-  .reader-close-button {
-    top: 10px;
-    right: 10px;
-  }
-
   .world-dungeon-grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1148,6 +1354,24 @@
   .world-dungeon-card {
     min-height: 72px;
     padding: 14px;
+  }
+
+  .world-index-page h1 {
+    font-size: 2rem;
+  }
+
+  .world-index-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .world-index-floor-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .world-index-floor-tile {
+    aspect-ratio: 1 / 0.82;
   }
 
   .floor-grid {
@@ -1263,7 +1487,8 @@
   .library-shelf,
   .content-flipbook-layer,
   .world-dungeon-card,
-  .floor-button {
+  .floor-button,
+  .world-index-floor-tile {
     transition-duration: 1ms;
   }
 

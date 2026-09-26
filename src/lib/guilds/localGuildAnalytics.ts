@@ -1,5 +1,10 @@
 import type { GuildHubLocalScan } from "./localScanLibrary";
 import {
+  collectGuildIdentityObservations,
+  collectPlayerIdentityObservations,
+  type IdentityResolutionSnapshot,
+} from "../identities/identityResolution";
+import {
   isDerivedGuildSnapshotForGuild,
   isDerivedMemberInGuild,
   type GuildAnalyticsDerivedData,
@@ -58,6 +63,7 @@ export type GuildAnalyticsPlayerPoint = {
   scanLabel: string;
   scannedAtMs: number;
   value: number | null;
+  playerName: string | null;
   membership: "currentGuild" | "otherGuild";
   guildIdentifier: string | null;
   guildName: string | null;
@@ -122,10 +128,11 @@ export function buildGuildAnalyticsSeries(
   guild: GuildAnalyticsGuildIdentity | null | undefined,
   metricKey: GuildAnalyticsMetricKey,
   range: GuildAnalyticsRangeInput,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ): GuildAnalyticsSeries {
   if (!guild) return { allPoints: [], visiblePoints: [], timeDomain: null };
 
-  const allPoints = buildAnalyticsSnapshotsForGuild(data, guild)
+  const allPoints = buildAnalyticsSnapshotsForGuild(data, guild, identityResolutionSnapshot)
     .map((snapshot) => snapshot.point)
     .filter((point) => typeof point.values[metricKey] === "number")
     .sort((a, b) => a.scannedAtMs - b.scannedAtMs);
@@ -144,6 +151,7 @@ export function buildGuildAnalyticsPlayerComparison(
   metricKey: GuildAnalyticsMetricKey,
   range: GuildAnalyticsRangeInput,
   selectedPlayerIds: string[],
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "players" | "guilds"> | null,
 ): GuildAnalyticsPlayerComparison {
   if (!guild) {
     return {
@@ -153,7 +161,7 @@ export function buildGuildAnalyticsPlayerComparison(
     };
   }
 
-  const currentGuildSnapshots = buildAnalyticsSnapshotsForGuild(data, guild).sort(
+  const currentGuildSnapshots = buildAnalyticsSnapshotsForGuild(data, guild, identityResolutionSnapshot).sort(
     (a, b) => a.point.scannedAtMs - b.point.scannedAtMs,
   );
   const allPoints = currentGuildSnapshots
@@ -165,10 +173,10 @@ export function buildGuildAnalyticsPlayerComparison(
   const candidateByRef = new Map(playerCandidates.map((player) => [player.memberRef, player]));
   const uniqueSelectedPlayerIds = Array.from(new Set(selectedPlayerIds));
   const playerSeries = uniqueSelectedPlayerIds.map((memberRef) => {
-    const points = buildPlayerHistoryPoints(data, guild, memberRef, metricKey);
+    const points = buildPlayerHistoryPoints(data, guild, memberRef, metricKey, identityResolutionSnapshot);
     return {
       memberRef,
-      name: resolvePlayerHistoryName(data, guild, memberRef) ?? candidateByRef.get(memberRef)?.name ?? memberRef,
+      name: resolvePlayerHistoryName(data, guild, memberRef, identityResolutionSnapshot) ?? candidateByRef.get(memberRef)?.name ?? memberRef,
       points: filterAnalyticsPointsByRange(points, range, (point) => point.scannedAtMs),
     };
   });
@@ -277,10 +285,11 @@ export function buildGuildAnalyticsProgressReport(
   data: GuildAnalyticsDerivedData,
   guild: GuildAnalyticsGuildIdentity | null | undefined,
   periodKey: GuildAnalyticsProgressPeriodKey,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ): GuildAnalyticsProgressReport | null {
   if (!guild) return null;
 
-  const snapshots = buildAnalyticsSnapshotsForGuild(data, guild).sort(
+  const snapshots = buildAnalyticsSnapshotsForGuild(data, guild, identityResolutionSnapshot).sort(
     (a, b) => a.point.scannedAtMs - b.point.scannedAtMs,
   );
 
@@ -358,21 +367,53 @@ type GuildAnalyticsSnapshot = {
 function buildAnalyticsSnapshotsForGuild(
   data: GuildAnalyticsDerivedData,
   guild: GuildAnalyticsGuildIdentity,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ): GuildAnalyticsSnapshot[] {
+  const resolvedIdentifier = resolveGuildAnalyticsIdentifier(guild);
   const membersBySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
-  for (const member of data.members) {
-    if (!isDerivedMemberInGuild(member, guild)) continue;
+  for (const member of collectGuildAnalyticsMemberObservations(data, guild, resolvedIdentifier, identityResolutionSnapshot)) {
     const members = membersBySnapshotId.get(member.snapshotId) ?? [];
     members.push(member);
     membersBySnapshotId.set(member.snapshotId, members);
   }
 
-  return data.guilds
-    .filter((snapshot) => isDerivedGuildSnapshotForGuild(snapshot, guild))
+  return collectGuildAnalyticsGuildObservations(data, guild, resolvedIdentifier, identityResolutionSnapshot)
     .map((snapshot) => ({
       point: pointFromGuildSnapshot(snapshot),
       members: membersBySnapshotId.get(snapshot.snapshotId) ?? [],
     }));
+}
+
+function resolveGuildAnalyticsIdentifier(guild: GuildAnalyticsGuildIdentity) {
+  return String(guild.logoIdentifier ?? guild.guildId ?? "").trim() || null;
+}
+
+function collectGuildAnalyticsGuildObservations(
+  data: GuildAnalyticsDerivedData,
+  guild: GuildAnalyticsGuildIdentity,
+  guildIdentifier: string | null,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+) {
+  if (identityResolutionSnapshot && guildIdentifier) {
+    const history = collectGuildIdentityObservations(identityResolutionSnapshot, guildIdentifier, data.guilds);
+    if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
+  }
+
+  return data.guilds.filter((snapshot) => isDerivedGuildSnapshotForGuild(snapshot, guild));
+}
+
+function collectGuildAnalyticsMemberObservations(
+  data: GuildAnalyticsDerivedData,
+  guild: GuildAnalyticsGuildIdentity,
+  guildIdentifier: string | null,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+) {
+  if (identityResolutionSnapshot && guildIdentifier) {
+    const history = collectGuildIdentityObservations(identityResolutionSnapshot, guildIdentifier, data.members);
+    if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
+  }
+
+  return data.members.filter((member) => isDerivedMemberInGuild(member, guild));
 }
 
 function pointFromGuildSnapshot(snapshot: GuildAnalyticsGuildSnapshot): GuildAnalyticsPoint {
@@ -410,11 +451,17 @@ function buildPlayerHistoryPoints(
   guild: GuildAnalyticsGuildIdentity,
   memberRef: string,
   metricKey: GuildAnalyticsMetricKey,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "players"> | null,
 ): GuildAnalyticsPlayerPoint[] {
   const snapshotsById = new Map(data.snapshots.map((snapshot) => [snapshot.id, snapshot]));
   const membersBySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
-  for (const member of data.members) {
-    if (member.memberRef !== memberRef) continue;
+  const history = collectPlayerIdentityObservations(
+    identityResolutionSnapshot ?? { players: { byIdentifier: new Map(), byIdentityId: new Map() } },
+    memberRef,
+    data.members,
+  );
+  for (const entry of history.observations) {
+    const member = entry.observation;
     const candidates = membersBySnapshotId.get(member.snapshotId) ?? [];
     candidates.push(member);
     membersBySnapshotId.set(member.snapshotId, candidates);
@@ -436,6 +483,7 @@ function buildPlayerHistoryPoints(
         scanLabel: snapshot.sourceScanFilename,
         scannedAtMs: snapshot.snapshotTimestamp,
         value,
+        playerName: member.name,
         membership: inCurrentGuild ? "currentGuild" : "otherGuild",
         guildIdentifier: member.guildIdentifier,
         guildName: member.guildName,
@@ -449,9 +497,15 @@ function resolvePlayerHistoryName(
   data: GuildAnalyticsDerivedData,
   guild: GuildAnalyticsGuildIdentity,
   memberRef: string,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "players"> | null,
 ) {
-  const snapshots = data.members
-    .filter((member) => member.memberRef === memberRef)
+  const history = collectPlayerIdentityObservations(
+    identityResolutionSnapshot ?? { players: { byIdentifier: new Map(), byIdentityId: new Map() } },
+    memberRef,
+    data.members,
+  );
+  const snapshots = history.observations
+    .map((entry) => entry.observation)
     .sort((a, b) => b.snapshotTimestamp - a.snapshotTimestamp);
   const bySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
   for (const member of snapshots) {

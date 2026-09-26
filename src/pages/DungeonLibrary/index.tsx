@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import ContentShell from "../../components/ContentShell";
 import FlipbookCurlViewer from "../../components/Flipbook/FlipbookCurlViewer";
@@ -51,12 +52,15 @@ type ReaderBounds = {
   height: number;
 };
 
+type WorldIndexSection = {
+  dungeon: DungeonDefinition;
+  floors: DungeonFloor[];
+};
+
 type PagePlan =
-  | { kind: "worldOverview"; overviewIndex: number; overviewCount: number; dungeons: DungeonDefinition[] }
+  | { kind: "worldIndex"; indexPage: number; indexPageCount: number; sections: WorldIndexSection[] }
   | { kind: "rangeOverview"; overviewIndex: number; overviewCount: number; ranges: FloorRange[] }
-  | { kind: "floorOverview"; dungeon: DungeonDefinition; floors: DungeonFloor[]; overviewIndex: number; overviewCount: number }
   | { kind: "floorSelector"; dungeon: DungeonDefinition; range: FloorRange; floors: DungeonFloor[]; selectorIndex: number; selectorCount: number }
-  | { kind: "dungeon"; dungeon: DungeonDefinition }
   | { kind: "floor"; dungeon: DungeonDefinition; floor: DungeonFloor }
   | { kind: "dynamicFloorDetail"; dungeon: DungeonDefinition };
 
@@ -73,11 +77,17 @@ type SelectedLongformFloor = {
   backPage: number;
 };
 
+type ZoomedEnemy = {
+  enemyId: number;
+  name?: string;
+} | null;
+
 type EnemyDetailProps = {
   dungeon: DungeonDefinition;
   floor: DungeonFloor;
   dungeonName: string;
   monsterName: string;
+  onOpenMonsterImage: (enemy: NonNullable<ZoomedEnemy>) => void;
 };
 
 const COVER_PAGE_COUNT = 2;
@@ -86,6 +96,8 @@ const CONTENT_PAGE_OFFSET = COVER_PAGE_COUNT + OPENING_FRONTMATTER_PAGE_COUNT;
 const OPENING_FRONTMATTER_PAGES = Array.from({ length: OPENING_FRONTMATTER_PAGE_COUNT }, (_, index) => index);
 const DUNGEONS_PER_OVERVIEW_PAGE = 6;
 const FLOORS_PER_OVERVIEW_PAGE = 20;
+const WORLD_INDEX_DUNGEONS_PER_PAGE = 3;
+const WORLD_INDEX_LONGFORM_FLOORS_PER_PAGE = 25;
 const OPENING_FLIP_START_DELAY = 900;
 const OPENING_FLIP_INTERVAL = 760;
 const OPENING_DURATION_MS = 4200;
@@ -98,13 +110,13 @@ const DUNGEON_DESKTOP_OPEN_WIDTH = DUNGEON_DESKTOP_PAGE_WIDTH * 2;
 const DUNGEON_DESKTOP_MAX_SCALE = 1.16;
 const READER_SIDE_SAFE_PX = 0;
 const READER_TOP_SAFE_PX = 4;
-const READER_BOTTOM_SAFE_PX = 0;
+const READER_BOTTOM_SAFE_PX = 8;
 const BOOK_VISUAL_LEFT_RESERVE_PX = 8;
 const BOOK_VISUAL_RIGHT_RESERVE_PX = 52;
 const BOOK_VISUAL_TOP_RESERVE_PX = 0;
 const BOOK_HUD_RESERVE_PX = 58;
-const dungeonNumberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-
+const READER_TOP_CSS_LENGTH = "var(--app-overlay-top, var(--topbar-h, 0px))";
+const MONSTER_ZOOM_IMAGE_SIZE = 960;
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -119,6 +131,27 @@ const chunk = <T,>(items: T[], size: number): T[][] => {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+};
+
+const balancedChunks = <T,>(items: T[], maxSize: number, preferEvenCount = false): T[][] => {
+  if (items.length === 0) return [];
+  const safeMaxSize = Math.max(1, maxSize);
+  let chunkCount = Math.ceil(items.length / safeMaxSize);
+  if (preferEvenCount && chunkCount % 2 === 1 && chunkCount < items.length) {
+    chunkCount += 1;
+  }
+
+  const chunks: T[][] = [];
+  let start = 0;
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+    const remainingItems = items.length - start;
+    const remainingChunks = chunkCount - chunkIndex;
+    const size = Math.min(safeMaxSize, Math.ceil(remainingItems / remainingChunks));
+    chunks.push(items.slice(start, start + size));
+    start += size;
+  }
+
+  return chunks.filter((group) => group.length > 0);
 };
 
 const buildFloorRanges = (floors: DungeonFloor[], chapterSize: number): FloorRange[] =>
@@ -146,7 +179,8 @@ const getOpeningPreloadEnemyIds = (world: DungeonWorld) => {
   return getFloorEnemyIds(dungeon.floors.slice(0, limit));
 };
 
-const formatDungeonNumber = (value: number) => dungeonNumberFormatter.format(value);
+const formatDungeonNumber = (value: number, locale?: string) =>
+  new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: 0 }).format(value);
 
 const getDungeonDisplayName = (
   dungeon: DungeonDefinition,
@@ -181,12 +215,34 @@ const areBookGeometriesEqual = (a: BookGeometry | null, b: BookGeometry) =>
   Math.abs(a!.centerY - b.centerY) < 0.5 &&
   a!.isMobile === b.isMobile;
 
-const getViewportReaderBounds = (): ReaderBounds => ({
-  left: 0,
-  top: 0,
-  width: window.innerWidth,
-  height: window.innerHeight,
-});
+const measureCssLengthPx = (cssLength: string): number => {
+  if (typeof document === "undefined") return 0;
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.height = cssLength;
+  probe.style.width = "0";
+  document.body.appendChild(probe);
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+
+  return Number.isFinite(height) ? height : 0;
+};
+
+const getReaderTop = () => Math.max(0, measureCssLengthPx(READER_TOP_CSS_LENGTH));
+
+const getViewportReaderBounds = (left = 0, width = window.innerWidth): ReaderBounds => {
+  const top = getReaderTop();
+
+  return {
+    left,
+    top,
+    width,
+    height: Math.max(0, window.innerHeight - top),
+  };
+};
 
 const getBookGeometry = (readerBounds: ReaderBounds = getViewportReaderBounds()): BookGeometry => {
   const isMobile = window.innerWidth < 760;
@@ -195,12 +251,10 @@ const getBookGeometry = (readerBounds: ReaderBounds = getViewportReaderBounds())
   const visualLeftReserve = isMobile ? 0 : BOOK_VISUAL_LEFT_RESERVE_PX;
   const visualRightReserve = isMobile ? 0 : BOOK_VISUAL_RIGHT_RESERVE_PX;
   const visualTopReserve = isMobile ? 0 : BOOK_VISUAL_TOP_RESERVE_PX;
-  const hudReserve = isMobile ? 44 : BOOK_HUD_RESERVE_PX;
+  const hudReserve = BOOK_HUD_RESERVE_PX;
   const readerCenterX = readerBounds.left + readerBounds.width / 2;
-  const readerTop = isMobile ? 0 : Math.max(0, readerBounds.top);
-  const readerBottom = isMobile
-    ? window.innerHeight
-    : Math.min(window.innerHeight, readerBounds.top + readerBounds.height);
+  const readerTop = Math.max(0, readerBounds.top);
+  const readerBottom = Math.min(window.innerHeight, readerTop + readerBounds.height);
   const readerHeight = Math.max(320, readerBottom - readerTop);
   const centerY = readerTop + readerHeight / 2;
   const availableWidth = Math.max(280, readerBounds.width - horizontalSafe * 2);
@@ -282,8 +336,18 @@ function EnemyClassBadge({ stats }: { stats?: DungeonFloorStats }) {
   );
 }
 
-function EnemyArtwork({ enemyId, stats }: { enemyId: number; stats?: DungeonFloorStats }) {
-  const { t } = useTranslation();
+function EnemyArtwork({
+  enemyId,
+  monsterName,
+  stats,
+  onOpenMonsterImage,
+}: {
+  enemyId: number;
+  monsterName: string;
+  stats?: DungeonFloorStats;
+  onOpenMonsterImage: (enemy: NonNullable<ZoomedEnemy>) => void;
+}) {
+  const { t, i18n } = useTranslation();
   const imageUrl = getDungeonMonsterImage(enemyId, 360);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     imageUrl ? "loading" : "error"
@@ -313,21 +377,36 @@ function EnemyArtwork({ enemyId, stats }: { enemyId: number; stats?: DungeonFloo
         </div>
       )}
       {imageUrl && status !== "error" && (
-        <img
-          key={`${enemyId}-${imageUrl}`}
-          className="enemy-detail-image"
-          src={imageUrl}
-          alt={t("dungeonLibrary.detail.monsterImageAlt", { enemyId })}
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setStatus("loaded")}
-          onError={() => setStatus("error")}
-        />
+        <button
+          className="enemy-detail-image-button"
+          type="button"
+          data-flip-interactive
+          aria-label={t("dungeonLibrary.detail.openMonsterImage")}
+          onPointerDown={stopFlipGesture}
+          onMouseDown={stopFlipGesture}
+          onTouchStart={stopFlipGesture}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenMonsterImage({ enemyId, name: monsterName });
+          }}
+        >
+          <img
+            key={`${enemyId}-${imageUrl}`}
+            className="enemy-detail-image"
+            src={imageUrl}
+            alt={t("dungeonLibrary.detail.monsterImageAlt", { enemyId })}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setStatus("loaded")}
+            onError={() => setStatus("error")}
+          />
+        </button>
       )}
       {stats && (
         <figcaption className="enemy-detail-art-meta">
           <span className="enemy-detail-level">
-            {t("dungeonLibrary.detail.levelShort", { level: formatDungeonNumber(stats.level) })}
+            {t("dungeonLibrary.detail.levelShort", { level: formatDungeonNumber(stats.level, i18n.language) })}
           </span>
           <EnemyClassBadge stats={stats} />
         </figcaption>
@@ -336,8 +415,82 @@ function EnemyArtwork({ enemyId, stats }: { enemyId: number; stats?: DungeonFloo
   );
 }
 
-function EnemyStatsPanel({ stats }: { stats?: DungeonFloorStats }) {
+function MonsterImageZoomOverlay({
+  enemy,
+  onClose,
+}: {
+  enemy: NonNullable<ZoomedEnemy>;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
+  const imageUrl = getDungeonMonsterImage(enemy.enemyId, MONSTER_ZOOM_IMAGE_SIZE);
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">(
+    imageUrl ? "loading" : "error"
+  );
+
+  useEffect(() => {
+    setStatus(imageUrl ? "loading" : "error");
+  }, [imageUrl]);
+
+  const imageLabel = enemy.name || t("dungeonLibrary.detail.monsterImageAlt", { enemyId: enemy.enemyId });
+
+  return (
+    <div
+      className="monster-image-zoom-overlay"
+      data-flip-interactive
+      role="presentation"
+      onClick={onClose}
+      onPointerDown={stopFlipGesture}
+      onMouseDown={stopFlipGesture}
+      onTouchStart={stopFlipGesture}
+    >
+      <div
+        className="monster-image-zoom-frame"
+        data-flip-interactive
+        role="dialog"
+        aria-modal="true"
+        aria-label={imageLabel}
+        onClick={stopFlipGesture}
+      >
+        <button
+          className="monster-image-zoom-close"
+          type="button"
+          aria-label={t("dungeonLibrary.detail.closeMonsterImage")}
+          onClick={(event) => {
+            stopFlipGesture(event);
+            onClose();
+          }}
+        >
+          ×
+        </button>
+        {status === "loading" && (
+          <div className="monster-image-zoom-status" role="status">
+            {t("dungeonLibrary.detail.loadingMonsterImage")}
+          </div>
+        )}
+        {status === "error" && (
+          <div className="monster-image-zoom-status" role="status">
+            {t("dungeonLibrary.detail.monsterImageUnavailable")}
+          </div>
+        )}
+        {imageUrl && status !== "error" && (
+          <img
+            key={`${enemy.enemyId}-${imageUrl}`}
+            className="monster-image-zoom-image"
+            src={imageUrl}
+            alt={imageLabel}
+            decoding="async"
+            onLoad={() => setStatus("loaded")}
+            onError={() => setStatus("error")}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EnemyStatsPanel({ stats }: { stats?: DungeonFloorStats }) {
+  const { t, i18n } = useTranslation();
 
   if (!stats) {
     return (
@@ -358,7 +511,7 @@ function EnemyStatsPanel({ stats }: { stats?: DungeonFloorStats }) {
           label={row.label}
           iconAlt={t("dungeonLibrary.detail.statIconAlt", { stat: row.label })}
           value={stats[row.key]}
-          displayValue={formatDungeonNumber(stats[row.key])}
+          displayValue={formatDungeonNumber(stats[row.key], i18n.language)}
           fillRatio={toStatFillPercent(stats[row.key], maxAttribute) / 100}
           variant="book"
           accentColor={getPlayerStatAccentColor(row.key)}
@@ -368,11 +521,11 @@ function EnemyStatsPanel({ stats }: { stats?: DungeonFloorStats }) {
       <dl className="enemy-detail-damage" aria-label={t("dungeonLibrary.detail.enemyDamageAria")}>
         <div className="enemy-detail-damage-row">
           <dt>{t("dungeonLibrary.detail.minDamage")}</dt>
-          <dd>{formatDungeonNumber(stats.min)}</dd>
+          <dd>{formatDungeonNumber(stats.min, i18n.language)}</dd>
         </div>
         <div className="enemy-detail-damage-row">
           <dt>{t("dungeonLibrary.detail.maxDamage")}</dt>
-          <dd>{formatDungeonNumber(stats.max)}</dd>
+          <dd>{formatDungeonNumber(stats.max, i18n.language)}</dd>
         </div>
       </dl>
     </div>
@@ -393,7 +546,7 @@ function EnemyHealthBar({ stats, locale }: { stats?: DungeonFloorStats; locale?:
   return (
     <div
       className="enemy-detail-hp"
-      aria-label={t("dungeonLibrary.detail.hpAria", { value: formatDungeonNumber(stats.health) })}
+      aria-label={t("dungeonLibrary.detail.hpAria", { value: formatDungeonNumber(stats.health, locale) })}
     >
       <div className="enemy-detail-hp-label">
         {t("dungeonLibrary.detail.hpValue", {
@@ -407,7 +560,7 @@ function EnemyHealthBar({ stats, locale }: { stats?: DungeonFloorStats; locale?:
   );
 }
 
-function EnemyDetail({ dungeon, floor, dungeonName, monsterName }: EnemyDetailProps) {
+function EnemyDetail({ dungeon, floor, dungeonName, monsterName, onOpenMonsterImage }: EnemyDetailProps) {
   const { t, i18n } = useTranslation();
   const stats = getDungeonFloorStats(dungeon.dungeonId, floor.position);
   const lore = stats?.lore?.trim() || t("dungeonLibrary.detail.loreUnavailable");
@@ -428,7 +581,12 @@ function EnemyDetail({ dungeon, floor, dungeonName, monsterName }: EnemyDetailPr
       </div>
       <div className="enemy-detail-reference">
         <div className="enemy-detail-media">
-          <EnemyArtwork enemyId={floor.enemyId} stats={stats} />
+          <EnemyArtwork
+            enemyId={floor.enemyId}
+            monsterName={monsterName}
+            stats={stats}
+            onOpenMonsterImage={onOpenMonsterImage}
+          />
           <EnemyHealthBar stats={stats} locale={i18n.language} />
         </div>
         <EnemyStatsPanel stats={stats} />
@@ -458,6 +616,7 @@ export default function DungeonLibraryPage() {
   const [coverCentered, setCoverCentered] = useState(false);
   const [openRun, setOpenRun] = useState(0);
   const [currentContentPage, setCurrentContentPage] = useState(0);
+  const [zoomedEnemy, setZoomedEnemy] = useState<ZoomedEnemy>(null);
 
   const getWorldTitle = useCallback((world: DungeonWorld) =>
     t(world.titleKey, { defaultValue: world.title }), [t]);
@@ -465,6 +624,12 @@ export default function DungeonLibraryPage() {
     world.type === "single-longform"
       ? t("dungeonLibrary.book.floorCount", { count: world.dungeons[0]?.floors.length ?? 0 })
       : t("dungeonLibrary.book.dungeonCount", { count: world.dungeons.length }), [t]);
+  const openMonsterImage = useCallback((enemy: NonNullable<ZoomedEnemy>) => {
+    setZoomedEnemy(enemy);
+  }, []);
+  const closeMonsterImage = useCallback(() => {
+    setZoomedEnemy(null);
+  }, []);
 
   const clearOpeningTimers = useCallback(() => {
     openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -475,30 +640,43 @@ export default function DungeonLibraryPage() {
 
   const getReaderBounds = useCallback((): ReaderBounds => {
     const rect = libraryRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return getViewportReaderBounds();
-    return {
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-    };
+    if (!rect || rect.width <= 0) return getViewportReaderBounds();
+    return getViewportReaderBounds(rect.left, rect.width);
   }, []);
 
   const pagePlan = useMemo(() => {
     const pages: PagePlan[] = [];
-    const dungeonPageById: Record<number, number> = {};
     const floorPageByKey: Record<string, number> = {};
-    const floorOverviewPageByKey: Record<string, number> = {};
     const floorSelectorPageByKey: Record<string, number> = {};
+    const worldIndexPageByDungeonId: Record<number, number> = {};
+    const worldIndexPageByFloorKey: Record<string, number> = {};
     let dynamicFloorDetailPage: number | null = null;
 
     if (!selectedWorld) {
-      return { pages, dungeonPageById, floorPageByKey, floorOverviewPageByKey, floorSelectorPageByKey, dynamicFloorDetailPage, worldOverviewPage: 0 };
+      return {
+        pages,
+        floorPageByKey,
+        floorSelectorPageByKey,
+        worldIndexPageByDungeonId,
+        worldIndexPageByFloorKey,
+        dynamicFloorDetailPage,
+        worldIndexPage: 0,
+      };
     }
 
     if (selectedWorld.type === "single-longform") {
       const [dungeon] = selectedWorld.dungeons;
-      if (!dungeon) return { pages, dungeonPageById, floorPageByKey, floorOverviewPageByKey, floorSelectorPageByKey, dynamicFloorDetailPage, worldOverviewPage: 0 };
+      if (!dungeon) {
+        return {
+          pages,
+          floorPageByKey,
+          floorSelectorPageByKey,
+          worldIndexPageByDungeonId,
+          worldIndexPageByFloorKey,
+          dynamicFloorDetailPage,
+          worldIndexPage: 0,
+        };
+      }
 
       if (selectedWorld.floorNavigation?.mode === "chapters") {
         const { chapterSize, pageSize } = selectedWorld.floorNavigation;
@@ -535,21 +713,29 @@ export default function DungeonLibraryPage() {
         dynamicFloorDetailPage = pages.length;
         pages.push({ kind: "dynamicFloorDetail", dungeon });
 
-        return { pages, dungeonPageById, floorPageByKey, floorOverviewPageByKey, floorSelectorPageByKey, dynamicFloorDetailPage, worldOverviewPage: 0 };
+        return {
+          pages,
+          floorPageByKey,
+          floorSelectorPageByKey,
+          worldIndexPageByDungeonId,
+          worldIndexPageByFloorKey,
+          dynamicFloorDetailPage,
+          worldIndexPage: 0,
+        };
       }
 
-      const floorChunks = chunk(dungeon.floors, FLOORS_PER_OVERVIEW_PAGE);
+      const floorChunks = balancedChunks(dungeon.floors, WORLD_INDEX_LONGFORM_FLOORS_PER_PAGE, true);
       floorChunks.forEach((floors, index) => {
-        const overviewPage = pages.length;
+        const indexPage = pages.length;
+        worldIndexPageByDungeonId[dungeon.dungeonId] ??= indexPage;
         floors.forEach((floor) => {
-          floorOverviewPageByKey[getFloorPageKey(dungeon, floor)] = overviewPage;
+          worldIndexPageByFloorKey[getFloorPageKey(dungeon, floor)] = indexPage;
         });
         pages.push({
-          kind: "floorOverview",
-          dungeon,
-          floors,
-          overviewIndex: index,
-          overviewCount: floorChunks.length,
+          kind: "worldIndex",
+          indexPage: index,
+          indexPageCount: floorChunks.length,
+          sections: [{ dungeon, floors }],
         });
       });
 
@@ -558,30 +744,50 @@ export default function DungeonLibraryPage() {
         pages.push({ kind: "floor", dungeon, floor });
       }
 
-      return { pages, dungeonPageById, floorPageByKey, floorOverviewPageByKey, floorSelectorPageByKey, dynamicFloorDetailPage, worldOverviewPage: 0 };
+      return {
+        pages,
+        floorPageByKey,
+        floorSelectorPageByKey,
+        worldIndexPageByDungeonId,
+        worldIndexPageByFloorKey,
+        dynamicFloorDetailPage,
+        worldIndexPage: 0,
+      };
     }
 
-    const dungeonChunks = chunk(selectedWorld.dungeons, DUNGEONS_PER_OVERVIEW_PAGE);
+    const dungeonChunks = balancedChunks(selectedWorld.dungeons, WORLD_INDEX_DUNGEONS_PER_PAGE, true);
     dungeonChunks.forEach((dungeons, index) => {
+      const indexPage = pages.length;
+      dungeons.forEach((dungeon) => {
+        worldIndexPageByDungeonId[dungeon.dungeonId] = indexPage;
+        dungeon.floors.forEach((floor) => {
+          worldIndexPageByFloorKey[getFloorPageKey(dungeon, floor)] = indexPage;
+        });
+      });
       pages.push({
-        kind: "worldOverview",
-        overviewIndex: index,
-        overviewCount: dungeonChunks.length,
-        dungeons,
+        kind: "worldIndex",
+        indexPage: index,
+        indexPageCount: dungeonChunks.length,
+        sections: dungeons.map((dungeon) => ({ dungeon, floors: dungeon.floors })),
       });
     });
 
     for (const dungeon of selectedWorld.dungeons) {
-      dungeonPageById[dungeon.dungeonId] = pages.length;
-      pages.push({ kind: "dungeon", dungeon });
-
       for (const floor of dungeon.floors) {
         floorPageByKey[getFloorPageKey(dungeon, floor)] = pages.length;
         pages.push({ kind: "floor", dungeon, floor });
       }
     }
 
-    return { pages, dungeonPageById, floorPageByKey, floorOverviewPageByKey, floorSelectorPageByKey, dynamicFloorDetailPage, worldOverviewPage: 0 };
+    return {
+      pages,
+      floorPageByKey,
+      floorSelectorPageByKey,
+      worldIndexPageByDungeonId,
+      worldIndexPageByFloorKey,
+      dynamicFloorDetailPage,
+      worldIndexPage: 0,
+    };
   }, [selectedWorld]);
 
   const goToPage = useCallback((pageIndex: number) => {
@@ -593,12 +799,12 @@ export default function DungeonLibraryPage() {
     const page = pagePlan.pages[pageIndex];
     if (!page) return;
 
-    if (page.kind === "dungeon") {
-      void preloadDungeonMonsters(getFloorEnemyIds(page.dungeon.floors));
+    if (page.kind === "worldIndex") {
+      void preloadDungeonMonsters(getFloorEnemyIds(page.sections.flatMap((section) => section.floors)));
       return;
     }
 
-    if (page.kind === "floorOverview" || page.kind === "floorSelector") {
+    if (page.kind === "floorSelector") {
       void preloadDungeonMonsters(getFloorEnemyIds(page.floors));
       return;
     }
@@ -701,6 +907,7 @@ export default function DungeonLibraryPage() {
     clearOpeningTimers();
     pfRef.current?.turnToPage(0, "hard");
     pfRef.current = null;
+    setZoomedEnemy(null);
     setState("library");
     setSelectedWorld(null);
     setSelectedLongformFloor(null);
@@ -710,6 +917,21 @@ export default function DungeonLibraryPage() {
     setCoverCentered(false);
     setBookGeometry(null);
   }, [clearOpeningTimers]);
+
+  useEffect(() => {
+    if (!zoomedEnemy) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      closeMonsterImage();
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [closeMonsterImage, zoomedEnemy]);
 
   useEffect(() => {
     if (state === "library") return;
@@ -739,10 +961,12 @@ export default function DungeonLibraryPage() {
       : null;
     if (target && observer) observer.observe(target);
     window.addEventListener("resize", updateGeometry, { passive: true });
+    window.visualViewport?.addEventListener("resize", updateGeometry, { passive: true });
 
     return () => {
       observer?.disconnect();
       window.removeEventListener("resize", updateGeometry);
+      window.visualViewport?.removeEventListener("resize", updateGeometry);
     };
   }, [getReaderBounds, state]);
 
@@ -777,85 +1001,89 @@ export default function DungeonLibraryPage() {
     ));
 
     const contentPages = pagePlan.pages.map((page, index) => {
-      if (page.kind === "worldOverview") {
+      if (page.kind === "worldIndex") {
         return (
-          <section className="dungeon-book-page" key={`world-${page.overviewIndex}`}>
+          <section className="dungeon-book-page world-index-page" key={`world-index-${page.indexPage}`}>
             <div className="page-kicker">{t("dungeonLibrary.title")}</div>
             <h1>{selectedWorldTitle}</h1>
-            <div className="world-dungeon-grid">
-              {page.dungeons.map((dungeon) => (
-                <button
-                  {...controlProps}
-                  className="world-dungeon-card"
-                  key={dungeon.dungeonId}
-                  type="button"
-                  onClick={(event) => {
-                    stopFlipGesture(event);
-                    void preloadDungeonMonsters(getFloorEnemyIds(dungeon.floors));
-                    goToPage(pagePlan.dungeonPageById[dungeon.dungeonId]);
-                  }}
-                >
-                  <span>
-                    {getDungeonDisplayName(dungeon, activeLocale, (dungeonId) =>
-                      t("dungeonLibrary.fallbacks.dungeon", { dungeonId })
-                    )}
-                  </span>
-                  <strong>{t("dungeonLibrary.book.floorCount", { count: dungeon.floors.length })}</strong>
-                </button>
-              ))}
-            </div>
-            <p className="page-note">
-              {t("dungeonLibrary.book.overviewPageNote", {
-                current: page.overviewIndex + 1,
-                total: page.overviewCount,
-                page: index + 1,
+            <div className="world-index-sections">
+              {page.sections.map((section) => {
+                const dungeonName = getDungeonDisplayName(section.dungeon, activeLocale, (dungeonId) =>
+                  t("dungeonLibrary.fallbacks.dungeon", { dungeonId })
+                );
+                const firstFloor = section.floors[0]?.position;
+                const lastFloor = section.floors[section.floors.length - 1]?.position;
+                const showRange = section.floors.length !== section.dungeon.floors.length;
+
+                return (
+                  <section className="world-index-section" key={`${section.dungeon.dungeonId}-${firstFloor ?? 0}`}>
+                    <div className="world-index-title-row">
+                      <h2 className="world-index-title">{dungeonName}</h2>
+                      <span className="world-index-section-meta">
+                        {showRange
+                          ? t("dungeonLibrary.book.floorRangeTitle", { start: firstFloor, end: lastFloor })
+                          : t("dungeonLibrary.book.floorCount", { count: section.floors.length })}
+                      </span>
+                    </div>
+                    <div
+                      className="world-index-floor-grid"
+                      aria-label={t("dungeonLibrary.book.floorGridAria", { title: dungeonName })}
+                    >
+                      {section.floors.map((floor) => {
+                        const floorKey = getFloorPageKey(section.dungeon, floor);
+                        const monsterName = getMonsterDisplayName(section.dungeon, floor, activeLocale, (enemyId) =>
+                          t("dungeonLibrary.fallbacks.enemy", { enemyId })
+                        );
+                        const imageUrl = getDungeonMonsterImage(floor.enemyId, 360);
+
+                        return (
+                          <button
+                            {...controlProps}
+                            className="world-index-floor-tile"
+                            data-flip-interactive
+                            key={floor.position}
+                            type="button"
+                            aria-label={t("dungeonLibrary.book.floorTileAria", {
+                              dungeon: dungeonName,
+                              floor: floor.position,
+                              monster: monsterName,
+                            })}
+                            onPointerEnter={() => {
+                              void preloadDungeonMonster(floor.enemyId, "priority");
+                            }}
+                            onClick={(event) => {
+                              stopFlipGesture(event);
+                              void preloadDungeonMonster(floor.enemyId, "priority");
+                              goToPage(pagePlan.floorPageByKey[floorKey]);
+                            }}
+                          >
+                            <span className="world-index-floor-image-frame" aria-hidden>
+                              {imageUrl ? (
+                                <img
+                                  className="world-index-floor-image"
+                                  src={imageUrl}
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <span className="world-index-floor-image-fallback">?</span>
+                              )}
+                            </span>
+                            <span className="world-index-floor-number">{floor.position}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
               })}
-            </p>
-          </section>
-        );
-      }
-
-      if (page.kind === "floorOverview") {
-        const firstFloor = page.floors[0]?.position;
-        const lastFloor = page.floors[page.floors.length - 1]?.position;
-
-        return (
-          <section className="dungeon-book-page" key={`floor-overview-${page.overviewIndex}`}>
-            <div className="page-kicker">{selectedWorldTitle}</div>
-            <h1>
-              {getDungeonDisplayName(page.dungeon, activeLocale, (dungeonId) =>
-                t("dungeonLibrary.fallbacks.dungeon", { dungeonId })
-              )}
-            </h1>
-            <div
-              className="floor-grid"
-              aria-label={t("dungeonLibrary.book.floorGridAria", { title: selectedWorldTitle })}
-            >
-              {page.floors.map((floor) => (
-                <button
-                  {...controlProps}
-                  className="floor-button"
-                  key={floor.position}
-                  type="button"
-                  onPointerEnter={() => {
-                    void preloadDungeonMonster(floor.enemyId, "priority");
-                  }}
-                  onClick={(event) => {
-                    stopFlipGesture(event);
-                    void preloadDungeonMonster(floor.enemyId, "priority");
-                    goToPage(pagePlan.floorPageByKey[getFloorPageKey(page.dungeon, floor)]);
-                  }}
-                >
-                  {floor.position}
-                </button>
-              ))}
             </div>
             <p className="page-note">
-              {t("dungeonLibrary.book.floorRangeOverviewNote", {
-                start: firstFloor,
-                end: lastFloor,
-                current: page.overviewIndex + 1,
-                total: page.overviewCount,
+              {t("dungeonLibrary.book.worldIndexPageNote", {
+                current: page.indexPage + 1,
+                total: page.indexPageCount,
+                page: index + 1,
               })}
             </p>
           </section>
@@ -954,47 +1182,6 @@ export default function DungeonLibraryPage() {
         );
       }
 
-      if (page.kind === "dungeon") {
-        return (
-          <section className="dungeon-book-page" key={`dungeon-${page.dungeon.dungeonId}`}>
-            <div className="page-kicker">{selectedWorldTitle}</div>
-            <h1>
-              {getDungeonDisplayName(page.dungeon, activeLocale, (dungeonId) =>
-                t("dungeonLibrary.fallbacks.dungeon", { dungeonId })
-              )}
-            </h1>
-            <div
-              className="floor-grid"
-              aria-label={t("dungeonLibrary.book.floorGridAria", {
-                title: getDungeonDisplayName(page.dungeon, activeLocale, (dungeonId) =>
-                  t("dungeonLibrary.fallbacks.dungeon", { dungeonId })
-                ),
-              })}
-            >
-              {page.dungeon.floors.map((floor) => (
-                <button
-                  {...controlProps}
-                  className="floor-button"
-                  key={floor.position}
-                  type="button"
-                  onPointerEnter={() => {
-                    void preloadDungeonMonster(floor.enemyId, "priority");
-                  }}
-                  onClick={(event) => {
-                    stopFlipGesture(event);
-                    void preloadDungeonMonster(floor.enemyId, "priority");
-                    goToPage(pagePlan.floorPageByKey[getFloorPageKey(page.dungeon, floor)]);
-                  }}
-                >
-                  {floor.position}
-                </button>
-              ))}
-            </div>
-            <p className="page-note">{t("dungeonLibrary.book.floorCount", { count: page.dungeon.floors.length })}</p>
-          </section>
-        );
-      }
-
       if (page.kind === "dynamicFloorDetail") {
         const selectedFloor = selectedLongformFloor?.dungeon.dungeonId === page.dungeon.dungeonId
           ? selectedLongformFloor.floor
@@ -1012,6 +1199,7 @@ export default function DungeonLibraryPage() {
               monsterName={getMonsterDisplayName(page.dungeon, selectedFloor, activeLocale, (enemyId) =>
                 t("dungeonLibrary.fallbacks.enemy", { enemyId })
               )}
+              onOpenMonsterImage={openMonsterImage}
             />
             <p className="page-note">{t("dungeonLibrary.book.pageNote", { page: index + 1 })}</p>
           </section>
@@ -1030,6 +1218,7 @@ export default function DungeonLibraryPage() {
             monsterName={getMonsterDisplayName(page.dungeon, page.floor, activeLocale, (enemyId) =>
               t("dungeonLibrary.fallbacks.enemy", { enemyId })
             )}
+            onOpenMonsterImage={openMonsterImage}
           />
           <p className="page-note">{t("dungeonLibrary.book.pageNote", { page: index + 1 })}</p>
         </section>
@@ -1037,7 +1226,7 @@ export default function DungeonLibraryPage() {
     });
 
     return [...coverPages, ...openingPages, ...contentPages];
-  }, [getLocalizedBookSubtitle, getWorldTitle, goToPage, i18n.language, pagePlan, selectedLongformFloor, selectedWorld, t]);
+  }, [getLocalizedBookSubtitle, getWorldTitle, goToPage, i18n.language, openMonsterImage, pagePlan, selectedLongformFloor, selectedWorld, t]);
 
   const opened = state !== "library";
   const bookVisualState = state === "reading" ? "reading" : coverCentered ? "cover" : "opening";
@@ -1045,7 +1234,6 @@ export default function DungeonLibraryPage() {
     if (!selectedWorld) return undefined;
     const page = pagePlan.pages[currentContentPage];
     if (!page) return undefined;
-    const selectedWorldTitle = getWorldTitle(selectedWorld);
     const makeAction = (label: string, targetPage: number | undefined) => {
       if (typeof targetPage !== "number") return undefined;
       return {
@@ -1056,30 +1244,28 @@ export default function DungeonLibraryPage() {
     };
 
     if (page.kind === "floorSelector") {
-      return makeAction(t("dungeonLibrary.navigation.floorRanges"), pagePlan.worldOverviewPage);
-    }
-    if (page.kind === "dungeon") {
-      return makeAction(selectedWorldTitle, pagePlan.worldOverviewPage);
+      return makeAction(t("dungeonLibrary.navigation.floorRanges"), pagePlan.worldIndexPage);
     }
     if (page.kind === "dynamicFloorDetail") {
       const targetPage = selectedLongformFloor?.dungeon.dungeonId === page.dungeon.dungeonId
         ? selectedLongformFloor.backPage
-        : pagePlan.worldOverviewPage;
+        : pagePlan.worldIndexPage;
       return makeAction(t("dungeonLibrary.navigation.floors"), targetPage);
     }
     if (page.kind === "floor") {
-      const targetPage = selectedWorld.type === "single-longform"
-        ? pagePlan.floorOverviewPageByKey[getFloorPageKey(page.dungeon, page.floor)]
-        : pagePlan.dungeonPageById[page.dungeon.dungeonId];
-      return makeAction(
-        selectedWorld.type === "single-longform"
-          ? t("dungeonLibrary.navigation.floorOverview")
-          : t("dungeonLibrary.navigation.dungeonOverview"),
-        targetPage
-      );
+      const floorKey = getFloorPageKey(page.dungeon, page.floor);
+      const targetPage = pagePlan.worldIndexPageByFloorKey[floorKey]
+        ?? pagePlan.worldIndexPageByDungeonId[page.dungeon.dungeonId]
+        ?? pagePlan.worldIndexPage;
+      return makeAction(t("dungeonLibrary.navigation.worldOverview"), targetPage);
     }
     return undefined;
-  }, [currentContentPage, getWorldTitle, goToPage, pagePlan, selectedLongformFloor, selectedWorld, t]);
+  }, [currentContentPage, goToPage, pagePlan, selectedLongformFloor, selectedWorld, t]);
+  const toolbarLibraryAction = useMemo(() => ({
+    label: t("dungeonLibrary.navigation.backToLibrary"),
+    shortLabel: t("dungeonLibrary.navigation.backToLibraryShort"),
+    onClick: backToLibrary,
+  }), [backToLibrary, t]);
   const bookStageStyle = bookGeometry
     ? {
         ...(() => {
@@ -1110,6 +1296,54 @@ export default function DungeonLibraryPage() {
         ["--book-page-height" as any]: `${bookGeometry.pageHeight}px`,
       }
     : undefined;
+  const readerStateClass = state === "reading" ? "is-reading" : "is-opening";
+  const bookStageLayer = opened && bookGeometry && selectedWorld
+    ? (
+        <div className={`book-reader-stage-layer ${readerStateClass}`}>
+          <div
+            className={`book-stage ${centered ? "is-centered" : ""} ${coverCentered ? "is-cover-centered" : ""} ${bookGeometry.isMobile ? "is-mobile-stage" : ""}`}
+            style={bookStageStyle}
+          >
+            <div className="content-flipbook-layer" aria-hidden={state !== "reading"}>
+              <div className="dom-flipbook-host">
+                <FlipbookCurlViewer
+                  htmlPages={htmlPages}
+                  htmlPagesKey={`${selectedWorld.worldId}-${openRun}`}
+                  title={getWorldTitle(selectedWorld)}
+                  pageWidth={bookGeometry.pageWidth}
+                  pageHeight={bookGeometry.pageHeight}
+                  initialPage={state === "opening" ? 1 : CONTENT_PAGE_OFFSET + 1}
+                  minPageIndex={state === "reading" ? CONTENT_PAGE_OFFSET : 0}
+                  displayPageOffset={CONTENT_PAGE_OFFSET}
+                  displayPageCount={pagePlan.pages.length}
+                  showHud={state === "reading"}
+                  showCover
+                  enableKeyboard={state === "reading"}
+                  visualMode="book"
+                  visualState={bookVisualState}
+                  flippingTime={OPENING_FLIPPING_TIME}
+                  syncPageIndex={state === "reading" ? CONTENT_PAGE_OFFSET : null}
+                  toolbarBackAction={toolbarBackAction}
+                  toolbarLibraryAction={toolbarLibraryAction}
+                  onReady={handleReady}
+                  onPageChange={handlePageChange}
+                  noSound
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    : null;
+  const bookStagePortal = bookStageLayer && typeof document !== "undefined"
+    ? createPortal(bookStageLayer, document.body)
+    : null;
+  const monsterZoomPortal = zoomedEnemy && typeof document !== "undefined"
+    ? createPortal(
+        <MonsterImageZoomOverlay enemy={zoomedEnemy} onClose={closeMonsterImage} />,
+        document.body
+      )
+    : null;
 
   return (
     <ContentShell
@@ -1148,45 +1382,13 @@ export default function DungeonLibraryPage() {
         </section>
 
         {opened && bookGeometry && selectedWorld && (
-          <section className={`book-reader-overlay ${state === "reading" ? "is-reading" : "is-opening"}`}>
+          <section className={`book-reader-overlay ${readerStateClass}`}>
             <div className="book-reader-backdrop" aria-hidden />
-            <button className="reader-close-button" type="button" onClick={backToLibrary} aria-label={t("dungeonLibrary.navigation.backToLibrary")}>
-              ×
-            </button>
-            <div
-              className={`book-stage ${centered ? "is-centered" : ""} ${coverCentered ? "is-cover-centered" : ""} ${bookGeometry.isMobile ? "is-mobile-stage" : ""}`}
-              style={bookStageStyle}
-            >
-              <div className="content-flipbook-layer" aria-hidden={state !== "reading"}>
-                <div className="dom-flipbook-host">
-                  <FlipbookCurlViewer
-                    htmlPages={htmlPages}
-                    htmlPagesKey={`${selectedWorld.worldId}-${openRun}`}
-                    title={getWorldTitle(selectedWorld)}
-                    pageWidth={bookGeometry.pageWidth}
-                    pageHeight={bookGeometry.pageHeight}
-                    initialPage={state === "opening" ? 1 : CONTENT_PAGE_OFFSET + 1}
-                    minPageIndex={state === "reading" ? CONTENT_PAGE_OFFSET : 0}
-                    displayPageOffset={CONTENT_PAGE_OFFSET}
-                    displayPageCount={pagePlan.pages.length}
-                    showHud={state === "reading"}
-                    showCover
-                    enableKeyboard={state === "reading"}
-                    visualMode="book"
-                    visualState={bookVisualState}
-                    flippingTime={OPENING_FLIPPING_TIME}
-                    syncPageIndex={state === "reading" ? CONTENT_PAGE_OFFSET : null}
-                    toolbarBackAction={toolbarBackAction}
-                    onReady={handleReady}
-                    onPageChange={handlePageChange}
-                    noSound
-                  />
-                </div>
-              </div>
-            </div>
             {state !== "reading" && <div className="interaction-lock" aria-hidden />}
           </section>
         )}
+        {bookStagePortal}
+        {monsterZoomPortal}
       </div>
     </ContentShell>
   );

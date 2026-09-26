@@ -92,6 +92,7 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 // Admin
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
+import AdminScanCoveragePage from "./pages/Admin/ScanCoverage";
 import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
 import AdminVisitorAnalyticsPage from "./pages/Admin/VisitorAnalytics";
 
@@ -117,6 +118,8 @@ import ListViews from "./pages/Playground/ListViews";
 import RecordBadgesPage from "./pages/Playground/RecordBadgesPage";
 import RecordsSvgIconsPage from "./pages/Playground/RecordsSvgIconsPage";
 import RecordsShowcasePage from "./pages/Playground/RecordsShowcasePage";
+import PlayerCardsPage from "./pages/Playground/PlayerCardsPage";
+import PotionIconsPage from "./pages/Playground/PotionIconsPage";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
@@ -453,6 +456,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.admin", "/admin", <AdminScansUploaded />)}
                 />
                 <Route
+                  path="/admin/scan-coverage"
+                  element={withFeatureGate("main.admin", "/admin", <AdminScanCoveragePage />)}
+                />
+                <Route
                   path="/admin/creators-api"
                   element={withFeatureGate("main.admin", "/admin", <AdminCreatorsAPI />)}
                 />
@@ -504,6 +511,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="records-svg-icons" element={<RecordsSvgIconsPage />} />
                   <Route path="record-badges" element={<RecordBadgesPage />} />
                   <Route path="records-showcase" element={<RecordsShowcasePage />} />
+                  <Route path="player-cards" element={<PlayerCardsPage />} />
+                  <Route path="potion-icons" element={<PotionIconsPage />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />
