@@ -19,6 +19,7 @@ type ToolbarAction = {
   label: string;
   shortLabel?: string;
   onClick: () => void;
+  disabled?: boolean;
 };
 
 type Props = {
@@ -41,8 +42,11 @@ type Props = {
   visualState?: "cover" | "opening" | "reading";
   flippingTime?: number;
   syncPageIndex?: number | null;
+  toolbarPrevAction?: ToolbarAction;
+  toolbarNextAction?: ToolbarAction;
   toolbarBackAction?: ToolbarAction;
   toolbarLibraryAction?: ToolbarAction;
+  toolbarPageInfo?: React.ReactNode;
   noSound?: boolean;
 };
 
@@ -177,8 +181,11 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   visualState = "reading",
   flippingTime,
   syncPageIndex = null,
+  toolbarPrevAction,
+  toolbarNextAction,
   toolbarBackAction,
   toolbarLibraryAction,
+  toolbarPageInfo,
   noSound = true,
 }) => {
   const { t } = useTranslation();
@@ -528,14 +535,25 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   }, []);
 
   const flipPrev = () => {
+    if (toolbarPrevAction) {
+      if (!toolbarPrevAction.disabled) toolbarPrevAction.onClick();
+      return;
+    }
     if ((singleton.pf as any)?.getCurrentPageIndex?.() <= minPageIndex) {
       singleton.pf?.turnToPage(minPageIndex, "hard");
       return;
     }
     singleton.pf?.flipPrev();
   };
-  const flipNext = () => singleton.pf?.flipNext();
+  const flipNext = () => {
+    if (toolbarNextAction) {
+      if (!toolbarNextAction.disabled) toolbarNextAction.onClick();
+      return;
+    }
+    singleton.pf?.flipNext();
+  };
   const visiblePage = clamp(currentPage0 - displayPageOffset + 1, 1, Math.max(1, visiblePageCount));
+  const pageInfo = toolbarPageInfo ?? t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount });
   const hasDungeonHudOrder = Boolean(toolbarLibraryAction);
   const hudClassName = `${styles.hud} ${toolbarBackAction || toolbarLibraryAction ? styles.hudWithBackAction : ""}`;
 
@@ -580,12 +598,12 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
       {showHud && <div className={hudClassName}>
         {hasDungeonHudOrder ? (
           <>
-            <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
-            <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
+            <button className={styles.hBtn} onClick={flipPrev} disabled={toolbarPrevAction?.disabled} aria-label={toolbarPrevAction?.label ?? t("flipbook.previous")}>‹</button>
+            <button className={styles.hBtn} onClick={flipNext} disabled={toolbarNextAction?.disabled} aria-label={toolbarNextAction?.label ?? t("flipbook.next")}>›</button>
             <div className={styles.hText}>
               <span className={styles.title}>{bookTitle}</span>
               <span className={styles.sep}>·</span>
-              <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
+              <span>{pageInfo}</span>
             </div>
             <div className={styles.spacer} />
             {toolbarLibraryAction && renderToolbarAction(toolbarLibraryAction)}
@@ -597,17 +615,17 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
         ) : (
           <>
             {toolbarBackAction && renderToolbarAction(toolbarBackAction)}
-            <button className={styles.hBtn} onClick={flipPrev} aria-label={t("flipbook.previous")}>‹</button>
+            <button className={styles.hBtn} onClick={flipPrev} disabled={toolbarPrevAction?.disabled} aria-label={toolbarPrevAction?.label ?? t("flipbook.previous")}>‹</button>
             <div className={styles.hText}>
               <span className={styles.title}>{bookTitle}</span>
               <span className={styles.sep}>·</span>
-              <span>{t("flipbook.pageIndicator", { current: visiblePage, total: visiblePageCount })}</span>
+              <span>{pageInfo}</span>
             </div>
             <div className={styles.spacer} />
             {supportsFullscreen() && (
               <button className={styles.hBtn} onClick={enterFullscreen} aria-label={t("flipbook.fullscreen")}>⤢</button>
             )}
-            <button className={styles.hBtn} onClick={flipNext} aria-label={t("flipbook.next")}>›</button>
+            <button className={styles.hBtn} onClick={flipNext} disabled={toolbarNextAction?.disabled} aria-label={toolbarNextAction?.label ?? t("flipbook.next")}>›</button>
           </>
         )}
       </div>}

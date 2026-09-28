@@ -5,6 +5,12 @@ import {
   startFusionIdentityWorkerRun,
   type FusionIdentityWorkerLike,
 } from "../../src/lib/identities/fusionIdentityWorkerClient.ts";
+import {
+  FUSION_IDENTITY_REVISION_REFRESH_PROGRESS,
+  canAutoRefreshFusionIdentityRevisionScope,
+  createFusionIdentityAutoRefreshAttemptKey,
+  usesFusionIdentityRevisionRefreshLoader,
+} from "../../src/lib/identities/fusionIdentityRefreshStatus.ts";
 import { listFusionIdentityAnalysisScopes } from "../../src/lib/identities/fusionIdentityScopes.ts";
 import { FusionIdentityScopeNotLocallyMatchableError } from "../../src/lib/identities/fusionScopeMatchability.ts";
 import type { FusionIdentityScopeInventory } from "../../src/lib/identities/fusionDashboardInventory.ts";
@@ -283,6 +289,160 @@ class FakeWorker implements FusionIdentityWorkerLike {
   await assert.rejects(run.promise, FusionIdentityWorkerCancelledError);
   assert.equal(worker.terminated, true);
   assert.deepEqual(worker.messages.at(-1), { type: "cancel", requestId: "e" });
+}
+
+{
+  assert.equal(FUSION_IDENTITY_REVISION_REFRESH_PROGRESS.phase, "identity-refresh");
+  assert.equal(
+    usesFusionIdentityRevisionRefreshLoader({
+      cacheState: "fresh",
+      inventory: {
+        scope: { analysisSupported: true },
+        isLocallyMatchable: true,
+        currentPlayerIdentifiers: ["p1"],
+        currentGuildIdentifiers: [],
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    usesFusionIdentityRevisionRefreshLoader({
+      cacheState: "stale",
+      inventory: {
+        scope: { analysisSupported: true },
+        isLocallyMatchable: true,
+        currentPlayerIdentifiers: [],
+        currentGuildIdentifiers: ["g1"],
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    usesFusionIdentityRevisionRefreshLoader({
+      cacheState: "fresh",
+      inventory: {
+        scope: { analysisSupported: false },
+        isLocallyMatchable: true,
+        currentPlayerIdentifiers: ["p1"],
+        currentGuildIdentifiers: [],
+      },
+    }),
+    false,
+  );
+  assert.equal(
+    usesFusionIdentityRevisionRefreshLoader({
+      cacheState: "never-analyzed",
+      inventory: {
+        scope: { analysisSupported: true },
+        isLocallyMatchable: true,
+        currentPlayerIdentifiers: ["p1"],
+        currentGuildIdentifiers: [],
+      },
+    }),
+    false,
+  );
+
+  const refreshableScope = {
+    cacheState: "stale" as const,
+    cache: { staleReason: "identity-revision" as const },
+    identityState: { identityRevision: "revision-2" },
+    inventory: {
+      scope: { id: "F8", targetServerCode: "F8", analysisSupported: true },
+      isLocallyMatchable: true,
+      scanFingerprint: "scan-a",
+      currentPlayerIdentifiers: ["p1"],
+      currentGuildIdentifiers: [],
+    },
+  };
+
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope(refreshableScope),
+    true,
+    "Identity-revision-stale analysis scope should auto-refresh.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      cache: { staleReason: "schema-version" },
+    }),
+    true,
+    "Schema-version-stale analysis scope should auto-refresh.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      cache: { staleReason: "scan-fingerprint" },
+    }),
+    false,
+    "New scan refreshes should stay manual.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      cache: { staleReason: "resolver-version" },
+    }),
+    false,
+    "Resolver-version refreshes should stay manual.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      inventory: {
+        ...refreshableScope.inventory,
+        scope: { ...refreshableScope.inventory.scope, analysisSupported: false },
+      },
+    }),
+    false,
+    "Inventory-only scopes should not start the full worker.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      inventory: {
+        ...refreshableScope.inventory,
+        isLocallyMatchable: false,
+      },
+    }),
+    false,
+    "Non-matchable scopes should not start the full worker.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      cacheState: "error",
+    }),
+    false,
+    "Worker failures should remain retryable without an automatic loop.",
+  );
+  assert.equal(
+    canAutoRefreshFusionIdentityRevisionScope({
+      ...refreshableScope,
+      inventory: {
+        ...refreshableScope.inventory,
+        currentPlayerIdentifiers: [],
+        currentGuildIdentifiers: [],
+      },
+    }),
+    false,
+    "Scopes without current input data should not start the full worker.",
+  );
+
+  assert.equal(
+    createFusionIdentityAutoRefreshAttemptKey(refreshableScope),
+    createFusionIdentityAutoRefreshAttemptKey({
+      ...refreshableScope,
+      identityState: { identityRevision: "revision-2" },
+    }),
+    "Batch writes ending at the same revision should coalesce to one attempt key.",
+  );
+  assert.notEqual(
+    createFusionIdentityAutoRefreshAttemptKey(refreshableScope),
+    createFusionIdentityAutoRefreshAttemptKey({
+      ...refreshableScope,
+      identityState: { identityRevision: "revision-3" },
+    }),
+    "Rapid follow-up revisions should create a new attempt key.",
+  );
 }
 
 console.log("fusionIdentityWorkerClient test passed");

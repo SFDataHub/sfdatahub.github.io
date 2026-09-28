@@ -7,7 +7,8 @@ import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingSt
 import { getClassMetaById } from "../../data/classes";
 import { subscribeToSfDataHubLocalScanChanges } from "../../lib/guilds/localScanLibrary";
 import {
-  readFusionIdentityAnalysisCache,
+  classifyFusionIdentityAnalysisCacheSnapshot,
+  loadFusionIdentityAnalysisCacheSnapshot,
   writeFusionIdentityAnalysisCache,
   type FusionIdentityAnalysisCacheLookup,
   type FusionIdentityAnalysisCacheState,
@@ -15,6 +16,7 @@ import {
 import { getFusionIdentityAnalyzeActionState } from "../../lib/identities/fusionIdentityAnalyzeAction";
 import {
   buildFusionIdentityScopeIdentityState,
+  loadFusionIdentityScopeIdentityRevisionBasis,
   normalizeFusionIdentityScopeInventory,
   type FusionIdentityDashboardInventory,
   type FusionIdentityDashboardInventoryProgress,
@@ -39,6 +41,7 @@ import {
 } from "../../lib/identities/fusionEvidenceHelp";
 import {
   confirmFusionIdentityLink,
+  listReadyFusionIdentityMergeItems,
   mergeReadyFusionIdentityItems,
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
@@ -60,6 +63,12 @@ import {
   type FusionIdentityStatusFilter as StatusFilter,
   type FusionIdentityTypeFilter as TypeFilter,
 } from "../../lib/identities/fusionIdentityMemberSelection";
+import {
+  FUSION_IDENTITY_REVISION_REFRESH_PROGRESS,
+  canAutoRefreshFusionIdentityRevisionScope,
+  createFusionIdentityAutoRefreshAttemptKey,
+  usesFusionIdentityRevisionRefreshLoader,
+} from "../../lib/identities/fusionIdentityRefreshStatus";
 import {
   FusionIdentityWorkerCancelledError,
   startFusionIdentityWorkerRun,
@@ -386,6 +395,8 @@ const getFusionIdentityProgressMessageKey = (
   phase: FusionIdentityProgress["phase"] | undefined,
 ) => {
   switch (phase) {
+    case "identity-refresh":
+      return "fusionIdentity.loading.phases.identityRefresh";
     case "loading":
       return "fusionIdentity.loading.phases.loading";
     case "preparing":
@@ -428,6 +439,60 @@ type FusionIdentityDashboardState = {
   scopes: FusionIdentityDashboardScopeModel[];
 };
 
+type FusionIdentityDashboardRefreshReason =
+  | "scan-inventory"
+  | "identity-revision";
+
+type FusionIdentityDashboardRefreshOptions = {
+  reason?: FusionIdentityDashboardRefreshReason;
+  scopeId?: string | null;
+  targetServerCode?: string | null;
+  autoAnalyzeIdentityRevision?: boolean;
+};
+
+type FusionIdentityAutoRefreshStaleReason = NonNullable<
+  FusionIdentityAnalysisCacheLookup["staleReason"]
+>;
+
+const SCAN_INVENTORY_AUTO_REFRESH_STALE_REASONS =
+  new Set<FusionIdentityAutoRefreshStaleReason>(["schema-version"]);
+const IDENTITY_REVISION_AUTO_REFRESH_STALE_REASONS =
+  new Set<FusionIdentityAutoRefreshStaleReason>([
+    "identity-revision",
+    "schema-version",
+  ]);
+
+type FusionIdentityAutoRefreshRequest = {
+  id: string;
+  scopeModel: FusionIdentityDashboardScopeModel;
+  attemptKey: string;
+};
+
+const EMPTY_FUSION_ANALYSIS_CACHE_LOOKUP: FusionIdentityAnalysisCacheLookup = {
+  state: "never-analyzed",
+  freshEntry: null,
+  previousEntry: null,
+  staleReason: null,
+};
+
+const shouldEvaluateFusionScopeFreshness = (
+  scopeInventory: FusionIdentityScopeInventory,
+) =>
+  scopeInventory.scope.analysisSupported &&
+  scopeInventory.isLocallyMatchable &&
+  Boolean(
+    scopeInventory.currentPlayerIdentifiers.length ||
+      scopeInventory.currentGuildIdentifiers.length,
+  );
+
+const createPendingFusionIdentityScopeIdentityState = (
+  scopeInventory: FusionIdentityScopeInventory,
+): FusionIdentityScopeIdentityState => ({
+  identityRevision: "",
+  openCurrentPlayers: scopeInventory.currentPlayerIdentifiers.length,
+  openCurrentGuilds: scopeInventory.currentGuildIdentifiers.length,
+});
+
 const createEmptyDashboardState = (): FusionIdentityDashboardState => ({
   loading: true,
   error: null,
@@ -445,6 +510,61 @@ const updateDashboardScope = (
     scope.inventory.scope.id === scopeId ? { ...scope, ...update } : scope,
   ),
 });
+
+const normalizeFusionIdentityDashboardRefreshOptions = (
+  input?: FusionIdentityDashboardRefreshReason | FusionIdentityDashboardRefreshOptions,
+): Required<Pick<FusionIdentityDashboardRefreshOptions, "reason" | "autoAnalyzeIdentityRevision">> &
+  Omit<FusionIdentityDashboardRefreshOptions, "reason" | "autoAnalyzeIdentityRevision"> => {
+  if (typeof input === "string") {
+    return {
+      reason: input,
+      scopeId: null,
+      targetServerCode: null,
+      autoAnalyzeIdentityRevision: input === "identity-revision",
+    };
+  }
+  const reason = input?.reason ?? "scan-inventory";
+  return {
+    reason,
+    scopeId: input?.scopeId ?? null,
+    targetServerCode: input?.targetServerCode ?? null,
+    autoAnalyzeIdentityRevision:
+      input?.autoAnalyzeIdentityRevision ?? reason === "identity-revision",
+  };
+};
+
+const findFusionIdentityRevisionAutoRefreshScope = (
+  scopes: readonly FusionIdentityDashboardScopeModel[],
+  options: Pick<FusionIdentityDashboardRefreshOptions, "scopeId" | "targetServerCode"> & {
+    staleReasons: ReadonlySet<FusionIdentityAutoRefreshStaleReason>;
+  },
+) => {
+  const matchingScopes = scopes.filter(
+    (scope) =>
+      canAutoRefreshFusionIdentityRevisionScope(scope) &&
+      typeof scope.cache.staleReason === "string" &&
+      options.staleReasons.has(scope.cache.staleReason),
+  );
+  if (options.scopeId) {
+    return matchingScopes.find((scope) => scope.inventory.scope.id === options.scopeId) ?? null;
+  }
+  if (options.targetServerCode) {
+    return (
+      matchingScopes.find(
+        (scope) => scope.inventory.scope.targetServerCode === options.targetServerCode,
+      ) ?? null
+    );
+  }
+  return matchingScopes.length === 1 ? matchingScopes[0] : null;
+};
+
+const logFusionIdentityRefreshDiagnostic = (
+  event: string,
+  details: Record<string, unknown>,
+) => {
+  if (typeof import.meta !== "undefined" && !import.meta.env?.DEV) return;
+  console.debug("[Fusion Identity]", event, details);
+};
 
 function useFusionIdentityDashboard() {
   const [dashboard, setDashboard] = React.useState<FusionIdentityDashboardState>(
@@ -466,15 +586,38 @@ function useFusionIdentityDashboard() {
   const [runningScopeId, setRunningScopeId] = React.useState<string | null>(
     null,
   );
+  const [autoRefreshRequest, setAutoRefreshRequest] =
+    React.useState<FusionIdentityAutoRefreshRequest | null>(null);
   const inventoryRunRef =
     React.useRef<FusionDashboardInventoryWorkerRun | null>(null);
   const activeInventoryRequestIdRef = React.useRef<string | null>(null);
   const runRef = React.useRef<FusionIdentityWorkerRun | null>(null);
   const activeRequestIdRef = React.useRef<string | null>(null);
+  const autoRefreshAttemptKeysRef = React.useRef<Set<string>>(new Set());
+  const activeAutoRefreshAttemptKeyRef = React.useRef<string | null>(null);
 
-  const refreshDashboard = React.useCallback(async () => {
+  const refreshDashboard = React.useCallback(async (
+    input?: FusionIdentityDashboardRefreshReason | FusionIdentityDashboardRefreshOptions,
+  ) => {
+    const refreshOptions = normalizeFusionIdentityDashboardRefreshOptions(input);
+    const { reason } = refreshOptions;
+    const isIdentityRevisionRefresh = reason === "identity-revision";
     inventoryRunRef.current?.cancel();
-    setDashboard((current) => ({ ...current, loading: true, error: null }));
+    setDashboard((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+      scopes: isIdentityRevisionRefresh
+        ? current.scopes.map((scope) =>
+            usesFusionIdentityRevisionRefreshLoader(scope)
+              ? { ...scope, cacheState: "running", error: null }
+              : scope,
+          )
+        : current.scopes,
+    }));
+    if (isIdentityRevisionRefresh) {
+      setProgress(FUSION_IDENTITY_REVISION_REFRESH_PROGRESS);
+    }
     setInventoryProgress({
       phase: "indexeddb-scan-metadata-load",
       message: "Reading local scan inventory",
@@ -495,32 +638,65 @@ function useFusionIdentityDashboard() {
       if (activeInventoryRequestIdRef.current !== run.requestId) return;
       const inventory = {
         ...inventoryResult.inventory,
-        scopes: inventoryResult.inventory.scopes.map(normalizeFusionIdentityScopeInventory),
+        scopes: inventoryResult.inventory.scopes.map(
+          normalizeFusionIdentityScopeInventory,
+        ),
       };
       const nextTimings = [...inventoryResult.timings];
+      const freshnessScopeCount = inventory.scopes.filter(
+        shouldEvaluateFusionScopeFreshness,
+      ).length;
+      const identityRevisionBasis = freshnessScopeCount
+        ? await (async () => {
+            const startedAt = performance.now();
+            const basis = await loadFusionIdentityScopeIdentityRevisionBasis();
+            nextTimings.push({
+              phase: "identity-revision-snapshot-load",
+              durationMs: performance.now() - startedAt,
+              count: 1,
+            });
+            return basis;
+          })()
+        : null;
+      const cacheSnapshot = freshnessScopeCount
+        ? await (async () => {
+            const startedAt = performance.now();
+            const snapshot = await loadFusionIdentityAnalysisCacheSnapshot();
+            nextTimings.push({
+              phase: "analysis-cache-snapshot-load",
+              durationMs: performance.now() - startedAt,
+              count: 1,
+            });
+            return snapshot;
+          })()
+        : null;
+      const scopeEvaluationStartedAt = performance.now();
       const scopes = await Promise.all(
         inventory.scopes.map(async (scopeInventory) => {
-          const identityStartedAt = performance.now();
+          if (
+            !shouldEvaluateFusionScopeFreshness(scopeInventory) ||
+            !identityRevisionBasis ||
+            !cacheSnapshot
+          ) {
+            return {
+              inventory: scopeInventory,
+              identityState: createPendingFusionIdentityScopeIdentityState(scopeInventory),
+              cache: EMPTY_FUSION_ANALYSIS_CACHE_LOOKUP,
+              cacheState: EMPTY_FUSION_ANALYSIS_CACHE_LOOKUP.state,
+              error: null,
+            } satisfies FusionIdentityDashboardScopeModel;
+          }
+
           const identityState = await buildFusionIdentityScopeIdentityState(
             scopeInventory.scope,
             scopeInventory.currentPlayerIdentifiers,
             scopeInventory.currentGuildIdentifiers,
+            { identityRevisionBasis },
           );
-          nextTimings.push({
-            phase: "identity-revision-calculation",
-            durationMs: performance.now() - identityStartedAt,
-            count: 1,
-          });
-          const cacheStartedAt = performance.now();
-          const cache = await readFusionIdentityAnalysisCache({
+          const cache = classifyFusionIdentityAnalysisCacheSnapshot(cacheSnapshot, {
             scope: scopeInventory.scope,
             scanFingerprint: scopeInventory.scanFingerprint,
             identityRevision: identityState.identityRevision,
-          });
-          nextTimings.push({
-            phase: "analysis-cache-lookup",
-            durationMs: performance.now() - cacheStartedAt,
-            count: 1,
           });
           return {
             inventory: scopeInventory,
@@ -531,9 +707,48 @@ function useFusionIdentityDashboard() {
           } satisfies FusionIdentityDashboardScopeModel;
         }),
       );
+      nextTimings.push({
+        phase: "scope-cache-evaluation",
+        durationMs: performance.now() - scopeEvaluationStartedAt,
+        count: inventory.scopes.length,
+      });
       if (activeInventoryRequestIdRef.current !== run.requestId) return;
+      const autoRefreshStaleReasons =
+        isIdentityRevisionRefresh && refreshOptions.autoAnalyzeIdentityRevision
+          ? IDENTITY_REVISION_AUTO_REFRESH_STALE_REASONS
+          : reason === "scan-inventory"
+            ? SCAN_INVENTORY_AUTO_REFRESH_STALE_REASONS
+            : null;
+      const autoRefreshScope =
+        autoRefreshStaleReasons
+          ? findFusionIdentityRevisionAutoRefreshScope(scopes, {
+              ...refreshOptions,
+              staleReasons: autoRefreshStaleReasons,
+            })
+          : null;
+      const autoRefreshAttemptKey = autoRefreshScope
+        ? createFusionIdentityAutoRefreshAttemptKey(autoRefreshScope)
+        : null;
+      const shouldStartAutoRefresh =
+        Boolean(autoRefreshScope && autoRefreshAttemptKey) &&
+        !autoRefreshAttemptKeysRef.current.has(autoRefreshAttemptKey ?? "");
       const reactStateStartedAt = performance.now();
       setDashboard({ loading: false, error: null, inventory, scopes });
+      if (autoRefreshScope && autoRefreshAttemptKey && shouldStartAutoRefresh) {
+        autoRefreshAttemptKeysRef.current.add(autoRefreshAttemptKey);
+        logFusionIdentityRefreshDiagnostic("identity-refresh-triggered", {
+          scopeId: autoRefreshScope.inventory.scope.id,
+          identityRevision: autoRefreshScope.identityState.identityRevision,
+          reason: autoRefreshScope.cache.staleReason,
+        });
+        setAutoRefreshRequest({
+          id: `${run.requestId}:${autoRefreshAttemptKey}`,
+          scopeModel: autoRefreshScope,
+          attemptKey: autoRefreshAttemptKey,
+        });
+      } else if (isIdentityRevisionRefresh) {
+        setAutoRefreshRequest(null);
+      }
       nextTimings.push({
         phase: "react-state-update",
         durationMs: performance.now() - reactStateStartedAt,
@@ -542,6 +757,7 @@ function useFusionIdentityDashboard() {
       });
       setInventoryTimings(nextTimings);
       setInventoryProgress(null);
+      if (isIdentityRevisionRefresh && !shouldStartAutoRefresh) setProgress(null);
       reportDashboardInventoryTimings(nextTimings);
     } catch (loadError) {
       if (activeInventoryRequestIdRef.current !== run.requestId) return;
@@ -556,6 +772,7 @@ function useFusionIdentityDashboard() {
             : "Fusion dashboard could not be prepared.",
       }));
       setInventoryProgress(null);
+      if (isIdentityRevisionRefresh) setProgress(null);
     } finally {
       if (activeInventoryRequestIdRef.current === run.requestId) {
         inventoryRunRef.current = null;
@@ -598,7 +815,10 @@ function useFusionIdentityDashboard() {
   }, []);
 
   const analyzeScope = React.useCallback(
-    async (scopeModel: FusionIdentityDashboardScopeModel) => {
+    async (
+      scopeModel: FusionIdentityDashboardScopeModel,
+      options: { source?: "manual" | "identity-refresh" } = {},
+    ) => {
       const { scope } = scopeModel.inventory;
       const actionState = getFusionIdentityAnalyzeActionState({
         analysisSupported: scope.analysisSupported,
@@ -640,6 +860,13 @@ function useFusionIdentityDashboard() {
         message: `Starting ${scope.targetServerCode} fusion worker`,
       });
       setTimings([]);
+      if (options.source === "identity-refresh") {
+        logFusionIdentityRefreshDiagnostic("identity-refresh-worker-start", {
+          scopeId: scope.id,
+          identityRevision: scopeModel.identityState.identityRevision,
+          reason: scopeModel.cache.staleReason,
+        });
+      }
 
       const run = startFusionIdentityWorkerRun({
         scopeInventory: scopeModel.inventory,
@@ -655,6 +882,37 @@ function useFusionIdentityDashboard() {
         const result = await run.promise;
         if (activeRequestIdRef.current !== run.requestId) return null;
         const nextTimings = [...result.timings];
+        const revisionCheckStartedAt = performance.now();
+        const latestIdentityRevisionBasis =
+          await loadFusionIdentityScopeIdentityRevisionBasis();
+        const latestIdentityState = await buildFusionIdentityScopeIdentityState(
+          scope,
+          scopeModel.inventory.currentPlayerIdentifiers,
+          scopeModel.inventory.currentGuildIdentifiers,
+          { identityRevisionBasis: latestIdentityRevisionBasis },
+        );
+        nextTimings.push({
+          phase: "main:identity-revision-result-check",
+          durationMs: performance.now() - revisionCheckStartedAt,
+          count: 1,
+        });
+        if (
+          latestIdentityState.identityRevision !==
+          scopeModel.identityState.identityRevision
+        ) {
+          logFusionIdentityRefreshDiagnostic("identity-refresh-stale-result", {
+            scopeId: scope.id,
+            resultIdentityRevision: scopeModel.identityState.identityRevision,
+            currentIdentityRevision: latestIdentityState.identityRevision,
+          });
+          await refreshDashboard({
+            reason: "identity-revision",
+            scopeId: scope.id,
+            targetServerCode: scope.targetServerCode,
+            autoAnalyzeIdentityRevision: true,
+          });
+          return null;
+        }
         const cacheWriteStartedAt = performance.now();
         await writeFusionIdentityAnalysisCache({
           scope,
@@ -686,6 +944,13 @@ function useFusionIdentityDashboard() {
         });
         setTimings([...nextTimings]);
         reportFusionIdentityWorkerTimings(scope.targetServerCode, nextTimings);
+        if (options.source === "identity-refresh") {
+          logFusionIdentityRefreshDiagnostic("identity-refresh-worker-complete", {
+            scopeId: scope.id,
+            identityRevision: scopeModel.identityState.identityRevision,
+            reason: scopeModel.cache.staleReason,
+          });
+        }
         return result.report;
       } catch (loadError) {
         if (activeRequestIdRef.current !== run.requestId) return null;
@@ -710,6 +975,29 @@ function useFusionIdentityDashboard() {
     },
     [refreshDashboard],
   );
+
+  React.useEffect(() => {
+    if (!autoRefreshRequest) return;
+    if (activeAutoRefreshAttemptKeyRef.current === autoRefreshRequest.attemptKey)
+      return;
+    activeAutoRefreshAttemptKeyRef.current = autoRefreshRequest.attemptKey;
+    let cancelled = false;
+    void (async () => {
+      await analyzeScope(autoRefreshRequest.scopeModel, {
+        source: "identity-refresh",
+      });
+      if (cancelled) return;
+      setAutoRefreshRequest((current) =>
+        current?.id === autoRefreshRequest.id ? null : current,
+      );
+      if (activeAutoRefreshAttemptKeyRef.current === autoRefreshRequest.attemptKey) {
+        activeAutoRefreshAttemptKeyRef.current = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [analyzeScope, autoRefreshRequest]);
 
   return {
     dashboard,
@@ -2289,18 +2577,23 @@ function ManualLinkDialog({
 function GuildMemberStatusSummary({
   item,
   onFocusMembersByStatus,
+  onCompleteReadyPlayers,
+  completingGuildIdentifier,
 }: {
   item: FusionIdentityManagementItem;
   onFocusMembersByStatus: (
     item: FusionIdentityManagementItem,
     status: FusionIdentityMemberSelectionStatus,
   ) => void;
+  onCompleteReadyPlayers: (item: FusionIdentityManagementItem) => void;
+  completingGuildIdentifier: string | null;
 }) {
   const { t } = useTranslation();
   const summary = item.memberStatusSummary;
   if (item.entityType !== "guild" || !summary) return null;
   const guildName = item.currentName ?? item.currentIdentifier;
   const memberRefsByStatus = summary.memberRefsByStatus ?? {
+    ready: [],
     review: [],
     unresolved: [],
     noHistoricalObservation: [],
@@ -2314,8 +2607,25 @@ function GuildMemberStatusSummary({
     summary.noHistoricalObservationMembers ?? 0;
   const noHistoricalDataMembers = summary.noHistoricalDataMembers ?? 0;
   const missingManagementEntries = summary.missingManagementEntries ?? 0;
+  const readyRefs = memberRefsByStatus.ready ?? [];
+  const readyButtonDisabled =
+    !readyRefs.length || completingGuildIdentifier === item.currentIdentifier;
 
   const problemParts: Array<React.ReactElement | string | null> = [
+    readyRefs.length ? (
+      <button
+        key="ready"
+        type="button"
+        className={styles.guildMemberStatusButton}
+        onClick={(event) => {
+          event.stopPropagation();
+          onCompleteReadyPlayers(item);
+        }}
+        disabled={readyButtonDisabled}
+      >
+        Complete ready players ({formatNumber(readyRefs.length)})
+      </button>
+    ) : null,
     reviewMembers ? (
       memberRefsByStatus.review.length ? (
         <button
@@ -2376,6 +2686,8 @@ function QueueRow({
   item,
   onOpen,
   onFocusMembersByStatus,
+  onCompleteReadyPlayers,
+  completingGuildIdentifier,
 }: {
   item: FusionIdentityManagementItem;
   onOpen: () => void;
@@ -2383,6 +2695,8 @@ function QueueRow({
     item: FusionIdentityManagementItem,
     status: FusionIdentityMemberSelectionStatus,
   ) => void;
+  onCompleteReadyPlayers: (item: FusionIdentityManagementItem) => void;
+  completingGuildIdentifier: string | null;
 }) {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.currentTarget !== event.target) return;
@@ -2412,6 +2726,8 @@ function QueueRow({
             <GuildMemberStatusSummary
               item={item}
               onFocusMembersByStatus={onFocusMembersByStatus}
+              onCompleteReadyPlayers={onCompleteReadyPlayers}
+              completingGuildIdentifier={completingGuildIdentifier}
             />
           </div>
           <div className={styles.muted}>{item.currentIdentifier}</div>
@@ -2680,6 +2996,8 @@ export default function FusionIdentityPage() {
   const [activeEvidenceChipId, setActiveEvidenceChipId] = React.useState<
     string | null
   >(null);
+  const [completingGuildIdentifier, setCompletingGuildIdentifier] =
+    React.useState<string | null>(null);
 
   const locallyMatchableScopes = React.useMemo(
     () => dashboard.scopes.filter((scope) => scope.inventory.isLocallyMatchable),
@@ -2861,16 +3179,65 @@ export default function FusionIdentityPage() {
       `Merge ready identities?\n\nPlayers ready: ${readyPlayers}\nGuilds ready: ${readyGuilds}\nRaw scans will not be changed.`,
     );
     if (!approved) return;
+    const refreshScope = report.scope;
     await mergeReadyFusionIdentityItems(report);
     clearReport();
     setView("dashboard");
-    await refreshDashboard();
+    await refreshDashboard({
+      reason: "identity-revision",
+      targetServerCode: refreshScope.targetServerCode,
+      autoAnalyzeIdentityRevision: true,
+    });
+  };
+
+  const handleMergeGuildReadyPlayers = async (
+    guildItem: FusionIdentityManagementItem,
+  ) => {
+    if (!report || guildItem.entityType !== "guild") return;
+    const readyIdentifiers =
+      guildItem.memberStatusSummary?.memberRefsByStatus?.ready.map(
+        (member) => member.identifier,
+      ) ?? [];
+    const readyItems = listReadyFusionIdentityMergeItems(report, {
+      entityType: "player",
+      currentIdentifiers: readyIdentifiers,
+    });
+    if (!readyItems.length) return;
+    const guildName = guildItem.currentName ?? guildItem.currentIdentifier;
+    const approved = window.confirm(
+      `Complete ready players for "${guildName}"?\n\nPlayers ready: ${readyItems.length}\nNeeds Review, Unresolved and No Historical Data stay unchanged.`,
+    );
+    if (!approved) return;
+    setCompletingGuildIdentifier(guildItem.currentIdentifier);
+    try {
+      const refreshScope = report.scope;
+      await mergeReadyFusionIdentityItems(report, {
+        filter: {
+          entityType: "player",
+          currentIdentifiers: readyIdentifiers,
+        },
+      });
+      clearReport();
+      setView("dashboard");
+      await refreshDashboard({
+        reason: "identity-revision",
+        targetServerCode: refreshScope.targetServerCode,
+        autoAnalyzeIdentityRevision: true,
+      });
+    } finally {
+      setCompletingGuildIdentifier(null);
+    }
   };
 
   const handleIdentityChanged = async () => {
+    const refreshScope = report?.scope ?? null;
     clearReport();
     setView("dashboard");
-    await refreshDashboard();
+    await refreshDashboard({
+      reason: "identity-revision",
+      targetServerCode: refreshScope?.targetServerCode ?? null,
+      autoAnalyzeIdentityRevision: true,
+    });
   };
 
   const openReportEntry = (
@@ -3322,6 +3689,8 @@ export default function FusionIdentityPage() {
                   item={item}
                   onOpen={() => setSelectedId(item.id)}
                   onFocusMembersByStatus={focusGuildMembersByStatus}
+                  onCompleteReadyPlayers={handleMergeGuildReadyPlayers}
+                  completingGuildIdentifier={completingGuildIdentifier}
                 />
               ))}
             </div>
@@ -3338,6 +3707,8 @@ export default function FusionIdentityPage() {
                   item={item}
                   onOpen={() => setSelectedId(item.id)}
                   onFocusMembersByStatus={focusGuildMembersByStatus}
+                  onCompleteReadyPlayers={handleMergeGuildReadyPlayers}
+                  completingGuildIdentifier={completingGuildIdentifier}
                 />
               ))}
             </div>

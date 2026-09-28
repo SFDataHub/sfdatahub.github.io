@@ -89,6 +89,13 @@ export type FusionIdentityScopeIdentityState = {
   openCurrentGuilds: number;
 };
 
+export type FusionIdentityScopeIdentityRevisionBasis = {
+  playerEntities: Array<{ entity: { entityId: string; updatedAt: string }; aliases: PlayerAlias[] }>;
+  playerExclusions: PlayerExclusion[];
+  guildEntities: Array<{ entity: { entityId: string; updatedAt: string }; aliases: GuildAlias[] }>;
+  guildExclusions: GuildExclusion[];
+};
+
 export const normalizeFusionIdentityScopeInventory = (
   scopeInventory: FusionIdentityScopeInventory,
 ): FusionIdentityScopeInventory => {
@@ -126,7 +133,10 @@ export type FusionIdentityDashboardInventoryPhase =
   | "fusion-scope-derivation"
   | "scan-fingerprint-generation"
   | "identity-revision-calculation"
+  | "identity-revision-snapshot-load"
   | "analysis-cache-lookup"
+  | "analysis-cache-snapshot-load"
+  | "scope-cache-evaluation"
   | "react-state-update"
   | "total"
   | "done";
@@ -212,11 +222,6 @@ const measureInventoryPhaseAsync = async <T>(
   options?.onTiming?.({ phase, durationMs, count: 1 });
   return result;
 };
-
-const normalizeIdentifierKey = (value: unknown) =>
-  String(value ?? "")
-    .trim()
-    .toLowerCase();
 
 const resolveServerCode = (value: unknown) =>
   resolveServer(String(value ?? ""))?.code ?? null;
@@ -769,17 +774,6 @@ const identityTouchesScope = (
     isServerInFusionIdentityScope(scope, readIdentifierServerCode(identifier)),
   );
 
-const completedIdentifiersFromAliases = <T extends PlayerAlias | GuildAlias>(
-  entries: Array<{ aliases: T[] }>,
-) => {
-  const completed = new Set<string>();
-  entries.forEach(({ aliases }) => {
-    if (aliases.length < 2) return;
-    aliases.forEach((alias) => completed.add(normalizeIdentifierKey(alias.identifier)));
-  });
-  return completed;
-};
-
 const scopedPlayerRevisionEntry = (
   entry: { entity: { entityId: string; updatedAt: string }; aliases: PlayerAlias[] },
 ) => ({
@@ -813,22 +807,61 @@ const scopedExclusionEntry = (entry: PlayerExclusion | GuildExclusion) => ({
   createdAt: entry.createdAt,
 });
 
-export const buildFusionIdentityScopeIdentityState = async (
-  scope: FusionIdentityAnalysisScope,
-  currentPlayerIdentifiers: readonly string[],
-  currentGuildIdentifiers: readonly string[],
-): Promise<FusionIdentityScopeIdentityState> => {
+type FusionIdentityScopeIdentityStateStoreOptions = {
+  playerStore?: {
+    listPlayerEntities: typeof listPlayerEntities;
+    listPlayerExclusions: typeof listPlayerExclusions;
+  };
+  guildStore?: {
+    listGuildEntities: typeof listGuildEntities;
+    listGuildExclusions: typeof listGuildExclusions;
+  };
+  identityRevisionBasis?: FusionIdentityScopeIdentityRevisionBasis;
+};
+
+export const loadFusionIdentityScopeIdentityRevisionBasis = async (
+  options: FusionIdentityScopeIdentityStateStoreOptions = {},
+): Promise<FusionIdentityScopeIdentityRevisionBasis> => {
+  const playerStore = options.playerStore ?? {
+    listPlayerEntities,
+    listPlayerExclusions,
+  };
+  const guildStore = options.guildStore ?? {
+    listGuildEntities,
+    listGuildExclusions,
+  };
   const [
     playerEntities,
     playerExclusions,
     guildEntities,
     guildExclusions,
   ] = await Promise.all([
-    listPlayerEntities(),
-    listPlayerExclusions(),
-    listGuildEntities(),
-    listGuildExclusions(),
+    playerStore.listPlayerEntities(),
+    playerStore.listPlayerExclusions(),
+    guildStore.listGuildEntities(),
+    guildStore.listGuildExclusions(),
   ]);
+  return {
+    playerEntities,
+    playerExclusions,
+    guildEntities,
+    guildExclusions,
+  };
+};
+
+export const buildFusionIdentityScopeIdentityState = async (
+  scope: FusionIdentityAnalysisScope,
+  currentPlayerIdentifiers: readonly string[],
+  currentGuildIdentifiers: readonly string[],
+  options: FusionIdentityScopeIdentityStateStoreOptions = {},
+): Promise<FusionIdentityScopeIdentityState> => {
+  const {
+    playerEntities,
+    playerExclusions,
+    guildEntities,
+    guildExclusions,
+  } = options.identityRevisionBasis ??
+    (await loadFusionIdentityScopeIdentityRevisionBasis(options));
 
   const scopedPlayerEntities = playerEntities.filter((entry) =>
     identityTouchesScope(
@@ -848,8 +881,6 @@ export const buildFusionIdentityScopeIdentityState = async (
   const scopedGuildExclusions = guildExclusions.filter((entry) =>
     identityTouchesScope(scope, [entry.identifierA, entry.identifierB]),
   );
-  const completedPlayers = completedIdentifiersFromAliases(scopedPlayerEntities);
-  const completedGuilds = completedIdentifiersFromAliases(scopedGuildEntities);
 
   return {
     identityRevision: createStableHash({
@@ -859,12 +890,8 @@ export const buildFusionIdentityScopeIdentityState = async (
       guilds: scopedGuildEntities.map(scopedGuildRevisionEntry),
       guildExclusions: scopedGuildExclusions.map(scopedExclusionEntry),
     }),
-    openCurrentPlayers: currentPlayerIdentifiers.filter(
-      (identifier) => !completedPlayers.has(normalizeIdentifierKey(identifier)),
-    ).length,
-    openCurrentGuilds: currentGuildIdentifiers.filter(
-      (identifier) => !completedGuilds.has(normalizeIdentifierKey(identifier)),
-    ).length,
+    openCurrentPlayers: currentPlayerIdentifiers.length,
+    openCurrentGuilds: currentGuildIdentifiers.length,
   };
 };
 

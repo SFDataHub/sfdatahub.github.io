@@ -11,7 +11,7 @@ const FUSION_ANALYSIS_CACHE_DB_NAME = "sfdatahub-fusion-identity-analysis";
 const FUSION_ANALYSIS_CACHE_DB_VERSION = 1;
 const ANALYSIS_REPORTS_STORE = "analysisReports";
 
-export const CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION = 1;
+export const CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION = 2;
 export const CURRENT_FUSION_RESOLVER_VERSION = 2;
 
 const COMPATIBLE_FUSION_ANALYSIS_SCHEMA_VERSIONS = new Set<number>([
@@ -58,6 +58,11 @@ export type FusionIdentityAnalysisCacheLookup = {
   freshEntry: FusionIdentityAnalysisCacheEntry | null;
   previousEntry: FusionIdentityAnalysisCacheEntry | null;
   staleReason: "scan-fingerprint" | "identity-revision" | "resolver-version" | "schema-version" | null;
+};
+
+export type FusionIdentityAnalysisCacheSnapshot = {
+  entries: readonly FusionIdentityAnalysisCacheEntry[];
+  byScopeId: ReadonlyMap<string, readonly FusionIdentityAnalysisCacheEntry[]>;
 };
 
 interface FusionAnalysisCacheDb extends DBSchema {
@@ -110,6 +115,21 @@ const compareEntriesNewestFirst = (
   left: FusionIdentityAnalysisCacheEntry,
   right: FusionIdentityAnalysisCacheEntry,
 ) => right.analyzedAt.localeCompare(left.analyzedAt);
+
+export const createFusionIdentityAnalysisCacheSnapshot = (
+  entries: readonly FusionIdentityAnalysisCacheEntry[],
+): FusionIdentityAnalysisCacheSnapshot => {
+  const byScopeId = new Map<string, FusionIdentityAnalysisCacheEntry[]>();
+  entries.forEach((entry) => {
+    const scopedEntries = byScopeId.get(entry.scopeId) ?? [];
+    scopedEntries.push(entry);
+    byScopeId.set(entry.scopeId, scopedEntries);
+  });
+  byScopeId.forEach((scopedEntries) => {
+    scopedEntries.sort(compareEntriesNewestFirst);
+  });
+  return { entries, byScopeId };
+};
 
 export const classifyFusionIdentityAnalysisCache = (
   entries: readonly FusionIdentityAnalysisCacheEntry[],
@@ -165,6 +185,26 @@ export const classifyFusionIdentityAnalysisCache = (
     staleReason,
   };
 };
+
+export const classifyFusionIdentityAnalysisCacheSnapshot = (
+  snapshot: FusionIdentityAnalysisCacheSnapshot,
+  input: {
+    scope: FusionIdentityAnalysisScope;
+    scanFingerprint: string;
+    identityRevision: string;
+  },
+): FusionIdentityAnalysisCacheLookup =>
+  classifyFusionIdentityAnalysisCache(
+    snapshot.byScopeId.get(input.scope.id) ?? [],
+    input,
+  );
+
+export const loadFusionIdentityAnalysisCacheSnapshot =
+  async (): Promise<FusionIdentityAnalysisCacheSnapshot> => {
+    const db = await getCacheDb();
+    const entries = await db.getAll(ANALYSIS_REPORTS_STORE);
+    return createFusionIdentityAnalysisCacheSnapshot(entries);
+  };
 
 export const readFusionIdentityAnalysisCache = async (input: {
   scope: FusionIdentityAnalysisScope;

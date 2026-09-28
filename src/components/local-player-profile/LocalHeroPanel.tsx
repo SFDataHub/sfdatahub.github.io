@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PortraitPreview from "../avatar/PortraitPreview";
 import PlayerAttributeBars from "../player-profile/AttributeBars/PlayerAttributeBars";
 import Tooltip from "../ui/Tooltip/Tooltip";
 import { HexGauge } from "../ui/HexGauge";
-import SectionDividerHeader from "../ui/shared/SectionDividerHeader";
 import { CLASSES } from "../../data/classes";
 import { guideAssetByKey } from "../../data/guidehub/assets";
 import { toDriveThumbProxy } from "../../lib/urls";
@@ -139,6 +138,9 @@ function ClassAvatar({
 function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"base" | "total">("base");
+  const portraitFrameRef = useRef<HTMLDivElement | null>(null);
+  const portraitModuleRef = useRef<HTMLDivElement | null>(null);
+  const [portraitLayout, setPortraitLayout] = useState({ scale: 1, height: 0 });
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const freshness = useMemo(() => computeFreshness(t, data.lastScanDays), [data.lastScanDays, t]);
   const freshnessTooltip = useMemo(() => {
@@ -199,6 +201,48 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
   }, [data.metrics, data.totalStatsValue, mode, totalBaseStatsLabel, totalStatsLabel]);
 
   const potionSlots = data.potionsSlots ?? [];
+  const hasActivePotions = potionSlots.some((slot) => Boolean(slot.type) || slot.size != null);
+  const potionSlotRow = hasActivePotions ? (
+    <div className="player-profile__hero-potions-inline player-profile__hero-potions-inline--local-profile">
+      <span className="player-profile__hero-potion-label">
+        {t("playerProfile.heroPanel.potions.activeLabel", { defaultValue: "Active potions:" })}
+      </span>
+      <div
+        className="player-profile__hero-potion-row"
+        role="list"
+        aria-label={t("playerProfile.heroPanel.potions.ariaLabel", { defaultValue: "Potion slots" })}
+      >
+        {[1, 2, 3].map((slot) => {
+          const slotData = potionSlots.find((item) => item.slot === slot) || null;
+          const isEmpty = !slotData?.type && slotData?.size == null;
+          const assetKey = resolvePotionAssetKey(slotData?.type ?? null, slotData?.size ?? null);
+          const asset = assetKey ? guideAssetByKey(assetKey, 128) : null;
+          return (
+            <div
+              key={slot}
+              className={`player-profile__hero-potion-card player-profile__hero-potion-card--slot${slot}${
+                isEmpty ? " player-profile__hero-potion-card--empty" : ""
+              }`}
+              role="listitem"
+              aria-label={t(`playerProfile.heroPanel.potions.slot${slot}`, { defaultValue: `Potion ${slot}` })}
+            >
+              {asset?.thumb ? (
+                <img
+                  src={asset.thumb}
+                  alt={t(`playerProfile.heroPanel.potions.slot${slot}`, { defaultValue: `Potion ${slot}` })}
+                  className="player-profile__hero-potion-icon"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <span className="player-profile__hero-potion-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
   const mountAssetThumb = useMemo(() => {
     const alignmentByRace: Record<string, "good" | "evil"> = {
       Human: "good",
@@ -220,208 +264,189 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
     return url ?? null;
   }, [data.mountPercentValue, data.mountRace]);
 
-  return (
-    <section className="player-profile__hero" aria-busy={loading}>
-      <SectionDividerHeader title={t("playerProfile.heroPanel.headerLabel", "PLAYER OVERVIEW")} />
-      <div className="player-profile__hero-content">
-        <div className="player-profile__hero-portrait">
-          <div className="player-profile__identity player-profile__identity--overlay">
-            <ClassAvatar className={data.className} label={data.playerName} size={48} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                className="player-profile__player-name-row"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  width: "100%",
-                }}
-              >
-                <div className="player-profile__player-name">{data.playerName}</div>
-              </div>
-              <div className="player-profile__player-meta">
-                <span>{data.className || t("playerProfile.heroPanel.meta.classUnknown", { defaultValue: "Class ?" })}</span>
-                {data.guild && <span>{"\u2022"} {data.guild}</span>}
-                {data.server && <span>{"\u2022"} {data.server}</span>}
-              </div>
-              {localizedLastScanLabel && (
-                <div className="player-profile__player-meta player-profile__player-meta--soft">
-                  {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
-                </div>
-              )}
-              <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
-                <div className="player-profile__freshness">
-                  <span
-                    aria-hidden
-                    className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
-                  />
-                  <span className="player-profile__freshness-label">{freshness.label}</span>
-                  <span aria-hidden className="player-profile__freshness-info">{"\u24d8"}</span>
-                </div>
-              </Tooltip>
-            </div>
-          </div>
-          <PortraitPreview
-            config={portraitConfig}
-            label={data.playerName}
-            fallbackImage={portraitFallbackUrl}
-            fallbackLabel={portraitFallbackLabel}
-          />
-        </div>
-        <div className="player-profile__hero-body">
-          <div className="player-profile__hero-metrics">
-            {heroMetrics.map((metric, metricIndex) => {
-              if (metric.gauge) {
-                const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
-                const hoverLines =
-                  metric.gauge.details && metric.gauge.details.length > 0
-                    ? metric.gauge.details
-                    : metric.gauge.centerBottom
-                      ? [metric.gauge.centerBottom]
-                      : [];
-                const hoverDetails =
-                  hoverLines.length > 0 ? (
-                    <div className="player-profile__hero-metric-hex-details" aria-hidden="true">
-                      {hoverLines.map((line) => (
-                        <div key={line}>{line}</div>
-                      ))}
-                    </div>
-                  ) : undefined;
+  useLayoutEffect(() => {
+    const frame = portraitFrameRef.current;
+    const module = portraitModuleRef.current;
+    if (!frame || !module) return;
 
-                return (
-                  <div key={`${metric.label}-${metricIndex}`} className="player-profile__hero-metric player-profile__hero-metric--gauge">
-                    <HexGauge
-                      className="player-profile__hero-metric-hex"
-                      value={progress}
-                      size={124}
-                      stroke={10}
-                      center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
-                      hoverDetails={hoverDetails}
-                    />
-                  </div>
-                );
-              }
-              const isMountMetric = metricIndex === 0;
-              const showMountImage = isMountMetric && !!mountAssetThumb;
-              const mountTooltip = `${metric.label}: ${metric.value}`;
-              return (
+    const updatePortraitLayout = () => {
+      const availableWidth = frame.clientWidth;
+      const naturalWidth = module.offsetWidth;
+      const naturalHeight = module.offsetHeight;
+      if (availableWidth <= 0 || naturalWidth <= 0 || naturalHeight <= 0) return;
+
+      const nextScale = Math.min(1, availableWidth / naturalWidth);
+      const nextHeight = Math.ceil(naturalHeight * nextScale);
+      setPortraitLayout((current) =>
+        Math.abs(current.scale - nextScale) < 0.001 && Math.abs(current.height - nextHeight) < 1
+          ? current
+          : { scale: nextScale, height: nextHeight },
+      );
+    };
+
+    updatePortraitLayout();
+    const observer = new ResizeObserver(updatePortraitLayout);
+    observer.observe(frame);
+    observer.observe(module);
+    window.addEventListener("resize", updatePortraitLayout);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updatePortraitLayout);
+    };
+  }, []);
+
+  const portraitFrameStyle = {
+    "--local-profile-portrait-scale": portraitLayout.scale,
+    "--local-profile-portrait-frame-height": portraitLayout.height ? `${portraitLayout.height}px` : undefined,
+  } as React.CSSProperties;
+
+  return (
+    <>
+      <section className="player-profile__hero player-profile__hero--local-profile" aria-busy={loading}>
+        <div ref={portraitFrameRef} className="player-profile__hero-portrait-frame--local" style={portraitFrameStyle}>
+          <div ref={portraitModuleRef} className="player-profile__hero-portrait player-profile__hero-portrait--local">
+            <div className="player-profile__identity player-profile__identity--overlay">
+              <ClassAvatar className={data.className} label={data.playerName} size={48} />
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div
-                  key={metric.label}
-                  className={`player-profile__hero-metric${showMountImage ? " player-profile__hero-metric--mount-icon" : ""}`}
+                  className="player-profile__player-name-row"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    width: "100%",
+                  }}
                 >
-                  {!showMountImage && <div className="player-profile__hero-metric-label">{metric.label}</div>}
-                  {showMountImage ? (
-                    <Tooltip content={mountTooltip}>
-                      <div className="player-profile__hero-metric-value player-profile__hero-metric-value--mount-image">
-                        <img
-                          src={mountAssetThumb}
-                          alt=""
-                          className="player-profile__hero-mount-image"
-                          loading="lazy"
-                          decoding="async"
-                          draggable={false}
-                        />
-                      </div>
-                    </Tooltip>
-                  ) : (
-                    <div className="player-profile__hero-metric-value">{metric.value}</div>
-                  )}
-                  {metric.hint && <div className="player-profile__hero-metric-hint">{metric.hint}</div>}
+                  <div className="player-profile__player-name">{data.playerName}</div>
+                </div>
+                <div className="player-profile__player-meta">
+                  <span>{data.className || t("playerProfile.heroPanel.meta.classUnknown", { defaultValue: "Class ?" })}</span>
+                  {data.guild && <span>{"\u2022"} {data.guild}</span>}
+                  {data.server && <span>{"\u2022"} {data.server}</span>}
+                </div>
+                {localizedLastScanLabel && (
+                  <div className="player-profile__player-meta player-profile__player-meta--soft">
+                    {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
+                  </div>
+                )}
+                <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
+                  <div className="player-profile__freshness">
+                    <span
+                      aria-hidden
+                      className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
+                    />
+                    <span className="player-profile__freshness-label">{freshness.label}</span>
+                    <span aria-hidden className="player-profile__freshness-info">{"\u24d8"}</span>
+                  </div>
+                </Tooltip>
+              </div>
+            </div>
+            <PortraitPreview
+              config={portraitConfig}
+              label={data.playerName}
+              fallbackImage={portraitFallbackUrl}
+              fallbackLabel={portraitFallbackLabel}
+            />
+          </div>
+        </div>
+        {potionSlotRow}
+      </section>
+
+      <section className="player-profile__hero player-profile__hero--local-summary" aria-busy={loading}>
+        <div className="player-profile__hero-metrics">
+          {heroMetrics.map((metric, metricIndex) => {
+            if (metric.gauge) {
+              const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
+              const hoverLines =
+                metric.gauge.details && metric.gauge.details.length > 0
+                  ? metric.gauge.details
+                  : metric.gauge.centerBottom
+                    ? [metric.gauge.centerBottom]
+                    : [];
+              const hoverDetails =
+                hoverLines.length > 0 ? (
+                  <div className="player-profile__hero-metric-hex-details" aria-hidden="true">
+                    {hoverLines.map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
+                ) : undefined;
+
+              return (
+                <div key={`${metric.label}-${metricIndex}`} className="player-profile__hero-metric player-profile__hero-metric--gauge">
+                  <HexGauge
+                    className="player-profile__hero-metric-hex"
+                    value={progress}
+                    size={124}
+                    stroke={10}
+                    center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
+                    hoverDetails={hoverDetails}
+                  />
                 </div>
               );
-            })}
-          </div>
+            }
+            const isMountMetric = metricIndex === 0;
+            const showMountImage = isMountMetric && !!mountAssetThumb;
+            const mountTooltip = `${metric.label}: ${metric.value}`;
+            return (
+              <div
+                key={metric.label}
+                className={`player-profile__hero-metric${showMountImage ? " player-profile__hero-metric--mount-icon" : ""}`}
+              >
+                {!showMountImage && <div className="player-profile__hero-metric-label">{metric.label}</div>}
+                {showMountImage ? (
+                  <Tooltip content={mountTooltip}>
+                    <div className="player-profile__hero-metric-value player-profile__hero-metric-value--mount-image">
+                      <img
+                        src={mountAssetThumb}
+                        alt=""
+                        className="player-profile__hero-mount-image"
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    </div>
+                  </Tooltip>
+                ) : (
+                  <div className="player-profile__hero-metric-value">{metric.value}</div>
+                )}
+                {metric.hint && <div className="player-profile__hero-metric-hint">{metric.hint}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-          {data.baseStats && (
-            <PlayerAttributeBars
-              baseStats={data.baseStats}
-              totalStats={data.totalStats}
-              mode={mode}
-              onModeChange={setMode}
-            />
-          )}
+      <section className="player-profile__hero player-profile__hero--local-stats" aria-busy={loading}>
+        {data.baseStats && (
+          <PlayerAttributeBars
+            baseStats={data.baseStats}
+            totalStats={data.totalStats}
+            mode={mode}
+            onModeChange={setMode}
+          />
+        )}
 
-          {(data.badges.length > 0 || potionSlots.length > 0) && (
-            <div className="player-profile__hero-meta-row">
-              {potionSlots.length > 0 && (
-                <div className="player-profile__hero-potions-inline">
-                  <span className="player-profile__hero-potion-label">
-                    {t("playerProfile.heroPanel.potions.activeLabel", { defaultValue: "Active potions:" })}
-                  </span>
-                  <div
-                    className="player-profile__hero-potion-row"
-                    role="list"
-                    aria-label={t("playerProfile.heroPanel.potions.ariaLabel", { defaultValue: "Potion slots" })}
-                  >
-                    {[1, 2, 3].map((slot) => {
-                      const slotData = potionSlots.find((item) => item.slot === slot) || null;
-                      const isEmpty = !slotData?.type && slotData?.size == null;
-                      const assetKey = resolvePotionAssetKey(slotData?.type ?? null, slotData?.size ?? null);
-                      const asset = assetKey ? guideAssetByKey(assetKey, 128) : null;
-                      return (
-                        <div
-                          key={slot}
-                          className={`player-profile__hero-potion-card player-profile__hero-potion-card--slot${slot}${
-                            isEmpty ? " player-profile__hero-potion-card--empty" : ""
-                          }`}
-                          role="listitem"
-                          aria-label={t(`playerProfile.heroPanel.potions.slot${slot}`, { defaultValue: `Potion ${slot}` })}
-                        >
-                          {asset?.thumb ? (
-                            <img
-                              src={asset.thumb}
-                              alt={t(`playerProfile.heroPanel.potions.slot${slot}`, { defaultValue: `Potion ${slot}` })}
-                              className="player-profile__hero-potion-icon"
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <span className="player-profile__hero-potion-placeholder" aria-hidden="true" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {data.badges.length > 0 && (
-                <div className="player-profile__hero-badges">
-                  {data.badges.map((badge) => (
-                    <span
-                      key={badge.label}
-                      className={`player-profile__hero-badge player-profile__hero-badge--${badge.tone || "neutral"}`}
-                      title={badge.hint}
-                    >
-                      {badge.icon && <span aria-hidden className="player-profile__hero-badge-icon">{badge.icon}</span>}
-                      <span>{badge.label}</span>
-                      <strong>{badge.value}</strong>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {data.actions.length > 0 && (
-            <div className="player-profile__hero-actions">
-              {data.actions.map((action) => (
-                <button
-                  key={action.key}
-                  className="player-profile__hero-action"
-                  type="button"
-                  title={action.title}
-                  onClick={() => undefined}
+        {data.badges.length > 0 && (
+          <div className="player-profile__hero-meta-row">
+            <div className="player-profile__hero-badges">
+              {data.badges.map((badge) => (
+                <span
+                  key={badge.label}
+                  className={`player-profile__hero-badge player-profile__hero-badge--${badge.tone || "neutral"}`}
+                  title={badge.hint}
                 >
-                  {action.label}
-                </button>
+                  {badge.icon && <span aria-hidden className="player-profile__hero-badge-icon">{badge.icon}</span>}
+                  <span>{badge.label}</span>
+                  <strong>{badge.value}</strong>
+                </span>
               ))}
             </div>
-          )}
-        </div>
-      </div>
-    </section>
+          </div>
+        )}
+      </section>
+    </>
   );
 }
 

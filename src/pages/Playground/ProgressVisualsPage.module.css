@@ -1,0 +1,871 @@
+.page {
+  --radar-panel: var(--color-surface-elevated, #152a42);
+  --radar-bg: var(--color-surface, #0d1b2d);
+  --radar-border: var(--color-border, #2c4a73);
+  --radar-text: var(--color-text, #f5f9ff);
+  --radar-muted: var(--color-text-muted, #b0c4d9);
+  --radar-accent: #67d7ff;
+  --radar-median: #f1c76a;
+  --radar-trend: #6ee7a8;
+  --radar-warn: #d98f72;
+  display: grid;
+  gap: 16px;
+  color: var(--radar-text);
+}
+
+.headerPanel,
+.loadingPanel,
+.statePanel,
+.controls,
+.radarShell,
+.performancePanel,
+.sourcePanel {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 80%, transparent);
+  border-radius: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--radar-panel) 94%, #ffffff 6%), var(--radar-panel));
+}
+
+.headerPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+}
+
+.headerPanel h1,
+.radarIntro h2,
+.sourcePanel h2 {
+  margin: 0;
+}
+
+.headerPanel p,
+.radarIntro p,
+.sourcePanel p {
+  margin: 8px 0 0;
+  color: var(--radar-muted);
+  line-height: 1.5;
+}
+
+.kicker {
+  margin: 0 0 6px;
+  color: var(--radar-median);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scanBadge {
+  display: grid;
+  min-width: 88px;
+  justify-items: end;
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scanBadge strong {
+  color: var(--radar-text);
+  font-size: 24px;
+}
+
+.loadingPanel,
+.statePanel {
+  padding: 22px;
+}
+
+.statePanel {
+  color: var(--radar-muted);
+  font-weight: 800;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(230px, 0.9fr) minmax(280px, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 14px;
+}
+
+.playerSummary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--radar-border) 60%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 70%, transparent);
+  padding: 11px;
+}
+
+.playerSummary span,
+.playerSummary small {
+  overflow: hidden;
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playerSummary strong {
+  overflow: hidden;
+  color: var(--radar-text);
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmentedControl,
+.periodControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: center;
+}
+
+.segmentedControl button,
+.periodControls button {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--radar-bg) 72%, #ffffff 8%);
+  color: var(--radar-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 9px 12px;
+}
+
+.segmentedControl button[data-active="true"],
+.periodControls button[data-active="true"] {
+  border-color: var(--radar-accent);
+  background: color-mix(in srgb, var(--radar-accent) 26%, var(--radar-bg));
+}
+
+.periodControls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.periodControls span {
+  display: block;
+  color: var(--radar-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.radarShell {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(300px, 1.05fr);
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+}
+
+.radarIntro {
+  grid-column: 1 / -1;
+}
+
+.radarFigure {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.radarSvg {
+  width: 100%;
+  max-height: min(68vh, 520px);
+}
+
+.gridRing,
+.medianRing,
+.medianShape,
+.playerShape {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.gridRing {
+  stroke: color-mix(in srgb, var(--radar-muted) 22%, transparent);
+  stroke-width: 1;
+}
+
+.medianRing {
+  stroke: var(--radar-median);
+  stroke-width: 3;
+}
+
+.medianShape {
+  fill: color-mix(in srgb, var(--radar-median) 8%, transparent);
+  stroke: color-mix(in srgb, var(--radar-median) 60%, transparent);
+  stroke-width: 1.5;
+}
+
+.playerShape {
+  fill: color-mix(in srgb, var(--radar-accent) 34%, transparent);
+  stroke: var(--radar-accent);
+  stroke-width: 3;
+}
+
+.axisLine {
+  stroke: color-mix(in srgb, var(--radar-muted) 28%, transparent);
+  stroke-width: 1;
+}
+
+.valuePoint {
+  fill: var(--radar-accent);
+  stroke: var(--radar-bg);
+  stroke-width: 2;
+}
+
+.clippedPoint {
+  fill: var(--radar-warn);
+  stroke: var(--radar-bg);
+  stroke-width: 2;
+}
+
+.radarSvg text {
+  fill: var(--radar-text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.centerLabel {
+  fill: var(--radar-median) !important;
+  font-size: 20px !important;
+  font-weight: 950 !important;
+}
+
+.centerSubLabel {
+  fill: var(--radar-muted) !important;
+  font-size: 11px !important;
+}
+
+.radarFigure figcaption {
+  color: var(--radar-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.noRadar {
+  display: grid;
+  min-height: 360px;
+  place-content: center;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--radar-border) 80%, transparent);
+  border-radius: 8px;
+  color: var(--radar-muted);
+  padding: 18px;
+  text-align: center;
+}
+
+.noRadar strong {
+  color: var(--radar-text);
+  font-size: 18px;
+}
+
+.axisTable {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.axisTableHeader,
+.axisRow {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(78px, 0.8fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.axisTableHeader {
+  color: var(--radar-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.axisRow {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 55%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 66%, transparent);
+  padding: 10px;
+}
+
+.axisRow[data-status="negative"] {
+  border-color: color-mix(in srgb, var(--radar-warn) 70%, var(--radar-border));
+}
+
+.axisRow strong,
+.axisRow span {
+  overflow-wrap: anywhere;
+}
+
+.axisRow strong {
+  color: var(--radar-text);
+  font-size: 13px;
+}
+
+.axisRow span {
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.axisRow small {
+  display: block;
+  color: color-mix(in srgb, var(--radar-muted) 76%, transparent);
+  font-size: 10px;
+}
+
+.notes {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.notes span {
+  border: 1px solid color-mix(in srgb, var(--radar-warn) 45%, transparent);
+  border-radius: 8px;
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+.sourcePanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.periodCardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.periodCard {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--radar-border) 64%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-panel) 88%, #ffffff 4%);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 14px;
+  text-align: left;
+}
+
+.periodCard[data-active="true"] {
+  border-color: var(--radar-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--radar-accent) 40%, transparent);
+}
+
+.periodCard:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.periodCard > span {
+  color: var(--radar-median);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.periodCard strong {
+  color: var(--radar-text);
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.periodCard small,
+.periodCard em {
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.periodCard dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.periodCard dl div {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--radar-border) 50%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 64%, transparent);
+  padding: 8px;
+}
+
+.periodCard dt {
+  color: var(--radar-muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.periodCard dd {
+  margin: 4px 0 0;
+  color: var(--radar-text);
+  font-size: 14px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.performancePanel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.performanceChart {
+  width: 100%;
+  min-height: 220px;
+}
+
+.performanceLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.performanceLegend span {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.performanceLegend i {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.legendBar {
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--radar-accent);
+}
+
+.legendMarker {
+  width: 20px;
+  border-top: 4px solid var(--radar-median);
+  border-radius: 999px;
+}
+
+.legendTrend {
+  width: 24px;
+  border-top: 3px solid var(--radar-trend);
+  border-radius: 999px;
+}
+
+.legendGrowth {
+  width: 22px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #58d68d 0 50%, var(--radar-warn) 50% 100%);
+}
+
+.legendPoint {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--radar-bg);
+  border-radius: 50%;
+  background: var(--radar-text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--radar-muted) 80%, transparent);
+}
+
+.chartBaseline {
+  stroke: color-mix(in srgb, var(--radar-muted) 34%, transparent);
+  stroke-width: 1;
+}
+
+.chartZeroLine {
+  stroke: color-mix(in srgb, var(--radar-muted) 55%, transparent);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.chartScaleLabel {
+  fill: var(--radar-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.chartBar {
+  fill: color-mix(in srgb, var(--radar-accent) 46%, var(--radar-bg));
+}
+
+.chartBar[data-highlighted="true"] {
+  fill: var(--radar-accent);
+}
+
+.chartBar[data-status="negative"] {
+  fill: var(--radar-warn);
+}
+
+.chartBar[data-status="missing"] {
+  fill: color-mix(in srgb, var(--radar-muted) 38%, transparent);
+}
+
+.guildMedianMarker {
+  stroke: var(--radar-median);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--radar-bg) 80%, transparent));
+}
+
+.playerTrendLine {
+  fill: none;
+  stroke: var(--radar-trend);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--radar-bg) 86%, transparent));
+}
+
+.playerTrendPoint {
+  fill: var(--radar-trend);
+  stroke: var(--radar-bg);
+  stroke-width: 2;
+}
+
+.guildStandBar {
+  fill: color-mix(in srgb, var(--radar-accent) 44%, var(--radar-bg));
+}
+
+.guildStandBar[data-highlighted="true"] {
+  fill: color-mix(in srgb, var(--radar-accent) 70%, var(--radar-bg));
+}
+
+.guildGrowthBar[data-direction="positive"] {
+  fill: #58d68d;
+}
+
+.guildGrowthBar[data-direction="negative"] {
+  fill: var(--radar-warn);
+}
+
+.guildStartMarker {
+  stroke: color-mix(in srgb, var(--radar-text) 70%, transparent);
+  stroke-dasharray: 3 3;
+  stroke-width: 1.5;
+}
+
+.guildEndMarker {
+  stroke: var(--radar-text);
+  stroke-width: 2;
+}
+
+.guildDailyPoint {
+  fill: var(--radar-text);
+  stroke: var(--radar-bg);
+  stroke-width: 2;
+}
+
+.chartLabel {
+  fill: var(--radar-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.segmentTable {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.segmentTableHeader,
+.segmentRow {
+  display: grid;
+  grid-template-columns:
+    minmax(130px, 1.2fr)
+    minmax(130px, 1.2fr)
+    minmax(76px, 0.65fr)
+    minmax(90px, 0.85fr)
+    minmax(90px, 0.85fr)
+    minmax(150px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.guildSegmentTableHeader,
+.guildSegmentRow {
+  display: grid;
+  grid-template-columns:
+    minmax(126px, 1.05fr)
+    minmax(126px, 1.05fr)
+    minmax(76px, 0.58fr)
+    minmax(116px, 0.86fr)
+    minmax(116px, 0.86fr)
+    minmax(116px, 0.86fr)
+    minmax(92px, 0.7fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.guildSegmentTableHeader {
+  color: var(--radar-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.guildSegmentRow {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 52%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 66%, transparent);
+  padding: 9px 10px;
+}
+
+.guildSegmentRow span {
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.guildSegmentTotalRow {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1fr)
+    minmax(126px, 0.9fr)
+    minmax(126px, 0.9fr)
+    minmax(76px, 0.58fr)
+    minmax(116px, 0.86fr)
+    minmax(116px, 0.86fr)
+    minmax(116px, 0.86fr)
+    minmax(92px, 0.7fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  border: 1px solid color-mix(in srgb, var(--radar-accent) 58%, var(--radar-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-accent) 14%, var(--radar-bg));
+  padding: 10px;
+}
+
+.guildSegmentTotalRow strong,
+.guildSegmentTotalRow span {
+  color: var(--radar-text);
+  font-size: 12px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.segmentTableHeader {
+  color: var(--radar-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.segmentRow {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 52%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 66%, transparent);
+  padding: 9px 10px;
+}
+
+.segmentRow[data-status="negative"] {
+  border-color: color-mix(in srgb, var(--radar-warn) 70%, var(--radar-border));
+}
+
+.segmentRow span {
+  color: var(--radar-muted);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.segmentTotalRow {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1fr)
+    minmax(130px, 1fr)
+    minmax(130px, 1fr)
+    minmax(76px, 0.65fr)
+    minmax(90px, 0.8fr)
+    minmax(90px, 0.8fr)
+    minmax(150px, 0.9fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  border: 1px solid color-mix(in srgb, var(--radar-accent) 58%, var(--radar-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-accent) 14%, var(--radar-bg));
+  padding: 10px;
+}
+
+.segmentTotalRow[data-status="negative"] {
+  border-color: color-mix(in srgb, var(--radar-warn) 70%, var(--radar-border));
+  background: color-mix(in srgb, var(--radar-warn) 12%, var(--radar-bg));
+}
+
+.segmentTotalRow strong {
+  color: var(--radar-text);
+  font-size: 12px;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.segmentTotalRow span {
+  color: var(--radar-text);
+  font-size: 12px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.performanceAudit {
+  border: 1px solid color-mix(in srgb, var(--radar-border) 52%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 54%, transparent);
+  padding: 10px;
+}
+
+.performanceAudit summary {
+  cursor: pointer;
+  color: var(--radar-text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.performanceAuditGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.performanceAuditItem {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--radar-border) 44%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 70%, transparent);
+  padding: 10px;
+}
+
+.performanceAuditItem[data-status="excluded"] {
+  border-color: color-mix(in srgb, var(--radar-warn) 58%, var(--radar-border));
+}
+
+.performanceAuditItem strong {
+  color: var(--radar-text);
+  font-size: 12px;
+}
+
+.performanceAuditItem span,
+.performanceAuditItem em {
+  color: var(--radar-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.performanceAuditItem em {
+  color: var(--radar-warn);
+}
+
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sourceGrid div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--radar-border) 55%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--radar-bg) 68%, transparent);
+  padding: 10px;
+}
+
+.sourceGrid strong {
+  color: var(--radar-text);
+}
+
+.sourceGrid span,
+.sourceGrid p,
+.auditLine {
+  color: var(--radar-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sourceGrid p {
+  margin: 0;
+}
+
+.auditLine {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .playerShape,
+  .valuePoint,
+  .clippedPoint {
+    transition: all 180ms ease;
+  }
+}
+
+@media (max-width: 980px) {
+  .controls,
+  .radarShell,
+  .periodCardGrid,
+  .sourceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .headerPanel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scanBadge {
+    justify-items: start;
+  }
+
+  .axisTableHeader {
+    display: none;
+  }
+
+  .segmentTableHeader,
+  .guildSegmentTableHeader {
+    display: none;
+  }
+
+  .axisRow,
+  .segmentRow,
+  .segmentTotalRow,
+  .guildSegmentRow,
+  .guildSegmentTotalRow {
+    grid-template-columns: 1fr;
+  }
+
+  .radarSvg {
+    max-height: none;
+  }
+}

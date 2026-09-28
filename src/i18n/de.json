@@ -1439,6 +1439,7 @@
       "loreUnavailable": "Noch nicht verfügbar.",
       "enemyId": "Gegner-ID {{enemyId}}"
     },
+    "monsterLore": {},
     "classes": {
       "warrior": "Krieger",
       "mage": "Magier",
@@ -1459,6 +1460,7 @@
       "title": "{{targetServerCode}} wird analysiert",
       "phases": {
         "loading": "Lokale Scans werden geladen",
+        "identityRefresh": "Identitätsänderungen werden angewendet",
         "preparingScanPool": "Fusion-Scan-Pool wird vorbereitet",
         "filteringScope": "Fusion-Scope wird gefiltert",
         "normalizing": "Identitätsdaten werden normalisiert",

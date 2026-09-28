@@ -314,6 +314,11 @@
   color: #FFFFFF;
 }
 
+.hBtn:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .backActionBtn {
   max-width: min(210px, 38vw);
   overflow: hidden;

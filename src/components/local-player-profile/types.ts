@@ -62,5 +62,13 @@ export type LocalHeroPanelData = {
 export type LocalPlayerProfileModel = {
   sourceScanId: string;
   sourcePlayerKey: string;
+  analytics: {
+    playerName: string;
+    server: string | null;
+    memberRef: string | null;
+    guildIdentifier: string | null;
+    guildName: string | null;
+    scannedAtMs: number;
+  };
   hero: LocalHeroPanelData;
 };

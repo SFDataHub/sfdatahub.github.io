@@ -3,6 +3,7 @@ import ContentShell from "../../components/ContentShell";
 import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import AnchoredLineChart from "../../components/ui/charts/AnchoredLineChart";
+import type { AnchoredLineChartVerticalMarker } from "../../components/ui/charts/AnchoredLineChart";
 import {
   collectionGroup,
   endAt,
@@ -26,12 +27,14 @@ import {
 import {
   getGuildHubLocalScan,
   listGuildHubScanSummaries,
+  parseServerFromGuildIdentifier,
   subscribeToSfDataHubLocalScanChanges,
 } from "../../lib/guilds/localScanLibrary";
 import {
   buildGuildAnalyticsPlayerComparison,
   buildGuildAnalyticsSeries,
   buildGuildAnalyticsProgressReport,
+  describeGuildAnalyticsIdentityScope,
   GUILD_ANALYTICS_METRICS,
   GUILD_ANALYTICS_RANGES,
   type GuildAnalyticsPlayerCandidate,
@@ -44,8 +47,12 @@ import {
   type GuildAnalyticsRangeSelection,
 } from "../../lib/guilds/localGuildAnalytics";
 import {
-  ensureGuildAnalyticsDerivedDataFromSummaries,
+  ensureGuildAnalyticsScopedDataFromSummaries,
+  type GuildAnalyticsDiagnosticEntry,
   type GuildAnalyticsDerivedData,
+  type GuildAnalyticsLoadPhase,
+  type GuildAnalyticsLoadPhaseUpdate,
+  type GuildAnalyticsSourceDiagnostic,
 } from "../../lib/guilds/localGuildAnalyticsStore";
 import {
   loadIdentityResolutionSnapshot,
@@ -55,6 +62,8 @@ import {
   buildLocalFightParticipationSeries,
   type FightParticipationSeries,
 } from "../../lib/guilds/localFightAnalytics";
+import { buildGuildAnalyticsFusionMarkers } from "../../lib/guilds/guildAnalyticsFusionMarkers";
+import type { GuildAnalyticsFusionMarker } from "../../lib/guilds/guildAnalyticsFusionMarkers";
 import { subscribeToFightTrackingChanges } from "./fightTrackingStore";
 import styles from "./Fusion.module.css";
 import { useGuildHubSelection } from "./hooks/useGuildHubSelection";
@@ -100,7 +109,10 @@ const PROGRESS_PERIODS: Array<{ key: GuildAnalyticsProgressPeriodKey; label: str
 ];
 const GUILD_AVERAGE_COLOR = "#55dba6";
 const PLAYER_HISTORY_OTHER_GUILD_COLOR = "#b8b8b8";
-const PLAYER_SERIES_COLORS = ["#7da5d8", "#f2a65a", "#d481e8", "#88d96b", "#f06f8f", "#66c7d9"];
+const PLAYER_SERIES_COLORS = ["#f2a65a", "#7da5d8", "#d481e8", "#88d96b", "#f06f8f", "#66c7d9", "#ffd166", "#b68cff"];
+const GUILD_AVERAGE_SERIES_KEY = "guild-average";
+
+const getPlayerSeriesColor = (seriesIndex: number) => PLAYER_SERIES_COLORS[seriesIndex % PLAYER_SERIES_COLORS.length];
 
 const numberFormatter = new Intl.NumberFormat("de-DE");
 const dateFormatter = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -113,15 +125,152 @@ const EMPTY_GUILD_ANALYTICS_DATA: GuildAnalyticsDerivedData = {
   guilds: [],
 };
 
+type GuildAnalyticsLoaderState = {
+  title: string;
+  message: string;
+  current?: number;
+  total?: number;
+  progressLabel?: string;
+};
+
+const isGuildAnalyticsDiagnosticsEnabled = () =>
+  typeof import.meta !== "undefined" && Boolean(import.meta.env?.DEV);
+
+const analyticsNowMs = () =>
+  typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+
+const formatDiagnosticMs = (value: number) => `${value.toFixed(1)}ms`;
+
+const formatDiagnosticDetails = (details: GuildAnalyticsDiagnosticEntry["details"]) => {
+  if (!details) return "";
+  return Object.entries(details)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(" ");
+};
+
+const formatDiagnosticEntry = (entry: GuildAnalyticsDiagnosticEntry) => {
+  const detailText = formatDiagnosticDetails(entry.details);
+  return [
+    `${entry.phase}=${formatDiagnosticMs(entry.durationMs)}`,
+    typeof entry.count === "number" ? `count=${entry.count}` : "",
+    detailText,
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
+
+const buildAnalyticsLoaderState = (update: GuildAnalyticsLoadPhaseUpdate): GuildAnalyticsLoaderState => {
+  const progress =
+    update.sourceIndex && update.sourceCount
+      ? {
+          current: update.sourceIndex,
+          total: update.sourceCount,
+          progressLabel: "Scans verarbeitet",
+        }
+      : {};
+  const phaseLabels: Record<GuildAnalyticsLoadPhase, GuildAnalyticsLoaderState> = {
+    "loading-local-scan-data": {
+      title: "Loading local scan data",
+      message: "Reading local scan summaries.",
+    },
+    "checking-analytics-cache": {
+      title: "Checking analytics cache",
+      message: "Comparing derived analytics versions and source hashes.",
+    },
+    "rebuilding-analytics-data": {
+      title: "Analytics-Daten werden aktualisiert",
+      message:
+        "Nach einem SF Data Hub-Update werden deine lokalen Scans einmalig neu eingelesen. Das kann je nach Anzahl deiner Scans etwas laenger dauern.",
+      ...progress,
+    },
+    "normalizing-historical-data": {
+      title: progress.current ? "Analytics-Daten werden aktualisiert" : "Normalizing historical data",
+      message: progress.current
+        ? "Nach einem SF Data Hub-Update werden deine lokalen Scans einmalig neu eingelesen. Das kann je nach Anzahl deiner Scans etwas laenger dauern."
+        : "Materializing historical player and guild observations.",
+      ...progress,
+    },
+    "saving-derived-analytics": {
+      title: progress.current ? "Analytics-Daten werden aktualisiert" : "Saving derived analytics",
+      message: progress.current
+        ? "Nach einem SF Data Hub-Update werden deine lokalen Scans einmalig neu eingelesen. Das kann je nach Anzahl deiner Scans etwas laenger dauern."
+        : "Writing rebuilt analytics snapshots to IndexedDB.",
+      ...progress,
+    },
+    "loading-derived-analytics": {
+      title: "Loading derived analytics",
+      message: "Reading materialized snapshots, members, and guilds.",
+    },
+  };
+  return phaseLabels[update.phase];
+};
+
+const logGuildAnalyticsDiagnostics = (
+  entries: GuildAnalyticsDiagnosticEntry[],
+  sourceEntries: GuildAnalyticsSourceDiagnostic[],
+  analyticsTotalMs: number,
+) => {
+  if (!isGuildAnalyticsDiagnosticsEnabled()) return;
+  const sumKnownPhasesMs = entries.reduce((sum, entry) => sum + entry.durationMs, 0);
+  const unattributedMs = Math.max(0, analyticsTotalMs - sumKnownPhasesMs);
+  const text = [
+    "[Guild Analytics] diagnostics",
+    `analytics-total=${formatDiagnosticMs(analyticsTotalMs)}`,
+    ...entries.map(formatDiagnosticEntry),
+    `analyticsTotalMs=${analyticsTotalMs.toFixed(1)}`,
+    `sumKnownPhasesMs=${sumKnownPhasesMs.toFixed(1)}`,
+    `unattributedMs=${unattributedMs.toFixed(1)}`,
+  ].join("\n");
+  console.info(text);
+
+  if (sourceEntries.length) {
+    console.info(
+      [
+        "[Guild Analytics] rematerialization sources",
+        ...sourceEntries.map((entry) =>
+          [
+            `sourceId=${entry.sourceId}`,
+            `total=${formatDiagnosticMs(entry.totalMs)}`,
+            `rawSourceLoad=${formatDiagnosticMs(entry.rawSourceLoadMs)}`,
+            `normalize=${formatDiagnosticMs(entry.normalizationTotalMs)}`,
+            `snapshotBuild=${formatDiagnosticMs(entry.snapshotBuildMs)}`,
+            `memberBuild=${formatDiagnosticMs(entry.memberObservationBuildMs)}`,
+            `guildBuild=${formatDiagnosticMs(entry.guildObservationBuildMs)}`,
+            `write=${formatDiagnosticMs(entry.writeMs)}`,
+            `snapshots=${entry.snapshotCount}`,
+            `members=${entry.memberObservationCount}`,
+            `guilds=${entry.guildObservationCount}`,
+          ].join(" "),
+        ),
+      ].join("\n"),
+    );
+  }
+};
+
+const logGuildAnalyticsViewDiagnostic = (
+  phase: string,
+  durationMs: number,
+  count: number,
+  details?: Record<string, string | number | boolean | null>,
+) => {
+  if (!isGuildAnalyticsDiagnosticsEnabled()) return;
+  console.info(
+    [
+      "[Guild Analytics] view diagnostics",
+      formatDiagnosticEntry({ phase, durationMs, count, details }),
+    ].join("\n"),
+  );
+};
+
 export default function GuildHubCompareGuilds() {
   const isMdUp = useMediaQuery("(min-width: 768px)");
   const { activeGuild } = useGuildHubSelection();
-  const localScanState = useGuildAnalyticsLocalScans();
+  const [selectedPlayerIds, setSelectedPlayerIds] = React.useState<string[]>([]);
+  const localScanState = useGuildAnalyticsLocalScans(activeGuild, selectedPlayerIds);
 
   const [activeTab, setActiveTab] = React.useState<AnalyticsTabKey>("overview");
   const [overviewMetric, setOverviewMetric] = React.useState<GuildAnalyticsMetricKey>("avgLevel");
-  const [overviewRange, setOverviewRange] = React.useState<GuildAnalyticsRangeSelection>({ key: "30d" });
-  const [selectedPlayerIds, setSelectedPlayerIds] = React.useState<string[]>([]);
+  const [overviewRange, setOverviewRange] = React.useState<GuildAnalyticsRangeSelection>({ key: "all" });
   const [progressPeriod, setProgressPeriod] = React.useState<GuildAnalyticsProgressPeriodKey>("monthly");
   const [serverFilter, setServerFilter] = React.useState<string>("all");
   const [selectedGuildAId, setSelectedGuildAId] = React.useState<string | null>(null);
@@ -258,6 +407,7 @@ export default function GuildHubCompareGuilds() {
             analyticsData={localScanState.analyticsData}
             identityResolutionSnapshot={localScanState.identityResolutionSnapshot}
             loading={localScanState.loading}
+            loadingPhase={localScanState.loadingPhase}
             error={localScanState.error}
             metricKey={overviewMetric}
             rangeKey={overviewRange}
@@ -275,6 +425,7 @@ export default function GuildHubCompareGuilds() {
             analyticsData={localScanState.analyticsData}
             identityResolutionSnapshot={localScanState.identityResolutionSnapshot}
             loading={localScanState.loading}
+            loadingPhase={localScanState.loadingPhase}
             error={localScanState.error}
             periodKey={progressPeriod}
             onPeriodChange={setProgressPeriod}
@@ -336,31 +487,113 @@ export default function GuildHubCompareGuilds() {
   );
 }
 
-function useGuildAnalyticsLocalScans() {
+function useGuildAnalyticsLocalScans(
+  activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"],
+  selectedPlayerIds: readonly string[],
+) {
+  const identitySnapshotRef = React.useRef<IdentityResolutionSnapshot | null>(null);
   const [state, setState] = React.useState<{
     analyticsData: GuildAnalyticsDerivedData;
     identityResolutionSnapshot: IdentityResolutionSnapshot | null;
     loading: boolean;
+    loadingPhase: GuildAnalyticsLoaderState;
     error: string | null;
-  }>({ analyticsData: EMPTY_GUILD_ANALYTICS_DATA, identityResolutionSnapshot: null, loading: true, error: null });
+  }>({
+    analyticsData: EMPTY_GUILD_ANALYTICS_DATA,
+    identityResolutionSnapshot: null,
+    loading: true,
+    loadingPhase: buildAnalyticsLoaderState({ phase: "loading-local-scan-data" }),
+    error: null,
+  });
 
   React.useEffect(() => {
     let cancelled = false;
 
     const load = () => {
-      setState((current) => ({ ...current, loading: true, error: null }));
+      const analyticsLoadStartedAt = analyticsNowMs();
+      const diagnostics: GuildAnalyticsDiagnosticEntry[] = [];
+      const sourceDiagnostics: GuildAnalyticsSourceDiagnostic[] = [];
+      const pushDiagnostic = (entry: GuildAnalyticsDiagnosticEntry) => diagnostics.push(entry);
+      const pushPhase = (phase: GuildAnalyticsLoadPhaseUpdate) => {
+        if (!cancelled) {
+          setState((current) => ({
+            ...current,
+            loading: true,
+            loadingPhase: buildAnalyticsLoaderState(phase),
+            error: null,
+          }));
+        }
+      };
+
+      pushPhase({ phase: "loading-local-scan-data" });
+      const summaryStartedAt = analyticsNowMs();
       listGuildHubScanSummaries()
         .then(async (summaries) => {
-          const [analyticsData, identityResolutionSnapshot] = await Promise.all([
-            ensureGuildAnalyticsDerivedDataFromSummaries(summaries, {
-              loadSourceById: getGuildHubLocalScan,
-            }),
-            loadIdentityResolutionSnapshot().catch((error) => {
-              console.warn("[GuildHubAnalytics] failed to load identity resolution snapshot", error);
-              return null;
-            }),
-          ]);
-          if (!cancelled) setState({ analyticsData, identityResolutionSnapshot, loading: false, error: null });
+          diagnostics.push({
+            phase: "source-summary-load",
+            durationMs: analyticsNowMs() - summaryStartedAt,
+            count: summaries.length,
+            details: {
+              sourceCount: summaries.length,
+              scanCount: summaries.length,
+            },
+          });
+
+          const identityStartedAt = analyticsNowMs();
+          const cachedIdentitySnapshot = identitySnapshotRef.current;
+          const identityResolutionSnapshot = cachedIdentitySnapshot
+            ? cachedIdentitySnapshot
+            : await loadIdentityResolutionSnapshot()
+                .then((snapshot) => {
+                  identitySnapshotRef.current = snapshot;
+                  return snapshot;
+                })
+                .catch((error) => {
+                  console.warn("[GuildHubAnalytics] failed to load identity resolution snapshot", error);
+                  return null;
+                });
+          diagnostics.push({
+            phase: "identity-resolution-load",
+            durationMs: analyticsNowMs() - identityStartedAt,
+            count: identityResolutionSnapshot
+              ? identityResolutionSnapshot.players.byIdentityId.size + identityResolutionSnapshot.guilds.byIdentityId.size
+              : 0,
+            details: identityResolutionSnapshot
+              ? {
+                  playerIdentities: identityResolutionSnapshot.players.byIdentityId.size,
+                  guildIdentities: identityResolutionSnapshot.guilds.byIdentityId.size,
+                  cached: Boolean(cachedIdentitySnapshot),
+                }
+              : {
+                  failed: true,
+                },
+          });
+          const analyticsResult = await ensureGuildAnalyticsScopedDataFromSummaries(summaries, {
+            guild: activeGuild,
+            identitySnapshot: identityResolutionSnapshot,
+            selectedPlayerRefs: selectedPlayerIds,
+            loadSourceById: getGuildHubLocalScan,
+            onDiagnostic: pushDiagnostic,
+            onSourceDiagnostic: (entry) => sourceDiagnostics.push(entry),
+            onPhase: pushPhase,
+          });
+          const analyticsData = analyticsResult.data;
+          const reactStateStartedAt = analyticsNowMs();
+          diagnostics.push({
+            phase: "react-state-enqueue",
+            durationMs: analyticsNowMs() - reactStateStartedAt,
+            count: 1,
+          });
+          if (!cancelled) {
+            setState({
+              analyticsData,
+              identityResolutionSnapshot,
+              loading: false,
+              loadingPhase: buildAnalyticsLoaderState({ phase: "loading-derived-analytics" }),
+              error: null,
+            });
+            logGuildAnalyticsDiagnostics(diagnostics, sourceDiagnostics, analyticsNowMs() - analyticsLoadStartedAt);
+          }
         })
         .catch((error) => {
           console.error("[GuildHubAnalytics] failed to load local analytics data", error);
@@ -369,6 +602,7 @@ function useGuildAnalyticsLocalScans() {
               analyticsData: EMPTY_GUILD_ANALYTICS_DATA,
               identityResolutionSnapshot: null,
               loading: false,
+              loadingPhase: buildAnalyticsLoaderState({ phase: "loading-local-scan-data" }),
               error: "Lokale Analytics-Daten konnten nicht geladen werden.",
             });
           }
@@ -382,7 +616,7 @@ function useGuildAnalyticsLocalScans() {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [activeGuild, selectedPlayerIds]);
 
   return state;
 }
@@ -392,6 +626,7 @@ function GuildDevelopmentOverview({
   analyticsData,
   identityResolutionSnapshot,
   loading,
+  loadingPhase,
   error,
   metricKey,
   rangeKey,
@@ -405,6 +640,7 @@ function GuildDevelopmentOverview({
   analyticsData: GuildAnalyticsDerivedData;
   identityResolutionSnapshot: IdentityResolutionSnapshot | null;
   loading: boolean;
+  loadingPhase: GuildAnalyticsLoaderState;
   error: string | null;
   metricKey: GuildAnalyticsMetricKey;
   rangeKey: GuildAnalyticsRangeSelection;
@@ -419,24 +655,44 @@ function GuildDevelopmentOverview({
   const supportsPlayerComparison = isPlayerComparisonMetric(metric.key);
   const scanMetricKey = isFightParticipation ? "avgLevel" : metric.key;
   const playerComparison = React.useMemo(
-    () =>
-      buildGuildAnalyticsPlayerComparison(
+    () => {
+      const startedAt = analyticsNowMs();
+      const comparison = buildGuildAnalyticsPlayerComparison(
         analyticsData,
         activeGuild,
         supportsPlayerComparison ? metric.key : "avgLevel",
         rangeKey,
         selectedPlayerIds,
         identityResolutionSnapshot,
-      ),
+      );
+      logGuildAnalyticsViewDiagnostic("player-history-build", analyticsNowMs() - startedAt, selectedPlayerIds.length, {
+        selectedPlayers: selectedPlayerIds.length,
+        inputObservations: analyticsData.members.length,
+        outputPoints: comparison.playerSeries.reduce((sum, series) => sum + series.points.length, 0),
+      });
+      return comparison;
+    },
     [activeGuild, analyticsData, supportsPlayerComparison, metric.key, rangeKey, selectedPlayerIds, identityResolutionSnapshot],
   );
   const series = React.useMemo(
-    () =>
-      isFightParticipation
+    () => {
+      const startedAt = analyticsNowMs();
+      const nextSeries = isFightParticipation
         ? { allPoints: [], visiblePoints: [], timeDomain: null }
         : supportsPlayerComparison
           ? playerComparison.guildSeries
-          : buildGuildAnalyticsSeries(analyticsData, activeGuild, scanMetricKey, rangeKey, identityResolutionSnapshot),
+          : buildGuildAnalyticsSeries(analyticsData, activeGuild, scanMetricKey, rangeKey, identityResolutionSnapshot);
+      const identityScope = describeGuildAnalyticsIdentityScope(analyticsData, activeGuild, identityResolutionSnapshot);
+      logGuildAnalyticsViewDiagnostic("guild-series-build", analyticsNowMs() - startedAt, nextSeries.allPoints.length, {
+        selectedGuildIdentifier: identityScope.selectedGuildIdentifier,
+        resolvedGuildIdentity: identityScope.resolvedGuildIdentity,
+        aliasIdentifierCount: identityScope.aliasIdentifierCount,
+        inputGuildObservations: identityScope.inputGuildObservations,
+        matchedGuildObservations: identityScope.matchedGuildObservations,
+        outputPoints: nextSeries.visiblePoints.length,
+      });
+      return nextSeries;
+    },
     [activeGuild, analyticsData, scanMetricKey, rangeKey, isFightParticipation, supportsPlayerComparison, playerComparison, identityResolutionSnapshot],
   );
   const fightState = useFightParticipationAnalytics(activeGuild, rangeKey, isFightParticipation);
@@ -448,12 +704,60 @@ function GuildDevelopmentOverview({
   const deltaValue = values.length >= 2 ? values[values.length - 1] - values[0] : null;
   const pointCount = values.length;
   const scanChart = React.useMemo(
-    () => buildScanChartViewModel(metric, visiblePoints, playerComparison, supportsPlayerComparison),
+    () => {
+      const startedAt = analyticsNowMs();
+      const model = buildScanChartViewModel(metric, visiblePoints, playerComparison, supportsPlayerComparison);
+      logGuildAnalyticsViewDiagnostic("chart-model-build", analyticsNowMs() - startedAt, model.series.length, {
+        metric: metric.key,
+        guildPoints: visiblePoints.length,
+        playerSeries: playerComparison.playerSeries.length,
+      });
+      return model;
+    },
     [metric, visiblePoints, playerComparison, supportsPlayerComparison],
   );
+  const [hoveredChartSeriesKey, setHoveredChartSeriesKey] = React.useState<string | null>(null);
+  const [lockedChartSeriesKeys, setLockedChartSeriesKeys] = React.useState<string[]>([]);
+  const availableChartSeriesKeys = React.useMemo(() => new Set(scanChart.series.map((entry) => entry.key)), [scanChart.series]);
+  React.useEffect(() => {
+    setLockedChartSeriesKeys((current) => current.filter((key) => availableChartSeriesKeys.has(key)));
+  }, [availableChartSeriesKeys]);
+  const highlightedChartSeriesKeys = React.useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...lockedChartSeriesKeys.filter((key) => availableChartSeriesKeys.has(key)),
+          ...(hoveredChartSeriesKey && availableChartSeriesKeys.has(hoveredChartSeriesKey) ? [hoveredChartSeriesKey] : []),
+        ]),
+      ),
+    [availableChartSeriesKeys, hoveredChartSeriesKey, lockedChartSeriesKeys],
+  );
+  const lockedChartSeriesKeySet = React.useMemo(() => new Set(lockedChartSeriesKeys), [lockedChartSeriesKeys]);
+  const toggleChartSeriesLock = React.useCallback((seriesKey: string) => {
+    setLockedChartSeriesKeys((current) =>
+      current.includes(seriesKey) ? current.filter((key) => key !== seriesKey) : [...current, seriesKey],
+    );
+  }, []);
   const timeTicks = React.useMemo(
     () => buildTimeTicks(series.timeDomain, rangeKey, isMdUp),
     [series.timeDomain, rangeKey, isMdUp],
+  );
+  const fusionMarkers = React.useMemo(
+    () =>
+      buildGuildAnalyticsFusionMarkers(
+        collectGuildFusionServerInputs(analyticsData, activeGuild, series.allPoints),
+        series.timeDomain,
+      ),
+    [activeGuild, analyticsData, series.allPoints, series.timeDomain],
+  );
+  const fusionMarkerTooltips = React.useMemo(() => buildFusionMarkerTooltips(fusionMarkers), [fusionMarkers]);
+  const verticalFusionMarkers = React.useMemo(
+    () => withMarkerTooltipIndexes(fusionMarkers, scanChart.tooltips.length),
+    [fusionMarkers, scanChart.tooltips.length],
+  );
+  const chartTooltips = React.useMemo(
+    () => [...scanChart.tooltips, ...fusionMarkerTooltips],
+    [scanChart.tooltips, fusionMarkerTooltips],
   );
   const selectedPlayers = playerComparison.playerSeries;
 
@@ -467,6 +771,7 @@ function GuildDevelopmentOverview({
         series={fightState.series}
         range={rangeKey}
         isMdUp={isMdUp}
+        fusionMarkers={fusionMarkers}
       />
     );
   } else if (!activeGuild) {
@@ -474,8 +779,11 @@ function GuildDevelopmentOverview({
   } else if (loading) {
     body = (
       <DataHubLoadingState
-        title="Lokale Scans werden geladen"
-        message="Guild-Analytics-Zeitreihe wird vorbereitet."
+        title={loadingPhase.title}
+        message={loadingPhase.message}
+        current={loadingPhase.current}
+        total={loadingPhase.total}
+        progressLabel={loadingPhase.progressLabel}
       />
     );
   } else if (error) {
@@ -493,23 +801,31 @@ function GuildDevelopmentOverview({
             series={scanChart.series}
             timeDomain={series.timeDomain}
             timeTicks={timeTicks}
+            verticalMarkers={verticalFusionMarkers}
             showAvg={false}
             showFill={false}
-            showDots
+            showDots={false}
             showXLabels
-            dotTooltips={scanChart.tooltips}
+            dotTooltips={chartTooltips}
             yValueFormatter={(value) => formatChartAxisValue(value, metric)}
             semanticKey={metric.key}
+            highlightedSeriesKeys={highlightedChartSeriesKeys}
+            onHoverSeriesKeyChange={setHoveredChartSeriesKey}
           />
           {supportsPlayerComparison ? (
             <ChartLegend
               items={[
-                { label: "Guild Average", color: GUILD_AVERAGE_COLOR },
+                { key: GUILD_AVERAGE_SERIES_KEY, label: "Guild Average", color: GUILD_AVERAGE_COLOR },
                 ...selectedPlayers.map((player, index) => ({
+                  key: player.memberRef,
                   label: player.name,
-                  color: PLAYER_SERIES_COLORS[index % PLAYER_SERIES_COLORS.length],
+                  color: getPlayerSeriesColor(index),
                 })),
               ]}
+              lockedKeys={lockedChartSeriesKeySet}
+              highlightedKeys={new Set(highlightedChartSeriesKeys)}
+              onHoverKeyChange={setHoveredChartSeriesKey}
+              onToggleLock={toggleChartSeriesLock}
             />
           ) : null}
         </div>
@@ -639,7 +955,7 @@ function buildScanChartViewModel(
   };
 
   const guildSeries = {
-    key: "guild-average",
+    key: GUILD_AVERAGE_SERIES_KEY,
     label: "Guild Average",
     points: [],
     timePoints: visiblePoints.map((point) => {
@@ -684,7 +1000,7 @@ function buildScanChartViewModel(
         points: [],
         timePoints: player.points.map((point) => {
           const guildPoint = guildPointByScanId.get(point.scanId) ?? null;
-          const playerColor = PLAYER_SERIES_COLORS[seriesIndex % PLAYER_SERIES_COLORS.length];
+          const playerColor = getPlayerSeriesColor(seriesIndex);
           return {
             timestampMs: point.scannedAtMs,
             value: point.value,
@@ -701,11 +1017,51 @@ function buildScanChartViewModel(
             ),
           };
         }),
-        color: PLAYER_SERIES_COLORS[seriesIndex % PLAYER_SERIES_COLORS.length],
+        color: getPlayerSeriesColor(seriesIndex),
       })),
     ],
     tooltips,
   };
+}
+
+function collectGuildFusionServerInputs(
+  analyticsData: GuildAnalyticsDerivedData,
+  activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"],
+  points: GuildAnalyticsPoint[],
+) {
+  const snapshotIds = new Set(points.map((point) => point.scanId));
+  const servers = new Set<string>();
+  const addServer = (value: string | null | undefined) => {
+    const server = String(value ?? "").trim();
+    if (server) servers.add(server);
+  };
+
+  analyticsData.guilds.forEach((guild) => {
+    if (!snapshotIds.has(guild.snapshotId)) return;
+    addServer(guild.server);
+    addServer(parseServerFromGuildIdentifier(guild.guildIdentifier));
+    addServer(guild.guildIdentifier);
+  });
+  addServer(activeGuild?.server);
+  addServer(parseServerFromGuildIdentifier(activeGuild?.logoIdentifier));
+  addServer(activeGuild?.logoIdentifier);
+  return [...servers];
+}
+
+function withMarkerTooltipIndexes(
+  markers: GuildAnalyticsFusionMarker[],
+  tooltipOffset: number,
+): AnchoredLineChartVerticalMarker[] {
+  return markers.map((marker, index) => ({
+    key: marker.key,
+    timestampMs: marker.timestampMs,
+    description: marker.description,
+    tooltipIndex: tooltipOffset + index,
+  }));
+}
+
+function buildFusionMarkerTooltips(markers: GuildAnalyticsFusionMarker[]) {
+  return markers.map((marker) => <FusionMarkerTooltip key={marker.key} marker={marker} />);
 }
 
 function ScanMetricTooltip({
@@ -732,6 +1088,30 @@ function ScanMetricTooltip({
           <b>{formatMetricValue(row.value, metric)}</b>
         </span>
       ))}
+    </div>
+  );
+}
+
+function FusionMarkerTooltip({ marker }: { marker: GuildAnalyticsFusionMarker }) {
+  return (
+    <div className={styles.scanTooltip}>
+      <strong>Server Fusion</strong>
+      <span>
+        <em>Fusion</em>
+        <b>{`${marker.originServerDisplayNames.join(", ")} -> ${marker.targetServerDisplayName}`}</b>
+      </span>
+      <span>
+        <em>From</em>
+        <b>{marker.originServerDisplayNames.join(", ")}</b>
+      </span>
+      <span>
+        <em>To</em>
+        <b>{marker.targetServerDisplayName}</b>
+      </span>
+      <span>
+        <em>Date</em>
+        <b>{formatFusionMarkerDate(marker.effectiveDate)}</b>
+      </span>
     </div>
   );
 }
@@ -774,15 +1154,62 @@ function PlayerHistoryTooltip({
   );
 }
 
-function ChartLegend({ items }: { items: Array<{ label: string; color: string }> }) {
+function formatFusionMarkerDate(value: string) {
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed) ? dateFormatter.format(parsed) : value;
+}
+
+function ChartLegend({
+  items,
+  lockedKeys,
+  highlightedKeys,
+  onHoverKeyChange,
+  onToggleLock,
+}: {
+  items: Array<{ key?: string; label: string; color: string }>;
+  lockedKeys?: ReadonlySet<string>;
+  highlightedKeys?: ReadonlySet<string>;
+  onHoverKeyChange?: (key: string | null) => void;
+  onToggleLock?: (key: string) => void;
+}) {
   return (
     <div className={styles.chartLegend} aria-label="Chart Legende">
-      {items.map((item) => (
-        <span key={`${item.label}-${item.color}`}>
-          <i style={{ backgroundColor: item.color }} />
-          {item.label}
-        </span>
-      ))}
+      {items.map((item) => {
+        const itemKey = item.key ?? `${item.label}-${item.color}`;
+        const isLocked = Boolean(lockedKeys?.has(itemKey));
+        const isHighlighted = Boolean(highlightedKeys?.has(itemKey));
+        const className = `${styles.chartLegendItem} ${isLocked ? styles.chartLegendItemLocked : ""} ${isHighlighted ? styles.chartLegendItemHighlighted : ""}`;
+        const content = (
+          <>
+            <i style={{ backgroundColor: item.color }} />
+            {item.label}
+          </>
+        );
+
+        if (!onToggleLock || !onHoverKeyChange) {
+          return (
+            <span key={itemKey} className={className}>
+              {content}
+            </span>
+          );
+        }
+
+        return (
+          <button
+            key={itemKey}
+            type="button"
+            className={className}
+            aria-pressed={isLocked}
+            onClick={() => onToggleLock(itemKey)}
+            onMouseEnter={() => onHoverKeyChange(itemKey)}
+            onMouseLeave={() => onHoverKeyChange(null)}
+            onFocus={() => onHoverKeyChange(itemKey)}
+            onBlur={() => onHoverKeyChange(null)}
+          >
+            {content}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -961,6 +1388,7 @@ function FightParticipationOverviewBody({
   series,
   range,
   isMdUp,
+  fusionMarkers,
 }: {
   activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"];
   loading: boolean;
@@ -968,12 +1396,18 @@ function FightParticipationOverviewBody({
   series: FightParticipationSeries;
   range: GuildAnalyticsRangeSelection;
   isMdUp: boolean;
+  fusionMarkers: GuildAnalyticsFusionMarker[];
 }) {
   const visiblePoints = series.visiblePoints;
   const latestPoint = visiblePoints[visiblePoints.length - 1] ?? null;
   const avgParticipants = visiblePoints.length
     ? visiblePoints.reduce((sum, point) => sum + point.participants, 0) / visiblePoints.length
     : null;
+  const fusionMarkerTooltips = React.useMemo(() => buildFusionMarkerTooltips(fusionMarkers), [fusionMarkers]);
+  const verticalFusionMarkers = React.useMemo(
+    () => withMarkerTooltipIndexes(fusionMarkers, visiblePoints.length),
+    [fusionMarkers, visiblePoints.length],
+  );
 
   if (!activeGuild) {
     return <GuildDevelopmentEmptyState message="Waehle im Guild Hub eine Gilde aus." />;
@@ -1031,11 +1465,15 @@ function FightParticipationOverviewBody({
           ]}
           timeDomain={series.timeDomain}
           timeTicks={buildTimeTicks(series.timeDomain, range, isMdUp)}
+          verticalMarkers={verticalFusionMarkers}
           showAvg={false}
           showFill={false}
-          showDots
+          showDots={false}
           showXLabels
-          dotTooltips={visiblePoints.map((point) => <FightParticipationTooltip key={point.fightId} point={point} />)}
+          dotTooltips={[
+            ...visiblePoints.map((point) => <FightParticipationTooltip key={point.fightId} point={point} />),
+            ...fusionMarkerTooltips,
+          ]}
           yValueFormatter={(value) => numberFormatter.format(Math.round(value))}
           semanticKey="fight-participation"
         />
@@ -1310,6 +1748,7 @@ function GuildProgressAnalytics({
   analyticsData,
   identityResolutionSnapshot,
   loading,
+  loadingPhase,
   error,
   periodKey,
   onPeriodChange,
@@ -1318,16 +1757,39 @@ function GuildProgressAnalytics({
   analyticsData: GuildAnalyticsDerivedData;
   identityResolutionSnapshot: IdentityResolutionSnapshot | null;
   loading: boolean;
+  loadingPhase: GuildAnalyticsLoaderState;
   error: string | null;
   periodKey: GuildAnalyticsProgressPeriodKey;
   onPeriodChange: (period: GuildAnalyticsProgressPeriodKey) => void;
 }) {
   const report = React.useMemo(
-    () => buildGuildAnalyticsProgressReport(analyticsData, activeGuild, periodKey, identityResolutionSnapshot),
+    () => {
+      const startedAt = analyticsNowMs();
+      const nextReport = buildGuildAnalyticsProgressReport(analyticsData, activeGuild, periodKey, identityResolutionSnapshot);
+      logGuildAnalyticsViewDiagnostic("chart-model-build", analyticsNowMs() - startedAt, nextReport?.players.length ?? 0, {
+        model: "progress-report",
+        periodKey,
+      });
+      return nextReport;
+    },
     [activeGuild, analyticsData, periodKey, identityResolutionSnapshot],
   );
   const matchingSeries = React.useMemo(
-    () => buildGuildAnalyticsSeries(analyticsData, activeGuild, "memberCount", "all", identityResolutionSnapshot),
+    () => {
+      const startedAt = analyticsNowMs();
+      const nextSeries = buildGuildAnalyticsSeries(analyticsData, activeGuild, "memberCount", "all", identityResolutionSnapshot);
+      const identityScope = describeGuildAnalyticsIdentityScope(analyticsData, activeGuild, identityResolutionSnapshot);
+      logGuildAnalyticsViewDiagnostic("guild-series-build", analyticsNowMs() - startedAt, nextSeries.allPoints.length, {
+        model: "progress-member-count",
+        selectedGuildIdentifier: identityScope.selectedGuildIdentifier,
+        resolvedGuildIdentity: identityScope.resolvedGuildIdentity,
+        aliasIdentifierCount: identityScope.aliasIdentifierCount,
+        inputGuildObservations: identityScope.inputGuildObservations,
+        matchedGuildObservations: identityScope.matchedGuildObservations,
+        outputPoints: nextSeries.visiblePoints.length,
+      });
+      return nextSeries;
+    },
     [activeGuild, analyticsData, identityResolutionSnapshot],
   );
 
@@ -1337,8 +1799,11 @@ function GuildProgressAnalytics({
   } else if (loading) {
     body = (
       <DataHubLoadingState
-        title="Lokale Scans werden geladen"
-        message="Guild-Fortschritt wird vorbereitet."
+        title={loadingPhase.title}
+        message={loadingPhase.message}
+        current={loadingPhase.current}
+        total={loadingPhase.total}
+        progressLabel={loadingPhase.progressLabel}
       />
     );
   } else if (error) {

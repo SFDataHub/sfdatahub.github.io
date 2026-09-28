@@ -166,6 +166,7 @@ export type FusionIdentityGuildMemberRef = {
 };
 
 export type FusionIdentityGuildMemberRefsByStatus = {
+  ready: FusionIdentityGuildMemberRef[];
   review: FusionIdentityGuildMemberRef[];
   unresolved: FusionIdentityGuildMemberRef[];
   noHistoricalObservation: FusionIdentityGuildMemberRef[];
@@ -760,6 +761,7 @@ const emptyGuildMemberStatusSummary =
     noHistoricalDataMembers: 0,
     missingManagementEntries: 0,
     memberRefsByStatus: {
+      ready: [],
       review: [],
       unresolved: [],
       noHistoricalObservation: [],
@@ -872,6 +874,7 @@ const attachGuildMemberStatusSummaries = (
         if (playerItem.status === "ready") {
           summary.readyMembers += 1;
           summary.resolvedMembers += 1;
+          summary.memberRefsByStatus.ready.push(toGuildMemberRef(playerItem));
         } else if (playerItem.status === "completed") {
           summary.completedMembers += 1;
           summary.resolvedMembers += 1;
@@ -2699,13 +2702,38 @@ export async function unlinkFusionIdentityAlias(
   await store.unlinkGuildAlias(identifier);
 }
 
+export type FusionIdentityReadyMergeFilter = {
+  entityType?: FusionIdentityEntityType;
+  currentIdentifiers?: readonly string[];
+};
+
+export const listReadyFusionIdentityMergeItems = (
+  report: FusionIdentityManagementReport,
+  filter: FusionIdentityReadyMergeFilter = {},
+) => {
+  const allowedIdentifiers = filter.currentIdentifiers
+    ? new Set(filter.currentIdentifiers.map(normalizeIdentifierKey))
+    : null;
+  return report.items.filter((item) => {
+    if (item.status !== "ready" || !item.readyCandidateIdentifier) return false;
+    if (filter.entityType && item.entityType !== filter.entityType) return false;
+    if (
+      allowedIdentifiers &&
+      !allowedIdentifiers.has(normalizeIdentifierKey(item.currentIdentifier))
+    ) {
+      return false;
+    }
+    return true;
+  });
+};
+
 export async function mergeReadyFusionIdentityItems(
   report: FusionIdentityManagementReport,
-  options: FusionIdentityManagementStores = {},
+  options: FusionIdentityManagementStores & {
+    filter?: FusionIdentityReadyMergeFilter;
+  } = {},
 ) {
-  const readyItems = report.items.filter(
-    (item) => item.status === "ready" && item.readyCandidateIdentifier,
-  );
+  const readyItems = listReadyFusionIdentityMergeItems(report, options.filter);
   const result = {
     players: 0,
     guilds: 0,

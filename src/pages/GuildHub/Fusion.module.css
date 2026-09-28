@@ -550,6 +550,23 @@
   font-weight: 700;
 }
 
+.developmentChartFrame :global(.player-profile__trend-vertical-markers) {
+  pointer-events: auto;
+}
+
+.developmentChartFrame :global(.player-profile__trend-vertical-marker line) {
+  stroke: rgba(177, 195, 230, 0.42);
+  stroke-dasharray: 4 6;
+  stroke-width: 1.25;
+}
+
+.developmentChartFrame :global(.player-profile__trend-vertical-marker-hitline) {
+  opacity: 0;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-width: 14;
+}
+
 .developmentChartFrame :global(.player-profile__trend-area) {
   opacity: 0.95;
 }
@@ -634,13 +651,37 @@
   margin-top: 8px;
 }
 
-.chartLegend span {
+.chartLegendItem {
   align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: #b1c3e6;
   display: inline-flex;
   font-size: 13px;
   font-weight: 700;
   gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+button.chartLegendItem {
+  cursor: pointer;
+}
+
+button.chartLegendItem:hover,
+button.chartLegendItem:focus-visible,
+.chartLegendItemHighlighted {
+  background: rgba(123, 162, 214, 0.1);
+  border-color: rgba(177, 195, 230, 0.25);
+  color: #e6efff;
+}
+
+.chartLegendItemLocked {
+  background: rgba(85, 219, 166, 0.1);
+  border-color: rgba(85, 219, 166, 0.48);
+  color: #f0fff9;
 }
 
 .chartLegend i {

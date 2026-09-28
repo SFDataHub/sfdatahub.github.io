@@ -2,8 +2,11 @@ import type { GuildHubLocalScan } from "./localScanLibrary";
 import {
   collectGuildIdentityObservations,
   collectPlayerIdentityObservations,
+  resolveGuildIdentity,
+  type GuildIdentityResolution,
   type IdentityResolutionSnapshot,
 } from "../identities/identityResolution";
+import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "./guildScanNormalizer";
 import {
   isDerivedGuildSnapshotForGuild,
   isDerivedMemberInGuild,
@@ -103,6 +106,14 @@ export type GuildAnalyticsProgressReport = {
   daysBetween: number;
   metrics: Record<GuildAnalyticsMetricKey, GuildAnalyticsProgressMetric>;
   players: GuildAnalyticsProgressPlayer[];
+};
+
+export type GuildAnalyticsIdentityScopeDescription = {
+  selectedGuildIdentifier: string | null;
+  resolvedGuildIdentity: string | null;
+  aliasIdentifierCount: number;
+  inputGuildObservations: number;
+  matchedGuildObservations: number;
 };
 
 export const GUILD_ANALYTICS_METRICS: GuildAnalyticsMetricDefinition[] = [
@@ -359,6 +370,38 @@ export function resolveGuildAnalyticsScanTimeMs(scan: GuildHubLocalScan) {
   return parseDateMs(scan.scannedAt) ?? 0;
 }
 
+export function describeGuildAnalyticsIdentityScope(
+  data: GuildAnalyticsDerivedData,
+  guild: GuildAnalyticsGuildIdentity | null | undefined,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+): GuildAnalyticsIdentityScopeDescription {
+  if (!guild) {
+    return {
+      selectedGuildIdentifier: null,
+      resolvedGuildIdentity: null,
+      aliasIdentifierCount: 0,
+      inputGuildObservations: data.guilds.length,
+      matchedGuildObservations: 0,
+    };
+  }
+
+  const identityScope = resolveGuildAnalyticsIdentityScope(guild, identityResolutionSnapshot);
+  const matchedGuildObservations = collectGuildAnalyticsGuildObservations(
+    data,
+    guild,
+    identityScope,
+    identityResolutionSnapshot,
+  ).length;
+
+  return {
+    selectedGuildIdentifier: identityScope.selectedGuildIdentifier,
+    resolvedGuildIdentity: identityScope.resolution?.resolved ? identityScope.resolution.identityId : null,
+    aliasIdentifierCount: identityScope.resolution?.resolved ? identityScope.resolution.aliasIdentifiers.length : 0,
+    inputGuildObservations: data.guilds.length,
+    matchedGuildObservations,
+  };
+}
+
 type GuildAnalyticsSnapshot = {
   point: GuildAnalyticsPoint;
   members: GuildAnalyticsMemberSnapshot[];
@@ -369,33 +412,71 @@ function buildAnalyticsSnapshotsForGuild(
   guild: GuildAnalyticsGuildIdentity,
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ): GuildAnalyticsSnapshot[] {
-  const resolvedIdentifier = resolveGuildAnalyticsIdentifier(guild);
+  const identityScope = resolveGuildAnalyticsIdentityScope(guild, identityResolutionSnapshot);
   const membersBySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
-  for (const member of collectGuildAnalyticsMemberObservations(data, guild, resolvedIdentifier, identityResolutionSnapshot)) {
+  for (const member of collectGuildAnalyticsMemberObservations(data, guild, identityScope, identityResolutionSnapshot)) {
     const members = membersBySnapshotId.get(member.snapshotId) ?? [];
     members.push(member);
     membersBySnapshotId.set(member.snapshotId, members);
   }
 
-  return collectGuildAnalyticsGuildObservations(data, guild, resolvedIdentifier, identityResolutionSnapshot)
+  return collectGuildAnalyticsGuildObservations(data, guild, identityScope, identityResolutionSnapshot)
     .map((snapshot) => ({
       point: pointFromGuildSnapshot(snapshot),
       members: membersBySnapshotId.get(snapshot.snapshotId) ?? [],
     }));
 }
 
-function resolveGuildAnalyticsIdentifier(guild: GuildAnalyticsGuildIdentity) {
-  return String(guild.logoIdentifier ?? guild.guildId ?? "").trim() || null;
+type GuildAnalyticsIdentityScope = {
+  selectedGuildIdentifier: string | null;
+  resolution: GuildIdentityResolution | null;
+};
+
+function resolveGuildAnalyticsIdentityScope(
+  guild: GuildAnalyticsGuildIdentity,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+): GuildAnalyticsIdentityScope {
+  const identifierCandidates = buildGuildAnalyticsIdentifierCandidates(guild);
+  if (!identifierCandidates.length) return { selectedGuildIdentifier: null, resolution: null };
+
+  if (identityResolutionSnapshot) {
+    for (const identifier of identifierCandidates) {
+      const resolution = resolveGuildIdentity(identityResolutionSnapshot, identifier);
+      if (resolution.resolved) {
+        return { selectedGuildIdentifier: identifier, resolution };
+      }
+    }
+  }
+
+  return { selectedGuildIdentifier: identifierCandidates[0] ?? null, resolution: null };
+}
+
+function buildGuildAnalyticsIdentifierCandidates(guild: GuildAnalyticsGuildIdentity) {
+  const identifiers = new Set<string>();
+  const addIdentifier = (value: string | null | undefined) => {
+    const identifier = String(value ?? "").trim();
+    if (identifier) identifiers.add(identifier);
+  };
+
+  addIdentifier(guild.logoIdentifier);
+  addIdentifier(guild.guildId);
+
+  const guildSegment = normalizeGuildSegmentForScan(guild.logoIdentifier ?? guild.guildId);
+  const guildServer = normalizeGuildScanServer(guild.server);
+  if (guildSegment && guildServer) addIdentifier(`${guildServer}_${guildSegment}`);
+  if (guildSegment) addIdentifier(guildSegment);
+
+  return [...identifiers];
 }
 
 function collectGuildAnalyticsGuildObservations(
   data: GuildAnalyticsDerivedData,
   guild: GuildAnalyticsGuildIdentity,
-  guildIdentifier: string | null,
+  identityScope: GuildAnalyticsIdentityScope,
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ) {
-  if (identityResolutionSnapshot && guildIdentifier) {
-    const history = collectGuildIdentityObservations(identityResolutionSnapshot, guildIdentifier, data.guilds);
+  if (identityResolutionSnapshot && identityScope.selectedGuildIdentifier && identityScope.resolution?.resolved) {
+    const history = collectGuildIdentityObservations(identityResolutionSnapshot, identityScope.selectedGuildIdentifier, data.guilds);
     if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
   }
 
@@ -405,11 +486,11 @@ function collectGuildAnalyticsGuildObservations(
 function collectGuildAnalyticsMemberObservations(
   data: GuildAnalyticsDerivedData,
   guild: GuildAnalyticsGuildIdentity,
-  guildIdentifier: string | null,
+  identityScope: GuildAnalyticsIdentityScope,
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ) {
-  if (identityResolutionSnapshot && guildIdentifier) {
-    const history = collectGuildIdentityObservations(identityResolutionSnapshot, guildIdentifier, data.members);
+  if (identityResolutionSnapshot && identityScope.selectedGuildIdentifier && identityScope.resolution?.resolved) {
+    const history = collectGuildIdentityObservations(identityResolutionSnapshot, identityScope.selectedGuildIdentifier, data.members);
     if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
   }
 
@@ -451,10 +532,11 @@ function buildPlayerHistoryPoints(
   guild: GuildAnalyticsGuildIdentity,
   memberRef: string,
   metricKey: GuildAnalyticsMetricKey,
-  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "players"> | null,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "players" | "guilds"> | null,
 ): GuildAnalyticsPlayerPoint[] {
   const snapshotsById = new Map(data.snapshots.map((snapshot) => [snapshot.id, snapshot]));
   const membersBySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
+  const isMemberInSelectedGuild = createGuildAnalyticsMembershipResolver(guild, identityResolutionSnapshot);
   const history = collectPlayerIdentityObservations(
     identityResolutionSnapshot ?? { players: { byIdentifier: new Map(), byIdentityId: new Map() } },
     memberRef,
@@ -477,7 +559,7 @@ function buildPlayerHistoryPoints(
       const value = readPlayerMetricValue(member, metricKey);
       if (value == null) return null;
 
-      const inCurrentGuild = isDerivedMemberInGuild(member, guild);
+      const inCurrentGuild = isMemberInSelectedGuild(member);
       return {
         scanId: snapshot.id,
         scanLabel: snapshot.sourceScanFilename,
@@ -491,6 +573,27 @@ function buildPlayerHistoryPoints(
     })
     .filter((point): point is GuildAnalyticsPlayerPoint => Boolean(point))
     .sort((a, b) => a.scannedAtMs - b.scannedAtMs || a.scanId.localeCompare(b.scanId));
+}
+
+function createGuildAnalyticsMembershipResolver(
+  guild: GuildAnalyticsGuildIdentity,
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+) {
+  const selectedScope = resolveGuildAnalyticsIdentityScope(guild, identityResolutionSnapshot);
+  const selectedIdentityId = selectedScope.resolution?.resolved ? selectedScope.resolution.identityId : null;
+  const resolutionByIdentifier = new Map<string, GuildIdentityResolution>();
+
+  return (member: GuildAnalyticsMemberSnapshot) => {
+    if (identityResolutionSnapshot && selectedIdentityId && member.guildIdentifier) {
+      const cached =
+        resolutionByIdentifier.get(member.guildIdentifier) ??
+        resolveGuildIdentity(identityResolutionSnapshot, member.guildIdentifier);
+      resolutionByIdentifier.set(member.guildIdentifier, cached);
+      if (cached.resolved) return cached.identityId === selectedIdentityId;
+    }
+
+    return isDerivedMemberInGuild(member, guild);
+  };
 }
 
 function resolvePlayerHistoryName(

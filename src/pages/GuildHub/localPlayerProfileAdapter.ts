@@ -15,11 +15,13 @@ export type LocalPlayerProfileAdapterInput = {
   rawPlayer: unknown;
   sourceScanId: string;
   sourcePlayerKey: string;
+  sourceMemberRef?: string | null;
   scannedAtMs: number;
   scannedAtIso: string | null;
   guild: {
     name: string | null;
     server: string | null;
+    identifier?: string | null;
     hofRank?: number | null;
   };
   guildRole?: NormalizedGuildRole;
@@ -212,6 +214,14 @@ export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInp
   return {
     sourceScanId: input.sourceScanId,
     sourcePlayerKey: input.sourcePlayerKey,
+    analytics: {
+      playerName,
+      server,
+      memberRef: input.sourceMemberRef ?? (input.sourcePlayerKey.includes(":name:") ? null : input.sourcePlayerKey),
+      guildIdentifier: input.guild.identifier ?? null,
+      guildName,
+      scannedAtMs: input.scannedAtMs,
+    },
     hero: {
       playerName,
       className,
