@@ -1,6 +1,6 @@
 .backdrop {
   position: fixed;
-  inset: var(--app-overlay-inset, var(--topbar-h, 0px) 0 0 0);
+  inset: var(--app-overlay-top, var(--topbar-h, 0px)) 0 0 var(--sidebar-w, 0px);
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -12,9 +12,14 @@
   box-sizing: border-box;
 }
 
+:global(body:has(#app-shell[data-sidebar="expanded"])) .backdrop {
+  left: var(--sidebar-expanded-w, var(--sidebar-w, 0px));
+}
+
 .panel {
   position: relative;
-  width: min(980px, calc(100vw - 32px));
+  width: min(1320px, calc(100vw - var(--sidebar-w, 0px) - 32px));
+  max-width: calc(100vw - var(--sidebar-w, 0px) - 32px);
   height: min(
     760px,
     calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 32px)
@@ -137,7 +142,8 @@
 
 .tabButton {
   min-height: 34px;
-  flex: 1 1 180px;
+  min-width: 0;
+  flex: 1 1 160px;
   appearance: none;
   border: 1px solid transparent;
   border-radius: 9px;
@@ -232,6 +238,24 @@
   padding: 12px;
 }
 
+:global(body:has(#app-shell[data-sidebar="expanded"])) .panel {
+  width: min(1320px, calc(100vw - var(--sidebar-expanded-w, var(--sidebar-w, 0px)) - 32px));
+  max-width: calc(100vw - var(--sidebar-expanded-w, var(--sidebar-w, 0px)) - 32px);
+}
+
+.inlineRetryButton {
+  appearance: none;
+  margin-left: 10px;
+  border: 1px solid rgba(246, 120, 156, 0.42);
+  border-radius: 8px;
+  background: rgba(92, 48, 70, 0.34);
+  color: #f6b8ca;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
 .feedbackBox {
   display: grid;
   gap: 4px;
@@ -245,6 +269,40 @@
 
 .feedbackError {
   color: #f6b8ca;
+}
+
+.statusBadge,
+.archiveBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(77, 163, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(77, 163, 255, 0.12);
+  color: #b8d9ff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 3px 6px;
+}
+
+.archiveBadge {
+  display: flex;
+  margin-top: 4px;
+  border-color: rgba(80, 214, 166, 0.32);
+  background: rgba(80, 214, 166, 0.12);
+  color: #b9f4dd;
+}
+
+.spinIcon {
+  animation: scanManagementSpin 0.9s linear infinite;
+}
+
+@keyframes scanManagementSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .jobStatusBox {
@@ -541,6 +599,7 @@
 }
 
 .tableWrap {
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -550,6 +609,54 @@
   border-collapse: collapse;
   text-align: left;
   font-size: 12px;
+}
+
+.archiveTable {
+  min-width: 780px;
+}
+
+.archiveMonthRow th {
+  padding: 0;
+  border-bottom: 1px solid rgba(77, 163, 255, 0.22);
+  background: rgba(16, 34, 56, 0.72);
+  color: #dcecff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.archiveMonthButton {
+  width: 100%;
+  min-height: 38px;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font: inherit;
+  letter-spacing: 0;
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.archiveMonthButton:hover {
+  background: rgba(77, 163, 255, 0.08);
+  color: var(--text);
+}
+
+.archiveMonthButton:focus-visible {
+  outline: 2px solid rgba(77, 163, 255, 0.7);
+  outline-offset: -2px;
+  background: rgba(77, 163, 255, 0.12);
+}
+
+.archiveMonthButton svg {
+  flex: 0 0 auto;
 }
 
 .table thead {
@@ -583,19 +690,21 @@
 }
 
 .actionCell {
-  width: 200px;
+  width: 220px;
   text-align: right;
   vertical-align: middle;
 }
 
 .rowActions {
   display: flex;
+  min-width: max-content;
   align-items: center;
   justify-content: flex-end;
   gap: 7px;
 }
 
 .iconButton {
+  flex: 0 0 auto;
   width: 32px;
   height: 32px;
   border-radius: 9px;
@@ -613,6 +722,7 @@
 .detailsButton {
   width: auto;
   min-width: 92px;
+  flex: 0 0 auto;
   gap: 6px;
   padding: 0 10px;
   font-size: 12px;
@@ -1298,14 +1408,27 @@
   }
 }
 
+@media (max-width: 1024px) {
+  .backdrop {
+    inset: var(--app-overlay-top, var(--topbar-h, 0px)) 0 0 0;
+  }
+
+  .panel {
+    width: min(1320px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+  }
+}
+
 @media (max-width: 767px) {
   .backdrop {
+    inset: var(--app-overlay-top, var(--topbar-h, 0px)) 0 0 0;
     align-items: stretch;
     padding: 8px;
   }
 
   .panel {
     width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
     height: calc(100dvh - var(--app-overlay-top, var(--topbar-h, 0px)) - 16px);
     border-radius: 14px;
   }
@@ -1454,6 +1577,7 @@
   .dangerButton,
   .iconButton,
   .tabButton,
+  .archiveMonthButton,
   .inlineActionButton,
   .entityButton {
     transition: none;

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "archives": [
+    {
+      "year": 2026,
+      "active": true,
+      "manifestUrl": "https://raw.githubusercontent.com/SFDataHub/scan-archive-2026/main/manifest.json"
+    }
+  ]
+}

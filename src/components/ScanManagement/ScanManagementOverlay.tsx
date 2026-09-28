@@ -2,7 +2,9 @@ import React from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Database,
   Download,
   Eye,
@@ -22,8 +24,10 @@ import {
 import { useBackClose } from "../../hooks/useBackClose";
 import {
   createSfDataHubLocalScanImportPreview,
+  commitSfDataHubLocalScanPreview,
   deleteSfDataHubLocalScans,
   deriveGuildHubLogicalScanSnapshots,
+  findSfDataHubLocalScanByArchiveScanId,
   getSfDataHubLocalScan,
   importSfDataHubLocalScanRecords,
   listSfDataHubScanSummaries,
@@ -34,6 +38,17 @@ import {
   type GuildHubScanSummary,
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
+import {
+  createScanArchiveSourceMetadata,
+  loadScanArchiveEntries,
+} from "../../lib/scanArchive/client";
+import {
+  ScanArchiveDownloadCancelledError,
+  startScanArchiveDownloadWorkerRun,
+  type ScanArchiveDownloadRun,
+} from "../../lib/scanArchive/downloadWorkerClient";
+import type { ScanArchiveDownloadProgress } from "../../lib/scanArchive/downloadWorkerTypes";
+import type { ScanArchiveEntry } from "../../lib/scanArchive/types";
 import type { GuildSnapshotCoverageStatus } from "../../lib/guilds/guildCoverage";
 import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../../lib/guilds/guildScanNormalizer";
 import {
@@ -87,7 +102,7 @@ type ImportFeedback = {
   errors: Array<{ filename: string; message: string }>;
 };
 
-type DataManagementTab = "scans" | "fightTracker";
+type DataManagementTab = "scans" | "archive" | "fightTracker";
 
 type PendingTransferImport = {
   kind: "transfer";
@@ -117,6 +132,18 @@ type PendingScanMergeImport = {
 type PendingImport = PendingTransferImport | PendingScanJsonImport | PendingScanMergeImport;
 
 type ScanDetailsData = ScanExplorerData;
+
+type ArchiveTableRow = {
+  id: string;
+  entry: ScanArchiveEntry | null;
+  localSummary: GuildHubScanSummary | null;
+};
+
+type ArchiveTableGroup = {
+  id: string;
+  label: string;
+  rows: ArchiveTableRow[];
+};
 
 const EMPTY_FEEDBACK: ImportFeedback = {
   imported: [],
@@ -188,6 +215,13 @@ function formatScanSnapshotCell(summary: GuildHubScanSummary) {
   };
 }
 
+function formatArchiveScanSnapshotCell(entry: ScanArchiveEntry) {
+  return {
+    label: formatScanDate(new Date(entry.timestamp).toISOString()),
+    title: entry.timestampUtc ?? new Date(entry.timestamp).toISOString(),
+  };
+}
+
 function formatOptionalDate(value: string | null | undefined) {
   if (!value) return "Unbekannt";
   const date = new Date(value);
@@ -201,6 +235,45 @@ function formatOptionalDate(value: string | null | undefined) {
 
 function formatServerList(scan: Pick<SfDataHubLocalScan, "servers"> | Pick<GuildHubScanSummary, "servers">) {
   return scan.servers.length ? scan.servers.join(", ") : "Unbekannt";
+}
+
+function getArchiveDisplayName(entry: ScanArchiveEntry) {
+  const filename = entry.path.split("/").pop() ?? entry.id;
+  return filename.endsWith(".gz") ? filename.slice(0, -3) : filename;
+}
+
+function getArchiveImportFilename(entry: ScanArchiveEntry) {
+  const displayName = getArchiveDisplayName(entry);
+  return displayName.toLowerCase().endsWith(".json") ? displayName : `${displayName}.json`;
+}
+
+function getScanSortTimestamp(summary: GuildHubScanSummary) {
+  return summary.lastSnapshotTimestamp ?? summary.firstSnapshotTimestamp ?? Number.NEGATIVE_INFINITY;
+}
+
+function getArchiveRowSortTimestamp(row: ArchiveTableRow) {
+  return row.entry?.timestamp ?? row.localSummary?.archiveSource?.timestamp ?? getScanSortTimestamp(row.localSummary!) ?? Number.NEGATIVE_INFINITY;
+}
+
+function getArchiveRowServerSortKey(row: ArchiveTableRow) {
+  const server = row.entry?.server ?? row.localSummary?.archiveSource?.server ?? row.localSummary?.servers.join(", ") ?? "";
+  return server.trim().toLowerCase();
+}
+
+function getArchiveMonthId(timestamp: number) {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return "unknown";
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatArchiveMonthLabel(timestamp: number) {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return "Unbekannter Monat";
+  return new Intl.DateTimeFormat("de-DE", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function downloadSfDataFile(filename: string, envelope: SfDataHubAnyTransferEnvelope) {
@@ -403,9 +476,16 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateTargetIdRef = React.useRef<string | null>(null);
+  const archiveDownloadRunsRef = React.useRef(new Map<string, ScanArchiveDownloadRun>());
   const [scans, setScans] = React.useState<GuildHubScanSummary[]>([]);
+  const [archiveEntries, setArchiveEntries] = React.useState<ScanArchiveEntry[]>([]);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
   const [loading, setLoading] = React.useState(false);
+  const [archiveLoading, setArchiveLoading] = React.useState(false);
+  const [archiveError, setArchiveError] = React.useState<string | null>(null);
+  const [downloadingArchiveIds, setDownloadingArchiveIds] = React.useState<Set<string>>(() => new Set());
+  const [archiveDownloadProgress, setArchiveDownloadProgress] = React.useState<Record<string, ScanArchiveDownloadProgress>>({});
+  const [expandedArchiveMonths, setExpandedArchiveMonths] = React.useState<Record<string, boolean>>({});
   const [busy, setBusy] = React.useState(false);
   const [feedback, setFeedback] = React.useState<ImportFeedback | null>(null);
   const [storageError, setStorageError] = React.useState<string | null>(null);
@@ -444,6 +524,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     if (isOpen) setActiveTab("scans");
     else {
       setPendingImport(null);
+      setExpandedArchiveMonths({});
       closeScanDetails();
     }
   }, [closeScanDetails, isOpen]);
@@ -461,6 +542,20 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
       setStorageError("Lokale Scans konnten nicht geladen werden.");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadArchiveEntries = React.useCallback(async () => {
+    setArchiveError(null);
+    setArchiveLoading(true);
+    try {
+      setArchiveEntries(await loadScanArchiveEntries());
+    } catch (error) {
+      console.error("[ScanManagement] failed to load scan archive", error);
+      setArchiveEntries([]);
+      setArchiveError("Scanarchiv konnte nicht geladen werden. Lokale Scans bleiben nutzbar.");
+    } finally {
+      setArchiveLoading(false);
     }
   }, []);
 
@@ -482,10 +577,17 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   React.useEffect(() => {
     if (!isOpen) return;
     void loadScans();
+    void loadArchiveEntries();
     return subscribeToSfDataHubLocalScanChanges(() => {
       void loadScans();
     });
-  }, [isOpen, loadScans]);
+  }, [isOpen, loadArchiveEntries, loadScans]);
+
+  React.useEffect(() => {
+    if (isOpen) return;
+    archiveDownloadRunsRef.current.forEach((run) => run.cancel());
+    archiveDownloadRunsRef.current.clear();
+  }, [isOpen]);
 
   React.useEffect(() => {
     if (!isOpen || activeTab !== "fightTracker") return;
@@ -516,6 +618,118 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   }, [isOpen]);
 
   const visibleScans = React.useMemo(() => scans.filter((scan) => !scan.containedInScanSlotId), [scans]);
+  const ownVisibleScans = React.useMemo(
+    () =>
+      visibleScans
+        .filter((scan) => !scan.archiveSource)
+        .sort((left, right) => getScanSortTimestamp(right) - getScanSortTimestamp(left) || left.sourceScanId.localeCompare(right.sourceScanId)),
+    [visibleScans],
+  );
+  const localArchiveScans = React.useMemo(
+    () =>
+      visibleScans
+        .filter((scan) => Boolean(scan.archiveSource?.archiveScanId))
+        .sort((left, right) => getScanSortTimestamp(right) - getScanSortTimestamp(left) || left.sourceScanId.localeCompare(right.sourceScanId)),
+    [visibleScans],
+  );
+  const archiveManifestEntries = React.useMemo(() => {
+    const byId = new Map<string, ScanArchiveEntry>();
+    for (const entry of archiveEntries) {
+      if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    }
+    return [...byId.values()].sort((left, right) => right.timestamp - left.timestamp || left.server.localeCompare(right.server) || left.id.localeCompare(right.id));
+  }, [archiveEntries]);
+  const archiveRows = React.useMemo<ArchiveTableRow[]>(() => {
+    const localByArchiveId = new Map<string, GuildHubScanSummary>();
+    for (const scan of localArchiveScans) {
+      const archiveScanId = scan.archiveSource?.archiveScanId;
+      if (archiveScanId && !localByArchiveId.has(archiveScanId)) localByArchiveId.set(archiveScanId, scan);
+    }
+
+    if (archiveManifestEntries.length) {
+      return archiveManifestEntries
+        .map((entry) => ({
+        id: entry.id,
+        entry,
+        localSummary: localByArchiveId.get(entry.id) ?? null,
+        }))
+        .sort(
+          (left, right) =>
+            getArchiveRowSortTimestamp(right) - getArchiveRowSortTimestamp(left) ||
+            getArchiveRowServerSortKey(left).localeCompare(getArchiveRowServerSortKey(right), "de-DE", {
+              numeric: true,
+              sensitivity: "base",
+            }) ||
+            left.id.localeCompare(right.id),
+        );
+    }
+
+    return localArchiveScans
+      .map((scan) => ({
+        id: scan.archiveSource?.archiveScanId ?? scan.sourceScanId,
+        entry: null,
+        localSummary: scan,
+      }))
+      .sort(
+        (left, right) =>
+          getArchiveRowSortTimestamp(right) - getArchiveRowSortTimestamp(left) ||
+          getArchiveRowServerSortKey(left).localeCompare(getArchiveRowServerSortKey(right), "de-DE", {
+            numeric: true,
+            sensitivity: "base",
+          }) ||
+          left.id.localeCompare(right.id),
+      );
+  }, [archiveManifestEntries, localArchiveScans]);
+  const archiveGroups = React.useMemo<ArchiveTableGroup[]>(() => {
+    const groups = new Map<string, ArchiveTableGroup>();
+    for (const row of archiveRows) {
+      const timestamp = getArchiveRowSortTimestamp(row);
+      const id = getArchiveMonthId(timestamp);
+      const group = groups.get(id);
+      if (group) {
+        group.rows.push(row);
+      } else {
+        groups.set(id, {
+          id,
+          label: formatArchiveMonthLabel(timestamp),
+          rows: [row],
+        });
+      }
+    }
+    return [...groups.values()];
+  }, [archiveRows]);
+  React.useEffect(() => {
+    if (!isOpen || !archiveGroups.length) return;
+    setExpandedArchiveMonths((current) => {
+      let changed = false;
+      const next = { ...current };
+      archiveGroups.forEach((group, index) => {
+        if (Object.prototype.hasOwnProperty.call(next, group.id)) return;
+        next[group.id] = index === 0;
+        changed = true;
+      });
+      return changed ? next : current;
+    });
+  }, [archiveGroups, isOpen]);
+  const localArchiveScanIds = React.useMemo(
+    () =>
+      new Set(
+        localArchiveScans
+          .map((scan) => scan.archiveSource?.archiveScanId)
+          .filter((archiveScanId): archiveScanId is string => Boolean(archiveScanId)),
+      ),
+    [localArchiveScans],
+  );
+  const archiveLocalCount = archiveManifestEntries.filter((entry) => localArchiveScanIds.has(entry.id)).length;
+  const selectedVisibleScans =
+    activeTab === "archive"
+      ? archiveRows
+          .map((row) => row.localSummary)
+          .filter((scan): scan is GuildHubScanSummary => Boolean(scan))
+      : ownVisibleScans;
+  const selectedExportableScans = ownVisibleScans.filter(
+    (scan) => selectedIds.has(scan.sourceScanId) && !scan.archiveSource,
+  );
 
   const handleImportFiles = async (files: File[]) => {
     if (!files.length) return;
@@ -619,8 +833,14 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
   const toggleAllVisible = () => {
     setSelectedIds((current) => {
-      if (visibleScans.length > 0 && visibleScans.every((scan) => current.has(scan.sourceScanId))) return new Set();
-      return new Set(visibleScans.map((scan) => scan.sourceScanId));
+      const visibleIds = selectedVisibleScans.map((scan) => scan.sourceScanId);
+      const next = new Set(current);
+      if (visibleIds.length > 0 && visibleIds.every((id) => current.has(id))) {
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      visibleIds.forEach((id) => next.add(id));
+      return next;
     });
   };
 
@@ -700,22 +920,32 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const exportSelectedScans = async () => {
-    const selectedScans = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
+    const selectedScans = selectedExportableScans;
     if (!selectedScans.length) return;
     setBusy(true);
     setStorageError(null);
     try {
-      const rawScans = (await Promise.all(selectedScans.map((scan) => getSfDataHubLocalScan(scan.sourceScanId)))).filter(
-        (scan): scan is SfDataHubLocalScan => Boolean(scan),
+      const scanPairs = await Promise.all(
+        selectedScans.map(async (summary) => ({
+          summary,
+          scan: await getSfDataHubLocalScan(summary.sourceScanId),
+        })),
       );
-      if (rawScans.length !== selectedScans.length) {
+      if (scanPairs.some((pair) => !pair.scan)) {
         setStorageError("Mindestens ein ausgewählter Scan wurde nicht gefunden.");
         return;
       }
 
+      const exportablePairs = scanPairs.filter(
+        (pair): pair is { summary: GuildHubScanSummary; scan: SfDataHubLocalScan } =>
+          pair.scan != null && !pair.summary.archiveSource && !pair.scan.archiveSource,
+      );
+      if (!exportablePairs.length) return;
+
+      const rawScans = exportablePairs.map((pair) => pair.scan);
       if (rawScans.length === 1) {
         if (rawScans[0].isMergedBundle) {
-          downloadJsonFile(getScanExportFilename(selectedScans[0]), rawScans[0].rawData);
+          downloadJsonFile(getScanExportFilename(exportablePairs[0].summary), rawScans[0].rawData);
           return;
         }
         const envelope = createSfDataHubTransferEnvelope("scan", rawScans[0]);
@@ -737,7 +967,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const startMergePreview = () => {
-    const selectedScans = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
+    const selectedScans = ownVisibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
     if (selectedScans.length < 2) return;
     setPendingImport({
       kind: "scanMerge",
@@ -880,13 +1110,87 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     }
   };
 
-  const selectedVisibleCount = visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).length;
-  const allVisibleSelected = visibleScans.length > 0 && visibleScans.every((scan) => selectedIds.has(scan.sourceScanId));
+  const downloadArchiveScan = async (entry: ScanArchiveEntry) => {
+    if (downloadingArchiveIds.has(entry.id)) return;
+    setBusy(true);
+    setStorageError(null);
+    setArchiveError(null);
+
+    const nextFeedback = createEmptyFeedback();
+    try {
+      const existingArchiveScan = await findSfDataHubLocalScanByArchiveScanId(entry.id);
+      if (existingArchiveScan) {
+        if (existingArchiveScan.archiveSource?.sha256 === entry.sha256) {
+          nextFeedback.duplicates.push(existingArchiveScan.filename);
+          setFeedback(nextFeedback);
+          await loadScans();
+          return;
+        }
+        throw new Error("Archivscan ist lokal mit abweichender Pruefsumme vorhanden.");
+      }
+
+      setDownloadingArchiveIds((current) => new Set(current).add(entry.id));
+      const run = startScanArchiveDownloadWorkerRun({
+        entry,
+        onProgress: (progress) => {
+          setArchiveDownloadProgress((current) => ({ ...current, [entry.id]: progress }));
+        },
+      });
+      archiveDownloadRunsRef.current.set(entry.id, run);
+      const result = await run.promise;
+      archiveDownloadRunsRef.current.delete(entry.id);
+
+      const filename = getArchiveImportFilename(entry);
+      const scan = await createSfDataHubLocalScanImportPreview(filename, result.content, {
+        archiveSource: createScanArchiveSourceMetadata(entry),
+      });
+      const imported = await commitSfDataHubLocalScanPreview(scan);
+      if (imported.status === "duplicate") {
+        nextFeedback.duplicates.push(imported.scan.filename);
+      } else {
+        nextFeedback.imported.push(imported.scan.filename);
+      }
+      setFeedback(nextFeedback);
+      await Promise.all([loadScans(), loadArchiveEntries()]);
+    } catch (error) {
+      if (error instanceof ScanArchiveDownloadCancelledError) return;
+      const message = error instanceof Error ? error.message : "Archivscan konnte nicht geladen werden.";
+      nextFeedback.errors.push({ filename: getArchiveDisplayName(entry), message });
+      setFeedback(nextFeedback);
+    } finally {
+      archiveDownloadRunsRef.current.delete(entry.id);
+      setDownloadingArchiveIds((current) => {
+        const next = new Set(current);
+        next.delete(entry.id);
+        return next;
+      });
+      setArchiveDownloadProgress((current) => {
+        const next = { ...current };
+        delete next[entry.id];
+        return next;
+      });
+      setBusy(false);
+    }
+  };
+
+  const isArchiveMonthExpanded = (monthId: string, groupIndex: number) =>
+    Object.prototype.hasOwnProperty.call(expandedArchiveMonths, monthId) ? expandedArchiveMonths[monthId] : groupIndex === 0;
+
+  const toggleArchiveMonth = (monthId: string, currentlyExpanded: boolean) => {
+    setExpandedArchiveMonths((current) => ({
+      ...current,
+      [monthId]: !currentlyExpanded,
+    }));
+  };
+
+  const selectedVisibleCount = selectedVisibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).length;
+  const selectedExportableCount = selectedExportableScans.length;
+  const allVisibleSelected = selectedVisibleScans.length > 0 && selectedVisibleScans.every((scan) => selectedIds.has(scan.sourceScanId));
   const allTrackersSelected = trackerSummaries.length > 0 && trackerSummaries.every((summary) => selectedTrackerIds.has(summary.tracker.id));
   const selectedTrackerCount = trackerSummaries.filter((summary) => selectedTrackerIds.has(summary.tracker.id)).length;
   const activeDataJob = runningSfToolsImportJob ?? runningScanMergeJob;
   const importDisabled = busy || !dataJobsReady || Boolean(activeDataJob);
-  const canMergeSelectedScans = selectedVisibleCount >= 2 && !importDisabled;
+  const canMergeSelectedScans = activeTab === "scans" && selectedVisibleCount >= 2 && !importDisabled;
 
   if (!isOpen || typeof document === "undefined") return null;
 
@@ -992,6 +1296,18 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
               <span>SFtools-Scans</span>
             </button>
             <button
+              id="data-management-archive-tab"
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "archive"}
+              aria-controls="data-management-archive-panel"
+              className={`${styles.tabButton} ${activeTab === "archive" ? styles.tabButtonActive : ""}`}
+              onClick={() => setActiveTab("archive")}
+            >
+              <Download size={15} aria-hidden />
+              <span>Scan-Archiv</span>
+            </button>
+            <button
               id="data-management-fight-trackers-tab"
               type="button"
               role="tab"
@@ -1007,6 +1323,14 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
           <div className={styles.contentScroll}>
             {storageError ? <div className={styles.errorBox}>{storageError}</div> : null}
+            {archiveError ? (
+              <div className={styles.errorBox}>
+                <span>{archiveError}</span>
+                <button type="button" className={styles.inlineRetryButton} onClick={() => void loadArchiveEntries()}>
+                  Erneut versuchen
+                </button>
+              </div>
+            ) : null}
             {hasFeedback(feedback) ? <FeedbackBox feedback={feedback!} /> : null}
             {activeDataJob ? <DataJobStatusBox job={activeDataJob} /> : null}
             {pendingImport ? (
@@ -1024,10 +1348,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             {activeTab === "scans" ? (
               <div id="data-management-scans-panel" role="tabpanel" aria-labelledby="data-management-scans-tab">
                 <div className={styles.toolbar}>
-                  {selectedVisibleCount > 0 ? (
+                  {selectedExportableCount > 0 ? (
                     <button type="button" className={styles.primaryButton} onClick={() => void exportSelectedScans()} disabled={busy}>
                       <Download size={16} aria-hidden />
-                      <span>{selectedVisibleCount === 1 ? "Scan exportieren" : "Scanpack exportieren"}</span>
+                      <span>{selectedExportableCount === 1 ? "Scan exportieren" : "Scanpack exportieren"}</span>
                     </button>
                   ) : null}
                   {selectedVisibleCount >= 2 ? (
@@ -1045,7 +1369,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                     <button
                       type="button"
                       className={styles.dangerButton}
-                      onClick={() => void deleteScans(visibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).map((scan) => scan.sourceScanId))}
+                      onClick={() => void deleteScans(selectedVisibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).map((scan) => scan.sourceScanId))}
                       disabled={busy}
                     >
                       <Trash2 size={15} aria-hidden />
@@ -1057,15 +1381,12 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                 <section className={styles.scanSection} aria-label="Vorhandene Scans">
                   <div className={styles.sectionHeader}>
                     <h3>Vorhandene Scans</h3>
-                    <span>{loading ? "Lädt..." : `${visibleScans.length} gespeichert`}</span>
+                    <span>{loading ? "Lädt..." : `${ownVisibleScans.length} lokal`}</span>
                   </div>
 
                   {loading ? (
-                    <DataHubLoadingState
-                      title="Lokale Scans werden geladen"
-                      message="Scan-Metadaten werden gelesen."
-                    />
-                  ) : visibleScans.length ? (
+                    <DataHubLoadingState title="Lokale Scans werden geladen" message="Scan-Metadaten werden gelesen." />
+                  ) : ownVisibleScans.length ? (
                     <div className={styles.tableWrap}>
                       <table className={styles.table}>
                         <thead>
@@ -1087,7 +1408,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                           </tr>
                         </thead>
                         <tbody>
-                          {visibleScans.map((scan) => {
+                          {ownVisibleScans.map((scan) => {
                             const scanTimeCell = formatScanSnapshotCell(scan);
                             const displayName = getScanDisplayName(scan);
                             const slotInfo = getScanSlotSourceInfo(scan);
@@ -1181,6 +1502,179 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                     </div>
                   ) : (
                     <div className={styles.emptyState}>Noch keine Scans importiert.</div>
+                  )}
+                </section>
+              </div>
+            ) : activeTab === "archive" ? (
+              <div id="data-management-archive-panel" role="tabpanel" aria-labelledby="data-management-archive-tab">
+                <div className={styles.toolbar}>
+                  {selectedVisibleCount > 0 ? (
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      onClick={() => void deleteScans(selectedVisibleScans.filter((scan) => selectedIds.has(scan.sourceScanId)).map((scan) => scan.sourceScanId))}
+                      disabled={busy}
+                    >
+                      <Trash2 size={15} aria-hidden />
+                      <span>Ausgewählte löschen</span>
+                    </button>
+                  ) : null}
+                </div>
+
+                <section className={styles.scanSection} aria-label="Scan-Archiv">
+                  <div className={styles.sectionHeader}>
+                    <h3>Scan-Archiv</h3>
+                    <span>
+                      {archiveLoading
+                        ? "Lädt..."
+                        : archiveError
+                          ? `${localArchiveScans.length} lokal gespeichert`
+                          : `${archiveLocalCount} von ${archiveManifestEntries.length} lokal gespeichert`}
+                    </span>
+                  </div>
+
+                  {loading || archiveLoading ? (
+                    <DataHubLoadingState title="Scan-Archiv wird geladen" message="Archiv- und lokale Scan-Metadaten werden gelesen." />
+                  ) : archiveRows.length ? (
+                    <div className={styles.tableWrap}>
+                      <table className={`${styles.table} ${styles.archiveTable}`}>
+                        <thead>
+                          <tr>
+                            <th className={styles.checkCell}>
+                              <input
+                                type="checkbox"
+                                aria-label="Alle lokal gespeicherten Archivscans auswählen"
+                                checked={allVisibleSelected}
+                                onChange={toggleAllVisible}
+                              />
+                            </th>
+                            <th>Scanzeitpunkt</th>
+                            <th>Server</th>
+                            <th className={styles.numericCell}>Spieler</th>
+                            <th className={styles.numericCell}>Gilden</th>
+                            <th>Status</th>
+                            <th className={styles.actionCell}>Aktion</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {archiveGroups.map((group, groupIndex) => {
+                            const isExpanded = isArchiveMonthExpanded(group.id, groupIndex);
+                            return (
+                              <React.Fragment key={group.id}>
+                                <tr className={styles.archiveMonthRow}>
+                                  <th colSpan={7} scope="colgroup">
+                                    <button
+                                      type="button"
+                                      className={styles.archiveMonthButton}
+                                      aria-expanded={isExpanded}
+                                      onClick={() => toggleArchiveMonth(group.id, isExpanded)}
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronDown size={15} aria-hidden />
+                                      ) : (
+                                        <ChevronRight size={15} aria-hidden />
+                                      )}
+                                      <span>{group.label}</span>
+                                    </button>
+                                  </th>
+                                </tr>
+                                {isExpanded
+                                  ? group.rows.map((row) => {
+                                      const scan = row.localSummary;
+                                      const entry = row.entry;
+                                      const scanTimeCell = entry ? formatArchiveScanSnapshotCell(entry) : formatScanSnapshotCell(scan!);
+                                      const displayName = entry ? getArchiveDisplayName(entry) : getScanDisplayName(scan!);
+                                      const serverLabel = entry ? entry.server : formatServerList(scan!);
+                                      const playerCount = entry ? entry.playerCount : scan!.playerCount;
+                                      const groupCount = entry ? entry.groupCount : getScanGuildCount(scan!);
+                                      const archiveProgress = entry ? archiveDownloadProgress[entry.id] : null;
+                                      const isDownloadingArchive = entry ? downloadingArchiveIds.has(entry.id) : false;
+                                      return (
+                                        <tr key={row.id}>
+                                          <td className={styles.checkCell}>
+                                            {scan ? (
+                                              <input
+                                                type="checkbox"
+                                                aria-label={`${displayName} auswählen`}
+                                                checked={selectedIds.has(scan.sourceScanId)}
+                                                onChange={() => toggleScan(scan.sourceScanId)}
+                                              />
+                                            ) : null}
+                                          </td>
+                                          <td title={scanTimeCell.title}>{scanTimeCell.label}</td>
+                                          <td>
+                                            <span className={styles.truncate} title={serverLabel}>
+                                              {serverLabel}
+                                            </span>
+                                          </td>
+                                          <td className={styles.numericCell}>{playerCount}</td>
+                                          <td className={styles.numericCell}>{groupCount}</td>
+                                          <td>
+                                            {scan ? (
+                                              <span className={styles.statusBadge}>lokal gespeichert</span>
+                                            ) : isDownloadingArchive ? (
+                                              <span className={styles.statusBadge}>{archiveProgress?.message ?? "Download läuft"}</span>
+                                            ) : (
+                                              <span className={styles.statusBadge}>online verfügbar</span>
+                                            )}
+                                          </td>
+                                          <td className={styles.actionCell}>
+                                            <div className={styles.rowActions}>
+                                              {scan ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    className={`${styles.iconButton} ${styles.detailsButton}`}
+                                                    onClick={() => openScanDetails(scan)}
+                                                    disabled={busy}
+                                                    aria-label={`${displayName} Details anzeigen`}
+                                                    title="Scan-Details anzeigen"
+                                                  >
+                                                    <Eye size={15} aria-hidden />
+                                                    <span>Details</span>
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                                                    onClick={() => void deleteScans([scan.sourceScanId])}
+                                                    disabled={busy}
+                                                    aria-label={`${displayName} löschen`}
+                                                    title="Lokale Archivkopie löschen"
+                                                  >
+                                                    <Trash2 size={15} aria-hidden />
+                                                  </button>
+                                                </>
+                                              ) : entry ? (
+                                                <button
+                                                  type="button"
+                                                  className={`${styles.iconButton} ${styles.detailsButton}`}
+                                                  onClick={() => void downloadArchiveScan(entry)}
+                                                  disabled={busy || isDownloadingArchive}
+                                                  aria-label={`${displayName} lokal speichern`}
+                                                  title="Archivscan lokal speichern"
+                                                >
+                                                  {isDownloadingArchive ? (
+                                                    <Loader2 size={15} aria-hidden className={styles.spinIcon} />
+                                                  ) : (
+                                                    <Download size={15} aria-hidden />
+                                                  )}
+                                                  <span>{isDownloadingArchive ? "Lädt" : "Speichern"}</span>
+                                                </button>
+                                              ) : null}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  : null}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className={styles.emptyState}>{archiveError ? "Keine lokalen Archivscans gefunden." : "Keine Archiveinträge gefunden."}</div>
                   )}
                 </section>
               </div>
