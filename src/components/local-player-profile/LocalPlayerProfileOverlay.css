@@ -1,0 +1,639 @@
+.profile-overlay--local {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: var(--app-overlay-padding, 16px);
+}
+
+.profile-overlay--local .profile-overlay__panel--local {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.profile-overlay--local .profile-overlay__local-header {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(40px, 1fr) minmax(0, auto) minmax(40px, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px 8px;
+}
+
+.profile-overlay--local .profile-overlay__local-title {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(24px, 1fr) auto minmax(24px, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  color: rgba(230, 240, 255, 0.92);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.profile-overlay--local .profile-overlay__local-title span {
+  height: 1px;
+  min-width: 0;
+  background: linear-gradient(90deg, transparent, rgba(134, 177, 226, 0.44), transparent);
+}
+
+.profile-overlay--local .profile-overlay__local-title strong {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.profile-overlay--local .profile-overlay__close--local {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.profile-overlay--local .profile-overlay__content--local {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 18px 18px;
+  scrollbar-gutter: stable;
+}
+
+.profile-overlay--local .profile-overlay__local-grid {
+  --local-profile-grid-gap: clamp(10px, 1.1vw, 16px);
+  --local-profile-row-min: clamp(62px, 6.2vh, 82px);
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(12, minmax(var(--local-profile-row-min), 1fr));
+  grid-template-areas:
+    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
+    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
+    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
+    "identity identity identity xp xp xp xp xp xp progression progression progression"
+    "identity identity identity xp xp xp xp xp xp progression progression progression"
+    "identity identity identity xp xp xp xp xp xp progression progression progression"
+    "stats stats stats xp xp xp xp xp xp player-average player-average player-average"
+    "stats stats stats stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev player-average player-average player-average"
+    "stats stats stats stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev player-average player-average player-average"
+    "stats stats stats stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev personal-bests personal-bests personal-bests"
+    "stats stats stats career career career career career career personal-bests personal-bests personal-bests"
+    "stats stats stats career career career career career career personal-bests personal-bests personal-bests";
+  gap: var(--local-profile-grid-gap);
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: max(100%, clamp(820px, 88vh, 980px));
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-overlay--local .player-profile__hero--local-profile,
+.profile-overlay--local .player-profile__hero--local-summary,
+.profile-overlay--local .player-profile__hero--local-stats {
+  min-width: 0;
+  align-self: stretch;
+  justify-self: stretch;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.profile-overlay--local .player-profile__hero--local-profile {
+  grid-area: identity;
+  --local-profile-portrait-popout-space: calc(48px + 1.2em);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: var(--local-profile-portrait-popout-space) 0 0;
+  overflow: visible;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats {
+  grid-area: stats;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  overflow: visible;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary {
+  grid-area: summary;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  overflow: visible;
+}
+
+.profile-overlay--local .local-player-analytics {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(92, 139, 198, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(63, 241, 195, 0.12), transparent 18%, transparent 82%, rgba(92, 139, 198, 0.1)),
+    rgba(255, 255, 255, 0.012);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.profile-overlay--local .local-player-analytics--xp {
+  grid-area: xp;
+}
+
+.profile-overlay--local .local-player-analytics--stats-dev {
+  grid-area: stats-dev;
+}
+
+.profile-overlay--local .local-player-analytics--career {
+  grid-area: career;
+}
+
+.profile-overlay--local .local-player-analytics__header {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(92, 139, 198, 0.18);
+  padding-bottom: 6px;
+}
+
+.profile-overlay--local .local-player-analytics__header h2 {
+  margin: 0;
+  min-width: 0;
+  color: rgba(238, 245, 255, 0.95);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.profile-overlay--local .local-player-analytics__header span {
+  min-width: 0;
+  color: rgba(176, 196, 217, 0.78);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.profile-overlay--local .local-player-analytics__body {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.profile-overlay--local .local-player-analytics__range-select {
+  min-width: 0;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: rgba(176, 196, 217, 0.82);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.profile-overlay--local .local-player-analytics__range-select span {
+  color: rgba(230, 240, 255, 0.82);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.profile-overlay--local .local-player-analytics__range-select select {
+  min-width: 0;
+  height: 28px;
+  border: 1px solid rgba(92, 139, 198, 0.34);
+  border-radius: 6px;
+  background: rgba(7, 18, 32, 0.72);
+  color: rgba(238, 245, 255, 0.92);
+  font: inherit;
+  font-weight: 700;
+  outline: none;
+}
+
+.profile-overlay--local .local-player-analytics__range-select select:disabled {
+  color: rgba(176, 196, 217, 0.62);
+}
+
+.profile-overlay--local .local-player-analytics__range-select small {
+  min-width: 0;
+  color: rgba(176, 196, 217, 0.72);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-overlay--local .local-player-analytics__legend {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: rgba(230, 240, 255, 0.82);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.profile-overlay--local .local-player-analytics__legend span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-overlay--local .local-player-analytics__legend i {
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.profile-overlay--local .local-player-analytics__chart {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: block;
+  overflow: visible;
+}
+
+.profile-overlay--local .local-player-analytics__chart-frame {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  height: 100%;
+  display: grid;
+  align-items: stretch;
+  overflow: visible;
+}
+
+.profile-overlay--local .local-player-analytics__grid-line {
+  stroke: rgba(134, 177, 226, 0.18);
+  stroke-width: 1;
+}
+
+.profile-overlay--local .local-player-analytics__axis-label {
+  fill: rgba(176, 196, 217, 0.76);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.profile-overlay--local .local-player-analytics__line {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.profile-overlay--local .local-player-analytics__point {
+  stroke: rgba(8, 16, 29, 0.96);
+  stroke-width: 1.5;
+  outline: none;
+}
+
+.profile-overlay--local .local-player-analytics__point:focus {
+  stroke: rgba(238, 245, 255, 0.95);
+  stroke-width: 2.5;
+}
+
+.profile-overlay--local .local-player-analytics__message {
+  min-width: 0;
+  min-height: 64px;
+  flex: 1 1 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(176, 196, 217, 0.82);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.profile-overlay--local .local-player-analytics__timeline {
+  min-width: 0;
+  flex: 1 1 0;
+  height: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(86px, 1fr);
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: rgba(230, 240, 255, 0.9);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node::before,
+.profile-overlay--local .local-player-analytics__timeline-node::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  height: 1px;
+  background: rgba(92, 139, 198, 0.42);
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node::before {
+  left: 0;
+  right: 50%;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node::after {
+  left: 50%;
+  right: 0;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node:first-child::before,
+.profile-overlay--local .local-player-analytics__timeline-node:last-child::after {
+  display: none;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-dot {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(63, 241, 195, 0.76);
+  background: rgba(12, 26, 45, 0.98);
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node--current .local-player-analytics__timeline-dot {
+  background: rgba(63, 241, 195, 0.34);
+  border-color: rgba(63, 241, 195, 0.94);
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node strong,
+.profile-overlay--local .local-player-analytics__timeline-node span:not(.local-player-analytics__timeline-dot) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.profile-overlay--local .local-player-analytics__timeline-node span:not(.local-player-analytics__timeline-dot) {
+  color: rgba(176, 196, 217, 0.78);
+}
+
+.profile-overlay--local .player-profile__hero-portrait-frame--local {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: var(--local-profile-portrait-frame-height, 0);
+  overflow: visible;
+}
+
+.profile-overlay--local .player-profile__hero-portrait--local {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  min-width: 0;
+  transform: translateX(-50%) scale(var(--local-profile-portrait-scale, 1));
+  transform-origin: top center;
+}
+
+.profile-overlay--local .player-profile__hero--local-profile .player-profile__hero-potions-inline {
+  min-width: 0;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.profile-overlay--local .player-profile__hero--local-profile .player-profile__hero-potion-row {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metrics {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(86px, 0.78fr) repeat(3, minmax(112px, 1fr));
+  align-items: center;
+  gap: clamp(8px, 1vw, 14px);
+  overflow: visible;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metric {
+  min-width: 0;
+  min-height: 112px;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metric--gauge {
+  height: 132px;
+  min-height: 132px;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metric--mount-icon {
+  min-height: 96px;
+}
+
+.profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metric--mount-icon .player-profile__hero-mount-image {
+  max-width: 100%;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bars {
+  min-width: 0;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bars-head {
+  align-items: flex-start;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-row {
+  grid-template-columns: minmax(112px, max-content) minmax(0, 1fr) minmax(76px, max-content);
+  gap: 10px;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-label,
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-track,
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-values {
+  min-width: 0;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-label {
+  min-width: 0;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-values {
+  text-align: right;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__hero-meta-row,
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__hero-badges {
+  min-width: 0;
+}
+
+.profile-overlay--local .player-profile__hero--local-stats .player-profile__hero-badges {
+  flex: 1 1 100%;
+}
+
+@media (max-width: 1180px) {
+  .profile-overlay--local .profile-overlay__local-grid {
+    min-height: 860px;
+  }
+
+  .profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .profile-overlay--local {
+    padding: 12px;
+  }
+
+  .profile-overlay--local .profile-overlay__local-header {
+    padding: 14px 48px 8px 12px;
+  }
+
+  .profile-overlay--local .profile-overlay__content--local {
+    padding: 0 12px 12px;
+  }
+
+  .profile-overlay--local .profile-overlay__local-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "summary"
+      "xp"
+      "stats-dev"
+      "career"
+      "identity"
+      "stats";
+    min-height: 0;
+  }
+
+  .profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .profile-overlay--local .local-player-analytics__grid-line,
+  .profile-overlay--local .local-player-analytics__axis-label {
+    animation: local-player-chart-fade-in 220ms ease-out both;
+  }
+
+  .profile-overlay--local .local-player-analytics__line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: local-player-chart-line-draw 680ms cubic-bezier(0.22, 0.78, 0.24, 1) 80ms both;
+  }
+
+  .profile-overlay--local .local-player-analytics__point {
+    opacity: 0;
+    animation: local-player-chart-point-in 260ms ease-out 520ms both;
+  }
+}
+
+@keyframes local-player-chart-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes local-player-chart-line-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes local-player-chart-point-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-overlay--local {
+    padding: 8px;
+  }
+
+  .profile-overlay--local .profile-overlay__local-header {
+    gap: 10px;
+    padding: 12px 44px 8px 10px;
+  }
+
+  .profile-overlay--local .profile-overlay__local-title {
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+
+  .profile-overlay--local .profile-overlay__close--local {
+    top: 8px;
+    right: 10px;
+  }
+
+  .profile-overlay--local .profile-overlay__content--local {
+    padding: 0 10px 10px;
+  }
+
+  .profile-overlay--local .local-player-analytics__range-select {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-overlay--local .player-profile__hero--local-summary .player-profile__hero-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-values {
+    text-align: left;
+  }
+}

@@ -119,6 +119,8 @@ import RecordBadgesPage from "./pages/Playground/RecordBadgesPage";
 import RecordsSvgIconsPage from "./pages/Playground/RecordsSvgIconsPage";
 import RecordsShowcasePage from "./pages/Playground/RecordsShowcasePage";
 import PlayerCardsPage from "./pages/Playground/PlayerCardsPage";
+import PlayerPerformancePage from "./pages/Playground/PlayerPerformancePage";
+import ProgressVisualsPage from "./pages/Playground/ProgressVisualsPage";
 import PotionIconsPage from "./pages/Playground/PotionIconsPage";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
@@ -512,6 +514,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="record-badges" element={<RecordBadgesPage />} />
                   <Route path="records-showcase" element={<RecordsShowcasePage />} />
                   <Route path="player-cards" element={<PlayerCardsPage />} />
+                  <Route path="progress-visuals" element={<ProgressVisualsPage />} />
+                  <Route path="player-performance" element={<PlayerPerformancePage />} />
                   <Route path="potion-icons" element={<PotionIconsPage />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />

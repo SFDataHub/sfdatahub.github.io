@@ -26,11 +26,20 @@ export type AnchoredLineChartTimeTick = {
   label: string;
 };
 
+export type AnchoredLineChartVerticalMarker = {
+  key: string;
+  timestampMs: number;
+  label?: string;
+  description?: string;
+  tooltipIndex?: number;
+};
+
 type AnchoredLineChartProps = {
   points: number[];
   series?: AnchoredLineChartSeries[];
   timeDomain?: AnchoredLineChartTimeDomain | null;
   timeTicks?: AnchoredLineChartTimeTick[];
+  verticalMarkers?: AnchoredLineChartVerticalMarker[];
   avgValue?: number | null;
   showAvg?: boolean;
   showFill?: boolean;
@@ -41,6 +50,8 @@ type AnchoredLineChartProps = {
   xLabels?: string[];
   yValueFormatter?: (value: number) => string;
   semanticKey?: string;
+  highlightedSeriesKeys?: readonly string[];
+  onHoverSeriesKeyChange?: (seriesKey: string | null) => void;
 };
 
 const FALLBACK_CHART_WIDTH = 600;
@@ -73,6 +84,7 @@ type AnchoredLineGradient = {
 
 type AnchoredLinePath = {
   key: string;
+  seriesKey: string;
   path: string;
   color: string;
   prominent: boolean;
@@ -100,6 +112,7 @@ type AnchoredLineChartGeometry = {
   labels: { x: number; text: string }[];
   gridX: number[];
   yTicks: { value: number; y: number; label: string }[];
+  verticalMarkers: ProjectedVerticalMarker[];
 };
 
 type AnchoredLineSeriesGeometry = {
@@ -133,6 +146,14 @@ type HoverState = {
   x: number;
   y: number;
   points: ProjectedChartPoint[];
+  tooltipIndexes: number[];
+};
+
+type ProjectedVerticalMarker = {
+  key: string;
+  x: number;
+  description?: string;
+  tooltipIndex?: number;
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -157,8 +178,11 @@ export function AnchoredLineChart({
   xLabels,
   timeDomain,
   timeTicks,
+  verticalMarkers,
   yValueFormatter = defaultYValueFormatter,
   semanticKey,
+  highlightedSeriesKeys,
+  onHoverSeriesKeyChange,
 }: AnchoredLineChartProps) {
   const gradientId = useId();
   const lineGradientBaseId = `anchored-line-${sanitizeSvgId(useId())}`;
@@ -227,6 +251,7 @@ export function AnchoredLineChart({
         labels: [] as { x: number; text: string }[],
         gridX: defaultGridX,
         yTicks: emptyYTicks,
+        verticalMarkers: [],
       };
     }
 
@@ -239,6 +264,7 @@ export function AnchoredLineChart({
         labels: [] as { x: number; text: string }[],
         gridX: defaultGridX,
         yTicks: emptyYTicks,
+        verticalMarkers: [],
       };
     }
 
@@ -253,6 +279,27 @@ export function AnchoredLineChart({
       safeDomain
         ? PLOT_LEFT + clamp((timestampMs - safeDomain.startMs) / (safeDomain.endMs - safeDomain.startMs), 0, 1) * plotWidth
         : PLOT_LEFT + plotWidth / 2;
+    const projectedVerticalMarkers: ProjectedVerticalMarker[] =
+      isTimeSeries && safeDomain
+        ? (verticalMarkers ?? []).flatMap((marker) => {
+            if (
+              !Number.isFinite(marker.timestampMs) ||
+              marker.timestampMs < safeDomain.startMs ||
+              marker.timestampMs > safeDomain.endMs
+            ) {
+              return [];
+            }
+            const x = scaleTimeX(marker.timestampMs);
+            return [
+              {
+                key: marker.key,
+                x,
+                description: marker.description,
+                tooltipIndex: marker.tooltipIndex,
+              },
+            ];
+          })
+        : [];
     const scaleY = (v: number) => clamp(PLOT_TOP + (1 - (v - min) / range) * plotHeight, PLOT_TOP, plotBottom);
     const projectPoint = (
       x: number,
@@ -303,7 +350,7 @@ export function AnchoredLineChart({
       const labels = (timeTicks ?? []).map((tick) => ({ x: scaleTimeX(tick.timestampMs), text: tick.label }));
       const gridX = labels.length ? labels.map((label) => label.x) : defaultGridX;
 
-      return { seriesGeometries, areaPath: "", dots, avgY, labels, gridX, yTicks };
+      return { seriesGeometries, areaPath: "", dots, avgY, labels, gridX, yTicks, verticalMarkers: projectedVerticalMarkers };
     }
 
     if (pointCount === 1) {
@@ -349,6 +396,7 @@ export function AnchoredLineChart({
         labels: [{ x: PLOT_LEFT, text: xLabels?.[0] ?? "t0" }],
         gridX: defaultGridX,
         yTicks,
+        verticalMarkers: [],
       };
     }
 
@@ -375,8 +423,8 @@ export function AnchoredLineChart({
     const avgY = !isMultiSeries && showAvg && avgValue != null ? scaleY(avgValue) : null;
     const labels = Array.from({ length: pointCount }, (_, idx) => ({ x: scaleX(idx), text: xLabels?.[idx] ?? `t${idx}` }));
 
-    return { seriesGeometries: seriesCoords, areaPath, dots, avgY, labels, gridX: defaultGridX, yTicks };
-  }, [pointCount, chartSeries, isTimeSeries, timeDomain, timeTicks, avgValue, showAvg, showDots, plotWidth, plotHeight, xLabels, isMultiSeries, lineGradientBaseId, currentYDomain, yValueFormatter, plotBottom, plotRight, chartHeight]);
+    return { seriesGeometries: seriesCoords, areaPath, dots, avgY, labels, gridX: defaultGridX, yTicks, verticalMarkers: [] };
+  }, [pointCount, chartSeries, isTimeSeries, timeDomain, timeTicks, verticalMarkers, avgValue, showAvg, showDots, plotWidth, plotHeight, xLabels, isMultiSeries, lineGradientBaseId, currentYDomain, yValueFormatter, plotBottom, plotRight, chartHeight]);
 
   const layoutKey = `${chartWidth}:${chartHeight}:${plotWidth}:${plotHeight}:${plotRight}:${plotBottom}`;
   const visibleGeometry = useAnimatedChartGeometry(targetGeometry, {
@@ -384,13 +432,25 @@ export function AnchoredLineChart({
     layoutKey,
   });
   const areaOpacity = visibleGeometry.seriesGeometries[0]?.opacity ?? 1;
-  const { linePaths, areaPath, dots, avgY, labels, gridX, yTicks } = useMemo(
+  const { linePaths, areaPath, dots, avgY, labels, gridX, yTicks, verticalMarkers: projectedVerticalMarkers } = useMemo(
     () => buildRenderableGeometry(visibleGeometry, lineGradientBaseId, chartHeight),
     [visibleGeometry, lineGradientBaseId, chartHeight],
   );
+  const singlePointSeriesKeys = useMemo(
+    () =>
+      new Set(
+        visibleGeometry.seriesGeometries
+          .filter((entry) => entry.coords.filter((coord): coord is ProjectedChartPoint => coord.y != null).length === 1)
+          .map((entry) => entry.key),
+      ),
+    [visibleGeometry.seriesGeometries],
+  );
+  const idleDots = showDots ? dots : dots.filter((dot) => singlePointSeriesKeys.has(dot.seriesKey));
+  const highlightedSeriesKeySet = useMemo(() => new Set(highlightedSeriesKeys ?? []), [highlightedSeriesKeys]);
+  const hasHighlightedSeries = highlightedSeriesKeySet.size > 0;
   const lineGradients = linePaths.flatMap((line) => (line.gradient ? [line.gradient] : []));
   const hoverTooltipNodes = hover
-    ? uniqueTooltipIndexes(hover.points)
+    ? hover.tooltipIndexes
         .map((tooltipIndex) => dotTooltips?.[tooltipIndex])
         .filter((node): node is React.ReactNode => node != null)
     : [];
@@ -402,15 +462,17 @@ export function AnchoredLineChart({
     : undefined;
 
   const handlePointerMove = React.useCallback(
-    (event: React.PointerEvent<SVGRectElement>) => {
+    (event: React.PointerEvent<SVGElement>) => {
       const svg = svgRef.current;
       if (!svg || !dots.length) {
         setHover(null);
+        onHoverSeriesKeyChange?.(null);
         return;
       }
       const pointer = getSvgPointerPosition(svg, event.clientX, event.clientY, chartWidth, chartHeight);
       if (!pointer || pointer.x < PLOT_LEFT || pointer.x > plotRight || pointer.y < PLOT_TOP || pointer.y > plotBottom) {
         setHover(null);
+        onHoverSeriesKeyChange?.(null);
         return;
       }
       const rect = svg.getBoundingClientRect();
@@ -423,6 +485,8 @@ export function AnchoredLineChart({
 
       if (!nearest.point || nearest.distance > HIT_RADIUS_PX) {
         setHover(null);
+        const targetSeriesKey = readEventTargetSeriesKey(event.target);
+        onHoverSeriesKeyChange?.(targetSeriesKey);
         return;
       }
 
@@ -431,9 +495,11 @@ export function AnchoredLineChart({
         const distance = Math.hypot((dot.x - nearestPoint.x) / scaleX, (dot.y - nearestPoint.y) / scaleY);
         return distance <= CLUSTER_RADIUS_PX;
       });
-      setHover({ x: nearestPoint.x, y: nearestPoint.y, points: sortHoverPoints(cluster) });
+      const sortedCluster = sortHoverPoints(cluster);
+      setHover({ x: nearestPoint.x, y: nearestPoint.y, points: sortedCluster, tooltipIndexes: uniqueTooltipIndexes(sortedCluster) });
+      onHoverSeriesKeyChange?.(nearestPoint.seriesKey);
     },
-    [dots, chartWidth, chartHeight, plotRight, plotBottom],
+    [dots, chartWidth, chartHeight, plotRight, plotBottom, onHoverSeriesKeyChange],
   );
 
   return (
@@ -446,6 +512,11 @@ export function AnchoredLineChart({
         className={`player-profile__trend-chart ${className ?? ""}`.trim()}
         role="img"
         aria-label="Anchored trend"
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => {
+          setHover(null);
+          onHoverSeriesKeyChange?.(null);
+        }}
       >
         <g className="player-profile__trend-grid" opacity="0.55" stroke="rgba(43,76,115,0.55)" strokeWidth={1}>
           {gridX.map((x, idx) => (
@@ -455,6 +526,35 @@ export function AnchoredLineChart({
             <line key={`gh-${tick.value}`} x1={PLOT_LEFT} x2={plotRight} y1={tick.y} y2={tick.y} />
           ))}
         </g>
+
+        {projectedVerticalMarkers.length ? (
+          <g className="player-profile__trend-vertical-markers" aria-hidden="true">
+            {projectedVerticalMarkers.map((marker) => (
+              <g key={marker.key} className="player-profile__trend-vertical-marker">
+                <line x1={marker.x} x2={marker.x} y1={PLOT_TOP} y2={plotBottom} />
+                <line
+                  className="player-profile__trend-vertical-marker-hitline"
+                  x1={marker.x}
+                  x2={marker.x}
+                  y1={PLOT_TOP}
+                  y2={plotBottom}
+                  onPointerEnter={(event) => {
+                    event.stopPropagation();
+                    if (typeof marker.tooltipIndex === "number") {
+                      setHover({ x: marker.x, y: PLOT_TOP, points: [], tooltipIndexes: [marker.tooltipIndex] });
+                    }
+                  }}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    if (typeof marker.tooltipIndex === "number") {
+                      setHover({ x: marker.x, y: PLOT_TOP, points: [], tooltipIndexes: [marker.tooltipIndex] });
+                    }
+                  }}
+                />
+              </g>
+            ))}
+          </g>
+        ) : null}
 
         <g className="player-profile__trend-y-axis">
           <line x1={PLOT_LEFT} x2={PLOT_LEFT} y1={PLOT_TOP} y2={plotBottom} />
@@ -502,25 +602,39 @@ export function AnchoredLineChart({
           <path d={areaPath} className="player-profile__trend-area" fill={`url(#${gradientId})`} style={{ opacity: areaOpacity }} />
         )}
 
-        {linePaths.map((line) => (
-          <path
-            key={line.key}
-            d={line.path}
-            className="player-profile__trend-line"
-            fill="none"
-            pathLength={1}
-            style={{
-              stroke: line.gradient ? `url(#${line.gradient.id})` : line.color,
-              strokeWidth: line.prominent ? 3.4 : 2.4,
-              opacity: line.opacity * (line.prominent ? 1 : 0.86),
-              strokeDasharray: line.drawProgress < 0.999 ? 1 : undefined,
-              strokeDashoffset: line.drawProgress < 0.999 ? 1 - line.drawProgress : undefined,
-            }}
-          />
-        ))}
+        <rect
+          className="player-profile__trend-plot-hitarea"
+          x={PLOT_LEFT}
+          y={PLOT_TOP}
+          width={plotWidth}
+          height={plotHeight}
+          fill="transparent"
+        />
 
-        {showDots
-          ? dots.map((dot, idx) => (
+        {linePaths.map((line) => {
+          const isHighlighted = highlightedSeriesKeySet.has(line.seriesKey);
+          const isDimmed = hasHighlightedSeries && !isHighlighted;
+          return (
+            <path
+              key={line.key}
+              data-series-key={line.seriesKey}
+              d={line.path}
+              className="player-profile__trend-line"
+              fill="none"
+              pathLength={1}
+              style={{
+                stroke: line.gradient ? `url(#${line.gradient.id})` : line.color,
+                strokeWidth: (line.prominent ? 3.4 : 2.4) + (isHighlighted ? 1.2 : 0),
+                opacity: line.opacity * (line.prominent ? 1 : 0.86) * (isDimmed ? 0.42 : 1),
+                pointerEvents: "stroke",
+                strokeDasharray: line.drawProgress < 0.999 ? 1 : undefined,
+                strokeDashoffset: line.drawProgress < 0.999 ? 1 - line.drawProgress : undefined,
+              }}
+            />
+          );
+        })}
+
+        {idleDots.map((dot, idx) => (
               <g key={`dot-${dot.seriesKey}-${dot.pointKey}-${idx}`} className="player-profile__trend-dot-svg-group" style={{ opacity: dot.opacity }}>
                 <circle className="player-profile__trend-dot-halo" cx={dot.x} cy={dot.y} r={dot.prominent ? 7.5 : 6.5} fill={dot.color} />
                 <circle
@@ -532,8 +646,7 @@ export function AnchoredLineChart({
                   stroke={dot.color}
                 />
               </g>
-            ))
-          : null}
+            ))}
 
         {hover
           ? hover.points.map((dot, idx) => (
@@ -560,16 +673,6 @@ export function AnchoredLineChart({
           </g>
         )}
 
-        <rect
-          className="player-profile__trend-plot-hitarea"
-          x={PLOT_LEFT}
-          y={PLOT_TOP}
-          width={plotWidth}
-          height={plotHeight}
-          fill="transparent"
-          onPointerMove={handlePointerMove}
-          onPointerLeave={() => setHover(null)}
-        />
       </svg>
 
       {hover && hoverTooltipNodes.length ? (
@@ -822,6 +925,7 @@ function buildRenderableGeometry(
       return [
         {
           key: `${series.renderKey}-${index}`,
+          seriesKey: series.key,
           color: segment.color,
           prominent: series.prominent,
           path: revealedSegment.path,
@@ -987,6 +1091,10 @@ function getSvgPointerPosition(svg: SVGSVGElement, clientX: number, clientY: num
     x: ((clientX - rect.left) / rect.width) * chartWidth,
     y: ((clientY - rect.top) / rect.height) * chartHeight,
   };
+}
+
+function readEventTargetSeriesKey(target: EventTarget) {
+  return target instanceof SVGElement ? target.dataset.seriesKey ?? null : null;
 }
 
 function uniqueTooltipIndexes(points: ProjectedChartPoint[]) {

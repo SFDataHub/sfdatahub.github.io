@@ -898,7 +898,7 @@ function normalizeLocalServer(value: unknown): string | null {
   return normalizeServerKeyFromInput(value);
 }
 
-function parseServerFromGuildIdentifier(value: unknown): string | null {
+export function parseServerFromGuildIdentifier(value: unknown): string | null {
   const raw = toTrimmedString(value);
   if (!raw) return null;
   const match = raw.match(/^(.+)_g[^_]+$/i);

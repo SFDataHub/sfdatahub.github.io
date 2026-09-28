@@ -1,4 +1,7 @@
+import "fake-indexeddb/auto";
+
 import assert from "node:assert/strict";
+import { deleteDB } from "idb";
 
 import type { LocalServerFusionEvent } from "../../src/data/serverFusions.ts";
 import type { LocalServerDefinition } from "../../src/data/serverRegistry.ts";
@@ -10,9 +13,13 @@ import {
   type FusionIdentityDashboardInventoryTiming,
   buildFusionIdentityDashboardInventoryFromSnapshots,
   buildFusionIdentityDashboardInventoryFromSummaries,
+  buildFusionIdentityScopeIdentityState,
+  loadFusionIdentityScopeIdentityRevisionBasis,
   normalizeFusionIdentityScopeInventory,
   type FusionIdentityScopeInventory,
 } from "../../src/lib/identities/fusionDashboardInventory.ts";
+import { createGuildIdentityStore } from "../../src/lib/identities/guildIdentityStore.ts";
+import { createPlayerIdentityStore } from "../../src/lib/identities/playerIdentityStore.ts";
 
 type MemberInput = {
   id: string;
@@ -300,6 +307,220 @@ const getF28Scope = (snapshots: GuildHubLogicalScanSnapshot[]) => {
   assert.equal(scope.relevantSnapshotIds.includes("mixed-foreign-first::F28"), true);
   assert.equal(scope.relevantSnapshotIds.includes("mixed-foreign-first::US9"), false);
   assert.equal(scope.currentPlayerIdentifiers.includes("f28_net_p1"), true);
+}
+
+{
+  const playerDb = `fusion-dashboard-current-pool-player-${Date.now()}`;
+  const guildDb = `fusion-dashboard-current-pool-guild-${Date.now()}`;
+  await deleteDB(playerDb);
+  await deleteDB(guildDb);
+  const playerStore = createPlayerIdentityStore({ dbName: playerDb });
+  const guildStore = createGuildIdentityStore({ dbName: guildDb });
+  const completedCurrentPool = [
+    snapshot("eu1-completed-current-pool", timestamp("2026-01-01"), ["s1_eu"], [
+      {
+        id: "s1_eu_p1",
+        name: "Historical One",
+        server: "s1_eu",
+        guildSegment: "g1",
+        guildName: "Historical Guild One",
+      },
+      {
+        id: "s1_eu_p2",
+        name: "Historical Two",
+        server: "s1_eu",
+        guildSegment: "g1",
+        guildName: "Historical Guild One",
+      },
+      {
+        id: "s1_eu_p3",
+        name: "Historical Three",
+        server: "s1_eu",
+        guildSegment: "g2",
+        guildName: "Historical Guild Two",
+      },
+    ]),
+    snapshot("f28-completed-current-pool", timestamp("2026-02-07"), ["f28_net"], [
+      {
+        id: "f28_net_p1",
+        name: "Current One",
+        server: "f28_net",
+        guildSegment: "g1",
+        guildName: "Current Guild One",
+      },
+      {
+        id: "f28_net_p2",
+        name: "Current Two",
+        server: "f28_net",
+        guildSegment: "g1",
+        guildName: "Current Guild One",
+      },
+      {
+        id: "f28_net_p3",
+        name: "Current Three",
+        server: "f28_net",
+        guildSegment: "g2",
+        guildName: "Current Guild Two",
+      },
+      {
+        id: "f28_net_p4",
+        name: "Current Four",
+        server: "f28_net",
+        guildSegment: "g2",
+        guildName: "Current Guild Two",
+      },
+      {
+        id: "f28_net_p5",
+        name: "Current Five",
+        server: "f28_net",
+        guildSegment: "g2",
+        guildName: "Current Guild Two",
+      },
+    ]),
+  ];
+  const { scope } = getF28Scope(completedCurrentPool);
+  assert.equal(scope.currentPlayerIdentifiers.length, 5);
+  assert.equal(scope.currentGuildIdentifiers.length, 2);
+
+  const initialState = await buildFusionIdentityScopeIdentityState(
+    scope.scope,
+    scope.currentPlayerIdentifiers,
+    scope.currentGuildIdentifiers,
+    { playerStore, guildStore },
+  );
+  assert.equal(initialState.openCurrentPlayers, 5);
+  assert.equal(initialState.openCurrentGuilds, 2);
+
+  await playerStore.linkPlayerIdentifiers("f28_net_p1", "s1_eu_p1", {
+    source: "manual",
+    confirmedAt: "2026-09-24T00:00:00Z",
+  });
+  await playerStore.linkPlayerIdentifiers("f28_net_p2", "s1_eu_p2", {
+    source: "manual",
+    confirmedAt: "2026-09-24T00:00:00Z",
+  });
+  await playerStore.linkPlayerIdentifiers("f28_net_p3", "s1_eu_p3", {
+    source: "manual",
+    confirmedAt: "2026-09-24T00:00:00Z",
+  });
+  await guildStore.linkGuildAliases("f28_net_g1", "s1_eu_g1", {
+    source: "manual",
+    confirmedAt: "2026-09-24T00:00:00Z",
+  });
+
+  const completedState = await buildFusionIdentityScopeIdentityState(
+    scope.scope,
+    scope.currentPlayerIdentifiers,
+    scope.currentGuildIdentifiers,
+    { playerStore, guildStore },
+  );
+  assert.notEqual(completedState.identityRevision, initialState.identityRevision);
+  assert.equal(completedState.openCurrentPlayers, 5);
+  assert.equal(completedState.openCurrentGuilds, 2);
+  await playerStore.close();
+  await guildStore.close();
+  await deleteDB(playerDb);
+  await deleteDB(guildDb);
+}
+
+{
+  const { scope } = getF28Scope([
+    snapshot("eu1-revision-basis", timestamp("2026-01-01"), ["s1_eu"], [
+      {
+        id: "s1_eu_p1",
+        name: "Historical One",
+        server: "s1_eu",
+        guildSegment: "g1",
+        guildName: "Historical Guild One",
+      },
+    ]),
+    snapshot("f28-revision-basis", timestamp("2026-02-07"), ["f28_net"], [
+      {
+        id: "f28_net_p1",
+        name: "Current One",
+        server: "f28_net",
+        guildSegment: "g1",
+        guildName: "Current Guild One",
+      },
+    ]),
+  ]);
+  const calls = {
+    playerEntities: 0,
+    playerExclusions: 0,
+    guildEntities: 0,
+    guildExclusions: 0,
+  };
+  const playerStore = {
+    listPlayerEntities: async () => {
+      calls.playerEntities += 1;
+      return [
+        {
+          entity: {
+            entityId: "player-1",
+            createdAt: "2026-09-24T00:00:00.000Z",
+            updatedAt: "2026-09-24T00:00:00.000Z",
+          },
+          aliases: [
+            {
+              identifier: "f28_net_p1",
+              identifierKey: "f28_net_p1",
+              entityId: "player-1",
+              addedAt: "2026-09-24T00:00:00.000Z",
+              source: "manual" as const,
+              confirmedAt: "2026-09-24T00:00:00.000Z",
+            },
+            {
+              identifier: "s1_eu_p1",
+              identifierKey: "s1_eu_p1",
+              entityId: "player-1",
+              addedAt: "2026-09-24T00:00:00.000Z",
+              source: "manual" as const,
+              confirmedAt: "2026-09-24T00:00:00.000Z",
+            },
+          ],
+        },
+      ];
+    },
+    listPlayerExclusions: async () => {
+      calls.playerExclusions += 1;
+      return [];
+    },
+  };
+  const guildStore = {
+    listGuildEntities: async () => {
+      calls.guildEntities += 1;
+      return [];
+    },
+    listGuildExclusions: async () => {
+      calls.guildExclusions += 1;
+      return [];
+    },
+  };
+
+  const identityRevisionBasis = await loadFusionIdentityScopeIdentityRevisionBasis({
+    playerStore,
+    guildStore,
+  });
+  const states = await Promise.all(
+    Array.from({ length: 30 }, () =>
+      buildFusionIdentityScopeIdentityState(
+        scope.scope,
+        scope.currentPlayerIdentifiers,
+        scope.currentGuildIdentifiers,
+        { identityRevisionBasis },
+      ),
+    ),
+  );
+
+  assert.deepEqual(calls, {
+    playerEntities: 1,
+    playerExclusions: 1,
+    guildEntities: 1,
+    guildExclusions: 1,
+  });
+  assert.equal(new Set(states.map((entry) => entry.identityRevision)).size, 1);
+  assert.equal(states[0].openCurrentPlayers, 1);
+  assert.equal(states[0].openCurrentGuilds, 1);
 }
 
 {

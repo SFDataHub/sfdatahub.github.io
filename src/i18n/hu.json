@@ -1113,6 +1113,7 @@
       "loreUnavailable": "Még nem érhető el.",
       "enemyId": "Ellenfél-azonosító {{enemyId}}"
     },
+    "monsterLore": {},
     "classes": {
       "warrior": "Harcos",
       "mage": "Mágus",
@@ -1133,6 +1134,7 @@
       "title": "{{targetServerCode}} elemzése",
       "phases": {
         "loading": "Helyi szkenek betöltése",
+        "identityRefresh": "Identitásváltozások alkalmazása",
         "preparingScanPool": "Fusion szkenkészlet előkészítése",
         "filteringScope": "Fusion scope szűrése",
         "normalizing": "Identitásadatok normalizálása",

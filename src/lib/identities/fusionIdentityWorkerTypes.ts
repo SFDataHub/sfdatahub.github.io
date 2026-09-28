@@ -2,6 +2,7 @@ import type { FusionIdentityManagementReport } from "./fusionIdentityManagement"
 import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
 
 export type FusionIdentityProgressPhase =
+  | "identity-refresh"
   | "loading"
   | "preparing"
   | "preparing-scan-pool"

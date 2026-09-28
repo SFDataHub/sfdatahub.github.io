@@ -1,11 +1,21 @@
 import { slimPlayer } from "../import/parsers";
 import { parseSaveStringToArray } from "../parsing/extractPortrait";
+import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../parsing/normalizedPlayer";
 import { readSfPlayerStats } from "../parsing/parseSfJson";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 
 export const GUILD_SCAN_NORMALIZER_VERSION = 9;
 
 type JsonRecord = Record<string, unknown>;
+type NormalizedAttributeKey = "strength" | "dexterity" | "intelligence" | "constitution" | "luck";
+
+const NORMALIZED_ATTRIBUTE_KEYS: readonly NormalizedAttributeKey[] = [
+  "strength",
+  "dexterity",
+  "intelligence",
+  "constitution",
+  "luck",
+];
 
 export type NormalizedGuildRole = "leader" | "officer" | "member" | null;
 
@@ -86,6 +96,24 @@ const toFiniteNumberOrNull = (value: unknown) => {
 
 const toNumberArray = (value: unknown) =>
   Array.isArray(value) ? value.map((entry) => toFiniteNumberOrNull(entry) ?? 0) : null;
+
+const safeNormalizePlayer = (player: unknown): NormalizedPlayer | null => {
+  try {
+    return normalizeSfPlayerCharacterCore(player);
+  } catch {
+    return null;
+  }
+};
+
+const sumNormalizedAttributeValues = (
+  normalized: NormalizedPlayer | null,
+  field: "base" | "total",
+) => {
+  if (!normalized) return null;
+  const values = NORMALIZED_ATTRIBUTE_KEYS.map((key) => normalized.attributes[key][field]);
+  if (!values.every((value): value is number => typeof value === "number" && Number.isFinite(value))) return null;
+  return values.reduce((sum, value) => sum + value, 0);
+};
 
 export const normalizeGuildScanServer = (value: unknown) => {
   const normalized = normalizeServerKeyFromInput(value)?.toLowerCase();
@@ -213,6 +241,9 @@ export function normalizeGuildScanMember(
 
   const slim = slimPlayer(record);
   const stats = readSfPlayerStats(record);
+  const normalized = safeNormalizePlayer(record);
+  const baseStats = sumNormalizedAttributeValues(normalized, "base") ?? stats.baseStats;
+  const totalStats = sumNormalizedAttributeValues(normalized, "total") ?? stats.totalStats;
   const slimLevel = typeof slim.level === "number" && Number.isFinite(slim.level) && slim.level > 0 ? slim.level : null;
   const identifier = readString(record, ["identifier", "Identifier"]) ?? normalizeDisplayString(slim.id);
   const playerId = readString(record, ["playerId", "Player ID", "id", "ID"]);
@@ -230,8 +261,8 @@ export function normalizeGuildScanMember(
     name,
     classId: normalizeDisplayString(slim.class) ?? stats.classId ?? readString(record, ["class", "Class", "className", "Class Name"]),
     level: stats.level ?? slimLevel,
-    baseStats: stats.baseStats,
-    totalStats: stats.totalStats,
+    baseStats,
+    totalStats,
     server,
     guildSegment: normalizeGuildSegmentForScan(slim.guildId) ?? readGuildSegment(record),
     groupSegment: readGroupSegment(record),

@@ -122,9 +122,13 @@ export default function GuildHubDashboard() {
         rawPlayer,
         sourceScanId: latest.source.sourceScanId,
         sourcePlayerKey: member.localRef.sourcePlayerKey,
+        sourceMemberRef: member.localRef.identifier ?? (member.localRef.matchedByNameFallback ? null : member.localRef.sourcePlayerKey),
         scannedAtMs: latest.scannedAtMs,
         scannedAtIso: latest.scannedAtIso,
-        guild: latest.guild,
+        guild: {
+          ...latest.guild,
+          identifier: activeGuild.logoIdentifier ?? activeGuild.guildId,
+        },
         guildRole: member.guildRole ?? null,
       });
       setSelectedLocalProfile(profile);

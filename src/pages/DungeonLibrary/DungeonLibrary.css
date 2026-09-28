@@ -409,8 +409,7 @@
   gap: 14px;
 }
 
-.world-dungeon-card,
-.floor-button {
+.world-dungeon-card {
   border: 1px solid rgba(100, 64, 23, 0.34);
   border-radius: 8px;
   background: rgba(255, 251, 229, 0.5);
@@ -431,8 +430,7 @@
   gap: 8px;
 }
 
-.world-dungeon-card:hover,
-.floor-button:hover {
+.world-dungeon-card:hover {
   background: rgba(255, 255, 245, 0.72);
   transform: translateY(-2px);
   box-shadow: 0 12px 18px rgba(75, 48, 18, 0.18);
@@ -446,23 +444,8 @@
   color: #7c4e23;
 }
 
-.floor-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(48px, 1fr));
-  gap: 12px;
-  max-width: 520px;
-}
-
-.floor-button {
-  min-height: 58px;
-  display: grid;
-  place-items: center;
-  font-size: 1.25rem;
-  font-weight: 800;
-}
-
 .world-index-page {
-  gap: 12px;
+  gap: 14px;
 }
 
 .world-index-page h1 {
@@ -473,13 +456,15 @@
 .world-index-sections {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: 22px;
   min-height: 0;
 }
 
 .world-index-section {
   display: grid;
-  gap: 7px;
+  gap: 10px;
 }
 
 .world-index-title-row {
@@ -510,16 +495,16 @@
 
 .world-index-floor-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  column-gap: 8px;
-  row-gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 10px;
+  row-gap: 10px;
 }
 
 .world-index-floor-tile {
   position: relative;
   min-width: 0;
   width: 100%;
-  aspect-ratio: 1 / 0.78;
+  aspect-ratio: 1 / 0.7;
   padding: 0;
   border: 1px solid rgba(100, 64, 23, 0.28);
   border-radius: 8px;
@@ -547,7 +532,7 @@
   left: 50%;
   top: 50%;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 1.62rem;
+  font-size: 1.88rem;
   font-weight: 900;
   line-height: 1;
   -webkit-text-stroke: 2.1px rgba(255, 255, 255, 1);
@@ -560,7 +545,7 @@
 
 .world-index-floor-image-frame {
   position: absolute;
-  inset: 4px;
+  inset: 3px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -582,6 +567,11 @@
   background: rgba(100, 64, 23, 0.14);
   color: #7c4e23;
   font-weight: 900;
+}
+
+.world-index-floor-image-placeholder {
+  width: 100%;
+  height: 100%;
 }
 
 .enemy-detail {
@@ -760,7 +750,7 @@
 .monster-image-zoom-overlay {
   position: fixed;
   inset: 0;
-  z-index: 220;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
@@ -819,6 +809,152 @@
   font-weight: 800;
   text-align: center;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.58);
+}
+
+.floor-preview-strip {
+  position: fixed;
+  z-index: 1500;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.floor-preview-strip-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 2px 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.floor-preview-item {
+  position: relative;
+  width: 46px;
+  height: 42px;
+  flex: 0 0 46px;
+  padding: 0;
+  overflow: visible;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #f5f9ff;
+  cursor: pointer;
+  opacity: 0.78;
+  pointer-events: auto;
+  transition: border-color 140ms ease, opacity 140ms ease, transform 140ms ease, filter 140ms ease;
+}
+
+.floor-preview-item:hover,
+.floor-preview-item:focus-visible {
+  border-color: rgba(244, 208, 129, 0.42);
+  opacity: 1;
+  filter: brightness(1.08);
+}
+
+.floor-preview-item.is-active {
+  border-color: rgba(244, 208, 129, 0.92);
+  outline: 2px solid rgba(255, 231, 163, 0.92);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 1px rgba(62, 41, 16, 0.42), 0 0 8px rgba(244, 208, 129, 0.28);
+  opacity: 1;
+  transform: translateY(-2px) scale(1.06);
+}
+
+.floor-preview-item:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.floor-preview-window-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  border: 1px solid rgba(78, 50, 18, 0.24);
+  border-radius: 7px;
+  background: rgba(255, 246, 214, 0.28);
+  color: rgba(68, 42, 13, 0.94);
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.94;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(72, 44, 13, 0.14);
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease, transform 140ms ease;
+}
+
+.floor-preview-window-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  stroke: currentColor;
+}
+
+.floor-preview-window-button:not(:disabled):hover,
+.floor-preview-window-button:not(:disabled):focus-visible {
+  border-color: rgba(96, 58, 17, 0.48);
+  background: rgba(255, 246, 214, 0.44);
+  box-shadow: 0 3px 10px rgba(72, 44, 13, 0.18);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.floor-preview-window-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+  transform: none;
+}
+
+.floor-preview-image-frame {
+  position: absolute;
+  inset: 2px 4px 6px;
+  display: grid;
+  place-items: center;
+}
+
+.floor-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.24));
+}
+
+.floor-preview-image-fallback {
+  color: rgba(245, 249, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.floor-preview-number {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  min-width: 15px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(4, 8, 14, 0.68);
+  color: #ffffff;
+  font-size: 0.66rem;
+  font-weight: 900;
+  line-height: 14px;
+  text-align: center;
+}
+
+.dynamic-floor-empty {
+  position: relative;
+  min-height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .enemy-detail-class-fallback {
@@ -1022,15 +1158,44 @@
     font-size: 2.45rem;
   }
 
+  .world-index-page.is-longform-dense {
+    gap: 10px;
+  }
+
+  .world-index-page.is-longform-dense h1 {
+    font-size: 2.16rem;
+  }
+
+  .world-index-page.is-longform-dense .world-index-sections {
+    justify-content: flex-start;
+    gap: 0;
+  }
+
+  .world-index-page.is-longform-dense .world-index-section {
+    gap: 8px;
+  }
+
+  .world-index-page.is-longform-dense .world-index-floor-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 7px;
+    row-gap: 6px;
+  }
+
+  .world-index-page.is-longform-dense .world-index-floor-tile {
+    aspect-ratio: 1 / 0.56;
+  }
+
+  .world-index-page.is-longform-dense .world-index-floor-number {
+    font-size: 1.58rem;
+  }
+
+  .world-index-page.is-longform-dense .world-index-floor-image-frame {
+    inset: 2px;
+  }
+
   .world-dungeon-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
-  }
-
-  .floor-grid {
-    grid-template-columns: repeat(5, minmax(48px, 1fr));
-    gap: 12px;
-    max-width: 520px;
   }
 
   .enemy-detail {
@@ -1374,10 +1539,6 @@
     aspect-ratio: 1 / 0.82;
   }
 
-  .floor-grid {
-    grid-template-columns: repeat(4, minmax(42px, 1fr));
-  }
-
   .dungeon-book-page {
     padding: 24px;
     gap: 16px;
@@ -1476,6 +1637,12 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .floor-preview-strip {
+    display: none;
+  }
+}
+
 @media (min-width: 768px) {
   .dungeon-library {
     padding: 1rem;
@@ -1487,7 +1654,8 @@
   .library-shelf,
   .content-flipbook-layer,
   .world-dungeon-card,
-  .floor-button,
+  .floor-preview-item,
+  .floor-preview-window-button,
   .world-index-floor-tile {
     transition-duration: 1ms;
   }

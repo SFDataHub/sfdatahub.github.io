@@ -8,6 +8,7 @@ export type DataHubLoadingStateProps = {
   message: string;
   current?: number;
   total?: number;
+  progressLabel?: string;
   variant?: DataHubLoadingStateVariant;
   error?: string | null;
   onRetry?: () => void;
@@ -22,6 +23,7 @@ export function DataHubLoadingState({
   message,
   current,
   total,
+  progressLabel,
   variant = "inline",
   error = null,
   onRetry,
@@ -47,6 +49,7 @@ export function DataHubLoadingState({
         {hasProgress ? (
           <div className={styles.progressCount} aria-label={`${formatNumber(current)} of ${formatNumber(total)}`}>
             {formatNumber(current)} / {formatNumber(total)}
+            {progressLabel ? ` ${progressLabel}` : null}
           </div>
         ) : null}
         {error && onRetry ? (

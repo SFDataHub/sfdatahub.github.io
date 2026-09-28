@@ -1115,6 +1115,7 @@
       "loreUnavailable": "Zatím není dostupné.",
       "enemyId": "ID protivníka {{enemyId}}"
     },
+    "monsterLore": {},
     "classes": {
       "warrior": "Válečník",
       "mage": "Mág",
@@ -1135,6 +1136,7 @@
       "title": "Analyzuje se {{targetServerCode}}",
       "phases": {
         "loading": "Načítají se lokální skeny",
+        "identityRefresh": "Používají se změny identit",
         "preparingScanPool": "Připravuje se fond fusion skenů",
         "filteringScope": "Filtruje se fusion rozsah",
         "normalizing": "Normalizují se data identit",

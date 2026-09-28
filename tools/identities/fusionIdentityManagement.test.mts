@@ -7,6 +7,7 @@ import type { GuildHubLogicalScanSnapshot } from "../../src/lib/guilds/localScan
 import {
   buildFusionIdentityManagementReportFromSnapshots,
   confirmFusionIdentityLink,
+  listReadyFusionIdentityMergeItems,
   mergeReadyFusionIdentityItems,
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
@@ -863,6 +864,18 @@ assert.equal(knights.memberStatusSummary?.resolvedMembers, 5);
 assert.equal(knights.memberStatusSummary?.readyMembers, 5);
 assert.equal(knights.memberStatusSummary?.completedMembers, 0);
 assert.equal(knights.memberStatusSummary?.reviewMembers, 0);
+assert.deepEqual(
+  knights.memberStatusSummary?.memberRefsByStatus.ready.map(
+    (member) => member.identifier,
+  ),
+  [
+    "f28_net_p901",
+    "f28_net_p902",
+    "f28_net_p903",
+    "f28_net_p904",
+    "f28_net_p905",
+  ],
+);
 assert.equal(knights.memberStatusSummary?.memberRefsByStatus.review.length, 0);
 assert.equal(knights.memberStatusSummary?.missingManagementEntries, 0);
 
@@ -906,6 +919,198 @@ assert.equal(
   ),
   false,
 );
+
+const guildScopedPlayerDb = `fusion-identity-management-player-guild-scoped-${dbSuffix}`;
+const guildScopedGuildDb = `fusion-identity-management-guild-guild-scoped-${dbSuffix}`;
+await deleteDB(guildScopedPlayerDb);
+await deleteDB(guildScopedGuildDb);
+const guildScopedPlayerStore = createPlayerIdentityStore({
+  dbName: guildScopedPlayerDb,
+});
+const guildScopedGuildStore = createGuildIdentityStore({
+  dbName: guildScopedGuildDb,
+});
+const guildScopedReport = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots,
+  playerStore: guildScopedPlayerStore,
+  guildStore: guildScopedGuildStore,
+});
+const guildScopedKnights = guildScopedReport.items.find(
+  (item) => item.entityType === "guild" && item.currentName === "Knights",
+);
+assert.ok(guildScopedKnights);
+const scopedReadyIdentifiers =
+  guildScopedKnights.memberStatusSummary?.memberRefsByStatus.ready
+    .map((member) => member.identifier)
+    .slice(0, 2) ?? [];
+assert.deepEqual(scopedReadyIdentifiers, ["f28_net_p901", "f28_net_p902"]);
+assert.deepEqual(
+  listReadyFusionIdentityMergeItems(guildScopedReport, {
+    entityType: "player",
+    currentIdentifiers: scopedReadyIdentifiers,
+  }).map((item) => item.currentIdentifier),
+  scopedReadyIdentifiers,
+);
+const guildScopedMergeResult = await mergeReadyFusionIdentityItems(
+  guildScopedReport,
+  {
+    playerStore: guildScopedPlayerStore,
+    guildStore: guildScopedGuildStore,
+    filter: {
+      entityType: "player",
+      currentIdentifiers: scopedReadyIdentifiers,
+    },
+  },
+);
+assert.equal(guildScopedMergeResult.players, 2);
+assert.equal(guildScopedMergeResult.guilds, 0);
+assert.deepEqual(guildScopedMergeResult.errors, []);
+const guildScopedAfter = await buildFusionIdentityManagementReportFromSnapshots({
+  snapshots,
+  playerStore: guildScopedPlayerStore,
+  guildStore: guildScopedGuildStore,
+});
+assert.equal(
+  guildScopedAfter.items.find((item) => item.currentIdentifier === "f28_net_p901")
+    ?.status,
+  "completed",
+);
+assert.equal(
+  guildScopedAfter.items.find((item) => item.currentIdentifier === "f28_net_p902")
+    ?.status,
+  "completed",
+);
+assert.equal(
+  guildScopedAfter.items.find((item) => item.currentIdentifier === "f28_net_p903")
+    ?.status,
+  "ready",
+);
+assert.equal(
+  guildScopedAfter.items.find((item) => item.currentIdentifier === "f28_net_p904")
+    ?.status,
+  "ready",
+);
+assert.equal(
+  guildScopedAfter.items.find((item) => item.currentIdentifier === "f28_net_p905")
+    ?.status,
+  "ready",
+);
+assert.equal(
+  guildScopedAfter.items.find((item) => item.entityType === "guild" && item.currentName === "Knights")
+    ?.status,
+  "ready",
+);
+const guildScopedKnightsAfter = guildScopedAfter.items.find(
+  (item) => item.entityType === "guild" && item.currentName === "Knights",
+);
+assert.equal(guildScopedKnightsAfter?.memberStatusSummary?.readyMembers, 3);
+assert.equal(guildScopedKnightsAfter?.memberStatusSummary?.completedMembers, 2);
+
+const mixedStatusReport = {
+  ...report,
+  items: [
+    {
+      ...readyAlice!,
+      id: "mixed-ready",
+      currentIdentifier: "mixed-ready",
+      status: "ready" as const,
+      readyCandidateIdentifier: "mixed-old-ready",
+    },
+    {
+      ...readyAlice!,
+      id: "mixed-review",
+      currentIdentifier: "mixed-review",
+      status: "review" as const,
+      readyCandidateIdentifier: "mixed-old-review",
+    },
+    {
+      ...readyAlice!,
+      id: "mixed-unresolved",
+      currentIdentifier: "mixed-unresolved",
+      status: "unresolved" as const,
+      readyCandidateIdentifier: "mixed-old-unresolved",
+    },
+    {
+      ...readyAlice!,
+      id: "mixed-no-observation",
+      currentIdentifier: "mixed-no-observation",
+      status: "noHistoricalObservation" as const,
+      readyCandidateIdentifier: "mixed-old-no-observation",
+    },
+    {
+      ...readyAlice!,
+      id: "mixed-no-history",
+      currentIdentifier: "mixed-no-history",
+      status: "noHistory" as const,
+      readyCandidateIdentifier: "mixed-old-no-history",
+    },
+    {
+      ...readyAlice!,
+      id: "mixed-completed",
+      currentIdentifier: "mixed-completed",
+      status: "completed" as const,
+      readyCandidateIdentifier: "mixed-old-completed",
+    },
+    {
+      ...readyBob!,
+      id: "mixed-conflict",
+      currentIdentifier: "f28_net_p902",
+      status: "ready" as const,
+      readyCandidateIdentifier: "mixed-old-conflict",
+    },
+    {
+      ...knights,
+      id: "mixed-ready-guild",
+      currentIdentifier: "mixed-ready-guild",
+      status: "ready" as const,
+      readyCandidateIdentifier: "mixed-old-guild",
+    },
+  ],
+};
+assert.deepEqual(
+  listReadyFusionIdentityMergeItems(mixedStatusReport, {
+    entityType: "player",
+    currentIdentifiers: [
+      "mixed-ready",
+      "mixed-review",
+      "mixed-unresolved",
+      "mixed-no-observation",
+      "mixed-no-history",
+      "mixed-completed",
+      "mixed-ready-guild",
+    ],
+  }).map((item) => item.currentIdentifier),
+  ["mixed-ready"],
+);
+assert.deepEqual(
+  listReadyFusionIdentityMergeItems(mixedStatusReport, {
+    entityType: "player",
+    currentIdentifiers: ["mixed-review"],
+  }),
+  [],
+);
+
+const conflictCalls: string[] = [];
+const conflictResult = await mergeReadyFusionIdentityItems(mixedStatusReport, {
+  filter: {
+    entityType: "player",
+    currentIdentifiers: ["mixed-ready", "f28_net_p902"],
+  },
+  playerStore: {
+    async linkPlayerIdentifiers(currentIdentifier: string) {
+      conflictCalls.push(currentIdentifier);
+      if (currentIdentifier === "f28_net_p902") {
+        throw new Error("candidate_reserved");
+      }
+    },
+  } as never,
+});
+assert.deepEqual(conflictCalls, ["mixed-ready", "f28_net_p902"]);
+assert.equal(conflictResult.players, 1);
+assert.equal(conflictResult.guilds, 0);
+assert.deepEqual(conflictResult.errors, [
+  { itemId: "mixed-conflict", message: "candidate_reserved" },
+]);
 
 const mergeResult = await mergeReadyFusionIdentityItems(report, {
   playerStore,
@@ -1705,6 +1910,8 @@ assert.equal(
 
 await playerStore.close();
 await guildStore.close();
+await guildScopedPlayerStore.close();
+await guildScopedGuildStore.close();
 await rejectPlayerStore.close();
 await rejectGuildStore.close();
 await collisionPlayerStore.close();
@@ -1737,6 +1944,8 @@ await guildBaseMissingPlayerStore.close();
 await guildBaseMissingGuildStore.close();
 await deleteDB(playerDb);
 await deleteDB(guildDb);
+await deleteDB(guildScopedPlayerDb);
+await deleteDB(guildScopedGuildDb);
 await deleteDB(rejectPlayerDb);
 await deleteDB(rejectGuildDb);
 await deleteDB(collisionPlayerDb);

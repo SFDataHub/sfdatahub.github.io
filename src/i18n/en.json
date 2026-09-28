@@ -1444,6 +1444,7 @@
       "loreUnavailable": "Not available yet.",
       "enemyId": "Enemy ID {{enemyId}}"
     },
+    "monsterLore": {},
     "classes": {
       "warrior": "Warrior",
       "mage": "Mage",
@@ -1464,6 +1465,7 @@
       "title": "Analyzing {{targetServerCode}}",
       "phases": {
         "loading": "Loading local scans",
+        "identityRefresh": "Applying identity changes",
         "preparingScanPool": "Preparing fusion scan pool",
         "filteringScope": "Filtering fusion scope",
         "normalizing": "Normalizing identity data",

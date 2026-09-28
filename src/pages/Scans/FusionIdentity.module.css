@@ -528,6 +528,11 @@
   outline: none;
 }
 
+.guildMemberStatusButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .infoButton {
   display: inline-flex;
   gap: 6px;

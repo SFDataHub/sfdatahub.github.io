@@ -109,6 +109,20 @@ export default function PlaygroundIndex() {
             </NavLink>
 
             <NavLink
+              to="progress-visuals"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Spielerprofil · Gildenradar
+            </NavLink>
+
+            <NavLink
+              to="player-performance"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Gildentrend
+            </NavLink>
+
+            <NavLink
               to="potion-icons"
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >
