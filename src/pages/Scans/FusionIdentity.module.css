@@ -468,7 +468,7 @@
   display: grid;
   grid-template-columns:
     minmax(180px, 1.3fr) minmax(150px, 0.9fr) minmax(140px, 0.8fr)
-    auto;
+    minmax(180px, auto);
   gap: 10px;
   align-items: center;
 }
@@ -508,27 +508,52 @@
   color: rgba(183, 245, 207, 0.58);
 }
 
-.guildMemberStatusButton {
-  appearance: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: #ffe2a8;
-  cursor: pointer;
-  padding: 2px 4px;
-  font: inherit;
-  line-height: 1.2;
+.resultRowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
-.guildMemberStatusButton:hover,
-.guildMemberStatusButton:focus-visible {
-  border-color: rgba(245, 190, 92, 0.52);
-  background: rgba(245, 190, 92, 0.12);
-  color: #fff0c8;
+.guildMemberActionGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.guildMemberActionButton {
+  appearance: none;
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(92, 139, 198, 0.58);
+  border-radius: 8px;
+  background: rgba(92, 139, 198, 0.12);
+  color: var(--title);
+  cursor: pointer;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.guildMemberActionButton:hover,
+.guildMemberActionButton:focus-visible {
+  border-color: rgba(92, 139, 198, 0.88);
+  background: rgba(92, 139, 198, 0.22);
+  color: var(--title);
   outline: none;
 }
 
-.guildMemberStatusButton:disabled {
+.guildMemberActionButton:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
@@ -1076,6 +1101,11 @@
 
   .statusBadge {
     justify-self: start;
+  }
+
+  .resultRowActions,
+  .guildMemberActionGroup {
+    justify-content: flex-start;
   }
 
   .statusCluster {

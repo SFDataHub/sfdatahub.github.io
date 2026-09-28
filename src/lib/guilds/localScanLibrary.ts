@@ -22,6 +22,7 @@ import { resolveServer } from "../servers/serverResolver";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 import { parsers } from "../import/parsers";
 import { parseSfJson } from "../parsing/parseSfJson";
+import type { ScanArchiveSourceMetadata } from "../scanArchive/types";
 import type { GuildAnalyticsMaterializeOptions } from "./localGuildAnalyticsStore";
 
 const GUILD_HUB_DB_NAME = "sfdatahub-guild-hub";
@@ -76,6 +77,7 @@ export type GuildHubLocalScan = {
   mergedSourceIds?: string[];
   containedInScanSlotId?: string | null;
   analyticsEnabled?: boolean;
+  archiveSource?: ScanArchiveSourceMetadata;
   [key: string]: unknown;
 };
 
@@ -158,6 +160,7 @@ export type GuildHubScanSummary = {
   mergedSourceIds?: string[];
   containedInScanSlotId?: string | null;
   analyticsEnabled?: boolean;
+  archiveSource?: ScanArchiveSourceMetadata;
   contentHash?: string;
   summaryVersion: number;
 };
@@ -210,6 +213,11 @@ export type GuildHubScanMergeOptions = {
   mode?: GuildHubScanMergeMode;
   displayName?: string;
   onProgress?: (progress: GuildHubScanMergeProgress) => void;
+};
+
+export type GuildHubLocalScanImportPreviewOptions = {
+  id?: string;
+  archiveSource?: ScanArchiveSourceMetadata;
 };
 
 export type GuildHubScanSlotRecoveryResult =
@@ -1563,6 +1571,7 @@ function createGuildHubScanSummary(scan: GuildHubLocalScan): GuildHubScanSummary
     ...(scan.mergedSourceIds ? { mergedSourceIds: scan.mergedSourceIds } : {}),
     ...("containedInScanSlotId" in scan ? { containedInScanSlotId: scan.containedInScanSlotId ?? null } : {}),
     ...(typeof scan.analyticsEnabled === "boolean" ? { analyticsEnabled: scan.analyticsEnabled } : {}),
+    ...(scan.archiveSource ? { archiveSource: scan.archiveSource } : {}),
     contentHash: scan.contentHash,
     summaryVersion: GUILD_HUB_SCAN_SUMMARY_VERSION,
   };
@@ -1604,6 +1613,9 @@ function applyScanMetadataToSummary(summary: GuildHubScanSummary, scan: GuildHub
 
   if (typeof scan.analyticsEnabled === "boolean") next.analyticsEnabled = scan.analyticsEnabled;
   else delete next.analyticsEnabled;
+
+  if (scan.archiveSource) next.archiveSource = scan.archiveSource;
+  else delete next.archiveSource;
 
   return next;
 }
@@ -1710,6 +1722,15 @@ function isNewerGuildSource(candidate: GuildHubLocalGuildIdentity, existing: Gui
 async function findScanByHash(contentHash: string) {
   const db = await getLocalScanDb();
   return db.getFromIndex(SCAN_STORE, "by_contentHash", contentHash);
+}
+
+export async function findGuildHubLocalScanByArchiveScanId(archiveScanId: string) {
+  const normalizedArchiveScanId = archiveScanId.trim();
+  if (!normalizedArchiveScanId) return null;
+  const db = await getLocalScanDb();
+  const scans = await db.getAll(SCAN_STORE);
+  const match = scans.find((scan) => scan.archiveSource?.archiveScanId === normalizedArchiveScanId) ?? null;
+  return match ? persistScanNormalizationIfNeeded(db, match) : null;
 }
 
 async function materializeGuildAnalyticsScan(scan: GuildHubLocalScan, options?: GuildAnalyticsMaterializeOptions) {
@@ -1838,6 +1859,7 @@ function buildLocalScanRecord({
   parserName,
   importedAt,
   updatedAt,
+  archiveSource,
 }: {
   id: string;
   filename: string;
@@ -1849,6 +1871,7 @@ function buildLocalScanRecord({
   parserName: string | null;
   importedAt: string;
   updatedAt?: string;
+  archiveSource?: ScanArchiveSourceMetadata;
 }): GuildHubLocalScan {
   const normalizedPlayers = normalizeGuildScanMembers(raw);
   const servers = extractServers(raw);
@@ -1871,6 +1894,7 @@ function buildLocalScanRecord({
     normalizerVersion: GUILD_SCAN_NORMALIZER_VERSION,
     detectedType,
     parserName,
+    ...(archiveSource ? { archiveSource } : {}),
   };
 
   return scan;
@@ -1899,13 +1923,17 @@ export function isGuildHubScanAnalyticsEnabled(scan: Pick<GuildHubLocalScan, "an
   return scan.analyticsEnabled !== false;
 }
 
-export async function createGuildHubLocalScanImportPreview(filename: string, content: string): Promise<GuildHubLocalScan> {
+export async function createGuildHubLocalScanImportPreview(
+  filename: string,
+  content: string,
+  options: GuildHubLocalScanImportPreviewOptions = {},
+): Promise<GuildHubLocalScan> {
   const rawData = JSON.parse(content);
   const derivedGuildCoa = extractDerivedGuildCoaMetadata(rawData, content);
   const { raw, detectedType, parserName } = await requireRawScan(rawData);
   const contentHash = await sha256Hex(content);
   return buildLocalScanRecord({
-    id: createScanId(),
+    id: options.id ?? createScanId(),
     filename,
     contentHash,
     importedAt: new Date().toISOString(),
@@ -1914,6 +1942,7 @@ export async function createGuildHubLocalScanImportPreview(filename: string, con
     raw,
     detectedType,
     parserName,
+    archiveSource: options.archiveSource,
   });
 }
 
@@ -2414,6 +2443,7 @@ export const renameSfDataHubScanSlot = renameGuildHubScanSlot;
 export const dissolveSfDataHubScanSlot = dissolveGuildHubScanSlot;
 export const recoverSfDataHubScanSlotMerge = recoverGuildHubScanSlotMerge;
 export const deleteSfDataHubLocalScans = deleteGuildHubLocalScans;
+export const findSfDataHubLocalScanByArchiveScanId = findGuildHubLocalScanByArchiveScanId;
 export const listSfDataHubScanSummaries = listGuildHubScanSummaries;
 export const listSfDataHubLocalServersFromScans = listGuildHubLocalServersFromScans;
 export const listSfDataHubLocalGuildsForServerFromScans = listGuildHubLocalGuildsForServerFromScans;

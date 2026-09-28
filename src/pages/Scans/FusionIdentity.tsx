@@ -2576,6 +2576,65 @@ function ManualLinkDialog({
 
 function GuildMemberStatusSummary({
   item,
+}: {
+  item: FusionIdentityManagementItem;
+}) {
+  const { t } = useTranslation();
+  const summary = item.memberStatusSummary;
+  if (item.entityType !== "guild" || !summary) return null;
+  const memberRefsByStatus = summary.memberRefsByStatus ?? {
+    ready: [],
+    review: [],
+    unresolved: [],
+    noHistoricalObservation: [],
+    noHistory: [],
+  };
+  const resolvedMembers = summary.resolvedMembers ?? 0;
+  const totalMembers = summary.totalMembers ?? 0;
+  const reviewMembers = summary.reviewMembers ?? 0;
+  const unresolvedMembers = summary.unresolvedMembers ?? 0;
+  const noHistoricalObservationMembers =
+    summary.noHistoricalObservationMembers ?? 0;
+  const noHistoricalDataMembers = summary.noHistoricalDataMembers ?? 0;
+  const missingManagementEntries = summary.missingManagementEntries ?? 0;
+
+  const problemParts: string[] = [
+    reviewMembers
+      ? t("fusionIdentity.memberSelection.reviewCount", {
+          count: reviewMembers,
+        })
+      : null,
+    unresolvedMembers
+      ? `${formatNumber(unresolvedMembers)} unresolved`
+      : null,
+    noHistoricalObservationMembers
+      ? `${formatNumber(noHistoricalObservationMembers)} no observation`
+      : null,
+    noHistoricalDataMembers
+      ? `${formatNumber(noHistoricalDataMembers)} no history`
+      : null,
+    missingManagementEntries
+      ? `${formatNumber(missingManagementEntries)} missing`
+      : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return (
+    <span className={styles.guildMemberInlineSummary}>
+      <span>
+        {formatNumber(resolvedMembers)} / {formatNumber(totalMembers)} resolved
+      </span>
+      {problemParts.map((part, index) => (
+        <React.Fragment key={index}>
+          <span className={styles.guildMemberStatusSeparator}>·</span>
+          <span>{part}</span>
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
+function GuildMemberRowActions({
+  item,
   onFocusMembersByStatus,
   onCompleteReadyPlayers,
   completingGuildIdentifier,
@@ -2599,39 +2658,19 @@ function GuildMemberStatusSummary({
     noHistoricalObservation: [],
     noHistory: [],
   };
-  const resolvedMembers = summary.resolvedMembers ?? 0;
-  const totalMembers = summary.totalMembers ?? 0;
   const reviewMembers = summary.reviewMembers ?? 0;
-  const unresolvedMembers = summary.unresolvedMembers ?? 0;
-  const noHistoricalObservationMembers =
-    summary.noHistoricalObservationMembers ?? 0;
-  const noHistoricalDataMembers = summary.noHistoricalDataMembers ?? 0;
-  const missingManagementEntries = summary.missingManagementEntries ?? 0;
   const readyRefs = memberRefsByStatus.ready ?? [];
   const readyButtonDisabled =
     !readyRefs.length || completingGuildIdentifier === item.currentIdentifier;
 
-  const problemParts: Array<React.ReactElement | string | null> = [
-    readyRefs.length ? (
-      <button
-        key="ready"
-        type="button"
-        className={styles.guildMemberStatusButton}
-        onClick={(event) => {
-          event.stopPropagation();
-          onCompleteReadyPlayers(item);
-        }}
-        disabled={readyButtonDisabled}
-      >
-        Complete ready players ({formatNumber(readyRefs.length)})
-      </button>
-    ) : null,
-    reviewMembers ? (
-      memberRefsByStatus.review.length ? (
+  if (!readyRefs.length && !memberRefsByStatus.review.length) return null;
+
+  return (
+    <div className={styles.guildMemberActionGroup}>
+      {memberRefsByStatus.review.length ? (
         <button
-          key="review"
           type="button"
-          className={styles.guildMemberStatusButton}
+          className={styles.guildMemberActionButton}
           onClick={(event) => {
             event.stopPropagation();
             onFocusMembersByStatus(item, "review");
@@ -2641,44 +2680,23 @@ function GuildMemberStatusSummary({
             guildName,
           })}
         >
-          {t("fusionIdentity.memberSelection.reviewCount", {
-            count: reviewMembers,
-          })}
+          Review
         </button>
-      ) : (
-        <span key="review">
-          {t("fusionIdentity.memberSelection.reviewCount", {
-            count: reviewMembers,
-          })}
-        </span>
-      )
-    ) : null,
-    unresolvedMembers
-      ? `${formatNumber(unresolvedMembers)} unresolved`
-      : null,
-    noHistoricalObservationMembers
-      ? `${formatNumber(noHistoricalObservationMembers)} no observation`
-      : null,
-    noHistoricalDataMembers
-      ? `${formatNumber(noHistoricalDataMembers)} no history`
-      : null,
-    missingManagementEntries
-      ? `${formatNumber(missingManagementEntries)} missing`
-      : null,
-  ].filter((value): value is React.ReactElement | string => value !== null);
-
-  return (
-    <span className={styles.guildMemberInlineSummary}>
-      <span>
-        {formatNumber(resolvedMembers)} / {formatNumber(totalMembers)} resolved
-      </span>
-      {problemParts.map((part, index) => (
-        <React.Fragment key={index}>
-          <span className={styles.guildMemberStatusSeparator}>·</span>
-          {part}
-        </React.Fragment>
-      ))}
-    </span>
+      ) : null}
+      {readyRefs.length ? (
+        <button
+          type="button"
+          className={styles.guildMemberActionButton}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCompleteReadyPlayers(item);
+          }}
+          disabled={readyButtonDisabled}
+        >
+          Complete ready players ({formatNumber(readyRefs.length)})
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -2723,12 +2741,7 @@ function QueueRow({
             <div className={styles.playerName}>
               {item.currentName ?? item.currentIdentifier}
             </div>
-            <GuildMemberStatusSummary
-              item={item}
-              onFocusMembersByStatus={onFocusMembersByStatus}
-              onCompleteReadyPlayers={onCompleteReadyPlayers}
-              completingGuildIdentifier={completingGuildIdentifier}
-            />
+            <GuildMemberStatusSummary item={item} />
           </div>
           <div className={styles.muted}>{item.currentIdentifier}</div>
         </div>
@@ -2751,11 +2764,19 @@ function QueueRow({
             {formatDate(item.firstSeen)} - {formatDate(item.lastSeen)}
           </div>
         </div>
-        <span
-          className={`${styles.statusBadge} ${statusClassName(item.status)}`}
-        >
-          {statusLabel(item.status)}
-        </span>
+        <div className={styles.resultRowActions}>
+          <GuildMemberRowActions
+            item={item}
+            onFocusMembersByStatus={onFocusMembersByStatus}
+            onCompleteReadyPlayers={onCompleteReadyPlayers}
+            completingGuildIdentifier={completingGuildIdentifier}
+          />
+          <span
+            className={`${styles.statusBadge} ${statusClassName(item.status)}`}
+          >
+            {statusLabel(item.status)}
+          </span>
+        </div>
       </div>
     </div>
   );
