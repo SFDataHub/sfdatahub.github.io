@@ -1,4 +1,4 @@
-import { GuildHubParams } from "./hooks/useGuildHubParams";
+import type { GuildHubParams } from "./hooks/useGuildHubParams";
 
 export type WaitlistStatus = "new" | "in_review" | "accepted" | "declined" | "withdrawn";
 export type FreshnessCode = "f0" | "f1" | "f2" | "f3" | "f4" | "f5" | "f6" | "f7" | "unknown";
@@ -341,11 +341,5 @@ function daysAgoISO(days: number) {
 function hoursAgoISO(hours: number) {
   const date = new Date();
   date.setHours(date.getHours() - hours);
-  return date.toISOString();
-}
-
-function hoursFromNowISO(hours: number) {
-  const date = new Date();
-  date.setHours(date.getHours() + hours);
   return date.toISOString();
 }

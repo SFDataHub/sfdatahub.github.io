@@ -18,9 +18,8 @@ import { createScanArchiveSourceMetadata, loadScanArchiveCatalog } from "./clien
 import {
   ScanArchiveDownloadCancelledError,
   startScanArchiveDownloadWorkerRun,
-  type ScanArchiveDownloadRun,
 } from "./downloadWorkerClient";
-import type { ScanArchiveEntry, ScanArchiveManifest } from "./types";
+import type { ScanArchiveEntry } from "./types";
 import { toScanArchiveEntries, validateScanArchiveManifest } from "./validation";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;

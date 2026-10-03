@@ -3,7 +3,7 @@ import React, { useMemo, useRef, useState, useCallback } from "react";
 import ContentShell from "../../../components/ContentShell";
 import styles from "./styles.module.css";
 import FlipbookCurlViewer from "../../../components/Flipbook/FlipbookCurlViewer";
-import { hotspotsByPage, Hotspot } from "./hotspots";
+import { hotspotsByPage, type Hotspot } from "./hotspots";
 
 type PageFlipLike = {
   flipNext: () => void;

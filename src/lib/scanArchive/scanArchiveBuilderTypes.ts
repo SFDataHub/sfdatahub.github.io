@@ -6,11 +6,13 @@ import type {
   ScanArchivePlannedFile,
 } from "./archiveBuilderCore";
 import type { ScanArchiveManifest } from "./types";
+import type { ScanArchiveBuilderMonthlyTarget } from "./scanArchiveBuilderMonthly";
 
 export type ScanArchiveBuilderProgressPhase =
   | "idle"
   | "parsing"
   | "validating"
+  | "loading-monthly"
   | "grouping"
   | "compressing"
   | "hashing"
@@ -55,6 +57,7 @@ export type ScanArchiveBuilderInspection = {
   months: string[];
   servers: string[];
   batchCount: number;
+  targets?: Array<{ server: string; month: string }>;
   blockers: ScanArchiveBuilderBlocker[];
 };
 
@@ -71,8 +74,12 @@ export type ScanArchiveBuilderRequest =
       manifest: ScanArchiveManifest;
       manifestSource: ScanArchiveBuilderManifestSource;
       usageMode: ScanArchiveBuilderUsageMode;
-      replaceMonthly?: boolean;
+      catalogUrl?: string;
       allowCurrentRollback?: boolean;
+    }
+  | {
+      type: "discard-build";
+      requestId: string;
     }
   | {
       type: "cancel";
@@ -86,6 +93,8 @@ export type ScanArchiveBuilderFileResult = Pick<
 
 export type ScanArchiveBuilderResult = {
   year: number;
+  usageMode: ScanArchiveBuilderUsageMode;
+  monthlyTargets: ScanArchiveBuilderMonthlyTarget[];
   manifestSource: ScanArchiveBuilderManifestSource;
   manifestBefore: ScanArchiveManifest;
   manifestAfter: ScanArchiveManifest;
@@ -129,6 +138,7 @@ export type ScanArchiveBuilderResponse =
       requestId: string;
       phase?: ScanArchiveBuilderProgressPhase;
       message: string;
+      blocker?: ScanArchiveBuilderBlocker;
     }
   | {
       type: "cancelled";

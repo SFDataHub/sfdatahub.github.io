@@ -1583,3 +1583,20 @@
     transition: none;
   }
 }
+
+.archiveDayRow {
+  background: rgba(77, 121, 168, 0.08);
+}
+
+.archiveMemberCaption {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted, #a0acc0);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.archiveEntryError {
+  color: #f2a2a2;
+  font-size: 12px;
+}

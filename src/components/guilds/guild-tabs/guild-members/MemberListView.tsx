@@ -1,6 +1,6 @@
 // src/components/guilds/guild-tabs/guild-members/MemberListView.tsx
 import React from "react";
-import { Member } from "./types";
+import type { Member } from "./types";
 import { THEME, mergeTheme } from "./utils";
 import { CLASSES } from "../../../../data/classes";
 import { toDriveThumbProxy } from "../../../../lib/urls";

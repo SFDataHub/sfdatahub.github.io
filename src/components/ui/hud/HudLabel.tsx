@@ -1,4 +1,3 @@
-import React from "react";
 import cls from "./HudLabel.module.css";
 
 export type HudLabelProps = {

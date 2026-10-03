@@ -683,7 +683,6 @@ export default function GuildToplists({
   const compareLoading = hasReadOnlyData ? (presetReadOnlyData?.compareLoading ?? false) : false;
   const compareExpected = hasReadOnlyData ? (presetReadOnlyData?.compareExpected ?? false) : false;
   const showCompare = hasReadOnlyData ? (presetReadOnlyData?.showCompare ?? false) : false;
-  const compareError = hasReadOnlyData ? (presetReadOnlyData?.compareError ?? null) : null;
   const avgSumSortMode: "base" | "total" = activeSortKey === "guildAvgSum" ? effectiveGuildAvgMode : "base";
   const handleGuildAvgModeChange = (nextMode: "base" | "total") => {
     if (hasReadOnlyData) {

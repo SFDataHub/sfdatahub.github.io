@@ -1,4 +1,3 @@
-import React from "react";
 
 // ACHTUNG: relativer Pfad, weil Seite unter src/pages/GuideHub/ liegt.
 // Falls dein Seitenpfad anders ist, bitte nur die Anzahl der "../" anpassen.

@@ -769,31 +769,6 @@ const emptyGuildMemberStatusSummary =
     },
   });
 
-const createEmptyReport = (
-  snapshots: GuildHubLogicalScanSnapshot[],
-  scopeDefinition: FusionIdentityAnalysisScope = getFallbackFusionIdentityScope(),
-  playerObservationCount = 0,
-  guildObservationCount = 0,
-): FusionIdentityManagementReport => ({
-  scope: {
-    label: scopeDefinition.label,
-    originServerCodes: scopeDefinition.originServerCodes,
-    targetServerCode: scopeDefinition.targetServerCode,
-    allSnapshotCount: snapshots.length,
-    historicalSnapshotCount: 0,
-    postFusionSnapshotCount: 0,
-    firstHistoricalTimestamp: null,
-    lastHistoricalTimestamp: null,
-    firstPostFusionTimestamp: null,
-    lastPostFusionTimestamp: null,
-    playerObservationCount,
-    guildObservationCount,
-  },
-  summary: summarize([]),
-  items: [],
-  currentAliases: [],
-  historicalAliases: [],
-});
 
 const groupPlayerObservations = (observations: PlayerFusionObservation[]) => {
   const byIdentifier = new Map<string, PlayerFusionObservation[]>();
@@ -1070,59 +1045,8 @@ const isAssignedToOtherIdentity = (
   return Boolean(historicalEntityId && historicalEntityId !== currentEntityId);
 };
 
-const readLinkedAliases = async (
-  getEntity: (identifier: string) => Promise<{ entityId: string } | null>,
-  getAliases: (entityId: string) => Promise<string[]>,
-  identifier: string,
-) => {
-  const entity = await getEntity(identifier);
-  if (!entity) return { entityId: null, aliases: [] };
-  return {
-    entityId: entity.entityId,
-    aliases: await getAliases(entity.entityId),
-  };
-};
 
-const createAssignedHistoricalMap = async (
-  items: Array<{
-    currentIdentifier: string;
-    historicalIdentifiers: string[];
-    entityId: string | null;
-  }>,
-) => {
-  const assignments = new Map<string, Set<string>>();
-  items.forEach((item) => {
-    if (!item.entityId) return;
-    item.historicalIdentifiers.forEach((historicalIdentifier) => {
-      const key = normalizeIdentifierKey(historicalIdentifier);
-      if (!key) return;
-      assignments.set(
-        key,
-        new Set([
-          ...(assignments.get(key) ?? []),
-          normalizeIdentifierKey(item.currentIdentifier),
-        ]),
-      );
-    });
-  });
-  return assignments;
-};
 
-const hasAssignedToOther = (
-  assignments: Map<string, Set<string>>,
-  historicalIdentifier: string,
-  currentIdentifier: string,
-) => {
-  const assigned = assignments.get(
-    normalizeIdentifierKey(historicalIdentifier),
-  );
-  return Boolean(
-    assigned &&
-    [...assigned].some(
-      (identifier) => identifier !== normalizeIdentifierKey(currentIdentifier),
-    ),
-  );
-};
 
 const READY_ASSIGNMENT_CONFLICT_REASON =
   "historical identity is claimed by multiple current identities";
@@ -1490,7 +1414,7 @@ const applyGlobalAssignmentResolution = (
 const buildPlayerItems = async (
   currentObservationsByIdentifier: Map<string, PlayerFusionObservation[]>,
   playerResults: PlayerFusionPlayerResult[],
-  stores: { playerStore: PlayerIdentityManagementStore },
+  _stores: { playerStore: PlayerIdentityManagementStore },
   identityState: IdentityStoreState,
   historicalPlayerSnapshotCountsByServer: Map<string, number>,
   resolverScope: PlayerFusionScopeContext,
@@ -1754,7 +1678,7 @@ const buildPlayerItems = async (
 const buildGuildItems = async (
   currentObservationsByIdentifier: Map<string, GuildFusionObservation[]>,
   guildResults: GuildFusionGuildResult[],
-  stores: { guildStore: GuildIdentityManagementStore },
+  _stores: { guildStore: GuildIdentityManagementStore },
   identityState: IdentityStoreState,
   historicalGuildSnapshotCount: number,
   originServerCodes: string[],

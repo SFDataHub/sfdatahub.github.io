@@ -1,4 +1,3 @@
-import React from "react";
 import ContentShell from "../../../components/ContentShell";
 import PortraitPreview from "../../../components/avatar/PortraitPreview";
 import type { PortraitOptions } from "../../../components/player-profile/types";

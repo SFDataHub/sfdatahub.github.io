@@ -1,4 +1,3 @@
-import React from "react";
 import HudLabel from "../../../ui/hud/HudLabel";
 import { getClassIconUrl } from "../../../ui/shared/classIcons";
 import cls from "./TotalStatsCard.module.css";

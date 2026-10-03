@@ -1,5 +1,5 @@
 // src/pages/GuideHub/ArenaAM/AMRuneBonuses.tsx
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./AMRuneBonuses.module.css";
 import Tooltip from "../../../../components/ui/Tooltip/Tooltip";

@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./DungeonPauseOpenXPCalculator.module.css";
 import { dungeonPauseOpenXPData } from "../../../lib/calculators/dungeonPauseOpenXP";
-import { DungeonRow, SpecialRow, buildOptions, sumXp } from "../../../lib/calculators/dungeonPauseOpenXP/types";
+import { type DungeonRow, type SpecialRow, buildOptions, sumXp } from "../../../lib/calculators/dungeonPauseOpenXP/types";
 
 type RangeMap = Record<string, { from: number; to: number }>;
 interface DungeonPauseOpenXPState {

@@ -9,7 +9,7 @@ import styles from "./styles.module.css";
 import guideHubLogo from "../../assets/logo_guidehub.png";
 
 /** ========== IMPORTS: HAUPTSEITEN (= tab) ========== */
-import GameFeaturesIndex from "./GameFeatures/Index";
+import GameFeaturesIndex from "./GameFeatures/index";
 
 
 import ProgressionIndex from "./Progression/Index";

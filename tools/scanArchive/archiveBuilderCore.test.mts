@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { gzipSync, unzipSync, zipSync } from "fflate";
+import { gzipSync, gunzipSync, unzipSync, zipSync } from "fflate";
 
 import {
   buildScanArchiveBatches,
   createScanArchiveBuildPlanCore,
   monthKeyForScanArchiveTimestamp,
 } from "../../src/lib/scanArchive/archiveBuilderCore.ts";
+import { ScanArchiveBuilderValidationError } from "../../src/lib/scanArchive/scanArchiveBuilderErrors.ts";
 import type { ScanArchiveManifest } from "../../src/lib/scanArchive/types.ts";
 
 const YEAR = 2026;
@@ -51,6 +52,41 @@ const group = (server: string, timestamp: number) => ({
   identifier: `${server}_g1`,
   name: `Guild ${server}`,
 });
+
+{
+  // Representative AM1 rows from the supplied export retain their raw identity.
+  const timestamp = 1788598437385;
+  const amPlayer = player("am1_net", timestamp, "am1_net_p2940");
+  const amGuild = { prefix: "am1_net", timestamp, identifier: "am1_net_g4", name: "AM guild" };
+  const batches = buildScanArchiveBatches(JSON.stringify({ players: [amPlayer], groups: [amGuild] }), YEAR);
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].server, "am1_net");
+  assert.equal(batches[0].timestamp, timestamp);
+  assert.equal(batches[0].id, `am1_net:${timestamp}`);
+  assert.match(batches[0].path, /^2026-09\/am1_net\//);
+  const plan = await createScanArchiveBuildPlanCore({ year: YEAR, manifest: minimalManifest(), inputBatches: batches, usageMode: "archive-only" }, deps);
+  assert.deepEqual(plan.conflicts, []);
+  const raw = plan.files.find(file => file.kind === "raw");
+  assert(raw?.bytes);
+  const archived = JSON.parse(new TextDecoder().decode(gunzipSync(raw.bytes)));
+  assert.deepEqual(archived.players, [amPlayer]);
+  assert.deepEqual(archived.groups, [amGuild]);
+  assert.equal(plan.manifestAfter.scans[0].server, "am1_net");
+  assert.equal(plan.manifestAfter.scans[0].timestamp, timestamp);
+  // Known historical servers remain accepted without changing their activity.
+  assert.equal(buildScanArchiveBatches(JSON.stringify({ players: [player("s1_ae", tsA, "s1_ae_p1")], groups: [] }), YEAR)[0].server, "s1_ae");
+  for (const kind of ["players", "groups"] as const) {
+    assert.throws(() => buildScanArchiveBatches(JSON.stringify({ players: [], groups: [], [kind]: [player("unknown_builder_test_net", tsA, "unknown_p1")] }), YEAR), (error: unknown) => {
+      assert(error instanceof ScanArchiveBuilderValidationError);
+      assert.equal(error.blocker.code, "server_resolution_failed");
+      assert(error.blocker.cause.includes(`${kind}[0]`));
+      assert(error.blocker.cause.includes("unknown_builder_test_net"));
+      assert.match(error.blocker.remedy, /Serverkey.*Aliaszuordnung/);
+      assert.doesNotMatch(error.blocker.remedy, /JSON/);
+      return true;
+    });
+  }
+}
 
 {
   const content = JSON.stringify({
@@ -140,14 +176,14 @@ const group = (server: string, timestamp: number) => ({
       year: YEAR,
       manifest: minimalManifest(),
       inputBatches: buildScanArchiveBatches(content, YEAR),
-      usageMode: "monthly",
+      usageMode: "create-monthly",
       updatedAt: "2026-09-20T00:00:00.000Z",
     },
     deps,
   );
   assert.equal(plan.conflicts.length, 0);
-  assert.equal(plan.manifestAfter.toplists?.current?.s31_eu, `s31_eu:${tsA}`);
-  assert.equal(plan.manifestAfter.toplists?.monthly?.["2026-09"]?.s31_eu, `s31_eu:${tsA}`);
+  assert.deepEqual(plan.manifestAfter.toplists?.current?.s31_eu, { scanIds: [`s31_eu:${tsA}`] });
+  assert.deepEqual(plan.manifestAfter.toplists?.monthly?.["2026-09"]?.s31_eu, { scanIds: [`s31_eu:${tsA}`] });
   assert.equal(plan.toplistChanges.current.length, 1);
   assert.equal(plan.toplistChanges.monthly.length, 1);
 }
@@ -161,7 +197,7 @@ const group = (server: string, timestamp: number) => ({
         players: [player("f8_net", tsA, "f8_p1")],
         groups: [group("f8_net", tsA)],
       }), YEAR),
-      usageMode: "monthly",
+      usageMode: "create-monthly",
     },
     deps,
   );

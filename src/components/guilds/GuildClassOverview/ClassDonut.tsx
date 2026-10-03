@@ -1,7 +1,7 @@
 // src/components/guilds/GuildClassOverview/ClassDonut.tsx
 import React, { useMemo } from "react";
 import styles from "./styles.module.css";
-import type { ClassMeta, GuildClassOverviewProps } from "./types";
+import type { GuildClassOverviewProps } from "./types";
 import { normalizeData, formatPct } from "./utils";
 import { getGuildClassAccent } from "../classColors";
 

@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef, useState, useEffect } from "re
 import { Link, useSearchParams } from "react-router-dom";
 import styles from "./styles.module.css";
 import ArcNav from "./ArcNav";
-import { Category, SubCategory } from "./config";
+import type { Category, SubCategory } from "./config";
 
 type Props = {
   logoSrc: string;
@@ -14,7 +14,6 @@ const GuideHubDashboard: React.FC<Props> = ({ logoSrc, categories }) => {
   const [params] = useSearchParams();
   const tab  = params.get("tab")  || null;
   const sub  = params.get("sub")  || null;
-  const sub2 = params.get("sub2") || null;
 
   // Aktive Knoten bestimmen
   const activeCat   = useMemo(() => categories.find(c => c.key === tab) || null, [categories, tab]);

@@ -1,4 +1,3 @@
-import React from "react";
 
 /** Farbpalette (Demo-Look) */
 export const COLORS = {

@@ -1,8 +1,16 @@
 import { resolveServer } from "../servers/serverResolver";
+import { ScanArchiveBuilderValidationError } from "./scanArchiveBuilderErrors";
+import {
+  prepareScanArchiveMonthlyAdd,
+  scanArchiveBuilderTargets,
+  type ScanArchiveBuilderMonthlyTarget,
+  type ScanArchiveBuilderRawPayload,
+} from "./scanArchiveBuilderMonthly";
 import {
   validateScanArchiveManifest,
   validateScanArchivePayload,
   validateScanArchiveSearchIndexPayload,
+  normalizeScanArchiveToplistReference,
 } from "./validation";
 import type {
   ScanArchiveManifest,
@@ -20,7 +28,7 @@ export type ScanArchiveSelectionInput = {
   monthly?: Record<string, Record<string, string>>;
 };
 
-export type ScanArchiveBuilderUsageMode = "monthly" | "archive-only";
+export type ScanArchiveBuilderUsageMode = "create-monthly" | "add-monthly" | "archive-only";
 
 export type ScanArchiveBuilderCoreOptions<TBytes = unknown> = {
   year: number;
@@ -33,9 +41,12 @@ export type ScanArchiveBuilderCoreOptions<TBytes = unknown> = {
   setImportedAsMonthly?: string | string[];
   replaceMonthly?: boolean;
   allowCurrentRollback?: boolean;
+  /** Admin monthly imports may write history while retaining a newer Current. */
+  preserveNewerCurrent?: boolean;
   updatedAt?: string;
   existingFiles?: ReadonlyMap<string, ScanArchiveExistingFileMetadata<TBytes>>;
   onProgress?: (progress: ScanArchiveBuilderCoreProgress) => void;
+  loadMonthlyRawScan?: (scan: ScanArchiveManifestScan) => Promise<ScanArchiveBuilderRawPayload>;
 };
 
 export type ScanArchiveBuilderCoreDependencies<TBytes> = {
@@ -48,6 +59,7 @@ export type ScanArchiveBuilderCoreDependencies<TBytes> = {
 
 export type ScanArchiveBuilderCoreProgressPhase =
   | "validating"
+  | "loading-monthly"
   | "grouping"
   | "compressing"
   | "hashing"
@@ -72,6 +84,14 @@ export type ScanArchiveBuilderWarning = {
   code: string;
   message: string;
   scanId?: string;
+  preservedCurrent?: {
+    server: string;
+    month: string;
+    monthlyScanIds: string[];
+    monthlyTimestamp: number;
+    currentScanIds: string[];
+    currentTimestamp: number;
+  };
 };
 
 export type ScanArchiveBatch = {
@@ -113,6 +133,8 @@ export type ScanArchivePreparedScan<TBytes> = {
 
 export type ScanArchiveBuildPlanCore<TBytes> = {
   year: number;
+  usageMode?: ScanArchiveBuilderUsageMode;
+  monthlyTargets: ScanArchiveBuilderMonthlyTarget[];
   batches: ScanArchiveBatch[];
   manifestBefore: ScanArchiveManifest;
   manifestAfter: ScanArchiveManifest;
@@ -192,7 +214,11 @@ const readRequiredString = (
 const resolveArchiveServer = (record: ScanArchiveJsonRecord, rowLabel: string) => {
   const server = readRequiredString(record, ["prefix", "server"], "Server/Prefix", rowLabel);
   if (!SERVER_PREFIX_PATTERN.test(server)) throw new Error(`${rowLabel}: ungueltiger Archivserver ${server}.`);
-  if (!resolveServer(server)) throw new Error(`${rowLabel}: Server ${server} kann nicht mit dem bestehenden Resolver aufgeloest werden.`);
+  if (!resolveServer(server)) throw new ScanArchiveBuilderValidationError({
+    code: "server_resolution_failed",
+    cause: `${rowLabel}: Server ${server} kann nicht mit dem bestehenden Resolver eindeutig aufgeloest werden.`,
+    remedy: "Pruefe den Raw-Serverkey und seine eindeutige Aliaszuordnung im bestehenden Server-Registry-Eintrag. Unbekannte Server muessen dort belegt zugeordnet werden.",
+  });
   return server;
 };
 
@@ -502,20 +528,88 @@ const emptyToplistChanges = () => ({
   monthly: [] as Array<{ month: string; server: string; from?: string; to: string }>,
 });
 
-const resolveToplistMergeOptions = <TBytes>(
-  options: ScanArchiveBuilderCoreOptions<TBytes>,
-  importedEntries: readonly ScanArchiveManifestScan[],
-): Pick<
-  ScanArchiveBuilderCoreOptions,
-  "selection" | "setImportedAsCurrent" | "setImportedAsMonthly" | "replaceMonthly" | "allowCurrentRollback"
-> => {
-  if (options.usageMode !== "monthly") return options;
-  return {
-    setImportedAsCurrent: true,
-    setImportedAsMonthly: [...new Set(importedEntries.map((scan) => monthKeyForScanArchiveTimestamp(scan.timestamp)))],
-    replaceMonthly: options.replaceMonthly ?? true,
-    allowCurrentRollback: options.allowCurrentRollback,
+const mergeMonthlyBuilderSets = (
+  manifest: ScanArchiveManifest,
+  options: ScanArchiveBuilderCoreOptions,
+  batches: readonly ScanArchiveBatch[],
+  targets: readonly ScanArchiveBuilderMonthlyTarget[],
+  conflicts: ScanArchiveBuilderConflict[],
+  warnings: ScanArchiveBuilderWarning[],
+) => {
+  const changes = emptyToplistChanges();
+  const toplists: ScanArchiveToplistsManifest = structuredClone(manifest.toplists ?? { schemaVersion: 1 });
+  if (conflicts.length) return { toplists: manifest.toplists, changes };
+  const scanById = new Map(manifest.scans.map((scan) => [scan.id, scan]));
+  const normalize = (reference: ScanArchiveToplistReference) => normalizeScanArchiveToplistReference(reference, scanById).scanIds;
+  const sameSet = (left: ScanArchiveToplistReference | undefined, right: ScanArchiveToplistReference | undefined) =>
+    Boolean(left && right && normalize(left).join("|") === normalize(right).join("|"));
+  const representativeTimestamp = (reference: ScanArchiveToplistReference) =>
+    Math.max(...normalize(reference).map((id) => scanById.get(id)!.timestamp));
+  const warnPreservedCurrent = (server: string, month: string, monthly: ScanArchiveToplistReference, current: ScanArchiveToplistReference) => {
+    const monthlyTimestamp = representativeTimestamp(monthly);
+    const currentTimestamp = representativeTimestamp(current);
+    warnings.push({
+      code: "current_preserved",
+      message: `${server}: Monatsstand ${month} (${new Date(monthlyTimestamp).toISOString()}; Set ${toplistReferenceLabel(monthly)}) wird geschrieben. Der neuere current-Stand (${new Date(currentTimestamp).toISOString()}; Set ${toplistReferenceLabel(current)}) bleibt unveraendert.`,
+      preservedCurrent: {
+        server, month, monthlyScanIds: normalize(monthly), monthlyTimestamp,
+        currentScanIds: normalize(current), currentTimestamp,
+      },
+    });
   };
+  const currentCandidates = new Map<string, Array<{ scanIds: string[] }>>();
+  for (const target of targets) {
+    const ids = batches.filter((batch) => batch.server === target.server && monthKeyForScanArchiveTimestamp(batch.timestamp) === target.month).map((batch) => batch.id);
+    if (!ids.length) continue;
+    const previous = toplists.monthly?.[target.month]?.[target.server];
+    const scanIds = normalize({ scanIds: [...new Set([...(options.usageMode === "add-monthly" && previous ? normalize(previous) : []), ...ids])] });
+    const scans = scanIds.map((id) => scanById.get(id)!);
+    if (!scans.some((scan) => scan.playerCount > 0) || !scans.some((scan) => scan.groupCount > 0)) {
+      conflicts.push({ code: "toplist_missing_set_data", message: `Monatsset ${target.month}/${target.server} benoetigt insgesamt Player- und Guild-Daten. Fehlenden Datentyp importieren oder Archive-only waehlen.` });
+      continue;
+    }
+    const next = { scanIds };
+    if (!sameSet(previous, next) || typeof previous === "string") {
+      changes.monthly.push({ server: target.server, month: target.month, ...(previous ? { from: toplistReferenceLabel(previous) } : {}), to: scanIds.join("+") });
+    }
+    toplists.monthly = { ...toplists.monthly, [target.month]: { ...toplists.monthly?.[target.month], [target.server]: next } };
+    if (options.usageMode === "create-monthly") {
+      const candidates = currentCandidates.get(target.server) ?? [];
+      candidates.push(next);
+      currentCandidates.set(target.server, candidates);
+    } else {
+      const current = toplists.current?.[target.server];
+      const currentTimestamp = current ? representativeTimestamp(current) : -Infinity;
+      const nextTimestamp = representativeTimestamp(next);
+      // An older monthly addition leaves a newer Current selection in place.
+      if (sameSet(current, previous) || currentTimestamp <= nextTimestamp) currentCandidates.set(target.server, [next]);
+      else if (options.preserveNewerCurrent && current) warnPreservedCurrent(target.server, target.month, next, current);
+    }
+  }
+  for (const [server, candidates] of currentCandidates) {
+    if (candidates.length !== 1) {
+      conflicts.push({ code: "toplist_ambiguous_current", message: `current ${server} hat ${candidates.length} importierte Monatssets. Pro Create-Lauf einen Monat je Server importieren.` });
+      continue;
+    }
+    const next = candidates[0];
+    const previous = toplists.current?.[server];
+    const previousTimestamp = previous ? representativeTimestamp(previous) : -Infinity;
+    const nextTimestamp = representativeTimestamp(next);
+    if (previous && previousTimestamp > nextTimestamp && options.preserveNewerCurrent) {
+      warnPreservedCurrent(server, monthKeyForScanArchiveTimestamp(nextTimestamp), next, previous);
+      continue;
+    }
+    if (previousTimestamp > nextTimestamp && !options.allowCurrentRollback) {
+      conflicts.push({ code: "toplist_current_rollback", message: `current ${server} wuerde vom neueren Set ${toplistReferenceLabel(previous)} auf das aeltere Set ${next.scanIds.join("+")} gesetzt.` });
+      continue;
+    }
+    if (!sameSet(previous, next) || typeof previous === "string") changes.current.push({ server, ...(previous ? { from: toplistReferenceLabel(previous) } : {}), to: next.scanIds.join("+") });
+    toplists.current = { ...toplists.current, [server]: next };
+  }
+  if (conflicts.length) return { toplists: manifest.toplists, changes: emptyToplistChanges() };
+  if (toplists.current) toplists.current = sortedObject(toplists.current);
+  if (toplists.monthly) toplists.monthly = sortedObject(Object.fromEntries(Object.entries(toplists.monthly).map(([month, value]) => [month, sortedObject(value)])));
+  return { toplists, changes };
 };
 
 async function isExistingFileIdentical<TBytes>(
@@ -569,7 +663,7 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
   const existingById = new Map(manifest.scans.map((scan) => [scan.id, scan]));
   const existingByPath = new Map(manifest.scans.map((scan) => [scan.path, scan]));
   const nextById = new Map(manifestBefore.scans.map((scan) => [scan.id, scan]));
-  const batches: ScanArchiveBatch[] = [];
+  let batches: ScanArchiveBatch[] = [];
   const importedEntries: ScanArchiveManifestScan[] = [];
 
   if (options.inputContent != null) {
@@ -578,6 +672,18 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
   } else if (options.inputBatches?.length) {
     options.onProgress?.({ phase: "grouping", message: "Archiv-Batches werden uebernommen." });
     batches.push(...options.inputBatches);
+  }
+
+  const monthlyTargets = scanArchiveBuilderTargets(batches);
+  if (options.usageMode === "add-monthly") {
+    batches = await prepareScanArchiveMonthlyAdd(manifest, batches, monthlyTargets, conflicts, options.loadMonthlyRawScan,
+      (scan, current, total) => options.onProgress?.({ phase: "loading-monthly", current, total, message: `Monatsset-Mitglied ${scan.id} wird geladen und validiert.` }));
+  } else {
+    for (const target of monthlyTargets) {
+      const relevant = batches.filter((batch) => batch.server === target.server && monthKeyForScanArchiveTimestamp(batch.timestamp) === target.month);
+      target.addedPlayers = relevant.reduce((count, batch) => count + batch.players.length, 0);
+      target.addedGuilds = relevant.reduce((count, batch) => count + batch.groups.length, 0);
+    }
   }
 
   if (batches.length) {
@@ -646,13 +752,14 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
 
   for (const scan of nextById.values()) {
     if (scan.playerCount === 0 || scan.groupCount === 0) {
-      warnings.push({ code: "partial_scan", message: `Scan ${scan.id} ist partiell und wird nicht automatisch fuer Toplisten gewaehlt.`, scanId: scan.id });
+      warnings.push({ code: "partial_scan", message: `Scan ${scan.id} enthaelt nur einen Datentyp; ein Toplisten-Set benoetigt insgesamt Player- und Guild-Daten.`, scanId: scan.id });
     }
   }
 
   options.onProgress?.({ phase: "manifest-merge", message: "Manifest wird zusammengefuehrt." });
   const sortedScans = withSortedScans([...nextById.values()]);
   const draftManifest: ScanArchiveManifest = {
+    ...manifestBefore,
     schemaVersion: 1,
     archiveYear: options.year,
     revision: manifest.revision,
@@ -666,7 +773,9 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
   const { toplists, changes: toplistChanges } =
     options.usageMode === "archive-only"
       ? { toplists: draftManifest.toplists, changes: emptyToplistChanges() }
-      : mergeScanArchiveToplists(draftManifest, resolveToplistMergeOptions(options, importedEntries), importedEntries, conflicts);
+      : options.usageMode === "create-monthly" || options.usageMode === "add-monthly"
+        ? mergeMonthlyBuilderSets(draftManifest, options, batches, monthlyTargets, conflicts, warnings)
+        : mergeScanArchiveToplists(draftManifest, options, importedEntries, conflicts);
   const hasManifestChanges =
     importedEntries.length > 0 ||
     toplistChanges.current.length > 0 ||
@@ -682,6 +791,8 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
   options.onProgress?.({ phase: "ready", message: "Archivpaket ist vorbereitet." });
   return {
     year: options.year,
+    usageMode: options.usageMode,
+    monthlyTargets,
     batches,
     manifestBefore,
     manifestAfter: manifestAfterInput,

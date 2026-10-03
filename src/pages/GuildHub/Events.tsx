@@ -1,4 +1,3 @@
-import React from "react";
 import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { useGuildHubParams } from "./hooks/useGuildHubParams";
 

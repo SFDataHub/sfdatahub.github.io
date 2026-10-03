@@ -452,8 +452,6 @@ const rankPeers = (peers: GuildFusionFlowPeer[]) =>
       left.guildIdentifier.localeCompare(right.guildIdentifier, undefined, { numeric: true, sensitivity: "base" }),
   );
 
-const firstByTimestamp = <T extends { timestamp: number }>(values: T[]) =>
-  [...values].sort((left, right) => left.timestamp - right.timestamp)[0] ?? null;
 
 const latestByTimestamp = <T extends { timestamp: number }>(values: T[]) =>
   [...values].sort((left, right) => right.timestamp - left.timestamp)[0] ?? null;

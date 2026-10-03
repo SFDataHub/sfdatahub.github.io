@@ -1,4 +1,3 @@
-import React from "react";
 import { ShieldOff } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
 import UploadCenterPageContent from "../../components/UploadCenter/UploadCenterPageContent";

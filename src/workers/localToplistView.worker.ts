@@ -55,7 +55,6 @@ type SearchEntry = {
   guildName?: string | null;
 };
 
-let searchIndexDatasetId: string | null = null;
 let searchEntries: SearchEntry[] = [];
 
 const normalizeSearchText = (value: unknown) =>
@@ -138,7 +137,6 @@ const buildSearchIndex = () => {
     });
 
   searchEntries = entries;
-  searchIndexDatasetId = datasetId;
 };
 
 const matchScore = (tokens: readonly string[], query: string) => {

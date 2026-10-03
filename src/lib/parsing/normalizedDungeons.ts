@@ -61,7 +61,6 @@ export type NormalizedDungeons = {
   };
 };
 
-const DUNGEON_OPEN = -1;
 const DUNGEON_LOCKED = -2;
 const CLASS_DUNGEON_COUNT = 5;
 const DUNGEON_ARR_TO_DID = [

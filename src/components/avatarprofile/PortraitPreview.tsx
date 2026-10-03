@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-latest.min.js";
 import type { PortraitOptions } from "../player-profile/types";
 import "./PortraitPreview.css";
@@ -29,12 +29,6 @@ const DEFAULT_PORTRAIT: PortraitOptions = {
 
 type PortraitStatus = "idle" | "loading" | "ready" | "error";
 
-const statusLabel: Record<PortraitStatus, string> = {
-  idle: "Portrait l\u00E4dt ...",
-  loading: "PortraitMaker wird initialisiert ...",
-  ready: "PortraitMaker bereit",
-  error: "PortraitMaker konnte nicht geladen werden",
-};
 
 const clampPositive = (value: number, max: number) => Math.min(Math.max(Math.round(value), 0), max);
 const roundSpecial = (value: number) => {

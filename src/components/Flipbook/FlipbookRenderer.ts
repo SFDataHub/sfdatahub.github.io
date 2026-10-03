@@ -8,7 +8,7 @@ export type LayoutDims = {
   scale: number;  // relativ zu nativer pageHeight
 };
 
-export function decideViewMode(containerW: number, pageWidth: number): ViewMode {
+export function decideViewMode(containerW: number, _pageWidth: number): ViewMode {
   return containerW < 900 ? "single" : "spread";
 }
 

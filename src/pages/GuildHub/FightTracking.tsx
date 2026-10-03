@@ -351,8 +351,6 @@ const sortFightsByDateAndSlot = (fights: GuildFight[]) =>
     return a.fightNumber.localeCompare(b.fightNumber) || a.createdAt.localeCompare(b.createdAt);
   });
 
-const getFightsForMonth = (fights: GuildFight[], monthValue: string) =>
-  sortFightsByDateAndSlot(fights.filter((fight) => fight.date.startsWith(`${monthValue}-`)));
 
 const getParticipationStickyWidth = (wrapper: HTMLDivElement) => {
   const table = wrapper.querySelector("table");

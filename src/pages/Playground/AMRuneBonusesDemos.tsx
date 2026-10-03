@@ -1,5 +1,5 @@
 // src/pages/Playground/AMRuneBonusesDemos.tsx
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import styles from "./AMRuneBonusesDemos.module.css";
 
 /** --- Datenmodell --- */

@@ -1,5 +1,5 @@
 // src/lib/db.ts
-import { openDB, IDBPDatabase } from "idb";
+import { openDB, type IDBPDatabase } from "idb";
 
 /**
  * Grundschema für SFDataHub – passt zu den Upserts in src/lib/import/upsert.ts

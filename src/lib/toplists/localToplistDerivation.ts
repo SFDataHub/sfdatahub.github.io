@@ -357,6 +357,7 @@ const deriveGuildRows = (
       sumAvg: avgSumBaseTotal,
       memberBasisStatus,
       memberBasisCount: uniqueMembers.length,
+      memberPlayerIdentifiers: uniqueMembers.map(member => member.identifier),
       lastScan: String(latestScanAtSec),
       latestScanAtSec,
     }];

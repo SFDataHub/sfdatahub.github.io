@@ -24,7 +24,6 @@ const toNum = (v: any): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const strip = (s?: string | null) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 /** Ist die URL eine Google-Drive-Ansicht? */
 function isDriveViewUrl(u?: string): boolean {

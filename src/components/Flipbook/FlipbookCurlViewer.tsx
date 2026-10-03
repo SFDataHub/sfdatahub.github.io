@@ -186,7 +186,6 @@ const FlipbookCurlViewerInner: React.FC<Props> = ({
   toolbarBackAction,
   toolbarLibraryAction,
   toolbarPageInfo,
-  noSound = true,
 }) => {
   const { t } = useTranslation();
   const wrapRef = useRef<HTMLDivElement | null>(null);

@@ -131,6 +131,8 @@ export type LocalGuildToplistRow = {
   sumAvg: number | null;
   memberBasisStatus: LocalGuildMemberBasisStatus;
   memberBasisCount: number;
+  /** Actual matched members of this physical source, before set composition. */
+  memberPlayerIdentifiers?: string[];
   lastScan: string | null;
   latestScanAtSec: number | null;
 };

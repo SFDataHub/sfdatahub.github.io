@@ -56,7 +56,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "AM",
     type: "origin",
     active: true,
-    aliases: ["am1_am", "am1am"],
+    aliases: ["am1_am", "am1am", "am1_net"],
   },
   {
     code: "BLACKFOREST",

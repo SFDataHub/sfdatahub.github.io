@@ -1,4 +1,4 @@
-import { GuildHubParams } from "./hooks/useGuildHubParams";
+import type { GuildHubParams } from "./hooks/useGuildHubParams";
 
 export type PlannerType = "raid" | "event" | "task";
 export type PlannerStatus = "open" | "in_progress" | "done" | "canceled";

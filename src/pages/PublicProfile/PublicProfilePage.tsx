@@ -1,4 +1,3 @@
-import React from "react";
 import { useParams } from "react-router-dom";
 import ContentShell from "../../components/ContentShell";
 import { t } from "../../i18n";

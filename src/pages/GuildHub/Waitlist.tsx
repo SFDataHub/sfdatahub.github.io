@@ -6,12 +6,11 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import styles from "./Waitlist.module.css";
 import {
-  WaitlistApplicant,
-  WaitlistFilterState,
-  WaitlistStatus,
+  type WaitlistApplicant,
+  type WaitlistFilterState,
+  type WaitlistStatus,
   CLASS_OPTIONS,
   SERVER_OPTIONS,
-  STATUS_LABELS,
   FRESHNESS_DISPLAY,
   DEFAULT_FILTERS,
   SAMPLE_APPLICANTS,

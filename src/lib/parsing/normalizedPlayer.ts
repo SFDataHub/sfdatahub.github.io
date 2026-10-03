@@ -115,7 +115,6 @@ export type NormalizedPlayer = {
 
 const ATTRIBUTE_KEYS = ["strength", "dexterity", "intelligence", "constitution", "luck"] as const;
 
-type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 
 type FieldReader = {
   read(saveArray: unknown[] | null, index: number): number | null;

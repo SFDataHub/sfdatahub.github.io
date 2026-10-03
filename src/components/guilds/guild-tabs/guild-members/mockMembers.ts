@@ -1,4 +1,4 @@
-import { Member } from "./types";
+import type { Member } from "./types";
 
 function rand(seed: number){ let t = seed + 1013904223; return ()=> (t=(1664525*t+1013904223)%4294967296)/4294967296; }
 const CLASSES = ["Warrior","Mage","Scout","Assassin","Battle Mage","Berserker","Demon Hunter","Druid","Necromancer","Bard","Assault Mage"];

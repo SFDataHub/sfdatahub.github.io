@@ -111,9 +111,6 @@ const Bar = ({ width, tone = "accent", height = 8 }: { width: string; tone?: str
   <div className={`g2-bar tone-${tone}`} style={{ width, height }} />
 );
 
-const Dot = ({ tone = "accent", size = 8 }: { tone?: string; size?: number }) => (
-  <span className={`g2-dot tone-${tone}`} style={{ width: size, height: size }} />
-);
 
 const previewRenderers: Record<string, () => JSX.Element> = {
   pv_quest_steps: () => (

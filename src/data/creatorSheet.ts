@@ -1,4 +1,4 @@
-import { SheetCreatorRow } from "../lib/creators/shared";
+import type { SheetCreatorRow } from "../lib/creators/shared";
 
 const CREATOR_SHEET: SheetCreatorRow[] = [
   {

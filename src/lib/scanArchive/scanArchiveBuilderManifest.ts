@@ -2,6 +2,7 @@ import { getScanArchiveCatalogUrl, loadScanArchiveCatalog } from "./client";
 import type { ScanArchiveBuilderBlocker, ScanArchiveBuilderManifestSource } from "./scanArchiveBuilderTypes";
 import type { ScanArchiveManifest } from "./types";
 import { validateScanArchiveManifest } from "./validation";
+import { preserveScanArchiveManifestMetadata } from "./archiveBuilderCore";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -33,7 +34,8 @@ export async function loadScanArchiveBuilderCatalogManifest(options: {
     }
     const response = await fetcher(archive.manifestUrl, { cache: "no-cache" });
     if (!response.ok) throw new Error(`Manifest request failed with HTTP ${response.status}.`);
-    const manifest = validateScanArchiveManifest(await response.json(), options.year);
+    const raw = await response.json();
+    const manifest = preserveScanArchiveManifestMetadata(raw, validateScanArchiveManifest(raw, options.year));
     return {
       status: "ready",
       manifest,
@@ -62,7 +64,8 @@ export function parseScanArchiveBuilderManifestOverride(options: {
   year: number;
 }): ScanArchiveBuilderManifestResult {
   try {
-    const manifest = validateScanArchiveManifest(JSON.parse(options.content) as unknown, options.year);
+    const raw: unknown = JSON.parse(options.content);
+    const manifest = preserveScanArchiveManifestMetadata(raw, validateScanArchiveManifest(raw, options.year));
     return {
       status: "ready",
       manifest,

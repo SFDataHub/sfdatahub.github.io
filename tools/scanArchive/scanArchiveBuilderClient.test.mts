@@ -9,6 +9,7 @@ import type {
   ScanArchiveBuilderRequest,
   ScanArchiveBuilderResponse,
 } from "../../src/lib/scanArchive/scanArchiveBuilderTypes.ts";
+import { ScanArchiveBuilderValidationError } from "../../src/lib/scanArchive/scanArchiveBuilderErrors.ts";
 import type { ScanArchiveManifest } from "../../src/lib/scanArchive/types.ts";
 
 class FakeWorker implements ScanArchiveBuilderWorkerLike {
@@ -76,15 +77,14 @@ const manifest: ScanArchiveManifest = {
     inspectionId: inspection.inspectionId,
     manifest,
     manifestSource: { kind: "catalog", manifestUrl: "https://example.test/manifest.json", year: 2026, scanCount: 0 },
-    usageMode: "monthly",
-    replaceMonthly: true,
+    usageMode: "create-monthly",
     requestId: "build-1",
   });
   const buildMessage = worker.messages[1];
   assert.equal(buildMessage.type, "build");
   if (buildMessage.type === "build") {
     assert.equal(buildMessage.inspectionId, "inspection-123");
-    assert.equal(buildMessage.usageMode, "monthly");
+    assert.equal(buildMessage.usageMode, "create-monthly");
     assert.equal(Object.prototype.hasOwnProperty.call(buildMessage, "inputFile"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(buildMessage, "inputBatches"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(buildMessage, "setImportedAsCurrent"), false);
@@ -103,6 +103,79 @@ const manifest: ScanArchiveManifest = {
   session.terminate();
   await assert.rejects(run.promise, ScanArchiveBuilderCancelledError);
   assert.equal(worker.terminated, true);
+}
+
+{
+  const worker = new FakeWorker();
+  const session = new ScanArchiveBuilderSession(() => worker);
+  let progresses = 0;
+  const first = session.build({
+    inspectionId: "preserved-inspection", manifest,
+    manifestSource: { kind: "catalog", manifestUrl: "https://example.test/manifest.json", year: 2026, scanCount: 0 },
+    usageMode: "add-monthly", requestId: "discarded", onProgress: () => progresses++,
+  });
+  session.discardBuild(first.requestId);
+  await assert.rejects(first.promise, ScanArchiveBuilderCancelledError);
+  assert.equal(worker.terminated, false);
+  const second = session.build({
+    inspectionId: "preserved-inspection", manifest,
+    manifestSource: { kind: "catalog", manifestUrl: "https://example.test/manifest.json", year: 2026, scanCount: 0 },
+    usageMode: "create-monthly", requestId: "fresh",
+  });
+  worker.emit({ type: "progress", requestId: "discarded", progress: { phase: "ready", message: "stale" } });
+  worker.emit({ type: "error", requestId: "discarded", message: "stale failure" });
+  assert.equal(progresses, 0);
+  assert.equal(worker.messages.filter((message) => message.type === "inspect").length, 0);
+  const message = worker.messages.at(-1);
+  assert.equal(message?.type, "build");
+  if (message?.type === "build") {
+    assert.equal(message.inspectionId, "preserved-inspection");
+    assert.equal(message.usageMode, "create-monthly");
+    assert.equal("inputBatches" in message, false);
+    assert.equal("players" in message, false);
+    assert.equal("groups" in message, false);
+  }
+  second.cancel();
+  await assert.rejects(second.promise, ScanArchiveBuilderCancelledError);
+  assert.equal(worker.terminated, true);
+}
+
+{
+  const worker = new FakeWorker();
+  const session = new ScanArchiveBuilderSession(() => worker);
+  const run = session.inspect({ inputFile: new File(["{}"], "invalid.json"), requestId: "invalid-input" });
+  const blocker = { code: "server_resolution_failed", cause: "players[0]: Server unknown_net", remedy: "Pruefe die Server-/Aliaszuordnung." };
+  worker.emit({ type: "error", requestId: run.requestId, message: "legacy combined message", blocker });
+  await assert.rejects(run.promise, (error: unknown) => {
+    assert(error instanceof ScanArchiveBuilderValidationError);
+    assert.deepEqual(error.blocker, blocker);
+    assert.equal(error.message, blocker.cause);
+    return true;
+  });
+  session.terminate();
+}
+
+{
+  // Replacing a file/reset terminates its session; late errors and successes
+  // cannot update the fresh file's inspection or its progress.
+  const oldWorker = new FakeWorker();
+  const oldSession = new ScanArchiveBuilderSession(() => oldWorker);
+  let staleProgress = 0;
+  const oldRun = oldSession.inspect({ inputFile: new File(["{}"], "old.json"), requestId: "old-file", onProgress: () => staleProgress++ });
+  oldSession.terminate();
+  await assert.rejects(oldRun.promise, ScanArchiveBuilderCancelledError);
+  const freshWorker = new FakeWorker();
+  const freshSession = new ScanArchiveBuilderSession(() => freshWorker);
+  const freshRun = freshSession.inspect({ inputFile: new File(["{}"], "new.json"), requestId: "new-file" });
+  const inspection = { inspectionId: "fresh-inspection", years: [2026], months: ["2026-09"], servers: ["am1_net"], batchCount: 1, blockers: [] };
+  oldWorker.emit({ type: "error", requestId: "old-file", message: "stale input error" });
+  oldWorker.emit({ type: "progress", requestId: "old-file", progress: { phase: "validating", message: "stale progress" } });
+  oldWorker.emit({ type: "inspected", requestId: "old-file", inspection: { ...inspection, inspectionId: "stale" } });
+  freshWorker.emit({ type: "inspected", requestId: freshRun.requestId, inspection });
+  assert.deepEqual(await freshRun.promise, inspection);
+  assert.equal(staleProgress, 0);
+  assert.equal(freshWorker.messages.filter(message => message.type === "inspect").length, 1);
+  freshSession.terminate();
 }
 
 console.log("scanArchiveBuilderClient.test: ok");
