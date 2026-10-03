@@ -77,6 +77,7 @@ import ScansFusionIdentity from "./pages/Scans/FusionIdentity";
 // GuildHub
 import GuildHubIndex from "./pages/GuildHub/Index";
 import GuildHubDashboard from "./pages/GuildHub/Dashboard";
+import GuildHubToplist from "./pages/GuildHub/Toplist";
 import GuildHubPlanner from "./pages/GuildHub/Planner";
 import GuildHubFusionPlanner from "./pages/GuildHub/FusionPlanner/FusionPlanner";
 import GuildHubCompareGuilds from "./pages/GuildHub/compareGuilds";
@@ -93,6 +94,7 @@ import GuildHubSettings from "./pages/GuildHub/Settings";
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 import AdminScanCoveragePage from "./pages/Admin/ScanCoverage";
+import AdminScanArchiveBuilderPage from "./pages/Admin/ScanArchiveBuilder";
 import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
 import AdminVisitorAnalyticsPage from "./pages/Admin/VisitorAnalytics";
 
@@ -402,6 +404,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubDashboard />)}
                 />
                 <Route
+                  path="/guild-hub/toplist"
+                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubToplist />)}
+                />
+                <Route
                   path="/guild-hub/planner"
                   element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubPlanner />)}
                 />
@@ -460,6 +466,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route
                   path="/admin/scan-coverage"
                   element={withFeatureGate("main.admin", "/admin", <AdminScanCoveragePage />)}
+                />
+                <Route
+                  path="/admin/scan-archive-builder"
+                  element={withFeatureGate("main.admin", "/admin", <AdminScanArchiveBuilderPage />)}
                 />
                 <Route
                   path="/admin/creators-api"

@@ -22,6 +22,9 @@ export type LocalPlayerIndexWorkerRequest =
       requestId: string;
       summaries: GuildHubScanSummary[];
       serverFilter: string | null;
+      targetPlayerRefs?: string[] | null;
+      targetPlayerNames?: string[] | null;
+      includeCards?: boolean;
     }
   | {
       type: "cancel";
@@ -84,6 +87,9 @@ type StartLocalPlayerIndexWorkerRunOptions = {
   requestId?: string;
   summaries: GuildHubScanSummary[];
   serverFilter: string | null;
+  targetPlayerRefs?: string[] | null;
+  targetPlayerNames?: string[] | null;
+  includeCards?: boolean;
   workerFactory?: () => LocalPlayerIndexWorkerLike;
   onProgress?: (progress: LocalPlayerIndexProgress) => void;
 };
@@ -157,6 +163,9 @@ export const startLocalPlayerIndexWorkerRun = (
       requestId,
       summaries: options.summaries,
       serverFilter: options.serverFilter,
+      targetPlayerRefs: options.targetPlayerRefs ?? null,
+      targetPlayerNames: options.targetPlayerNames ?? null,
+      includeCards: options.includeCards ?? true,
     });
   });
 

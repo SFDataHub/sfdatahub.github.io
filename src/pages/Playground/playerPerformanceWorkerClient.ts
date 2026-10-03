@@ -1,5 +1,5 @@
 import type { GuildHubScanSummary } from "../../lib/guilds/localScanLibrary";
-import type { GuildTrendBuildResult } from "./playerPerformanceModel";
+import type { GuildTrendBuildResult, GuildTrendTarget } from "./playerPerformanceModel";
 
 export type PlayerPerformanceProgressPhase = "loading-analytics" | "loading-scans" | "building-performance" | "done";
 
@@ -15,6 +15,7 @@ export type PlayerPerformanceWorkerRequest =
       type: "build-performance";
       requestId: string;
       summaries: GuildHubScanSummary[];
+      guildTarget?: GuildTrendTarget | null;
     }
   | {
       type: "cancel";
@@ -55,8 +56,10 @@ export type PlayerPerformanceWorkerLike = {
   terminate(): void;
   addEventListener(type: "message", listener: (event: MessageEvent<PlayerPerformanceWorkerResponse>) => void): void;
   addEventListener(type: "error", listener: (event: ErrorEvent) => void): void;
+  addEventListener(type: "messageerror", listener: (event: MessageEvent) => void): void;
   removeEventListener(type: "message", listener: (event: MessageEvent<PlayerPerformanceWorkerResponse>) => void): void;
   removeEventListener(type: "error", listener: (event: ErrorEvent) => void): void;
+  removeEventListener(type: "messageerror", listener: (event: MessageEvent) => void): void;
 };
 
 export type PlayerPerformanceWorkerRun = {
@@ -68,6 +71,7 @@ export type PlayerPerformanceWorkerRun = {
 type StartPlayerPerformanceWorkerRunOptions = {
   requestId?: string;
   summaries: GuildHubScanSummary[];
+  guildTarget?: GuildTrendTarget | null;
   workerFactory?: () => PlayerPerformanceWorkerLike;
   onProgress?: (progress: PlayerPerformanceProgress) => void;
 };
@@ -89,11 +93,13 @@ export const startPlayerPerformanceWorkerRun = (
   let settled = false;
   let handleMessage: (event: MessageEvent<PlayerPerformanceWorkerResponse>) => void = () => undefined;
   let handleError: (event: ErrorEvent) => void = () => undefined;
+  let handleMessageError: (event: MessageEvent) => void = () => undefined;
   let rejectRun: (reason?: unknown) => void = () => undefined;
 
   const cleanup = () => {
     worker.removeEventListener("message", handleMessage);
     worker.removeEventListener("error", handleError);
+    worker.removeEventListener("messageerror", handleMessageError);
   };
 
   const promise = new Promise<GuildTrendBuildResult>((resolve, reject) => {
@@ -133,9 +139,23 @@ export const startPlayerPerformanceWorkerRun = (
       reject(new Error(event.message || "Player performance worker failed."));
     };
 
+    handleMessageError = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      worker.terminate();
+      reject(new Error("Player performance worker returned an unreadable message."));
+    };
+
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "build-performance", requestId, summaries: options.summaries });
+    worker.addEventListener("messageerror", handleMessageError);
+    worker.postMessage({
+      type: "build-performance",
+      requestId,
+      summaries: options.summaries,
+      guildTarget: options.guildTarget ?? null,
+    });
   });
 
   return {

@@ -39,6 +39,7 @@ import type { Member as GuildMember } from "../../components/guilds/guild-tabs/g
 import { adaptClassMeta } from "../../components/guilds/GuildClassOverview/utils";
 import { CLASSES } from "../../data/classes";
 import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
+import { calculateGuildActivityPct } from "../../lib/guilds/guildActivity";
 import { isValidGuildCoaString } from "../../lib/guilds/guildCoa";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 
@@ -71,7 +72,6 @@ const guildProfileMemory = new Map<string, GuildProfileCacheValue>();
 const GUILD_CACHE_PREFIX = "sf_profile_guild__";
 const GUILD_SERVER_INDEX_KEY = "sf_profile_guild_server_index";
 const GUILD_CACHE_TTL_MS = 60 * 60 * 1000;
-const INACTIVE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const COA_CANVAS_SIZE = 240;
 const EMPTY_TRANSFERS: GuildHeroTransfersData = {
@@ -761,20 +761,12 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
   }, [snapshot?.members]);
   const activityPct = useMemo(() => {
     const members = snapshot?.members ?? [];
-    const totalMembers = members.length;
-    if (!totalMembers) return null;
-
-    let activeMembers = 0;
-    for (const member of members) {
-      const lastScanMs = toEpochMs(member.lastScanMs) ?? toEpochMs(member.lastScan);
-      const lastActivityMs = toEpochMs(member.lastActivityMs) ?? toEpochMs(member.lastActivity);
-      if (lastScanMs == null || lastActivityMs == null) continue;
-
-      const inactiveForTooLong = lastScanMs - lastActivityMs > INACTIVE_THRESHOLD_MS;
-      if (!inactiveForTooLong) activeMembers += 1;
-    }
-
-    return (activeMembers / totalMembers) * 100;
+    return calculateGuildActivityPct(
+      members.map((member) => ({
+        lastScanMs: toEpochMs(member.lastScanMs) ?? toEpochMs(member.lastScan),
+        lastActivityMs: toEpochMs(member.lastActivityMs) ?? toEpochMs(member.lastActivity),
+      })),
+    );
   }, [snapshot?.members]);
 
   if (loading) {

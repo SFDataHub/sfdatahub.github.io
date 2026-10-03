@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import LocalPlayerAnalytics from "./LocalPlayerAnalytics";
 import LocalHeroPanel from "./LocalHeroPanel";
+import LocalPlayerProfileInsights from "./LocalPlayerProfileInsights";
 import type { LocalPlayerProfileModel } from "./types";
 import "../../styles/Toplist.css";
 import "./LocalPlayerProfileOverlay.css";
@@ -66,6 +67,7 @@ export default function LocalPlayerProfileOverlay({
           <div className="player-profile profile-overlay__local-grid">
             <LocalHeroPanel data={profile.hero} />
             <LocalPlayerAnalytics profile={profile} />
+            <LocalPlayerProfileInsights profile={profile} />
           </div>
         </div>
       </div>

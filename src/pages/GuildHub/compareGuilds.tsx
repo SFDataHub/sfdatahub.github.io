@@ -30,6 +30,7 @@ import {
   parseServerFromGuildIdentifier,
   subscribeToSfDataHubLocalScanChanges,
 } from "../../lib/guilds/localScanLibrary";
+import { acquireLocalFirstScans } from "../../lib/scanArchive/localFirstScanAcquisition";
 import {
   buildGuildAnalyticsPlayerComparison,
   buildGuildAnalyticsSeries,
@@ -65,6 +66,10 @@ import {
 import { buildGuildAnalyticsFusionMarkers } from "../../lib/guilds/guildAnalyticsFusionMarkers";
 import type { GuildAnalyticsFusionMarker } from "../../lib/guilds/guildAnalyticsFusionMarkers";
 import { subscribeToFightTrackingChanges } from "./fightTrackingStore";
+import {
+  loadGuildAnalyticsLocalFirstData,
+  type GuildAnalyticsLocalFirstAcquisitionOutcome,
+} from "./guildAnalyticsLocalFirst";
 import styles from "./Fusion.module.css";
 import { useGuildHubSelection } from "./hooks/useGuildHubSelection";
 import {
@@ -266,11 +271,11 @@ export default function GuildHubCompareGuilds() {
   const isMdUp = useMediaQuery("(min-width: 768px)");
   const { activeGuild } = useGuildHubSelection();
   const [selectedPlayerIds, setSelectedPlayerIds] = React.useState<string[]>([]);
-  const localScanState = useGuildAnalyticsLocalScans(activeGuild, selectedPlayerIds);
 
   const [activeTab, setActiveTab] = React.useState<AnalyticsTabKey>("overview");
   const [overviewMetric, setOverviewMetric] = React.useState<GuildAnalyticsMetricKey>("avgLevel");
   const [overviewRange, setOverviewRange] = React.useState<GuildAnalyticsRangeSelection>({ key: "all" });
+  const localScanState = useGuildAnalyticsLocalScans(activeGuild, selectedPlayerIds, overviewRange);
   const [progressPeriod, setProgressPeriod] = React.useState<GuildAnalyticsProgressPeriodKey>("monthly");
   const [serverFilter, setServerFilter] = React.useState<string>("all");
   const [selectedGuildAId, setSelectedGuildAId] = React.useState<string | null>(null);
@@ -490,8 +495,12 @@ export default function GuildHubCompareGuilds() {
 function useGuildAnalyticsLocalScans(
   activeGuild: ReturnType<typeof useGuildHubSelection>["activeGuild"],
   selectedPlayerIds: readonly string[],
+  range: GuildAnalyticsRangeSelection,
 ) {
   const identitySnapshotRef = React.useRef<IdentityResolutionSnapshot | null>(null);
+  const completedAcquisitionKeysRef = React.useRef<Set<string>>(new Set());
+  const failedAcquisitionKeysRef = React.useRef<Set<string>>(new Set());
+  const inFlightAcquisitionKeysRef = React.useRef<Set<string>>(new Set());
   const [state, setState] = React.useState<{
     analyticsData: GuildAnalyticsDerivedData;
     identityResolutionSnapshot: IdentityResolutionSnapshot | null;
@@ -508,14 +517,21 @@ function useGuildAnalyticsLocalScans(
 
   React.useEffect(() => {
     let cancelled = false;
+    let loadRunId = 0;
+    const controllers = new Set<AbortController>();
 
     const load = () => {
+      const runId = ++loadRunId;
+      const controller = new AbortController();
+      controllers.add(controller);
+      let startedAcquisitionKey: string | null = null;
+      const isStale = () => cancelled || runId !== loadRunId;
       const analyticsLoadStartedAt = analyticsNowMs();
       const diagnostics: GuildAnalyticsDiagnosticEntry[] = [];
       const sourceDiagnostics: GuildAnalyticsSourceDiagnostic[] = [];
       const pushDiagnostic = (entry: GuildAnalyticsDiagnosticEntry) => diagnostics.push(entry);
       const pushPhase = (phase: GuildAnalyticsLoadPhaseUpdate) => {
-        if (!cancelled) {
+        if (!isStale()) {
           setState((current) => ({
             ...current,
             loading: true,
@@ -524,34 +540,102 @@ function useGuildAnalyticsLocalScans(
           }));
         }
       };
-
-      pushPhase({ phase: "loading-local-scan-data" });
-      const summaryStartedAt = analyticsNowMs();
-      listGuildHubScanSummaries()
-        .then(async (summaries) => {
+      const finishAcquisition = (outcome: GuildAnalyticsLocalFirstAcquisitionOutcome) => {
+        if (outcome.status === "skipped") return;
+        if (outcome.key !== "unresolved") inFlightAcquisitionKeysRef.current.delete(outcome.key);
+        if (outcome.status === "completed") {
+          completedAcquisitionKeysRef.current.add(outcome.key);
           diagnostics.push({
-            phase: "source-summary-load",
-            durationMs: analyticsNowMs() - summaryStartedAt,
-            count: summaries.length,
+            phase: "local-first-acquisition",
+            durationMs: 0,
+            count: outcome.result.acquiredArchives.length + outcome.result.skippedArchives.length,
             details: {
-              sourceCount: summaries.length,
-              scanCount: summaries.length,
+              status: outcome.result.status,
+              networkAccessed: outcome.result.networkAccessed,
+              acquiredArchives: outcome.result.acquiredArchives.length,
+              skippedArchives: outcome.result.skippedArchives.length,
+              failedArchives: outcome.result.failedArchives.length,
+              manifestFailures: outcome.result.manifestFailures.length,
             },
           });
+          if (outcome.result.failedArchives.length || outcome.result.manifestFailures.length) {
+            console.warn("[GuildHubAnalytics] local-first acquisition completed with partial errors", outcome.result);
+          }
+          return;
+        }
+        failedAcquisitionKeysRef.current.add(outcome.key);
+        console.warn("[GuildHubAnalytics] local-first acquisition failed; using local analytics data", outcome.error);
+      };
 
-          const identityStartedAt = analyticsNowMs();
-          const cachedIdentitySnapshot = identitySnapshotRef.current;
-          const identityResolutionSnapshot = cachedIdentitySnapshot
-            ? cachedIdentitySnapshot
-            : await loadIdentityResolutionSnapshot()
-                .then((snapshot) => {
-                  identitySnapshotRef.current = snapshot;
-                  return snapshot;
-                })
-                .catch((error) => {
-                  console.warn("[GuildHubAnalytics] failed to load identity resolution snapshot", error);
-                  return null;
-                });
+      pushPhase({ phase: "loading-local-scan-data" });
+      (async () => {
+        const cachedIdentitySnapshot = identitySnapshotRef.current;
+        const identityStartedAt = analyticsNowMs();
+        const result = await loadGuildAnalyticsLocalFirstData({
+          guild: activeGuild,
+          range,
+          selectedPlayerIds,
+          cachedIdentityResolutionSnapshot: cachedIdentitySnapshot,
+          signal: controller.signal,
+          dependencies: {
+            listScanSummaries: async () => {
+              const summaryStartedAt = analyticsNowMs();
+              const summaries = await listGuildHubScanSummaries();
+              diagnostics.push({
+                phase: "source-summary-load",
+                durationMs: analyticsNowMs() - summaryStartedAt,
+                count: summaries.length,
+                details: {
+                  sourceCount: summaries.length,
+                  scanCount: summaries.length,
+                },
+              });
+              return summaries;
+            },
+            getLocalScan: getGuildHubLocalScan,
+            loadIdentityResolutionSnapshot,
+            ensureScopedDataFromSummaries: ensureGuildAnalyticsScopedDataFromSummaries,
+            acquireLocalFirstScans,
+          },
+          shouldAcquireRequest: (need) => {
+            if (
+              completedAcquisitionKeysRef.current.has(need.key) ||
+              failedAcquisitionKeysRef.current.has(need.key) ||
+              inFlightAcquisitionKeysRef.current.has(need.key)
+            ) {
+              return false;
+            }
+            startedAcquisitionKey = need.key;
+            inFlightAcquisitionKeysRef.current.add(need.key);
+            diagnostics.push({
+              phase: "local-first-acquisition-request",
+              durationMs: 0,
+              count: need.segments.length,
+              details: {
+                dataKind: need.request.dataKind,
+                completeness: need.request.completeness,
+                timeKind: need.request.time.kind,
+                from: need.request.time.kind === "interval" ? need.request.time.from : null,
+                to: need.request.time.kind === "interval" ? need.request.time.to : null,
+                source: need.source,
+                serverSegments: need.segments.map((segment) => segment.serverCode).join(","),
+                lineageServerSegments: need.segments
+                  .flatMap((segment) => segment.lineageServerCodes)
+                  .join(","),
+              },
+            });
+            return true;
+          },
+          onIdentityResolutionSnapshot: (snapshot) => {
+            identitySnapshotRef.current = snapshot;
+          },
+          onAcquisitionOutcome: finishAcquisition,
+          onDiagnostic: pushDiagnostic,
+          onSourceDiagnostic: (entry) => sourceDiagnostics.push(entry),
+          onPhase: pushPhase,
+        });
+        startedAcquisitionKey = null;
+        const identityResolutionSnapshot = result.identityResolutionSnapshot;
           diagnostics.push({
             phase: "identity-resolution-load",
             durationMs: analyticsNowMs() - identityStartedAt,
@@ -568,23 +652,14 @@ function useGuildAnalyticsLocalScans(
                   failed: true,
                 },
           });
-          const analyticsResult = await ensureGuildAnalyticsScopedDataFromSummaries(summaries, {
-            guild: activeGuild,
-            identitySnapshot: identityResolutionSnapshot,
-            selectedPlayerRefs: selectedPlayerIds,
-            loadSourceById: getGuildHubLocalScan,
-            onDiagnostic: pushDiagnostic,
-            onSourceDiagnostic: (entry) => sourceDiagnostics.push(entry),
-            onPhase: pushPhase,
-          });
-          const analyticsData = analyticsResult.data;
+          const analyticsData = result.analyticsData;
           const reactStateStartedAt = analyticsNowMs();
           diagnostics.push({
             phase: "react-state-enqueue",
             durationMs: analyticsNowMs() - reactStateStartedAt,
             count: 1,
           });
-          if (!cancelled) {
+          if (!isStale()) {
             setState({
               analyticsData,
               identityResolutionSnapshot,
@@ -594,10 +669,12 @@ function useGuildAnalyticsLocalScans(
             });
             logGuildAnalyticsDiagnostics(diagnostics, sourceDiagnostics, analyticsNowMs() - analyticsLoadStartedAt);
           }
-        })
+      })()
         .catch((error) => {
+          if (startedAcquisitionKey) inFlightAcquisitionKeysRef.current.delete(startedAcquisitionKey);
+          if (error instanceof DOMException && error.name === "AbortError") return;
           console.error("[GuildHubAnalytics] failed to load local analytics data", error);
-          if (!cancelled) {
+          if (!isStale()) {
             setState({
               analyticsData: EMPTY_GUILD_ANALYTICS_DATA,
               identityResolutionSnapshot: null,
@@ -606,6 +683,9 @@ function useGuildAnalyticsLocalScans(
               error: "Lokale Analytics-Daten konnten nicht geladen werden.",
             });
           }
+        })
+        .finally(() => {
+          controllers.delete(controller);
         });
     };
 
@@ -614,9 +694,10 @@ function useGuildAnalyticsLocalScans(
 
     return () => {
       cancelled = true;
+      controllers.forEach((controller) => controller.abort());
       unsubscribe();
     };
-  }, [activeGuild, selectedPlayerIds]);
+  }, [activeGuild, selectedPlayerIds, range]);
 
   return state;
 }

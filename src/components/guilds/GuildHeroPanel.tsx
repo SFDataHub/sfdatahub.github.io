@@ -12,7 +12,7 @@ import ClassDonut from "./GuildClassOverview/ClassDonut";
 import type { GuildClassOverviewProps } from "./GuildClassOverview/types";
 import { getGuildClassAccent, getGuildMutedAccent } from "./classColors";
 
-type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
+export type GuildHeroFreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
 type TranslateFn = (key: string, options?: any) => string;
 
 export type GuildHeroMetric = {
@@ -131,7 +131,7 @@ const DEFAULT_COLORS: PaletteColors = {
 
 const THREE_COLUMN_MEDIA_QUERY = "(min-width: 1280px)";
 
-const FRESHNESS_DOT_COLORS: Record<FreshnessLevel, string> = {
+const FRESHNESS_DOT_COLORS: Record<GuildHeroFreshnessLevel, string> = {
   0: "#22c55e",
   1: "#84cc16",
   2: "#a3e635",
@@ -142,10 +142,10 @@ const FRESHNESS_DOT_COLORS: Record<FreshnessLevel, string> = {
   unknown: "#94a3b8",
 };
 
-const computeFreshness = (
+export const computeGuildHeroFreshness = (
   t: TranslateFn,
   lastScanDays?: number | null,
-): { level: FreshnessLevel; label: string; hint: string } => {
+): { level: GuildHeroFreshnessLevel; label: string; hint: string } => {
   if (lastScanDays == null || !Number.isFinite(lastScanDays)) {
     return {
       level: "unknown",
@@ -207,7 +207,7 @@ const computeFreshness = (
   };
 };
 
-const formatAgeLabel = (t: TranslateFn, lastScanDays?: number | null) => {
+export const formatGuildHeroAgeLabel = (t: TranslateFn, lastScanDays?: number | null) => {
   if (lastScanDays == null || !Number.isFinite(lastScanDays)) return null;
   const days = Math.max(0, Math.floor(lastScanDays));
   if (days === 0) return t("guildProfile.heroPanel.tooltips.age.today", { defaultValue: "today" });
@@ -259,7 +259,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     [colors],
   );
   const freshness = useMemo(
-    () => computeFreshness(t, data.lastScanDays),
+    () => computeGuildHeroFreshness(t, data.lastScanDays),
     [data.lastScanDays, t],
   );
   const freshnessTooltip = useMemo(() => {
@@ -272,7 +272,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
         }),
       );
     }
-    const ageLabel = formatAgeLabel(t, data.lastScanDays);
+    const ageLabel = formatGuildHeroAgeLabel(t, data.lastScanDays);
     if (ageLabel) {
       lines.push(
         t("guildProfile.heroPanel.tooltips.age.label", {
@@ -292,7 +292,7 @@ const GuildHeroPanel = memo(function GuildHeroPanel({
     );
   }, [data.lastScanAtLabel, data.lastScanDays, freshness.hint, t]);
 
-  const localizedLastScanLabel = formatAgeLabel(t, data.lastScanDays) ?? data.lastScanLabel;
+  const localizedLastScanLabel = formatGuildHeroAgeLabel(t, data.lastScanDays) ?? data.lastScanLabel;
   const metrics = data.metrics ?? [];
   const badges = data.badges ?? [];
   const actions = data.actions ?? [];

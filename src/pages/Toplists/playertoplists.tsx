@@ -14,26 +14,44 @@ import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
 import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
-import type { ToplistExportAmount } from "../../components/export/ToplistPngExportDialog";
 import ToplistExportController, {
   type ToplistCaptureStatus,
   type ToplistExportControllerHandle,
 } from "../../components/export/ToplistExportController";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
-import { ToplistsProvider, useToplistsData, type Filters, type PlayerScopeStatus, type SortSpec } from "../../context/ToplistsDataContext";
+import { ToplistsProvider } from "../../context/ToplistsDataContext";
+import { useToplistsData, type Filters, type PlayerScopeStatus, type SortSpec } from "../../context/ToplistsDataContextCore";
 import { useAuth } from "../../context/AuthContext";
 import GuildToplists, { type GuildToplistsPresetData } from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
   getPlayerToplistSnapshotByDocIdCached,
-  type FirestoreLatestToplistSnapshot,
-  type FirestoreToplistPlayerRow,
   type FirestoreLatestToplistResult,
 } from "../../lib/api/toplistsFirestore";
-import { normalizeServerKeyFromInput, parsePlayerIdentifier } from "../../lib/players/identifier";
+import type { ToplistPlayerRow, ToplistPlayerSnapshot } from "../../lib/toplists/toplistContracts";
+import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import {
+  PLAYER_TOPLIST_CON_RANK_COLORS as CON_RANK_COLORS,
+  PLAYER_TOPLIST_LEVEL_RANK_COLORS as LEVEL_RANK_COLORS,
+  PLAYER_TOPLIST_MAIN_RANK_COLORS as MAIN_RANK_COLORS,
+  buildPlayerToplistCompareKey,
+  buildPlayerToplistDecorMap,
+  getPlayerToplistFrameStyle as getFrameStyle,
+  getPlayerToplistMineTone as getMineTone,
+  getPlayerToplistRankTone as getRankTone,
+  normalizePlayerToplistCompareServerKey as normalizeCompareServerKey,
+  resolvePlayerToplistRowIdentifier,
+  toPlayerToplistNumberSafe as toNumberSafe,
+} from "./playerToplistDecor";
+import {
+  formatToplistDelta,
+  formatToplistNumberWithSpaceGrouping,
+  getToplistRankDeltaDisplay,
+} from "./toplistCompareDisplay";
+import { useToplistRowFocus } from "./useToplistRowFocus";
 import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
@@ -51,35 +69,6 @@ const normalizeServerList = (list: string[]) => {
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 };
 
-const STUMBLE_STEPPE_COMPARE_ALIAS_TOKENS = new Set([
-  "STUMBLESTEPPE",
-  "STUMPLESTEPPE",
-]);
-
-const compareServerAliasToken = (value: string) => {
-  let token = String(value ?? "").trim().toUpperCase();
-  if (!token) return "";
-  token = token.replace(/^[A-Z][A-Z0-9+.-]*:\/\//, "");
-  token = token.split(/[/?#]/)[0] ?? token;
-  token = token.replace(/:\d+$/, "").replace(/^\.+|\.+$/g, "");
-  token = token.replace(/\.SFGAME\.(NET|EU)$/, "");
-  token = token.replace(/[_.-]?(NET|EU)$/, "");
-  return token.replace(/[\s._-]+/g, "");
-};
-
-const normalizeCompareServerKey = (value: string) => {
-  const raw = String(value ?? "").trim().toUpperCase();
-  if (!raw) return "";
-  if (STUMBLE_STEPPE_COMPARE_ALIAS_TOKENS.has(compareServerAliasToken(raw))) {
-    return "STUMBLESTEPPE";
-  }
-  const hostMatch = raw.match(/^S(\d+)(?:\.EU)?$/);
-  if (hostMatch) return `EU${hostMatch[1]}`;
-  const euMatch = raw.match(/^EU(\d+)$/);
-  if (euMatch) return `EU${euMatch[1]}`;
-  return raw;
-};
-
 const normalizeCompareServerList = (list: string[]) => {
   const set = new Set<string>();
   list.forEach((entry) => {
@@ -94,7 +83,7 @@ const buildCompareDocId = (serverKey: string, month: string) =>
 type CompareSnapshotScope = "players" | "guilds";
 type ToplistsCompareMode = "off" | "progress" | "months";
 type CompareSnapshotState = {
-  rows: FirestoreToplistPlayerRow[];
+  rows: ToplistPlayerRow[];
   baselineServers: string[];
   missingServers: string[];
   error: string | null;
@@ -103,8 +92,9 @@ type CompareSnapshotUiState = CompareSnapshotState & {
   loading: boolean;
 };
 
-type PlayerPresetReadOnlyData = {
-  rows: FirestoreToplistPlayerRow[];
+export type PlayerPresetReadOnlyData = {
+  rows: ToplistPlayerRow[];
+  allRows?: ToplistPlayerRow[];
   tableLoading: boolean;
   compareLoading: boolean;
   compareExpected: boolean;
@@ -162,7 +152,7 @@ const readCompareSnapshotCache = (key: string): CompareSnapshotState | null => {
     if (!Array.isArray(maybe.missingServers)) return null;
     if (maybe.error != null && typeof maybe.error !== "string") return null;
     return {
-      rows: maybe.rows as FirestoreToplistPlayerRow[],
+      rows: maybe.rows as ToplistPlayerRow[],
       baselineServers: maybe.baselineServers.map((server) => String(server || "").trim()).filter(Boolean),
       missingServers: maybe.missingServers.map((server) => String(server || "").trim()).filter(Boolean),
       error: maybe.error ?? null,
@@ -184,8 +174,8 @@ const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => 
 const compareSnapshotStateMemory = new Map<string, CompareSnapshotUiState>();
 const compareSnapshotStateInFlight = new Map<string, Promise<CompareSnapshotUiState>>();
 
-const mergeCompareSnapshotRows = (snapshots: FirestoreLatestToplistSnapshot[]) => {
-  const mergedRows: FirestoreToplistPlayerRow[] = [];
+const mergeCompareSnapshotRows = (snapshots: ToplistPlayerSnapshot[]) => {
+  const mergedRows: ToplistPlayerRow[] = [];
   for (const snapshot of snapshots) {
     const players = Array.isArray(snapshot.players) ? snapshot.players : [];
     for (const row of players) mergedRows.push({ ...row, server: snapshot.server || row.server });
@@ -224,7 +214,7 @@ const buildGuildToplistIdentifier = (server: unknown, guildId: unknown): string 
   return `${normalizedServer}__${normalizedGuildId}`;
 };
 
-const resolveDirectGuildIdFromPlayerRow = (row: FirestoreToplistPlayerRow): string | null => {
+const resolveDirectGuildIdFromPlayerRow = (row: ToplistPlayerRow): string | null => {
   const candidates = [
     (row as any).guildId,
     (row as any).guild_id,
@@ -247,25 +237,9 @@ const normalizeFavoriteIdentifier = (value: unknown): string | null => {
   return raw || null;
 };
 
-const resolveToplistRowIdentifier = (row: FirestoreToplistPlayerRow): string | null => {
-  const candidates = [
-    row.identifier,
-    (row as any).original?.identifier,
-    (row as any).value?.identifier,
-    (row as any).data?.identifier,
-    (row as any).player?.identifier,
-    (row as any).value?.player?.identifier,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") continue;
-    const trimmed = candidate.trim();
-    if (!trimmed) continue;
-    if (parsePlayerIdentifier(trimmed)) return trimmed;
-  }
-  return null;
-};
+const resolveToplistRowIdentifier = resolvePlayerToplistRowIdentifier;
 
-const buildPlayerFavoriteIdentifierFromRow = (row: FirestoreToplistPlayerRow): string | null => {
+const buildPlayerFavoriteIdentifierFromRow = (row: ToplistPlayerRow): string | null => {
   return normalizeFavoriteIdentifier(resolveToplistRowIdentifier(row));
 };
 
@@ -522,11 +496,6 @@ const computeLastScanColor = (lastScan: unknown, nowMs: number): string | null =
   return "#b91c1c";
 };
 
-const toNumberSafe = (value: any): number | null => {
-  if (value == null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
 const normalizeServerCode = (value: string) => value.trim().toUpperCase();
 const normalizeClass = (value: string | null | undefined) =>
   value != null
@@ -590,8 +559,8 @@ const deriveRatioMain = (main: number | null, con: number | null) => {
   return Math.round((m / total) * 100);
 };
 const computeStatsDay = (
-  current: FirestoreToplistPlayerRow | null | undefined,
-  baseline: FirestoreToplistPlayerRow | null | undefined,
+  current: ToplistPlayerRow | null | undefined,
+  baseline: ToplistPlayerRow | null | undefined,
   sumDeltaOverride?: number | null,
   daysOverride?: number | null,
   sumField: "sum" | "sumTotal" = "sum",
@@ -620,14 +589,14 @@ const computeStatsDay = (
   const perDay = sumDelta != null ? Math.round(sumDelta / days) : null;
   return { days, perDay };
 };
-const buildTieKey = (row: FirestoreToplistPlayerRow) => {
+const buildTieKey = (row: ToplistPlayerRow) => {
   const serverKey = normalizeServerCode(String(row.server ?? ""));
   const identifier = resolveToplistRowIdentifier(row);
   const idKey = String(identifier ?? row.name ?? "").trim();
   const classKey = String(row.class ?? "").trim();
   return `${serverKey}__${idKey}__${classKey}`;
 };
-const filterToplistRows = (rows: FirestoreToplistPlayerRow[], filters: Filters) => {
+const filterToplistRows = (rows: ToplistPlayerRow[], filters: Filters) => {
   const serverFilter = Array.isArray(filters.servers) ? filters.servers : [];
   const serverSet = serverFilter.length ? new Set(serverFilter.map(normalizeServerCode)) : null;
   const classFilter = Array.isArray(filters.classes) ? filters.classes : [];
@@ -645,7 +614,7 @@ const filterToplistRows = (rows: FirestoreToplistPlayerRow[], filters: Filters) 
     return true;
   });
 };
-const sortToplistRows = (rows: FirestoreToplistPlayerRow[], sort: SortSpec) => {
+const sortToplistRows = (rows: ToplistPlayerRow[], sort: SortSpec) => {
   const compareNumber = (aVal: number | null, bVal: number | null) => {
     if (aVal == null && bVal == null) return 0;
     if (aVal == null) return 1;
@@ -660,7 +629,7 @@ const sortToplistRows = (rows: FirestoreToplistPlayerRow[], sort: SortSpec) => {
     const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
     return sort.dir === "asc" ? diff : -diff;
   };
-  const compareTie = (a: FirestoreToplistPlayerRow, b: FirestoreToplistPlayerRow) => {
+  const compareTie = (a: ToplistPlayerRow, b: ToplistPlayerRow) => {
     const cmp = buildTieKey(a).localeCompare(buildTieKey(b), undefined, { numeric: true, sensitivity: "base" });
     return sort.dir === "asc" ? cmp : -cmp;
   };
@@ -731,39 +700,6 @@ const sortToplistRows = (rows: FirestoreToplistPlayerRow[], sort: SortSpec) => {
 
   return rows;
 };
-type CellDecor = {
-  mainRank?: number;
-  conRank?: number;
-  levelRank?: number;
-  mineTier?: 1 | 2 | 3 | 4;
-};
-
-const MAIN_RANK_COLORS = ["#f6e7a6", "#f4de89", "#f2d56d", "#f0cc51", "#edc236"];
-const CON_RANK_COLORS = ["#ffe4b3", "#ffdda0", "#ffd68d", "#ffcf7a", "#ffc867"];
-const LEVEL_RANK_COLORS = ["#9ec5ff", "#8ab7ff", "#76a9ff", "#629bff", "#4e8dff"];
-const MINE_TIER_COLORS: Record<number, string> = {
-  1: "#d8b4fe",
-  2: "#c084fc",
-  3: "#a855f7",
-  4: "#f472b6",
-};
-const getRankTone = (rank: number | undefined, palette: string[]) =>
-  rank && rank > 0 && rank <= palette.length ? palette[rank - 1] : null;
-const getMineTone = (tier: number | undefined) =>
-  tier ? MINE_TIER_COLORS[tier] ?? null : null;
-const getFrameStyle = (color?: string | null): React.CSSProperties | undefined =>
-  color
-    ? {
-        border: `1px solid ${color}`,
-        borderRadius: 6,
-        padding: "1px 3px 0",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxSizing: "border-box",
-      }
-    : undefined;
-
 function ValueCrossfade({
   value,
   fadeKey,
@@ -1513,15 +1449,21 @@ type TableDataViewProps = {
   showAvgModeControl: boolean;
   focusIdentifier: string | null;
   focusRank: number | null;
+  focusNonce?: number | string | null;
   tableRef: React.RefObject<HTMLDivElement>;
   renderMode?: "live" | "preset";
-  presetAmount?: ToplistExportAmount | null;
+  presetAmount?: number | null;
   onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
   presetReadOnlyData?: PlayerPresetReadOnlyData | null;
+  onPlayerAvgModeChange?: (nextMode: "base" | "total") => void;
+  readOnlyHasMoreRows?: boolean;
+  onReadOnlyRowsEndVisible?: () => void;
+  onOpenPlayerProfile?: (row: ToplistPlayerRow) => void;
+  renderFirestoreProfileOverlay?: boolean;
 };
 
-const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null,
+export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(function TableDataView({
+  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, focusNonce = null, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPlayerAvgModeChange, readOnlyHasMoreRows = false, onReadOnlyRowsEndVisible, onOpenPlayerProfile, renderFirestoreProfileOverlay = true,
 }, ref) {
   const { t } = useTranslation();
   const { guilds, favoritesOnly } = useFilters();
@@ -1540,6 +1482,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   const navigate = useNavigate();
   const location = useLocation();
   const isPresetRender = renderMode === "preset";
+  const hasReadOnlyData = Boolean(presetReadOnlyData);
   const resolvedPresetAmount = presetAmount ?? 50;
   const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
   const isCompactToplistView = useMediaQuery("(max-width: 1099px)") && !isPresetRender;
@@ -1547,7 +1490,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
 
   const hasServers = (servers?.length ?? 0) > 0;
   const [playerAvgMode, setPlayerAvgMode] = React.useState<"base" | "total">(() => PLAYER_AVG_MODE_CACHE);
-  const effectivePlayerAvgMode = isPresetRender ? (presetReadOnlyData?.playerAvgMode ?? playerAvgMode) : playerAvgMode;
+  const effectivePlayerAvgMode = hasReadOnlyData ? (presetReadOnlyData?.playerAvgMode ?? playerAvgMode) : playerAvgMode;
   const [isPlayerAvgModePending, startPlayerAvgModeTransition] = React.useTransition();
   const [showPlayerUpdating, setShowPlayerUpdating] = React.useState(false);
   const [playerAvgModeSlot, setPlayerAvgModeSlot] = React.useState<HTMLElement | null>(null);
@@ -1557,6 +1500,10 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   const playerSortSensitiveRef = React.useRef(new Set(["main", "constitution", "sum"]));
 
   const handlePlayerAvgModeChange = React.useCallback((nextMode: "base" | "total") => {
+    if (hasReadOnlyData) {
+      if (nextMode !== effectivePlayerAvgMode) onPlayerAvgModeChange?.(nextMode);
+      return;
+    }
     if (nextMode === playerAvgMode) return;
     PLAYER_AVG_MODE_CACHE = nextMode;
     if (playerSortSensitiveRef.current.has(sortKey)) {
@@ -1566,7 +1513,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       return;
     }
     setPlayerAvgMode(nextMode);
-  }, [playerAvgMode, sortKey, startPlayerAvgModeTransition]);
+  }, [effectivePlayerAvgMode, hasReadOnlyData, onPlayerAvgModeChange, playerAvgMode, sortKey, startPlayerAvgModeTransition]);
   React.useEffect(() => {
     playerSortSensitiveRef.current = new Set(["main", "constitution", "sum", "statsDay"]);
   }, []);
@@ -1623,7 +1570,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
 
   // HUD-Filter -> Provider
   useEffect(() => {
-    if (isPresetRender) return;
+    if (isPresetRender || hasReadOnlyData) return;
     const providerRange =
       range === "all" ? "all" : range === 60 ? "30d" : `${range}d`;
     const normalized = normalizeServerList(servers);
@@ -1635,61 +1582,26 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       timeRange: providerRange as any,
       group,
     });
-  }, [servers, classes, isPresetRender, range, setFilters]);
+  }, [servers, classes, hasReadOnlyData, isPresetRender, range, setFilters]);
 
   useEffect(() => {
-    if (isPresetRender) return;
+    if (isPresetRender || hasReadOnlyData) return;
     const s = mapSort(sortKey);
     setSort(s);
-  }, [isPresetRender, sortKey, setSort]);
+  }, [hasReadOnlyData, isPresetRender, sortKey, setSort]);
   const effectiveSort = React.useMemo(
     () => mapSort(sortKey),
     [sortKey]
   );
 
-  const formatDeWithSpaceGrouping = (value: number, options?: Intl.NumberFormatOptions) =>
-    new Intl.NumberFormat("de-DE", options)
-      .formatToParts(value)
-      .map((part) => (part.type === "group" ? " " : part.value))
-      .join("");
+  const formatDeWithSpaceGrouping = formatToplistNumberWithSpaceGrouping;
   const fmtNum = (n: number | null | undefined) => {
     if (n == null || !Number.isFinite(n)) return "";
     return formatDeWithSpaceGrouping(n);
   };
-  const fmtDelta = (n: number | null | undefined) => {
-    if (n == null) return "";
-    const formatted = fmtNum(Math.abs(n));
-    if (!formatted) return String(n);
-    return n > 0 ? `+${formatted}` : `-${formatted}`;
-  };
-  const getRankDeltaDisplay = (value: number | string | null | undefined, compareMissing: boolean) => {
-    if (compareMissing) {
-      return { text: "n/a", variant: "na" as const };
-    }
-    if (value == null || value === "") {
-      return { text: "n/a", variant: "na" as const };
-    }
-    let parsed: number | null = null;
-    if (typeof value === "number") {
-      parsed = value;
-    } else if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed || /^n\/a$/i.test(trimmed)) {
-        return { text: "n/a", variant: "na" as const };
-      }
-      const numeric = Number(trimmed);
-      parsed = Number.isFinite(numeric) ? numeric : null;
-    }
-    if (parsed == null || !Number.isFinite(parsed)) {
-      return { text: "n/a", variant: "na" as const };
-    }
-    if (parsed === 0 || Object.is(parsed, -0)) {
-      return { text: "-", variant: "zero" as const };
-    }
-    const absText = fmtNum(Math.abs(parsed));
-    const signedText = parsed > 0 ? `+${absText}` : `-${absText}`;
-    return { text: signedText, variant: parsed > 0 ? "pos" as const : "neg" as const };
-  };
+  const fmtDelta = (n: number | null | undefined) => formatToplistDelta(n, fmtNum);
+  const getRankDeltaDisplay = (value: number | string | null | undefined, compareMissing: boolean) =>
+    getToplistRankDeltaDisplay(value, compareMissing, fmtNum);
   const getStatsDayVariant = (value: number | null | undefined, avg: number | null) => {
     if (value == null || avg == null || !Number.isFinite(value) || !Number.isFinite(avg) || avg === 0) return "";
     const ratio = value / avg;
@@ -1706,7 +1618,9 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   };
   const fmtDateObj = (d: Date | null | undefined) => (d ? d.toLocaleString() : "�");
 
-  const rows = isPresetRender ? (presetReadOnlyData?.rows ?? (playerRows || [])) : (playerRows || []);
+  const readOnlyAllRows = hasReadOnlyData ? (presetReadOnlyData?.allRows ?? presetReadOnlyData?.rows ?? []) : [];
+  const readOnlyVisibleRows = hasReadOnlyData ? (presetReadOnlyData?.rows ?? readOnlyAllRows) : [];
+  const rows = hasReadOnlyData ? readOnlyAllRows : (playerRows || []);
   const isCompareMonthsMode = compareMode === "months";
   const progressBaselineMonth = String(progressSinceMonth ?? "").trim();
   const compareFromMonthValue = String(compareFromMonth ?? "").trim();
@@ -1782,12 +1696,12 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     Boolean(activeBaselineCompareMonth) &&
     (!isCompareMonthsMode || Boolean(activeTargetCompareMonth)) &&
     !derivedCompareLoading;
-  const compareLoading = isPresetRender ? (presetReadOnlyData?.compareLoading ?? false) : derivedCompareLoading;
-  const showCompare = isPresetRender ? (presetReadOnlyData?.showCompare ?? false) : derivedShowCompare;
+  const compareLoading = hasReadOnlyData ? (presetReadOnlyData?.compareLoading ?? false) : derivedCompareLoading;
+  const showCompare = hasReadOnlyData ? (presetReadOnlyData?.showCompare ?? false) : derivedShowCompare;
 
   // Load monthly baseline snapshot(s) for comparison
   useEffect(() => {
-    if (isPresetRender) return;
+    if (isPresetRender || hasReadOnlyData) return;
     let cancelled = false;
     const normalizedCompareMonth = activeBaselineCompareMonth;
     const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
@@ -1874,7 +1788,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       const results: FirestoreLatestToplistResult[] = await Promise.all(
         docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
-      const snapshots: FirestoreLatestToplistSnapshot[] = [];
+      const snapshots: ToplistPlayerSnapshot[] = [];
       const baselineServers: string[] = [];
       const missingServers: string[] = [];
       let firstErrorCode: string | null = null;
@@ -1946,11 +1860,11 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return () => {
       cancelled = true;
     };
-  }, [activeBaselineCompareMonth, compareServersKey, isPresetRender]);
+  }, [activeBaselineCompareMonth, compareServersKey, hasReadOnlyData, isPresetRender]);
 
   // Load compare target snapshot(s) when comparing month-to-month (visible list = "to" month)
   useEffect(() => {
-    if (isPresetRender) return;
+    if (isPresetRender || hasReadOnlyData) return;
     let cancelled = false;
     const normalizedTargetMonth = activeTargetCompareMonth;
     const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
@@ -2024,7 +1938,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       const results: FirestoreLatestToplistResult[] = await Promise.all(
         docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
       );
-      const snapshots: FirestoreLatestToplistSnapshot[] = [];
+      const snapshots: ToplistPlayerSnapshot[] = [];
       const snapshotServers: string[] = [];
       const missingServers: string[] = [];
       let firstErrorCode: string | null = null;
@@ -2088,10 +2002,10 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return () => {
       cancelled = true;
     };
-  }, [activeTargetCompareMonth, compareServersKey, isCompareMonthsMode, isPresetRender]);
+  }, [activeTargetCompareMonth, compareServersKey, hasReadOnlyData, isCompareMonthsMode, isPresetRender]);
 
   const compareMonthsTargetRows = React.useMemo(() => {
-    if (!isCompareMonthsMode) return [] as FirestoreToplistPlayerRow[];
+    if (!isCompareMonthsMode) return [] as ToplistPlayerRow[];
 
     let nextRows = Array.isArray(compareTargetState.rows) ? [...compareTargetState.rows] : [];
     if (!nextRows.length) return nextRows;
@@ -2170,12 +2084,12 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       ? (compareTargetState.loading || compareState.loading)
       : playerLoading;
   const activeCompareError = isPresetRender ? (presetReadOnlyData?.compareError ?? null) : derivedActiveCompareError;
-  const tableLoading = isPresetRender ? (presetReadOnlyData?.tableLoading ?? false) : derivedTableLoading;
-  const effectivePlayerError = isPresetRender ? (presetReadOnlyData?.playerError ?? null) : playerError;
-  const effectivePlayerLastUpdatedAt = isPresetRender ? (presetReadOnlyData?.playerLastUpdatedAt ?? null) : playerLastUpdatedAt;
-  const effectivePlayerScopeStatus = isPresetRender ? (presetReadOnlyData?.playerScopeStatus ?? null) : playerScopeStatus;
+  const tableLoading = hasReadOnlyData ? (presetReadOnlyData?.tableLoading ?? false) : derivedTableLoading;
+  const effectivePlayerError = hasReadOnlyData ? (presetReadOnlyData?.playerError ?? null) : playerError;
+  const effectivePlayerLastUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.playerLastUpdatedAt ?? null) : playerLastUpdatedAt;
+  const effectivePlayerScopeStatus = hasReadOnlyData ? (presetReadOnlyData?.playerScopeStatus ?? null) : playerScopeStatus;
 
-  const buildRowKey = React.useCallback((row: FirestoreToplistPlayerRow, fallbackIndex?: number) => {
+  const buildRowKey = React.useCallback((row: ToplistPlayerRow, fallbackIndex?: number) => {
     const identifier = resolveToplistRowIdentifier(row);
     if (identifier) return identifier;
     const serverKey = normalizeServerCode(String(row.server ?? ""));
@@ -2185,31 +2099,12 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
   }, []);
 
-  const buildCompareFallbackKey = React.useCallback((row: FirestoreToplistPlayerRow, fallbackIndex?: number) => {
-    const serverKey = normalizeCompareServerKey(String(row.server ?? ""));
-    const nameKey = String(row.name ?? "").trim();
-    const classKey = String(row.class ?? "").trim();
-    const suffix = fallbackIndex != null ? String(fallbackIndex) : "na";
-    return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
+  const buildCompareKey = React.useCallback((row: ToplistPlayerRow) => {
+    return buildPlayerToplistCompareKey(row);
   }, []);
-
-  const normalizeCompareIdentifier = React.useCallback((value: string | null) => {
-    if (!value) return null;
-    const parsed = parsePlayerIdentifier(value);
-    if (!parsed) return value.trim().toLowerCase() || null;
-    const serverKey = normalizeCompareServerKey(parsed.serverKey);
-    if (!serverKey) return value.trim().toLowerCase() || null;
-    return `${serverKey.toLowerCase()}_p${parsed.playerId}`;
-  }, []);
-
-  const buildCompareKey = React.useCallback((row: FirestoreToplistPlayerRow) => {
-    const identifier = normalizeCompareIdentifier(resolveToplistRowIdentifier(row));
-    if (identifier) return identifier;
-    return buildCompareFallbackKey(row);
-  }, [buildCompareFallbackKey, normalizeCompareIdentifier]);
 
   const baselineRowByKey = React.useMemo(() => {
-    const map = new Map<string, FirestoreToplistPlayerRow>();
+    const map = new Map<string, ToplistPlayerRow>();
     if (!showCompare) return map;
     effectiveBaselineRows.forEach((row) => {
       const key = buildCompareKey(row);
@@ -2228,7 +2123,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       const serverKey = normalizeCompareServerKey(String((row as any).server ?? ""));
       const baselineExists = baselineServerSet.has(serverKey);
       const compareMissing = !baselineExists || !past;
-      const delta = (field: keyof FirestoreToplistPlayerRow) => {
+      const delta = (field: keyof ToplistPlayerRow) => {
         if (compareMissing || !past) return null;
         if (field === "ratio") return null;
         const curr = toNumberSafe((row as any)[field]);
@@ -2305,7 +2200,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   ]);
 
   const currentRowByKey = React.useMemo(() => {
-    const map = new Map<string, FirestoreToplistPlayerRow>();
+    const map = new Map<string, ToplistPlayerRow>();
     currentRowsWithCompare.forEach((row) => {
       const key = buildCompareKey(row);
       if (!map.has(key)) {
@@ -2421,8 +2316,8 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   }, [currentSortedRows, buildCompareKey]);
 
   const enhancedRows = React.useMemo(() => {
-    if (isPresetRender) {
-      return presetReadOnlyData?.rows ?? [];
+    if (hasReadOnlyData) {
+      return readOnlyAllRows;
     }
     return currentSortedRows.map((row, idx) => {
       if (!showCompare) {
@@ -2438,11 +2333,15 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
         _rankDelta: rankDelta,
       };
     });
-  }, [isPresetRender, presetReadOnlyData, showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
+  }, [hasReadOnlyData, readOnlyAllRows, showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
   const renderedRows = React.useMemo(
-    () => (captureRowLimit == null ? enhancedRows : enhancedRows.slice(0, captureRowLimit)),
-    [captureRowLimit, enhancedRows]
+    () => {
+      if (hasReadOnlyData && !isPresetRender) return readOnlyVisibleRows;
+      return captureRowLimit == null ? enhancedRows : enhancedRows.slice(0, captureRowLimit);
+    },
+    [captureRowLimit, enhancedRows, hasReadOnlyData, isPresetRender, readOnlyVisibleRows]
   );
+  const statusRowCount = hasReadOnlyData ? enhancedRows.length : renderedRows.length;
   const mobileRenderedRowKeys = React.useMemo(() => {
     const keys = new Set<string>();
     renderedRows.forEach((row) => keys.add(buildCompareKey(row)));
@@ -2479,62 +2378,10 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return max;
   })();
 
-  const decorMap = React.useMemo(() => {
-    const map = new Map<string, CellDecor>();
-    const rows = enhancedRows;
-    const keyFor = (row: FirestoreToplistPlayerRow) => buildCompareKey(row);
-
-    const ensure = (row: FirestoreToplistPlayerRow) => {
-      const key = keyFor(row);
-      let entry = map.get(key);
-      if (!entry) {
-        entry = {};
-        map.set(key, entry);
-      }
-      return entry;
-    };
-
-    const rankBy = (
-      valueGetter: (row: FirestoreToplistPlayerRow) => number | null,
-      field: "mainRank" | "conRank" | "levelRank",
-    ) => {
-      const ranked = rows
-        .map((row, idx) => {
-          const value = valueGetter(row);
-          if (value == null) return null;
-          return { row, value, idx };
-        })
-        .filter(Boolean) as { row: FirestoreToplistPlayerRow; value: number; idx: number }[];
-      ranked.sort((a, b) => b.value - a.value || a.idx - b.idx);
-      ranked.slice(0, 5).forEach((entry, i) => {
-        ensure(entry.row)[field] = i + 1;
-      });
-    };
-
-    rankBy(
-      (row) => toNumberSafe(effectivePlayerAvgMode === "total" ? row.mainTotal : row.main),
-      "mainRank"
-    );
-    rankBy(
-      (row) => toNumberSafe(effectivePlayerAvgMode === "total" ? row.conTotal : row.con),
-      "conRank"
-    );
-    rankBy((row) => toNumberSafe(row.level), "levelRank");
-
-    rows.forEach((row) => {
-      const mineValue = toNumberSafe(row.mine);
-      if (mineValue == null) return;
-      const tier =
-        mineValue >= 100 ? 4 :
-        mineValue >= 80 ? 3 :
-        mineValue >= 65 ? 2 :
-        mineValue >= 50 ? 1 :
-        null;
-      if (tier) ensure(row).mineTier = tier as 1 | 2 | 3 | 4;
-    });
-
-    return map;
-  }, [enhancedRows, buildCompareKey, effectivePlayerAvgMode]);
+  const decorMap = React.useMemo(
+    () => buildPlayerToplistDecorMap(enhancedRows, effectivePlayerAvgMode, buildCompareKey),
+    [enhancedRows, buildCompareKey, effectivePlayerAvgMode],
+  );
 
   const nowMs = Date.now();
   const statusLabel = !hasServers
@@ -2555,10 +2402,8 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     name: string | null;
     server: string | null;
   } | null>(null);
-  const [highlightedIdentifier, setHighlightedIdentifier] = React.useState<string | null>(null);
-  const focusHandledRef = React.useRef<string | null>(null);
-  const focusHighlightTimeoutRef = React.useRef<number | null>(null);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const readOnlyLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null);
   const guildLookupCacheRef = React.useRef<Map<string, string | null>>(new Map());
   const [tableScrollbarWidth, setTableScrollbarWidth] = React.useState(0);
   const virtualRowHeight = showCompare ? 72 : 64;
@@ -2581,6 +2426,15 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     estimateSize: () => virtualRowHeight,
     overscan: 14,
     getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
+  });
+  const highlightedIdentifier = useToplistRowFocus({
+    focusIdentifier,
+    focusNonce,
+    disabled: isPresetRender || !hasServers || playerLoading,
+    rowIndexByIdentifier,
+    scrollToIndex: (targetIndex) => {
+      rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "smooth" });
+    },
   });
   const compareExpected = isPresetRender ? (presetReadOnlyData?.compareExpected ?? false) : effectiveCompareMode !== "off";
   const virtualTotalSize = Math.round(rowVirtualizer.getTotalSize());
@@ -2630,8 +2484,35 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     virtualTotalSize,
   ]);
 
+  React.useEffect(() => {
+    if (!hasReadOnlyData || isPresetRender || !readOnlyHasMoreRows || !onReadOnlyRowsEndVisible) return;
+    const sentinel = readOnlyLoadMoreSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        onReadOnlyRowsEndVisible();
+      }
+    }, {
+      root: isCompactToplistView ? null : tableScrollRef.current,
+      rootMargin: "160px 0px",
+      threshold: 0,
+    });
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    hasReadOnlyData,
+    isCompactToplistView,
+    isPresetRender,
+    onReadOnlyRowsEndVisible,
+    readOnlyHasMoreRows,
+    renderedRows.length,
+  ]);
+
   const getPresetReadOnlyData = React.useCallback((): PlayerPresetReadOnlyData => ({
     rows: enhancedRows.slice(0, 150),
+    allRows: enhancedRows,
     tableLoading,
     compareLoading,
     compareExpected,
@@ -2659,7 +2540,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   }), [getPresetReadOnlyData]);
 
   const resolveGuildOverlayTarget = React.useCallback(
-    async (row: FirestoreToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
+    async (row: ToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
       const directGuildId = resolveDirectGuildIdFromPlayerRow(row);
       const serverCode = normalizeServerKeyFromInput(row.server) ?? "";
       if (directGuildId) {
@@ -2698,7 +2579,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   );
 
   const handleGuildCellClick = React.useCallback(
-    async (row: FirestoreToplistPlayerRow) => {
+    async (row: ToplistPlayerRow) => {
       const guildName = String(row.guild ?? "").trim();
       if (!guildName) return;
 
@@ -2714,23 +2595,6 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     },
     [resolveGuildOverlayTarget]
   );
-
-  React.useEffect(() => {
-    focusHandledRef.current = null;
-    setHighlightedIdentifier(null);
-    if (focusHighlightTimeoutRef.current != null) {
-      window.clearTimeout(focusHighlightTimeoutRef.current);
-      focusHighlightTimeoutRef.current = null;
-    }
-  }, [focusIdentifier]);
-
-  React.useEffect(() => {
-    return () => {
-      if (focusHighlightTimeoutRef.current != null) {
-        window.clearTimeout(focusHighlightTimeoutRef.current);
-      }
-    };
-  }, []);
 
   React.useEffect(() => {
     if (isPresetRender) return;
@@ -2751,26 +2615,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     };
   }, [hasServers, isPresetRender, renderedRows.length, showCompare]);
 
-  React.useEffect(() => {
-    void focusRank;
-
-    if (isPresetRender) return;
-    if (!focusIdentifier || !hasServers || playerLoading) return;
-    if (focusHandledRef.current === focusIdentifier) return;
-    const targetIndex = rowIndexByIdentifier.get(focusIdentifier);
-    if (targetIndex == null) return;
-    focusHandledRef.current = focusIdentifier;
-    rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "smooth" });
-    setHighlightedIdentifier(focusIdentifier);
-
-    if (focusHighlightTimeoutRef.current != null) {
-      window.clearTimeout(focusHighlightTimeoutRef.current);
-    }
-    focusHighlightTimeoutRef.current = window.setTimeout(() => {
-      setHighlightedIdentifier((prev) => (prev === focusIdentifier ? null : prev));
-      focusHighlightTimeoutRef.current = null;
-    }, 2600);
-  }, [focusIdentifier, focusRank, hasServers, isPresetRender, playerLoading, rowIndexByIdentifier, rowVirtualizer]);
+  void focusRank;
 
   const renderDelta = (value: number | null, missing: boolean, hideIfNull = false) => {
     if (!showCompare) return null;
@@ -2790,7 +2635,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
     return text || "-";
   };
 
-  const getRowDisplayData = (r: FirestoreToplistPlayerRow, i: number) => {
+  const getRowDisplayData = (r: ToplistPlayerRow, i: number) => {
     const rankDelta = showCompare ? (r as any)._rankDelta : null;
     const deltas = (r as any)._delta || {};
     const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
@@ -2864,7 +2709,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   };
 
   const getSortMetric = (
-    r: FirestoreToplistPlayerRow,
+    r: ToplistPlayerRow,
     row: ReturnType<typeof getRowDisplayData>,
   ) => {
     const valueOrDash = (value: React.ReactNode) => formatMetricText(value);
@@ -3049,6 +2894,7 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
       {!tableLoading && !effectivePlayerError && renderedRows.length === 0 && (
         <div className="toplists-mobile-empty">{t("toplists.table.noResults", "No results")}</div>
       )}
+      {hasReadOnlyData && readOnlyHasMoreRows && <div ref={readOnlyLoadMoreSentinelRef} aria-hidden style={{ height: 1 }} />}
     </div>
   );
 
@@ -3155,7 +3001,11 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
           const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
             event.preventDefault();
             event.stopPropagation();
-            if (isPresetRender) return;
+            if (isPresetRender && !onOpenPlayerProfile) return;
+            if (onOpenPlayerProfile) {
+              onOpenPlayerProfile(r);
+              return;
+            }
             if (!profileIdentifier) return;
             setSelectedPlayerProfile({
               identifier: profileIdentifier,
@@ -3323,13 +3173,13 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
       <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{statusLabel} - {renderedRows.length} {t("toplists.status.rows", "rows")}</div>
+        <div>{statusLabel} - {statusRowCount} {t("toplists.status.rows", "rows")}</div>
         <div>{effectivePlayerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(effectivePlayerLastUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && playerAvgModeSlot &&
         createPortal(
           <PlayerAvgModeControls
-            mode={playerAvgMode}
+            mode={effectivePlayerAvgMode}
             updating={showPlayerUpdating}
             onChange={handlePlayerAvgModeChange}
             label={t("toplists.players.avgMode.label", "Values")}
@@ -3405,11 +3255,12 @@ const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(
               style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
             >
               {renderToplistTableBody({ imgLoading: isPresetRender ? "eager" : "lazy" })}
+              {hasReadOnlyData && readOnlyHasMoreRows && <div ref={readOnlyLoadMoreSentinelRef} aria-hidden style={{ height: 1 }} />}
             </div>
           </div>
         </>
       )}
-      {!isPresetRender && (
+      {!isPresetRender && renderFirestoreProfileOverlay && (
         <>
           <ProfileOverlay
             isOpen={Boolean(selectedPlayerProfile?.identifier)}

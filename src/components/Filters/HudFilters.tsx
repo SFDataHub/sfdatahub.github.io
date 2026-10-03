@@ -23,6 +23,7 @@ type Props = {
   onCompareToMonthChange: (v: string) => void;
   monthOptions: string[];
   guildOptions: { value: string; label: string }[];
+  searchSlot?: React.ReactNode;
   onExportPng?: () => void;
   exportDisabled?: boolean;
 };
@@ -41,6 +42,7 @@ export default function HudFilters({
   onCompareToMonthChange,
   monthOptions,
   guildOptions,
+  searchSlot,
   onExportPng,
   exportDisabled,
 }: Props) {
@@ -277,6 +279,8 @@ export default function HudFilters({
           </div>
         )}
       </div>
+
+      {searchSlot ? <div className={styles.searchSlot}>{searchSlot}</div> : null}
 
       <div className="ml-auto flex items-center gap-2">
         <button

@@ -434,20 +434,43 @@ assert.equal(normalizedMissingStatsMember.totalStats, null);
 const guildData: GuildAnalyticsDerivedData = {
   snapshots: timestamps.map((timestamp, index) => snapshot(`guild-scan-${index + 1}`, timestamp)),
   guilds: [
-    guildSnapshotForIdentifier("guild-scan-1", timestamps[0], "s3_g7", "Old Guild", 40, 500),
-    guildSnapshotForIdentifier("guild-scan-2", timestamps[1], "s3_g7", "Old Guild", 42, 510),
-    guildSnapshotForIdentifier("guild-scan-3", timestamps[2], "f6_g8", "Middle Guild", 44, 520),
-    guildSnapshotForIdentifier("guild-scan-4", timestamps[3], "f28_g1", "Current Guild", 46, 530),
-    guildSnapshotForIdentifier("guild-scan-4", timestamps[3], "f28_g1", "Current Guild", 46, 530),
+    guildSnapshotForIdentifier("guild-scan-1", timestamps[0], "s3_g7", "Old Guild", 2, 510),
+    guildSnapshotForIdentifier("guild-scan-2", timestamps[1], "s3_g7", "Old Guild", 3, 520),
+    guildSnapshotForIdentifier("guild-scan-3", timestamps[2], "f6_g8", "Middle Guild", 2, 530),
+    guildSnapshotForIdentifier("guild-scan-4", timestamps[3], "f28_g1", "Current Guild", 2, 540),
+    guildSnapshotForIdentifier("guild-scan-4", timestamps[3], "f28_g1", "Current Guild", 2, 540),
     guildSnapshotForIdentifier("guild-scan-5", timestamps[4], "f28_other", "Other Guild", 99, 999),
     guildSnapshotForIdentifier("guild-scan-6", timestamps[5], "solo_g1", "Solo Guild", 51, 540),
     guildSnapshotForIdentifier("guild-scan-6", timestamps[5], "same_name_trap", "Current Guild", 88, 777),
   ],
   members: [
     member("guild-member-old-1", "guild-scan-1", timestamps[0], "stable_member", "Stable", 500, "s3_g7", "Old Guild"),
+    member("guild-member-old-support-1", "guild-scan-1", timestamps[0], "old_support", "Old Support", 520, "s3_g7", "Old Guild"),
     member("guild-member-old-2", "guild-scan-2", timestamps[1], "stable_member", "Stable", 510, "s3_g7", "Old Guild"),
+    member("guild-member-old-support-2", "guild-scan-2", timestamps[1], "old_support", "Old Support", 530, "s3_g7", "Old Guild"),
+    member(
+      "guild-member-alias-trap",
+      "guild-scan-2",
+      timestamps[1],
+      "current_ref",
+      "Stable",
+      990,
+      "s3_g8",
+      "Alias Trap Guild",
+    ),
     member("guild-member-mid", "guild-scan-3", timestamps[2], "stable_member", "Stable", 520, "f6_g8", "Middle Guild"),
+    member("guild-member-mid-support", "guild-scan-3", timestamps[2], "mid_support", "Mid Support", 540, "f6_g8", "Middle Guild"),
     member("guild-member-current", "guild-scan-4", timestamps[3], "stable_member", "Stable", 530, "f28_g1", "Current Guild"),
+    member(
+      "guild-member-current-support",
+      "guild-scan-4",
+      timestamps[3],
+      "current_support",
+      "Current Support",
+      550,
+      "f28_g1",
+      "Current Guild",
+    ),
     member("guild-member-other", "guild-scan-5", timestamps[4], "other_member", "Other", 999, "f28_other", "Other Guild"),
     member("guild-member-solo", "guild-scan-6", timestamps[5], "solo_member", "Solo", 540, "solo_g1", "Solo Guild"),
     member("guild-member-name-trap", "guild-scan-6", timestamps[5], "trap_member", "Trap", 777, "same_name_trap", "Current Guild"),
@@ -504,11 +527,11 @@ const intermediateGuildSeries = buildGuildAnalyticsSeries(guildData, activeInter
 
 assert.deepEqual(
   currentGuildSeries.allPoints.map((point) => point.values.memberCount),
-  [40, 42, 44, 46],
+  [2, 3, 2, 2],
 );
 assert.deepEqual(
   currentGuildSeriesFromUiSelection.allPoints.map((point) => point.values.memberCount),
-  [40, 42, 44, 46],
+  [2, 3, 2, 2],
 );
 assert.equal(currentGuildSeries.allPoints.filter((point) => point.scanId === "guild-scan-4").length, 1);
 assert.deepEqual(
@@ -537,8 +560,34 @@ assert.deepEqual(uiSelectionIdentityScope, {
 
 const currentLevelSeries = buildGuildAnalyticsSeries(guildData, activeCurrentGuild, "avgLevel", "all", guildIdentitySnapshot);
 assert.deepEqual(
+  currentLevelSeries.allPoints.map((point) => point.scanId),
+  ["guild-scan-1", "guild-scan-3", "guild-scan-4"],
+);
+assert.deepEqual(
   currentLevelSeries.allPoints.map((point) => point.values.avgLevel),
-  [500, 510, 520, 530],
+  [510, 530, 540],
+);
+assert.deepEqual(
+  buildGuildAnalyticsSeries(guildData, activeCurrentGuild, "avgBaseStats", "all", guildIdentitySnapshot)
+    .allPoints.map((point) => point.values.avgBaseStats),
+  [51_000, 53_000, 54_000],
+);
+assert.deepEqual(
+  buildGuildAnalyticsSeries(guildData, activeCurrentGuild, "avgTotalStats", "all", guildIdentitySnapshot)
+    .allPoints.map((point) => point.values.avgTotalStats),
+  [102_000, 106_000, 108_000],
+);
+assert.equal(
+  currentLevelSeries.allPoints.some((point) => point.scanId === "guild-scan-2"),
+  false,
+);
+assert.equal(
+  currentLevelSeries.allPoints.some((point) => point.values.avgLevel === (510 + 530) / 2),
+  false,
+);
+assert.equal(
+  currentLevelSeries.allPoints.some((point) => point.values.avgLevel === (510 + 530 + 990) / 3),
+  false,
 );
 
 const soloSeriesWithSnapshot = buildGuildAnalyticsSeries(guildData, activeSoloGuild, "memberCount", "all", guildIdentitySnapshot);
@@ -557,8 +606,10 @@ assert.deepEqual(
 
 const progressReport = buildGuildAnalyticsProgressReport(guildData, activeCurrentGuild, "monthly", guildIdentitySnapshot);
 assert.ok(progressReport);
-assert.equal(progressReport.baseline.values.memberCount, 44);
-assert.equal(progressReport.current.values.memberCount, 46);
+assert.equal(progressReport.baseline.values.memberCount, 2);
+assert.equal(progressReport.current.values.memberCount, 2);
+assert.equal(progressReport.baseline.values.avgLevel, 530);
+assert.equal(progressReport.current.values.avgLevel, 540);
 assert.deepEqual(
   progressReport.players.map((player) => [player.memberRef, player.levelDelta]),
   [["stable_member", 10]],

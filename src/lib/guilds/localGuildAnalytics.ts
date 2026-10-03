@@ -28,6 +28,14 @@ export type GuildAnalyticsTimeDomain = {
   startMs: number;
   endMs: number;
 };
+export type GuildAnalyticsRangeInterval = {
+  from: number;
+  to: number;
+};
+export type GuildAnalyticsRangeBounds = {
+  earliest?: number | null;
+  latest?: number | null;
+};
 
 export type GuildAnalyticsGuildIdentity = {
   guildId?: string | null;
@@ -250,6 +258,56 @@ export function normalizeGuildAnalyticsRange(range: GuildAnalyticsRangeInput): G
   return typeof range === "string" ? { key: range } : range;
 }
 
+export function resolveGuildAnalyticsRangeInterval(
+  range: GuildAnalyticsRangeInput,
+  timestamps: readonly number[],
+  bounds: GuildAnalyticsRangeBounds = {},
+): GuildAnalyticsRangeInterval | null {
+  const selection = normalizeGuildAnalyticsRange(range);
+  const finiteTimestamps = timestamps.filter(isFiniteNumber);
+  const finiteEarliest = isFiniteNumber(bounds.earliest) ? bounds.earliest : null;
+  const finiteLatest = isFiniteNumber(bounds.latest) ? bounds.latest : null;
+
+  if (selection.key === "custom") {
+    const fromMs = parseDateInputStartMs(selection.from);
+    const toMs = parseDateInputEndMs(selection.to);
+    const fallbackFrom = finiteTimestamps.length ? Math.min(...finiteTimestamps) : null;
+    const fallbackTo = finiteTimestamps.length ? Math.max(...finiteTimestamps) : null;
+    const from = fromMs ?? fallbackFrom;
+    const to = toMs ?? fallbackTo;
+    return from != null && to != null && from <= to ? { from, to } : null;
+  }
+
+  if (!finiteTimestamps.length && finiteLatest == null) return null;
+
+  if (selection.key === "all") {
+    const fromCandidates = [
+      ...(finiteTimestamps.length ? [Math.min(...finiteTimestamps)] : []),
+      ...(finiteEarliest != null ? [finiteEarliest] : []),
+    ];
+    const toCandidates = [
+      ...(finiteTimestamps.length ? [Math.max(...finiteTimestamps)] : []),
+      ...(finiteLatest != null ? [finiteLatest] : []),
+    ];
+    return fromCandidates.length && toCandidates.length
+      ? { from: Math.min(...fromCandidates), to: Math.max(...toCandidates) }
+      : null;
+  }
+
+  const localLatest = finiteTimestamps.length ? Math.max(...finiteTimestamps) : null;
+  const endMs = Math.max(...[localLatest, finiteLatest].filter(isFiniteNumber));
+  const from =
+    selection.key === "7d"
+      ? endMs - 7 * 86400000
+      : selection.key === "30d"
+        ? endMs - 30 * 86400000
+        : selection.key === "90d"
+          ? endMs - 90 * 86400000
+          : subtractMonths(endMs, selection.key === "6m" ? 6 : 12);
+
+  return { from, to: endMs };
+}
+
 export function resolveGuildAnalyticsTimeDomain<T>(
   allPoints: T[],
   visiblePoints: T[],
@@ -413,18 +471,15 @@ function buildAnalyticsSnapshotsForGuild(
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
 ): GuildAnalyticsSnapshot[] {
   const identityScope = resolveGuildAnalyticsIdentityScope(guild, identityResolutionSnapshot);
-  const membersBySnapshotId = new Map<string, GuildAnalyticsMemberSnapshot[]>();
-  for (const member of collectGuildAnalyticsMemberObservations(data, guild, identityScope, identityResolutionSnapshot)) {
-    const members = membersBySnapshotId.get(member.snapshotId) ?? [];
-    members.push(member);
-    membersBySnapshotId.set(member.snapshotId, members);
-  }
 
   return collectGuildAnalyticsGuildObservations(data, guild, identityScope, identityResolutionSnapshot)
-    .map((snapshot) => ({
-      point: pointFromGuildSnapshot(snapshot),
-      members: membersBySnapshotId.get(snapshot.snapshotId) ?? [],
-    }));
+    .map((snapshot) => {
+      const members = collectExactGuildSnapshotMembers(data, snapshot);
+      return {
+        point: pointFromGuildSnapshot(snapshot, members),
+        members,
+      };
+    });
 }
 
 type GuildAnalyticsIdentityScope = {
@@ -497,18 +552,60 @@ function collectGuildAnalyticsMemberObservations(
   return data.members.filter((member) => isDerivedMemberInGuild(member, guild));
 }
 
-function pointFromGuildSnapshot(snapshot: GuildAnalyticsGuildSnapshot): GuildAnalyticsPoint {
+function collectExactGuildSnapshotMembers(
+  data: GuildAnalyticsDerivedData,
+  snapshot: GuildAnalyticsGuildSnapshot,
+) {
+  const guildIdentifierKey = snapshot.guildIdentifier?.toLowerCase() ?? null;
+  if (!guildIdentifierKey) return [];
+  return dedupeGuildAnalyticsSnapshotMembers(
+    data.members.filter(
+      (member) =>
+        member.snapshotId === snapshot.snapshotId &&
+        member.guildIdentifier?.toLowerCase() === guildIdentifierKey,
+    ),
+  );
+}
+
+function pointFromGuildSnapshot(snapshot: GuildAnalyticsGuildSnapshot, members: GuildAnalyticsMemberSnapshot[]): GuildAnalyticsPoint {
+  const declaredMemberCount = isPlausibleMemberCount(snapshot.memberCount) ? snapshot.memberCount : null;
+  const completeMemberSet = declaredMemberCount != null && members.length === declaredMemberCount;
+  const levelValues = members.map((member) => member.level).filter(isFiniteNumber);
+  const baseStatsValues = members.map((member) => member.baseStats).filter(isFiniteNumber);
+  const totalStatsValues = members.map((member) => member.totalStats).filter(isFiniteNumber);
+
   return {
     scanId: snapshot.snapshotId,
     scanLabel: snapshot.sourceScanFilename,
     scannedAtMs: snapshot.snapshotTimestamp,
     values: {
-      avgLevel: snapshot.averageLevel ?? undefined,
-      avgBaseStats: snapshot.averageBaseStats ?? undefined,
-      avgTotalStats: snapshot.averageTotalStats ?? undefined,
+      avgLevel: completeMemberSet && levelValues.length === declaredMemberCount ? average(levelValues) ?? undefined : undefined,
+      avgBaseStats: completeMemberSet && baseStatsValues.length === declaredMemberCount ? average(baseStatsValues) ?? undefined : undefined,
+      avgTotalStats: completeMemberSet && totalStatsValues.length === declaredMemberCount ? average(totalStatsValues) ?? undefined : undefined,
       memberCount: snapshot.memberCount,
     },
   };
+}
+
+function dedupeGuildAnalyticsSnapshotMembers(members: GuildAnalyticsMemberSnapshot[]) {
+  const byRef = new Map<string, GuildAnalyticsMemberSnapshot>();
+  members.forEach((member) => {
+    const previous = byRef.get(member.memberRef.toLowerCase());
+    if (!previous || scoreGuildAnalyticsMemberValues(member) >= scoreGuildAnalyticsMemberValues(previous)) {
+      byRef.set(member.memberRef.toLowerCase(), member);
+    }
+  });
+  return [...byRef.values()];
+}
+
+function scoreGuildAnalyticsMemberValues(member: GuildAnalyticsMemberSnapshot) {
+  return (
+    Number(isFiniteNumber(member.level)) +
+    Number(isFiniteNumber(member.baseStats)) +
+    Number(isFiniteNumber(member.totalStats)) +
+    Number(isFiniteNumber(member.xpTotal)) +
+    Number(isFiniteNumber(member.focusedBaseStats))
+  );
 }
 
 function buildCurrentPlayerCandidates(snapshots: GuildAnalyticsSnapshot[]): GuildAnalyticsPlayerCandidate[] {
@@ -675,6 +772,15 @@ function subtractMonths(ms: number, months: number) {
 
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isPlausibleMemberCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function average(values: number[]) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function diffNumbers(current: number | null | undefined, baseline: number | null | undefined) {

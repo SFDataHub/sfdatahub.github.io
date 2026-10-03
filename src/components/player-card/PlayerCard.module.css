@@ -242,6 +242,224 @@
   line-height: 1.4;
 }
 
+.developmentBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  min-height: 116px;
+}
+
+.developmentPeriod {
+  min-width: 0;
+  overflow: hidden;
+  color: #8edbff;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.developmentMetric {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.developmentMetric h4 {
+  margin: 0;
+  color: #d9e8f8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.developmentLine {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 58px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.developmentOwner {
+  min-width: 0;
+  overflow: hidden;
+  color: #8fa8c2;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.developmentValues {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  color: #f5f9ff;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.developmentValues strong,
+.developmentValues span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.developmentValues strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.developmentValues span {
+  color: currentColor;
+  font-size: 9px;
+  font-weight: 800;
+  opacity: 0.72;
+}
+
+.developmentValues[data-tone="turquoise"],
+.trendSparkline[data-tone="turquoise"] {
+  color: #2fe7c4;
+}
+
+.developmentValues[data-tone="green"],
+.trendSparkline[data-tone="green"] {
+  color: #6edf8d;
+}
+
+.developmentValues[data-tone="ice-blue"],
+.trendSparkline[data-tone="ice-blue"] {
+  color: #8bdcff;
+}
+
+.developmentValues[data-tone="blue-violet"],
+.trendSparkline[data-tone="blue-violet"] {
+  color: #aaa5ff;
+}
+
+.developmentValues[data-tone="amber"],
+.trendSparkline[data-tone="amber"] {
+  color: #f2c75c;
+}
+
+.developmentValues[data-tone="orange"],
+.trendSparkline[data-tone="orange"] {
+  color: #f09a58;
+}
+
+.developmentValues[data-tone="red"],
+.trendSparkline[data-tone="red"] {
+  color: #ef6272;
+}
+
+.trendSparkline {
+  display: block;
+  width: 58px;
+  height: 24px;
+  overflow: visible;
+  color: #8fa8c2;
+}
+
+.trendSparkline[data-trend="stable"] {
+  color: #58d6ff;
+}
+
+.trendSparkline[data-trend="unknown"] {
+  color: rgba(176, 196, 217, 0.52);
+}
+
+.trendSparkline[data-tone="none"][data-trend="strong-up"] {
+  color: #2fe7c4;
+}
+
+.trendSparkline[data-tone="none"][data-trend="clear-up"] {
+  color: #6edf8d;
+}
+
+.trendSparkline[data-tone="none"][data-trend="slight-up"] {
+  color: #a9ec79;
+}
+
+.trendSparkline[data-tone="none"][data-trend="slight-down"] {
+  color: #f2c75c;
+}
+
+.trendSparkline[data-tone="none"][data-trend="clear-down"] {
+  color: #f09a58;
+}
+
+.trendSparkline[data-tone="none"][data-trend="strong-down"] {
+  color: #ef6272;
+}
+
+.trendSparklinePath,
+.trendSparklineMarker,
+.trendSparklineDot {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.trendSparklineMarker {
+  stroke-width: 2;
+}
+
+.trendSparklineDot {
+  fill: currentColor;
+}
+
+.trendSparkline[data-trend="unknown"] .trendSparklinePath {
+  stroke-dasharray: 3 3;
+}
+
+.developmentPeriodSkeleton,
+.developmentTitleSkeleton,
+.developmentLineSkeleton {
+  overflow: hidden;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(176, 196, 217, 0.12), rgba(142, 219, 255, 0.22), rgba(176, 196, 217, 0.12));
+  background-size: 180% 100%;
+  animation: playerCardDevelopmentSkeleton 1.35s ease-in-out infinite;
+}
+
+.developmentPeriodSkeleton {
+  width: 76%;
+  height: 11px;
+}
+
+.developmentTitleSkeleton {
+  width: 34%;
+  height: 10px;
+}
+
+.developmentLineSkeleton {
+  width: 100%;
+  height: 20px;
+}
+
+@keyframes playerCardDevelopmentSkeleton {
+  0% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0 50%;
+  }
+}
+
 .trendRow {
   display: grid;
   grid-template-columns: minmax(82px, 0.85fr) repeat(2, minmax(0, 1fr));

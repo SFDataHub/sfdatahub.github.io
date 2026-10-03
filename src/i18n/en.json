@@ -40,6 +40,7 @@
     "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
     "scanCoverage": "Scan Coverage",
+    "scanArchiveBuilder": "Scan Archive Builder",
     "visitorAnalytics": "Visitor Analytics",
     "profile": "Profile",
     "account": "Account",
@@ -48,6 +49,62 @@
     "rescanWidget": "Rescan Widget",
     "uploadSimulator": "Upload Simulator",
     "hudGameButtons": "HUD · Game Buttons"
+  },
+  "guildHub": {
+    "menu": {
+      "dashboard": { "title": "Dashboard", "desc": "Overview & entry" },
+      "toplist": { "title": "Toplist", "desc": "Current local rankings" },
+      "analytics": { "title": "Analytics", "desc": "Progress, development & comparisons" },
+      "fusionPlanner": { "title": "Fusion Planner", "desc": "Setups & scenarios" },
+      "fightTracking": { "title": "Fight Tracking", "desc": "Attacks & miss rates" },
+      "waitlist": { "title": "Waitlist", "desc": "Applicants & slots" },
+      "import": { "title": "Import", "desc": "Add SF-Tools JSONs locally" },
+      "settings": { "title": "Settings", "desc": "Configure Guild Hub" }
+    },
+    "toplist": {
+      "title": "Toplist",
+      "tabsLabel": "Toplist type",
+      "tabs": { "players": "Players", "guilds": "Guilds" },
+      "search": { "label": "Search current toplists", "placeholder": "Search name or identifier", "clear": "Clear search" },
+      "servers": { "label": "Servers", "all": "All available servers" },
+      "classes": { "label": "Player classes" },
+      "loading": {
+        "archive": "Loading archive metadata",
+        "search": "Loading search index",
+        "scans": "Loading selected scans",
+        "table": "Preparing table",
+        "message": "Preparing current local toplists."
+      },
+      "empty": { "noCurrent": "No current toplist selection is available.", "activeUnavailable": "The active guild server has no current local toplist snapshot.", "rows": "No rows match the current filters." },
+      "partial": "{{count}} selected server(s) could not be loaded.",
+      "pagination": { "summary": "{{total}} rows", "previous": "Previous", "next": "Next", "page": "Page {{page}} / {{pages}}" },
+      "columns": {
+        "rank": "#",
+        "name": "Name",
+        "guild": "Guild",
+        "guildName": "Guild",
+        "server": "Server",
+        "level": "Level",
+        "main": "Main",
+        "constitution": "Constitution",
+        "sum": "Sum",
+        "ratio": "Ratio",
+        "mine": "Mine",
+        "treasury": "Treasury",
+        "lastScan": "Last Scan",
+        "hof": "HoF",
+        "honor": "Honor",
+        "raids": "Raids",
+        "portal": "Portal",
+        "hydra": "Hydra",
+        "instructor": "Pet Level",
+        "members": "Members",
+        "avgLevel": "Avg Level",
+        "avgMain": "Avg Main",
+        "avgCon": "Avg Constitution",
+        "avgSum": "Avg Sum"
+      }
+    }
   },
   "home": {
     "title": "Home",

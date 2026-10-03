@@ -1,10 +1,15 @@
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useFilters, type DaysFilter } from "./FilterContext";
+import type { LocalToplistSearchResult } from "../../lib/toplists/localToplistViewWorkerTypes";
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  localSearchLoading?: boolean;
+  localSearchResults?: LocalToplistSearchResult[];
+  onLocalSearchResultSelect?: (result: LocalToplistSearchResult) => void;
+  localSearchEmptyText?: string;
 };
 
 const PALETTE = {
@@ -17,7 +22,14 @@ const PALETTE = {
   backdrop: "rgba(0,0,0,.5)",
 };
 
-export default function BottomFilterSheet({ open, onClose }: Props) {
+export default function BottomFilterSheet({
+  open,
+  onClose,
+  localSearchLoading = false,
+  localSearchResults = [],
+  onLocalSearchResultSelect,
+  localSearchEmptyText,
+}: Props) {
   const { t } = useTranslation();
   const {
     searchText, setSearchText,
@@ -48,6 +60,50 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
   }, [open]);
 
   if (!open) return null;
+
+  const showLocalResults = Boolean(onLocalSearchResultSelect);
+  const groupedLocalResults = {
+    player: localSearchResults.filter((result) => result.kind === "player"),
+    guild: localSearchResults.filter((result) => result.kind === "guild"),
+    server: localSearchResults.filter((result) => result.kind === "server"),
+  };
+
+  const renderLocalResultGroup = (
+    kind: keyof typeof groupedLocalResults,
+    label: string,
+  ) => {
+    const results = groupedLocalResults[kind];
+    if (!results.length) return null;
+    return (
+      <div style={resultGroup}>
+        <div style={resultGroupTitle}>{label}</div>
+        {results.map((result) => {
+          const disabled = result.status !== "jumpable";
+          const detailParts = [
+            result.server,
+            result.kind === "player" ? result.className : null,
+            result.kind === "player" ? result.guildName : null,
+            disabled ? result.statusReason : null,
+          ].filter(Boolean);
+          return (
+            <button
+              key={`${result.kind}:${result.id}`}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                if (disabled) return;
+                onLocalSearchResultSelect?.(result);
+              }}
+              style={{ ...resultButton, ...(disabled ? resultButtonDisabled : null) }}
+            >
+              <span style={resultLabel}>{result.label}</span>
+              <span style={resultMeta}>{detailParts.join(" · ")}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   const rangeButtons: { label: string; value: DaysFilter }[] = [
     { label: "3d", value: 3 },
@@ -89,6 +145,21 @@ export default function BottomFilterSheet({ open, onClose }: Props) {
             autoComplete="off"
             style={input}
           />
+          {showLocalResults && (
+            <div style={resultsPanel} aria-live="polite">
+              {localSearchLoading ? (
+                <div style={resultStatus}>{t("toplists.status.loading", "Loading...")}</div>
+              ) : localSearchResults.length ? (
+                <>
+                  {renderLocalResultGroup("player", t("toplists.search.players", "Players"))}
+                  {renderLocalResultGroup("guild", t("toplists.search.guilds", "Guilds"))}
+                  {renderLocalResultGroup("server", t("toplists.search.servers", "Servers"))}
+                </>
+              ) : searchText.trim().length ? (
+                <div style={resultStatus}>{localSearchEmptyText ?? t("toplists.search.empty", "No local results.")}</div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* Range (Buttons – keine Radios) */}
@@ -190,6 +261,63 @@ const input: React.CSSProperties = {
   border: `1px solid ${PALETTE.line}`,
   borderRadius: 12,
   padding: "10px 12px",
+};
+
+const resultsPanel: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const resultGroup: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+};
+
+const resultGroupTitle: React.CSSProperties = {
+  color: PALETTE.text2,
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+};
+
+const resultButton: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  width: "100%",
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.line}`,
+  background: "#14273E",
+  color: PALETTE.text,
+  textAlign: "left",
+};
+
+const resultButtonDisabled: React.CSSProperties = {
+  opacity: 0.55,
+  cursor: "not-allowed",
+};
+
+const resultLabel: React.CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const resultMeta: React.CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  color: PALETTE.text2,
+  fontSize: 12,
+};
+
+const resultStatus: React.CSSProperties = {
+  color: PALETTE.text2,
+  fontSize: 12,
 };
 
 const select: React.CSSProperties = {

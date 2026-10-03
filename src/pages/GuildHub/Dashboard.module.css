@@ -18,19 +18,40 @@
 }
 
 .dashboardGrid {
+  --dashboard-grid-gap: 16px;
+  --dashboard-grid-row-height: 121px;
+  --guild-trend-chart-height: 310px;
+  --guild-trend-body-height: 354px;
+  --guild-trend-header-height: 29px;
+  --guild-trend-internal-gap: 12px;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.8fr);
-  gap: 16px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(12, minmax(var(--dashboard-grid-row-height), var(--dashboard-grid-row-height)));
+  grid-auto-rows: minmax(var(--dashboard-grid-row-height), var(--dashboard-grid-row-height));
+  gap: var(--dashboard-grid-gap);
   align-items: start;
   min-width: 0;
 }
 
-.leftColumn,
-.rightColumn {
-  display: flex;
+.membersSlot {
+  grid-column: 4 / 9;
+  grid-row: 4 / span var(--dashboard-members-row-span, 9);
+  align-self: start;
   min-width: 0;
-  flex-direction: column;
-  gap: 16px;
+}
+
+.classDistributionSlot {
+  grid-column: 1 / 4;
+  grid-row: 7 / 13;
+  align-self: start;
+  min-width: 0;
+}
+
+.historySlot {
+  grid-column: 9 / 13;
+  grid-row: 4 / 13;
+  align-self: start;
+  min-width: 0;
 }
 
 .panel {
@@ -39,6 +60,105 @@
   border-radius: 8px;
   background: transparent;
   padding: 16px;
+}
+
+.guildOverviewHero {
+  grid-column: 1 / 4;
+  grid-row: 1 / 7;
+  align-self: start;
+  min-width: 0;
+}
+
+.guildOverviewTrend {
+  --radar-panel: #152a42;
+  --radar-bg: #0d1b2d;
+  --radar-border: #2b4c73;
+  --radar-text: #f5f9ff;
+  --radar-muted: #b0c4d9;
+  --radar-accent: #67d7ff;
+  --radar-trend: #6ee7a8;
+  --radar-warn: #d98f72;
+  display: grid;
+  grid-column: 4 / 13;
+  grid-row: 1 / 4;
+  gap: var(--guild-trend-internal-gap);
+  align-self: start;
+  min-width: 0;
+  background: transparent;
+}
+
+.guildTrendHeader {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-block-size: var(--guild-trend-header-height);
+  min-width: 0;
+}
+
+.guildTrendHeader h2 {
+  margin: 0;
+  color: #f5f9ff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.guildTrendToggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid #2b4c73;
+  border-radius: 8px;
+  background: #0f2135;
+}
+
+.guildTrendToggle button {
+  border: 0;
+  background: transparent;
+  color: #b0c4d9;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.guildTrendToggle button[data-active="true"] {
+  background: #1b4168;
+  color: #f5f9ff;
+}
+
+.guildTrendToggle button:focus-visible {
+  outline: 2px solid rgba(103, 215, 255, 0.65);
+  outline-offset: -2px;
+}
+
+.guildTrendChart {
+  gap: 10px;
+  block-size: var(--guild-trend-body-height);
+  min-block-size: var(--guild-trend-body-height);
+  align-content: start;
+}
+
+.guildTrendChart svg {
+  block-size: var(--guild-trend-chart-height);
+  min-height: 0;
+}
+
+.guildTrendState {
+  display: grid;
+  box-sizing: border-box;
+  block-size: var(--guild-trend-body-height);
+  min-block-size: var(--guild-trend-body-height);
+  place-items: center;
+  border: 1px dashed rgba(43, 76, 115, 0.78);
+  border-radius: 8px;
+  color: #b0c4d9;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 14px;
+  text-align: center;
 }
 
 .emptyPanel {
@@ -85,38 +205,6 @@
   text-decoration: none;
 }
 
-.guildHero {
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: 16px;
-  align-items: center;
-}
-
-.guildEmblem {
-  display: grid;
-  width: 86px;
-  aspect-ratio: 1;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid #2b4c73;
-  border-radius: 8px;
-  background: #102238;
-  color: #f5f9ff;
-  font-size: 28px;
-  font-weight: 800;
-}
-
-.guildEmblem img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.3));
-}
-
-.guildText {
-  min-width: 0;
-}
-
 .kicker {
   margin: 0 0 5px;
   color: #b0c4d9;
@@ -126,7 +214,6 @@
   letter-spacing: 0.04em;
 }
 
-.guildText h1,
 .panelHeader h2 {
   margin: 0;
   color: #f5f9ff;
@@ -134,25 +221,10 @@
   line-height: 1.2;
 }
 
-.guildText h1 {
-  overflow-wrap: anywhere;
-  font-size: 24px;
-}
-
 .panelHeader h2 {
   font-size: 16px;
 }
 
-.guildMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 9px;
-  color: #b7d4ff;
-  font-size: 12px;
-}
-
-.guildMeta span,
 .countBadge {
   border: 1px solid #2b4c73;
   border-radius: 999px;
@@ -160,28 +232,6 @@
   padding: 4px 8px;
 }
 
-.factGrid,
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.kpiGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.fact {
-  min-width: 0;
-  border: 1px solid rgba(43, 76, 115, 0.78);
-  border-radius: 8px;
-  background: #102238;
-  padding: 10px;
-}
-
-.fact span,
-.fact small,
 .memberSubline,
 .memberScore small,
 .emptyText,
@@ -189,42 +239,50 @@
   color: #b0c4d9;
 }
 
-.fact span,
-.fact small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fact span {
-  font-size: 11px;
-}
-
-.fact strong {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  margin-top: 4px;
-  color: #f5f9ff;
-  font-size: 18px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fact small {
-  margin-top: 3px;
-  font-size: 11px;
-}
-
 .panelHeader {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   color: #b7d4ff;
+}
+
+.memberPanelActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.memberViewToggle {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #2b4c73;
+  border-radius: 8px;
+  background: #0f2135;
+}
+
+.memberViewToggle button {
+  border: 0;
+  background: transparent;
+  color: #b0c4d9;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 8px 10px;
+}
+
+.memberViewToggle button[data-active="true"] {
+  background: #1b4168;
+  color: #f5f9ff;
+}
+
+.memberViewToggle button:focus-visible {
+  outline: 2px solid rgba(103, 215, 255, 0.65);
+  outline-offset: -2px;
 }
 
 .countBadge {
@@ -237,13 +295,37 @@
   padding-bottom: 10px;
 }
 
+.memberEntriesScroll {
+  min-width: 0;
+}
+
+.memberCardsArea {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  min-width: 0;
+}
+
+.memberCardsError {
+  margin: 0;
+  color: #f0a85c;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.memberCardGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  min-width: 0;
+  align-items: stretch;
+}
+
 .memberList {
   display: grid;
-  max-height: min(52vh, 560px);
   gap: 8px;
   margin-top: 14px;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .memberRow {
@@ -360,6 +442,12 @@
   padding-top: 14px;
 }
 
+.classDistributionSlot .classDistribution {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
 .subhead {
   margin: 0 0 2px;
   color: #f5f9ff;
@@ -467,30 +555,54 @@
 
 @media (max-width: 980px) {
   .dashboardGrid {
+    --guild-trend-chart-height: 310px;
+    --guild-trend-body-height: 354px;
     grid-template-columns: 1fr;
+    grid-template-rows: none;
   }
 
-  .memberList {
-    max-height: 420px;
+  .guildOverviewHero,
+  .guildOverviewTrend,
+  .classDistributionSlot,
+  .membersSlot,
+  .historySlot {
+    grid-column: 1 / -1;
+    grid-row: auto;
   }
 }
 
 @media (max-width: 640px) {
+  .dashboardGrid {
+    --guild-trend-chart-height: 260px;
+    --guild-trend-body-height: 360px;
+  }
+
   .panel,
   .emptyPanel {
     padding: 14px;
   }
 
-  .guildHero,
   .memberRow,
-  .factGrid,
-  .kpiGrid,
   .transferGrid {
     grid-template-columns: 1fr;
   }
 
-  .guildEmblem {
-    width: 76px;
+  .guildTrendHeader {
+    flex-direction: column;
+  }
+
+  .guildTrendToggle {
+    flex-wrap: wrap;
+  }
+
+  .panelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .memberPanelActions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .memberRow {

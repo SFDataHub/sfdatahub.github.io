@@ -1,4 +1,5 @@
 import React from "react";
+import SharedGuildTrendChart from "../../components/guild-trend/GuildTrendChart";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import type { GuildSnapshotCompletenessReport } from "../../lib/guilds/guildSnapshotCompleteness";
 import { listGuildHubScanSummaries } from "../../lib/guilds/localScanLibrary";
@@ -149,14 +150,14 @@ export default function PlayerPerformancePage() {
             ))}
           </section>
 
-          <GuildTrendChart
+          <GuildTrendPanel
             title="Gilden-XP-Entwicklung"
             metric="xp"
             intervals={result.intervals}
             selectedInterval={selectedInterval}
             excludedGuildSnapshots={result.excludedGuildSnapshots}
           />
-          <GuildTrendChart
+          <GuildTrendPanel
             title="Gilden-Basiswerte-Entwicklung"
             metric="base"
             intervals={result.intervals}
@@ -251,7 +252,7 @@ function PeriodCard({
   );
 }
 
-function GuildTrendChart({
+function GuildTrendPanel({
   title,
   metric,
   intervals,
@@ -264,25 +265,6 @@ function GuildTrendChart({
   selectedInterval: GuildTrendInterval | null;
   excludedGuildSnapshots: GuildSnapshotCompletenessReport[];
 }) {
-  const absoluteValues = intervals.flatMap((interval) => {
-    const values = getMetric(interval, metric);
-    return [values.startAverage, values.endAverage];
-  });
-  const dailyValues = intervals.flatMap((interval) => {
-    const values = getMetric(interval, metric);
-    return [values.perDay, values.trendPerDay];
-  }).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  const absoluteMax = Math.max(1, ...absoluteValues.map((value) => Math.abs(value)));
-  const width = 940;
-  const height = 310;
-  const plotTop = 28;
-  const plotBottom = 238;
-  const plotHeight = plotBottom - plotTop;
-  const rateScale = buildRateScale(dailyValues, plotTop, plotBottom);
-  const gap = 10;
-  const barWidth = intervals.length ? Math.max(10, (width - 100 - gap * (intervals.length - 1)) / intervals.length) : 0;
-  const trendRuns = buildTrendRuns(intervals, metric, { barWidth, gap, rateScale });
-
   return (
     <section className={styles.performancePanel}>
       <div className={styles.radarIntro}>
@@ -293,79 +275,7 @@ function GuildTrendChart({
 
       {intervals.length ? (
         <>
-          <div className={styles.performanceLegend} aria-label="Diagrammlegende">
-            <span><i className={styles.legendBar} />Gildenstand</span>
-            <span><i className={styles.legendGrowth} />Wachstum / Verlust</span>
-            <span><i className={styles.legendPoint} />Gilde pro Tag</span>
-            <span><i className={styles.legendTrend} />Gewichteter Gildentrend</span>
-          </div>
-          <svg className={styles.performanceChart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
-            <line className={styles.chartBaseline} x1="48" y1={plotBottom} x2={width - 48} y2={plotBottom} />
-            <line className={styles.chartZeroLine} x1="48" y1={rateScale.zeroY} x2={width - 48} y2={rateScale.zeroY} />
-            <text className={styles.chartScaleLabel} x="48" y="18">Absolut</text>
-            <text className={styles.chartScaleLabel} x={width - 48} y="18" textAnchor="end">pro Tag</text>
-            {intervals.map((interval, index) => {
-              const values = getMetric(interval, metric);
-              const x = 52 + index * (barWidth + gap);
-              const yStart = absoluteY(values.startAverage, absoluteMax, plotTop, plotHeight);
-              const yEnd = absoluteY(values.endAverage, absoluteMax, plotTop, plotHeight);
-              const lower = Math.min(values.startAverage, values.endAverage);
-              const upper = Math.max(values.startAverage, values.endAverage);
-              const yUpper = absoluteY(upper, absoluteMax, plotTop, plotHeight);
-              const yLower = absoluteY(lower, absoluteMax, plotTop, plotHeight);
-              const highlighted = selectedInterval ? isIntervalInPeriod(interval, selectedInterval) : false;
-              const labelVisible = shouldShowXAxisLabel(index, intervals.length);
-
-              return (
-                <g key={`${interval.start.snapshotId}-${interval.end.snapshotId}-${index}`}>
-                  <rect
-                    className={styles.guildStandBar}
-                    data-highlighted={highlighted}
-                    x={x}
-                    y={values.absoluteGrowth < 0 ? yEnd : yStart}
-                    width={barWidth}
-                    height={Math.max(0, plotBottom - (values.absoluteGrowth < 0 ? yEnd : yStart))}
-                    rx="3"
-                  />
-                  {values.absoluteGrowth !== 0 ? (
-                    <rect
-                      className={styles.guildGrowthBar}
-                      data-direction={values.absoluteGrowth > 0 ? "positive" : "negative"}
-                      x={x}
-                      y={yUpper}
-                      width={barWidth}
-                      height={Math.max(0, yLower - yUpper)}
-                    />
-                  ) : null}
-                  <line className={styles.guildStartMarker} x1={x} x2={x + barWidth} y1={yStart} y2={yStart} />
-                  <line className={styles.guildEndMarker} x1={x} x2={x + barWidth} y1={yEnd} y2={yEnd} />
-                  {labelVisible ? (
-                    <text className={styles.chartLabel} x={x + barWidth / 2} y={height - 14} textAnchor="middle">
-                      {formatAxisDate(interval.end.scannedAtMs)}
-                    </text>
-                  ) : null}
-                </g>
-              );
-            })}
-            {trendRuns.map((run, index) => (
-              run.length > 1 ? <path key={`guild-trend-${index}`} className={styles.playerTrendLine} d={buildTrendPath(run)} /> : null
-            ))}
-            {intervals.map((interval, index) => {
-              const values = getMetric(interval, metric);
-              const x = 52 + index * (barWidth + gap) + barWidth / 2;
-              return (
-                <circle
-                  key={`guild-daily-${interval.start.snapshotId}-${interval.end.snapshotId}-${index}`}
-                  className={styles.guildDailyPoint}
-                  cx={x}
-                  cy={rateScale.project(values.perDay)}
-                  r="4"
-                >
-                  <title>{formatSignedNumber(values.perDay, metric === "xp" ? 0 : 2)} pro Tag</title>
-                </circle>
-              );
-            })}
-          </svg>
+          <SharedGuildTrendChart title={title} metric={metric} intervals={intervals} selectedInterval={selectedInterval} />
           <SegmentTable intervals={intervals} metric={metric} selectedInterval={selectedInterval} />
           <SegmentAudit intervals={intervals} metric={metric} excludedGuildSnapshots={excludedGuildSnapshots} />
         </>
@@ -377,56 +287,6 @@ function GuildTrendChart({
       )}
     </section>
   );
-}
-
-type TrendPoint = {
-  x: number;
-  y: number;
-  value: number;
-};
-
-type RateScale = {
-  min: number;
-  max: number;
-  zeroY: number;
-  project(value: number): number;
-};
-
-function buildTrendRuns(
-  intervals: GuildTrendInterval[],
-  metric: "xp" | "base",
-  scale: { barWidth: number; gap: number; rateScale: RateScale },
-) {
-  const runs: TrendPoint[][] = [];
-  let currentRun: TrendPoint[] = [];
-
-  intervals.forEach((interval, index) => {
-    const value = getMetric(interval, metric).trendPerDay;
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      if (currentRun.length) runs.push(currentRun);
-      currentRun = [];
-      return;
-    }
-    currentRun.push({
-      x: 52 + index * (scale.barWidth + scale.gap) + scale.barWidth / 2,
-      y: scale.rateScale.project(value),
-      value,
-    });
-  });
-
-  if (currentRun.length) runs.push(currentRun);
-  return runs;
-}
-
-function buildTrendPath(points: TrendPoint[]) {
-  if (points.length < 2) return "";
-  const [first, ...rest] = points;
-  if (points.length === 2) return `M ${first.x} ${first.y} L ${points[1].x} ${points[1].y}`;
-  return rest.reduce((path, point, index) => {
-    const previous = points[index];
-    const controlX = (previous.x + point.x) / 2;
-    return `${path} C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`;
-  }, `M ${first.x} ${first.y}`);
 }
 
 function SegmentTable({
@@ -541,51 +401,6 @@ function getMetric(interval: GuildTrendInterval, metric: "xp" | "base"): GuildTr
   return metric === "xp" ? interval.xp : interval.base;
 }
 
-function absoluteY(value: number, maxValue: number, top: number, height: number) {
-  return top + height - Math.max(0, value) / maxValue * height;
-}
-
-function buildRateScale(values: number[], top: number, bottom: number): RateScale {
-  const finiteValues = values.filter((value) => Number.isFinite(value));
-  const rawMin = finiteValues.length ? Math.min(...finiteValues) : 0;
-  const rawMax = finiteValues.length ? Math.max(...finiteValues) : 1;
-  if (!finiteValues.length || (rawMin === 0 && rawMax === 0)) {
-    const project = (value: number) => bottom - value * (bottom - top);
-    return {
-      min: 0,
-      max: 1,
-      zeroY: bottom,
-      project,
-    };
-  }
-  const rawRange = rawMax - rawMin;
-  const padding = Math.max(rawRange * 0.08, Math.abs(rawMax || rawMin) * 0.04, 1);
-  const min = rawMin >= 0 ? 0 : rawMin - padding;
-  const max = rawMax <= 0 ? 0 : rawMax + padding;
-  const domainRange = Math.max(max - min, 1);
-  const project = (value: number) => top + (max - value) / domainRange * (bottom - top);
-
-  return {
-    min,
-    max,
-    zeroY: project(0),
-    project,
-  };
-}
-
-function isIntervalInPeriod(interval: GuildTrendInterval, selectedInterval: GuildTrendInterval) {
-  return (
-    interval.start.scannedAtMs >= selectedInterval.start.scannedAtMs &&
-    interval.end.scannedAtMs <= selectedInterval.end.scannedAtMs
-  );
-}
-
-function shouldShowXAxisLabel(index: number, total: number) {
-  if (total <= 12) return true;
-  const step = Math.ceil(total / 8);
-  return index === total - 1 || index % step === 0;
-}
-
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 0) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return value.toLocaleString("de-DE", { maximumFractionDigits });
@@ -600,11 +415,6 @@ function formatSignedNumber(value: number | null | undefined, maximumFractionDig
 function formatDate(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return new Date(value).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
-}
-
-function formatAxisDate(value: number | null | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
-  return new Date(value).toLocaleDateString("de-DE", { month: "2-digit", year: "2-digit" });
 }
 
 function formatDateTime(value: number | null | undefined) {

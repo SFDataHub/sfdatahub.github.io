@@ -134,7 +134,7 @@ export default function PlayerCardsPage() {
           <section className={styles.previewPanel}>
             {selectedPlayer ? (
               <>
-                <PlayerCard player={selectedPlayer.card} />
+                <PlayerCard player={selectedPlayer.card} development={selectedPlayer.development ?? null} developmentResolved />
                 <div className={styles.selectionMeta}>
                   <span>{selectedPlayer.sourceFilename}</span>
                   <span>{formatDateTime(selectedPlayer.scannedAtMs)}</span>

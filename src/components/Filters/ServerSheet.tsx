@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { RegionKey, ServerGroupsByRegion } from "./serverGroups";
 import { SERVER_BY_ID } from "../../data/servers";
+import { resolveServer } from "../../lib/servers/serverResolver";
 
 /** Layout-Modus */
 type Mode = "sheet" | "modal";
@@ -45,7 +46,7 @@ const normalizeServerId = (value: string) => value.trim().toLowerCase();
 
 const formatServerLabel = (code: string) => {
   const normalized = normalizeServerId(code);
-  const known = SERVER_BY_ID[normalized]?.label;
+  const known = resolveServer(code)?.displayName ?? SERVER_BY_ID[normalized]?.label;
   if (known) return known;
   const upper = code.trim().toUpperCase();
   if (!upper) return code;

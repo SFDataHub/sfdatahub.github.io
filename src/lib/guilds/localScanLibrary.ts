@@ -22,16 +22,26 @@ import { resolveServer } from "../servers/serverResolver";
 import { normalizeServerKeyFromInput } from "../players/identifier";
 import { parsers } from "../import/parsers";
 import { parseSfJson } from "../parsing/parseSfJson";
-import type { ScanArchiveSourceMetadata } from "../scanArchive/types";
+import type { ScanArchiveEntry, ScanArchiveSearchIndexPayload, ScanArchiveSourceMetadata } from "../scanArchive/types";
+import { validateScanArchivePayload, validateScanArchiveSearchIndexPayload } from "../scanArchive/validation";
 import type { GuildAnalyticsMaterializeOptions } from "./localGuildAnalyticsStore";
+import type {
+  LocalGuildToplistRow,
+  LocalPlayerToplistRow,
+  LocalToplistIssue,
+  LocalToplistSnapshotMeta,
+} from "../toplists/localToplistTypes";
 
 const GUILD_HUB_DB_NAME = "sfdatahub-guild-hub";
 const GUILD_HUB_DB_VERSION = 2;
 const LOCAL_DATA_DB_NAME = "sfdatahub-local-data";
-const LOCAL_DATA_DB_VERSION = 2;
+const LOCAL_DATA_DB_VERSION = 5;
 const SCAN_STORE = "scans";
 const SCAN_SUMMARY_STORE = "scanSummaries";
 const METADATA_STORE = "metadata";
+const ARCHIVE_SCAN_BINDING_STORE = "archiveScanBindings";
+const ARCHIVE_SEARCH_INDEX_STORE = "archiveSearchIndexes";
+const LOCAL_TOPLIST_SNAPSHOT_STORE = "localToplistSnapshots";
 const STATE_STORE = "state";
 const GUILD_SELECTION_STATE_KEY = "guild-selection";
 const GUILD_HUB_SCANS_MIGRATION_KEY = "migration.guildHubScans";
@@ -161,8 +171,55 @@ export type GuildHubScanSummary = {
   containedInScanSlotId?: string | null;
   analyticsEnabled?: boolean;
   archiveSource?: ScanArchiveSourceMetadata;
+  archiveBindings?: GuildHubArchiveScanBinding[];
   contentHash?: string;
   summaryVersion: number;
+};
+
+export type GuildHubArchiveScanBinding = ScanArchiveSourceMetadata & {
+  key: string;
+  localScanId: string;
+  localContentHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GuildHubArchiveSearchIndexCacheRecord = {
+  key: string;
+  archiveScanId: string;
+  archiveYear: number;
+  manifestRevision: number;
+  manifestUrl: string;
+  server: string;
+  timestamp: number;
+  sourceSha256: string;
+  searchIndexPath: string;
+  searchIndexSha256: string;
+  compressedBytes: number;
+  uncompressedBytes: number;
+  playerCount: number;
+  groupCount: number;
+  payload: ScanArchiveSearchIndexPayload;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GuildHubLocalToplistSnapshotRecord = {
+  key: string;
+  derivationVersion: number;
+  manifestYear: number;
+  archiveScanId: string;
+  archiveSha256: string;
+  server: string;
+  scanTimestamp: number;
+  localScanId: string;
+  localContentHash: string;
+  playerRows: LocalPlayerToplistRow[];
+  guildRows: LocalGuildToplistRow[];
+  snapshotMeta: LocalToplistSnapshotMeta;
+  issues: LocalToplistIssue[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type GuildHubScanSummaryBackfillResult = {
@@ -261,6 +318,28 @@ interface LocalScanDb extends DBSchema {
     key: string;
     value: LocalDataMetadataRecord;
   };
+  archiveScanBindings: {
+    key: string;
+    value: GuildHubArchiveScanBinding;
+    indexes: {
+      by_localScanId: string;
+    };
+  };
+  archiveSearchIndexes: {
+    key: string;
+    value: GuildHubArchiveSearchIndexCacheRecord;
+    indexes: {
+      by_archiveScanId: string;
+    };
+  };
+  localToplistSnapshots: {
+    key: string;
+    value: GuildHubLocalToplistSnapshotRecord;
+    indexes: {
+      by_archiveScanId: string;
+      by_localScanId: string;
+    };
+  };
 }
 
 interface GuildHubStateDb extends DBSchema {
@@ -283,13 +362,17 @@ let localScanDbPromise: Promise<IDBPDatabase<LocalScanDb>> | null = null;
 let legacyScanMigrationPromise: Promise<void> | null = null;
 const scanLibraryListeners = new Set<() => void>();
 
+type LocalDataVersionStore =
+  | typeof SCAN_STORE
+  | typeof SCAN_SUMMARY_STORE
+  | typeof METADATA_STORE
+  | typeof ARCHIVE_SCAN_BINDING_STORE
+  | typeof ARCHIVE_SEARCH_INDEX_STORE
+  | typeof LOCAL_TOPLIST_SNAPSHOT_STORE;
+
 function ensureLocalScanStore(
   db: IDBPDatabase<LocalScanDb>,
-  transaction: IDBPTransaction<
-    LocalScanDb,
-    (typeof SCAN_STORE | typeof SCAN_SUMMARY_STORE | typeof METADATA_STORE)[],
-    "versionchange"
-  >,
+  transaction: IDBPTransaction<LocalScanDb, LocalDataVersionStore[], "versionchange">,
 ) {
   const store = db.objectStoreNames.contains(SCAN_STORE)
     ? transaction.objectStore(SCAN_STORE)
@@ -304,11 +387,7 @@ function ensureLocalScanStore(
 
 function ensureLocalScanSummaryStore(
   db: IDBPDatabase<LocalScanDb>,
-  transaction: IDBPTransaction<
-    LocalScanDb,
-    (typeof SCAN_STORE | typeof SCAN_SUMMARY_STORE | typeof METADATA_STORE)[],
-    "versionchange"
-  >,
+  transaction: IDBPTransaction<LocalScanDb, LocalDataVersionStore[], "versionchange">,
 ) {
   const store = db.objectStoreNames.contains(SCAN_SUMMARY_STORE)
     ? transaction.objectStore(SCAN_SUMMARY_STORE)
@@ -327,16 +406,76 @@ function ensureLocalMetadataStore(db: IDBPDatabase<LocalScanDb>) {
   }
 }
 
+function ensureArchiveScanBindingStore(
+  db: IDBPDatabase<LocalScanDb>,
+  transaction: IDBPTransaction<LocalScanDb, LocalDataVersionStore[], "versionchange">,
+) {
+  const store = db.objectStoreNames.contains(ARCHIVE_SCAN_BINDING_STORE)
+    ? transaction.objectStore(ARCHIVE_SCAN_BINDING_STORE)
+    : db.createObjectStore(ARCHIVE_SCAN_BINDING_STORE, { keyPath: "key" });
+  if (!store.indexNames.contains("by_localScanId")) {
+    store.createIndex("by_localScanId", "localScanId");
+  }
+}
+
+function ensureArchiveSearchIndexStore(
+  db: IDBPDatabase<LocalScanDb>,
+  transaction: IDBPTransaction<LocalScanDb, LocalDataVersionStore[], "versionchange">,
+) {
+  const store = db.objectStoreNames.contains(ARCHIVE_SEARCH_INDEX_STORE)
+    ? transaction.objectStore(ARCHIVE_SEARCH_INDEX_STORE)
+    : db.createObjectStore(ARCHIVE_SEARCH_INDEX_STORE, { keyPath: "key" });
+  if (!store.indexNames.contains("by_archiveScanId")) {
+    store.createIndex("by_archiveScanId", "archiveScanId");
+  }
+}
+
+function ensureLocalToplistSnapshotStore(
+  db: IDBPDatabase<LocalScanDb>,
+  transaction: IDBPTransaction<LocalScanDb, LocalDataVersionStore[], "versionchange">,
+) {
+  const store = db.objectStoreNames.contains(LOCAL_TOPLIST_SNAPSHOT_STORE)
+    ? transaction.objectStore(LOCAL_TOPLIST_SNAPSHOT_STORE)
+    : db.createObjectStore(LOCAL_TOPLIST_SNAPSHOT_STORE, { keyPath: "key" });
+  if (!store.indexNames.contains("by_archiveScanId")) {
+    store.createIndex("by_archiveScanId", "archiveScanId");
+  }
+  if (!store.indexNames.contains("by_localScanId")) {
+    store.createIndex("by_localScanId", "localScanId");
+  }
+}
+
 function isLocalDataDbReady(db: IDBPDatabase<LocalScanDb>) {
   if (!db.objectStoreNames.contains(SCAN_STORE)) return false;
   if (!db.objectStoreNames.contains(SCAN_SUMMARY_STORE)) return false;
   if (!db.objectStoreNames.contains(METADATA_STORE)) return false;
+  if (!db.objectStoreNames.contains(ARCHIVE_SCAN_BINDING_STORE)) return false;
+  if (!db.objectStoreNames.contains(ARCHIVE_SEARCH_INDEX_STORE)) return false;
+  if (!db.objectStoreNames.contains(LOCAL_TOPLIST_SNAPSHOT_STORE)) return false;
 
   const tx = db.transaction(SCAN_STORE);
   const { indexNames } = tx.store;
   const ready = indexNames.contains("by_contentHash") && indexNames.contains("by_importedAt");
   void tx.done.catch(() => undefined);
   if (!ready) return false;
+
+  const bindingTx = db.transaction(ARCHIVE_SCAN_BINDING_STORE);
+  const { indexNames: bindingIndexNames } = bindingTx.store;
+  const bindingsReady = bindingIndexNames.contains("by_localScanId");
+  void bindingTx.done.catch(() => undefined);
+  if (!bindingsReady) return false;
+
+  const searchIndexTx = db.transaction(ARCHIVE_SEARCH_INDEX_STORE);
+  const { indexNames: searchIndexIndexNames } = searchIndexTx.store;
+  const searchIndexesReady = searchIndexIndexNames.contains("by_archiveScanId");
+  void searchIndexTx.done.catch(() => undefined);
+  if (!searchIndexesReady) return false;
+
+  const toplistTx = db.transaction(LOCAL_TOPLIST_SNAPSHOT_STORE);
+  const { indexNames: toplistIndexNames } = toplistTx.store;
+  const toplistsReady = toplistIndexNames.contains("by_archiveScanId") && toplistIndexNames.contains("by_localScanId");
+  void toplistTx.done.catch(() => undefined);
+  if (!toplistsReady) return false;
 
   const summaryTx = db.transaction(SCAN_SUMMARY_STORE);
   const { indexNames: summaryIndexNames } = summaryTx.store;
@@ -400,6 +539,9 @@ async function openLocalScanDb(version: number) {
       ensureLocalScanStore(db, transaction);
       ensureLocalScanSummaryStore(db, transaction);
       ensureLocalMetadataStore(db);
+      ensureArchiveScanBindingStore(db, transaction);
+      ensureArchiveSearchIndexStore(db, transaction);
+      ensureLocalToplistSnapshotStore(db, transaction);
     },
   });
 }
@@ -1692,7 +1834,8 @@ export async function listGuildHubScanSummaries(options: ListGuildHubScanSummari
     await ensureGuildHubScanSummaries();
   }
   const db = await getLocalScanDb();
-  return (await db.getAll(SCAN_SUMMARY_STORE)).sort(compareScanSummaries);
+  const summaries = await attachArchiveBindingsToSummaries(db, await db.getAll(SCAN_SUMMARY_STORE));
+  return summaries.sort(compareScanSummaries);
 }
 
 function scanSourceTimeMs(guild: GuildHubLocalGuildIdentity) {
@@ -1724,6 +1867,271 @@ async function findScanByHash(contentHash: string) {
   return db.getFromIndex(SCAN_STORE, "by_contentHash", contentHash);
 }
 
+const archiveBindingKey = (archiveScanId: string, archiveSha256: string) =>
+  `${archiveScanId.trim()}:${archiveSha256.trim().toLowerCase()}`;
+
+const archiveSearchIndexCacheKey = (archiveScanId: string, searchIndexSha256: string) =>
+  `${archiveScanId.trim()}:${searchIndexSha256.trim().toLowerCase()}`;
+
+const createArchiveBindingFromEntry = (
+  entry: ScanArchiveEntry,
+  scan: Pick<GuildHubLocalScan, "id" | "contentHash">,
+  existing?: GuildHubArchiveScanBinding | null,
+): GuildHubArchiveScanBinding => {
+  const now = new Date().toISOString();
+  return {
+    key: archiveBindingKey(entry.id, entry.sha256),
+    provider: "scan-archive",
+    archiveScanId: entry.id,
+    archiveYear: entry.archiveYear,
+    manifestRevision: entry.manifestRevision,
+    manifestUrl: entry.manifestUrl,
+    path: entry.path,
+    sha256: entry.sha256,
+    server: entry.server,
+    timestamp: entry.timestamp,
+    localScanId: scan.id,
+    localContentHash: scan.contentHash,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+};
+
+function archiveBindingMatchesEntry(binding: GuildHubArchiveScanBinding, entry: ScanArchiveEntry) {
+  return (
+    binding.archiveScanId === entry.id &&
+    binding.sha256.toLowerCase() === entry.sha256.toLowerCase() &&
+    binding.archiveYear === entry.archiveYear &&
+    binding.server === entry.server &&
+    binding.timestamp === entry.timestamp
+  );
+}
+
+function localScanMatchesArchiveEntry(scan: GuildHubLocalScan, entry: ScanArchiveEntry) {
+  try {
+    validateScanArchivePayload(scan.rawData, entry);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function cleanupArchiveBinding(db: IDBPDatabase<LocalScanDb>, binding: GuildHubArchiveScanBinding) {
+  if (!db.objectStoreNames.contains(ARCHIVE_SCAN_BINDING_STORE)) return;
+  await db.delete(ARCHIVE_SCAN_BINDING_STORE, binding.key);
+}
+
+function archiveSearchIndexRecordMatchesEntry(record: GuildHubArchiveSearchIndexCacheRecord, entry: ScanArchiveEntry) {
+  const searchIndex = entry.searchIndex;
+  if (!searchIndex) return false;
+  return (
+    record.archiveScanId === entry.id &&
+    record.sourceSha256.toLowerCase() === entry.sha256.toLowerCase() &&
+    record.searchIndexSha256.toLowerCase() === searchIndex.sha256.toLowerCase() &&
+    record.searchIndexPath === searchIndex.path &&
+    record.archiveYear === entry.archiveYear &&
+    record.manifestRevision === entry.manifestRevision &&
+    record.manifestUrl === entry.manifestUrl &&
+    record.server === entry.server &&
+    record.timestamp === entry.timestamp &&
+    record.compressedBytes === searchIndex.compressedBytes &&
+    record.uncompressedBytes === searchIndex.uncompressedBytes &&
+    record.playerCount === searchIndex.playerCount &&
+    record.groupCount === searchIndex.groupCount
+  );
+}
+
+function createArchiveSearchIndexRecordFromEntry(
+  entry: ScanArchiveEntry,
+  payload: ScanArchiveSearchIndexPayload,
+  existing?: GuildHubArchiveSearchIndexCacheRecord | null,
+): GuildHubArchiveSearchIndexCacheRecord {
+  if (!entry.searchIndex) throw new Error(`Archivscan ${entry.id} hat keinen Suchindex.`);
+  const now = new Date().toISOString();
+  return {
+    key: archiveSearchIndexCacheKey(entry.id, entry.searchIndex.sha256),
+    archiveScanId: entry.id,
+    archiveYear: entry.archiveYear,
+    manifestRevision: entry.manifestRevision,
+    manifestUrl: entry.manifestUrl,
+    server: entry.server,
+    timestamp: entry.timestamp,
+    sourceSha256: entry.sha256,
+    searchIndexPath: entry.searchIndex.path,
+    searchIndexSha256: entry.searchIndex.sha256,
+    compressedBytes: entry.searchIndex.compressedBytes,
+    uncompressedBytes: entry.searchIndex.uncompressedBytes,
+    playerCount: entry.searchIndex.playerCount,
+    groupCount: entry.searchIndex.groupCount,
+    payload,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+export async function bindGuildHubLocalScanToArchiveEntry(
+  entry: ScanArchiveEntry,
+  localScanId: string,
+): Promise<GuildHubArchiveScanBinding> {
+  const db = await getLocalScanDb();
+  const scan = await db.get(SCAN_STORE, localScanId);
+  if (!scan) throw new Error(`Lokaler Scan wurde nicht gefunden: ${localScanId}`);
+  const normalizedScan = await persistScanNormalizationIfNeeded(db, scan);
+  if (!localScanMatchesArchiveEntry(normalizedScan, entry)) {
+    throw new Error(`Lokaler Scan passt nicht zum Archivscan ${entry.id}.`);
+  }
+
+  const key = archiveBindingKey(entry.id, entry.sha256);
+  const existing = await db.get(ARCHIVE_SCAN_BINDING_STORE, key);
+  const binding = createArchiveBindingFromEntry(entry, normalizedScan, existing);
+  await db.put(ARCHIVE_SCAN_BINDING_STORE, binding);
+  notifyLocalScanLibraryChanged();
+  return binding;
+}
+
+export async function findGuildHubLocalScanByArchiveBinding(entry: ScanArchiveEntry): Promise<GuildHubLocalScan | null> {
+  const db = await getLocalScanDb();
+  const binding = await db.get(ARCHIVE_SCAN_BINDING_STORE, archiveBindingKey(entry.id, entry.sha256));
+  if (!binding) return null;
+  if (!archiveBindingMatchesEntry(binding, entry)) {
+    await cleanupArchiveBinding(db, binding);
+    return null;
+  }
+  const scan = await db.get(SCAN_STORE, binding.localScanId);
+  if (!scan) {
+    await cleanupArchiveBinding(db, binding);
+    return null;
+  }
+  const normalizedScan = await persistScanNormalizationIfNeeded(db, scan);
+  if (normalizedScan.contentHash !== binding.localContentHash || !localScanMatchesArchiveEntry(normalizedScan, entry)) {
+    await cleanupArchiveBinding(db, binding);
+    return null;
+  }
+  return normalizedScan;
+}
+
+export async function deleteGuildHubArchiveScanBinding(archiveScanId: string, archiveSha256: string) {
+  const db = await getLocalScanDb();
+  await db.delete(ARCHIVE_SCAN_BINDING_STORE, archiveBindingKey(archiveScanId, archiveSha256));
+  notifyLocalScanLibraryChanged();
+}
+
+export async function listGuildHubArchiveScanBindings() {
+  const db = await getLocalScanDb();
+  return db.getAll(ARCHIVE_SCAN_BINDING_STORE);
+}
+
+export async function getGuildHubArchiveSearchIndexCache(entry: ScanArchiveEntry) {
+  if (!entry.searchIndex) return null;
+  const db = await getLocalScanDb();
+  const key = archiveSearchIndexCacheKey(entry.id, entry.searchIndex.sha256);
+  const record = await db.get(ARCHIVE_SEARCH_INDEX_STORE, key);
+  if (!record) return null;
+  if (!archiveSearchIndexRecordMatchesEntry(record, entry)) {
+    await db.delete(ARCHIVE_SEARCH_INDEX_STORE, key);
+    return null;
+  }
+  try {
+    validateScanArchiveSearchIndexPayload(record.payload, entry);
+    return record;
+  } catch {
+    await db.delete(ARCHIVE_SEARCH_INDEX_STORE, key);
+    return null;
+  }
+}
+
+export async function putGuildHubArchiveSearchIndexCache(
+  entry: ScanArchiveEntry,
+  payload: ScanArchiveSearchIndexPayload,
+) {
+  if (!entry.searchIndex) throw new Error(`Archivscan ${entry.id} hat keinen Suchindex.`);
+  const db = await getLocalScanDb();
+  const validated = validateScanArchiveSearchIndexPayload(payload, entry);
+  const key = archiveSearchIndexCacheKey(entry.id, entry.searchIndex.sha256);
+  const existing = await db.get(ARCHIVE_SEARCH_INDEX_STORE, key);
+  const record = createArchiveSearchIndexRecordFromEntry(entry, validated, existing);
+  await db.put(ARCHIVE_SEARCH_INDEX_STORE, record);
+  return record;
+}
+
+export async function deleteGuildHubArchiveSearchIndexCache(archiveScanId: string, searchIndexSha256: string) {
+  const db = await getLocalScanDb();
+  await db.delete(ARCHIVE_SEARCH_INDEX_STORE, archiveSearchIndexCacheKey(archiveScanId, searchIndexSha256));
+}
+
+export async function listGuildHubArchiveSearchIndexCacheRecords() {
+  const db = await getLocalScanDb();
+  return db.getAll(ARCHIVE_SEARCH_INDEX_STORE);
+}
+
+export async function getGuildHubLocalToplistSnapshotRecord(cacheKey: string) {
+  const key = cacheKey.trim();
+  if (!key) return null;
+  const db = await getLocalScanDb();
+  return (await db.get(LOCAL_TOPLIST_SNAPSHOT_STORE, key)) ?? null;
+}
+
+export async function putGuildHubLocalToplistSnapshotRecord(record: GuildHubLocalToplistSnapshotRecord) {
+  const db = await getLocalScanDb();
+  const existing = await db.get(LOCAL_TOPLIST_SNAPSHOT_STORE, record.key);
+  const now = new Date().toISOString();
+  const next: GuildHubLocalToplistSnapshotRecord = {
+    ...record,
+    createdAt: existing?.createdAt ?? record.createdAt ?? now,
+    updatedAt: now,
+  };
+  await db.put(LOCAL_TOPLIST_SNAPSHOT_STORE, next);
+  return next;
+}
+
+export async function deleteGuildHubLocalToplistSnapshotRecord(cacheKey: string) {
+  const key = cacheKey.trim();
+  if (!key) return;
+  const db = await getLocalScanDb();
+  await db.delete(LOCAL_TOPLIST_SNAPSHOT_STORE, key);
+}
+
+export async function listGuildHubLocalToplistSnapshotRecords() {
+  const db = await getLocalScanDb();
+  return db.getAll(LOCAL_TOPLIST_SNAPSHOT_STORE);
+}
+
+export async function deleteGuildHubLocalToplistSnapshotRecordsForLocalScanIds(localScanIds: readonly string[]) {
+  const ids = [...new Set(localScanIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return;
+  const db = await getLocalScanDb();
+  const tx = db.transaction(LOCAL_TOPLIST_SNAPSHOT_STORE, "readwrite");
+  const store = tx.objectStore(LOCAL_TOPLIST_SNAPSHOT_STORE);
+  const index = store.index("by_localScanId");
+  const keys = (await Promise.all(ids.map((id) => index.getAllKeys(id)))).flat();
+  await Promise.all(keys.map((key) => store.delete(key)));
+  await tx.done;
+}
+
+async function attachArchiveBindingsToSummaries(
+  db: IDBPDatabase<LocalScanDb>,
+  summaries: readonly GuildHubScanSummary[],
+) {
+  const bindings = await db.getAll(ARCHIVE_SCAN_BINDING_STORE);
+  if (!bindings.length) return [...summaries];
+  const bindingsByLocalScanId = new Map<string, GuildHubArchiveScanBinding[]>();
+  bindings.forEach((binding) => {
+    const group = bindingsByLocalScanId.get(binding.localScanId);
+    if (group) group.push(binding);
+    else bindingsByLocalScanId.set(binding.localScanId, [binding]);
+  });
+  return summaries.map((summary) => {
+    const matching = (bindingsByLocalScanId.get(summary.sourceScanId) ?? []).filter(
+      (binding) => binding.localContentHash === summary.contentHash,
+    );
+    if (!matching.length) return summary;
+    return {
+      ...summary,
+      archiveBindings: matching.sort((left, right) => left.archiveScanId.localeCompare(right.archiveScanId)),
+    };
+  });
+}
+
 export async function findGuildHubLocalScanByArchiveScanId(archiveScanId: string) {
   const normalizedArchiveScanId = archiveScanId.trim();
   if (!normalizedArchiveScanId) return null;
@@ -1753,10 +2161,20 @@ async function removeGuildHubLocalScanRecords(ids: string[]) {
   if (!ids.length) return;
 
   const db = await getLocalScanDb();
-  const tx = db.transaction([SCAN_STORE, SCAN_SUMMARY_STORE], "readwrite");
+  const tx = db.transaction([SCAN_STORE, SCAN_SUMMARY_STORE, ARCHIVE_SCAN_BINDING_STORE, LOCAL_TOPLIST_SNAPSHOT_STORE], "readwrite");
   const scanStore = tx.objectStore(SCAN_STORE);
   const summaryStore = tx.objectStore(SCAN_SUMMARY_STORE);
-  await Promise.all(ids.flatMap((id) => [scanStore.delete(id), summaryStore.delete(id)]));
+  const bindingStore = tx.objectStore(ARCHIVE_SCAN_BINDING_STORE);
+  const toplistStore = tx.objectStore(LOCAL_TOPLIST_SNAPSHOT_STORE);
+  const bindingIndex = bindingStore.index("by_localScanId");
+  const toplistIndex = toplistStore.index("by_localScanId");
+  const bindingKeys = (await Promise.all(ids.map((id) => bindingIndex.getAllKeys(id)))).flat();
+  const toplistKeys = (await Promise.all(ids.map((id) => toplistIndex.getAllKeys(id)))).flat();
+  await Promise.all([
+    ...ids.flatMap((id) => [scanStore.delete(id), summaryStore.delete(id)]),
+    ...bindingKeys.map((key) => bindingStore.delete(key)),
+    ...toplistKeys.map((key) => toplistStore.delete(key)),
+  ]);
   await tx.done;
   await deleteGuildAnalyticsSources(ids);
 }
@@ -2444,6 +2862,19 @@ export const dissolveSfDataHubScanSlot = dissolveGuildHubScanSlot;
 export const recoverSfDataHubScanSlotMerge = recoverGuildHubScanSlotMerge;
 export const deleteSfDataHubLocalScans = deleteGuildHubLocalScans;
 export const findSfDataHubLocalScanByArchiveScanId = findGuildHubLocalScanByArchiveScanId;
+export const bindSfDataHubLocalScanToArchiveEntry = bindGuildHubLocalScanToArchiveEntry;
+export const findSfDataHubLocalScanByArchiveBinding = findGuildHubLocalScanByArchiveBinding;
+export const deleteSfDataHubArchiveScanBinding = deleteGuildHubArchiveScanBinding;
+export const listSfDataHubArchiveScanBindings = listGuildHubArchiveScanBindings;
+export const getSfDataHubArchiveSearchIndexCache = getGuildHubArchiveSearchIndexCache;
+export const putSfDataHubArchiveSearchIndexCache = putGuildHubArchiveSearchIndexCache;
+export const deleteSfDataHubArchiveSearchIndexCache = deleteGuildHubArchiveSearchIndexCache;
+export const listSfDataHubArchiveSearchIndexCacheRecords = listGuildHubArchiveSearchIndexCacheRecords;
+export const getSfDataHubLocalToplistSnapshotRecord = getGuildHubLocalToplistSnapshotRecord;
+export const putSfDataHubLocalToplistSnapshotRecord = putGuildHubLocalToplistSnapshotRecord;
+export const deleteSfDataHubLocalToplistSnapshotRecord = deleteGuildHubLocalToplistSnapshotRecord;
+export const listSfDataHubLocalToplistSnapshotRecords = listGuildHubLocalToplistSnapshotRecords;
+export const deleteSfDataHubLocalToplistSnapshotRecordsForLocalScanIds = deleteGuildHubLocalToplistSnapshotRecordsForLocalScanIds;
 export const listSfDataHubScanSummaries = listGuildHubScanSummaries;
 export const listSfDataHubLocalServersFromScans = listGuildHubLocalServersFromScans;
 export const listSfDataHubLocalGuildsForServerFromScans = listGuildHubLocalGuildsForServerFromScans;

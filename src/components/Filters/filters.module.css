@@ -15,6 +15,7 @@
 .compareBlockTitle{ color:var(--text2); font-size:12px; line-height:1; }
 .compareInputsRow{ display:flex; flex-wrap:wrap; gap:.5rem; padding-left:.35rem; }
 .compareField{ display:inline-flex; align-items:center; gap:.35rem; }
+.searchSlot{ flex:1 1 260px; min-width:220px; max-width:460px; }
 .sortField{ display:flex; align-items:center; gap:.4rem; }
 .sortLabel{ color:var(--text2); font-size:12px; }
 .sortSelect{ background:#14273E; color:var(--text); border:1px solid var(--border); padding:.4rem .6rem; border-radius:.5rem; }

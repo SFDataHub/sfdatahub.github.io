@@ -2,7 +2,9 @@ import React from "react";
 import {
   buildLocalPlayerAnalytics,
   type LocalAnalyticsSeries,
+  type LocalAnalyticsTimeDomain,
   type LocalComparisonScanOption,
+  type LocalPeriodRateSummary,
   type LocalPlayerAnalyticsResult,
 } from "./localPlayerAnalyticsModel";
 import type { LocalPlayerProfileModel } from "./types";
@@ -27,7 +29,7 @@ type LocalPlayerAnalyticsProps = {
   profile: LocalPlayerProfileModel;
 };
 
-export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsProps) {
+function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsProps) {
   const [state, setState] = React.useState<AnalyticsState>({ status: "loading", data: null, error: null });
   const [selectedComparisonTimestamp, setSelectedComparisonTimestamp] = React.useState<number | null>(null);
   const profileKey = `${profile.sourceScanId}:${profile.sourcePlayerKey}:${profile.analytics.memberRef ?? ""}:${profile.analytics.scannedAtMs}`;
@@ -58,12 +60,14 @@ export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsPr
   if (state.status === "loading") {
     return (
       <>
-        <AnalyticsShell area="xp" title="XP PER DAY" subtitle="Loading">
+        <AnalyticsShell area="xp" title="TOTAL XP" subtitle="Loading">
+          <ChartMeta rate={<PeriodRateSummary label="XP / DAY" summary={null} valueKind="xp" />} />
           <ChartFrame>
             <AnalyticsMessage text="Loading analytics" />
           </ChartFrame>
         </AnalyticsShell>
-        <AnalyticsShell area="stats-dev" title="BASE STATS GROWTH" subtitle="Loading">
+        <AnalyticsShell area="stats-dev" title="FOCUSED BASE STATS" subtitle="Loading">
+          <ChartMeta rate={<PeriodRateSummary label="BASE STATS / DAY" summary={null} valueKind="base" />} />
           <ChartFrame>
             <AnalyticsMessage text="Loading analytics" />
           </ChartFrame>
@@ -78,12 +82,14 @@ export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsPr
   if (state.status === "error") {
     return (
       <>
-        <AnalyticsShell area="xp" title="XP PER DAY" subtitle="Error">
+        <AnalyticsShell area="xp" title="TOTAL XP" subtitle="Error">
+          <ChartMeta rate={<PeriodRateSummary label="XP / DAY" summary={null} valueKind="xp" />} />
           <ChartFrame>
             <AnalyticsMessage text={state.error} />
           </ChartFrame>
         </AnalyticsShell>
-        <AnalyticsShell area="stats-dev" title="BASE STATS GROWTH" subtitle="Error">
+        <AnalyticsShell area="stats-dev" title="FOCUSED BASE STATS" subtitle="Error">
+          <ChartMeta rate={<PeriodRateSummary label="BASE STATS / DAY" summary={null} valueKind="base" />} />
           <ChartFrame>
             <AnalyticsMessage text={state.error} />
           </ChartFrame>
@@ -101,7 +107,7 @@ export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsPr
 
   return (
     <>
-      <AnalyticsShell area="xp" title="XP PER DAY" subtitle={data.periodLabel}>
+      <AnalyticsShell area="xp" title="TOTAL XP" subtitle={data.periodLabel}>
         <ComparisonSelect
           options={data.comparison.options}
           selectedValue={selectedValue}
@@ -111,42 +117,54 @@ export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsPr
         />
         {data.xp.series[0]?.points.length >= 2 ? (
           <>
-            <SeriesLegend series={data.xp.series} />
+            <ChartMeta
+              legend={<SeriesLegend series={data.xp.series} />}
+              rate={<PeriodRateSummary label="XP / DAY" summary={data.xp.rateSummary} valueKind="xp" />}
+            />
             <ChartFrame>
-              <LineChart series={data.xp.series} animationKey={`xp:${chartAnimationKey}`} />
+              <LineChart series={data.xp.series} animationKey={`xp:${chartAnimationKey}`} timeDomain={data.comparison.chartTimeDomain} />
             </ChartFrame>
           </>
         ) : (
-          <ChartFrame>
-            <AnalyticsMessage
-              text={
-                data.comparison.options.length && !data.comparison.selectedPlayerAtStart
-                  ? "Player unavailable at selected comparison scan"
-                  : "Not enough scan history"
-              }
-            />
-          </ChartFrame>
+          <>
+            <ChartMeta rate={<PeriodRateSummary label="XP / DAY" summary={data.xp.rateSummary} valueKind="xp" />} />
+            <ChartFrame>
+              <AnalyticsMessage
+                text={
+                  data.comparison.options.length && !data.comparison.selectedPlayerAtStart
+                    ? "Player unavailable at selected comparison scan"
+                    : "Not enough scan history"
+                }
+              />
+            </ChartFrame>
+          </>
         )}
       </AnalyticsShell>
 
-      <AnalyticsShell area="stats-dev" title="BASE STATS GROWTH" subtitle={data.periodLabel}>
+      <AnalyticsShell area="stats-dev" title="FOCUSED BASE STATS" subtitle={data.periodLabel}>
         {data.stats.series[0]?.points.length >= 2 ? (
           <>
-            <SeriesLegend series={data.stats.series} />
+            <ChartMeta
+              legend={<SeriesLegend series={data.stats.series} />}
+              rate={<PeriodRateSummary label="BASE STATS / DAY" summary={data.stats.rateSummary} valueKind="base" />}
+            />
             <ChartFrame>
-              <LineChart series={data.stats.series} animationKey={`stats:${chartAnimationKey}`} />
+              <LineChart series={data.stats.series} animationKey={`stats:${chartAnimationKey}`} timeDomain={data.comparison.chartTimeDomain} />
             </ChartFrame>
           </>
         ) : (
-          <ChartFrame>
-            <AnalyticsMessage
-              text={
-                data.comparison.options.length && !data.comparison.selectedPlayerAtStart
-                  ? "Player unavailable at selected comparison scan"
-                  : "Not enough scan history"
-              }
-            />
-          </ChartFrame>
+          <>
+            <ChartMeta rate={<PeriodRateSummary label="BASE STATS / DAY" summary={data.stats.rateSummary} valueKind="base" />} />
+            <ChartFrame>
+              <AnalyticsMessage
+                text={
+                  data.comparison.options.length && !data.comparison.selectedPlayerAtStart
+                    ? "Player unavailable at selected comparison scan"
+                    : "Not enough scan history"
+                }
+              />
+            </ChartFrame>
+          </>
         )}
       </AnalyticsShell>
 
@@ -168,6 +186,8 @@ export default function LocalPlayerAnalytics({ profile }: LocalPlayerAnalyticsPr
     </>
   );
 }
+
+export default LocalPlayerAnalytics;
 
 function AnalyticsShell({
   area,
@@ -251,10 +271,57 @@ function SeriesLegend({ series }: { series: LocalAnalyticsSeries[] }) {
   );
 }
 
-function LineChart({ series, animationKey }: { series: LocalAnalyticsSeries[]; animationKey: string }) {
+function ChartMeta({ legend, rate }: { legend?: React.ReactNode; rate: React.ReactNode }) {
+  return (
+    <div className="local-player-analytics__meta">
+      {legend}
+      {rate}
+    </div>
+  );
+}
+
+function PeriodRateSummary({
+  label,
+  summary,
+  valueKind,
+}: {
+  label: string;
+  summary: LocalPeriodRateSummary | null;
+  valueKind: "xp" | "base";
+}) {
+  return (
+    <div className="local-player-analytics__rate-summary" aria-label={label}>
+      <strong>{label}</strong>
+      <dl>
+        <div className="local-player-analytics__rate-row local-player-analytics__rate-row--player">
+          <dt>Player</dt>
+          <dd>{formatRate(summary?.player ?? null, valueKind)}</dd>
+        </div>
+        <div className="local-player-analytics__rate-row local-player-analytics__rate-row--guild">
+          <dt>Guild Avg.</dt>
+          <dd>{formatRate(summary?.guildAverage ?? null, valueKind)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function LineChart({
+  series,
+  animationKey,
+  timeDomain,
+}: {
+  series: LocalAnalyticsSeries[];
+  animationKey: string;
+  timeDomain?: LocalAnalyticsTimeDomain | null;
+}) {
   const validPoints = series.flatMap((entry) => entry.points);
-  const minTime = Math.min(...validPoints.map((point) => point.timestamp));
-  const maxTime = Math.max(...validPoints.map((point) => point.timestamp));
+  const fallbackMinTime = Math.min(...validPoints.map((point) => point.timestamp));
+  const fallbackMaxTime = Math.max(...validPoints.map((point) => point.timestamp));
+  const hasExplicitTimeDomain =
+    timeDomain != null && Number.isFinite(timeDomain.min) && Number.isFinite(timeDomain.max) && timeDomain.min < timeDomain.max;
+  const minTime = hasExplicitTimeDomain ? timeDomain.min : fallbackMinTime;
+  const maxTime = hasExplicitTimeDomain ? timeDomain.max : fallbackMaxTime;
   const minValue = Math.min(...validPoints.map((point) => point.value));
   const maxValue = Math.max(...validPoints.map((point) => point.value));
   const width = 640;
@@ -342,6 +409,30 @@ function formatCompact(value: number) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
+function formatRate(value: number | null, valueKind: "xp" | "base") {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const magnitude = Math.abs(value);
+  const formatted = valueKind === "xp" ? formatCompact(magnitude) : formatBaseRateMagnitude(magnitude);
+  return `${sign}${formatted} / day`;
+}
+
+function formatBaseRateMagnitude(value: number) {
+  if (value >= 10_000) {
+    return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+  }
+  if (value > 0 && value < 0.01) {
+    return new Intl.NumberFormat("en", { maximumFractionDigits: 4 }).format(value);
+  }
+  if (value < 1) {
+    return new Intl.NumberFormat("en", { maximumFractionDigits: 3 }).format(value);
+  }
+  if (value < 100) {
+    return new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(value);
+  }
+  return new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(value);
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const AXIS_INTERVALS: AxisInterval[] = [
   { unit: "day", step: 1 },
@@ -355,7 +446,7 @@ const AXIS_INTERVALS: AxisInterval[] = [
   { unit: "year", step: 1 },
 ];
 
-function buildTimeAxisTicks(minTime: number, maxTime: number, plotWidth: number): AxisTick[] {
+export function buildTimeAxisTicks(minTime: number, maxTime: number, plotWidth: number): AxisTick[] {
   if (!Number.isFinite(minTime) || !Number.isFinite(maxTime) || minTime >= maxTime) {
     return [{ timestamp: minTime, label: formatAxisDate(minTime, minTime, maxTime) }];
   }
@@ -418,9 +509,14 @@ function buildCalendarTicks(minTime: number, maxTime: number, interval: AxisInte
 
 function dedupeTicks(ticks: AxisTick[]) {
   const seen = new Set<number>();
+  const seenLabels = new Set<string>();
+  const endpointLabels = new Set(ticks.filter((tick) => tick.endpoint).map((tick) => tick.label));
   return ticks.filter((tick) => {
     if (seen.has(tick.timestamp)) return false;
+    if (!tick.endpoint && endpointLabels.has(tick.label)) return false;
+    if (seenLabels.has(tick.label)) return false;
     seen.add(tick.timestamp);
+    seenLabels.add(tick.label);
     return true;
   });
 }

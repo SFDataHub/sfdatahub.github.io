@@ -1,5 +1,9 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import AttributeCompositionCard from "../attribute-composition/AttributeCompositionCard";
+import AttributeCompositionRadar from "../attribute-composition/AttributeCompositionRadar";
+import type { AttributeCompositionModel } from "../attribute-composition/attributeCompositionModel";
 import PortraitPreview from "../avatar/PortraitPreview";
 import PlayerAttributeBars from "../player-profile/AttributeBars/PlayerAttributeBars";
 import Tooltip from "../ui/Tooltip/Tooltip";
@@ -138,6 +142,7 @@ function ClassAvatar({
 function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"base" | "total">("base");
+  const [isCompositionDetailsOpen, setIsCompositionDetailsOpen] = useState(false);
   const portraitFrameRef = useRef<HTMLDivElement | null>(null);
   const portraitModuleRef = useRef<HTMLDivElement | null>(null);
   const [portraitLayout, setPortraitLayout] = useState({ scale: 1, height: 0 });
@@ -264,6 +269,67 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
     return url ?? null;
   }, [data.mountPercentValue, data.mountRace]);
 
+  const heroMetricCards = heroMetrics.map((metric, metricIndex) => {
+    if (metric.gauge) {
+      const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
+      const hoverLines =
+        metric.gauge.details && metric.gauge.details.length > 0
+          ? metric.gauge.details
+          : metric.gauge.centerBottom
+            ? [metric.gauge.centerBottom]
+            : [];
+      const hoverDetails =
+        hoverLines.length > 0 ? (
+          <div className="player-profile__hero-metric-hex-details" aria-hidden="true">
+            {hoverLines.map((line) => (
+              <div key={line}>{line}</div>
+            ))}
+          </div>
+        ) : undefined;
+
+      return (
+        <div key={`${metric.label}-${metricIndex}`} className="player-profile__hero-metric player-profile__hero-metric--gauge">
+          <HexGauge
+            className="player-profile__hero-metric-hex"
+            value={progress}
+            size={96}
+            stroke={8}
+            center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
+            hoverDetails={hoverDetails}
+          />
+        </div>
+      );
+    }
+    const isMountMetric = metricIndex === 0;
+    const showMountImage = isMountMetric && !!mountAssetThumb;
+    const mountTooltip = `${metric.label}: ${metric.value}`;
+    return (
+      <div
+        key={metric.label}
+        className={`player-profile__hero-metric${showMountImage ? " player-profile__hero-metric--mount-icon" : ""}`}
+      >
+        {!showMountImage && <div className="player-profile__hero-metric-label">{metric.label}</div>}
+        {showMountImage ? (
+          <Tooltip content={mountTooltip}>
+            <div className="player-profile__hero-metric-value player-profile__hero-metric-value--mount-image">
+              <img
+                src={mountAssetThumb}
+                alt=""
+                className="player-profile__hero-mount-image"
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
+            </div>
+          </Tooltip>
+        ) : (
+          <div className="player-profile__hero-metric-value">{metric.value}</div>
+        )}
+        {metric.hint && <div className="player-profile__hero-metric-hint">{metric.hint}</div>}
+      </div>
+    );
+  });
+
   useLayoutEffect(() => {
     const frame = portraitFrameRef.current;
     const module = portraitModuleRef.current;
@@ -351,83 +417,9 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
           </div>
         </div>
         {potionSlotRow}
-      </section>
-
-      <section className="player-profile__hero player-profile__hero--local-summary" aria-busy={loading}>
-        <div className="player-profile__hero-metrics">
-          {heroMetrics.map((metric, metricIndex) => {
-            if (metric.gauge) {
-              const progress = Math.min(1, Math.max(0, metric.gauge.progress || 0));
-              const hoverLines =
-                metric.gauge.details && metric.gauge.details.length > 0
-                  ? metric.gauge.details
-                  : metric.gauge.centerBottom
-                    ? [metric.gauge.centerBottom]
-                    : [];
-              const hoverDetails =
-                hoverLines.length > 0 ? (
-                  <div className="player-profile__hero-metric-hex-details" aria-hidden="true">
-                    {hoverLines.map((line) => (
-                      <div key={line}>{line}</div>
-                    ))}
-                  </div>
-                ) : undefined;
-
-              return (
-                <div key={`${metric.label}-${metricIndex}`} className="player-profile__hero-metric player-profile__hero-metric--gauge">
-                  <HexGauge
-                    className="player-profile__hero-metric-hex"
-                    value={progress}
-                    size={124}
-                    stroke={10}
-                    center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
-                    hoverDetails={hoverDetails}
-                  />
-                </div>
-              );
-            }
-            const isMountMetric = metricIndex === 0;
-            const showMountImage = isMountMetric && !!mountAssetThumb;
-            const mountTooltip = `${metric.label}: ${metric.value}`;
-            return (
-              <div
-                key={metric.label}
-                className={`player-profile__hero-metric${showMountImage ? " player-profile__hero-metric--mount-icon" : ""}`}
-              >
-                {!showMountImage && <div className="player-profile__hero-metric-label">{metric.label}</div>}
-                {showMountImage ? (
-                  <Tooltip content={mountTooltip}>
-                    <div className="player-profile__hero-metric-value player-profile__hero-metric-value--mount-image">
-                      <img
-                        src={mountAssetThumb}
-                        alt=""
-                        className="player-profile__hero-mount-image"
-                        loading="lazy"
-                        decoding="async"
-                        draggable={false}
-                      />
-                    </div>
-                  </Tooltip>
-                ) : (
-                  <div className="player-profile__hero-metric-value">{metric.value}</div>
-                )}
-                {metric.hint && <div className="player-profile__hero-metric-hint">{metric.hint}</div>}
-              </div>
-            );
-          })}
+        <div className="player-profile__hero-metrics player-profile__hero-metrics--local-compact">
+          {heroMetricCards}
         </div>
-      </section>
-
-      <section className="player-profile__hero player-profile__hero--local-stats" aria-busy={loading}>
-        {data.baseStats && (
-          <PlayerAttributeBars
-            baseStats={data.baseStats}
-            totalStats={data.totalStats}
-            mode={mode}
-            onModeChange={setMode}
-          />
-        )}
-
         {data.badges.length > 0 && (
           <div className="player-profile__hero-meta-row">
             <div className="player-profile__hero-badges">
@@ -446,7 +438,90 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
           </div>
         )}
       </section>
+
+      <section className="player-profile__hero player-profile__hero--local-summary" aria-busy={loading}>
+        <div className="player-profile__hero-summary-grid">
+          <div className="player-profile__hero-summary-base-stats">
+            {data.baseStats && (
+              <PlayerAttributeBars
+                baseStats={data.baseStats}
+                totalStats={data.totalStats}
+                mode={mode}
+                onModeChange={setMode}
+              />
+            )}
+          </div>
+          <div className="player-profile__hero-summary-reserved">
+            <AttributeCompositionRadar
+              composition={data.attributeComposition}
+              onOpenDetails={() => setIsCompositionDetailsOpen(true)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <AttributeCompositionDetailOverlay
+        composition={data.attributeComposition}
+        isOpen={isCompositionDetailsOpen}
+        onClose={() => setIsCompositionDetailsOpen(false)}
+      />
     </>
+  );
+}
+
+function AttributeCompositionDetailOverlay({
+  composition,
+  isOpen,
+  onClose,
+}: {
+  composition?: AttributeCompositionModel;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !composition) return null;
+
+  return createPortal(
+    <div className="attribute-composition-detail-overlay" onClick={onClose}>
+      <div
+        className="attribute-composition-detail-overlay__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Attribute Composition"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="attribute-composition-detail-overlay__header">
+          <button
+            type="button"
+            className="attribute-composition-detail-overlay__close"
+            onClick={onClose}
+            aria-label="Close attribute composition details"
+            title="Close"
+          >
+            X
+          </button>
+        </header>
+        <div className="attribute-composition-detail-overlay__body sfdatahub-scrollbar">
+          <AttributeCompositionCard
+            attributes={composition.attributes}
+            className="player-profile__stats-panel player-profile__stats-panel--attributes"
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

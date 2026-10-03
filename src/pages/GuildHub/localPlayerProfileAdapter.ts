@@ -1,5 +1,6 @@
 import { getClassMetaById } from "../../data/classes";
 import type { LocalBaseStatValues, LocalPlayerProfileModel, LocalPotionSlot } from "../../components/local-player-profile/types";
+import { createAttributeCompositionModelFromNormalizedAttributes } from "../../components/attribute-composition/attributeCompositionModel";
 import { createPortraitOptionsFromSaveArray } from "../../lib/portraitFromSave";
 import { readSfPlayerSaveArray } from "../../lib/parsing/playerSaveLayout";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
@@ -279,6 +280,9 @@ export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInp
       mountRace,
       mountPercentValue: mountPercent,
       potionsSlots: buildPotionSlots(input.rawPlayer),
+      attributeComposition: normalized
+        ? createAttributeCompositionModelFromNormalizedAttributes(normalized.attributes)
+        : undefined,
     },
   };
 }

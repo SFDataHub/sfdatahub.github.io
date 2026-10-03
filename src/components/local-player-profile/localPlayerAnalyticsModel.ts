@@ -5,9 +5,15 @@ import {
 import {
   ensureGuildAnalyticsDerivedDataFromSummaries,
   type GuildAnalyticsDerivedData,
+  type GuildAnalyticsMemberSnapshot,
 } from "../../lib/guilds/localGuildAnalyticsStore";
 import { buildGuildSnapshotCompletenessReports } from "../../lib/guilds/guildSnapshotCompleteness";
-import { loadIdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
+import {
+  collectGuildIdentityObservations,
+  loadIdentityResolutionSnapshot,
+  resolveGuildIdentity,
+  type IdentityResolutionSnapshot,
+} from "../../lib/identities/identityResolution";
 import {
   getFusionEvent,
   getFusionLineage,
@@ -17,13 +23,12 @@ import {
 import {
   buildPlayerPerformanceModel,
   type PlayerPerformanceBuildResult,
-  type PlayerPerformancePair,
   type PlayerPerformanceSnapshot,
 } from "../../pages/Playground/playerPerformanceModel";
+import { resolveSelectedComparisonTimestamp as resolveSharedSelectedComparisonTimestamp } from "../../lib/player-progress/comparisonScanSelection";
 import type { LocalPlayerProfileModel } from "./types";
 
 const DAY_MS = 86_400_000;
-const DEFAULT_COMPARISON_DAYS = 30;
 
 export type LocalComparisonScanOption = {
   timestamp: number;
@@ -48,6 +53,16 @@ export type LocalAnalyticsSeries = {
   points: LocalAnalyticsPoint[];
 };
 
+export type LocalAnalyticsTimeDomain = {
+  min: number;
+  max: number;
+};
+
+export type LocalPeriodRateSummary = {
+  player: number | null;
+  guildAverage: number | null;
+};
+
 export type LocalCareerEvent = {
   id: string;
   label: string;
@@ -67,6 +82,7 @@ export type LocalPlayerAnalyticsResult = {
     currentLabel: string;
     selectedTimestamp: number | null;
     selectedPlayerAtStart: boolean;
+    chartTimeDomain: LocalAnalyticsTimeDomain | null;
     options: LocalComparisonScanOption[];
     emptyReason: string | null;
   };
@@ -74,10 +90,12 @@ export type LocalPlayerAnalyticsResult = {
     series: LocalAnalyticsSeries[];
     hasGuildAverage: boolean;
     guildAverageDefinition: string;
+    rateSummary: LocalPeriodRateSummary;
   };
   stats: {
     series: LocalAnalyticsSeries[];
     description: string;
+    rateSummary: LocalPeriodRateSummary;
   };
   career: {
     title: "CAREER TIMELINE" | "FUSION HISTORY";
@@ -110,12 +128,13 @@ export async function buildLocalPlayerAnalytics(
 
   const playerName = performance.player?.name ?? profile.analytics.playerName;
   const snapshots = performance.snapshots;
-  const segments = performance.segments;
   const currentTimestamp = resolveCurrentTimestamp(profile, snapshots);
+  const currentGuildIdentifier = resolveCurrentGuildIdentifier(profile, snapshots, currentTimestamp);
   const comparisonOptions = buildComparisonOptions({
     analyticsData,
     currentTimestamp,
-    guildIdentifier: resolveCurrentGuildIdentifier(profile, snapshots, currentTimestamp),
+    guildIdentifier: currentGuildIdentifier,
+    identityResolutionSnapshot,
   });
   const selectedTimestamp = resolveSelectedComparisonTimestamp(
     comparisonOptions,
@@ -125,7 +144,28 @@ export async function buildLocalPlayerAnalytics(
   const selectedPlayerAtStart =
     selectedTimestamp != null && snapshots.some((snapshot) => snapshot.scannedAtMs === selectedTimestamp);
   const rangedSnapshots = filterSnapshotsForRange(snapshots, selectedTimestamp, currentTimestamp);
-  const rangedSegments = filterSegmentsForRange(segments, selectedTimestamp, currentTimestamp);
+  const guildAverageSnapshots = buildGuildAverageSnapshotsForRange({
+    analyticsData,
+    currentTimestamp,
+    guildIdentifier: currentGuildIdentifier,
+    identityResolutionSnapshot,
+    selectedTimestamp,
+  });
+  const chartTimeDomain = buildChartTimeDomain(selectedTimestamp, currentTimestamp);
+  const xpRateSummary = buildPeriodRateSummary({
+    playerSnapshots: snapshots,
+    guildAverageSnapshots,
+    selectedTimestamp,
+    currentTimestamp,
+    metric: "xp",
+  });
+  const baseRateSummary = buildPeriodRateSummary({
+    playerSnapshots: snapshots,
+    guildAverageSnapshots,
+    selectedTimestamp,
+    currentTimestamp,
+    metric: "base",
+  });
 
   return {
     status: performance.status,
@@ -141,30 +181,66 @@ export async function buildLocalPlayerAnalytics(
       currentLabel: currentTimestamp != null ? formatDate(currentTimestamp) : "Current scan unavailable",
       selectedTimestamp,
       selectedPlayerAtStart,
+      chartTimeDomain,
       options: comparisonOptions,
       emptyReason: comparisonOptions.length ? null : "Kein älterer vollständiger Scan verfügbar",
     },
-    xp: buildXpSeries(rangedSegments, playerName),
-    stats: buildStatsSeries(rangedSnapshots),
+    xp: {
+      ...buildXpSeries(rangedSnapshots, guildAverageSnapshots, playerName),
+      rateSummary: xpRateSummary,
+    },
+    stats: {
+      ...buildStatsSeries(rangedSnapshots),
+      rateSummary: baseRateSummary,
+    },
     career: buildCareerTimeline(snapshots),
   };
 }
 
-function buildXpSeries(segments: PlayerPerformancePair[], playerName: string): LocalPlayerAnalyticsResult["xp"] {
-  const playerPoints = segments
-    .map((pair) => {
-      const value = finiteNumber(pair.xpPerDayTrend) ?? finiteNumber(pair.xpPerDay);
-      if (value == null || pair.xpDelta == null || pair.xpDelta < 0) return null;
-      return toPairPoint(pair, value, pair.xpPerDay);
-    })
-    .filter((point): point is LocalAnalyticsPoint => Boolean(point));
-  const guildAveragePoints = segments
-    .map((pair) => {
-      const value = finiteNumber(pair.guildReference.xpPerDay.averagePerDay);
-      if (value == null || pair.guildReference.xpPerDay.reason) return null;
-      return toPairPoint(pair, value, value);
-    })
-    .filter((point): point is LocalAnalyticsPoint => Boolean(point));
+export type LocalGuildAverageSnapshot = {
+  timestamp: number;
+  sourceScanId: string;
+  snapshotId: string;
+  guildIdentifier: string;
+  averageXpTotal: number | null;
+  averageFocusedBaseStats: number | null;
+};
+
+export function buildXpSeries(
+  snapshots: PlayerPerformanceSnapshot[],
+  guildAverageSnapshots: LocalGuildAverageSnapshot[],
+  playerName: string,
+): LocalPlayerAnalyticsResult["xp"] {
+  const playerPoints = dedupePointsByTimestamp(
+    snapshots
+      .map((snapshot): LocalAnalyticsPoint | null => {
+        const value = finiteNumber(snapshot.xpTotal);
+        if (value == null) return null;
+        return {
+          timestamp: snapshot.scannedAtMs,
+          label: formatDate(snapshot.scannedAtMs),
+          value,
+          rawValue: value,
+          detail: `${formatDate(snapshot.scannedAtMs)}: ${formatCompact(value)} XP`,
+        };
+      })
+      .filter((point): point is LocalAnalyticsPoint => Boolean(point)),
+  );
+  const guildAveragePoints = dedupePointsByTimestamp(
+    guildAverageSnapshots
+      .map((snapshot): LocalAnalyticsPoint | null => {
+        const value = finiteNumber(snapshot.averageXpTotal);
+        if (value == null) return null;
+        return {
+          timestamp: snapshot.timestamp,
+          label: formatDate(snapshot.timestamp),
+          value,
+          rawValue: value,
+          detail: `${formatDate(snapshot.timestamp)}: ${formatCompact(value)} avg XP`,
+        };
+      })
+      .filter((point): point is LocalAnalyticsPoint => Boolean(point)),
+  );
 
   return {
     series: [
@@ -186,11 +262,12 @@ function buildXpSeries(segments: PlayerPerformancePair[], playerName: string): L
         : []),
     ],
     hasGuildAverage: guildAveragePoints.length > 0,
-    guildAverageDefinition: "Snapshot average delta per elapsed day across comparable guild snapshots.",
+    guildAverageDefinition: "Absolute average total XP across complete guild snapshots.",
+    rateSummary: emptyRateSummary(),
   };
 }
 
-function buildStatsSeries(snapshots: PlayerPerformanceSnapshot[]): LocalPlayerAnalyticsResult["stats"] {
+export function buildStatsSeries(snapshots: PlayerPerformanceSnapshot[]): LocalPlayerAnalyticsResult["stats"] {
   const points = snapshots
     .map((snapshot): LocalAnalyticsPoint | null => {
       const value = finiteNumber(snapshot.baseStats);
@@ -215,8 +292,99 @@ function buildStatsSeries(snapshots: PlayerPerformanceSnapshot[]): LocalPlayerAn
       },
     ],
     description: "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+    rateSummary: emptyRateSummary(),
   };
 }
+
+export function buildPeriodRateSummary({
+  playerSnapshots,
+  guildAverageSnapshots,
+  selectedTimestamp,
+  currentTimestamp,
+  metric,
+}: {
+  playerSnapshots: PlayerPerformanceSnapshot[];
+  guildAverageSnapshots: LocalGuildAverageSnapshot[];
+  selectedTimestamp: number | null;
+  currentTimestamp: number | null;
+  metric: "xp" | "base";
+}): LocalPeriodRateSummary {
+  const elapsedDays = getElapsedDays(selectedTimestamp, currentTimestamp);
+  if (elapsedDays == null) return emptyRateSummary();
+
+  const playerStart = playerSnapshots.find((snapshot) => snapshot.scannedAtMs === selectedTimestamp) ?? null;
+  const playerEnd = playerSnapshots.find((snapshot) => snapshot.scannedAtMs === currentTimestamp) ?? null;
+  const guildStart = guildAverageSnapshots.find((snapshot) => snapshot.timestamp === selectedTimestamp) ?? null;
+  const guildEnd = guildAverageSnapshots.find((snapshot) => snapshot.timestamp === currentTimestamp) ?? null;
+
+  return {
+    player: calculateEndpointRate(getPlayerMetricValue(playerStart, metric), getPlayerMetricValue(playerEnd, metric), elapsedDays),
+    guildAverage: calculateEndpointRate(getGuildMetricValue(guildStart, metric), getGuildMetricValue(guildEnd, metric), elapsedDays),
+  };
+}
+
+export function buildGuildAverageSnapshotsForRange({
+  analyticsData,
+  currentTimestamp,
+  guildIdentifier,
+  identityResolutionSnapshot,
+  selectedTimestamp,
+}: {
+  analyticsData: GuildAnalyticsDerivedData;
+  currentTimestamp: number | null;
+  guildIdentifier: string | null;
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null;
+  selectedTimestamp: number | null;
+}): LocalGuildAverageSnapshot[] {
+  if (currentTimestamp == null || !guildIdentifier) return [];
+  const reports = collectCompleteReportsForGuildIdentity(
+    buildGuildSnapshotCompletenessReports(analyticsData),
+    guildIdentifier,
+    identityResolutionSnapshot ?? null,
+  ).filter((report) => report.scannedAtMs <= currentTimestamp && (selectedTimestamp == null || report.scannedAtMs >= selectedTimestamp));
+
+  const snapshots = reports
+    .map((report): LocalGuildAverageSnapshot | null => {
+      if (!report.guildIdentifier) return null;
+      const members = dedupeAnalyticsMembers(
+        analyticsData.members.filter(
+          (member) =>
+            member.snapshotId === report.snapshotId &&
+            member.guildIdentifier?.toLowerCase() === report.guildIdentifier?.toLowerCase(),
+        ),
+      );
+      const xpValues = members.map((member) => member.xpTotal).filter(isFiniteNumber);
+      const baseValues = members.map((member) => member.focusedBaseStats).filter(isFiniteNumber);
+      return {
+        timestamp: report.scannedAtMs,
+        sourceScanId: report.sourceScanId,
+        snapshotId: report.snapshotId,
+        guildIdentifier: report.guildIdentifier,
+        averageXpTotal: xpValues.length ? average(xpValues) : null,
+        averageFocusedBaseStats: baseValues.length ? average(baseValues) : null,
+      };
+    })
+    .filter((snapshot): snapshot is LocalGuildAverageSnapshot => Boolean(snapshot));
+
+  return dedupeGuildAverageSnapshots(snapshots);
+}
+
+export function buildChartTimeDomain(
+  selectedTimestamp: number | null,
+  currentTimestamp: number | null,
+): LocalAnalyticsTimeDomain | null {
+  if (
+    selectedTimestamp == null ||
+    currentTimestamp == null ||
+    !Number.isFinite(selectedTimestamp) ||
+    !Number.isFinite(currentTimestamp) ||
+    selectedTimestamp >= currentTimestamp
+  ) {
+    return null;
+  }
+  return { min: selectedTimestamp, max: currentTimestamp };
+}
+
 
 function buildCareerTimeline(snapshots: PlayerPerformanceSnapshot[]): LocalPlayerAnalyticsResult["career"] {
   const observedServers = dedupeConsecutive(
@@ -283,16 +451,6 @@ function buildCareerTimeline(snapshots: PlayerPerformanceSnapshot[]): LocalPlaye
   };
 }
 
-function toPairPoint(pair: PlayerPerformancePair, value: number, rawValue: number | null): LocalAnalyticsPoint {
-  return {
-    timestamp: pair.end.scannedAtMs,
-    label: formatDate(pair.end.scannedAtMs),
-    value,
-    rawValue,
-    detail: `${formatDate(pair.start.scannedAtMs)} to ${formatDate(pair.end.scannedAtMs)}: ${formatCompact(value)} / day`,
-  };
-}
-
 function formatPeriodLabel(snapshots: PlayerPerformanceSnapshot[]) {
   if (snapshots.length < 2) {
     const only = snapshots[0];
@@ -335,22 +493,26 @@ function resolveCurrentGuildIdentifier(
   return currentSnapshot?.guildIdentifier ?? profile.analytics.guildIdentifier ?? null;
 }
 
-function buildComparisonOptions({
+export function buildComparisonOptions({
   analyticsData,
   currentTimestamp,
   guildIdentifier,
+  identityResolutionSnapshot,
 }: {
   analyticsData: GuildAnalyticsDerivedData;
   currentTimestamp: number | null;
   guildIdentifier: string | null;
+  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null;
 }) {
   if (currentTimestamp == null || !guildIdentifier) return [];
-  const normalizedGuildIdentifier = guildIdentifier.toLowerCase();
   const byTimestamp = new Map<number, LocalComparisonScanOption>();
+  const reports = collectCompleteReportsForGuildIdentity(
+    buildGuildSnapshotCompletenessReports(analyticsData),
+    guildIdentifier,
+    identityResolutionSnapshot ?? null,
+  );
 
-  buildGuildSnapshotCompletenessReports(analyticsData)
-    .filter((report) => report.completeForPerformance)
-    .filter((report) => report.guildIdentifier?.toLowerCase() === normalizedGuildIdentifier)
+  reports
     .filter((report) => report.scannedAtMs < currentTimestamp)
     .forEach((report) => {
       const elapsedMs = currentTimestamp - report.scannedAtMs;
@@ -375,22 +537,7 @@ function resolveSelectedComparisonTimestamp(
   currentTimestamp: number | null,
   requestedTimestamp?: number | null,
 ) {
-  if (!options.length) return null;
-  if (requestedTimestamp != null && options.some((option) => option.timestamp === requestedTimestamp)) {
-    return requestedTimestamp;
-  }
-  if (currentTimestamp == null) return options[options.length - 1]?.timestamp ?? null;
-
-  const withDistance = options.map((option) => ({
-    option,
-    elapsedDays: (currentTimestamp - option.timestamp) / DAY_MS,
-  }));
-  const atLeastThirty = withDistance
-    .filter((entry) => entry.elapsedDays >= DEFAULT_COMPARISON_DAYS)
-    .sort((left, right) => left.elapsedDays - right.elapsedDays)[0];
-  if (atLeastThirty) return atLeastThirty.option.timestamp;
-
-  return options[options.length - 1]?.timestamp ?? null;
+  return resolveSharedSelectedComparisonTimestamp(options, currentTimestamp, requestedTimestamp);
 }
 
 function filterSnapshotsForRange(
@@ -400,20 +547,6 @@ function filterSnapshotsForRange(
 ) {
   if (selectedTimestamp == null || currentTimestamp == null) return snapshots;
   return snapshots.filter((snapshot) => snapshot.scannedAtMs >= selectedTimestamp && snapshot.scannedAtMs <= currentTimestamp);
-}
-
-function filterSegmentsForRange(
-  segments: PlayerPerformancePair[],
-  selectedTimestamp: number | null,
-  currentTimestamp: number | null,
-) {
-  if (selectedTimestamp == null || currentTimestamp == null) return segments;
-  return segments.filter(
-    (segment) =>
-      segment.start.scannedAtMs >= selectedTimestamp &&
-      segment.end.scannedAtMs <= currentTimestamp &&
-      segment.start.scannedAtMs < segment.end.scannedAtMs,
-  );
 }
 
 function formatDate(timestamp: number) {
@@ -441,6 +574,103 @@ function formatCompact(value: number | null | undefined) {
 
 function finiteNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function emptyRateSummary(): LocalPeriodRateSummary {
+  return { player: null, guildAverage: null };
+}
+
+function getElapsedDays(selectedTimestamp: number | null, currentTimestamp: number | null) {
+  if (
+    selectedTimestamp == null ||
+    currentTimestamp == null ||
+    !Number.isFinite(selectedTimestamp) ||
+    !Number.isFinite(currentTimestamp) ||
+    selectedTimestamp >= currentTimestamp
+  ) {
+    return null;
+  }
+  const elapsedDays = (currentTimestamp - selectedTimestamp) / DAY_MS;
+  return Number.isFinite(elapsedDays) && elapsedDays > 0 ? elapsedDays : null;
+}
+
+function getPlayerMetricValue(snapshot: PlayerPerformanceSnapshot | null, metric: "xp" | "base") {
+  if (!snapshot) return null;
+  return metric === "xp" ? finiteNumber(snapshot.xpTotal) : finiteNumber(snapshot.baseStats);
+}
+
+function getGuildMetricValue(snapshot: LocalGuildAverageSnapshot | null, metric: "xp" | "base") {
+  if (!snapshot) return null;
+  return metric === "xp" ? finiteNumber(snapshot.averageXpTotal) : finiteNumber(snapshot.averageFocusedBaseStats);
+}
+
+function calculateEndpointRate(start: number | null, end: number | null, elapsedDays: number) {
+  if (start == null || end == null || !Number.isFinite(elapsedDays) || elapsedDays <= 0) return null;
+  const value = (end - start) / elapsedDays;
+  return Number.isFinite(value) ? value : null;
+}
+
+function collectCompleteReportsForGuildIdentity(
+  reports: ReturnType<typeof buildGuildSnapshotCompletenessReports>,
+  guildIdentifier: string,
+  identityResolutionSnapshot: Pick<IdentityResolutionSnapshot, "guilds"> | null,
+) {
+  const completeReports = reports.filter((report) => report.completeForPerformance);
+  if (identityResolutionSnapshot) {
+    const resolution = resolveGuildIdentity(identityResolutionSnapshot, guildIdentifier);
+    if (resolution.resolved) {
+      const history = collectGuildIdentityObservations(identityResolutionSnapshot, guildIdentifier, completeReports, {
+        getIdentifier: (report) => report.guildIdentifier,
+        getTimestamp: (report) => report.scannedAtMs,
+        getObservationKey: (report) => `${report.sourceScanId}:${report.snapshotId}:${report.guildIdentifier ?? ""}`,
+      });
+      if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
+    }
+  }
+
+  const normalizedGuildIdentifier = guildIdentifier.toLowerCase();
+  return completeReports.filter((report) => report.guildIdentifier?.toLowerCase() === normalizedGuildIdentifier);
+}
+
+function dedupeAnalyticsMembers(members: GuildAnalyticsMemberSnapshot[]) {
+  const byRef = new Map<string, GuildAnalyticsMemberSnapshot>();
+  members.forEach((member) => {
+    const previous = byRef.get(member.memberRef.toLowerCase());
+    if (!previous || scoreAnalyticsMemberValues(member) >= scoreAnalyticsMemberValues(previous)) {
+      byRef.set(member.memberRef.toLowerCase(), member);
+    }
+  });
+  return [...byRef.values()];
+}
+
+function dedupePointsByTimestamp(points: LocalAnalyticsPoint[]) {
+  const byTimestamp = new Map<number, LocalAnalyticsPoint>();
+  points.forEach((point) => byTimestamp.set(point.timestamp, point));
+  return [...byTimestamp.values()].sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function dedupeGuildAverageSnapshots(snapshots: LocalGuildAverageSnapshot[]) {
+  const byTimestamp = new Map<number, LocalGuildAverageSnapshot>();
+  snapshots.forEach((snapshot) => {
+    const previous = byTimestamp.get(snapshot.timestamp);
+    if (!previous || snapshot.sourceScanId.localeCompare(previous.sourceScanId) > 0) {
+      byTimestamp.set(snapshot.timestamp, snapshot);
+    }
+  });
+  return [...byTimestamp.values()].sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function scoreAnalyticsMemberValues(member: GuildAnalyticsMemberSnapshot) {
+  return Number(isFiniteNumber(member.xpTotal)) + Number(isFiniteNumber(member.focusedBaseStats));
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function average(values: number[]) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function dedupeConsecutive<T>(items: T[], getKey: (item: T) => string) {

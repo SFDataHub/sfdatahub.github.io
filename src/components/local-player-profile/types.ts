@@ -1,4 +1,5 @@
 import type { PortraitOptions } from "../player-profile/types";
+import type { AttributeCompositionModel } from "../attribute-composition/attributeCompositionModel";
 
 export type LocalHeroActionKey = "open-player" | "open-guild" | "share" | "copy-link";
 
@@ -57,6 +58,7 @@ export type LocalHeroPanelData = {
   mountRace?: string | null;
   mountPercentValue?: number | null;
   potionsSlots?: LocalPotionSlot[];
+  attributeComposition?: AttributeCompositionModel;
 };
 
 export type LocalPlayerProfileModel = {

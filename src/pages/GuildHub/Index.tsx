@@ -1,6 +1,7 @@
 // src/pages/GuildHub/Index.tsx
 import React from "react";
 import { Check, Loader2, Pencil, Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ContentShell from "../../components/ContentShell"; // <- korrigierter Pfad
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
@@ -21,6 +22,7 @@ import {
   useGuildHubSelection,
   type GuildHubSelectedGuild,
 } from "./hooks/useGuildHubSelection";
+import { GUILD_HUB_NAV_ITEMS } from "./localToplistPageModel";
 import styles from "./Index.module.css";
 
 type LocalScanState = {
@@ -127,35 +129,19 @@ function GuildSelectionPanel({
 }
 
 function GuildHubTileMenu({ scanDependentDisabled }: { scanDependentDisabled: boolean }) {
+  const { t } = useTranslation();
   return (
     <section className={styles.tileGrid} aria-label="Guild-Hub-Bereiche">
-      <Tile
-        to="/guild-hub/dashboard"
-        title="Dashboard"
-        desc="Ueberblick & Einstieg"
-        disabled={scanDependentDisabled}
-      />
-      <Tile
-        to="/guild-hub/analytics"
-        title="Analytics"
-        desc="Fortschritt, Entwicklung & Vergleiche"
-        disabled={scanDependentDisabled}
-      />
-      <Tile
-        to="/guild-hub/fusion-planner"
-        title="Fusion Planner"
-        desc="Setups & Szenarien"
-        disabled={scanDependentDisabled}
-      />
-      <Tile to="/guild-hub/fight-tracking" title="Fight Tracking" desc="Angriffe & Fehlquoten" />
-      <Tile to="/guild-hub/waitlist" title="Waitlist" desc="Bewerber & Slots" />
-      <Tile
-        to="/guild-hub/import"
-        title="Import"
-        desc="SF-Tools JSONs lokal hinzufuegen"
-        nudge={scanDependentDisabled}
-      />
-      <Tile to="/guild-hub/settings" title="Einstellungen" desc="Guild-Hub konfigurieren" />
+      {GUILD_HUB_NAV_ITEMS.map((item) => (
+        <Tile
+          key={item.to}
+          to={item.to}
+          title={t(item.titleKey, item.titleFallback)}
+          desc={t(item.descKey, item.descFallback)}
+          disabled={item.requiresLocalScans && scanDependentDisabled}
+          nudge={item.to === "/guild-hub/import" && scanDependentDisabled}
+        />
+      ))}
     </section>
   );
 }

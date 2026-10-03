@@ -2,6 +2,13 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { normalizeServerKeyFromInput } from "../players/identifier";
+import { mapFirestoreGuildRow } from "./toplistGuildRowMapper";
+import type {
+  ToplistGuildRow,
+  ToplistGuildSnapshot,
+  ToplistPlayerRow,
+  ToplistPlayerSnapshot,
+} from "../toplists/toplistContracts";
 import {
   beginReadScope,
   endReadScope,
@@ -10,6 +17,8 @@ import {
   startReadTraceSession,
   traceGetDoc,
 } from "../debug/firestoreReadTrace";
+
+export { mapFirestoreGuildRow };
 
 const STATS_PUBLIC_ROOT = "stats_public";
 const PLAYERS_COLLECTION = "toplists_players_v1";
@@ -192,32 +201,6 @@ export async function loadToplistsMeta(): Promise<ToplistsMeta | null> {
   }
 }
 
-// Row-Daten einer Spieler-Topliste - Keys 1:1 wie columnKeysPlayers
-export type FirestoreToplistPlayerRow = {
-  identifier?: string | null;
-  playerId?: string | null;
-  flag: string | null;
-  deltaRank: number | null;
-  server: string;
-  name: string;
-  class: string;
-  level: number | null;
-  guild: string | null;
-  main: number | null;
-  con: number | null;
-  sum: number | null;
-  ratio: string | null;
-  mainTotal: number | null;
-  conTotal: number | null;
-  sumTotal: number | null;
-  xpProgress: number | null;
-  xpTotal: number | null;
-  mine: number | null;
-  treasury: number | null;
-  lastScan: string | null;
-  deltaSum: number | null;
-};
-
 export type FirestoreToplistPlayerList = {
   id: string;
   entity: "players";
@@ -229,44 +212,7 @@ export type FirestoreToplistPlayerList = {
   updatedAt: number | null;
   nextUpdateAt?: number | null;
   ttlSec?: number | null;
-  rows: FirestoreToplistPlayerRow[];
-};
-
-export type FirestoreLatestToplistSnapshot = {
-  server: string;
-  updatedAt: number | null;
-  players: FirestoreToplistPlayerRow[];
-};
-
-export type FirestoreToplistGuildRow = {
-  guildId: string;
-  server: string;
-  name: string;
-  honor: number | null;
-  raids: number | null;
-  portalFloor: number | null;
-  hydra: number | null;
-  instructor: number | null;
-  memberCount: number | null;
-  hofRank: number | null;
-  latestScanAtSec: number | null;
-  lastScan: string | null;
-  sumAvg: number | null;
-  avgLevel: number | null;
-  avgTreasury: number | null;
-  avgMine: number | null;
-  avgBaseMain: number | null;
-  avgConBase: number | null;
-  avgSumBaseTotal: number | null;
-  avgAttrTotal: number | null;
-  avgConTotal: number | null;
-  avgTotalStats: number | null;
-};
-
-export type FirestoreLatestGuildToplistSnapshot = {
-  server: string;
-  updatedAt: number | null;
-  guilds: FirestoreToplistGuildRow[];
+  rows: ToplistPlayerRow[];
 };
 
 export type FirestoreToplistPlayerResult =
@@ -274,11 +220,11 @@ export type FirestoreToplistPlayerResult =
   | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
 
 export type FirestoreLatestToplistResult =
-  | { ok: true; snapshot: FirestoreLatestToplistSnapshot }
+  | { ok: true; snapshot: ToplistPlayerSnapshot }
   | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
 
 export type FirestoreLatestGuildToplistResult =
-  | { ok: true; snapshot: FirestoreLatestGuildToplistSnapshot }
+  | { ok: true; snapshot: ToplistGuildSnapshot }
   | { ok: false; error: "not_found" | "decode_error" | "firestore_error"; detail?: string };
 
 const toNumber = (value: any): number | null => {
@@ -302,7 +248,7 @@ const toIdStringOrNull = (value: any): string | null => {
   return null;
 };
 
-const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
+const mapFirestorePlayerRow = (raw: any): ToplistPlayerRow | null => {
   if (!raw || typeof raw !== "object") return null;
 
   const server = toStringOrNull(raw.server);
@@ -339,49 +285,6 @@ const mapRow = (raw: any): FirestoreToplistPlayerRow | null => {
   };
 };
 
-const mapGuildRow = (raw: any): FirestoreToplistGuildRow | null => {
-  if (!raw || typeof raw !== "object") return null;
-
-  const server = toStringOrNull(raw.server);
-  const name = toStringOrNull(raw.name) ?? toStringOrNull(raw.guildId);
-  const guildId = toStringOrNull(raw.guildId) ?? name;
-
-  if (!server || !name || !guildId) return null;
-
-  const sumAvg = toNumber(raw.sumAvg ?? raw.avgSumBaseTotal ?? raw.sum);
-  const lastScanValue =
-    typeof raw.lastScan === "string"
-      ? raw.lastScan
-      : typeof raw.lastScan === "number" && Number.isFinite(raw.lastScan)
-        ? String(raw.lastScan)
-        : null;
-
-  return {
-    guildId,
-    server,
-    name,
-    honor: toNumber(raw.honor),
-    raids: toNumber(raw.raids),
-    portalFloor: toNumber(raw.portalFloor),
-    hydra: toNumber(raw.hydra),
-    instructor: toNumber(raw.instructor),
-    memberCount: toNumber(raw.memberCount),
-    hofRank: toNumber(raw.hofRank),
-    latestScanAtSec: toNumber(raw.latestScanAtSec),
-    lastScan: lastScanValue,
-    sumAvg,
-    avgLevel: toNumber(raw.avgLevel),
-    avgTreasury: toNumber(raw.avgTreasury),
-    avgMine: toNumber(raw.avgMine),
-    avgBaseMain: toNumber(raw.avgBaseMain),
-    avgConBase: toNumber(raw.avgConBase),
-    avgSumBaseTotal: toNumber(raw.avgSumBaseTotal),
-    avgAttrTotal: toNumber(raw.avgAttrTotal),
-    avgConTotal: toNumber(raw.avgConTotal),
-    avgTotalStats: toNumber(raw.avgTotalStats),
-  };
-};
-
 export async function getLatestPlayerToplistSnapshot(serverCode: string): Promise<FirestoreLatestToplistResult> {
   const code = normalizeToplistServerCode(serverCode);
   if (!code) {
@@ -413,9 +316,9 @@ export async function getLatestPlayerToplistSnapshot(serverCode: string): Promis
       return { ok: false, error: "decode_error", detail: "missing players array" };
     }
 
-    const players: FirestoreToplistPlayerRow[] = [];
+    const players: ToplistPlayerRow[] = [];
     for (const row of rawPlayers) {
-      const mapped = mapRow(row);
+      const mapped = mapFirestorePlayerRow(row);
       if (!mapped) {
         console.error("[toplistsFirestore] Latest snapshot row decode failed", row);
         return { ok: false, error: "decode_error", detail: "invalid player row" };
@@ -488,9 +391,9 @@ async function getPlayerToplistSnapshotByDocIdNoCache(docId: string): Promise<Fi
       return { ok: false, error: "decode_error", detail: "missing players array" };
     }
 
-    const players: FirestoreToplistPlayerRow[] = [];
+    const players: ToplistPlayerRow[] = [];
     for (const row of rawPlayers) {
-      const mapped = mapRow(row);
+      const mapped = mapFirestorePlayerRow(row);
       if (!mapped) {
         console.error("[toplistsFirestore] Snapshot row decode failed", row);
         return { ok: false, error: "decode_error", detail: "invalid player row" };
@@ -538,7 +441,7 @@ export async function getPlayerToplistSnapshotByDocId(
       cached.data &&
       typeof cached.data === "object"
     ) {
-      return { ok: true, snapshot: cached.data as FirestoreLatestToplistSnapshot };
+      return { ok: true, snapshot: cached.data as ToplistPlayerSnapshot };
     }
   }
 
@@ -606,7 +509,7 @@ const MAX_PROGRESS_SNAPSHOTS = 10;
 type CachedProgressSnapshot = {
   v: 1;
   savedAt: number;
-  data: FirestoreLatestToplistSnapshot;
+  data: ToplistPlayerSnapshot;
 };
 const progressSnapshotInFlight = new Map<string, Promise<FirestoreLatestToplistResult>>();
 
@@ -817,7 +720,7 @@ export async function getLatestPlayerToplistSnapshotCached(
   const memoryHit = readLiveToplistMemoryEntry(latestPlayerSnapshotMemory, code, now);
   if (memoryHit) return memoryHit;
 
-  const cached = readLatestToplistSnapshotCache<FirestoreLatestToplistSnapshot>(key);
+  const cached = readLatestToplistSnapshotCache<ToplistPlayerSnapshot>(key);
   if (cached) {
     if (now < cached.expiresAtMs) {
       const result: FirestoreLatestToplistResult = cached.ok
@@ -842,7 +745,7 @@ export async function getLatestPlayerToplistSnapshotCached(
     const cachedAtMs = Date.now();
     const ttlMs = result.ok ? TOPLIST_SNAPSHOT_TTL_MS : TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
     const expiresAtMs = cachedAtMs + ttlMs;
-    const cacheEntry: LatestToplistSnapshotCacheEntry<FirestoreLatestToplistSnapshot> = result.ok
+    const cacheEntry: LatestToplistSnapshotCacheEntry<ToplistPlayerSnapshot> = result.ok
       ? { ok: true, cachedAtMs, expiresAtMs, data: result.snapshot }
       : { ok: false, cachedAtMs, expiresAtMs, error: result.error, detail: result.detail };
     writeLatestToplistSnapshotCache(key, cacheEntry);
@@ -874,7 +777,7 @@ export async function getPlayerToplistSnapshotByDocIdCached(
     if (now < memoryHit.expiresAt) return memoryHit.result;
     compareSnapshotMemory.delete(code);
   }
-  const cached = readSnapshotCache<FirestoreLatestToplistSnapshot>(key);
+  const cached = readSnapshotCache<ToplistPlayerSnapshot>(key);
   if (cached) {
     if (now < cached.expiresAt) {
       const result: FirestoreLatestToplistResult = { ok: true, snapshot: cached.snapshot };
@@ -944,9 +847,9 @@ export async function getLatestGuildToplistSnapshot(
       return { ok: false, error: "decode_error", detail: "missing guilds array" };
     }
 
-    const guilds: FirestoreToplistGuildRow[] = [];
+    const guilds: ToplistGuildRow[] = [];
     for (const row of rawGuilds) {
-      const mapped = mapGuildRow(row);
+      const mapped = mapFirestoreGuildRow(row);
       if (!mapped) {
         console.error("[toplistsFirestore] Latest guild snapshot row decode failed", row);
         return { ok: false, error: "decode_error", detail: "invalid guild row" };
@@ -985,7 +888,7 @@ export async function getLatestGuildToplistSnapshotCached(
   const memoryHit = readLiveToplistMemoryEntry(latestGuildSnapshotMemory, code, now);
   if (memoryHit) return memoryHit;
 
-  const cached = readLatestToplistSnapshotCache<FirestoreLatestGuildToplistSnapshot>(key);
+  const cached = readLatestToplistSnapshotCache<ToplistGuildSnapshot>(key);
   if (cached) {
     if (now < cached.expiresAtMs) {
       const result: FirestoreLatestGuildToplistResult = cached.ok
@@ -1010,7 +913,7 @@ export async function getLatestGuildToplistSnapshotCached(
     const cachedAtMs = Date.now();
     const ttlMs = result.ok ? TOPLIST_SNAPSHOT_TTL_MS : TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS;
     const expiresAtMs = cachedAtMs + ttlMs;
-    const cacheEntry: LatestToplistSnapshotCacheEntry<FirestoreLatestGuildToplistSnapshot> = result.ok
+    const cacheEntry: LatestToplistSnapshotCacheEntry<ToplistGuildSnapshot> = result.ok
       ? { ok: true, cachedAtMs, expiresAtMs, data: result.snapshot }
       : { ok: false, cachedAtMs, expiresAtMs, error: result.error, detail: result.detail };
     writeLatestToplistSnapshotCache(key, cacheEntry);
