@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import AnchoredLineChart from "./AnchoredLineChart";
 import type { TrendSeries } from "../../player-profile/types";

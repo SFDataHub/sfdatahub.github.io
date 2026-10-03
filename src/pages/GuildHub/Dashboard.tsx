@@ -1251,7 +1251,6 @@ function buildGuildScanView(
   const normalizedMembers = normalizeGuildScanMembers(raw);
   const snapshotMembers = normalizedMembers.filter((member) => isNormalizedMemberInActiveGuild(member, activeGuild, activeServer, activeGuildSegment));
   const rawPlayersByKey = buildRawPlayerLookup(raw.players, activeServer, source.sourceScanId);
-  const nameCounts = buildPlayerNameCounts(raw.players);
   const playerLookup = new Map<string, JsonRecord>();
   const members = snapshotMembers
     .map((member) =>
@@ -1403,66 +1402,7 @@ function isGroupMatch(
   return Boolean(groupName && normalizeLoose(groupName) === normalizeLoose(activeGuild.name) && serverMatches);
 }
 
-function isPlayerInGuild(
-  player: JsonRecord,
-  activeGuild: GuildHubSelectedGuild,
-  activeServer: string | null,
-  activeGuildSegment: string | null,
-) {
-  const playerServer = normalizeServerForCompare(
-    readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(readString(player, ["identifier", "Identifier"])),
-  );
-  const serverMatches = !activeServer || !playerServer || activeServer === playerServer;
-  const playerGuildSegment = normalizeGuildSegment(
-    readString(player, ["guildIdentifier", "Guild Identifier", "group", "groupIdentifier", "groupId", "guildId", "Guild ID"]),
-  );
-  if (activeGuildSegment && playerGuildSegment) return activeGuildSegment === playerGuildSegment && serverMatches;
 
-  const playerGuildName = readString(player, ["groupname", "groupName", "guildName", "guild", "Guild"]);
-  return Boolean(playerGuildName && normalizeLoose(playerGuildName) === normalizeLoose(activeGuild.name) && serverMatches);
-}
-
-function toLocalMember(
-  player: JsonRecord,
-  fallbackServer: string | null,
-  sourceScanId: string,
-  nameCounts: Map<string, number>,
-  normalizedByRef: Map<string, NormalizedGuildMember>,
-): LocalMember | null {
-  const identifier = readString(player, ["identifier", "Identifier"]);
-  const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
-  const server = normalizeServerForCompare(
-    readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(identifier) ?? fallbackServer,
-  );
-  const key = resolveLocalPlayerKey(player, fallbackServer, sourceScanId, nameCounts);
-  if (!key) return null;
-
-  const rawClassLabel = readString(player, ["class", "Class", "className", "Class Name"]);
-  const normalized = normalizedByRef.get(key.toLowerCase()) ?? null;
-  const classMeta = getClassMetaById(normalized?.classId ?? rawClassLabel);
-  return {
-    key,
-    name: readString(player, ["name", "Name", "playerName", "Player Name"]) ?? normalized?.name ?? key,
-    classLabel: classMeta?.label ?? normalizeMemberClassLabel(normalized?.classId ?? rawClassLabel),
-    classMeta,
-    level: normalized?.level ?? readNumber(player, ["level", "Level"]),
-    honor: readNumber(player, ["honor", "Honor", "honour", "Honour", "arenaHonor", "Ehre"]),
-    hofRank: readNumber(player, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank"]),
-    baseMain: normalized?.baseStats ?? readNumber(player, ["baseMain", "Base Main", "Base"]),
-    totalStats: normalized?.totalStats ?? readNumber(player, ["totalStats", "Total Stats", "Total"]),
-    lastScanMs: readTimestampMs(player, ["lastScanMs", "lastScan", "scannedAt", "scanAt", "timestamp"]),
-    lastActivityMs: readTimestampMs(player, ["lastActivityMs", "lastActivity", "lastActive", "lastOnline"]),
-    guildRole: normalized?.guildRole ?? null,
-    localRef: {
-      sourceScanId,
-      sourcePlayerKey: key,
-      identifier,
-      playerId,
-      server,
-      matchedByNameFallback: !identifier && !(playerId && server),
-    },
-  };
-}
 
 function buildPlayerNameCounts(players: JsonRecord[]) {
   const counts = new Map<string, number>();

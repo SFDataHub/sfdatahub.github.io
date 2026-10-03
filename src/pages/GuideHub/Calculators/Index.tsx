@@ -1,5 +1,4 @@
 // FILE: src/pages/GuideHub/Calculators/Index.tsx
-import React from "react";
 import { useSearchParams } from "react-router-dom";
 import HudBox from "../../../components/ui/hud/box/HudBox";
 import { tiles } from "./config";

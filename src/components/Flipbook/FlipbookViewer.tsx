@@ -34,7 +34,7 @@ const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
   const [page, setPage] = useState<number>(initialPage);
   const [zoom, setZoom] = useState<number>(1.0);
   const [viewMode, setViewMode] = useState<"single" | "spread">("spread");
-  const [crossfade, setCrossfade] = useState<boolean>(false);
+  const [, setCrossfade] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [fsSupported, setFsSupported] = useState<boolean>(false);
 

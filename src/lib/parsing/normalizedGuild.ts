@@ -1,5 +1,5 @@
 import { extractGuildCoaString } from "../guilds/guildCoa";
-import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../guilds/guildScanNormalizer";
+import { normalizeGuildScanServer } from "../guilds/guildScanNormalizer";
 import { parseSaveStringToArray } from "./extractPortrait";
 import type {
   NormalizedPlayer,
@@ -324,14 +324,6 @@ const parseGuildIdFromIdentifier = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const parsePlayerIdFromIdentifier = (value: unknown) => {
-  const identifier = toTrimmedString(value);
-  if (!identifier) return null;
-  const match = identifier.match(/_p(\d+)$/i);
-  if (!match) return null;
-  const parsed = Number.parseInt(match[1] ?? "", 10);
-  return Number.isFinite(parsed) ? parsed : null;
-};
 
 const decodeRole = (roleId: number | null): NormalizedGuildRole => {
   if (roleId === GUILD_ROLE_LEADER) return "leader";
@@ -579,7 +571,7 @@ const normalizeMember = (
   };
 };
 
-const resolveIdentifier = (group: JsonRecord, saveArray: unknown[] | null, server: string | null, id: number | null) =>
+const resolveIdentifier = (group: JsonRecord, _saveArray: unknown[] | null, server: string | null, id: number | null) =>
   readString(group, ["guildIdentifier", "Guild Identifier", "identifier", "Identifier", "groupIdentifier", "Group Identifier"]) ??
   (server && id != null ? `${server}_g${id}` : null);
 

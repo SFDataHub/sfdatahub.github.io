@@ -1,4 +1,3 @@
-import React from "react";
 import { useUploadCenter } from "./UploadCenterContext";
 import ScanManagementOverlay from "../ScanManagement/ScanManagementOverlay";
 

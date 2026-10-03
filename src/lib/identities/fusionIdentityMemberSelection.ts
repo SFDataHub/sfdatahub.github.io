@@ -73,7 +73,7 @@ export const removeSelectedIdentityId = (
 };
 
 export const clearSelectedIdentityIds = (
-  state: Pick<
+  _state: Pick<
     FusionIdentityMemberFilterState,
     "selectedIdentityIds" | "selectionContext"
   >,

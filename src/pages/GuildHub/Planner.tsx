@@ -6,13 +6,12 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import styles from "./Planner.module.css";
 import {
-  PlannerItem,
-  PlannerStatus,
-  FilterState,
+  type PlannerItem,
+  type PlannerStatus,
+  type FilterState,
   TEAM_MEMBERS,
   STATUS_LABELS,
   TYPE_LABELS,
-  PRIORITY_LABELS,
   FRESHNESS_DISPLAY,
   DEFAULT_FILTERS,
   SAMPLE_ITEMS,
@@ -24,8 +23,8 @@ import {
   formatRelative,
   formatCountdown,
   computeFreshness,
-  FreshnessCode,
-  PlannerPriority,
+  type FreshnessCode,
+  type PlannerPriority,
 } from "./plannerData";
 
 export default function GuildHubPlanner() {

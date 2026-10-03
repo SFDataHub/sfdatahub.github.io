@@ -21,7 +21,7 @@ import DashboardProgression from "./pages/Dashboard/Progression";
 import Discover from "./pages/Discover/Index";
 
 // Flipbook SFM
-import SFMagazineIndex from "./pages/SFMagazine";
+import SFMagazineIndex from "./pages/SFMagazine/Index";
 // SF Magazin
 import HistoryBookPage from "./pages/SFMagazine/HistoryBook";
 import DungeonLibraryPage from "./pages/DungeonLibrary";

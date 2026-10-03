@@ -1,8 +1,7 @@
-import React from "react";
 import HudLabel from "../../../ui/hud/HudLabel";
 import type { PaletteColors } from "../GuildProfileInfo.types";
 
-export default function RankingsCard({ colors }: { colors: PaletteColors }) {
+export default function RankingsCard(_props: { colors: PaletteColors }) {
   return (
     <div style={{ background: "transparent" }}>
       <HudLabel text="Rankings" />

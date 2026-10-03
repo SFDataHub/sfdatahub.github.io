@@ -1,4 +1,3 @@
-import React from "react";
 import "./GamifiedTab3.css";
 
 type Sample = {

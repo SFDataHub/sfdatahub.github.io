@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import styles from "./LogoDock.module.css";
+import "./LogoDock.module.css";
 import defaultLogo from "../../assets/logo-sfdatahub.png";
 
 type Props = {

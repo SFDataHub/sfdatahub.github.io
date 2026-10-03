@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Member, ViewMode, SortKey, SortDir } from "./types";
+import type { Member, ViewMode, SortKey, SortDir } from "./types";
 import { THEME, mergeTheme, timeAgo, sumBaseStats, strictSumBase } from "./utils";
 import MemberDetailTop from "./MemberDetailTop";
 import MemberListView from "./MemberListView";

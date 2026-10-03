@@ -15,21 +15,16 @@ import {
 import type {
   ScanArchiveBuilderBlocker,
   ScanArchiveBuilderInspection,
-  ScanArchiveBuilderManifestSource,
   ScanArchiveBuilderProgress,
   ScanArchiveBuilderResult,
   ScanArchiveBuilderUsageMode,
 } from "../../lib/scanArchive/scanArchiveBuilderTypes";
-import type { ScanArchiveManifest } from "../../lib/scanArchive/types";
+import { getScanArchiveCatalogUrl } from "../../lib/scanArchive/client";
+import { scanArchiveBuilderBlockerFromError } from "../../lib/scanArchive/scanArchiveBuilderErrors";
+import { evaluateScanArchiveBuilderInput, type ScanArchiveBuilderManifestState } from "../../lib/scanArchive/scanArchiveBuilderUi";
 import styles from "./ScanArchiveBuilder.module.css";
 
-type ManifestState =
-  | { status: "idle" }
-  | { status: "loading"; message: string }
-  | { status: "ready"; manifest: ScanArchiveManifest; source: ScanArchiveBuilderManifestSource }
-  | { status: "error"; blocker: ScanArchiveBuilderBlocker };
-
-const emptyManifestState: ManifestState = { status: "idle" };
+const emptyManifestState: ScanArchiveBuilderManifestState = { status: "idle" };
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -81,15 +76,17 @@ export default function AdminScanArchiveBuilderPage() {
   const [inspection, setInspection] = React.useState<ScanArchiveBuilderInspection | null>(null);
   const [usageMode, setUsageMode] = React.useState<ScanArchiveBuilderUsageMode | null>(null);
   const [manifestMode, setManifestMode] = React.useState<"catalog" | "override">("catalog");
-  const [manifestState, setManifestState] = React.useState<ManifestState>(emptyManifestState);
+  const [manifestState, setManifestState] = React.useState<ScanArchiveBuilderManifestState>(emptyManifestState);
   const [progress, setProgress] = React.useState<ScanArchiveBuilderProgress | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [inspectionError, setInspectionError] = React.useState<ScanArchiveBuilderBlocker | null>(null);
+  const [buildError, setBuildError] = React.useState<ScanArchiveBuilderBlocker | null>(null);
   const [result, setResult] = React.useState<ScanArchiveBuilderResult | null>(null);
   const [zipUrl, setZipUrl] = React.useState<string | null>(null);
   const sessionRef = React.useRef<ScanArchiveBuilderSession | null>(null);
   const inspectRunRef = React.useRef<ScanArchiveBuilderRun<ScanArchiveBuilderInspection> | null>(null);
   const buildRunRef = React.useRef<ScanArchiveBuilderRun<ScanArchiveBuilderResult> | null>(null);
   const lastZipUrlRef = React.useRef<string | null>(null);
+  const revisionRef = React.useRef(0);
 
   React.useEffect(
     () => () => {
@@ -110,21 +107,29 @@ export default function AdminScanArchiveBuilderPage() {
   }, []);
 
   const resetResult = React.useCallback(() => {
+    if (buildRunRef.current) {
+      sessionRef.current?.discardBuild(buildRunRef.current.requestId);
+      buildRunRef.current = null;
+      setProgress(null);
+    }
     clearZip();
     setResult(null);
-    setError(null);
+    setBuildError(null);
   }, [clearZip]);
 
   const handleFileChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
+      revisionRef.current++;
       inspectRunRef.current?.cancel();
+      inspectRunRef.current = null;
       buildRunRef.current?.cancel();
       sessionRef.current?.terminate();
       sessionRef.current = null;
       resetResult();
       setInputFile(file);
       setInspection(null);
+      setInspectionError(null);
       setUsageMode(null);
       setManifestState(emptyManifestState);
       setProgress(null);
@@ -135,18 +140,24 @@ export default function AdminScanArchiveBuilderPage() {
       sessionRef.current = session;
       const run = session.inspect({
         inputFile: file,
-        onProgress: setProgress,
+        onProgress: (nextProgress) => {
+          if (inspectRunRef.current?.requestId === run.requestId) setProgress(nextProgress);
+        },
       });
       inspectRunRef.current = run;
       run.promise
         .then((nextInspection) => {
           if (inspectRunRef.current?.requestId !== run.requestId) return;
+          inspectRunRef.current = null;
           setInspection(nextInspection);
+          setInspectionError(null);
           setProgress(null);
         })
         .catch((caught) => {
+          if (inspectRunRef.current?.requestId !== run.requestId) return;
+          inspectRunRef.current = null;
           if (caught instanceof ScanArchiveBuilderCancelledError) return;
-          setError(caught instanceof Error ? caught.message : String(caught));
+          setInspectionError(scanArchiveBuilderBlockerFromError(caught));
           setProgress(null);
         });
     },
@@ -160,11 +171,12 @@ export default function AdminScanArchiveBuilderPage() {
       return;
     }
     let cancelled = false;
+    const revision = revisionRef.current;
     const year = inspection.years[0];
     setManifestState({ status: "loading", message: "Catalog and year manifest are loading." });
     loadScanArchiveBuilderCatalogManifest({ year })
       .then((manifestResult) => {
-        if (cancelled) return;
+        if (cancelled || revisionRef.current !== revision) return;
         setManifestState(manifestResult);
       });
     return () => {
@@ -176,6 +188,7 @@ export default function AdminScanArchiveBuilderPage() {
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
       resetResult();
+      const revision = ++revisionRef.current;
       if (!file) {
         setManifestMode("catalog");
         setManifestState(emptyManifestState);
@@ -192,8 +205,11 @@ export default function AdminScanArchiveBuilderPage() {
             "Load a valid single-year SFtools JSON first, then choose the override manifest.",
           );
         }
-        setManifestState(parseScanArchiveBuilderManifestOverride({ content: await file.text(), filename: file.name, year }));
+        const content = await file.text();
+        if (revisionRef.current !== revision) return;
+        setManifestState(parseScanArchiveBuilderManifestOverride({ content, filename: file.name, year }));
       } catch (caught) {
+        if (revisionRef.current !== revision) return;
         const item =
           typeof caught === "object" && caught != null && "cause" in caught && "remedy" in caught
             ? (caught as ScanArchiveBuilderBlocker)
@@ -216,43 +232,35 @@ export default function AdminScanArchiveBuilderPage() {
     [resetResult],
   );
 
-  const blockers = React.useMemo(() => {
-    const items: ScanArchiveBuilderBlocker[] = [];
-    if (!inputFile) items.push(blocker("input_missing", "No SFtools JSON file is selected.", "Choose the raw export file first."));
-    if (inspection?.blockers.length) items.push(...inspection.blockers);
-    if (manifestState.status === "error") items.push(manifestState.blocker);
-    if (inspection && !inspection.blockers.length && inspection.years.length === 1 && manifestState.status === "ready" && manifestState.manifest.archiveYear !== inspection.years[0]) {
-      items.push(blocker("manifest_year_mismatch", "The manifest year does not match the input file year.", "Load the matching catalog manifest or override."));
-    }
-    if (inputFile && inspection && !inspection.blockers.length && manifestState.status === "ready" && !usageMode) {
-      items.push(blocker(
-        "monthly_role_missing",
-        "The builder cannot infer whether this import should update monthly toplist references.",
-        "Choose whether to use the scans as monthly scans or archive them as DataHub scans only.",
-      ));
-    }
-    return items;
-  }, [inputFile, inspection, manifestState, usageMode]);
-
-  const canBuild = Boolean(inputFile && inspection && manifestState.status === "ready" && blockers.length === 0 && !progress);
+  const { blockers, canBuild } = React.useMemo(() => evaluateScanArchiveBuilderInput({
+    inputSelected: Boolean(inputFile),
+    inspection,
+    inspectionError,
+    manifestState,
+    usageMode,
+    busy: Boolean(progress),
+  }), [inputFile, inspection, inspectionError, manifestState, usageMode, progress]);
 
   const handleBuild = React.useCallback(() => {
     if (!inputFile || !inspection || !usageMode || manifestState.status !== "ready" || !canBuild || !sessionRef.current) return;
-    buildRunRef.current?.cancel();
+    if (buildRunRef.current) return;
     resetResult();
     const run = sessionRef.current.build({
       inspectionId: inspection.inspectionId,
       manifest: manifestState.manifest,
       manifestSource: manifestState.source,
       usageMode,
-      replaceMonthly: true,
+      catalogUrl: getScanArchiveCatalogUrl(),
       allowCurrentRollback: false,
-      onProgress: setProgress,
+      onProgress: (nextProgress) => {
+        if (buildRunRef.current?.requestId === run.requestId) setProgress(nextProgress);
+      },
     });
     buildRunRef.current = run;
     run.promise
       .then((nextResult) => {
         if (buildRunRef.current?.requestId !== run.requestId) return;
+        buildRunRef.current = null;
         setResult(nextResult);
         if (!nextResult.blockers.length && nextResult.zipBytes.byteLength > 0) {
           const nextUrl = URL.createObjectURL(new Blob([nextResult.zipBytes], { type: "application/zip" }));
@@ -262,18 +270,23 @@ export default function AdminScanArchiveBuilderPage() {
         setProgress(null);
       })
       .catch((caught) => {
+        if (buildRunRef.current?.requestId !== run.requestId) return;
+        buildRunRef.current = null;
         if (caught instanceof ScanArchiveBuilderCancelledError) return;
-        setError(caught instanceof Error ? caught.message : String(caught));
+        setBuildError(scanArchiveBuilderBlockerFromError(caught, "build"));
         setProgress(null);
       });
   }, [canBuild, inputFile, inspection, manifestState, resetResult, usageMode]);
 
   const cancelBuild = React.useCallback(() => {
+    revisionRef.current++;
     buildRunRef.current?.cancel();
     inspectRunRef.current?.cancel();
     sessionRef.current?.terminate();
     sessionRef.current = null;
+    inspectRunRef.current = null;
     setInspection(null);
+    setInspectionError(null);
     setUsageMode(null);
     setManifestState(emptyManifestState);
     setProgress(null);
@@ -325,11 +338,11 @@ export default function AdminScanArchiveBuilderPage() {
               <p className={styles.muted}>{manifestDescription}</p>
             </div>
             <label className={styles.checkbox}>
-              <input type="radio" checked={manifestMode === "catalog"} onChange={() => setManifestMode("catalog")} />
+              <input type="radio" checked={manifestMode === "catalog"} onChange={() => { revisionRef.current++; resetResult(); setManifestState(emptyManifestState); setManifestMode("catalog"); }} />
               Auto-load catalog manifest
             </label>
             <label className={styles.checkbox}>
-              <input type="radio" checked={manifestMode === "override"} onChange={() => setManifestMode("override")} />
+              <input type="radio" checked={manifestMode === "override"} onChange={() => { revisionRef.current++; resetResult(); setManifestState(emptyManifestState); setManifestMode("override"); }} />
               Manual override
             </label>
             <input className={styles.fileInput} type="file" accept="application/json,.json" onChange={handleOverrideChange} />
@@ -339,18 +352,25 @@ export default function AdminScanArchiveBuilderPage() {
         <section className={`${styles.panel} ${styles.stack}`}>
           <h2 className={styles.title}>Toplist changes</h2>
           <div className={styles.optionGrid} role="radiogroup" aria-label="Toplist update role">
-            <label className={`${styles.option} ${usageMode === "monthly" ? styles.optionActive : ""}`}>
+            <label className={`${styles.option} ${usageMode === "create-monthly" ? styles.optionActive : ""}`}>
               <input
                 type="radio"
                 name="scanArchiveUsageMode"
-                checked={usageMode === "monthly"}
-                onChange={() => handleUsageModeChange("monthly")}
+                checked={usageMode === "create-monthly"}
+                onChange={() => handleUsageModeChange("create-monthly")}
               />
               <span>
-                <strong>Use as monthly scan</strong>
+                <strong>Create monthly scan</strong>
                 <span className={styles.small}>
-                  Archive scans and update monthly/current references by the existing builder rules.
+                  Create an explicit monthly set from this import and replace the monthly reference. Existing archive files are retained.
                 </span>
+              </span>
+            </label>
+            <label className={`${styles.option} ${usageMode === "add-monthly" ? styles.optionActive : ""}`}>
+              <input type="radio" name="scanArchiveUsageMode" checked={usageMode === "add-monthly"} onChange={() => handleUsageModeChange("add-monthly")} />
+              <span>
+                <strong>Add to monthly scan</strong>
+                <span className={styles.small}>Load the complete referenced monthly set and add only missing player and guild IDs. Existing entities are skipped.</span>
               </span>
             </label>
             <label className={`${styles.option} ${usageMode === "archive-only" ? styles.optionActive : ""}`}>
@@ -369,8 +389,10 @@ export default function AdminScanArchiveBuilderPage() {
             </label>
           </div>
           <p className={styles.muted}>
-            {usageMode === "monthly"
-              ? "Complete imported scans update monthly and current archive selections by the builder rules."
+            {usageMode === "create-monthly"
+              ? "This import defines the new monthly set. A newer Current selection is retained; otherwise the existing update and conflict rules apply."
+              : usageMode === "add-monthly"
+                ? "Only the referenced monthly set supplies existing IDs. Follow-up scans in the same UTC month may use different timestamps."
               : usageMode === "archive-only"
                 ? "The scan is archived for DataHub, with no toplist reference changes."
                 : "Choose how this import should be used before building the ZIP."}
@@ -384,18 +406,24 @@ export default function AdminScanArchiveBuilderPage() {
             message={progress.message}
             current={progress.current}
             total={progress.total}
-            progressLabel="batches"
+            progressLabel={progress.phase === "loading-monthly" ? "set members" : "batches"}
           />
         ) : null}
 
-        {error ? (
-          <div className={`${styles.status} ${styles.bad}`} role="alert">
-            <strong>{error}</strong>
-          </div>
-        ) : null}
+        {buildError ? <BlockerList blockers={[buildError]} /> : null}
 
         <BlockerList blockers={blockers} />
         {result ? <BlockerList blockers={result.blockers} /> : null}
+        {result && !result.blockers.length && result.warnings.some((warning) => warning.code === "current_preserved") ? (
+          <div className={styles.status} role="status">
+            <strong>Current remains unchanged</strong>
+            <ul className={styles.list}>
+              {result.warnings.filter((warning) => warning.code === "current_preserved").map((warning) => (
+                <li key={`${warning.preservedCurrent?.server}:${warning.preservedCurrent?.month}`}>{warning.message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className={styles.row}>
           <button type="button" className={styles.button} onClick={handleBuild} disabled={!canBuild}>
@@ -426,6 +454,12 @@ export default function AdminScanArchiveBuilderPage() {
         {result ? (
           <section className={`${styles.panel} ${styles.stack}`}>
             <h2 className={styles.title}>Result</h2>
+            <span className={styles.small}>Mode: {result.usageMode === "create-monthly" ? "Create monthly scan" : result.usageMode === "add-monthly" ? "Add to monthly scan" : "Archive as DataHub scan only"}</span>
+            {result.monthlyTargets.map((target) => (
+              <div className={styles.small} key={`${target.server}/${target.month}`}>
+                {target.server}/{target.month} · Existing set members: {target.baseMembers.length} · Players skipped / added: {target.skippedPlayers} / {target.addedPlayers} · Guilds skipped / added: {target.skippedGuilds} / {target.addedGuilds} · Complete-source updates (players / guilds): {target.updatedPlayers} / {target.updatedGuilds} · Duplicate new rows omitted (players / guilds): {target.duplicatePlayers} / {target.duplicateGuilds}
+              </div>
+            ))}
             <div className={styles.metrics}>
               <Metric label="New scans" value={result.summary.newScans} />
               <Metric label="Files to write" value={result.summary.filesToWrite} />

@@ -101,7 +101,6 @@ export type ImportReport = {
 
 /** ---- utilities ---- */
 type Row = Record<string, any>;
-type RowMeta = { row: Row; ts: number };
 type FirestoreOpDetail = { op?: string; path?: string | null };
 type FirestoreErrorContext = {
   op?: string;
@@ -141,11 +140,6 @@ const CANON = (s: string) =>
     .replace(/:+$/, "")
     .toLowerCase()
     .replace(/[\s_\u00a0]+/g, "");
-const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
-const dateKeyFromSec = (sec: number | null | undefined): number => {
-  const d = sec ? new Date(sec * 1000) : new Date();
-  return Number(`${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`);
-};
 
 // diakritikfrei + lowercase (für Folds/Token/Ngram)
 const toFold = (s: any) =>
@@ -359,27 +353,14 @@ const resolveMemberCountHeader = (headers: string[], candidates?: string[]) => {
   return list[0];
 };
 
-const MAX_CANON_KEYS = new Set<string>([
-  CANON("Strength"),
-  CANON("Dexterity"),
-  CANON("Intelligence"),
-  CANON("Constitution"),
-  CANON("Luck"),
-  CANON("Attribute"),
-]);
 
-const MAX_SUBSTRINGS = ["equipment"]; // „alles was equipment betrifft“
 
-const isMaxField = (canonKey: string) =>
-  MAX_CANON_KEYS.has(canonKey) || MAX_SUBSTRINGS.some((s) => canonKey.includes(s));
 
 const pickByCanon = (row: Row, canonKey: string): any => {
   for (const k of Object.keys(row)) if (CANON(k) === canonKey) return row[k];
   return undefined;
 };
 
-const pickAnyByCanon = (row: Row, keys: string[]): any =>
-  keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
 
 const SERVER_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
 const SERVER_CODE_SUFFIX_PATTERN = /^([a-z]{1,4}\d+)[_.-]?(net|eu)$/i;
@@ -1043,7 +1024,6 @@ export function parseGuildsCsvText(text: string): ParsedGuildCsvRow[] {
 /** ---- batching ---- */
 const PLAYER_DERIVED_COL = "stats_cache_player_derived";
 const GUILD_DERIVED_COL = "stats_cache_guild_derived";
-const BATCH_SCANS = 120;   // viele, mittelgross
 const BATCH_LATEST = 40;   // gross (alle Felder) -> kleine Batches
 const BATCH_HISTORY = 120; // aggregiert, moderat
 const PLAYER_DERIVED_SNAPSHOT_LIMIT = 500;
@@ -1441,7 +1421,7 @@ async function writeScansWithResults(
 async function writeLatest(
   latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }>,
   onProgress?: ImportCsvOptions["onProgress"],
-  kind?: ImportCsvKind,
+  _kind?: ImportCsvKind,
   onErrorCode?: (error: unknown, context?: FirestoreErrorContext) => void,
 ) {
   if (!latestDocs.length) return;
@@ -1881,42 +1861,6 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
   }
 }
 
-/** ---- Aggregation ---- */
-function aggregateValues(rowsSortedAsc: RowMeta[], allHeaders: string[]): Record<string, any> {
-  const out: Record<string, any> = {};
-  for (const h of allHeaders) {
-    const canon = CANON(h);
-
-    if (isMaxField(canon)) {
-      let bestNum: number | null = null;
-      let bestRaw: any = undefined;
-      for (const rm of rowsSortedAsc) {
-        const v = rm.row[h];
-        if (v == null || v === "") continue;
-        const n = Number(String(v).replace(/[^0-9.-]/g, ""));
-        if (!Number.isNaN(n)) {
-          if (bestNum == null || n > bestNum) {
-            bestNum = n;
-            bestRaw = v;
-          }
-        }
-      }
-      out[h] = bestRaw ?? "";
-    } else {
-      let chosen: any = "";
-      for (let i = rowsSortedAsc.length - 1; i >= 0; i--) {
-        const v = rowsSortedAsc[i].row[h];
-        if (v != null && String(v) !== "") {
-          chosen = v;
-          break;
-        }
-      }
-      out[h] = chosen;
-    }
-  }
-  return out;
-}
-
 /** ---- Helper: vorhandenen latest-Zeitpunkt robust lesen (Sekunden) ---- */
 async function readPrevLatestSec(
   latestRef: ReturnType<typeof doc>,
@@ -2039,7 +1983,6 @@ export async function importCsvToDB(
   if (opts.kind === "players") {
     const playerScanDocs: ScanDoc[] = [];
     const latestDocs: Array<{ ref: ReturnType<typeof doc>; data: any }> = [];
-    const putHistory: BatchWrite[] = [];
     const pendingDerivedByServer = new Map<string, PlayerDerivedSnapshotEntry[]>();
 
     let sourceRows: Row[] = [];
@@ -2058,12 +2001,10 @@ export async function importCsvToDB(
     const {
       rows: parsedPlayers,
       stats: playerParseStats,
-      headers: playerHeaders,
     } = parsePlayersFromRows(sourceRows, sourceHeaders);
     counts.skippedMissingIdentifier! += playerParseStats.missingIdentifier;
     counts.skippedBadTs! += playerParseStats.badTimestamp;
     counts.skippedMissingServer! += playerParseStats.missingServer;
-    const ALL_HEADERS = playerHeaders.length ? playerHeaders : inferHeadersFromRows(sourceRows);
 
     type PlayerRowMeta = { row: Row; ts: number; parsed: ParsedPlayerCsvRow };
     const byIdentifier = new Map<string, PlayerRowMeta[]>();
@@ -2306,12 +2247,10 @@ export async function importCsvToDB(
     const {
       rows: parsedGuilds,
       stats: guildParseStats,
-      headers: guildHeaders,
     } = parseGuildsFromRows(sourceRows, sourceHeaders);
     counts.skippedMissingGuildIdentifier! += guildParseStats.missingIdentifier;
     counts.skippedBadTsGuild! += guildParseStats.badTimestamp;
     counts.skippedMissingServer! += guildParseStats.missingServer;
-    const ALL_HEADERS = guildHeaders.length ? guildHeaders : inferHeadersFromRows(sourceRows);
 
     type GuildRowMeta = { row: Row; ts: number; parsed: ParsedGuildCsvRow };
     const byGid = new Map<string, GuildRowMeta[]>();

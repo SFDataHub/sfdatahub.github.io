@@ -1,5 +1,4 @@
 // src/pages/Toplists/index.tsx
-import React from "react";
 import PlayerToplists from "./playertoplists";
 import { FilterProvider } from "../../components/Filters/FilterContext";
 

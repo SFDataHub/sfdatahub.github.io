@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     base,
     publicDir: "public",
+    // The builder uses the shared local scan library inside its module worker,
+    // including that library's lazy imports and archive download subworker.
+    worker: { format: "es" },
     server: {
       port: 5173,
       open: false,

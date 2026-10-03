@@ -1,5 +1,5 @@
 // FILE: src/pages/Playground/PortraitMakerDemo/Index.tsx
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./styles.module.css";
 import PortraitMaker from "https://pm-lib.12hp.de/PortraitMaker-core-latest.min.js";
 

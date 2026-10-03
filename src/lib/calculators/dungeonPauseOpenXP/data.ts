@@ -1,4 +1,4 @@
-import { CalculatorData, SpecialRow } from "./types";
+import type { CalculatorData, SpecialRow } from "./types";
 
 /** 1-basige Arrays (Index 0 bleibt 0) */
 function oneBased(values: number[], max?: number): number[] {

@@ -3,6 +3,7 @@ import {
   putSfDataHubArchiveSearchIndexCache,
   type GuildHubArchiveSearchIndexCacheRecord,
 } from "../guilds/localScanLibrary";
+import { toplistRowIdentity } from "./toplistRowIdentity";
 import { resolveServer } from "../servers/serverResolver";
 import {
   ScanArchiveSearchIndexCancelledError,
@@ -62,6 +63,8 @@ export type ScanArchiveSearchIndexLoadResult = {
 export type ScanArchiveSearchKind = "player" | "guild";
 
 export type ScanArchiveSearchHitBase = {
+  // A matching physical source, never an authoritative monthly winner.
+  // Resolve all explicit set members before deriving a monthly dataset.
   kind: ScanArchiveSearchKind;
   name: string;
   identifier: string;
@@ -485,6 +488,13 @@ export class ScanArchiveSearchIndexSet {
     this.entriesByArchiveKey = new Map(this.entries.map((entry) => [archiveEntryKey(entry), entry] as const));
   }
 
+  getUniqueEntityCounts() {
+    const players = new Set<string>();
+    const guilds = new Set<string>();
+    for (const { hit } of this.documents) (hit.kind === "player" ? players : guilds).add(toplistRowIdentity(hit.server, hit.identifier, hit.kind === "player" ? "players" : "groups"));
+    return { players: players.size, guilds: guilds.size };
+  }
+
   searchPlayers(query: string, options: ScanArchiveSearchOptions = {}) {
     return this.searchByKind(query, "player", options) as ScanArchivePlayerSearchHit[];
   }
@@ -532,7 +542,12 @@ export function collectArchiveEntriesForSearchResults(
   selectedEntries: readonly ScanArchiveEntry[],
 ) {
   const entryByKey = new Map(selectedEntries.map((entry) => [archiveEntryKey(entry), entry] as const));
-  const selectedKeys = new Set(results.map((result) => `${result.archiveScanId}:${result.archiveSha256.toLowerCase()}`));
+  const selectedKeys = new Set(results.flatMap((result) => {
+    const sourceKey = `${result.archiveScanId}:${result.archiveSha256.toLowerCase()}`;
+    const source = entryByKey.get(sourceKey);
+    if (!source?.toplistSetScanIds) return [sourceKey];
+    return selectedEntries.filter(entry => source.toplistSetScanIds!.includes(entry.id) && entry.toplistSetKey === source.toplistSetKey).map(archiveEntryKey);
+  }));
   return [...selectedKeys]
     .flatMap((key) => {
       const entry = entryByKey.get(key);

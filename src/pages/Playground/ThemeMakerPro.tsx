@@ -84,7 +84,7 @@ function ColorRow({label,value,onChange}:{label:string; value:string; onChange:(
   );
 }
 function NumRow({
-  label,value,min,max,step=1,onChange,suffix
+  label,value,min,max,step=1,onChange
 }:{label:string; value:number; min:number; max:number; step?:number; suffix?:string; onChange:(v:number)=>void}){
   return (
     <label style={{...row, gridTemplateColumns:"140px 1fr 70px"}}>

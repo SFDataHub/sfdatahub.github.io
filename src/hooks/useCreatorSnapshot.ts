@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Creator, CreatorSnapshot } from "../lib/creators/shared";
+import type { Creator, CreatorSnapshot } from "../lib/creators/shared";
 
 interface SnapshotResult {
   snapshot: CreatorSnapshot | null;

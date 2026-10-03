@@ -510,7 +510,6 @@ function UploadCenterContentBody() {
 
   useEffect(() => {
     let isActive = true;
-    const today = formatTodayString();
     const usageFromUser: UploadCenterUsage = user?.uploadCenter?.usage ?? {
       date: null,
       guilds: 0,

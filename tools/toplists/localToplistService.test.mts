@@ -362,8 +362,12 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   assert.equal(result.snapshots[0].guildCount, 1);
   assert.equal(result.playerRows.length, 2);
   assert.equal(result.guildRows.length, 1);
-  assert.equal(result.playerRows.every((row) => row.archiveScanId === newMember.id), true);
-  assert.equal(result.guildRows[0].archiveScanId, newMember.id);
+  // These suffixed fixture identifiers do not match the numeric roster IDs.
+  // With no complete candidate the earliest source remains the basis.
+  assert.equal(result.guildRows[0].memberBasisStatus, "incomplete");
+  assert.equal(result.guildRows[0].avgLevel, null);
+  assert.equal(result.playerRows.every((row) => row.archiveScanId === oldMember.id), true);
+  assert.equal(result.guildRows[0].archiveScanId, oldMember.id);
 }
 
 {

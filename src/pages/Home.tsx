@@ -1,7 +1,6 @@
 // src/pages/Home.tsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import ContentShell from "../components/ContentShell";
 import FeaturedPreviewCard from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard";
 import FeaturedPreviewRow from "../components/wrapper/home/FeaturedPreviewRow/FeaturedPreviewRow";
@@ -18,8 +17,6 @@ import guideHubLogo from "../assets/logo_guidehub.png";
 import { guideAssetByKey } from "../data/guidehub/assets";
 import { AUTH_BASE_URL } from "../lib/auth/config";
 
-// Historybook cover (homepage preview)
-const HISTORYBOOK_COVER_URL = "/flipbooks/sf-history-book/history_book_coverpage.png";
 const GUIDEHUB_ROUTE = "/guidehub-v2";
 const SFTOOLS_ASSET = guideAssetByKey("sftools", 512);
 const SFTAVERN_DISCORD_ASSET = guideAssetByKey("sftaverndiscord", 512);
@@ -208,52 +205,10 @@ function extractYouTubeVideoId(url: string): string | null {
   return null;
 }
 
-// Kachel-Grid
-type Tile = { to: string; labelKey: string; icon?: string };
-const TILE_ROUTES: Tile[] = [
-  { to: "/toplists/", labelKey: "nav.toplists" },
-  { to: "/players/", labelKey: "nav.players" },
-  { to: "/guilds/", labelKey: "nav.guilds" },
-  { to: "/community/", labelKey: "nav.community" },
-  { to: "/creator-hub/", labelKey: "nav.creatorHub" },
-  { to: "/help", labelKey: "nav.help" },
-  { to: "/settings/", labelKey: "nav.settings" },
-];
 
-const ICON_MANIFEST: Record<string, string> = {
-  // optional: "/toplists/": "/icons/toplists.svg"
-};
 
 // ---------- Subcomponents ----------
 
-const TileGrid: React.FC = () => {
-  const { t } = useTranslation();
-  return (
-    <section className={styles.card} data-i18n-scope="home.tiles">
-      <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.title">{t("home.title")}</span>
-        <span className={styles.subtitle} data-i18n="home.subtitle">{t("home.subtitle")}</span>
-      </header>
-      <div className={styles.tileGrid} role="list">
-        {TILE_ROUTES.map((tile) => {
-          const label = t(tile.labelKey);
-          return (
-            <Link key={tile.to} to={tile.to} role="listitem" className={styles.tile} aria-label={label}>
-              {ICON_MANIFEST[tile.to] ? (
-                <img src={ICON_MANIFEST[tile.to]} alt="" className={styles.tileIcon} />
-              ) : tile.to === GUIDEHUB_ROUTE ? (
-                <img src={guideHubLogo} alt="" className={styles.tileIcon} />
-              ) : (
-                <div className={styles.tileIconFallback} aria-hidden>{label.slice(0,2).toUpperCase()}</div>
-              )}
-              <div className={styles.tileLabel} data-i18n={tile.labelKey}>{label}</div>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-};
 
 const TwitchHeaderLogo: React.FC = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

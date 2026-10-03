@@ -22,6 +22,15 @@ import {
 import type { LocalServerFusionEvent } from "../../src/data/serverFusions.ts";
 import type { LocalServerDefinition } from "../../src/data/serverRegistry.ts";
 
+for (const input of ["AM1", "am1_net", "AM1_NET", "am1_am", "am1am", "am1.sfgame.net", 521]) {
+  const resolved = resolveServer(input);
+  assert.equal(resolved?.code, "AM1", String(input));
+  assert.equal(resolved?.host, "am1.sfgame.net");
+  assert.equal(resolved?.numericId, 521);
+}
+assert.equal(resolveServer("unknown_builder_test_net"), null);
+assert.deepEqual(validateServerGraph(), []);
+
 const eu3Inputs = ["EU3", "eu3", "s3_eu", "s3eu", "s3.sfgame.eu", "https://s3.sfgame.eu/profile"];
 
 eu3Inputs.forEach((input) => {

@@ -381,8 +381,20 @@ assert.equal(cached.searchSet.search("Gamma").length, 1);
     dependencies: { downloadSearchIndex: downloader([]) },
   });
   assert.equal(result.status, "complete");
+  assert.deepEqual(result.searchSet.getUniqueEntityCounts(), { players: 1, guilds: 1 });
   assert.deepEqual(result.searchSet.searchPlayers("Shared Hero").map((hit) => hit.archiveScanId), [sharedNewer.entry.id]);
   assert.deepEqual(result.searchSet.searchGuilds("Shared Guild").map((hit) => hit.archiveScanId), [sharedNewer.entry.id]);
+}
+
+{
+  const key = "explicit-shared-set";
+  const entries = [sharedOlder.entry, sharedNewer.entry].map(entry => ({ ...entry, toplistSetKey: key, toplistSetScanIds: [sharedOlder.entry.id, sharedNewer.entry.id] }));
+  const result = await loadScanArchiveSearchIndexSet(entries, { dependencies: { downloadSearchIndex: downloader([]) } });
+  const hits = result.searchSet.searchGuilds("Shared Guild");
+  assert.equal(hits.length, 1);
+  // The hit is an index source. Acquisition expands its explicit set so the
+  // derivation can choose the authoritative complete guild/member basis.
+  assert.deepEqual(result.searchSet.collectArchiveEntriesForResults(hits).map(entry => entry.id), entries.map(entry => entry.id));
 }
 
 const alphaHit = cached.searchSet.searchPlayers("Alpha")[0];

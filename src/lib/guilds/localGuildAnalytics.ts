@@ -538,19 +538,6 @@ function collectGuildAnalyticsGuildObservations(
   return data.guilds.filter((snapshot) => isDerivedGuildSnapshotForGuild(snapshot, guild));
 }
 
-function collectGuildAnalyticsMemberObservations(
-  data: GuildAnalyticsDerivedData,
-  guild: GuildAnalyticsGuildIdentity,
-  identityScope: GuildAnalyticsIdentityScope,
-  identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null,
-) {
-  if (identityResolutionSnapshot && identityScope.selectedGuildIdentifier && identityScope.resolution?.resolved) {
-    const history = collectGuildIdentityObservations(identityResolutionSnapshot, identityScope.selectedGuildIdentifier, data.members);
-    if (history.resolution.resolved) return history.observations.map((entry) => entry.observation);
-  }
-
-  return data.members.filter((member) => isDerivedMemberInGuild(member, guild));
-}
 
 function collectExactGuildSnapshotMembers(
   data: GuildAnalyticsDerivedData,

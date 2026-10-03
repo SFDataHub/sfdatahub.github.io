@@ -1,5 +1,4 @@
 // src/pages/GuideHub/Exit.tsx
-import React from "react";
 import styles from "./Exit.module.css"; // Die CSS-Datei für die Exit-Seite
 
 export default function Exit() {

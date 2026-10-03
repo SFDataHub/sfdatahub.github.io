@@ -41,7 +41,6 @@ import {
   type LocalToplistExportSnapshot,
 } from "./localToplistExportModel";
 import {
-  buildLocalToplistPendingTarget,
   nextLocalToplistVisibleBatchSize,
   normalizeLocalToplistSearchIdentifier,
   resolveLocalToplistSearchSelection,
@@ -164,7 +163,6 @@ function GuildHubToplistInner() {
     setServers,
     classes,
     guilds,
-    setGuilds,
     sortBy,
     setSortBy,
     favoritesOnly,

@@ -315,7 +315,7 @@ export default function ServerComparisonMultiLineChart({
 }: ServerComparisonMultiLineChartProps) {
   const [rangeMonths, setRangeMonths] = useState<RangeMonths>(12);
   const [normalize, setNormalize] = useState(false);
-  const [showServerAvg, setShowServerAvg] = useState(false);
+  const [showServerAvg] = useState(false);
   const [showGuildAvg, setShowGuildAvg] = useState(true);
   const [internalSelectedFavoriteKeys, setInternalSelectedFavoriteKeys] = useState<string[]>(["aster"]);
   const [nextFavorite, setNextFavorite] = useState<string>("aster");

@@ -13,10 +13,16 @@ import type {
   ScanArchiveBuilderResponse,
 } from "../lib/scanArchive/scanArchiveBuilderTypes";
 import { mapCoreBuilderPhase } from "../lib/scanArchive/scanArchiveBuilderTypes";
+import { scanArchiveBuilderBlockerFromError } from "../lib/scanArchive/scanArchiveBuilderErrors";
 import type { ScanArchiveManifest } from "../lib/scanArchive/types";
+import { createScanArchiveBuilderMonthlyLoader } from "../lib/scanArchive/scanArchiveBuilderAcquisition";
+import { scanArchiveBuilderTargets } from "../lib/scanArchive/scanArchiveBuilderMonthly";
 
 const textEncoder = new TextEncoder();
 let activeRequestId: string | null = null;
+let activeAbort: AbortController | null = null;
+let requestQueue = Promise.resolve();
+const discardedRequests = new Set<string>();
 const inspections = new Map<string, { batches: ScanArchiveBatch[] }>();
 const workerScope = self as unknown as {
   postMessage(message: ScanArchiveBuilderResponse, transfer?: Transferable[]): void;
@@ -57,28 +63,22 @@ const assertActive = (requestId: string) => {
   if (activeRequestId !== requestId) throw new Error("scan_archive_builder_cancelled");
 };
 
-const blockerFromError = (error: unknown): ScanArchiveBuilderBlocker => {
-  const message = error instanceof Error ? error.message : String(error);
-  return {
-    code: "input_validation_failed",
-    cause: message || "Die Eingabedatei konnte nicht als Scan-Archiv verarbeitet werden.",
-    remedy: "Nutze ein rohes SFtools-JSON mit top-level players[] und groups[] fuer genau ein Archivjahr.",
-  };
-};
-
 const blockerFromConflict = (conflict: ScanArchiveBuildPlanCore<Uint8Array>["conflicts"][number]): ScanArchiveBuilderBlocker => ({
   code: conflict.code,
   cause: conflict.message,
   remedy:
-    conflict.code === "toplist_monthly_replace_required"
-      ? "Aktiviere das Ersetzen der monatlichen Auswahl oder waehle eine Manifest-Version ohne diese Belegung."
-      : "Pruefe Manifest, Eingabedatei und Zielpfade, bevor du das Archivpaket exportierst.",
+    conflict.code.startsWith("add_")
+      ? "Pruefe das Monatsziel und alle genannten Set-Mitglieder. Fuer einen neuen Monatsstand Create monthly scan verwenden."
+      : conflict.code === "scan_id_conflict" || conflict.code.includes("path_conflict")
+        ? "Bestehende Archivdateien sind unveraenderlich. Einen echten Nachscan mit anderem Timestamp importieren; vorhandene Bytes nicht ueberschreiben."
+        : "Pruefe Manifest, Eingabedatei und Zielpfade, bevor du das Archivpaket exportierst.",
 });
 
 const createInspectionId = () => `inspection-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const inspectInput = async (requestId: string, inputFile: File) => {
   activeRequestId = requestId;
+  inspections.clear();
   emitProgress(requestId, { phase: "parsing", message: "SFtools-JSON wird gelesen." });
   const content = await inputFile.text();
   assertActive(requestId);
@@ -104,6 +104,7 @@ const inspectInput = async (requestId: string, inputFile: File) => {
       months: [...new Set(batches.map((batch) => monthKeyForScanArchiveTimestamp(batch.timestamp)))],
       servers: [...new Set(batches.map((batch) => batch.server))].sort((left, right) => left.localeCompare(right)),
       batchCount: batches.length,
+      targets: scanArchiveBuilderTargets(batches).map(({ server, month }) => ({ server, month })),
       blockers,
     },
   });
@@ -124,19 +125,27 @@ const buildExistingFiles = (manifest: ScanArchiveManifest) => {
 };
 
 const buildZip = (plan: ScanArchiveBuildPlanCore<Uint8Array>) => {
+  // ZIP's DOS date starts at 1980; Unix epoch 0 is only valid for gzip.
+  const mtime = new Date(1980, 0, 1);
   const zipContent: Zippable = {
-    "manifest.json": [strToU8(`${JSON.stringify(plan.manifestAfter, null, 2)}\n`), { level: 9, mtime: 0 }],
+    "manifest.json": [strToU8(`${JSON.stringify(plan.manifestAfter, null, 2)}\n`), { level: 9, mtime }],
   };
   for (const file of plan.files) {
     if (file.action !== "write" || !file.bytes) continue;
-    zipContent[file.relativePath] = [file.bytes, { level: 9, mtime: 0 }];
+    zipContent[file.relativePath] = [file.bytes, { level: 9, mtime }];
   }
-  return zipSync(zipContent, { level: 9, mtime: 0 });
+  return zipSync(zipContent, { level: 9, mtime });
 };
 
 const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuilderRequest, { type: "build" }>) => {
   activeRequestId = requestId;
+  activeAbort?.abort();
+  const abort = new AbortController();
+  activeAbort = abort;
   const inspected = inspections.get(request.inspectionId);
+  if (!["create-monthly", "add-monthly", "archive-only"].includes(request.usageMode)) {
+    throw new Error("Waehle Create monthly scan, Add to monthly scan oder Archive as DataHub scan only.");
+  }
   if (!inspected) {
     throw new Error("Die Worker-Inspection ist nicht mehr verfuegbar. Bitte lade die Eingabedatei erneut.");
   }
@@ -147,8 +156,11 @@ const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuild
       manifest: request.manifest,
       inputBatches: inspected.batches,
       usageMode: request.usageMode,
-      replaceMonthly: request.replaceMonthly,
+      loadMonthlyRawScan: request.usageMode === "add-monthly" ? createScanArchiveBuilderMonthlyLoader({
+        manifest: request.manifest, source: request.manifestSource, catalogUrl: request.catalogUrl, signal: abort.signal,
+      }) : undefined,
       allowCurrentRollback: request.allowCurrentRollback,
+      preserveNewerCurrent: true,
       existingFiles: buildExistingFiles(request.manifest),
       onProgress: (progress) => {
         emitProgress(requestId, { ...progress, phase: mapCoreBuilderPhase(progress.phase) });
@@ -186,6 +198,8 @@ const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuild
       requestId,
       result: {
         year: plan.year,
+        usageMode: request.usageMode,
+        monthlyTargets: plan.monthlyTargets,
         manifestSource: request.manifestSource,
         manifestBefore: plan.manifestBefore,
         manifestAfter: plan.manifestAfter,
@@ -205,22 +219,28 @@ const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuild
     },
     [zipBuffer],
   );
-  inspections.delete(request.inspectionId);
+  if (activeAbort === abort) activeAbort = null;
 };
 
 workerScope.addEventListener("message", (event: MessageEvent<ScanArchiveBuilderRequest>) => {
   const request = event.data;
-  if (request.type === "cancel") {
+  if (request.type === "cancel" || request.type === "discard-build") {
+    discardedRequests.add(request.requestId);
     if (activeRequestId === request.requestId) {
       activeRequestId = null;
-      inspections.clear();
+      activeAbort?.abort();
+      if (request.type === "cancel") inspections.clear();
       postResponse({ type: "cancelled", requestId: request.requestId });
     }
     return;
   }
 
-  void (async () => {
+  requestQueue = requestQueue.then(async () => {
     try {
+      if (discardedRequests.has(request.requestId)) {
+        postResponse({ type: "cancelled", requestId: request.requestId });
+        return;
+      }
       if (request.type === "inspect") {
         await inspectInput(request.requestId, request.inputFile);
       } else {
@@ -229,18 +249,24 @@ workerScope.addEventListener("message", (event: MessageEvent<ScanArchiveBuilderR
       if (activeRequestId === request.requestId) activeRequestId = null;
     } catch (error) {
       if (error instanceof Error && error.message === "scan_archive_builder_cancelled") {
-        inspections.clear();
         postResponse({ type: "cancelled", requestId: request.requestId });
         return;
       }
-      inspections.clear();
-      const blocker = blockerFromError(error);
+      const blocker = scanArchiveBuilderBlockerFromError(error, request.type === "inspect" ? "input" : "build");
       postResponse({
         type: "error",
         requestId: request.requestId,
         phase: "error",
         message: `${blocker.cause} Remedy: ${blocker.remedy}`,
+        blocker,
       });
+    } finally {
+      discardedRequests.delete(request.requestId);
+      if (activeRequestId === request.requestId) {
+        activeRequestId = null;
+        activeAbort?.abort();
+        activeAbort = null;
+      }
     }
-  })();
+  });
 });

@@ -68,7 +68,6 @@ export type FusionSetupState = {
   partnerGuilds: PlannerGuildConfig[];
 };
 
-const DEFAULT_FALLBACK_GUILD_ID = "guild-emerald";
 
 const INITIAL_MEMBERS: FusionMember[] = [
   {

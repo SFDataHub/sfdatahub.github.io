@@ -360,10 +360,6 @@ function slimGuilds(rows: Row[], headers: string[]): GuildSlim[] {
   return out;
 }
 
-const toUpperOrUndefined = (value: any) => {
-  const s = value != null ? String(value).trim() : "";
-  return s ? s.toUpperCase() : undefined;
-};
 
 export type CsvTextSource = {
   name: string;
@@ -635,7 +631,7 @@ export default function ImportCsv({ mode = "db", onBuildUploadSession }: ImportC
 
   const [importBusy, setImportBusy] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
-  const [reports, setReports] = useState<ImportReport[]>([]);
+  const [, setReports] = useState<ImportReport[]>([]);
   const [progress, setProgress] = useState<{phase:"prepare"|"write"|"done"; current:number; total:number} | null>(null);
 
   useEffect(()=>{ const p=document.body.style.overflowX; document.body.style.overflowX="hidden"; return ()=>{ document.body.style.overflowX=p; }; },[]);

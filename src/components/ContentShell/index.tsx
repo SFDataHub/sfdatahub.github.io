@@ -82,7 +82,6 @@ export default function ContentShell({
   };
 
   // Shell-Viewport: volle Höhe abzüglich globaler Topbar
-  const shellHeight = `calc(100vh - ${shellViewportOffset})`;
 
   // ---------- Top (fix/sticky) ----------
   const TopArea = (

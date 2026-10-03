@@ -24,11 +24,10 @@ import {
 import { useBackClose } from "../../hooks/useBackClose";
 import {
   createSfDataHubLocalScanImportPreview,
-  commitSfDataHubLocalScanPreview,
   deleteSfDataHubLocalScans,
   deriveGuildHubLogicalScanSnapshots,
-  findSfDataHubLocalScanByArchiveScanId,
   getSfDataHubLocalScan,
+  getSfDataHubArchiveSearchIndexCache,
   importSfDataHubLocalScanRecords,
   listSfDataHubScanSummaries,
   renameSfDataHubScanSlot,
@@ -39,15 +38,17 @@ import {
   type SfDataHubLocalScan,
 } from "../../lib/guilds/localScanLibrary";
 import {
-  createScanArchiveSourceMetadata,
   loadScanArchiveEntries,
 } from "../../lib/scanArchive/client";
 import {
-  ScanArchiveDownloadCancelledError,
   startScanArchiveDownloadWorkerRun,
   type ScanArchiveDownloadRun,
 } from "../../lib/scanArchive/downloadWorkerClient";
 import type { ScanArchiveDownloadProgress } from "../../lib/scanArchive/downloadWorkerTypes";
+import { acquireExplicitLocalFirstArchiveScans } from "../../lib/scanArchive/localFirstScanAcquisition";
+import { loadScanArchiveSearchIndexSet, ScanArchiveSearchIndexSet } from "../../lib/scanArchive/searchIndexService";
+import { archiveGroupLocalIds, findArchiveOverviewLocal, groupArchiveOverviewDays, type ArchiveOverviewDay } from "./scanArchiveOverview";
+import { validateScanArchiveSearchIndexPayload } from "../../lib/scanArchive/validation";
 import type { ScanArchiveEntry } from "../../lib/scanArchive/types";
 import type { GuildSnapshotCoverageStatus } from "../../lib/guilds/guildCoverage";
 import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../../lib/guilds/guildScanNormalizer";
@@ -142,7 +143,7 @@ type ArchiveTableRow = {
 type ArchiveTableGroup = {
   id: string;
   label: string;
-  rows: ArchiveTableRow[];
+  rows: ArchiveOverviewDay[];
 };
 
 const EMPTY_FEEDBACK: ImportFeedback = {
@@ -242,11 +243,6 @@ function getArchiveDisplayName(entry: ScanArchiveEntry) {
   return filename.endsWith(".gz") ? filename.slice(0, -3) : filename;
 }
 
-function getArchiveImportFilename(entry: ScanArchiveEntry) {
-  const displayName = getArchiveDisplayName(entry);
-  return displayName.toLowerCase().endsWith(".json") ? displayName : `${displayName}.json`;
-}
-
 function getScanSortTimestamp(summary: GuildHubScanSummary) {
   return summary.lastSnapshotTimestamp ?? summary.firstSnapshotTimestamp ?? Number.NEGATIVE_INFINITY;
 }
@@ -260,19 +256,12 @@ function getArchiveRowServerSortKey(row: ArchiveTableRow) {
   return server.trim().toLowerCase();
 }
 
-function getArchiveMonthId(timestamp: number) {
-  const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime())) return "unknown";
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 function formatArchiveMonthLabel(timestamp: number) {
   const date = new Date(timestamp);
   if (!Number.isFinite(date.getTime())) return "Unbekannter Monat";
   return new Intl.DateTimeFormat("de-DE", {
     month: "long",
     year: "numeric",
-    timeZone: "UTC",
   }).format(date);
 }
 
@@ -476,6 +465,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateTargetIdRef = React.useRef<string | null>(null);
+  const archiveAcquisitionRef = React.useRef<AbortController | null>(null);
+  const [expandedArchiveDays, setExpandedArchiveDays] = React.useState<Record<string, boolean>>({});
+  const [archiveDayCounts, setArchiveDayCounts] = React.useState<Record<string, { players: number; guilds: number }>>({});
+  const [archiveEntryErrors, setArchiveEntryErrors] = React.useState<Record<string, string>>({});
   const archiveDownloadRunsRef = React.useRef(new Map<string, ScanArchiveDownloadRun>());
   const [scans, setScans] = React.useState<GuildHubScanSummary[]>([]);
   const [archiveEntries, setArchiveEntries] = React.useState<ScanArchiveEntry[]>([]);
@@ -535,7 +528,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     try {
       const rows = await listSfDataHubScanSummaries();
       setScans(rows);
-      const visibleIds = new Set(rows.filter((scan) => !scan.containedInScanSlotId).map((scan) => scan.sourceScanId));
+      const visibleIds = new Set(rows.map((scan) => scan.sourceScanId));
       setSelectedIds((current) => new Set([...current].filter((id) => visibleIds.has(id))));
     } catch (error) {
       console.error("[ScanManagement] failed to load scans", error);
@@ -585,6 +578,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
   React.useEffect(() => {
     if (isOpen) return;
+    archiveAcquisitionRef.current?.abort();
     archiveDownloadRunsRef.current.forEach((run) => run.cancel());
     archiveDownloadRunsRef.current.clear();
   }, [isOpen]);
@@ -640,18 +634,12 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     return [...byId.values()].sort((left, right) => right.timestamp - left.timestamp || left.server.localeCompare(right.server) || left.id.localeCompare(right.id));
   }, [archiveEntries]);
   const archiveRows = React.useMemo<ArchiveTableRow[]>(() => {
-    const localByArchiveId = new Map<string, GuildHubScanSummary>();
-    for (const scan of localArchiveScans) {
-      const archiveScanId = scan.archiveSource?.archiveScanId;
-      if (archiveScanId && !localByArchiveId.has(archiveScanId)) localByArchiveId.set(archiveScanId, scan);
-    }
-
     if (archiveManifestEntries.length) {
       return archiveManifestEntries
         .map((entry) => ({
         id: entry.id,
         entry,
-        localSummary: localByArchiveId.get(entry.id) ?? null,
+        localSummary: findArchiveOverviewLocal(entry, scans),
         }))
         .sort(
           (left, right) =>
@@ -679,25 +667,47 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
           }) ||
           left.id.localeCompare(right.id),
       );
-  }, [archiveManifestEntries, localArchiveScans]);
+  }, [archiveManifestEntries, localArchiveScans, scans]);
+  const archiveDays = React.useMemo(() => groupArchiveOverviewDays(archiveRows), [archiveRows]);
   const archiveGroups = React.useMemo<ArchiveTableGroup[]>(() => {
     const groups = new Map<string, ArchiveTableGroup>();
-    for (const row of archiveRows) {
-      const timestamp = getArchiveRowSortTimestamp(row);
-      const id = getArchiveMonthId(timestamp);
-      const group = groups.get(id);
-      if (group) {
-        group.rows.push(row);
-      } else {
-        groups.set(id, {
-          id,
-          label: formatArchiveMonthLabel(timestamp),
-          rows: [row],
-        });
-      }
+    for (const day of archiveDays) {
+      const group = groups.get(day.month);
+      if (group) group.rows.push(day);
+      else groups.set(day.month, { id: day.month, label: formatArchiveMonthLabel(day.firstTimestamp), rows: [day] });
     }
     return [...groups.values()];
-  }, [archiveRows]);
+  }, [archiveDays]);
+  const archiveDayKey = (day: ArchiveOverviewDay) => JSON.stringify(day.members.map(row => [row.id, row.entry?.sha256, row.entry?.searchIndex?.sha256]));
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    // Opening the overview reads existing sidecar caches only. Expanding a
+    // day may acquire its small indexes; neither path requests raw scans.
+    void (async () => {
+      for (const day of archiveDays) {
+        const entries = day.members.flatMap(row => row.entry ? [row.entry] : []);
+        if (!entries.length || entries.length !== day.members.length) continue;
+        let counts: { players: number; guilds: number } | null = null;
+        if (expandedArchiveDays[day.id]) {
+          const result = await loadScanArchiveSearchIndexSet(entries, { signal: controller.signal });
+          if (result.status === "complete") counts = result.searchSet.getUniqueEntityCounts();
+        } else {
+          const cached = await Promise.all(entries.map(async entry => {
+            try {
+              const record = await getSfDataHubArchiveSearchIndexCache(entry);
+              return record ? { entry, payload: validateScanArchiveSearchIndexPayload(record.payload, entry), source: "cache" as const } : null;
+            } catch { return null; }
+          }));
+          const indexes = cached.flatMap(index => index ? [index] : []);
+          if (indexes.length === entries.length) counts = new ScanArchiveSearchIndexSet(indexes).getUniqueEntityCounts();
+        }
+        if (controller.signal.aborted) return;
+        if (counts) setArchiveDayCounts(current => ({ ...current, [archiveDayKey(day)]: counts }));
+      }
+    })().catch(error => { if (!controller.signal.aborted) console.error("[ScanManagement] archive counts", error); });
+    return () => controller.abort();
+  }, [archiveDays, expandedArchiveDays, isOpen]);
   React.useEffect(() => {
     if (!isOpen || !archiveGroups.length) return;
     setExpandedArchiveMonths((current) => {
@@ -711,22 +721,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
       return changed ? next : current;
     });
   }, [archiveGroups, isOpen]);
-  const localArchiveScanIds = React.useMemo(
-    () =>
-      new Set(
-        localArchiveScans
-          .map((scan) => scan.archiveSource?.archiveScanId)
-          .filter((archiveScanId): archiveScanId is string => Boolean(archiveScanId)),
-      ),
-    [localArchiveScans],
-  );
-  const archiveLocalCount = archiveManifestEntries.filter((entry) => localArchiveScanIds.has(entry.id)).length;
-  const selectedVisibleScans =
-    activeTab === "archive"
-      ? archiveRows
-          .map((row) => row.localSummary)
-          .filter((scan): scan is GuildHubScanSummary => Boolean(scan))
-      : ownVisibleScans;
+  const archiveLocalCount = archiveRows.filter(row => row.entry && row.localSummary).length;
+  const selectedVisibleScans = activeTab === "archive"
+    ? [...new Map(archiveRows.flatMap(row => row.localSummary ? [[row.localSummary.sourceScanId, row.localSummary] as const] : [])).values()]
+    : ownVisibleScans;
   const selectedExportableScans = ownVisibleScans.filter(
     (scan) => selectedIds.has(scan.sourceScanId) && !scan.archiveSource,
   );
@@ -1110,66 +1108,55 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     }
   };
 
-  const downloadArchiveScan = async (entry: ScanArchiveEntry) => {
-    if (downloadingArchiveIds.has(entry.id)) return;
+  const saveArchiveEntries = async (entries: ScanArchiveEntry[]) => {
+    if (busy || archiveAcquisitionRef.current) return;
+    const controller = new AbortController();
+    archiveAcquisitionRef.current = controller;
     setBusy(true);
     setStorageError(null);
     setArchiveError(null);
-
+    setArchiveEntryErrors(current => {
+      const next = { ...current };
+      entries.forEach(entry => delete next[entry.id]);
+      return next;
+    });
     const nextFeedback = createEmptyFeedback();
     try {
-      const existingArchiveScan = await findSfDataHubLocalScanByArchiveScanId(entry.id);
-      if (existingArchiveScan) {
-        if (existingArchiveScan.archiveSource?.sha256 === entry.sha256) {
-          nextFeedback.duplicates.push(existingArchiveScan.filename);
-          setFeedback(nextFeedback);
-          await loadScans();
-          return;
-        }
-        throw new Error("Archivscan ist lokal mit abweichender Pruefsumme vorhanden.");
-      }
-
-      setDownloadingArchiveIds((current) => new Set(current).add(entry.id));
-      const run = startScanArchiveDownloadWorkerRun({
-        entry,
-        onProgress: (progress) => {
-          setArchiveDownloadProgress((current) => ({ ...current, [entry.id]: progress }));
-        },
+      const result = await acquireExplicitLocalFirstArchiveScans(entries, {
+        signal: controller.signal,
+        dependencies: { downloadArchiveEntry: async (entry, signal) => {
+          setDownloadingArchiveIds(current => new Set(current).add(entry.id));
+          const run = startScanArchiveDownloadWorkerRun({ entry, onProgress: progress => {
+            if (!signal?.aborted) setArchiveDownloadProgress(current => ({ ...current, [entry.id]: progress }));
+          } });
+          archiveDownloadRunsRef.current.set(entry.id, run);
+          const abort = () => run.cancel();
+          signal?.addEventListener("abort", abort, { once: true });
+          if (signal?.aborted) run.cancel();
+          try { return { content: (await run.promise).content }; }
+          finally {
+            signal?.removeEventListener("abort", abort);
+            archiveDownloadRunsRef.current.delete(entry.id);
+            setDownloadingArchiveIds(current => { const next = new Set(current); next.delete(entry.id); return next; });
+            setArchiveDownloadProgress(current => { const next = { ...current }; delete next[entry.id]; return next; });
+          }
+        } },
       });
-      archiveDownloadRunsRef.current.set(entry.id, run);
-      const result = await run.promise;
-      archiveDownloadRunsRef.current.delete(entry.id);
-
-      const filename = getArchiveImportFilename(entry);
-      const scan = await createSfDataHubLocalScanImportPreview(filename, result.content, {
-        archiveSource: createScanArchiveSourceMetadata(entry),
+      if (controller.signal.aborted) return;
+      result.selectedArchives.forEach(item => {
+        (item.status === "imported" ? nextFeedback.imported : nextFeedback.duplicates).push(item.archiveScanId);
       });
-      const imported = await commitSfDataHubLocalScanPreview(scan);
-      if (imported.status === "duplicate") {
-        nextFeedback.duplicates.push(imported.scan.filename);
-      } else {
-        nextFeedback.imported.push(imported.scan.filename);
-      }
+      result.failedArchives.forEach(item => nextFeedback.errors.push({ filename: item.archiveScanId, message: item.message }));
+      setArchiveEntryErrors(current => ({ ...current, ...Object.fromEntries(result.failedArchives.map(item => [item.archiveScanId, item.message])) }));
       setFeedback(nextFeedback);
-      await Promise.all([loadScans(), loadArchiveEntries()]);
+      await loadScans();
     } catch (error) {
-      if (error instanceof ScanArchiveDownloadCancelledError) return;
-      const message = error instanceof Error ? error.message : "Archivscan konnte nicht geladen werden.";
-      nextFeedback.errors.push({ filename: getArchiveDisplayName(entry), message });
-      setFeedback(nextFeedback);
+      if (!controller.signal.aborted) setFeedback({ ...nextFeedback, errors: [{ filename: "Archivgruppe", message: error instanceof Error ? error.message : "Speichern fehlgeschlagen" }] });
     } finally {
-      archiveDownloadRunsRef.current.delete(entry.id);
-      setDownloadingArchiveIds((current) => {
-        const next = new Set(current);
-        next.delete(entry.id);
-        return next;
-      });
-      setArchiveDownloadProgress((current) => {
-        const next = { ...current };
-        delete next[entry.id];
-        return next;
-      });
-      setBusy(false);
+      if (archiveAcquisitionRef.current === controller) {
+        archiveAcquisitionRef.current = null;
+        setBusy(false);
+      }
     }
   };
 
@@ -1579,7 +1566,37 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                   </th>
                                 </tr>
                                 {isExpanded
-                                  ? group.rows.map((row) => {
+                                  ? group.rows.map(day => {
+                                      const localIds = archiveGroupLocalIds(day.members);
+                                      const localCount = day.members.filter(row => row.localSummary).length;
+                                      const expanded = Boolean(expandedArchiveDays[day.id]);
+                                      const counts = archiveDayCounts[archiveDayKey(day)];
+                                      const entries = day.members.flatMap(row => row.entry ? [row.entry] : []);
+                                      const dayDate = isoFromSummaryTimestamp(day.firstTimestamp);
+                                      const label = `${formatScanDateShort(dayDate)} · ${day.server}`;
+                                      const time = (timestamp: number) => Number.isFinite(timestamp) ? new Intl.DateTimeFormat("de-DE", { timeStyle: "short" }).format(timestamp) : "Unbekannt";
+                                      return <React.Fragment key={day.id}>
+                                        <tr className={styles.archiveDayRow}>
+                                          <td className={styles.checkCell}>{localIds.length ? <input type="checkbox" aria-label={`${label} auswählen`}
+                                            checked={localIds.every(id => selectedIds.has(id))}
+                                            ref={input => { if (input) input.indeterminate = localIds.some(id => selectedIds.has(id)) && !localIds.every(id => selectedIds.has(id)); }}
+                                            onChange={() => setSelectedIds(current => { const next = new Set(current); const remove = localIds.every(id => next.has(id)); localIds.forEach(id => remove ? next.delete(id) : next.add(id)); return next; })} /> : null}</td>
+                                          <td>{formatScanDateShort(dayDate)}
+                                            <small className={styles.archiveMemberCaption}>{time(day.firstTimestamp)}{day.lastTimestamp !== day.firstTimestamp ? `–${time(day.lastTimestamp)}` : ""} · {day.members.length} Teilscans</small></td>
+                                          <td>{day.server}</td>
+                                          <td className={styles.numericCell} title="Eindeutige Spieler; — = noch unbekannt">{counts?.players ?? "—"}</td>
+                                          <td className={styles.numericCell} title="Eindeutige Gilden; — = noch unbekannt">{counts?.guilds ?? "—"}</td>
+                                          <td><span className={styles.statusBadge}>{localCount} von {day.members.length} lokal</span></td>
+                                          <td className={styles.actionCell}><div className={styles.rowActions}>
+                                            <button type="button" className={styles.iconButton} aria-expanded={expanded} aria-label={`${label} Teilscans anzeigen`}
+                                              onClick={() => setExpandedArchiveDays(current => ({ ...current, [day.id]: !expanded }))}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Teilscans</button>
+                                            {localCount < day.members.length && entries.length ? <button type="button" className={styles.iconButton} disabled={busy}
+                                              onClick={() => void saveArchiveEntries(entries)} aria-label={`${label} lokal speichern`}><Download size={15} /> Speichern</button> : null}
+                                            {localIds.length ? <button type="button" className={`${styles.iconButton} ${styles.iconButtonDanger}`} disabled={busy}
+                                              onClick={() => void deleteScans(localIds)} aria-label={`${label} lokale Scans löschen`}><Trash2 size={15} /></button> : null}
+                                          </div></td>
+                                        </tr>
+                                        {expanded ? day.members.map((row) => {
                                       const scan = row.localSummary;
                                       const entry = row.entry;
                                       const scanTimeCell = entry ? formatArchiveScanSnapshotCell(entry) : formatScanSnapshotCell(scan!);
@@ -1601,7 +1618,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                               />
                                             ) : null}
                                           </td>
-                                          <td title={scanTimeCell.title}>{scanTimeCell.label}</td>
+                                          <td title={scanTimeCell.title}>{scanTimeCell.label}<small className={styles.archiveMemberCaption}>{entry?.path ?? scan?.filename} · Rohzeilen</small></td>
                                           <td>
                                             <span className={styles.truncate} title={serverLabel}>
                                               {serverLabel}
@@ -1610,7 +1627,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                           <td className={styles.numericCell}>{playerCount}</td>
                                           <td className={styles.numericCell}>{groupCount}</td>
                                           <td>
-                                            {scan ? (
+                                            {entry && archiveEntryErrors[entry.id] ? <span className={styles.archiveEntryError}>{archiveEntryErrors[entry.id]}</span> : scan ? (
                                               <span className={styles.statusBadge}>lokal gespeichert</span>
                                             ) : isDownloadingArchive ? (
                                               <span className={styles.statusBadge}>{archiveProgress?.message ?? "Download läuft"}</span>
@@ -1648,7 +1665,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                                 <button
                                                   type="button"
                                                   className={`${styles.iconButton} ${styles.detailsButton}`}
-                                                  onClick={() => void downloadArchiveScan(entry)}
+                                                  onClick={() => void saveArchiveEntries([entry])}
                                                   disabled={busy || isDownloadingArchive}
                                                   aria-label={`${displayName} lokal speichern`}
                                                   title="Archivscan lokal speichern"
@@ -1665,6 +1682,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                           </td>
                                         </tr>
                                       );
+                                    }) : null}
+                                      </React.Fragment>;
                                     })
                                   : null}
                               </React.Fragment>

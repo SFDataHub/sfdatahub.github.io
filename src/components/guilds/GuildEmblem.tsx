@@ -4,7 +4,6 @@ import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.j
 import {
   getGuildAccentPalette,
   GUILD_ACCENT_FALLBACK,
-  SFDATAHUB_ACTION_BLUE,
   type GuildAccentPalette,
 } from "../../lib/ui/guildAccent";
 import { isValidGuildCoaString } from "../../lib/guilds/guildCoa";

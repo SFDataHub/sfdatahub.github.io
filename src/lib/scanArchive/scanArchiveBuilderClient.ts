@@ -8,6 +8,7 @@ import type {
   ScanArchiveBuilderUsageMode,
 } from "./scanArchiveBuilderTypes";
 import type { ScanArchiveManifest } from "./types";
+import { ScanArchiveBuilderValidationError } from "./scanArchiveBuilderErrors";
 
 export class ScanArchiveBuilderCancelledError extends Error {
   constructor() {
@@ -77,7 +78,7 @@ export class ScanArchiveBuilderSession {
     manifest: ScanArchiveManifest;
     manifestSource: ScanArchiveBuilderManifestSource;
     usageMode: ScanArchiveBuilderUsageMode;
-    replaceMonthly?: boolean;
+    catalogUrl?: string;
     allowCurrentRollback?: boolean;
     requestId?: string;
     onProgress?: (progress: ScanArchiveBuilderProgress) => void;
@@ -91,7 +92,7 @@ export class ScanArchiveBuilderSession {
       manifest: options.manifest,
       manifestSource: options.manifestSource,
       usageMode: options.usageMode,
-      replaceMonthly: options.replaceMonthly,
+      catalogUrl: options.catalogUrl,
       allowCurrentRollback: options.allowCurrentRollback,
     });
     return {
@@ -99,6 +100,14 @@ export class ScanArchiveBuilderSession {
       promise,
       cancel: () => this.cancel(requestId),
     };
+  }
+
+  discardBuild(requestId: string) {
+    const pending = this.pending.get(requestId);
+    if (!pending) return;
+    this.pending.delete(requestId);
+    this.worker.postMessage({ type: "discard-build", requestId });
+    pending.reject(new ScanArchiveBuilderCancelledError());
   }
 
   cancel(requestId: string) {
@@ -152,7 +161,7 @@ export class ScanArchiveBuilderSession {
       pending.reject(new ScanArchiveBuilderCancelledError());
       return;
     }
-    pending.reject(new Error(message.message));
+    pending.reject(message.blocker ? new ScanArchiveBuilderValidationError(message.blocker) : new Error(message.message));
   };
 
   private handleError = (event: ErrorEvent) => {

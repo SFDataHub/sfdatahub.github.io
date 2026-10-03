@@ -1,5 +1,5 @@
 // FILE: src/pages/GuideHub/ArenaAM/AMBuildOrder.tsx
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./AMBuildOrder.module.css";
 import { guideAssetByKey } from "../../../../data/guidehub/assets";

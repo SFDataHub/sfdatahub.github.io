@@ -1,4 +1,3 @@
-import React from "react";
 import ContentShell from "../../../components/ContentShell";
 
 const placeholders = Array.from({ length: 4 }, (_, index) => ({

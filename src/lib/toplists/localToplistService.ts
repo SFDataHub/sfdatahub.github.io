@@ -10,6 +10,7 @@ import {
   type GuildHubLocalScan,
 } from "../guilds/localScanLibrary";
 import { normalizeServerKeyFromInput } from "../players/identifier";
+import { composeMonthlySet } from "../scanArchive/monthlySetComposition";
 import type {
   LocalGuildToplistRow,
   LocalPlayerToplistRow,
@@ -111,32 +112,6 @@ const toplistSetKey = (entry: ScanArchiveEntry) => entry.toplistSetKey ?? archiv
 const logicalCacheKey = (entries: readonly ScanArchiveEntry[], derivationVersion: number) =>
   `logical:${derivationVersion}:${entries.map(archiveEntryKey).join("|")}`;
 
-const rowServerKey = (server: string) => normalizeServerKeyFromInput(server) ?? server.trim().toLowerCase();
-
-const playerRowKey = (row: LocalPlayerToplistRow) =>
-  `${rowServerKey(row.server)}\u0000${(row.playerId ?? row.identifier).toLowerCase()}`;
-
-const guildRowKey = (row: LocalGuildToplistRow) =>
-  `${rowServerKey(row.server)}\u0000${row.guildIdentifier.toLowerCase()}`;
-
-const newestRow = <T extends { scanTimestamp: number; archiveScanId: string }>(left: T, right: T) => {
-  if (left.scanTimestamp !== right.scanTimestamp) return left.scanTimestamp > right.scanTimestamp ? left : right;
-  return compareText(left.archiveScanId, right.archiveScanId) >= 0 ? left : right;
-};
-
-const mergeRowsByIdentity = <T extends { scanTimestamp: number; archiveScanId: string }>(
-  rows: readonly T[],
-  keyFor: (row: T) => string,
-) => {
-  const byKey = new Map<string, T>();
-  for (const row of rows) {
-    const key = keyFor(row);
-    const existing = byKey.get(key);
-    byKey.set(key, existing ? newestRow(existing, row) : row);
-  }
-  return [...byKey.values()];
-};
-
 const groupEntriesByToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   const groups = new Map<string, ScanArchiveEntry[]>();
   for (const entry of entries) {
@@ -161,8 +136,7 @@ const mergeLogicalToplistPayload = (
     .map((item) => item.payload)
     .sort((left, right) => left.scanTimestamp - right.scanTimestamp || compareText(left.archiveScanId, right.archiveScanId));
   const latest = payloads[payloads.length - 1];
-  const playerRows = mergeRowsByIdentity(payloads.flatMap((payload) => payload.playerRows), playerRowKey);
-  const guildRows = mergeRowsByIdentity(payloads.flatMap((payload) => payload.guildRows), guildRowKey);
+  const { playerRows, guildRows } = composeMonthlySet(payloads);
   const issues = payloads.flatMap((payload) => payload.issues);
   const scanTimestamp = Math.max(...payloads.map((payload) => payload.scanTimestamp));
   const archiveScanId = groupEntries.map((entry) => entry.id).join("+");

@@ -1,5 +1,4 @@
 // FILE: src/pages/GuideHub/Fortress/PackageSkipOrder.tsx
-import React from "react";
 import styles from "./PackageSkipOrder.module.css";
 
 type PackageSkipOrderTableVariant = "guidehub" | "underworld";

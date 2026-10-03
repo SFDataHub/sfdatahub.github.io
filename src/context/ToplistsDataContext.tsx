@@ -438,19 +438,11 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       return true;
     });
 
-    const dir = sort.dir === "asc" ? 1 : -1;
     const compareNumber = (aVal: number | null, bVal: number | null) => {
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
       const diff = aVal - bVal;
-      return sort.dir === "asc" ? diff : -diff;
-    };
-    const compareText = (aVal: string | null, bVal: string | null) => {
-      if (aVal == null && bVal == null) return 0;
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-      const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
       return sort.dir === "asc" ? diff : -diff;
     };
     const compareTie = (a: ToplistPlayerRow, b: ToplistPlayerRow) => {

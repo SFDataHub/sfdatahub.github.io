@@ -20,7 +20,6 @@ const ArcNav: React.FC<Props> = ({
   side,
   anchorSide,
   compact = false,
-  variant = "main",
   arcOffset = 220,
   outerOffset = 440,
   superOffset = 660,

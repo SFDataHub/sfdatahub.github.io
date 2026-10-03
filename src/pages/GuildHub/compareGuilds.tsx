@@ -73,7 +73,7 @@ import {
 import styles from "./Fusion.module.css";
 import { useGuildHubSelection } from "./hooks/useGuildHubSelection";
 import {
-  FreshnessCode,
+  type FreshnessCode,
   FRESHNESS_DISPLAY,
   formatCountdown,
   formatDate,
@@ -2620,16 +2620,4 @@ function useGuildSearchResults(term: string, server: string, excludeId?: string 
   }, [term, server, excludeId]);
 
   return { results, loading };
-}
-
-function hoursAgoISO(hours: number) {
-  const date = new Date();
-  date.setHours(date.getHours() - hours);
-  return date.toISOString();
-}
-
-function hoursFromNowISO(hours: number) {
-  const date = new Date();
-  date.setHours(date.getHours() + hours);
-  return date.toISOString();
 }

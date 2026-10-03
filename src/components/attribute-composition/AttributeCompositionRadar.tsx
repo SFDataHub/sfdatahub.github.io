@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   ATTRIBUTE_COMPOSITION_RADAR_LABELS,
   buildAttributeCompositionRadarModel,

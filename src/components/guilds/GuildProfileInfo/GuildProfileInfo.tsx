@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import styles from "./GuildProfileInfo.module.css";
 import type { GuildProfileInfoProps } from "./GuildProfileInfo.types";
 
@@ -9,7 +9,7 @@ import FortressCard from "./cards/FortressCard";
 import RankingsCard from "./cards/RankingsCard";
 
 const GuildProfileInfo = memo(function GuildProfileInfo({
-  guild, snapshot, emblemUrl, colors,
+  guild, snapshot, colors,
 }: GuildProfileInfoProps) {
   const iconColor = colors.icon;
 

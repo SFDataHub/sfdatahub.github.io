@@ -1,4 +1,3 @@
-import React from "react";
 import styles from "./GuildMonthlyProgressTab.module.css";
 import { getClassIconUrl } from "../../../ui/shared/classIcons";
 import { getGuildClassAccent, getGuildMutedAccent } from "../../classColors";

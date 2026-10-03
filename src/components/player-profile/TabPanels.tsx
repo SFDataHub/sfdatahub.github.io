@@ -152,8 +152,6 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
     },
   ];
 
-  const potionHasAnyData =
-    data.potions.lifePotion != null || data.potions.slots.some((slot) => slot.type != null || slot.size != null);
 
   const runeRows: Array<{
     labelKey: string;
@@ -695,14 +693,6 @@ function formatPlainNumber(value: number) {
   }).format(value);
 }
 
-function formatCompactNumber(value: number) {
-  if (!Number.isFinite(value)) return DASH;
-  return new Intl.NumberFormat(undefined, {
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: Math.abs(value) >= 100 ? 0 : 1,
-  }).format(value);
-}
 
 function formatMetricValue(value: number | null, kind: MetricKind = "number") {
   if (value == null || !Number.isFinite(value)) return DASH;
@@ -1039,9 +1029,3 @@ export function HistoryTab({ entries }: { entries: TimelineEntry[] }) {
     </div>
   );
 }
-
-function MiniTrend({ points }: { points: number[] }) {
-  // legacy, unused
-  return <div className="player-profile__trend-chart player-profile__trend-chart--empty" />;
-}
-

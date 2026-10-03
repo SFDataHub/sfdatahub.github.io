@@ -22,7 +22,7 @@ import {
 } from "../../lib/debug/firestoreReadTrace";
 import styles from "../GuildHub/Fusion.module.css";
 import {
-  FreshnessCode,
+  type FreshnessCode,
   FRESHNESS_DISPLAY,
   formatCountdown,
   formatDate,
@@ -765,11 +765,6 @@ function toPlayerNumber(value: unknown) {
   return Number.isFinite(num) ? num : 0;
 }
 
-function hoursAgoISO(hours: number) {
-  const date = new Date();
-  date.setHours(date.getHours() - hours);
-  return date.toISOString();
-}
 
 function hoursFromNowISO(hours: number) {
   const date = new Date();

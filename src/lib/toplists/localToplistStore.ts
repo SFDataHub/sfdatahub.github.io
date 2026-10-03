@@ -10,7 +10,7 @@ import type {
 } from "./localToplistTypes";
 import type { LocalToplistDerivedSnapshotPayload } from "./localToplistWorkerTypes";
 
-export const LOCAL_TOPLIST_DERIVATION_VERSION = 3;
+export const LOCAL_TOPLIST_DERIVATION_VERSION = 4;
 
 export type LocalToplistSnapshotCacheIdentity = {
   derivationVersion?: number;

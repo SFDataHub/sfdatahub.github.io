@@ -1,4 +1,3 @@
-import React from "react";
 import ContentShell from "../../../components/ContentShell";
 
 const timelines = [

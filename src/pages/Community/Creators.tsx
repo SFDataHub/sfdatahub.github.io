@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./creators.css";
 
 import creatorSheet from "../../data/creatorSheet";
-import { Creator, Platform, SheetCreatorRow, sheetRowToCreator } from "../../lib/creators/shared";
+import { type Creator, type Platform, type SheetCreatorRow, sheetRowToCreator } from "../../lib/creators/shared";
 import { useCreatorSnapshot } from "../../hooks/useCreatorSnapshot";
 
 type SortKey = "subs" | "views" | "activity" | "language";

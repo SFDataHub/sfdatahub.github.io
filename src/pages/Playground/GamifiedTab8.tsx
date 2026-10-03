@@ -1,4 +1,3 @@
-import React from "react";
 import "./GamifiedTab8.css";
 
 type Sample = {
@@ -111,9 +110,6 @@ const Bar = ({ width, tone = "accent", height = 8 }: { width: string; tone?: str
   <div className={`g8-bar tone-${tone}`} style={{ width, height }} />
 );
 
-const Dot = ({ tone = "accent", size = 8 }: { tone?: string; size?: number }) => (
-  <span className={`g8-dot tone-${tone}`} style={{ width: size, height: size }} />
-);
 
 const previewRenderers: Record<string, () => JSX.Element> = {
   pv_anim_pulse_bar: () => (

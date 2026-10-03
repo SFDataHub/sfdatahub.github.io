@@ -6,7 +6,7 @@ import {
   type ScanArchiveToplistSelectionResult,
 } from "../../lib/scanArchive/toplistSelection";
 import type { ScanArchiveEntry, ScanArchiveManifest } from "../../lib/scanArchive/types";
-import { resolveServer } from "../../lib/servers/serverResolver";
+import { normalizeToplistServerSelection } from "./localToplistPageModel";
 import type { LocalToplistLoadResult } from "../../lib/toplists/localToplistService";
 import { localToplistDatasetId } from "../../lib/toplists/localToplistStore";
 import type {
@@ -65,7 +65,7 @@ type ResolveCompareEntriesInput = {
 };
 
 const normalizeServerCode = (value: unknown) =>
-  resolveServer(String(value ?? ""))?.code ?? String(value ?? "").trim().toUpperCase();
+  normalizeToplistServerSelection([String(value ?? "")])[0] ?? "";
 
 const normalizeServers = (servers: readonly string[]) => {
   const seen = new Set<string>();
@@ -96,6 +96,19 @@ const formatMissingServersMessage = (
   if (side === "previous") return `${subject} ${verb} no comparison baseline for ${month}.`;
   if (mode === "progress") return `${subject} ${verb} no current comparison target.`;
   return `${subject} ${verb} no comparison target for ${month}.`;
+};
+
+// Resolve each side against its own keys; UI aliases must never become archive keys.
+const selectedArchiveServerKeys = (
+  manifests: readonly ScanArchiveManifest[],
+  selectedServers: readonly string[],
+  month?: string,
+) => {
+  const selected = new Set(selectedServers);
+  const keys = manifests.flatMap((manifest) => Object.keys(
+    month == null ? manifest.toplists?.current ?? {} : manifest.toplists?.monthly?.[month] ?? {},
+  ));
+  return [...new Set(keys)].filter((key) => selected.has(normalizeServerCode(key)));
 };
 
 const selectedSelectionByServer = (selections: Readonly<Record<string, ScanArchiveToplistSelectionResult>>) => {
@@ -167,10 +180,14 @@ export function resolveLocalToplistCompareEntryPlan(input: ResolveCompareEntries
     return { ...inactivePlan(issues), status: "unavailable" };
   }
 
-  const previousSelections = resolveScanArchiveMonthlyToplistScans(input.manifests, requestedServers, previousMonth);
+  const previousKeys = selectedArchiveServerKeys(input.manifests, requestedServers, previousMonth);
+  const currentKeys = selectedArchiveServerKeys(
+    input.manifests, requestedServers, input.mode === "progress" ? undefined : requestedCurrentMonth,
+  );
+  const previousSelections = resolveScanArchiveMonthlyToplistScans(input.manifests, previousKeys, previousMonth);
   const currentSelections = input.mode === "progress"
-    ? resolveScanArchiveCurrentToplistScans(input.manifests, requestedServers)
-    : resolveScanArchiveMonthlyToplistScans(input.manifests, requestedServers, requestedCurrentMonth);
+    ? resolveScanArchiveCurrentToplistScans(input.manifests, currentKeys)
+    : resolveScanArchiveMonthlyToplistScans(input.manifests, currentKeys, requestedCurrentMonth);
   const previousByServer = selectedSelectionByServer(previousSelections);
   const currentByServer = selectedSelectionByServer(currentSelections);
   const missingPreviousServers = requestedServers.filter((server) => !previousByServer.has(server));

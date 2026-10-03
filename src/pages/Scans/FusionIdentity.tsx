@@ -45,7 +45,6 @@ import {
   mergeReadyFusionIdentityItems,
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
-  type FusionIdentityAliasOption,
   type FusionIdentityCandidate,
   type FusionIdentityEntityType,
   type FusionIdentityManagementItem,
@@ -2582,13 +2581,6 @@ function GuildMemberStatusSummary({
   const { t } = useTranslation();
   const summary = item.memberStatusSummary;
   if (item.entityType !== "guild" || !summary) return null;
-  const memberRefsByStatus = summary.memberRefsByStatus ?? {
-    ready: [],
-    review: [],
-    unresolved: [],
-    noHistoricalObservation: [],
-    noHistory: [],
-  };
   const resolvedMembers = summary.resolvedMembers ?? 0;
   const totalMembers = summary.totalMembers ?? 0;
   const reviewMembers = summary.reviewMembers ?? 0;

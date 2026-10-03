@@ -1,5 +1,5 @@
 import { serverTimestamp } from "firebase/firestore";
-import type { CsvRow, Mapping, MetaAppConfig } from "./types";
+import type { CsvRow, MetaAppConfig } from "./types";
 
 export function getTimestamp(row: CsvRow, header: string): number | null {
   const raw = row[header];

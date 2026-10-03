@@ -905,7 +905,6 @@ const buildProfileView = (
   const level = snapshot.level ?? lookup.number(["level"]);
   const scrapbook = snapshot.scrapbookPct ?? lookup.number(scrapbookKeys);
   const honor = lookup.number(honorKeys);
-  const totalStats = snapshot.totalStats ?? lookup.number(["totalstats", "stats"]);
 
   const baseStatConfig = BASE_STAT_CONFIG;
 

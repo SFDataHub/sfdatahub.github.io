@@ -4,7 +4,7 @@ import { guideAssetUrlByKey } from "../../../../data/guidehub/assets";
 import styles from "./FirstWeekendGuide.module.css";
 
 const FirstWeekendGuide: React.FC = () => {
-  const [params, setParams] = useSearchParams();
+  useSearchParams();
 
   // Platzhalter – ersetze die Keys im Assets-Manifest bei Bedarf
   const imageUrls = [

@@ -1,6 +1,5 @@
 // FILE: src/pages/Playground/Templates/BlankTemplatePageLayout2.tsx
 
-import React from "react";
 import ContentShell from "../../../components/ContentShell";
 import styles from "./BlankTemplatePageLayout2.module.css";
 

@@ -13,9 +13,7 @@ import {
 } from "firebase/firestore";
 import { useTranslation } from "react-i18next";
 import { db } from "../../lib/firebase";
-import { CLASSES } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
-import { toDriveThumbProxy } from "../../lib/urls";
 import { beginReadScope, endReadScope, traceGetDocs } from "../../lib/debug/firestoreReadTrace";
 import {
   getCachedSuggestions,
@@ -177,17 +175,6 @@ const removeRecent = (key: string, setState: React.Dispatch<React.SetStateAction
   }
 };
 
-function iconUrlByLabel(label?: string | null, size = 64): string | undefined {
-  if (!label) return undefined;
-  const strip = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const target = strip(label);
-
-  let c = CLASSES.find((cl) => strip(cl.label) === target);
-  if (!c) c = CLASSES.find((cl) => strip(cl.label).startsWith(target) || target.startsWith(strip(cl.label)));
-  if (!c) return undefined;
-
-  return toDriveThumbProxy(c.iconUrl, size);
-}
 
 function getRootAndId(docSnap: any): { root?: string; id?: string } {
   const latestCol = docSnap.ref.parent; // .../latest
@@ -247,7 +234,7 @@ export default function UniversalSearch({
   const [activeIndex, setActiveIndex] = React.useState<number>(-1);
   const [isOpen, setIsOpen] = React.useState(false);
   const [hasFocus, setHasFocus] = React.useState(false);
-  const [lastSource, setLastSource] = React.useState<"cache" | "live" | null>(null);
+  const [, setLastSource] = React.useState<"cache" | "live" | null>(null);
   const boxRef = React.useRef<HTMLDivElement | null>(null);
   const requestSeq = React.useRef(0);
 

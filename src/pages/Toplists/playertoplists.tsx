@@ -622,13 +622,6 @@ const sortToplistRows = (rows: ToplistPlayerRow[], sort: SortSpec) => {
     const diff = aVal - bVal;
     return sort.dir === "asc" ? diff : -diff;
   };
-  const compareText = (aVal: string | null, bVal: string | null) => {
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
-    const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
-    return sort.dir === "asc" ? diff : -diff;
-  };
   const compareTie = (a: ToplistPlayerRow, b: ToplistPlayerRow) => {
     const cmp = buildTieKey(a).localeCompare(buildTieKey(b), undefined, { numeric: true, sensitivity: "base" });
     return sort.dir === "asc" ? cmp : -cmp;
@@ -913,8 +906,8 @@ function PlayerToplistsPageContent() {
   const filterCollapseStorageKey = "sf_toplists_hud_filters_collapsed_v1";
   const f = useFilters(); // MUSS innerhalb FilterProvider laufen
   const {
-    filterMode, setFilterMode,
-    listView, setListView,
+    filterMode,
+    listView,
     bottomFilterOpen, setBottomFilterOpen,
     serverSheetOpen, setServerSheetOpen,
     servers, setServers,
@@ -925,7 +918,7 @@ function PlayerToplistsPageContent() {
     setSortBy,
   } = f;
   const { serverGroups, player } = useToplistsData();
-  const navigate = useNavigate();
+  useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const serverParam = searchParams.get("server");
   const serversParam = searchParams.get("servers");
@@ -2089,7 +2082,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
   const effectivePlayerLastUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.playerLastUpdatedAt ?? null) : playerLastUpdatedAt;
   const effectivePlayerScopeStatus = hasReadOnlyData ? (presetReadOnlyData?.playerScopeStatus ?? null) : playerScopeStatus;
 
-  const buildRowKey = React.useCallback((row: ToplistPlayerRow, fallbackIndex?: number) => {
+  React.useCallback((row: ToplistPlayerRow, fallbackIndex?: number) => {
     const identifier = resolveToplistRowIdentifier(row);
     if (identifier) return identifier;
     const serverKey = normalizeServerCode(String(row.server ?? ""));

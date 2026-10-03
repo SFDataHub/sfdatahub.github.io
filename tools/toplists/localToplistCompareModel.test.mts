@@ -201,6 +201,202 @@ const publicGuild = (local: LocalGuildToplistRow): ToplistGuildRow & { __localRo
 });
 
 describe("local toplist compare model", () => {
+  const rawF28Manifest = (): ScanArchiveManifest => {
+    const source = manifest();
+    source.scans = [
+      scan("f28-aug-a", "f28_net", Date.UTC(2026, 7, 2, 9)),
+      scan("f28-aug-b", "f28_net", Date.UTC(2026, 7, 2, 10)),
+      scan("f28-sep-a", "f28_net", Date.UTC(2026, 8, 5, 9)),
+      scan("f28-sep-b", "f28_net", Date.UTC(2026, 8, 5, 10)),
+    ];
+    source.scanCount = source.scans.length;
+    source.serverCount = 1;
+    source.toplists = {
+      schemaVersion: 1,
+      current: { f28_net: { scanIds: ["f28-sep-a", "f28-sep-b"] } },
+      monthly: {
+        "2026-08": { f28_net: { scanIds: ["f28-aug-a", "f28-aug-b"] } },
+        "2026-09": { f28_net: { scanIds: ["f28-sep-a", "f28-sep-b"] } },
+      },
+    };
+    return source;
+  };
+  const rawF28Plan = (source: ScanArchiveManifest, mode: "months" | "progress" = "months") =>
+    resolveLocalToplistCompareEntryPlan({
+      mode, selectedServers: ["F28"], progressSinceMonth: "2026-08",
+      compareFromMonth: "2026-08", compareToMonth: "2026-09",
+      manifests: [source], manifestUrlsByYear,
+    });
+
+  for (const mode of ["progress", "months"] as const) {
+    for (const kind of ["legacy", "set"] as const) {
+      test(`${mode} resolves UI F28 against f28_net with ${kind} references`, () => {
+        const source = rawF28Manifest();
+        if (kind === "legacy") {
+          source.toplists!.monthly!["2026-08"].f28_net = "f28-aug-a";
+          source.toplists!.monthly!["2026-09"].f28_net = "f28-sep-a";
+          source.toplists!.current!.f28_net = "f28-sep-a";
+        }
+        const plan = rawF28Plan(source, mode);
+        assert.equal(plan.status, "complete");
+        assert.deepEqual(plan.commonServers, ["F28"]);
+        assert.deepEqual(plan.noticeMessages, []);
+        assert.deepEqual(plan.previousEntries.map((entry) => entry.id), kind === "legacy" ? ["f28-aug-a"] : ["f28-aug-a", "f28-aug-b"]);
+        assert.deepEqual(plan.currentEntries.map((entry) => entry.id), kind === "legacy" ? ["f28-sep-a"] : ["f28-sep-a", "f28-sep-b"]);
+        assert(plan.previousEntries.concat(plan.currentEntries).every((entry) => entry.server === "f28_net"));
+      });
+    }
+  }
+
+  test("keeps genuine missing September terminal despite unreferenced September scans", () => {
+    const source = rawF28Manifest();
+    delete source.toplists!.monthly!["2026-09"];
+    delete source.toplists!.current!.f28_net;
+    for (const mode of ["months", "progress"] as const) {
+      const plan = rawF28Plan(source, mode);
+      assert.equal(plan.status, "unavailable");
+      assert.deepEqual(plan.missingPreviousServers, []);
+      assert.deepEqual(plan.missingCurrentServers, ["F28"]);
+      assert.deepEqual(plan.previousEntries, []);
+      assert.deepEqual(plan.currentEntries, []);
+      assert.deepEqual(plan.noticeMessages, [
+        mode === "months" ? "Server F28 has no comparison target for 2026-09." : "Server F28 has no current comparison target.",
+        "No selected server exists on both comparison sides.",
+      ]);
+    }
+  });
+
+  test("retains the common raw-key server while reporting partial missing sources on both sides", () => {
+    const source = rawF28Manifest();
+    source.scans.push(scan("eu30-sep", "s30_eu", Date.UTC(2026, 8, 5)), scan("gnar-aug", "gnarogrim_net", Date.UTC(2026, 7, 2)));
+    source.scanCount = source.scans.length;
+    source.serverCount = 3;
+    source.toplists!.monthly!["2026-08"].gnarogrim_net = "gnar-aug";
+    source.toplists!.monthly!["2026-09"].s30_eu = "eu30-sep";
+    const plan = resolveLocalToplistCompareEntryPlan({
+      mode: "months", selectedServers: ["EU30", "F28", "GNAROGRIM"], progressSinceMonth: "",
+      compareFromMonth: "2026-08", compareToMonth: "2026-09", manifests: [source], manifestUrlsByYear,
+    });
+    assert.equal(plan.status, "partial");
+    assert.deepEqual(plan.commonServers, ["F28"]);
+    assert.deepEqual(plan.missingPreviousServers, ["EU30"]);
+    assert.deepEqual(plan.missingCurrentServers, ["GNAROGRIM"]);
+    assert.deepEqual(plan.noticeMessages, [
+      "Server EU30 has no comparison baseline for 2026-08.",
+      "Server GNAROGRIM has no comparison target for 2026-09.",
+    ]);
+    assert.deepEqual(plan.previousEntries.map((entry) => entry.id), ["f28-aug-a", "f28-aug-b"]);
+    assert.deepEqual(plan.currentEntries.map((entry) => entry.id), ["f28-sep-a", "f28-sep-b"]);
+  });
+
+  test("keeps plans and source keys invariant under scan and set-member input reordering", () => {
+    const source = rawF28Manifest();
+    const shuffled = structuredClone(source);
+    shuffled.scans.reverse();
+    for (const refs of [shuffled.toplists!.current!, ...Object.values(shuffled.toplists!.monthly!)]) {
+      for (const ref of Object.values(refs)) if (typeof ref !== "string") ref.scanIds.reverse();
+    }
+    for (const mode of ["months", "progress"] as const) assert.deepEqual(rawF28Plan(shuffled, mode), rawF28Plan(source, mode));
+  });
+
+  test("changes compare keys when sources recover, set membership changes or a source hash changes", () => {
+    const source = rawF28Manifest();
+    const ready = rawF28Plan(source);
+    const missing = structuredClone(source);
+    delete missing.toplists!.monthly!["2026-09"];
+    const missingPlan = rawF28Plan(missing);
+    assert.equal(missingPlan.status, "unavailable");
+    assert.notEqual(missingPlan.loadKey, ready.loadKey);
+    const smaller = structuredClone(source);
+    smaller.toplists!.monthly!["2026-08"].f28_net = { scanIds: ["f28-aug-a"] };
+    const smallerPlan = rawF28Plan(smaller);
+    assert.notEqual(smallerPlan.previousDatasetId, ready.previousDatasetId);
+    assert.notEqual(smallerPlan.loadKey, ready.loadKey);
+    const changed = structuredClone(source);
+    changed.scans.find((item) => item.id === "f28-sep-a")!.sha256 = "e".repeat(64);
+    const changedPlan = rawF28Plan(changed);
+    assert.notEqual(changedPlan.currentDatasetId, ready.currentDatasetId);
+    assert.notEqual(changedPlan.loadKey, ready.loadKey);
+  });
+
+  for (const mode of ["progress", "months"] as const) {
+    test(`${mode} resolves raw archive keys per side and retains every explicit set member`, () => {
+      const source = manifest();
+      source.scans = [
+        scan("f28-aug", "f28_fu", Date.UTC(2026, 7, 2)),
+        scan("f28-sep-a", "f28_net", Date.UTC(2026, 8, 5, 9)),
+        scan("f28-sep-b", "f28_net", Date.UTC(2026, 8, 5, 10)),
+        scan("gnar-aug-a", "gnarogrim_net", Date.UTC(2026, 7, 2, 9)),
+        scan("gnar-aug-b", "gnarogrim_net", Date.UTC(2026, 7, 2, 10)),
+        scan("gnar-sep", "granogrim_net", Date.UTC(2026, 8, 5)),
+      ];
+      source.scanCount = source.scans.length;
+      source.serverCount = new Set(source.scans.map((item) => item.server)).size;
+      source.toplists = {
+        schemaVersion: 1,
+        current: { f28_net: { scanIds: ["f28-sep-a", "f28-sep-b"] }, granogrim_net: "gnar-sep" },
+        monthly: {
+          "2026-08": { f28_fu: "f28-aug", gnarogrim_net: { scanIds: ["gnar-aug-a", "gnar-aug-b"] } },
+          "2026-09": { f28_net: { scanIds: ["f28-sep-a", "f28-sep-b"] }, granogrim_net: "gnar-sep" },
+        },
+      };
+      const unchanged = structuredClone(source);
+      const plan = resolveLocalToplistCompareEntryPlan({
+        mode, selectedServers: ["Gnarogrim", "F28", "f28_net", "granogrim_net"],
+        progressSinceMonth: "2026-08", compareFromMonth: "2026-08", compareToMonth: "2026-09",
+        manifests: [source], manifestUrlsByYear,
+      });
+      assert.equal(plan.status, "complete");
+      assert.deepEqual(plan.commonServers, ["GNAROGRIM", "F28"]);
+      assert.deepEqual(plan.noticeMessages, []);
+      assert.deepEqual(plan.missingPreviousServers, []);
+      assert.deepEqual(plan.missingCurrentServers, []);
+      assert.equal(plan.previousMonth, "2026-08");
+      assert.equal(plan.currentMonth, "2026-09");
+      assert.deepEqual(new Set(plan.previousEntries.map((entry) => entry.id)), new Set(["f28-aug", "gnar-aug-a", "gnar-aug-b"]));
+      assert.deepEqual(new Set(plan.currentEntries.map((entry) => entry.id)), new Set(["f28-sep-a", "f28-sep-b", "gnar-sep"]));
+      assert.deepEqual(new Set(plan.previousEntries.map((entry) => entry.server)), new Set(["f28_fu", "gnarogrim_net"]));
+      assert.deepEqual(new Set(plan.currentEntries.map((entry) => entry.server)), new Set(["f28_net", "granogrim_net"]));
+      for (const entry of plan.currentEntries.filter((item) => item.server === "f28_net")) {
+        assert.deepEqual(entry.toplistSetScanIds, ["f28-sep-a", "f28-sep-b"]);
+      }
+      assert.notEqual(plan.previousDatasetId, plan.currentDatasetId);
+      assert.deepEqual(source, unchanged);
+    });
+  }
+
+  test("maps regional and named aliases while preserving missing-side notices and never selecting unreferenced scans", () => {
+    const source = manifest();
+    source.scans = [
+      scan("eu30-aug", "s30_eu", Date.UTC(2026, 7, 2)),
+      scan("eu30-sep", "s30_eu", Date.UTC(2026, 8, 5)),
+      scan("stumble-aug", "stumblesteppe_net", Date.UTC(2026, 7, 2)),
+      scan("stumble-unreferenced", "stumblesteppe_net", Date.UTC(2026, 8, 5)),
+    ];
+    source.scanCount = source.scans.length;
+    source.serverCount = new Set(source.scans.map((item) => item.server)).size;
+    source.toplists = {
+      schemaVersion: 1,
+      current: { s30_eu: "eu30-sep" },
+      monthly: {
+        "2026-08": { s30_eu: "eu30-aug", stumblesteppe_net: "stumble-aug" },
+        "2026-09": { s30_eu: "eu30-sep" },
+      },
+    };
+    const plan = resolveLocalToplistCompareEntryPlan({
+      mode: "months", selectedServers: ["EU30", "s30_eu", "STUMPLESTEPPE"],
+      progressSinceMonth: "", compareFromMonth: "2026-08", compareToMonth: "2026-09",
+      manifests: [source], manifestUrlsByYear,
+    });
+    assert.equal(plan.status, "partial");
+    assert.deepEqual(plan.commonServers, ["EU30"]);
+    assert.deepEqual(plan.missingPreviousServers, []);
+    assert.deepEqual(plan.missingCurrentServers, ["STUMBLESTEPPE"]);
+    assert.deepEqual(plan.noticeMessages, ["Server STUMBLESTEPPE has no comparison target for 2026-09."]);
+    assert.deepEqual(plan.previousEntries.map((entry) => entry.id), ["eu30-aug"]);
+    assert.deepEqual(plan.currentEntries.map((entry) => entry.id), ["eu30-sep"]);
+  });
+
   test("keeps the singular baseline notice for one missing baseline server", () => {
     const plan = resolveLocalToplistCompareEntryPlan({
       mode: "months",

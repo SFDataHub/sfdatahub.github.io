@@ -49,12 +49,6 @@ const LOCAL_SCAN_LIBRARY_CHANGE_EVENT = "sfdatahub:local-scans-changed";
 export const GUILD_HUB_SCAN_SUMMARY_VERSION = 5;
 
 type JsonRecord = Record<string, unknown>;
-type RawScanRecord = JsonRecord & {
-  players?: unknown[];
-  groups?: unknown[];
-  guilds?: unknown[];
-  data?: unknown;
-};
 type NormalizedRawScanRecord = JsonRecord & {
   players: unknown[];
   groups: unknown[];
@@ -857,12 +851,6 @@ function isoFromTimestampMillis(millis: number): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
-function isoFromTimestampValue(value: unknown): string | null {
-  const millis = toTimestampMillis(value);
-  if (millis == null) return null;
-
-  return isoFromTimestampMillis(millis);
-}
 
 function readFirstTimestampMillis(record: JsonRecord, keys: string[] = SCAN_TIMESTAMP_KEYS) {
   for (const key of keys) {
@@ -874,15 +862,6 @@ function readFirstTimestampMillis(record: JsonRecord, keys: string[] = SCAN_TIME
   return null;
 }
 
-function readFirstTimestamp(record: JsonRecord, keys: string[] = SCAN_TIMESTAMP_KEYS) {
-  for (const key of keys) {
-    const direct = record[key];
-    const parsed = isoFromTimestampValue(direct);
-    if (parsed) return parsed;
-  }
-
-  return null;
-}
 
 function collectParsedPlayerTimestampMillis(raw: NormalizedRawScanRecord) {
   try {
