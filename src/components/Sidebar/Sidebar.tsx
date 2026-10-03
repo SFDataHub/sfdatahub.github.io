@@ -70,6 +70,7 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/upload-center", labelKey: "nav.uploadCenter", minRole: "mod" },
     { to: "/upload-center-v2", labelKey: "nav.uploadCenterV2", minRole: "mod" },
     { to: "/admin/scan-coverage", labelKey: "nav.scanCoverage", minRole: "mod" },
+    { to: "/admin/scan-archive-builder", labelKey: "nav.scanArchiveBuilder", minRole: "mod" },
     { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", minRole: "admin" },
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],

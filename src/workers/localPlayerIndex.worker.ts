@@ -1,4 +1,6 @@
 import { getGuildHubLocalScan } from "../lib/guilds/localScanLibrary";
+import { ensureGuildAnalyticsDerivedDataFromSummaries } from "../lib/guilds/localGuildAnalyticsStore";
+import { loadIdentityResolutionSnapshot } from "../lib/identities/identityResolution";
 import { createLocalPlayerIndexBuilder } from "../lib/player-search/localPlayerIndex";
 import type {
   LocalPlayerIndexProgress,
@@ -68,10 +70,21 @@ const runBuildIndex = async (request: Extract<LocalPlayerIndexWorkerRequest, { t
   };
 
   try {
-    const builder = createLocalPlayerIndexBuilder({ serverFilter: request.serverFilter });
+    const identityResolutionSnapshot = await loadIdentityResolutionSnapshot();
+    const analyticsData = await ensureGuildAnalyticsDerivedDataFromSummaries(request.summaries, {
+      loadSourceById: getGuildHubLocalScan,
+    });
+    const builder = createLocalPlayerIndexBuilder({
+      serverFilter: request.serverFilter,
+      analyticsData,
+      identityResolutionSnapshot,
+      targetPlayerRefs: request.targetPlayerRefs ?? null,
+      targetPlayerNames: request.targetPlayerNames ?? null,
+      includeCards: request.includeCards ?? true,
+    });
     const total = request.summaries.length;
 
-    emitProgress({ phase: "loading-scans", current: 0, total, message: "Lokale F28-Scans werden geladen" });
+    emitProgress({ phase: "loading-scans", current: 0, total, message: "Lokale Scans werden geladen" });
 
     for (let index = 0; index < request.summaries.length; index += 1) {
       if (isCancelled(request.requestId)) {
@@ -85,7 +98,7 @@ const runBuildIndex = async (request: Extract<LocalPlayerIndexWorkerRequest, { t
         phase: "loading-scans",
         current: index + 1,
         total,
-        message: "Lokale F28-Scans werden geladen",
+        message: "Lokale Scans werden geladen",
       });
 
       if (isCancelled(request.requestId)) {

@@ -4,6 +4,7 @@ import type {
   ScanArchiveDownloadRequest,
   ScanArchiveDownloadResponse,
 } from "../lib/scanArchive/downloadWorkerTypes";
+import { gunzipArrayBuffer, sha256Hex } from "../lib/scanArchive/compressedJson";
 import { validateScanArchivePayload } from "../lib/scanArchive/validation";
 
 let activeRequestId: string | null = null;
@@ -15,21 +16,6 @@ const postWorkerMessage = (message: ScanArchiveDownloadResponse) => {
 
 const serializeError = (error: unknown) =>
   error instanceof Error ? error.message : "Scanarchiv-Download fehlgeschlagen.";
-
-const sha256Hex = async (bytes: ArrayBuffer) => {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
-
-const gunzip = async (bytes: ArrayBuffer) => {
-  if (typeof DecompressionStream === "undefined") {
-    throw new Error("gzip-Entpackung wird von diesem Browser nicht unterstuetzt.");
-  }
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-  return new Response(stream).arrayBuffer();
-};
 
 const runRequest = async (request: Exclude<ScanArchiveDownloadRequest, { type: "cancel" }>) => {
   activeRequestId = request.requestId;
@@ -72,7 +58,7 @@ const runRequest = async (request: Exclude<ScanArchiveDownloadRequest, { type: "
     }
 
     emitProgress({ phase: "decompressing", message: "gzip-Datei wird entpackt." });
-    const rawBytes = await gunzip(compressed);
+    const rawBytes = await gunzipArrayBuffer(compressed);
     assertActive();
     if (rawBytes.byteLength !== request.entry.uncompressedBytes) {
       throw new Error("Entpackte Groesse stimmt nicht mit dem Manifest ueberein.");

@@ -4,20 +4,23 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
-  type FirestoreToplistGuildRow,
-  type FirestoreLatestGuildToplistSnapshot,
   type FirestoreLatestGuildToplistResult,
 } from "../../lib/api/toplistsFirestore";
+import type { ToplistGuildRow, ToplistGuildSnapshot } from "../../lib/toplists/toplistContracts";
 import { SERVERS } from "../../data/servers";
 import { useFilters } from "../../components/Filters/FilterContext";
 import { useAuth } from "../../context/AuthContext";
-import { useToplistsData } from "../../context/ToplistsDataContext";
+import { useToplistsData } from "../../context/ToplistsDataContextCore";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
-import type { ToplistExportAmount } from "../../components/export/ToplistPngExportDialog";
 import type { ToplistCaptureStatus } from "../../components/export/ToplistExportController";
 import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import {
+  formatToplistDelta,
+  getToplistRankDeltaDisplay,
+} from "./toplistCompareDisplay";
+import { useToplistRowFocus } from "./useToplistRowFocus";
 
 type GuildToplistsProps = {
   serverCodes?: string[];
@@ -25,18 +28,26 @@ type GuildToplistsProps = {
   showAvgModeControl?: boolean;
   tableRef?: React.RefObject<HTMLDivElement>;
   renderMode?: "live" | "preset";
-  presetAmount?: ToplistExportAmount | null;
+  presetAmount?: number | null;
   onCaptureStatusChange?: (status: ToplistCaptureStatus) => void;
   presetReadOnlyData?: GuildToplistsPresetData | null;
   onPresetReadOnlyDataChange?: (data: GuildToplistsPresetData) => void;
+  onAvgModeChange?: (nextMode: "base" | "total") => void;
+  renderFirestoreGuildOverlay?: boolean;
+  focusIdentifier?: string | null;
+  focusNonce?: number | string | null;
 };
 
 export type GuildToplistsPresetData = {
-  rows: FirestoreToplistGuildRow[];
+  rows: ToplistGuildRow[];
   loading: boolean;
   error: string | null;
   updatedAt: number | null;
   avgMode: "base" | "total";
+  compareLoading?: boolean;
+  compareExpected?: boolean;
+  showCompare?: boolean;
+  compareError?: string | null;
 };
 
 type GuildColumnKey =
@@ -154,6 +165,29 @@ const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
   textAlign: "right",
 };
 
+const TOPLIST_FLEX_COLUMN_RIGHT_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  gap: 2,
+};
+
+const TOPLIST_FLEX_COLUMN_CENTER_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+};
+
+const TOPLIST_DELTA_SUBTEXT_STYLE: React.CSSProperties = {
+  color: "#8FE6A8",
+  fontSize: 11,
+  lineHeight: 1.1,
+  whiteSpace: "nowrap",
+};
+
 const TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
   acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: column.align };
   return acc;
@@ -249,7 +283,7 @@ const buildCanonicalFavoriteServerKey = (value: unknown): string | null => {
   return null;
 };
 
-const buildGuildFavoriteIdentifierFromRow = (row: FirestoreToplistGuildRow): string | null => {
+const buildGuildFavoriteIdentifierFromRow = (row: ToplistGuildRow): string | null => {
   const guildId = String(row.guildId ?? "").trim();
   if (!guildId) return null;
   const serverKey = buildCanonicalFavoriteServerKey(row.server);
@@ -257,7 +291,7 @@ const buildGuildFavoriteIdentifierFromRow = (row: FirestoreToplistGuildRow): str
   return `${serverKey}_g${guildId}`.toLowerCase();
 };
 
-const resolveGuildIdentifier = (row: FirestoreToplistGuildRow): string | null => {
+const resolveGuildIdentifier = (row: ToplistGuildRow): string | null => {
   const fromRowFields = buildGuildToplistIdentifier(row.server, row.guildId);
   if (fromRowFields) return fromRowFields;
   const explicitIdentifier = normalizeGuildFocusIdentifier((row as any).identifier);
@@ -276,13 +310,14 @@ const toFiniteNumber = (value: unknown): number | null => {
   return null;
 };
 
-const normalizeGuildNumericRow = (row: FirestoreToplistGuildRow): FirestoreToplistGuildRow => ({
+const normalizeGuildNumericRow = (row: ToplistGuildRow): ToplistGuildRow => ({
   ...row,
   hofRank: toFiniteNumber(row.hofRank),
   honor: toFiniteNumber(row.honor),
   raids: toFiniteNumber(row.raids),
   portalFloor: toFiniteNumber(row.portalFloor),
   hydra: toFiniteNumber(row.hydra),
+  petLevel: toFiniteNumber(row.petLevel),
   instructor: toFiniteNumber(row.instructor),
   memberCount: toFiniteNumber(row.memberCount),
   avgLevel: toFiniteNumber(row.avgLevel),
@@ -299,7 +334,7 @@ const normalizeGuildNumericRow = (row: FirestoreToplistGuildRow): FirestoreTopli
   lastScan: row.lastScan == null ? null : String(row.lastScan).trim() || null,
 });
 
-const resolveGuildLastScanSec = (row: FirestoreToplistGuildRow): number | null => {
+const resolveGuildLastScanSec = (row: ToplistGuildRow): number | null => {
   const latestScanAtSec = toFiniteNumber(row.latestScanAtSec);
   if (latestScanAtSec != null) return latestScanAtSec;
   return toFiniteNumber(row.lastScan);
@@ -332,13 +367,13 @@ const resolveGuildSort = (value: string | null | undefined) => {
   }
 };
 
-const getGuildAvgMain = (row: FirestoreToplistGuildRow, mode: "base" | "total") =>
+const getGuildAvgMain = (row: ToplistGuildRow, mode: "base" | "total") =>
   mode === "total" ? row.avgAttrTotal : row.avgBaseMain;
 
-const getGuildAvgCon = (row: FirestoreToplistGuildRow, mode: "base" | "total") =>
+const getGuildAvgCon = (row: ToplistGuildRow, mode: "base" | "total") =>
   mode === "total" ? row.avgConTotal : row.avgConBase;
 
-const getGuildAvgSum = (row: FirestoreToplistGuildRow, mode: "base" | "total") =>
+const getGuildAvgSum = (row: ToplistGuildRow, mode: "base" | "total") =>
   mode === "total" ? row.avgTotalStats : row.avgSumBaseTotal;
 
 function GuildAvgModeControls({
@@ -419,16 +454,21 @@ export default function GuildToplists({
   presetAmount = null,
   onCaptureStatusChange,
   presetReadOnlyData = null,
+  onAvgModeChange,
+  renderFirestoreGuildOverlay = true,
+  focusIdentifier = null,
+  focusNonce = null,
 }: GuildToplistsProps) {
   const { t, i18n } = useTranslation();
   const { favoritesOnly } = useFilters();
   const { user } = useAuth();
   const { getGuildToplistSnapshotCached } = useToplistsData();
   const isPresetRender = renderMode === "preset";
+  const hasReadOnlyData = Boolean(presetReadOnlyData);
   const resolvedPresetAmount = presetAmount ?? 50;
   const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
   const isCompactToplistView = useMediaQuery("(max-width: 1099px)") && !isPresetRender;
-  const [rows, setRows] = useState<FirestoreToplistGuildRow[]>([]);
+  const [rows, setRows] = useState<ToplistGuildRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
@@ -448,10 +488,11 @@ export default function GuildToplists({
   const resolvedServers = useMemo(() => {
     const normalized = normalizeServerList(serverCodes ?? []);
     if (normalized.length) return normalized;
+    if (hasReadOnlyData) return [];
     const fallback = SERVERS.find((server) => server.id)?.id || "EU1";
     const fallbackCode = String(fallback).toUpperCase();
     return fallbackCode ? [fallbackCode] : [];
-  }, [serverCodes]);
+  }, [hasReadOnlyData, serverCodes]);
   const resolvedServerKey = useMemo(() => resolvedServers.join(","), [resolvedServers]);
   const i18nLanguageKey = i18n.resolvedLanguage || i18n.language || "";
   const tNoSnapshot = useMemo(
@@ -492,7 +533,7 @@ export default function GuildToplists({
   }, [tNoSnapshot, tFirestoreError, tDecodeError, tUnexpectedError]);
 
   useEffect(() => {
-    if (isPresetRender) return;
+    if (isPresetRender || hasReadOnlyData) return;
     let active = true;
     const currentMessages = errorMessagesRef.current;
     const serversForFetch = resolvedServerKey
@@ -515,7 +556,7 @@ export default function GuildToplists({
     Promise.all(serversForFetch.map((serverCode) => getGuildToplistSnapshotCachedRef.current(serverCode)))
       .then((results) => {
         if (!active) return;
-        const snapshots: FirestoreLatestGuildToplistSnapshot[] = [];
+        const snapshots: ToplistGuildSnapshot[] = [];
         let firstErrorCode: string | null = null;
         let firstErrorDetail: string | null = null;
 
@@ -544,8 +585,8 @@ export default function GuildToplists({
         }
 
         let nextUpdatedAt: number | null = null;
-        const mergedByIdentifier = new Map<string, FirestoreToplistGuildRow>();
-        const mergedWithoutIdentifier: FirestoreToplistGuildRow[] = [];
+        const mergedByIdentifier = new Map<string, ToplistGuildRow>();
+        const mergedWithoutIdentifier: ToplistGuildRow[] = [];
 
         snapshots.forEach((snapshot) => {
           if (snapshot.updatedAt != null) {
@@ -553,7 +594,7 @@ export default function GuildToplists({
           }
 
           const guilds = Array.isArray(snapshot.guilds) ? snapshot.guilds : [];
-          guilds.forEach((rawRow: FirestoreToplistGuildRow) => {
+          guilds.forEach((rawRow: ToplistGuildRow) => {
             const row = normalizeGuildNumericRow(rawRow);
             const identifier = resolveGuildIdentifier(row);
             if (!identifier) {
@@ -593,7 +634,7 @@ export default function GuildToplists({
     return () => {
       active = false;
     };
-  }, [isPresetRender, resolvedServerKey]);
+  }, [hasReadOnlyData, isPresetRender, resolvedServerKey]);
 
   const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("de-DE").format(n));
   const fmtGroupedInt = (n: number | null | undefined) => {
@@ -603,6 +644,27 @@ export default function GuildToplists({
       .format(rounded)
       .replace(/\./g, " ");
   };
+  const fmtDelta = (n: number | null | undefined) => formatToplistDelta(n, (value) => fmtGroupedInt(value));
+  const renderGuildDelta = (value: number | null | undefined, missing: boolean) => {
+    if (!showCompare) return null;
+    if (missing) return <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>-</div>;
+    if (value == null) return null;
+    return <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>{fmtDelta(value)}</div>;
+  };
+  const getGuildRowCompare = (row: ToplistGuildRow) => {
+    const deltas = ((row as any)._delta ?? {}) as Record<string, number | null | undefined>;
+    const compareMissing = showCompare ? Boolean((row as any)._compareMissing) : false;
+    const rankDeltaDisplay = showCompare
+      ? getToplistRankDeltaDisplay((row as any)._rankDelta, compareMissing, (value) => fmtGroupedInt(value))
+      : null;
+    return { deltas, compareMissing, rankDeltaDisplay };
+  };
+  const guildAvgMainDelta = (deltas: Record<string, number | null | undefined>) =>
+    effectiveGuildAvgMode === "total" ? deltas.avgAttrTotal : deltas.avgBaseMain;
+  const guildAvgConDelta = (deltas: Record<string, number | null | undefined>) =>
+    effectiveGuildAvgMode === "total" ? deltas.avgConTotal : deltas.avgConBase;
+  const guildAvgSumDelta = (deltas: Record<string, number | null | undefined>) =>
+    effectiveGuildAvgMode === "total" ? deltas.avgTotalStats : deltas.avgSumBaseTotal;
   const fmtDate = (ts: number | null | undefined) => {
     return formatScanDateTimeLabel(ts);
   };
@@ -614,20 +676,29 @@ export default function GuildToplists({
 
   const activeSortKey = resolveGuildSort(sortKey);
   const activeGuildAvgMode = guildAvgMode === "total" ? "total" : "base";
-  const effectiveGuildAvgMode = isPresetRender ? (presetReadOnlyData?.avgMode ?? activeGuildAvgMode) : activeGuildAvgMode;
-  const effectiveLoading = isPresetRender ? (presetReadOnlyData?.loading ?? false) : loading;
-  const effectiveError = isPresetRender ? (presetReadOnlyData?.error ?? null) : error;
-  const effectiveUpdatedAt = isPresetRender ? (presetReadOnlyData?.updatedAt ?? null) : updatedAt;
-  const avgSumSortMode: "base" | "total" = activeSortKey === "guildAvgSum" ? activeGuildAvgMode : "base";
+  const effectiveGuildAvgMode = hasReadOnlyData ? (presetReadOnlyData?.avgMode ?? activeGuildAvgMode) : activeGuildAvgMode;
+  const effectiveLoading = hasReadOnlyData ? (presetReadOnlyData?.loading ?? false) : loading;
+  const effectiveError = hasReadOnlyData ? (presetReadOnlyData?.error ?? null) : error;
+  const effectiveUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.updatedAt ?? null) : updatedAt;
+  const compareLoading = hasReadOnlyData ? (presetReadOnlyData?.compareLoading ?? false) : false;
+  const compareExpected = hasReadOnlyData ? (presetReadOnlyData?.compareExpected ?? false) : false;
+  const showCompare = hasReadOnlyData ? (presetReadOnlyData?.showCompare ?? false) : false;
+  const compareError = hasReadOnlyData ? (presetReadOnlyData?.compareError ?? null) : null;
+  const avgSumSortMode: "base" | "total" = activeSortKey === "guildAvgSum" ? effectiveGuildAvgMode : "base";
   const handleGuildAvgModeChange = (nextMode: "base" | "total") => {
+    if (hasReadOnlyData) {
+      if (nextMode !== effectiveGuildAvgMode) onAvgModeChange?.(nextMode);
+      return;
+    }
     if (nextMode === guildAvgMode) return;
     setGuildAvgMode(nextMode);
   };
 
 
   const computedDisplayRows = useMemo(() => {
-    let list = Array.isArray(rows) ? [...rows] : [];
+    let list = hasReadOnlyData ? [...(presetReadOnlyData?.rows ?? [])] : Array.isArray(rows) ? [...rows] : [];
     if (!list.length) return list;
+    if (hasReadOnlyData) return list;
 
     if (favoritesOnly && user) {
       list = list.filter((row) => {
@@ -643,10 +714,10 @@ export default function GuildToplists({
           cmp = compareNumberDesc(a.memberCount, b.memberCount);
           break;
         case "guildAvgMain":
-          cmp = compareNumberDesc(getGuildAvgMain(a, activeGuildAvgMode), getGuildAvgMain(b, activeGuildAvgMode));
+          cmp = compareNumberDesc(getGuildAvgMain(a, effectiveGuildAvgMode), getGuildAvgMain(b, effectiveGuildAvgMode));
           break;
         case "guildAvgCon":
-          cmp = compareNumberDesc(getGuildAvgCon(a, activeGuildAvgMode), getGuildAvgCon(b, activeGuildAvgMode));
+          cmp = compareNumberDesc(getGuildAvgCon(a, effectiveGuildAvgMode), getGuildAvgCon(b, effectiveGuildAvgMode));
           break;
         case "guildAvgSum":
           cmp = compareNumberDesc(getGuildAvgSum(a, avgSumSortMode), getGuildAvgSum(b, avgSumSortMode));
@@ -670,15 +741,21 @@ export default function GuildToplists({
     });
 
     return list;
-  }, [rows, favoritesOnly, user, favoriteGuildSet, activeSortKey, avgSumSortMode, activeGuildAvgMode]);
+  }, [activeSortKey, avgSumSortMode, effectiveGuildAvgMode, favoriteGuildSet, favoritesOnly, hasReadOnlyData, presetReadOnlyData?.rows, rows, user]);
   const displayRows = useMemo(
-    () => (isPresetRender ? (presetReadOnlyData?.rows ?? []) : computedDisplayRows),
-    [computedDisplayRows, isPresetRender, presetReadOnlyData]
+    () => (hasReadOnlyData && isPresetRender ? (presetReadOnlyData?.rows ?? []) : computedDisplayRows),
+    [computedDisplayRows, hasReadOnlyData, isPresetRender, presetReadOnlyData]
   );
   const renderedRows = useMemo(
     () => (captureRowLimit == null ? displayRows : displayRows.slice(0, captureRowLimit)),
     [captureRowLimit, displayRows]
   );
+  const highlightedIdentifier = useToplistRowFocus({
+    focusIdentifier,
+    focusNonce,
+    disabled: isPresetRender || effectiveLoading,
+    scrollContainerRef: (tableRef ?? tableScrollRef) as React.RefObject<HTMLElement | null>,
+  });
   const mobileRenderedGuildKeys = useMemo(() => {
     const keys = new Set<string>();
     renderedRows.forEach((row, idx) => {
@@ -691,18 +768,25 @@ export default function GuildToplists({
     setExpandedMobileGuildKey((prev) => (prev && mobileRenderedGuildKeys.has(prev) ? prev : null));
   }, [mobileRenderedGuildKeys]);
 
-  const virtualTotalSize = renderedRows.length * 56;
+  const virtualRowHeight = showCompare ? 72 : 56;
+  const virtualTotalSize = renderedRows.length * virtualRowHeight;
   const firstRenderedIdentifier = renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[0]) ?? "" : "";
   const lastRenderedIdentifier =
     renderedRows.length > 0 ? resolveGuildIdentifier(renderedRows[renderedRows.length - 1]) ?? "" : "";
-  const captureReady = !effectiveLoading && renderedRows.length > 0;
+  const captureReady =
+    !effectiveLoading &&
+    renderedRows.length > 0 &&
+    (!compareExpected || (!compareLoading && showCompare));
   const captureStabilityKey = [
     renderMode,
     effectiveLoading ? "loading:1" : "loading:0",
     `rows:${renderedRows.length}`,
     `sort:${activeSortKey}`,
     `avg:${effectiveGuildAvgMode}`,
-    "rowH:56",
+    `rowH:${virtualRowHeight}`,
+    compareExpected ? "cmp:1" : "cmp:0",
+    compareLoading ? "cmpLoading:1" : "cmpLoading:0",
+    showCompare ? "showCompare:1" : "showCompare:0",
     `virt:${virtualTotalSize}`,
     `first:${firstRenderedIdentifier}`,
     `last:${lastRenderedIdentifier}`,
@@ -716,10 +800,10 @@ export default function GuildToplists({
       rowCount: renderedRows.length,
       ready: captureReady,
       stabilityKey: captureStabilityKey,
-      compareLoading: false,
-      compareExpected: false,
-      showCompare: false,
-      virtualRowHeight: 56,
+      compareLoading,
+      compareExpected,
+      showCompare,
+      virtualRowHeight,
       virtualTotalSize,
     };
     const signature = JSON.stringify(nextStatus);
@@ -729,14 +813,18 @@ export default function GuildToplists({
   }, [
     captureReady,
     captureStabilityKey,
+    compareExpected,
+    compareLoading,
     effectiveLoading,
     isPresetRender,
     onCaptureStatusChange,
     renderedRows.length,
+    showCompare,
+    virtualRowHeight,
     virtualTotalSize,
   ]);
 
-  const openGuildProfile = (row: FirestoreToplistGuildRow) => {
+  const openGuildProfile = (row: ToplistGuildRow) => {
     if (isPresetRender) return;
     const guildId = String(row.guildId ?? "").trim();
     if (!guildId) return;
@@ -749,7 +837,7 @@ export default function GuildToplists({
     });
   };
 
-  const getGuildSortMetric = (row: FirestoreToplistGuildRow) => {
+  const getGuildSortMetric = (row: ToplistGuildRow) => {
     const valueOrDash = (value: string | number | null | undefined) => {
       const text = String(value ?? "").trim();
       return text || "-";
@@ -777,11 +865,15 @@ export default function GuildToplists({
     key: string,
     label: React.ReactNode,
     value: React.ReactNode,
+    delta?: React.ReactNode,
     className = "",
   ) => (
     <div key={key} className={`toplists-mobile-detail-item${className ? ` ${className}` : ""}`}>
       <div className="toplists-mobile-detail-label">{label}</div>
-      <div className="toplists-mobile-detail-value">{value}</div>
+      <div className="toplists-mobile-detail-value">
+        {value}
+        {delta}
+      </div>
     </div>
   );
 
@@ -794,6 +886,7 @@ export default function GuildToplists({
       {renderedRows.map((row, idx) => {
         const rowIdentifier = resolveGuildIdentifier(row);
         const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
+        const isFocusedRow = Boolean(rowIdentifier && highlightedIdentifier === rowIdentifier);
         const isExpanded = expandedMobileGuildKey === rowKey;
         const lastScanSec = resolveGuildLastScanSec(row);
         const sortMetric = getGuildSortMetric(row);
@@ -801,11 +894,12 @@ export default function GuildToplists({
         const guildServer = String(row.server ?? "").trim();
         const guildId = String(row.guildId ?? "").trim();
         const detailId = `toplist-guild-mobile-details-${idx}`;
+        const compare = getGuildRowCompare(row);
 
         return (
           <div
             key={rowKey}
-            className={`toplists-mobile-row${isExpanded ? " toplists-mobile-row--open" : ""}`}
+            className={`toplists-mobile-row${isExpanded ? " toplists-mobile-row--open" : ""}${isFocusedRow ? " toplists-mobile-row--focused" : ""}`}
             data-sfh-identifier={rowIdentifier ?? undefined}
           >
             <button
@@ -815,7 +909,14 @@ export default function GuildToplists({
               aria-controls={detailId}
               onClick={() => setExpandedMobileGuildKey((prev) => (prev === rowKey ? null : rowKey))}
             >
-              <span className="toplists-mobile-rank">#{idx + 1}</span>
+              <span className="toplists-mobile-rank">
+                #{idx + 1}
+                {compare.rankDeltaDisplay ? (
+                  <span className={`rank-delta-chip rank-delta-chip--${compare.rankDeltaDisplay.variant}`}>
+                    {compare.rankDeltaDisplay.text}
+                  </span>
+                ) : null}
+              </span>
               <span className="toplists-mobile-guild-identity">
                 <span className="toplists-mobile-name">{guildName}</span>
                 <span className="toplists-mobile-meta">{guildServer || "-"}</span>
@@ -841,21 +942,22 @@ export default function GuildToplists({
                     onClick={() => openGuildProfile(row)}
                   />
                 </div>
-                {renderGuildMobileDetailItem("hofRank", t("toplists.columns.hofRank", "HoF Rank"), fmtNum(row.hofRank) || "-")}
-                {renderGuildMobileDetailItem("honor", t("toplists.columns.honor", "Honor"), fmtGroupedInt(row.honor) || "-")}
-                {renderGuildMobileDetailItem("raids", t("toplists.columns.raids", "Raids"), fmtNum(row.raids) || "-")}
-                {renderGuildMobileDetailItem("portal", t("toplists.columns.portal", "Portal"), fmtNum(row.portalFloor) || "-")}
-                {renderGuildMobileDetailItem("hydra", t("toplists.columns.hydra", "Hydra"), fmtNum(row.hydra) || "-")}
-                {renderGuildMobileDetailItem("petLevel", t("toplists.columns.petLevel", "Pet Level"), fmtNum(row.instructor) || "-")}
-                {renderGuildMobileDetailItem("members", t("toplists.columns.members", "Members"), fmtNum(row.memberCount) || "-")}
-                {renderGuildMobileDetailItem("avgLevel", t("toplists.columns.avgLevel", "\u00F8 Level"), fmtNum(row.avgLevel) || "-")}
-                {renderGuildMobileDetailItem("avgMain", t("toplists.columns.avgMain", "\u00F8 Main"), fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode)) || "-")}
-                {renderGuildMobileDetailItem("avgCon", t("toplists.columns.avgCon", "\u00F8 Con"), fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode)) || "-")}
-                {renderGuildMobileDetailItem("avgSum", t("toplists.columns.avgSum", "\u00F8 Sum"), fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode)) || "-")}
+                {renderGuildMobileDetailItem("hofRank", t("toplists.columns.hofRank", "HoF Rank"), fmtNum(row.hofRank) || "-", renderGuildDelta(compare.deltas.hofRank, compare.compareMissing))}
+                {renderGuildMobileDetailItem("honor", t("toplists.columns.honor", "Honor"), fmtGroupedInt(row.honor) || "-", renderGuildDelta(compare.deltas.honor, compare.compareMissing))}
+                {renderGuildMobileDetailItem("raids", t("toplists.columns.raids", "Raids"), fmtNum(row.raids) || "-", renderGuildDelta(compare.deltas.raids, compare.compareMissing))}
+                {renderGuildMobileDetailItem("portal", t("toplists.columns.portal", "Portal"), fmtNum(row.portalFloor) || "-", renderGuildDelta(compare.deltas.portalFloor, compare.compareMissing))}
+                {renderGuildMobileDetailItem("hydra", t("toplists.columns.hydra", "Hydra"), fmtNum(row.hydra) || "-", renderGuildDelta(compare.deltas.hydra, compare.compareMissing))}
+                {renderGuildMobileDetailItem("petLevel", t("toplists.columns.petLevel", "Pet Level"), fmtNum(row.petLevel) || "-", renderGuildDelta(compare.deltas.petLevel, compare.compareMissing))}
+                {renderGuildMobileDetailItem("members", t("toplists.columns.members", "Members"), fmtNum(row.memberCount) || "-", renderGuildDelta(compare.deltas.memberCount, compare.compareMissing))}
+                {renderGuildMobileDetailItem("avgLevel", t("toplists.columns.avgLevel", "\u00F8 Level"), fmtNum(row.avgLevel) || "-", renderGuildDelta(compare.deltas.avgLevel, compare.compareMissing))}
+                {renderGuildMobileDetailItem("avgMain", t("toplists.columns.avgMain", "\u00F8 Main"), fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode)) || "-", renderGuildDelta(guildAvgMainDelta(compare.deltas), compare.compareMissing))}
+                {renderGuildMobileDetailItem("avgCon", t("toplists.columns.avgCon", "\u00F8 Con"), fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode)) || "-", renderGuildDelta(guildAvgConDelta(compare.deltas), compare.compareMissing))}
+                {renderGuildMobileDetailItem("avgSum", t("toplists.columns.avgSum", "\u00F8 Sum"), fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode)) || "-", renderGuildDelta(guildAvgSumDelta(compare.deltas), compare.compareMissing))}
                 {renderGuildMobileDetailItem(
                   "lastScan",
                   t("toplists.columns.lastScan", "Last Scan"),
                   formatLastScanDisplay(lastScanSec) || "-",
+                  undefined,
                   "toplists-mobile-detail-item--wide",
                 )}
               </div>
@@ -882,7 +984,9 @@ export default function GuildToplists({
           {rows.map((row, idx) => {
             const rowIdentifier = resolveGuildIdentifier(row);
             const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
+            const isFocusedRow = Boolean(rowIdentifier && highlightedIdentifier === rowIdentifier);
             const lastScanSec = resolveGuildLastScanSec(row);
+            const compare = getGuildRowCompare(row);
             const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
               event.preventDefault();
               event.stopPropagation();
@@ -892,45 +996,79 @@ export default function GuildToplists({
             return (
               <tr
                 key={rowKey}
-                className="toplists-row"
+                className={`toplists-row${isFocusedRow ? " toplists-row--focused" : ""}`}
                 data-sfh-identifier={rowIdentifier ?? undefined}
                 style={{
                   borderBottom: "1px solid #2C4A73",
                   cursor: "pointer",
                   userSelect: "none",
-                  height: 56,
+                  height: virtualRowHeight,
                 }}
                 onClick={rowOnClick}
               >
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.rank}>{idx + 1}</td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.rank}>
+                  <div style={TOPLIST_FLEX_COLUMN_CENTER_STYLE}>
+                    <span>{idx + 1}</span>
+                    {compare.rankDeltaDisplay ? (
+                      <span className={`rank-delta-chip rank-delta-chip--${compare.rankDeltaDisplay.variant}`}>
+                        {compare.rankDeltaDisplay.text}
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.server}>
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{row.server}</span>
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.name}>
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{row.name}</span>
                 </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.hofRank}>{fmtNum(row.hofRank)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.honor}>{fmtGroupedInt(row.honor)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.raids}>{fmtNum(row.raids)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.portal}>{fmtNum(row.portalFloor)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.hydra}>{fmtNum(row.hydra)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.petLevel}>{fmtNum(row.instructor)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.members}>{fmtNum(row.memberCount)}</td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgLevel}>{fmtNum(row.avgLevel)}</td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.hofRank}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.hofRank)}</span>{renderGuildDelta(compare.deltas.hofRank, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.honor}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtGroupedInt(row.honor)}</span>{renderGuildDelta(compare.deltas.honor, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.raids}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.raids)}</span>{renderGuildDelta(compare.deltas.raids, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.portal}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.portalFloor)}</span>{renderGuildDelta(compare.deltas.portalFloor, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.hydra}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.hydra)}</span>{renderGuildDelta(compare.deltas.hydra, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.petLevel}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.petLevel)}</span>{renderGuildDelta(compare.deltas.petLevel, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.members}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.memberCount)}</span>{renderGuildDelta(compare.deltas.memberCount, compare.compareMissing)}</div>
+                </td>
+                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgLevel}>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.avgLevel)}</span>{renderGuildDelta(compare.deltas.avgLevel, compare.compareMissing)}</div>
+                </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgMain}>
-                  <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode))}
-                  </span>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode))}
+                    </span>
+                    {renderGuildDelta(guildAvgMainDelta(compare.deltas), compare.compareMissing)}
+                  </div>
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgCon}>
-                  <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode))}
-                  </span>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode))}
+                    </span>
+                    {renderGuildDelta(guildAvgConDelta(compare.deltas), compare.compareMissing)}
+                  </div>
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.avgSum}>
-                  <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode))}
-                  </span>
+                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode))}
+                    </span>
+                    {renderGuildDelta(guildAvgSumDelta(compare.deltas), compare.compareMissing)}
+                  </div>
                 </td>
                 <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
                   <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>
@@ -972,7 +1110,7 @@ export default function GuildToplists({
       {showAvgModeControl && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
           <GuildAvgModeControls
-            mode={activeGuildAvgMode}
+            mode={effectiveGuildAvgMode}
             updating={false}
             onChange={handleGuildAvgModeChange}
             label={t("toplists.guilds.avgMode.label", "Values")}
@@ -1016,7 +1154,7 @@ export default function GuildToplists({
           </div>
         </div>
       )}
-      {!isPresetRender && (
+      {!isPresetRender && renderFirestoreGuildOverlay && (
         <GuildProfileOverlay
           isOpen={Boolean(selectedGuildProfile?.guildId)}
           guildId={selectedGuildProfile?.guildId ?? null}

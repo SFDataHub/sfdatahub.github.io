@@ -1024,9 +1024,12 @@ function buildGuildSnapshotRecords(
   }
 
   return [...aggregates.entries()].map(([key, draft]) => {
-    const levels = draft.members.map((member) => member.level).filter(isFiniteNumber);
-    const baseStats = draft.members.map((member) => member.baseStats).filter(isFiniteNumber);
-    const totalStats = draft.members.map((member) => member.totalStats).filter(isFiniteNumber);
+    const uniqueMembers = dedupeNormalizedSnapshotMembers(draft.members);
+    const memberCount = draft.memberCountOverride ?? uniqueMembers.length;
+    const completeMemberSet = uniqueMembers.length === memberCount;
+    const levels = uniqueMembers.map((member) => member.level).filter(isFiniteNumber);
+    const baseStats = uniqueMembers.map((member) => member.baseStats).filter(isFiniteNumber);
+    const totalStats = uniqueMembers.map((member) => member.totalStats).filter(isFiniteNumber);
 
     return {
       id: `${snapshot.id}::guild::${key}`,
@@ -1038,12 +1041,31 @@ function buildGuildSnapshotRecords(
       guildSegment: draft.guildSegment,
       guildIdentifier: draft.guildIdentifier,
       guildName: draft.guildName,
-      memberCount: draft.memberCountOverride ?? draft.members.length,
-      averageLevel: average(levels),
-      averageBaseStats: average(baseStats),
-      averageTotalStats: average(totalStats),
+      memberCount,
+      averageLevel: completeMemberSet && levels.length === memberCount ? average(levels) : null,
+      averageBaseStats: completeMemberSet && baseStats.length === memberCount ? average(baseStats) : null,
+      averageTotalStats: completeMemberSet && totalStats.length === memberCount ? average(totalStats) : null,
     };
   });
+}
+
+function dedupeNormalizedSnapshotMembers(members: NormalizedGuildMember[]) {
+  const byRef = new Map<string, NormalizedGuildMember>();
+  members.forEach((member) => {
+    const previous = byRef.get(member.memberRef.toLowerCase());
+    if (!previous || scoreNormalizedMemberValues(member) >= scoreNormalizedMemberValues(previous)) {
+      byRef.set(member.memberRef.toLowerCase(), member);
+    }
+  });
+  return [...byRef.values()];
+}
+
+function scoreNormalizedMemberValues(member: NormalizedGuildMember) {
+  return (
+    Number(isFiniteNumber(member.level)) +
+    Number(isFiniteNumber(member.baseStats)) +
+    Number(isFiniteNumber(member.totalStats))
+  );
 }
 
 async function clearDerivedAnalyticsDb(db: IDBPDatabase<GuildAnalyticsDb>) {

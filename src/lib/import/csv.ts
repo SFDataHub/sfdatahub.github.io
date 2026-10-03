@@ -19,6 +19,7 @@ import {
   withDerivedScanSec,
 } from "../../../tools/playerDerivedHelpers";
 import type { GuildDerivedAggregate } from "./importer";
+import { readGuildLatestMeta } from "./guildLatestMeta";
 import { db } from "../firebase";
 import {
   recordWrite,
@@ -1088,6 +1089,7 @@ type GuildDerivedSnapshotEntry = {
   honor?: number;
   hydra?: number;
   instructor?: number;
+  petLevel?: number | null;
   knights?: number;
   knights15Plus?: number;
   portalFloor?: number;
@@ -1116,46 +1118,6 @@ const toFiniteNumberOrNull = (value: any): number | null => {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
-
-const toDigitsOnlyNumber = (value: any): number => {
-  if (value == null) return 0;
-  const cleaned = String(value).replace(/[^0-9]/g, "");
-  if (!cleaned) return 0;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
-  if (!values || typeof values !== "object") return undefined;
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(values, key)) return (values as any)[key];
-  }
-  return undefined;
-};
-
-const GUILD_LATEST_VALUE_KEYS = {
-  honor: ["Guild Honor"],
-  hydra: ["Guild Hydra"],
-  instructor: ["Guild Instructor"],
-  knights: ["Guild Knights"],
-  knights15Plus: ["Guild Knights 15+"],
-  memberCount: ["Guild Member Count"],
-  portalFloor: ["Guild Portal Floor"],
-  raids: ["Guild Raids"],
-  treasury: ["Guild Treasure", "Guild Treasury"],
-} as const;
-
-const readGuildLatestMeta = (values: Record<string, any> | null | undefined) => ({
-  honor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.honor)),
-  hydra: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.hydra)),
-  instructor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.instructor)),
-  knights: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights)),
-  knights15Plus: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights15Plus)),
-  memberCount: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.memberCount)),
-  portalFloor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.portalFloor)),
-  raids: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.raids)),
-  treasury: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.treasury)),
-});
 
 const toSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_player_derived`;
 const toGuildSnapshotDocId = (serverKey: string) => `snapshot_${serverKey}_guild_derived`;
@@ -1860,6 +1822,7 @@ export async function flushGuildDerivedSnapshotsFromAggregates(
       honor: toFiniteNumberOrNull(aggregate.honor) ?? 0,
       hydra: toFiniteNumberOrNull(aggregate.hydra) ?? 0,
       instructor: toFiniteNumberOrNull(aggregate.instructor) ?? 0,
+      petLevel: toFiniteNumberOrNull(aggregate.petLevel),
       knights: toFiniteNumberOrNull(aggregate.knights) ?? 0,
       knights15Plus: toFiniteNumberOrNull(aggregate.knights15Plus) ?? 0,
       portalFloor: toFiniteNumberOrNull(aggregate.portalFloor) ?? 0,
@@ -2477,6 +2440,7 @@ export async function importCsvToDB(
             honor: latestMeta.honor,
             hydra: latestMeta.hydra,
             instructor: latestMeta.instructor,
+            petLevel: latestMeta.petLevel,
             knights: latestMeta.knights,
             knights15Plus: latestMeta.knights15Plus,
             portalFloor: latestMeta.portalFloor,

@@ -19,13 +19,7 @@ import {
   usePlayerProgressSnapshots,
 } from "../../lib/player-progress/usePlayerProgressSnapshots";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
-import {
-  ATTRIBUTE_COMPOSITION_SHADE_ACCENT_WEIGHTS,
-  ATTRIBUTE_COMPOSITION_SHADE_MIX_BG,
-  getPlayerStatAccentColor,
-  getPlayerStatAccentRgbString,
-  mixHexColors,
-} from "./statAccents";
+import AttributeCompositionCard from "../attribute-composition/AttributeCompositionCard";
 
 type MetricKind = "number" | "percent" | "rank";
 type FieldRow = {
@@ -45,28 +39,6 @@ const FORTRESS_GUIDE_LINKS = {
   packageSkipOrder: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-package-skip-order",
   attackDuplication: "/guidehub?tab=gamefeatures&sub=fortress&sub2=fortress-attack-duplication",
 } as const;
-
-type AttributeCompositionSourceKey =
-  | "base"
-  | "baseItems"
-  | "upgrades"
-  | "equipment"
-  | "gems"
-  | "pet"
-  | "potion"
-  | "petBonus"
-  | "other";
-
-type AttributeCompositionSegment = {
-  sourceKey: AttributeCompositionSourceKey;
-  label: string;
-  value: number;
-  widthPct: number;
-  iconPlaceholder: string;
-  shadeIndex: number;
-  isBarSegment: boolean;
-  isInteractive: boolean;
-};
 
 const FORTRESS_BUILDING_ICON_KEYS: Record<
   string,
@@ -156,70 +128,12 @@ const FORTRESS_BUILDING_ICON_KEYS: Record<
   },
 };
 
-const ATTRIBUTE_COMPOSITION_SOURCE_META: Record<
-  AttributeCompositionSourceKey,
-  { iconPlaceholder: string; shadeIndex: number }
-> = {
-  base: { iconPlaceholder: "BA", shadeIndex: -1 },
-  baseItems: { iconPlaceholder: "BI", shadeIndex: 0 },
-  upgrades: { iconPlaceholder: "UP", shadeIndex: 1 },
-  equipment: { iconPlaceholder: "EQ", shadeIndex: 2 },
-  gems: { iconPlaceholder: "GM", shadeIndex: 3 },
-  pet: { iconPlaceholder: "PB", shadeIndex: 4 },
-  potion: { iconPlaceholder: "PO", shadeIndex: 5 },
-  petBonus: { iconPlaceholder: "PC", shadeIndex: 5 },
-  other: { iconPlaceholder: "OT", shadeIndex: 2 },
-};
-
-const ATTRIBUTE_COMPOSITION_BASE_ACCENT_WEIGHT = 0.16;
-const ATTRIBUTE_COMPOSITION_OTHER_ACCENT_WEIGHT = 0.35;
-
-function getAttributeCompositionSegmentFill(
-  attrCode: string,
-  sourceKey: AttributeCompositionSourceKey,
-  shadeIndex: number,
-) {
-  const statAccent = getPlayerStatAccentColor(attrCode);
-  const isClampedStat = attrCode === "dex" || attrCode === "lck";
-  if (sourceKey === "base") {
-    return mixHexColors(ATTRIBUTE_COMPOSITION_SHADE_MIX_BG, statAccent, ATTRIBUTE_COMPOSITION_BASE_ACCENT_WEIGHT);
-  }
-  if (sourceKey === "other") {
-    return mixHexColors(ATTRIBUTE_COMPOSITION_SHADE_MIX_BG, statAccent, ATTRIBUTE_COMPOSITION_OTHER_ACCENT_WEIGHT);
-  }
-  const weight =
-    ATTRIBUTE_COMPOSITION_SHADE_ACCENT_WEIGHTS[
-      Math.max(0, Math.min(ATTRIBUTE_COMPOSITION_SHADE_ACCENT_WEIGHTS.length - 1, shadeIndex))
-    ];
-  const effectiveWeight = isClampedStat ? Math.max(0, weight - 0.05) : weight;
-  return mixHexColors(ATTRIBUTE_COMPOSITION_SHADE_MIX_BG, statAccent, effectiveWeight);
-}
-
-function getAttributeCompositionRowStyle(attrCode: string): React.CSSProperties {
-  return {
-    ["--pp-attr-stat-accent" as const]: getPlayerStatAccentColor(attrCode),
-    ["--pp-attr-stat-accent-rgb" as const]: getPlayerStatAccentRgbString(attrCode),
-  } as React.CSSProperties;
-}
-
-function getAttributeCompositionSegmentStyle(
-  attrCode: string,
-  segment: Pick<AttributeCompositionSegment, "sourceKey" | "shadeIndex" | "widthPct">,
-): React.CSSProperties {
-  return {
-    width: `${segment.widthPct}%`,
-    ["--pp-attr-segment-fill" as const]: getAttributeCompositionSegmentFill(attrCode, segment.sourceKey, segment.shadeIndex),
-  } as React.CSSProperties;
-}
-
 export function StatsTab({ data }: { data: StatsTabModel }) {
   return <PlayerStatsTabV2 data={data} />;
 }
 
 function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
   const { t } = useTranslation();
-  const [hoveredAttrCode, setHoveredAttrCode] = React.useState<string | null>(null);
-  const [hoveredSourceKey, setHoveredSourceKey] = React.useState<AttributeCompositionSourceKey | null>(null);
 
   const combatRows: Array<{ labelKey: string; value: number | null; kind?: MetricKind }> = [
     { labelKey: "playerProfile.statsTab.combat.armor", value: data.combat.armor },
@@ -356,14 +270,6 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
   const showProgressPanel = [...raidsRows, ...xpRows].some((row) => row.value != null);
   const showAdvancedPanel = false;
   const noDataText = t("common.noData");
-  const setHoveredCompositionSource = (attrCode: string, sourceKey: AttributeCompositionSourceKey) => {
-    setHoveredAttrCode(attrCode);
-    setHoveredSourceKey(sourceKey);
-  };
-  const clearHoveredCompositionSource = () => {
-    setHoveredAttrCode(null);
-    setHoveredSourceKey(null);
-  };
 
   return (
     <div className="player-profile__tab-panel player-profile__stats-v2">
@@ -379,110 +285,10 @@ function PlayerStatsTabV2({ data }: { data: StatsTabModel }) {
           />
         </section>
 
-        <section className="player-profile__stats-panel player-profile__stats-panel--attributes">
-          <PanelHead
-            title={t("playerProfile.statsTab.attrComposition.title")}
-            subtitle={t("playerProfile.statsTab.attrComposition.subtitle")}
-          />
-          <div className="player-profile__stats-attr-list">
-            {data.attributeComposition.map((attr) => {
-              const segments = buildAttributeSegments(t, attr.base, attr.breakdown, attr.total);
-              const barSegments = segments.filter((segment) => segment.isBarSegment);
-              const hasData = attr.total != null || segments.length > 0;
-              const hasBarData = barSegments.length > 0 || (typeof attr.total === "number" && attr.total > 0);
-              const isAttrHoverActive = hoveredAttrCode === attr.code && hoveredSourceKey != null;
-              const attrRowStyle = getAttributeCompositionRowStyle(attr.code);
-
-              return (
-                <div key={attr.code} className="player-profile__stats-attr-row" style={attrRowStyle}>
-                  <div className="player-profile__stats-attr-head">
-                    <div className="player-profile__stats-attr-label">
-                      {t(`playerProfile.statsTab.attrComposition.attributes.${attr.code}`)}
-                    </div>
-                    <div className="player-profile__stats-attr-values">
-                      <strong>{formatMetricValue(attr.total, "number")}</strong>
-                      {attr.bonus != null && (
-                        <span>
-                          {t("playerProfile.statsTab.attrComposition.bonus")} +{formatPlainNumber(attr.bonus)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="player-profile__stats-stack-track" aria-hidden="true">
-                    {hasBarData ? (
-                      barSegments.map((segment) => {
-                        const isHovered = segment.isInteractive && hoveredAttrCode === attr.code && hoveredSourceKey === segment.sourceKey;
-                        const isDimmed = isAttrHoverActive && !isHovered;
-                        return (
-                          <div
-                            key={segment.sourceKey}
-                            className={`player-profile__stats-stack-fill player-profile__stats-stack-fill--${segment.sourceKey}${
-                              isHovered ? " player-profile__stats-stack-fill--hovered" : ""
-                            }${isDimmed ? " player-profile__stats-stack-fill--dimmed" : ""}`}
-                            data-shade-index={segment.shadeIndex}
-                            style={getAttributeCompositionSegmentStyle(attr.code, segment)}
-                            onMouseEnter={() => setHoveredCompositionSource(attr.code, segment.sourceKey)}
-                            onMouseLeave={clearHoveredCompositionSource}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="player-profile__stats-stack-empty" />
-                    )}
-                  </div>
-                  {hasData ? (
-                    <div className="player-profile__stats-attr-legend" role="list">
-                      {segments.map((segment) => {
-                        const isHovered =
-                          segment.isInteractive && hoveredAttrCode === attr.code && hoveredSourceKey === segment.sourceKey;
-                        const isDimmed = segment.isInteractive && isAttrHoverActive && !isHovered;
-                        return (
-                          <div
-                            key={segment.sourceKey}
-                            className={`player-profile__stats-attr-legend-item${
-                              isHovered ? " player-profile__stats-attr-legend-item--hovered" : ""
-                            }${isDimmed ? " player-profile__stats-attr-legend-item--dimmed" : ""}${
-                              !segment.isInteractive ? " player-profile__stats-attr-legend-item--static" : ""
-                            }`}
-                            role="listitem"
-                            tabIndex={segment.isInteractive ? 0 : undefined}
-                            onMouseEnter={
-                              segment.isInteractive
-                                ? () => setHoveredCompositionSource(attr.code, segment.sourceKey)
-                                : undefined
-                            }
-                            onMouseLeave={segment.isInteractive ? clearHoveredCompositionSource : undefined}
-                            onFocus={
-                              segment.isInteractive
-                                ? () => setHoveredCompositionSource(attr.code, segment.sourceKey)
-                                : undefined
-                            }
-                            onBlur={segment.isInteractive ? clearHoveredCompositionSource : undefined}
-                          >
-                            <i
-                              className={`player-profile__stats-attr-swatch player-profile__stats-attr-swatch--${segment.sourceKey}`}
-                              data-shade-index={segment.shadeIndex}
-                              aria-hidden="true"
-                            />
-                            <span className="player-profile__stats-attr-legend-icon" aria-hidden="true">
-                              {segment.iconPlaceholder}
-                            </span>
-                            <span className="player-profile__stats-attr-legend-label">{segment.label}</span>
-                            <strong className="player-profile__stats-attr-legend-value">
-                              {formatCompactNumber(segment.value)}
-                            </strong>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="player-profile__stats-muted">{noDataText}</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <AttributeCompositionCard
+          attributes={data.attributeComposition}
+          className="player-profile__stats-panel player-profile__stats-panel--attributes"
+        />
 
         <section className="player-profile__stats-panel player-profile__stats-panel--runes">
           <PanelHead title={t("playerProfile.statsTab.runesResists.title")} />
@@ -867,95 +673,6 @@ function renderTooltipList(lines: string[]) {
       ))}
     </div>
   );
-}
-
-function buildAttributeSegments(
-  t: TranslateFn,
-  base: number | null,
-  breakdown: StatsTabModel["attributeComposition"][number]["breakdown"],
-  total: number | null,
-) {
-  const segments: Array<Omit<AttributeCompositionSegment, "widthPct">> = [];
-  let bonusContributionSum = 0;
-  const pushSourceSegment = (
-    sourceKey: Exclude<AttributeCompositionSourceKey, "other">,
-    label: string,
-    value: number | null | undefined,
-    options?: { isBarSegment?: boolean; isInteractive?: boolean; countTowardsBase?: boolean },
-  ) => {
-    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return;
-    const isBarSegment = options?.isBarSegment ?? true;
-    const isInteractive = options?.isInteractive ?? isBarSegment;
-    const countTowardsBase = options?.countTowardsBase ?? isBarSegment;
-    if (countTowardsBase) {
-      bonusContributionSum += value;
-    }
-    segments.push({
-      sourceKey,
-      label,
-      value,
-      iconPlaceholder: ATTRIBUTE_COMPOSITION_SOURCE_META[sourceKey].iconPlaceholder,
-      shadeIndex: ATTRIBUTE_COMPOSITION_SOURCE_META[sourceKey].shadeIndex,
-      isBarSegment,
-      isInteractive,
-    });
-  };
-
-  pushSourceSegment("base", t("playerProfile.statsTab.attrComposition.breakdown.base"), base, {
-    isBarSegment: true,
-    isInteractive: true,
-    countTowardsBase: false,
-  });
-  pushSourceSegment("baseItems", t("playerProfile.statsTab.attrComposition.breakdown.baseItems"), breakdown.baseItems);
-  pushSourceSegment("upgrades", t("playerProfile.statsTab.attrComposition.breakdown.upgrades"), breakdown.upgrades);
-  pushSourceSegment("equipment", t("playerProfile.statsTab.attrComposition.breakdown.equipment"), breakdown.equipment);
-  pushSourceSegment("gems", t("playerProfile.statsTab.attrComposition.breakdown.gems"), breakdown.gems);
-  pushSourceSegment("pet", t("playerProfile.statsTab.attrComposition.breakdown.pet"), breakdown.pet);
-  pushSourceSegment("potion", t("playerProfile.statsTab.attrComposition.breakdown.potion"), breakdown.potion);
-
-  const fallbackBaseValue =
-    base == null && typeof total === "number" && Number.isFinite(total)
-      ? Math.max(0, total - Math.max(0, bonusContributionSum))
-      : null;
-
-  if (fallbackBaseValue != null && fallbackBaseValue > 0) {
-    segments.unshift({
-      sourceKey: "base",
-      label: t("playerProfile.statsTab.attrComposition.breakdown.base"),
-      value: fallbackBaseValue,
-      iconPlaceholder: ATTRIBUTE_COMPOSITION_SOURCE_META.base.iconPlaceholder,
-      shadeIndex: ATTRIBUTE_COMPOSITION_SOURCE_META.base.shadeIndex,
-      isBarSegment: true,
-      isInteractive: true,
-    });
-  }
-
-  pushSourceSegment("petBonus", t("playerProfile.statsTab.attrComposition.breakdown.petBonus"), breakdown.petBonus, {
-    isBarSegment: false,
-    isInteractive: false,
-    countTowardsBase: false,
-  });
-
-  if (!segments.length && typeof total === "number" && total > 0) {
-    segments.push({
-      sourceKey: "other",
-      label: t("playerProfile.statsTab.attrComposition.breakdown.other"),
-      value: total,
-      iconPlaceholder: ATTRIBUTE_COMPOSITION_SOURCE_META.other.iconPlaceholder,
-      shadeIndex: ATTRIBUTE_COMPOSITION_SOURCE_META.other.shadeIndex,
-      isBarSegment: true,
-      isInteractive: true,
-    });
-  }
-
-  const barSegments = segments.filter((segment) => segment.isBarSegment);
-  const sum = barSegments.reduce((acc, segment) => acc + segment.value, 0);
-  const denominator = Math.max(sum, total ?? 0, 1);
-
-  return segments.map((segment) => ({
-    ...segment,
-    widthPct: segment.isBarSegment ? Math.max(0, Math.min(100, (segment.value / denominator) * 100)) : 0,
-  }));
 }
 
 function resolveFortressBuildingIcon(labelKey: string, level: number | null): FieldRow["icon"] | undefined {

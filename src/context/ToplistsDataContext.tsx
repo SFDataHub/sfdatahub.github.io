@@ -1,8 +1,6 @@
 ﻿// src/context/ToplistsDataContext.tsx
 import React, {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -16,9 +14,18 @@ import {
   TOPLIST_SNAPSHOT_NEGATIVE_TTL_MS,
   TOPLIST_SNAPSHOT_TTL_MS,
   type FirestoreLatestGuildToplistResult,
-  type FirestoreLatestToplistSnapshot,
-  type FirestoreToplistPlayerRow,
 } from "../lib/api/toplistsFirestore";
+import {
+  ToplistsDataContext,
+  ToplistsDataStaticProvider,
+  useToplistsData,
+  type Filters,
+  type PlayerScopeStatus,
+  type PlayerToplistDataState,
+  type SortSpec,
+  type ToplistsDataContextValue,
+} from "./ToplistsDataContextCore";
+import type { ToplistPlayerRow, ToplistPlayerSnapshot } from "../lib/toplists/toplistContracts";
 import { buildServerGroupsFromCodes, type ServerGroupsByRegion } from "../components/Filters/serverGroups";
 import { SERVERS } from "../data/servers";
 import i18n from "../i18n";
@@ -29,31 +36,8 @@ const FALLBACK_SERVER_GROUPS = buildServerGroupsFromCodes(
   SERVERS.map((s) => s.id).filter((id): id is string => typeof id === "string" && !!id)
 );
 
-type TimeRange = "all" | "3d" | "7d" | "14d" | "30d" | "60d" | "90d";
-type SortDir = "asc" | "desc";
-
-export type Filters = {
-  group: string;
-  servers: string[];
-  classes: string[];
-  timeRange: TimeRange;
-};
-
-export type SortSpec = { key: string; dir: SortDir };
-
-type PlayerToplistDataState = {
-  rows: FirestoreToplistPlayerRow[];
-  loading: boolean;
-  error: string | null;
-  lastUpdatedAt: number | null;
-  nextUpdateAt: number | null;
-  ttlSec: number | null;
-  listId: string | null;
-  rowLimit: number | null;
-};
-
 type CachedPlayerToplist = {
-  snapshot: FirestoreLatestToplistSnapshot;
+  snapshot: ToplistPlayerSnapshot;
   cachedAt: number;
 };
 
@@ -62,35 +46,6 @@ type CachedGuildToplist = {
   cachedAt: number;
   expiresAtMs: number;
 };
-
-export type PlayerScopeStatus = {
-  scopeId: string;
-  lastRebuildAt: Date | null;
-  lastChangeAt: Date | null;
-  changesSinceLastRebuild: number;
-  minChanges: number | null;
-  maxAgeDays: number | null;
-  progress: number;
-  isFresh: boolean;
-};
-
-type Ctx = {
-  player: PlayerToplistDataState;
-  playerRows: FirestoreToplistPlayerRow[];
-  playerLoading: boolean;
-  playerError: string | null;
-  playerLastUpdatedAt: number | null;
-  playerNextUpdateAt: number | null;
-  playerScopeStatus: PlayerScopeStatus | null;
-  serverGroups: ServerGroupsByRegion;
-  filters: Filters;
-  sort: SortSpec;
-  getGuildToplistSnapshotCached: (serverCode: string) => Promise<FirestoreLatestGuildToplistResult>;
-  setFilters: (next: Partial<Filters> | ((prev: Filters) => Filters)) => void;
-  setSort: (next: SortSpec | ((prev: SortSpec) => SortSpec)) => void;
-};
-
-const ToplistsCtx = createContext<Ctx | null>(null);
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -312,8 +267,8 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const mergeSnapshots = (snapshots: FirestoreLatestToplistSnapshot[]) => {
-      const rows: FirestoreToplistPlayerRow[] = [];
+    const mergeSnapshots = (snapshots: ToplistPlayerSnapshot[]) => {
+      const rows: ToplistPlayerRow[] = [];
       let updatedAt: number | null = null;
       let rowLimit = 0;
 
@@ -331,7 +286,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       return { rows, updatedAt, rowLimit: rowLimit || null };
     };
 
-    const cachedSnapshots: FirestoreLatestToplistSnapshot[] = [];
+    const cachedSnapshots: ToplistPlayerSnapshot[] = [];
     const missingServers: string[] = [];
     for (const serverCode of resolvedServers) {
       const cached = playerCacheRef.current.get(serverCode);
@@ -378,7 +333,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       );
       if (cancelled) return;
 
-      const snapshots: FirestoreLatestToplistSnapshot[] = [...cachedSnapshots];
+      const snapshots: ToplistPlayerSnapshot[] = [...cachedSnapshots];
       let firstErrorCode: SnapshotError["error"] | null = null;
       let firstErrorDetail: string | null = null;
 
@@ -498,7 +453,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       const diff = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
       return sort.dir === "asc" ? diff : -diff;
     };
-    const compareTie = (a: FirestoreToplistPlayerRow, b: FirestoreToplistPlayerRow) => {
+    const compareTie = (a: ToplistPlayerRow, b: ToplistPlayerRow) => {
       const aServer = normalizeServerCode(String(a.server ?? ""));
       const bServer = normalizeServerCode(String(b.server ?? ""));
       const aPid = (a as any).playerId ?? (a as any).id ?? a.name ?? "";
@@ -575,7 +530,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
   }, [playerState.rows, playerState.rowLimit, filters.timeRange, normalizedServers, normalizedClasses, sort]);
 
   // Context-Value MEMOISIEREN, sonst re-rendert alles unnoetig
-  const value = useMemo<Ctx>(
+  const value = useMemo<ToplistsDataContextValue>(
     () => ({
       player: playerState,
       playerRows,
@@ -594,15 +549,14 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
     [playerState, playerRows, filters, sort, serverGroups, setFilters, setSort, playerScopeStatus, getGuildToplistSnapshotCached]
   );
 
-  return <ToplistsCtx.Provider value={value}>{children}</ToplistsCtx.Provider>;
+  return <ToplistsDataContext.Provider value={value}>{children}</ToplistsDataContext.Provider>;
 }
 
-// ---- hook ------------------------------------------------------------------
-
-export function useToplistsData(): Ctx {
-  const ctx = useContext(ToplistsCtx);
-  if (!ctx) {
-    throw new Error("useToplistsData() must be used inside <ToplistsProvider>.");
-  }
-  return ctx;
-}
+export {
+  ToplistsDataStaticProvider,
+  useToplistsData,
+  type Filters,
+  type PlayerScopeStatus,
+  type SortSpec,
+  type ToplistsDataContextValue,
+};

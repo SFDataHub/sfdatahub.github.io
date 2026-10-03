@@ -3,6 +3,7 @@ import { resolvePotionAssetKey } from "../../components/potions/potionAssets";
 import { getClassMetaById, iconForClassName } from "../../data/classes";
 import { getGuildClassAccent } from "../../components/guilds/classColors";
 import { guideAssetByKey } from "../../data/guidehub/assets";
+import type { GuildAnalyticsDerivedData } from "../guilds/localGuildAnalyticsStore";
 import type { GuildHubLocalScan, GuildHubScanSummary } from "../guilds/localScanLibrary";
 import {
   normalizeGuildScanMembers,
@@ -10,7 +11,13 @@ import {
   type NormalizedGuildMember,
   type NormalizedGuildRole,
 } from "../guilds/guildScanNormalizer";
-import { buildLocalPlayerTrend, type LocalPlayerTrendSourceEntry } from "../player-progress/localPlayerTrend";
+import { resolvePlayerIdentity, type IdentityResolutionSnapshot } from "../identities/identityResolution";
+import { normalizePlayerIdentifierKey } from "../identities/playerIdentityStore";
+import {
+  buildPlayerCardDevelopmentLookup,
+  type PlayerCardDevelopmentSummary,
+  type PlayerCardDevelopmentSourceEntry,
+} from "../player-progress/playerCardDevelopment";
 import { normalizeSfPlayerPotions } from "../parsing/normalizedConsumables";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../parsing/normalizedPlayer";
 import { readSfPlayerStats } from "../parsing/parseSfJson";
@@ -36,11 +43,17 @@ export type LocalPlayerIndexPlayer = {
   sourceFilename: string;
   queryText: string;
   card: PlayerCardData;
+  development?: PlayerCardDevelopmentSummary | null;
 };
 
 type LocalPlayerIndexEntry = LocalPlayerIndexPlayer & {
-  trendSource: LocalPlayerTrendSourceEntry;
+  developmentSource: PlayerCardDevelopmentSourceEntry;
 };
+
+type LocalPlayerIndexTargetFilter = {
+  refs: ReadonlySet<string>;
+  names: ReadonlySet<string>;
+} | null;
 
 export type LocalPlayerIndexScanInput = {
   scan: GuildHubLocalScan;
@@ -66,34 +79,59 @@ const ROLE_LABELS: Record<Exclude<NormalizedGuildRole, null>, string> = {
 
 export function buildLocalPlayerIndex(
   scans: LocalPlayerIndexScanInput[],
-  options: { serverFilter?: string | null } = {},
+  options: {
+    serverFilter?: string | null;
+    analyticsData?: GuildAnalyticsDerivedData | null;
+    identityResolutionSnapshot?: IdentityResolutionSnapshot | null;
+    targetPlayerRefs?: readonly string[] | null;
+    targetPlayerNames?: readonly string[] | null;
+    includeCards?: boolean;
+  } = {},
 ): LocalPlayerIndexResult {
   const builder = createLocalPlayerIndexBuilder(options);
   scans.forEach((input) => builder.addScan(input));
   return builder.finish();
 }
 
-export function createLocalPlayerIndexBuilder(options: { serverFilter?: string | null } = {}) {
+export function createLocalPlayerIndexBuilder(
+  options: {
+    serverFilter?: string | null;
+    analyticsData?: GuildAnalyticsDerivedData | null;
+    identityResolutionSnapshot?: IdentityResolutionSnapshot | null;
+    targetPlayerRefs?: readonly string[] | null;
+    targetPlayerNames?: readonly string[] | null;
+    includeCards?: boolean;
+  } = {},
+) {
   const serverFilter = normalizeServer(options.serverFilter);
+  const targetFilter = buildTargetFilter({
+    targetPlayerRefs: options.targetPlayerRefs ?? null,
+    targetPlayerNames: options.targetPlayerNames ?? null,
+    identityResolutionSnapshot: options.identityResolutionSnapshot ?? null,
+  });
+  const includeCards = options.includeCards ?? true;
   const allPlayers: LocalPlayerIndexEntry[] = [];
   let scanCount = 0;
 
   return {
     addScan(input: LocalPlayerIndexScanInput) {
       scanCount += 1;
-      allPlayers.push(...buildPlayersFromScan(input.scan, input.summary, serverFilter));
+      allPlayers.push(...buildPlayersFromScan(input.scan, input.summary, serverFilter, targetFilter, includeCards));
     },
     finish(): LocalPlayerIndexResult {
-      const trendsByKey = buildTrendLookup(allPlayers);
+      const developmentByKey = buildPlayerCardDevelopmentLookup(
+        allPlayers.map((player) => player.developmentSource),
+        {
+          analyticsData: options.analyticsData ?? null,
+          identityResolutionSnapshot: options.identityResolutionSnapshot ?? null,
+        },
+      );
       const deduped = new Map<string, LocalPlayerIndexPlayer>();
 
       for (const player of allPlayers) {
         const nextPlayer: LocalPlayerIndexPlayer = {
           ...player,
-          card: {
-            ...player.card,
-            trends: trendsByKey.get(player.key),
-          },
+          development: developmentByKey.get(player.key) ?? null,
         };
         const previous = deduped.get(nextPlayer.key);
         if (!previous || comparePlayerFreshness(nextPlayer, previous) < 0) {
@@ -120,10 +158,97 @@ export function createLocalPlayerIndexBuilder(options: { serverFilter?: string |
   };
 }
 
+function buildTargetFilter({
+  targetPlayerRefs,
+  targetPlayerNames,
+  identityResolutionSnapshot,
+}: {
+  targetPlayerRefs: readonly string[] | null;
+  targetPlayerNames: readonly string[] | null;
+  identityResolutionSnapshot: IdentityResolutionSnapshot | null;
+}): LocalPlayerIndexTargetFilter {
+  if (!targetPlayerRefs && !targetPlayerNames) return null;
+  const refs = new Set<string>();
+  const names = new Set<string>();
+
+  const addIdentifier = (value: string | null | undefined) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return;
+    addRefCandidate(refCandidate(raw));
+
+    const unprefixed = stripIdentityKeyPrefix(raw);
+    if (unprefixed !== raw) addRefCandidate(refCandidate(unprefixed));
+
+    if (!identityResolutionSnapshot) return;
+    const resolution = resolvePlayerIdentity(identityResolutionSnapshot, unprefixed);
+    if (!resolution.resolved) return;
+    resolution.aliases.forEach((alias) => {
+      addRefCandidate(refCandidate(alias.identifier));
+      addRefCandidate(alias.identifierKey);
+    });
+  };
+
+  targetPlayerRefs?.forEach(addIdentifier);
+  targetPlayerNames?.forEach((name) => {
+    const normalized = normalizeSearch(name);
+    if (normalized) names.add(normalized);
+  });
+
+  return { refs, names };
+
+  function addRefCandidate(value: string | null) {
+    if (value) refs.add(value);
+  }
+}
+
+function isTargetPlayer(player: JsonRecord, sourceScanId: string, targetFilter: LocalPlayerIndexTargetFilter) {
+  if (!targetFilter) return true;
+
+  const identifier = readString(player, ["identifier", "Identifier"]);
+  const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
+  const server = normalizeServer(
+    readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(identifier),
+  );
+  const name = readString(player, ["name", "Name", "playerName", "Player Name"]);
+
+  const refCandidates = [
+    identifier,
+    stripIdentityKeyPrefix(identifier),
+    playerId && server ? `${server.toLowerCase()}_p${playerId}` : null,
+    identifier ? `identifier:${identifier.toLowerCase()}` : null,
+    playerId && server ? `server-player-id:${server.toLowerCase()}:p${playerId}` : null,
+    name ? `scan-name:${sourceScanId}:${normalizeSearch(name)}` : null,
+  ];
+  if (refCandidates.some((candidate) => refCandidate(candidate) && targetFilter.refs.has(refCandidate(candidate) ?? ""))) {
+    return true;
+  }
+
+  const normalizedName = normalizeSearch(name);
+  return Boolean(normalizedName && targetFilter.names.has(normalizedName));
+}
+
+function stripIdentityKeyPrefix(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  const prefixed = raw.match(/^(?:identifier|server-player-id):(.+)$/i);
+  return prefixed?.[1] ?? raw;
+}
+
+function refCandidate(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  try {
+    return normalizePlayerIdentifierKey(raw);
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
 function buildPlayersFromScan(
   scan: GuildHubLocalScan,
   summary: GuildHubScanSummary,
   serverFilter: string | null,
+  targetFilter: LocalPlayerIndexTargetFilter,
+  includeCards: boolean,
 ): LocalPlayerIndexEntry[] {
   const raw = asRecord(scan.rawData);
   if (!raw) return [];
@@ -139,7 +264,8 @@ function buildPlayersFromScan(
   const scanMs = scanTimestampMs(scan, summary);
 
   return players
-    .map((player) => toIndexPlayer(player, scan, summary, scanMs, normalizedByRef, groupsBySegment, serverFilter))
+    .filter((player) => isTargetPlayer(player, scan.id, targetFilter))
+    .map((player) => toIndexPlayer(player, scan, summary, scanMs, normalizedByRef, groupsBySegment, serverFilter, includeCards))
     .filter((player): player is LocalPlayerIndexEntry => Boolean(player));
 }
 
@@ -151,6 +277,7 @@ function toIndexPlayer(
   normalizedByRef: Map<string, NormalizedGuildMember>,
   groupsBySegment: Map<string, GroupInfo>,
   serverFilter: string | null,
+  includeCards: boolean,
 ): LocalPlayerIndexEntry | null {
   const identifier = readString(player, ["identifier", "Identifier"]);
   const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
@@ -168,11 +295,12 @@ function toIndexPlayer(
   if (!name) return null;
 
   const identity = resolveIdentityKey({ identifier, playerId, server, name, sourceScanId: scan.id });
+  const groupInfo = findGroupInfo(normalized, player, groupsBySegment);
   const guildName =
     normalizedPlayer?.guild.name ??
     normalized?.guildName ??
     readString(player, ["guildName", "Guild Name", "groupname", "groupName", "guild", "Guild"]) ??
-    findGroupInfo(normalized, player, groupsBySegment)?.name ??
+    groupInfo?.name ??
     null;
   const classId =
     normalizedPlayer?.identity.class ??
@@ -187,10 +315,11 @@ function toIndexPlayer(
     null;
   const icon = iconForClassName(className);
   const iconUrl = icon.url ? toDriveThumbProxy(icon.url, 96) : undefined;
-  const saveArray = toNumberArray(readSfPlayerSaveArray(player));
-  const portrait = saveArray
-    ? createPortraitOptionsFromSaveArray(saveArray, { own: player.own, saveVersion: player.saveVersion, save: saveArray })
-    : undefined;
+  const saveArray = includeCards ? toNumberArray(readSfPlayerSaveArray(player)) : null;
+  const portrait =
+    includeCards && saveArray
+      ? createPortraitOptionsFromSaveArray(saveArray, { own: player.own, saveVersion: player.saveVersion, save: saveArray })
+      : undefined;
   const level = normalizedPlayer?.progression.level ?? normalized?.level ?? stats.level ?? readNumber(player, ["level", "Level"]);
   const hofRank =
     normalizedPlayer?.progression.rank ??
@@ -202,13 +331,14 @@ function toIndexPlayer(
   const classAccent = getGuildClassAccent(classMeta?.key ?? className) ?? null;
   const baseStats = readFocusedBaseStats(normalizedPlayer, classMeta?.primaryAttribute ?? null, stats);
   const xpTotal = readTotalXp(player);
-  const guildKey = resolveGuildKey({
+  const levelValue = toFiniteNumber(level);
+  const memberRef = ref;
+  const guildIdentifier = resolveGuildIdentifier({
     normalized,
     normalizedPlayer,
     player,
     server: serverDisplay,
-    guildName,
-    groupInfo: findGroupInfo(normalized, player, groupsBySegment),
+    groupInfo,
   });
 
   return {
@@ -232,32 +362,29 @@ function toIndexPlayer(
       level,
       guildRole: role ? ROLE_LABELS[role] : "-",
       hofRank,
-      potions: buildPlayerCardPotions(player, saveArray),
+      potions: includeCards ? buildPlayerCardPotions(player, saveArray) : [],
       portrait,
       hasPortrait: Boolean(portrait),
-      portraitFallbackUrl: iconUrl ?? null,
-      portraitFallbackLabel: className ? `Klassenbild ${className}` : "Portrait-Platzhalter",
+      portraitFallbackUrl: includeCards ? iconUrl ?? null : null,
+      portraitFallbackLabel: includeCards
+        ? className
+          ? `Klassenbild ${className}`
+          : "Portrait-Platzhalter"
+        : "Portrait nicht verfügbar",
     },
-    trendSource: {
+    developmentSource: {
+      playerKey: identity.key,
+      name,
+      server: serverDisplay,
+      memberRef,
       scannedAtMs,
       sourceScanId: scan.id,
-      memberKey: identity.key,
-      guildKey,
-      xpTotal,
+      guildIdentifier,
+      guildName,
+      level: levelValue,
       baseStats,
     },
   };
-}
-
-function buildTrendLookup(players: LocalPlayerIndexEntry[]) {
-  const grouped = new Map<string, LocalPlayerTrendSourceEntry[]>();
-  players.forEach((player) => {
-    const entries = grouped.get(player.key) ?? [];
-    entries.push(player.trendSource);
-    grouped.set(player.key, entries);
-  });
-  const allTrendSources = players.map((player) => player.trendSource);
-  return new Map([...grouped.entries()].map(([key, entries]) => [key, buildLocalPlayerTrend(entries, allTrendSources)]));
 }
 
 function buildPlayerCardPotions(player: JsonRecord, saveArray: number[] | null): PlayerCardPotion[] {
@@ -355,19 +482,17 @@ function findGroupInfo(
   return groupsBySegment.get(groupLookupKey(segment, server)) ?? groupsBySegment.get(groupLookupKey(segment, null)) ?? null;
 }
 
-function resolveGuildKey({
+function resolveGuildIdentifier({
   normalized,
   normalizedPlayer,
   player,
   server,
-  guildName,
   groupInfo,
 }: {
   normalized: NormalizedGuildMember | null;
   normalizedPlayer: NormalizedPlayer | null;
   player: JsonRecord;
   server: string | null;
-  guildName: string | null;
   groupInfo: GroupInfo | null;
 }) {
   const normalizedServer = normalizeServer(server ?? normalized?.server ?? normalizedPlayer?.guild.server ?? groupInfo?.server);
@@ -380,10 +505,8 @@ function resolveGuildKey({
     normalized?.guildSegment ??
     normalized?.groupSegment ??
     groupInfo?.segment;
-  if (normalizedServer && guildSegment) return `${normalizedServer.toLowerCase()}:${guildSegment.toLowerCase()}`;
-  const nameKey = normalizeSearch(guildName ?? groupInfo?.name);
-  if (normalizedServer && nameKey) return `${normalizedServer.toLowerCase()}:name:${nameKey}`;
-  return null;
+  if (normalizedServer && guildSegment) return `${normalizedServer.toLowerCase()}_${guildSegment.toLowerCase()}`;
+  return guildIdentifier ? guildIdentifier.toLowerCase() : null;
 }
 
 function groupLookupKey(segment: string, server: string | null) {

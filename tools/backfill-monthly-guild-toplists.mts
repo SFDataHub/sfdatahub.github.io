@@ -10,6 +10,8 @@ import { execFile } from "node:child_process";
 import https from "node:https";
 import { promisify } from "node:util";
 
+import { readGuildLatestMeta } from "../src/lib/import/guildLatestMeta";
+
 const execFileAsync = promisify(execFile);
 
 // ---------- Args ----------
@@ -177,26 +179,10 @@ const pickByCanon = (row: Record<string, any>, canonKey: string): any => {
 const pickAnyByCanon = (row: Record<string, any>, keys: string[]): any =>
   keys.map((k) => pickByCanon(row, k)).find((v) => v != null && String(v) !== "");
 
-const pickByKey = (values: Record<string, any> | null | undefined, keys: readonly string[]) => {
-  if (!values || typeof values !== "object") return undefined;
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(values, key)) return (values as any)[key];
-  }
-  return undefined;
-};
-
 const toFiniteNumberOrNull = (value: any): number | null => {
   if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-};
-
-const toDigitsOnlyNumber = (value: any): number => {
-  if (value == null) return 0;
-  const cleaned = String(value).replace(/[^0-9]/g, "");
-  if (!cleaned) return 0;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : 0;
 };
 
 const toNumberLoose = (v: any): number | null => {
@@ -237,30 +223,6 @@ const G = {
   RANK: CANON("Rank"),
   GUILD_RANK: CANON("Guild Rank"),
 } as const;
-
-const GUILD_LATEST_VALUE_KEYS = {
-  honor: ["Guild Honor"],
-  hydra: ["Guild Hydra"],
-  instructor: ["Guild Instructor"],
-  knights: ["Guild Knights"],
-  knights15Plus: ["Guild Knights 15+"],
-  memberCount: ["Guild Member Count"],
-  portalFloor: ["Guild Portal Floor"],
-  raids: ["Guild Raids"],
-  treasury: ["Guild Treasure", "Guild Treasury"],
-} as const;
-
-const readGuildLatestMeta = (values: Record<string, any> | null | undefined) => ({
-  honor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.honor)),
-  hydra: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.hydra)),
-  instructor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.instructor)),
-  knights: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights)),
-  knights15Plus: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.knights15Plus)),
-  memberCount: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.memberCount)),
-  portalFloor: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.portalFloor)),
-  raids: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.raids)),
-  treasury: toDigitsOnlyNumber(pickByKey(values, GUILD_LATEST_VALUE_KEYS.treasury)),
-});
 
 type ResolvedServerKeys = {
   input: string;
@@ -616,6 +578,7 @@ const buildGuildEntry = (
     honor: toFiniteNumberOrNull(history?.honor) ?? latestMeta.honor,
     hydra: toFiniteNumberOrNull(history?.hydra) ?? latestMeta.hydra,
     instructor: toFiniteNumberOrNull(history?.instructor) ?? latestMeta.instructor,
+    petLevel: toFiniteNumberOrNull(history?.petLevel) ?? latestMeta.petLevel,
     knights: toFiniteNumberOrNull(history?.knights) ?? latestMeta.knights,
     knights15Plus: toFiniteNumberOrNull(history?.knights15Plus) ?? latestMeta.knights15Plus,
     portalFloor: toFiniteNumberOrNull(history?.portalFloor) ?? latestMeta.portalFloor,

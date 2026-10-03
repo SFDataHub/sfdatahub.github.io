@@ -1,0 +1,192 @@
+.card {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  border: 1px solid #2b4c73;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(20, 39, 62, 0.92), rgba(9, 21, 41, 0.94));
+  padding: 14px;
+  color: #f5f9ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.profileLogoPanel {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  border: 1px solid #2b4c73;
+  border-radius: 8px;
+  background: rgba(2, 17, 40, 0.55);
+  padding: 14px;
+}
+
+.coaStage {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.coaImage {
+  width: min(270px, 100%);
+  height: auto;
+  max-width: min(270px, 100%);
+  max-height: none;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  filter: none;
+}
+
+.coaFallback {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #b0c4d9;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.profileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  color: #b0c4d9;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.profileMeta > div {
+  min-width: 0;
+}
+
+.metaInline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+}
+
+.kpiItem dt {
+  color: #b0c4d9;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(43, 76, 115, 0.82);
+  border-radius: 999px;
+  background: rgba(15, 33, 53, 0.78);
+  padding: 5px 9px;
+  color: #b0c4d9;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.freshness span {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.freshness strong {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(43, 76, 115, 0.72);
+  border-radius: 8px;
+  background: rgba(2, 17, 40, 0.32);
+}
+
+.kpiItem {
+  min-width: 0;
+  border-top: 1px solid rgba(43, 76, 115, 0.62);
+  padding: 8px;
+}
+
+.kpiItem:nth-child(1),
+.kpiItem:nth-child(2) {
+  border-top: 0;
+}
+
+.kpiItem:nth-child(odd) {
+  border-right: 1px solid rgba(43, 76, 115, 0.62);
+}
+
+.kpiItem dd {
+  min-width: 0;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #f5f9ff;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiItem small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 2px;
+  color: #b0c4d9;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 12px;
+  }
+
+  .profileLogoPanel {
+    padding: 12px;
+  }
+
+  .coaStage {
+    margin-bottom: 6px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .kpiItem,
+  .kpiItem:nth-child(2) {
+    border-top: 1px solid rgba(43, 76, 115, 0.62);
+  }
+
+  .kpiItem:first-child {
+    border-top: 0;
+  }
+
+  .kpiItem:nth-child(odd) {
+    border-right: 0;
+  }
+}

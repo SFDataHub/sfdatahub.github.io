@@ -50,6 +50,7 @@ type ToplistExportControllerProps = {
     tableRef: React.RefObject<HTMLDivElement>;
     onCaptureStatusChange: (status: ToplistCaptureStatus) => void;
   }) => React.ReactNode;
+  onExportingChange?: (exporting: boolean) => void;
 };
 
 const EMPTY_CAPTURE_STATUS: ToplistCaptureStatus = {
@@ -426,6 +427,7 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
     activeKind,
     liveTableRef,
     renderPresetContent,
+    onExportingChange,
   }, ref) {
     const presetTableRef = React.useRef<HTMLDivElement | null>(null);
     const iconDataUrlPromiseCacheRef = React.useRef<Map<string, Promise<string | null>>>(new Map());
@@ -438,6 +440,10 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
     const [exportAmount, setExportAmount] = React.useState<ToplistExportAmount>(50);
     const [presetRenderState, setPresetRenderState] = React.useState<ToplistPresetRenderState | null>(null);
     const [isExportingPng, setIsExportingPng] = React.useState(false);
+
+    React.useEffect(() => {
+      onExportingChange?.(isExportingPng);
+    }, [isExportingPng, onExportingChange]);
 
     const handlePresetCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
       presetCaptureStatusRef.current = status;

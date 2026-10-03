@@ -56,7 +56,11 @@ const runBuildPerformance = async (request: Extract<PlayerPerformanceWorkerReque
     }
 
     emitProgress({ phase: "building-performance", message: "Gildentrend wird berechnet" });
-    const result = buildGuildTrendModel({ analyticsData, identityResolutionSnapshot });
+    const result = buildGuildTrendModel({
+      analyticsData,
+      identityResolutionSnapshot,
+      guildTarget: request.guildTarget ?? null,
+    });
     emitProgress({ phase: "done", message: "Gildentrend bereit" });
     postWorkerMessage({ type: "complete", requestId: request.requestId, result });
   } catch (error) {

@@ -124,12 +124,19 @@ export type PlayerPerformanceAnalyticsInput = {
   analyticsData?: GuildAnalyticsDerivedData | null;
   identityResolutionSnapshot?: IdentityResolutionSnapshot | null;
   target?: PlayerPerformanceTarget | null;
+  guildTarget?: GuildTrendTarget | null;
 };
 
 export type PlayerPerformanceTarget = {
   name?: string | null;
   server?: string | null;
   memberRef?: string | null;
+};
+
+export type GuildTrendTarget = {
+  guildId?: string | null;
+  logoIdentifier?: string | null;
+  server?: string | null;
 };
 
 export type GuildTrendMetric = {
@@ -289,6 +296,7 @@ export function buildGuildTrendModel(
   analyticsInput: PlayerPerformanceAnalyticsInput = {},
 ): GuildTrendBuildResult {
   const target = normalizePerformanceTarget(analyticsInput.target);
+  const guildTarget = normalizeGuildTrendTarget(analyticsInput.guildTarget);
   const data = analyticsInput.analyticsData ?? null;
   const identityResolutionSnapshot = analyticsInput.identityResolutionSnapshot ?? null;
   const analyticsIndexes = buildAnalyticsIndexes(data);
@@ -297,7 +305,9 @@ export function buildGuildTrendModel(
     return emptyGuildTrendResult("empty", "Keine lokalen Analytics-Gildensnapshots gefunden.", 0, 0);
   }
 
-  const targetGuildIdentifier = findCurrentTargetGuildIdentifier(data.members, identityResolutionSnapshot, target);
+  const targetGuildIdentifier = guildTarget
+    ? resolveTargetGuildIdentifier(data.guilds, identityResolutionSnapshot, guildTarget)
+    : findCurrentTargetGuildIdentifier(data.members, identityResolutionSnapshot, target);
   if (!targetGuildIdentifier) {
     return emptyGuildTrendResult("missing-guild", "Die aktuelle Testgilde konnte nicht eindeutig bestimmt werden.", countDistinctGuildSources(data), countDistinctGuildSources(data));
   }
@@ -313,6 +323,7 @@ export function buildGuildTrendModel(
     guildRows
       .map((guild) => toGuildTrendSnapshot(guild, analyticsIndexes))
       .filter((snapshot): snapshot is GuildTrendSnapshot => Boolean(snapshot)),
+    targetGuildIdentifier,
   );
 
   if (!snapshots.length) {
@@ -446,15 +457,23 @@ function toGuildTrendSnapshot(
   };
 }
 
-function dedupeGuildTrendSnapshots(snapshots: GuildTrendSnapshot[]) {
+function dedupeGuildTrendSnapshots(snapshots: GuildTrendSnapshot[], preferredGuildIdentifier: string) {
   const byTimestamp = new Map<number, GuildTrendSnapshot>();
+  const preferredKey = preferredGuildIdentifier.toLowerCase();
   snapshots.forEach((snapshot) => {
     const previous = byTimestamp.get(snapshot.scannedAtMs);
-    if (!previous || snapshot.sourceScanId.localeCompare(previous.sourceScanId) > 0) {
+    if (!previous || compareGuildTrendSnapshotPreference(snapshot, previous, preferredKey) > 0) {
       byTimestamp.set(snapshot.scannedAtMs, snapshot);
     }
   });
   return [...byTimestamp.values()].sort((left, right) => left.scannedAtMs - right.scannedAtMs || left.sourceScanId.localeCompare(right.sourceScanId));
+}
+
+function compareGuildTrendSnapshotPreference(left: GuildTrendSnapshot, right: GuildTrendSnapshot, preferredGuildIdentifier: string) {
+  const leftPreferred = left.guildIdentifier.toLowerCase() === preferredGuildIdentifier ? 1 : 0;
+  const rightPreferred = right.guildIdentifier.toLowerCase() === preferredGuildIdentifier ? 1 : 0;
+  if (leftPreferred !== rightPreferred) return leftPreferred - rightPreferred;
+  return left.sourceScanId.localeCompare(right.sourceScanId);
 }
 
 function buildGuildIntervals(snapshots: GuildTrendSnapshot[]) {
@@ -768,6 +787,70 @@ function normalizePerformanceTarget(target?: PlayerPerformanceTarget | null): Re
     server: String(target?.server ?? TARGET_SERVER).trim() || TARGET_SERVER,
     memberRef: String(target?.memberRef ?? "").trim() || null,
   };
+}
+
+function normalizeGuildTrendTarget(target?: GuildTrendTarget | null): GuildTrendTarget | null {
+  if (!target) return null;
+  const guildId = String(target.guildId ?? "").trim() || null;
+  const logoIdentifier = String(target.logoIdentifier ?? "").trim() || null;
+  const server = String(target.server ?? "").trim() || null;
+  return guildId || logoIdentifier ? { guildId, logoIdentifier, server } : null;
+}
+
+function resolveTargetGuildIdentifier(
+  guilds: GuildAnalyticsDerivedData["guilds"],
+  identityResolutionSnapshot: IdentityResolutionSnapshot | null,
+  target: GuildTrendTarget,
+) {
+  const candidates = buildGuildTrendTargetIdentifierCandidates(target);
+  if (!candidates.length) return null;
+
+  if (identityResolutionSnapshot) {
+    for (const candidate of candidates) {
+      const resolution = resolveGuildIdentity(identityResolutionSnapshot, candidate);
+      if (!resolution.resolved) continue;
+      const candidateKey = candidate.toLowerCase();
+      const latestMatch = [...guilds]
+        .filter((guild) => guild.guildIdentifier && areSameGuildIdentity(guild.guildIdentifier, candidate, identityResolutionSnapshot))
+        .sort((left, right) => {
+          const timeCompare = left.snapshotTimestamp - right.snapshotTimestamp;
+          if (timeCompare !== 0) return timeCompare;
+          const leftExact = left.guildIdentifier?.toLowerCase() === candidateKey ? 1 : 0;
+          const rightExact = right.guildIdentifier?.toLowerCase() === candidateKey ? 1 : 0;
+          return leftExact - rightExact || left.id.localeCompare(right.id);
+        })
+        .reverse()[0];
+      return latestMatch?.guildIdentifier ?? candidate;
+    }
+  }
+
+  const normalizedCandidates = new Set(candidates.map((candidate) => candidate.toLowerCase()));
+  const latestDirectMatch = [...guilds]
+    .filter((guild) => guild.guildIdentifier && normalizedCandidates.has(guild.guildIdentifier.toLowerCase()))
+    .sort((left, right) => left.snapshotTimestamp - right.snapshotTimestamp || left.id.localeCompare(right.id))
+    .reverse()[0];
+  return latestDirectMatch?.guildIdentifier ?? candidates[0];
+}
+
+function buildGuildTrendTargetIdentifierCandidates(target: GuildTrendTarget) {
+  const identifiers = new Set<string>();
+  const addIdentifier = (value: string | null | undefined) => {
+    const identifier = String(value ?? "").trim().toLowerCase();
+    if (identifier) identifiers.add(identifier);
+  };
+
+  addIdentifier(target.logoIdentifier);
+  addIdentifier(target.guildId);
+
+  const server = normalizeServer(target.server);
+  [target.logoIdentifier, target.guildId].forEach((value) => {
+    const segment = normalizeGuildSegmentForScan(value);
+    if (!segment) return;
+    addIdentifier(segment);
+    if (server) addIdentifier(`${server}_${segment}`);
+  });
+
+  return [...identifiers];
 }
 
 function selectTargetIdentitySnapshots(
@@ -1245,13 +1328,11 @@ function buildAnalyticsGuildReference(
     referenceContext.analyticsIndexes,
     start.snapshotId,
     start.guildIdentifier,
-    referenceContext.identityResolutionSnapshot,
   );
   const endMembers = getAnalyticsMembersForGuildSnapshot(
     referenceContext.analyticsIndexes,
     end.snapshotId,
     end.guildIdentifier,
-    referenceContext.identityResolutionSnapshot,
   );
   const startReport = getPerformanceGuildCompletenessReport(start, referenceContext.analyticsIndexes);
   const endReport = getPerformanceGuildCompletenessReport(end, referenceContext.analyticsIndexes);
@@ -1267,10 +1348,10 @@ function getAnalyticsMembersForGuildSnapshot(
   analyticsIndexes: AnalyticsIndexes,
   snapshotId: string,
   guildIdentifier: string,
-  identityResolutionSnapshot: IdentityResolutionSnapshot | null,
 ) {
   const members = analyticsIndexes.membersBySnapshotId.get(snapshotId) ?? [];
-  return members.filter((member) => areSameGuildIdentity(member.guildIdentifier, guildIdentifier, identityResolutionSnapshot));
+  const guildIdentifierKey = guildIdentifier.toLowerCase();
+  return members.filter((member) => member.guildIdentifier?.toLowerCase() === guildIdentifierKey);
 }
 
 function buildSnapshotAverageReference(
