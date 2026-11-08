@@ -24,6 +24,7 @@ const check = (allowed: () => boolean) => { if (!allowed()) throw new DOMExcepti
  * Toplist navigation never invoke this API. The receiver owns its input after handoff. */
 export async function resolveHubSearchTarget(hit: HubSearchHit, options: {
   mode: "profile" | "toplist"; historical?: HubSearchOccurrence; month?: string;
+  signal?: AbortSignal;
   allowed: () => boolean; accessAllowed: () => boolean; onAcquire?: (occurrence: HubSearchOccurrence) => void;
 }): Promise<HubResolvedTarget> {
     const __audit1 = auditBegin("F06", "resolveHubSearchTarget");
@@ -85,17 +86,17 @@ export async function resolveHubSearchTarget(hit: HubSearchHit, options: {
     try {
       let entries = [occurrence.entry];
       if (!options.historical && !hit.observationBound) {
-        const loaded = await loadScanArchiveManifestEntries({ year: occurrence.entry.archiveYear, active: true, manifestUrl: occurrence.entry.manifestUrl });
+        const loaded = await loadScanArchiveManifestEntries({ year: occurrence.entry.archiveYear, active: true, manifestUrl: occurrence.entry.manifestUrl }, { signal: options.signal });
         check(options.allowed);
         const selection = resolveScanArchiveCurrentToplistScan([loaded.manifest], occurrence.entry.server);
         if (selection.status !== "selected" || !selection.scans.some(scan => scan.id === occurrence!.entry!.id && scan.sha256 === occurrence!.entry!.sha256)) throw new HubTargetError("changed");
         const ids = new Set(selection.scans.map(scan => scan.id));
         entries = loaded.entries.filter(entry => ids.has(entry.id));
       }
-      const acquired = await (auditValue(__audit1, auditEnter(__audit1, "acquireExplicitLocalFirstArchiveScans"), (acquireExplicitLocalFirstArchiveScans(entries)))); check(options.allowed);
+      const acquired = await (auditValue(__audit1, auditEnter(__audit1, "acquireExplicitLocalFirstArchiveScans"), (acquireExplicitLocalFirstArchiveScans(entries, { signal: options.signal })))); check(options.allowed);
       if (acquired.status !== "complete") throw new HubTargetError("offline");
       source = acquired.selectedArchives.find(item => item.archiveScanId === occurrence!.entry!.id)?.localScanId;
-    } catch (error) { auditCaught(__audit1, error);  check(options.allowed); throw new HubTargetError("offline"); }
+    } catch (error) { auditCaught(__audit1, error); options.signal?.throwIfAborted(); check(options.allowed); throw new HubTargetError("offline"); }
   }
   if (!source) throw new HubTargetError("offline");
   // Acquisition creates a legitimate source change. Start a new source/identity

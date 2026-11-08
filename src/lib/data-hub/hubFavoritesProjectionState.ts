@@ -77,8 +77,9 @@ export class HubFavoritesProjectionState {
   private invalidate() {
     this.generation++;
     this.pending = true;
-    this.publish({ ...this.state, readyIds: emptyIds,
-      loadingIds: new Set(this.state.rows.map(row => row.favorite.id)), error: null });
+    // Accepted cards stay usable while their own evidence is checked. Actions
+    // still validate each row's receipt before resolving a target.
+    this.publish({ ...this.state, error: null });
     void this.run();
   }
   retry = () => this.state.record ? this.ensure(this.state.record, { trigger: "favorites-projection-retry" }) : Promise.resolve();
@@ -92,7 +93,11 @@ export class HubFavoritesProjectionState {
         try {
           const checked = this.receipt ? await this.dependencies.validate(this.receipt) : undefined;
           if (generation !== this.generation) { this.pending = true; continue; }
-          const keep = checked?.current ? this.state.rows.filter(row => this.state.readyIds.has(row.favorite.id)) : [];
+          const acceptedRows = this.state.rows.filter(row => this.state.readyIds.has(row.favorite.id));
+          const validity = checked?.current ? acceptedRows.map(() => true) : await Promise.all(acceptedRows.map(async row =>
+            row.dependencies ? (await this.dependencies.validate(row.dependencies)).current : false));
+          if (generation !== this.generation) { this.pending = true; continue; }
+          const keep = acceptedRows.filter((_, index) => validity[index]);
           const kept = new Map(keep.map(row => [row.favorite.id, row]));
           const missing = record.favorites.filter(favorite => !kept.has(favorite.id));
           if (!missing.length) {
@@ -101,20 +106,29 @@ export class HubFavoritesProjectionState {
             if (this.state.loadingIds.size || this.state.error) this.publish({ ...this.state, loadingIds: emptyIds, error: null });
             continue;
           }
-          this.publish({ ...this.state, readyIds: new Set(kept.keys()), loadingIds: new Set(missing.map(favorite => favorite.id)), error: null });
+          this.publish({ ...this.state, loadingIds: new Set(missing.filter(favorite => !this.state.readyIds.has(favorite.id)).map(favorite => favorite.id)), error: null });
           const built = await this.dependencies.project(missing, { ...context, consumer: "shared-favorites-projection", awaitConsumerDecision: true }, record);
           const accepted = generation === this.generation;
           auditRecordedEvent(auditResultId(built), accepted ? "projection-accepted" : "projection-superseded", { ...context, recordRevision: record.recordRevision });
           if (!accepted) { this.pending = true; continue; }
           const projected = new Map(built.map(row => [row.favorite.id, row]));
           const rows = kept.size ? record.favorites.map(favorite => projected.get(favorite.id) ?? kept.get(favorite.id)!) : built;
-          this.receipt = built[0]?.dependencies;
+          const rowReceipt = built[0]?.dependencies;
+          // The owner watches the whole collection; each row scopes its own
+          // reuse/actions. A foreign first card cannot certify every other card.
+          this.receipt = rowReceipt ? { ...rowReceipt, need } : undefined;
           if (!this.receipt) throw Error("Favorite dependency receipt missing");
           this.publish({ record, rows, readyIds: new Set(rows.map(row => row.favorite.id)), loadingIds: emptyIds, error: null, acceptedRunId: auditResultId(built) });
         } catch (error) {
           if (generation !== this.generation) { this.pending = true; continue; }
+          if (error instanceof Error && error.message === "Favorite evidence changed") {
+            // A concurrent committed source supersedes preparation, not the
+            // accepted collection. Recheck row receipts against that new basis.
+            this.pending = true;
+            continue;
+          }
           this.receipt = undefined;
-          this.publish({ ...this.state, error: String(error), readyIds: emptyIds, loadingIds: emptyIds });
+          this.publish({ ...this.state, error: String(error), loadingIds: emptyIds });
         }
       }
     }).finally(() => { this.job = undefined; if (this.pending) void this.run(); });

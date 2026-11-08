@@ -527,6 +527,7 @@ export async function acquirePreparedLocalFirstFeatureScans(
 ): Promise<LocalFirstFeatureAcquisitionResult> {
     const __audit2 = auditBegin("S01", "acquirePreparedLocalFirstFeatureScans");
     try {
+  throwIfAborted(options.signal);
   if (options.shouldAcquirePreparedRequest?.(prepared) === false) {
     return auditReturn(__audit2, syntheticResult(prepared, "duplicate-or-failed"));
   }
@@ -535,6 +536,7 @@ export async function acquirePreparedLocalFirstFeatureScans(
   const dependencies = createDependencies(options);
   const acquisition = await (auditValue(__audit2, auditEnter(__audit2, "dependencies.acquireLocalFirstScans"), (dependencies.acquireLocalFirstScans(prepared.request, {
     ...options.acquisitionOptions,
+    signal: options.signal,
     archiveEntries: prepared.archiveEntries,
     availableManifestYears: prepared.availableManifestYears,
   }))));
@@ -578,42 +580,52 @@ export type LocalFirstFeatureCoordinatorState =
 export function createLocalFirstFeatureAcquisitionCoordinator() {
   let sequence = 0;
   let state: LocalFirstFeatureCoordinatorState = { status: "idle", key: null };
-  const inFlight = new Map<string, Promise<LocalFirstFeatureAcquisitionResult>>();
-  const controllers = new Map<string, AbortController>();
-
+  type Flight = { controller: AbortController; consumers: Set<symbol>; promise: Promise<LocalFirstFeatureAcquisitionResult> };
+  const inFlight = new Map<string, Flight>();
   return {
     getState: () => state,
     abort: (key?: string) => {
-      if (key) controllers.get(key)?.abort();
-      else controllers.forEach((controller) => controller.abort());
+      if (key) inFlight.get(key)?.controller.abort();
+      else inFlight.forEach(flight => flight.controller.abort());
     },
     run: (request: LocalFirstFeatureRequest, options: LocalFirstFeatureAcquisitionOptions = {}) => {
+      if (options.signal?.aborted) return Promise.reject<LocalFirstFeatureAcquisitionResult>(new DOMException("aborted", "AbortError"));
       const requestKey = buildLocalFirstFeatureRequestKey(request);
-      const existing = inFlight.get(requestKey);
-      if (existing) { auditLink(auditCurrent(), auditPromiseId(existing), "in-flight-join"); auditEvent(auditCurrent(), "in-flight-join"); return existing; }
-
-      const controller = new AbortController();
-      const runSequence = ++sequence;
-      controllers.set(requestKey, controller);
-      state = { status: "running", key: requestKey };
-      const promise = acquireLocalFirstFeatureScans(request, {
-        ...options,
-        signal: controller.signal,
-      })
-        .then((result) => {
-          if (runSequence === sequence) state = { status: "success", key: requestKey, result };
-          return result;
-        })
-        .catch((error) => {
-          if (runSequence === sequence) state = { status: "error", key: requestKey, error };
-          throw error;
-        })
-        .finally(() => {
-          inFlight.delete(requestKey);
-          controllers.delete(requestKey);
+      let flight = inFlight.get(requestKey);
+      if (!flight) {
+        const controller = new AbortController(), runSequence = ++sequence;
+        const next: Flight = { controller, consumers: new Set(), promise: undefined! };
+        state = { status: "running", key: requestKey };
+        next.promise = acquireLocalFirstFeatureScans(request, { ...options, signal: controller.signal })
+          .then(result => {
+            if (runSequence === sequence && !controller.signal.aborted) state = { status: "success", key: requestKey, result };
+            return result;
+          }).catch(error => {
+            if (runSequence === sequence) state = controller.signal.aborted ? { status: "idle", key: null } : { status: "error", key: requestKey, error };
+            throw error;
+          }).finally(() => { if (inFlight.get(requestKey) === next) inFlight.delete(requestKey); });
+        flight = next; inFlight.set(requestKey, next);
+      } else {
+        auditLink(auditCurrent(), auditPromiseId(flight.promise), "in-flight-join");
+      }
+      const shared = flight, consumer = Symbol(), signal = options.signal;
+      shared.consumers.add(consumer);
+      return new Promise<LocalFirstFeatureAcquisitionResult>((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+          signal?.removeEventListener("abort", cancel);
+          shared.consumers.delete(consumer);
+          if (!shared.consumers.size && inFlight.get(requestKey) === shared) {
+            inFlight.delete(requestKey); shared.controller.abort();
+          }
+        };
+        const cancel = () => { if (!settled) { settled = true; cleanup(); reject(new DOMException("aborted", "AbortError")); } };
+        signal?.addEventListener("abort", cancel, { once: true });
+        void shared.promise.then(result => { if (!settled) { settled = true; cleanup(); resolve(result); } }, error => {
+          if (!settled) { settled = true; cleanup(); reject(error); }
         });
-      inFlight.set(requestKey, promise);
-      return promise;
+        if (signal?.aborted) cancel();
+      });
     },
   };
 }

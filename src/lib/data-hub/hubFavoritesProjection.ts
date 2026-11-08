@@ -3,7 +3,7 @@ import { prepareFavoriteMatchingStatus, type FavoriteMatchingStatus } from "./hu
 import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields, auditCount, auditCall, auditLink, auditExpectConsumer, auditDetailsStatus, type AuditFields } from "./runtimeAudit";
 import { loadIdentityResolutionSnapshot, revalidateIdentityResolutionSnapshot, resolvePlayerIdentity, type IdentityResolutionSnapshot } from "../identities/identityResolution";
 import { resolveObservedGuildIdentity } from "../identities/guildObservationIdentity";
-import { captureLocalDataDependencies, revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
+import { captureLocalDataDependencies, revalidateLocalDataDependencies, createAnalyticsScopeMatcher, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
 import { projectGuildFavoriteObservation, type GuildFavoriteObservation } from "./hubGuildFavoriteObservation";
 import { isGuildHubFavoriteScanSummaryCurrent, readDataHubLocalScanMetadata, type GuildHubScanSummary } from "../guilds/localScanLibrary";
 import { favoriteReference, referenceKey, type HubFavorite, type FavoriteReference, type FavoriteKind } from "./hubFavoritesContract";
@@ -138,8 +138,13 @@ export async function projectHubFavorites(favorites: readonly HubFavorite[], con
         slice.playerIdentifiers.every(identifier => favoriteReference("player", identifier)?.serverNamespace === namespace(slice.server)));
     });
     const observation = favorite.kind === "guild" ? projectGuildFavoriteObservation(favorite, resolution.identity === "resolved" ? resolution.identityId : null, identities, inventories.map(item => item.summary)) : undefined;
-    if (observation) actionEvidence.set(observation.effective, dependencies);
-    const row: FavoriteProjection = { favorite, identity: resolution.identity, identityId: resolution.identityId, aliasIdentifiers: resolution.aliases, dependencies,
+    const sourceScope = { [favorite.kind === "player" ? "players" : "guilds"]: refs.map(ref => ref.identifier),
+      servers: [...new Set(refs.map(ref => ref.serverNamespace))] };
+    const matches = createAnalyticsScopeMatcher(sourceScope);
+    const rowDependencies = { ...dependencies, need: { allIdentities: true, sourceScope,
+      sourceIds: metadata.summaries.filter(matches).map(summary => summary.sourceScanId) } };
+    if (observation) actionEvidence.set(observation.effective, rowDependencies);
+    const row: FavoriteProjection = { favorite, identity: resolution.identity, identityId: resolution.identityId, aliasIdentifiers: resolution.aliases, dependencies: rowDependencies,
       ...(observation ? { observation } : {}),
       availability: available ? "available" : !favorite.reference || !complete ? "unknown" : "missing" };
     return { ...row, matching: matchingStatus(row) };

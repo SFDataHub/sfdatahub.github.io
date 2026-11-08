@@ -1,3 +1,4 @@
+import { isLocalProfileEvidenceCurrent } from "../../lib/local-player-profile/historyBasis";
 import { acquireProfileArchiveHistory } from "../../lib/scanArchive/profileHistoryAcquisition";
 import { subscribeToScanArchiveMetadata } from "../../lib/scanArchive/client";
 import { profileDate, profileElapsed } from "../../lib/i18n/profilePresentation";
@@ -41,7 +42,18 @@ export function LocalPlayerComparisonProvider({ profile, children, view }: { pro
   active.current = actual.key === location.key && !actual.state?.localProfileParent;
   const [selected, select] = React.useState<number | null>(null);
   const sumMode = useProfileAttributeSumMode();
-  const part = useLocalProfilePart(profile, `charts:${view}:${sumMode}`, selected);
+  const chartPart = useLocalProfilePart(profile, `charts:${view}:${sumMode}`, selected);
+  const chartReadiness = React.useRef({ part: chartPart, listeners: new Set<() => void>() });
+  chartReadiness.current.part = chartPart;
+  React.useEffect(() => { chartReadiness.current.listeners.forEach(check => check()); }, [chartPart.status, chartPart.value, chartPart.reason]);
+  const demandKey = JSON.stringify([profile.sourceScanId, profile.analytics.scannedAtMs, selected]);
+  const [archiveAttempt, retryArchive] = React.useState(0);
+  const [archiveState, setArchiveState] = React.useState<{ key: string; loading: boolean; error?: string }>({ key: demandKey, loading: true });
+  const archivePending = archiveState.key !== demandKey || archiveState.loading;
+  const historyError = archiveState.key === demandKey ? archiveState.error : undefined;
+  const part = { ...(historyError ? { ...chartPart, status: "error" as const, reason: historyError }
+    : archivePending && !chartPart.value?.comparison.options.length ? { ...chartPart, status: "loading" as const } : chartPart),
+    retry: () => { chartPart.retry(); retryArchive(attempt => attempt + 1); } };
   const [players, setPlayers] = React.useState<ComparisonPlayer[]>([]);
   const playersRef = React.useRef(players);
   const [selectionError, setSelectionError] = React.useState(false);
@@ -51,6 +63,7 @@ export function LocalPlayerComparisonProvider({ profile, children, view }: { pro
   const owner = favoriteReference("player", profile.analytics.memberRef ?? profile.currentSeed?.rawIdentifier ?? profile.sourcePlayerKey);
   React.useEffect(() => {
     if (!owner) return;
+    const controller = new AbortController();
     let stopped = false, running = false, pending = false;
     const load = async () => {
       pending = true;
@@ -59,15 +72,41 @@ export function LocalPlayerComparisonProvider({ profile, children, view }: { pro
       try {
         while (pending && !stopped) {
           pending = false;
-          await acquireProfileArchiveHistory(owner, profile.analytics.scannedAtMs, () => !stopped);
+          setArchiveState({ key: demandKey, loading: true });
+          await acquireProfileArchiveHistory(owner, profile.analytics.scannedAtMs, {
+            signal: controller.signal, selectedAt: selected, from: selected ?? undefined, consumer: "player-comparison-charts",
+            comparisonReady: () => new Promise<boolean>((resolve, reject) => {
+              let settled = false;
+              const cleanup = () => { chartReadiness.current.listeners.delete(check); controller.signal.removeEventListener("abort", cancel); };
+              const cancel = () => { if (!settled) { settled = true; cleanup(); reject(new DOMException("aborted", "AbortError")); } };
+              const check = () => {
+                const part = chartReadiness.current.part;
+                if (settled || part.status === "loading" || part.status === "cancelled" || part.status === "not-requested") return;
+                void (async () => {
+                  // Wait for the existing visible chart consumer's successor.
+                  // A superseded/invalid receipt cannot request another source.
+                  if (part.evidence && !await isLocalProfileEvidenceCurrent(part.evidence)) return;
+                  if (settled || chartReadiness.current.part.value !== part.value || chartReadiness.current.part.status !== part.status) return;
+                  settled = true; cleanup();
+                  if (part.status === "error") { reject(Error(part.reason ?? "Comparison preparation failed")); return; }
+                  const timestamp = part.value?.comparison.selectedTimestamp;
+                  resolve(timestamp != null && (selected != null ? timestamp === selected : profile.analytics.scannedAtMs - timestamp >= 28 * 86_400_000));
+                })().catch(error => { if (!settled) { settled = true; cleanup(); reject(error); } });
+              };
+              chartReadiness.current.listeners.add(check);
+              controller.signal.addEventListener("abort", cancel, { once: true });
+              if (controller.signal.aborted) cancel(); else check();
+            }),
+          });
+          if (!stopped) setArchiveState({ key: demandKey, loading: false });
         }
-      } catch (error) { if (!stopped) console.error("Profile archive history acquisition failed", error); }
+      } catch (error) { if (!stopped) { console.error("Profile archive history acquisition failed", error); setArchiveState({ key: demandKey, loading: false, error: String(error) }); } }
       finally { running = false; }
     };
     const stop = subscribeToScanArchiveMetadata(() => { void load(); });
     void load();
-    return () => { stopped = true; stop(); };
-  }, [owner?.identifier, profile.analytics.scannedAtMs]);
+    return () => { stopped = true; controller.abort(); stop(); };
+  }, [owner?.identifier, profile.analytics.scannedAtMs, selected, archiveAttempt]);
   const addPlayer = React.useCallback(async (selection: HubPlayerSelection, allowed: () => boolean = () => true) => {
     const ownGeneration = generation.current, started = removalSequence.current;
     const id = referenceKey(selection.reference);
@@ -148,7 +187,7 @@ export function LocalPlayerComparisonSelect() {
   const comparison = part.value?.comparison;
   const options = comparison?.options ?? [];
   const unavailable = part.status === "loading" || part.status === "not-requested"
-    ? t("localProfileRoute.loading") : t("localProfileRoute.comparisonUnavailable");
+    ? t("localProfileRoute.loading") : part.status === "error" ? t("playerProfile.localData.error") : t("localProfileRoute.comparisonUnavailable");
   return <label className="local-player-analytics__range-select local-profile-comparison-select">
     <span>{t("localProfileRoute.comparisonScan")}</span>
     <select value={comparison?.selectedTimestamp == null ? "" : String(comparison.selectedTimestamp)}

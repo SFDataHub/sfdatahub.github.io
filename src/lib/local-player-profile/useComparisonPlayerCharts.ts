@@ -1,3 +1,4 @@
+import { acquireProfileArchiveHistory } from "../scanArchive/profileHistoryAcquisition";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HubPlayerSelection } from "../../pages/DataHub/HubSearch";
 import type { LocalPlayerProfileModel } from "../../components/local-player-profile/types";
@@ -45,6 +46,14 @@ export function useComparisonPlayerCharts(selection: HubPlayerSelection | undefi
     if (!profile || !range) return;
     return lease.current!.watch(`charts:${view}:${mode}`, range, part => setState({ key, part }));
   }, [profile, key]);
+  useEffect(() => {
+    if (!profile || !range || !selection) return;
+    const controller = new AbortController();
+    void acquireProfileArchiveHistory(selection.reference, profile.analytics.scannedAtMs, {
+      signal: controller.signal, from: range.min, selectedAt: range.min, consumer: "player-vs-charts",
+    }).catch(error => { if (!controller.signal.aborted) console.error("Comparison history acquisition failed", error); });
+    return () => controller.abort();
+  }, [profile, selection, range?.min, range?.max]);
   const part: LocalProfilePart<LocalPlayerAnalyticsResult> = !selection || !range ? { status: "not-requested", value: null }
     : targetStatus === "error" ? { status: "error", value: null }
     : state?.key === key ? state.part : { status: "loading", value: null };
