@@ -1,3 +1,4 @@
+import { acquireProfileEntrySource, ProfileEntryAcquisitionError } from "./profileEntryAcquisition";
 import { resolveObservedGuildIdentity } from "../identities/guildObservationIdentity";
 import React from "react";
 import { normalizeSelectedGuild } from "./useGuildFavoritesSelection";
@@ -37,26 +38,47 @@ export function useAddressedGuild(feature: GuildFeatureKey) {
   const hintedGuild = React.useMemo(() => normalizeSelectedGuild(location.state?.guildLoadingTarget), [location.state]);
   const hintedReference = hintedGuild && favoriteReference("guild", hintedGuild.logoIdentifier, hintedGuild.server);
   const loadingGuild = addressed && observation.kind === "free" && targetReference && hintedReference && referenceKey(targetReference) === referenceKey(hintedReference) ? hintedGuild : null;
-  const [result, setResult] = React.useState<{ key: string; ready: boolean; error: boolean; failure?: "invalid" | "missing" | "failed" }>();
+  const [retry, setRetry] = React.useState(0);
+  const [result, setResult] = React.useState<{ key: string; ready: boolean; error: boolean; failure?: "invalid" | "missing" | "failed" | "historicalMissing" | "changed"; observation?: ParsedObservation }>();
   React.useEffect(() => {
     if (!addressed) return;
-    let stopped = false, generation = 0;
+    setResult({ key, ready: false, error: false });
+    const controller = new AbortController(), signal = controller.signal;
+    let generation = 0, running = false, pending = false;
+    let resolvedObservation = parseObservation(location.search);
     const resolve = async () => {
-      const attempt = ++generation;
-      const ref = parseLocalEntity("guild", params.server, params.identifier), observation = parseObservation(location.search);
-      const failed = (failure: "invalid" | "missing" | "failed") => { if (!stopped && attempt === generation) setResult({ key, ready: false, error: true, failure }); };
-      if (!ref || observation.kind === "invalid") { failed("invalid"); return; }
+      pending = true;
+      if (running) return;
+      running = true;
       try {
-        const guild = await resolveLocalGuildReference(ref, observation);
-        if (stopped || attempt !== generation) return;
-        if (!guild) { failed("missing"); return; }
-        pageContextStore.selectGuild(feature, pageGuildReference(guild));
-        setResult({ key, ready: true, error: false });
-      } catch { failed("failed"); }
+        while (pending && !signal.aborted) {
+          pending = false;
+          const attempt = ++generation;
+          const ref = parseLocalEntity("guild", params.server, params.identifier);
+          const failed = (failure: NonNullable<typeof result>["failure"]) => {
+            if (!signal.aborted && attempt === generation) setResult({ key, ready: false, error: true, failure });
+          };
+          if (!ref || resolvedObservation.kind === "invalid") { failed("invalid"); return; }
+          try {
+            let guild = await resolveLocalGuildReference(ref, resolvedObservation);
+            signal.throwIfAborted();
+            if (!guild) {
+              resolvedObservation = await acquireProfileEntrySource("guild", ref, resolvedObservation, signal);
+              guild = await resolveLocalGuildReference(ref, resolvedObservation);
+            }
+            signal.throwIfAborted();
+            if (!guild) { failed(resolvedObservation.kind === "exact" ? "historicalMissing" : "missing"); return; }
+            const current = pageContextStore.get(feature).guild;
+            // Historical imports must not replace the selected context object.
+            if (JSON.stringify(current?.guild) !== JSON.stringify(guild)) pageContextStore.selectGuild(feature, pageGuildReference(guild));
+            setResult({ key, ready: true, error: false, observation: resolvedObservation });
+          } catch (error) { failed(error instanceof ProfileEntryAcquisitionError ? error.code : "failed"); return; }
+        }
+      } finally { running = false; }
     };
     void resolve();
     const stop = subscribeToLocalDataDependencies({ allSources: true, allIdentities: true }, () => { void resolve(); }, undefined, { consumer: "addressed-guild-resolution" });
-    return () => { stopped = true; generation++; stop(); };
-  }, [addressed, params.server, params.identifier, key, feature, location.search]);
-  return { addressed, targetReference, loadingGuild, acceptsContextArtwork: observation.kind === "free", failure: addressed && result?.key === key ? result.failure : undefined, ready: !addressed || result?.key === key && result.ready, error: addressed && result?.key === key && result.error };
+    return () => { controller.abort(); generation++; stop(); };
+  }, [addressed, params.server, params.identifier, key, feature, location.search, retry]);
+  return { retry: () => setRetry(n => n + 1), observation: result?.key === key ? result.observation ?? observation : observation, addressed, targetReference, loadingGuild, acceptsContextArtwork: observation.kind === "free", failure: addressed && result?.key === key ? result.failure : undefined, ready: !addressed || result?.key === key && result.ready, error: addressed && result?.key === key && result.error };
 }

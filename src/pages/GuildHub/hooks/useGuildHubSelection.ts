@@ -95,7 +95,7 @@ export function useGuildHubSelection(feature: GuildFeatureKey) {
   }, [selectedGuilds, chooseGuild]);
   // Expose completion separately from a temporarily absent activeGuild. Existing
   // callers keep their favorites-loading contract; the dashboard owns this gate.
-  const targetError = address.failure === "failed" ? "localProfileRoute.failed"
+  const targetError = address.failure ? `localProfileRoute.${address.failure}`
     : address.ready && context.error ? "pageContext.session"
     : address.ready && resolution?.input === input && resolution.error ? "localProfileRoute.failed"
     : !address.addressed && !context.initialized && favorites.error ? "localProfileRoute.failed" : null;
@@ -106,7 +106,7 @@ export function useGuildHubSelection(feature: GuildFeatureKey) {
     input.reference.identifier === address.targetReference.identifier && input.reference.serverNamespace === address.targetReference.serverNamespace;
   const loadingGuild = activeGuild ?? (!address.error && !targetError && !conflicted && !needsIdentityCheck
     ? contextArtworkMatches ? input!.guild : address.loadingGuild : null);
-  return { loadingGuild, targetLoading, targetError, auditContext: favorites.auditContext, selectedGuilds, activeGuildId: activeGuild?.id ?? null, activeGuild, context,
+  return { observation: address.observation, retryTarget: address.retry, loadingGuild, targetLoading, targetError, auditContext: favorites.auditContext, selectedGuilds, activeGuildId: activeGuild?.id ?? null, activeGuild, context,
     contextIssue: address.error ? "route" as const : address.ready && context.error ? "session" as const : address.ready && input && (!input.reference || conflicted) ? "unresolved" as const : null,
     isLoading: favorites.status === "restoring", isSaving: favorites.status === "saving", disabled: favorites.disabled,
     error: favorites.error, retry: favorites.retry, selectContextGuild, chooseGuild, selectGuild: favorites.selectGuild, removeGuild: favorites.removeGuild, reorderGuilds: favorites.reorderGuilds };

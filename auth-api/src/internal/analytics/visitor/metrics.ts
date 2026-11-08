@@ -111,7 +111,10 @@ export async function publishMetrics(fetchRange: FetchRange, now = new Date()) {
     if ((lease.data()?.until ?? 0) > now.getTime()) return false;
     // A recent snapshot made with the old confirmation-date clamp is stale,
     // even when the stored configuration revision has not changed.
-    if (previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Date.parse(previous.asOf) > now.getTime() - 3600000) return false;
+    // Absolute hour buckets tolerate scheduler jitter and delayed starts. Berlin's
+    // repeated autumn hour has two distinct UTC buckets; elapsed minutes do not
+    // identify which scheduled hour the snapshot actually covers.
+    if (previous?.complete === true && previous?.schemaVersion === METRIC_VERSION && previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Math.floor(Date.parse(previous.asOf) / 3600000) === Math.floor(now.getTime() / 3600000)) return false;
     tx.set(leaseRef, { id: leaseId, until: now.getTime() + 240000 });
     return true;
   });
