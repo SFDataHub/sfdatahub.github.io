@@ -33,6 +33,8 @@ export default function HubSearch({ entityKind, variant = "legacy", onPlayerSele
   const [selectionVersion, setSelectionVersion] = React.useState(0);
   const recents = useHubSearchRecents(dashboard);
   const generation = React.useRef(0), mounted = React.useRef(false);
+  const targetController = React.useRef<AbortController>();
+  const cancelTarget = () => { targetController.current?.abort(); targetController.current = undefined; };
   const pending = React.useRef<{ attempt: number; hit: HubSearchHit; acquisition?: HubSearchOccurrence }>();
   const [action, setAction] = React.useState<{ key: string; status: string }>();
   const [history, setHistory] = React.useState(() => query.scope.kind === "historical" ? query.scope : { kind: "historical" as const, from: `${new Date().getFullYear()}-01`, to: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`, server: "" });
@@ -40,29 +42,31 @@ export default function HubSearch({ entityKind, variant = "legacy", onPlayerSele
   React.useLayoutEffect(() => {
     if (!topbar) return;
     // The persistent consumer cancels handoffs and closes UI, retaining its prepared controller.
-    generation.current++; pending.current = undefined; setAction(undefined);
+    cancelTarget(); generation.current++; pending.current = undefined; setAction(undefined);
     setSelectionVersion(value => value + 1);
   }, [topbar, location.key, location.pathname, location.search, location.hash]);
-  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current++; }; }, []);
+  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; cancelTarget(); generation.current++; }; }, []);
   React.useEffect(() => {
     const active = pending.current;
     if (!active || active.attempt !== generation.current) return;
     const valid = active.acquisition ? search.controller.current?.isArchiveOccurrenceCurrent(active.acquisition) : search.controller.current?.isHitCurrent(active.hit);
-    if (!valid) { generation.current++; pending.current = undefined; setAction({ key: active.hit.key, status: "changed" }); }
+    if (!valid) { cancelTarget(); generation.current++; pending.current = undefined; setAction({ key: active.hit.key, status: "changed" }); }
   }, [state.revision, state.queryGeneration]);
-  const update = (next: HubSearchQuery) => { pending.current = undefined; generation.current++; setAction(undefined); search.setQuery(next); };
+  const update = (next: HubSearchQuery) => { cancelTarget(); pending.current = undefined; generation.current++; setAction(undefined); search.setQuery(next); };
   async function open(hit: HubSearchHit, occurrence?: HubSearchOccurrence, month?: string, recent?: HubRecentEntity) {
     const origin = location;
+    cancelTarget();
     const attempt = ++generation.current;
     if ((!recent && !search.current) || !search.controller.current?.isHitCurrent(hit)) return;
     trackLocalEvent(hit.kind === "player" ? "datahub/search/player-select" : "datahub/search/guild-select");
+    const controller = new AbortController(); targetController.current = controller;
     pending.current = { attempt, hit };
     setAction({ key: hit.key, status: "preparingTarget" });
     let acquisition: HubSearchOccurrence | undefined;
-    const allowed = () => mounted.current && attempt === generation.current && (!topbar || route.current === origin) &&
+    const allowed = () => !controller.signal.aborted && mounted.current && attempt === generation.current && (!topbar || route.current === origin) &&
       (acquisition ? !!search.controller.current?.isArchiveOccurrenceCurrent(acquisition) : !!search.controller.current?.isHitCurrent(hit));
     try {
-      const target = await resolveHubSearchTarget(hit, { mode: query.mode, historical: occurrence, month, allowed,
+      const target = await resolveHubSearchTarget(hit, { mode: query.mode, historical: occurrence, month, allowed, signal: controller.signal,
         // This search opens public local DataHub targets; the resolver keeps its caller-specific access contract.
         accessAllowed: () => true, onAcquire: occurrence => { acquisition = occurrence; if (pending.current?.attempt === attempt) pending.current.acquisition = occurrence; } });
       if (!allowed()) return;
@@ -91,9 +95,10 @@ export default function HubSearch({ entityKind, variant = "legacy", onPlayerSele
       setAction({ key: hit.key, status: error instanceof HubTargetError ? error.code : error instanceof DOMException && error.name === "AbortError" ? "changed" : "failed" });
     }
   }
-  const retry = () => { pending.current = undefined; generation.current++; setAction(undefined); search.retry(); };
+  const retry = () => { cancelTarget(); pending.current = undefined; generation.current++; setAction(undefined); search.retry(); };
   async function openRecent(entry: HubSearchRecent) {
     if (entry.kind === "query") { recents.add(entry); update({ ...query, text: entry.text }); return; }
+    cancelTarget();
     const attempt = ++generation.current; pending.current = undefined;
     const key = `recent:${hubRecentKey(entry)}`;
     setAction({ key, status: "preparingTarget" });
@@ -149,7 +154,7 @@ export default function HubSearch({ entityKind, variant = "legacy", onPlayerSele
         {(state[kind].unresolved ?? 0) > 0 && ` · ${t("hubSearch.unresolvedEntries")}`}
         {state[kind].error && ` · ${t("hubSearch.preparationError")}`}
       </p>)}
-      <button type="button" onClick={() => { pending.current = undefined; generation.current++; setAction(undefined); search.retry(); }}>{t("hubSearch.retry")}</button>
+      <button type="button" onClick={() => { cancelTarget(); pending.current = undefined; generation.current++; setAction(undefined); search.retry(); }}>{t("hubSearch.retry")}</button>
     </div>
     <div id={resultsId} aria-busy={!search.current}>
       {parseHubSearchText(query.text).name.length < HUB_SEARCH_MIN_QUERY ? <p>{t("hubSearch.minQuery", { count: HUB_SEARCH_MIN_QUERY })}</p> : !search.current ? <p role="status">{t("hubSearch.querying")}</p> : <>

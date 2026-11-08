@@ -1,11 +1,4 @@
-import {
-  buildLocalFirstFusionScopeSegments,
-} from "../../lib/guilds/localFirstScanResolver";
 import type { GuildHubScanSummary } from "../../lib/guilds/localScanLibrary";
-import {
-  listFusionIdentityAnalysisScopes,
-  type FusionIdentityAnalysisScope,
-} from "../../lib/identities/fusionIdentityScopes";
 import {
   buildLocalFirstFeatureRequestKey,
   createLocalFirstFeatureAcquisitionCoordinator,
@@ -36,25 +29,6 @@ export type DashboardLocalFirstAcquisitionOptions = LocalFirstFeatureAcquisition
 
 const dashboardLocalFirstCoordinator = createLocalFirstFeatureAcquisitionCoordinator();
 
-const findDashboardFusionScope = (serverCode: string): FusionIdentityAnalysisScope | null => {
-  const scopes = listFusionIdentityAnalysisScopes();
-  return (
-    scopes.find(
-      (scope) =>
-        scope.analysisSupported &&
-        scope.temporalStatus !== "future" &&
-        scope.targetServerCode === serverCode,
-    ) ??
-    scopes.find(
-      (scope) =>
-        scope.analysisSupported &&
-        scope.temporalStatus !== "future" &&
-        scope.lineageServerCodes.includes(serverCode),
-    ) ??
-    null
-  );
-};
-
 export function buildDashboardLocalFirstFeatureRequest(
   guild: DashboardLocalFirstGuild | null | undefined,
 ): LocalFirstFeatureRequest | null {
@@ -62,11 +36,9 @@ export function buildDashboardLocalFirstFeatureRequest(
   const server = resolveServer(String(guild.server ?? ""));
   if (!server) return null;
 
-  const scope = findDashboardFusionScope(server.code);
   return {
-    target: scope ? { kind: "fusion-scope", scope } : { kind: "server", server: server.code },
-    ...(scope ? { segments: buildLocalFirstFusionScopeSegments(scope) } : {}),
-    time: { kind: "all" },
+    target: { kind: "server", server: server.code },
+    time: { kind: "latest" },
     dataKind: "both",
     completeness: "usable-snapshot",
   };

@@ -142,7 +142,8 @@ type InFlightArchiveResult =
   | { status: "race-already-local"; archiveScanId: string; localScanId: string; networkAccessed: boolean };
 
 const MAX_DOWNLOAD_CONCURRENCY = 2;
-const inFlightArchiveImports = new Map<string, Promise<InFlightArchiveResult>>();
+type ArchiveFlight = { controller: AbortController; consumers: Set<symbol>; promise: Promise<InFlightArchiveResult> };
+const inFlightArchiveImports = new Map<string, ArchiveFlight>();
 
 const compareText = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
@@ -328,6 +329,8 @@ const importArchiveEntry = async (
       archiveSource: createScanArchiveSourceMetadata(entry),
     }))));
     auditEvent(__audit1, "preview-ready");
+    // Cancellation may stop preparation; an already started commit must finish atomically.
+    throwIfAborted(signal);
     const committed: GuildHubImportScanResult = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.commitLocalScanPreview"), (dependencies.commitLocalScanPreview(preview))));
     if (__audit1) auditFields(__audit1, { sourceScanId: committed.scan.id, sourceGeneration: committed.scan.sourceGeneration, importStatus: committed.status });
     auditEvent(__audit1, "raw-and-post-import-preparations-ready");
@@ -343,6 +346,7 @@ const importArchiveEntry = async (
       networkAccessed: true,
     });
   } catch (error) { auditCaught(__audit1, error);
+    throwIfAborted(signal);
     if (/IndexedDB|IDB|database|transaction/i.test(errorMessage(error))) throw error;
     const wrapped = new Error(errorMessage(error));
     wrapped.name = "LocalFirstScanPreviewImportError";
@@ -358,17 +362,44 @@ const acquireArchiveEntry = (
   dependencies: LocalFirstScanAcquisitionDependencies,
   signal?: AbortSignal,
 ) => {
+  throwIfAborted(signal);
   const key = archiveInflightKey(entry);
-  const existing = inFlightArchiveImports.get(key);
-  if (existing) { auditLink(auditCurrent(), auditPromiseId(existing), "in-flight-join"); auditEvent(auditCurrent(), "in-flight-join"); return existing; }
-
-  const sourceJob = importArchiveEntry(entry, dependencies, signal);
-  const promise = sourceJob.finally(() => {
-    inFlightArchiveImports.delete(key);
+  let flight = inFlightArchiveImports.get(key);
+  const observer = auditCurrent();
+  if (!flight) {
+    const controller = new AbortController();
+    const next: ArchiveFlight = { controller, consumers: new Set(), promise: undefined! };
+    const sourceJob = importArchiveEntry(entry, dependencies, controller.signal);
+    next.promise = sourceJob.finally(() => {
+      if (inFlightArchiveImports.get(key) === next) inFlightArchiveImports.delete(key);
+    });
+    auditAliasPromise(next.promise, sourceJob);
+    flight = next;
+    inFlightArchiveImports.set(key, next);
+  } else {
+    auditLink(observer, auditPromiseId(flight.promise), "in-flight-join");
+  }
+  const shared = flight, consumer = Symbol();
+  shared.consumers.add(consumer);
+  auditEvent(observer, "archive-consumer-acquire", { archiveScanId: entry.id, consumers: shared.consumers.size });
+  return new Promise<InFlightArchiveResult>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      signal?.removeEventListener("abort", cancel);
+      shared.consumers.delete(consumer);
+      auditEvent(observer, "archive-consumer-release", { archiveScanId: entry.id, aborted: signal?.aborted ?? false, consumers: shared.consumers.size });
+      if (!shared.consumers.size && inFlightArchiveImports.get(key) === shared) {
+        inFlightArchiveImports.delete(key);
+        shared.controller.abort();
+      }
+    };
+    const cancel = () => { if (!settled) { settled = true; cleanup(); reject(new DOMException("aborted", "AbortError")); } };
+    signal?.addEventListener("abort", cancel, { once: true });
+    void shared.promise.then(result => { if (!settled) { settled = true; cleanup(); resolve(result); } }, error => {
+      if (!settled) { settled = true; cleanup(); reject(error); }
+    });
+    if (signal?.aborted) cancel();
   });
-  auditAliasPromise(promise, sourceJob);
-  inFlightArchiveImports.set(key, promise);
-  return promise;
 };
 
 const runWithConcurrency = async <T, R>(
@@ -465,6 +496,7 @@ export async function acquireExplicitLocalFirstArchiveScans(
         report();
         return result;
       } catch (error) {
+        throwIfAborted(options.signal);
         failed += 1;
         report();
         return {
@@ -569,6 +601,7 @@ export async function acquireLocalFirstScans(
       try {
         return await (__audit3 ? auditCall(__audit3, "source-consumer-wait", () => acquireArchiveEntry(entry, dependencies, signal), "async-container") : acquireArchiveEntry(entry, dependencies, signal));
       } catch (error) {
+        throwIfAborted(signal);
         return {
           archiveScanId: entry.id,
           errorCode: error instanceof Error && error.name === "LocalFirstScanPreviewImportError" ? "preview-import-error" : classifyArchiveError(error),

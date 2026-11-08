@@ -29,7 +29,6 @@ import {
   selectGuildHubRawSnapshot,
   isGuildHubScanAnalyticsEnabled,
   listGuildHubScanSummaries,
-  subscribeToSfDataHubLocalScanChanges,
   type GuildHubLocalGuildIdentity,
   type GuildHubLocalScan,
   type GuildHubScanSummary,
@@ -42,6 +41,7 @@ import { guildObservationIdentifierCandidates, confirmedGuildObservationsMatch, 
 import { classifyDashboardTransfers } from "./dashboardTransfersModel";
 import {
   loadIdentityResolutionSnapshot,
+  resolvePlayerIdentity,
   revalidateIdentityResolutionSnapshot,
   type IdentityResolutionSnapshot,
 } from "../../lib/identities/identityResolution";
@@ -57,11 +57,14 @@ import {
   type PlayerPerformanceWorkerRun,
 } from "../Playground/playerPerformanceWorkerClient";
 import { useLocalProfileNavigation } from "../../lib/data-hub/profileNavigation";
-import { captureLocalDataDependencies, revalidateLocalDataDependencies, subscribeToLocalDataDependencies } from "../../lib/local-data/localDataDependencies";
+import { captureLocalDataDependencies, revalidateLocalDataDependencies, subscribeToLocalDataDependencies, createAnalyticsScopeMatcher } from "../../lib/local-data/localDataDependencies";
 import { matchesLocalSourceValidity } from "../../lib/guilds/localSourceValidity";
 import { readGuildScanMemberIdentity } from "../../lib/guilds/guildScanNormalizer";
 import { isLocalPlayerSourceContextValid, type LocalPlayerSourceContext } from "./localPlayerCurrentSeed";
 
+import { acquireProfileArchiveHistory } from "../../lib/scanArchive/profileHistoryAcquisition";
+import { subscribeToScanArchiveMetadata } from "../../lib/scanArchive/client";
+import { startDashboardMemberComparison } from "./dashboardMemberComparisonClient";
 import { acquireDashboardLocalFirstFeatureScans } from "./dashboardLocalFirst";
 import {
   buildDashboardStaticPlayerCardItems,
@@ -170,6 +173,7 @@ type GuildTrendState = {
 
 type DashboardArchiveInventoryState = {
   guildContextId?: string;
+  demandKey?: string;
   archiveEntries?: readonly ScanArchiveEntry[];
   archiveScanCount: number | null;
   loading: boolean;
@@ -191,7 +195,6 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
   const currentScans = useDashboardScans(activeGuild);
   const [comparisonSelection, setComparisonSelection] = React.useState<{ guildId: string; stand: NonNullable<import("./dashboardMemberComparison").DashboardMemberComparisonRequest["selectedComparison"]> } | null>(null);
   const requestedComparison = comparisonSelection && comparisonSelection.guildId === activeGuild?.id ? comparisonSelection.stand : null;
-  const archiveInventoryState = useDashboardLocalFirstAcquisition(activeGuild, currentScans.summaries, currentScans.loading);
 
   const attributeSumMode = useProfileAttributeSumMode();
   const latest = currentScans.latest?.guildContextId === activeGuild?.id ? currentScans.latest : null;
@@ -204,6 +207,7 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
   const [chartRangeSelection, setChartRangeSelection] = React.useState<{ guildId: string; value: GuildChartRangeSelection } | null>(null);
   const chartRangeValue = chartRangeSelection && chartRangeSelection.guildId === activeGuild?.id ? chartRangeSelection.value : "12months";
   const chartWindow = React.useMemo(() => latest ? { startMs: guildChartRangeStart(chartRangeValue, latest.scannedAtMs), endMs: latest.scannedAtMs } : undefined, [chartRangeValue, latest?.scannedAtMs]);
+  const archiveInventoryState = useDashboardLocalFirstAcquisition(activeGuild, latest, chartWindow, requestedComparison);
   const chartRange: GuildChartRangeControl = {
     value: chartRangeValue, times: guildChartAvailableTimes(currentScans.sources, currentScans.summaries, latest?.scannedAtMs ?? 0),
     onChange: value => { if (activeGuild) setChartRangeSelection({ guildId: activeGuild.id, value }); },
@@ -274,7 +278,7 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
     currentGuildIdentifier: latest.source.guildIdentifier, currentDeclaredMemberCount: latest.guild.declaredMemberCount,
     guild: { name: activeGuild.name, server: activeGuild.server, logoIdentifier: activeGuild.logoIdentifier }, members: currentStatsMembers,
   } : null, [latest, activeGuild, currentScans.summaries, currentStatsMembers, requestedComparison]);
-  const memberComparison = useDashboardMemberComparison(comparisonInput, latest?.context ?? null, attributeSumMode);
+  const memberComparison = useDashboardMemberComparison(comparisonInput, latest?.context ?? null, attributeSumMode, archiveInventoryState.loading, currentScans.identities && activeGuild ? resolveObservedGuildIdentity(currentScans.identities, activeGuild.logoIdentifier, activeGuild.server).identityId : null, !!archiveInventoryState.error);
   const comparisonOptions = React.useRef<{ guildId?: string; values: NonNullable<LocalGuildRankingComparison["options"]> }>({ values: [] });
   if (comparisonOptions.current.guildId !== activeGuild?.id) comparisonOptions.current = { guildId: activeGuild?.id, values: [] };
   if (memberComparison.options) comparisonOptions.current.values = memberComparison.options;
@@ -513,6 +517,14 @@ function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState
     let cancelled = false;
     let runId = 0;
     let committed: LocalGuildScanView | null = null;
+    let sourceUnsubscribe = () => {}, watchedScope = "";
+    const sourceScope = (identity: IdentityResolutionSnapshot | null, latest = committed) => {
+      const guilds = [activeGuild?.logoIdentifier ?? "", ...(identity ? resolveObservedGuildIdentity(identity, activeGuild?.logoIdentifier, activeGuild?.server).aliasIdentifiers : [])];
+      const players = latest?.members.flatMap(member => [member.localRef?.identifier ?? member.key,
+        ...(identity ? resolvePlayerIdentity(identity, member.localRef?.identifier ?? member.key).aliasIdentifiers : [])]) ?? [];
+      const servers = [...new Set([activeGuild?.server ?? "", ...guilds.map(id => id.replace(/_g[^_]+$/i, "")), ...players.map(id => id.replace(/_p[^_]+$/i, ""))])].filter(Boolean);
+      return { servers, guilds, players };
+    };
     const empty: ScanState = {
       requestKey, summaries: [], sources: [], latest: null, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, identities: null, comparisonStatus: "not-requested",
       loading: false, detailLoading: false, error: null,
@@ -526,9 +538,9 @@ function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState
       const currentRunId = ++runId;
       const allowed = () => !cancelled && currentRunId === runId;
       // Historical refreshes retain the current component tree and its toggles.
-      (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState(current => ({ ...current, generation: currentRunId, transferDependencies: undefined, transferGuildStands: undefined, scanIdentityContexts: [], identityContextStatus: "checking", loading: !committed, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, comparisonStatus: "not-requested", error: null })))));
+      (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState(current => ({ ...current, generation: currentRunId, loading: !committed, error: null })))));
       try {
-        const [summaries, identityResolutionSnapshot] = await (auditValue(__audit2, auditEnter(__audit2, "Promise.all"), (Promise.all([
+        const [allSummaries, identityResolutionSnapshot] = await (auditValue(__audit2, auditEnter(__audit2, "Promise.all"), (Promise.all([
           listGuildHubScanSummaries({ auditContext: { trigger, consumer: "dashboard-current-and-comparison" } }),
           loadIdentityResolutionSnapshot().catch(error => {
             console.warn("[GuildHubDashboard] identity resolution unavailable for dashboard scan scope", error);
@@ -536,6 +548,8 @@ function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState
           }),
         ]))));
         if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        const scope = sourceScope(identityResolutionSnapshot);
+        const summaries = allSummaries.filter(createAnalyticsScopeMatcher(scope));
         const sources = (auditValue(__audit2, auditEnter(__audit2, "buildDashboardGuildSources", "sync-elapsed"), (buildDashboardGuildSources(summaries, activeGuild, identityResolutionSnapshot))));
         if (observation.kind === "invalid") throw Error("Invalid guild observation anchor");
         const exact = observation.kind === "exact" ? observation.anchor : null;
@@ -584,13 +598,19 @@ function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState
           return auditReturn(__audit2, undefined);
         }
         committed = latest;
+        const watchedNeed = { sourceScope: sourceScope(identityResolutionSnapshot, latest), sourceIds: summaries.map(summary => summary.sourceScanId) };
+        const nextScope = JSON.stringify(watchedNeed);
+        if (nextScope !== watchedScope) {
+          sourceUnsubscribe(); watchedScope = nextScope;
+          sourceUnsubscribe = subscribeToLocalDataDependencies(watchedNeed, cause => { void load(cause?.trigger ?? "source-dependency-change"); }, undefined, { consumer: "guild-dashboard-sources" });
+        }
         auditAccept(__audit2, latest);
-        (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, generation: currentRunId, summaries, sources, latest, identities: identityResolutionSnapshot,
+        (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState(current => ({ ...empty, ...(reusable ? current : {}), generation: currentRunId, summaries, sources, latest, identities: identityResolutionSnapshot,
           identityContextStatus: identityResolutionSnapshot ? "ready" : "not-checked",
           scanIdentityContexts: identityResolutionSnapshot ? [{ stand: { ...latest.source, scannedAtMs: latest.scannedAtMs }, role: "current", status: "ready",
             summary: summarizeScanIdentities(latest.members, identityResolutionSnapshot, latest.source.guildIdentifier, latest.guild.declaredMemberCount),
             revisions: identityResolutionSnapshot.revisions, contentHash: latest.context.scan.contentHash }] : [],
-          comparisonStatus: "not-requested" }))));
+          comparisonStatus: reusable ? current.comparisonStatus : "not-requested" })) )));
         // The member worker selects one eligible basis for every comparison consumer.
       } catch (error) { auditCaught(__audit2, error);
         if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
@@ -603,9 +623,9 @@ function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState
     finally { auditLeave(__audit2); }
 };
     void load();
-    const unsubscribe = subscribeToSfDataHubLocalScanChanges(cause => { void load(cause?.trigger ?? "source-dependency-change"); }, { consumer: "guild-dashboard-sources" });
+    sourceUnsubscribe = subscribeToLocalDataDependencies({ sourceScope: sourceScope(null) }, cause => { void load(cause?.trigger ?? "source-dependency-change"); }, undefined, { consumer: "guild-dashboard-sources" });
     const unsubscribeIdentity = subscribeToLocalDataDependencies({ allIdentities: true, guildAliases: [activeGuild.logoIdentifier] }, cause => { void load(cause?.trigger ?? "identity-dependency-change"); }, undefined, { consumer: "guild-dashboard-identities" });
-    return () => { cancelled = true; runId++; unsubscribe(); unsubscribeIdentity(); };
+    return () => { cancelled = true; runId++; sourceUnsubscribe(); unsubscribeIdentity(); };
   }, [requestKey]);
   useRuntimeAuditCommit(state.latest, !!state.latest && !state.loading, "guild-current");
   useRuntimeAuditCommit(state.comparisonMembers, state.comparisonStatus === "ready", "guild-history-comparison");
@@ -630,7 +650,10 @@ function useDashboardTransferComparison(base: ScanState, activeGuild: GuildHubSe
     let cancelled = false;
     const allowed = () => !cancelled;
     const latest = base.latest;
-    setState({ ...base, comparisonStatus: source ? "loading" : comparison.status === "loading" ? "loading" : comparison.status === "error" ? "error" : "empty" });
+    setState(current => current.latest === base.latest && current.comparisonStatus === "ready" &&
+      current.scanIdentityContexts?.some(context => context.role === "transfer" && context.stand.sourceScanId === source?.sourceScanId && context.stand.scannedAtMs === source?.scannedAtMs)
+      ? { ...current, summaries: base.summaries, sources: base.sources } :
+      { ...base, comparisonStatus: source ? "loading" : comparison.status === "loading" ? "loading" : comparison.status === "error" ? "error" : "empty" });
     if (!latest || !source || !activeGuild) return () => { cancelled = true; };
     const runComparison = async (
       latest: LocalGuildScanView, source: DashboardGuildSource, summaries: GuildHubScanSummary[],
@@ -692,66 +715,75 @@ function useDashboardTransferComparison(base: ScanState, activeGuild: GuildHubSe
     void runComparison(latest, source, base.summaries, allowed, base.identities);
     return () => { cancelled = true; };
   }, [base, activeGuild, source, comparison.status]);
-  return state.latest === base.latest && state.summaries === base.summaries && (source ? state.comparisonStatus === "loading" || state.scanIdentityContexts?.some(context => context.role === "transfer" && context.stand.sourceScanId === source.sourceScanId && context.stand.scannedAtMs === source.scannedAtMs) : state.comparisonStatus !== "ready") ? state : { ...base, comparisonStatus: "loading" };
+  return state.latest === base.latest && (source ? state.comparisonStatus === "loading" || state.scanIdentityContexts?.some(context => context.role === "transfer" && context.stand.sourceScanId === source.sourceScanId && context.stand.scannedAtMs === source.scannedAtMs) : state.comparisonStatus !== "ready") ? state : { ...base, comparisonStatus: "loading" };
 }
 
 function useDashboardLocalFirstAcquisition(
   activeGuild: GuildHubSelectedGuild | null,
-  summaries: GuildHubScanSummary[],
-  localLoading: boolean,
+  latest: LocalGuildScanView | null,
+  chartWindow: { startMs: number; endMs: number } | undefined,
+  selectedComparison: import("./dashboardMemberComparison").DashboardMemberComparisonRequest["selectedComparison"],
 ): DashboardArchiveInventoryState {
-  const [state, setState] = React.useState<DashboardArchiveInventoryState>({
-    archiveScanCount: null,
-    loading: false,
-    error: null,
-  });
-  const inventoryKey = React.useMemo(() => buildGuildTrendInventoryKey(summaries), [summaries]);
-
+  const location = useLocation();
+  const historical = parseObservation(location.search).kind === "exact";
+  const [state, setState] = React.useState<DashboardArchiveInventoryState>({ archiveScanCount: null, loading: false, error: null });
+  const key = JSON.stringify([activeGuild?.id, activeGuild?.server, activeGuild?.logoIdentifier,
+    latest?.source.sourceScanId, latest?.scannedAtMs, chartWindow, selectedComparison, historical]);
   React.useEffect(() => {
-    if (!activeGuild) {
-      setState({ archiveScanCount: null, loading: false, error: null });
-      return undefined;
-    }
-
-    if (localLoading) {
-      setState((current) => ({ ...current, loading: true, error: null }));
-      return undefined;
-    }
-
-    let stale = false;
-    setState((current) => ({ ...current, loading: true, error: null }));
-
-    acquireDashboardLocalFirstFeatureScans(activeGuild, {
-      localScanSummaries: summaries,
-    })
-      .then((outcome) => {
-        if (stale) return;
-        if (outcome.status !== "completed") {
-          setState({ archiveScanCount: null, loading: false, error: null });
-          return;
+    if (!activeGuild) return;
+    const controller = new AbortController(), signal = controller.signal;
+    let running = false, pending = false;
+    const load = async () => {
+      pending = true;
+      if (running) return;
+      running = true;
+      try {
+        while (pending && !signal.aborted) {
+          pending = false;
+          setState(current => ({ ...current, guildContextId: activeGuild.id, demandKey: key, loading: true, error: null }));
+          // The current observation has its own acquisition and may be published
+          // before any history. Historical routes never advance their anchor.
+          if (!historical) await acquireDashboardLocalFirstFeatureScans(activeGuild, { signal });
+          if (signal.aborted) return;
+          const reference = favoriteReference("guild", activeGuild.logoIdentifier ?? activeGuild.guildId, activeGuild.server);
+          if (!latest || !reference) { setState({ guildContextId: activeGuild.id, demandKey: key, archiveScanCount: null, loading: false, error: null }); continue; }
+          const history = await acquireProfileArchiveHistory(reference, latest.scannedAtMs, {
+            signal, kind: "guild", from: chartWindow?.startMs, all: chartWindow?.startMs === 0,
+            selectedAt: selectedComparison?.scannedAtMs,
+            players: latest.members.map(member => member.localRef?.identifier ?? member.key),
+            consumer: "guild-comparison-and-charts",
+            comparisonReady: async () => {
+              signal.throwIfAborted();
+              const summaries = await listGuildHubScanSummaries();
+              const run = startDashboardMemberComparison({ summaries, currentSourceId: latest.source.sourceScanId,
+                currentTimestamp: latest.scannedAtMs, currentGuildIdentifier: latest.source.guildIdentifier,
+                currentDeclaredMemberCount: latest.guild.declaredMemberCount,
+                guild: { name: activeGuild.name, server: activeGuild.server, logoIdentifier: activeGuild.logoIdentifier },
+                members: latest.members.map(member => ({ ...member, playerStats: member.playerStats ?? readLocalGuildMemberValues(null) })), selectedComparison });
+              const cancel = () => run.cancel();
+              signal.addEventListener("abort", cancel, { once: true });
+              try {
+                const result = await run.promise;
+                signal.throwIfAborted();
+                return result.comparison.status === "ready" && (selectedComparison != null ||
+                  latest.scannedAtMs - (result.comparison.timestamp ?? latest.scannedAtMs) >= 28 * 86_400_000);
+              } finally { signal.removeEventListener("abort", cancel); }
+            },
+          });
+          if (signal.aborted) return;
+          setState({ guildContextId: activeGuild.id, demandKey: key, archiveEntries: history.archiveEntries,
+            archiveScanCount: countUniqueArchiveEntries(history.archiveEntries), loading: false, error: null });
         }
-
-        const archiveScanCount = countUniqueArchiveEntries(outcome.result.preparedRequest.archiveEntries);
-        setState({
-          guildContextId: activeGuild.id,
-          archiveEntries: outcome.result.preparedRequest.archiveEntries,
-          archiveScanCount: outcome.result.manifestStatus === "offline" ? null : archiveScanCount,
-          loading: false,
-          error: outcome.result.manifestStatus === "offline" ? "Archiv nicht verfuegbar" : null,
-        });
-      })
-      .catch((error) => {
-        if (stale) return;
-        console.warn("[GuildHubDashboard] local-first archive acquisition failed; using local dashboard data", error);
-        setState({ archiveScanCount: null, loading: false, error: "Archiv nicht verfuegbar" });
-      });
-
-    return () => {
-      stale = true;
+      } catch (error) {
+        if (!signal.aborted) { console.warn("[GuildHubDashboard] archive demand failed", error);
+          setState(current => ({ ...current, loading: false, error: "Archiv nicht verfuegbar" })); }
+      } finally { running = false; }
     };
-  }, [activeGuild, inventoryKey, localLoading, summaries]);
-
-  return state.guildContextId === activeGuild?.id ? state : { archiveScanCount: null, archiveEntries: EMPTY_ARCHIVE_ENTRIES, loading: state.loading, error: state.error };
+    const stop = subscribeToScanArchiveMetadata(() => { void load(); });
+    void load();
+    return () => { controller.abort(); stop(); };
+  }, [key]);
+  return state.guildContextId === activeGuild?.id && state.demandKey === key ? state : { archiveScanCount: null, archiveEntries: EMPTY_ARCHIVE_ENTRIES, loading: !!activeGuild, error: null };
 }
 
 function useDashboardPlayerCards(latest: LocalGuildScanView | null): DashboardPlayerCardsState {
@@ -853,17 +885,6 @@ function buildDashboardGuildTrendRequestKey(
   ].join(":");
 }
 
-function buildGuildTrendInventoryKey(summaries: GuildHubScanSummary[]) {
-  return summaries
-    .map((summary) => [
-      summary.sourceScanId,
-      summary.updatedAtIso ?? summary.updatedAt,
-      summary.contentHash ?? "",
-      summary.analyticsEnabled ? "analytics" : "raw",
-    ].join(":"))
-    .sort()
-    .join("|");
-}
 
 function buildDashboardGuildSources(
   summaries: GuildHubScanSummary[],

@@ -6,7 +6,7 @@ import type { LocalProfilePart } from "./contract";
 import { acquireLocalPlayerProfile, type LocalProfileArea, type LocalProfileValues, type LocalProfileLease } from "./coordinator";
 import { localProfileContextKey } from "./historyBasis";
 
-export function useLocalProfilePart<K extends LocalProfileArea>(profile: LocalPlayerProfileModel, area: K, comparison?: number | null) {
+export function useLocalProfilePart<K extends LocalProfileArea>(profile: LocalPlayerProfileModel, area: K, comparison?: number | null, enabled = true) {
   const key = localProfileContextKey(profile);
   const acceptedAuditId = useRef<string>();
   const leaseRef = useRef<LocalProfileLease>();
@@ -17,6 +17,7 @@ export function useLocalProfilePart<K extends LocalProfileArea>(profile: LocalPl
     return () => { lease.release(); if (leaseRef.current === lease) leaseRef.current = undefined; };
   }, [key]);
   useEffect(() => {
+    if (!enabled) return;
     const lease = leaseRef.current!;
     return lease.watch(area, comparison, part => {
       acceptedAuditId.current = auditResultId(part);
@@ -24,7 +25,7 @@ export function useLocalProfilePart<K extends LocalProfileArea>(profile: LocalPl
         previous.key === key && previous.area === area && previous.comparison === comparison && previous.part.value
         ? { ...part, value: previous.part.value } : part }));
     });
-  }, [key, area, comparison]);
+  }, [key, area, comparison, enabled]);
   // A new target must never render the previous target's values for one frame.
   const part = state.key === key && state.area === area && state.comparison === comparison ? state.part : { status: "loading" as const, value: null };
   useRuntimeAuditCommit(part.value, part.status === "ready" || part.status === "partial", `profile:${area}`, acceptedAuditId.current);

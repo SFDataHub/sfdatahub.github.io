@@ -1,3 +1,5 @@
+import { acquireProfileArchiveHistory } from "../../lib/scanArchive/profileHistoryAcquisition";
+import { favoriteReference } from "../../lib/data-hub/hubFavoritesContract";
 import { profileLocale } from "../../lib/i18n/profilePresentation";
 import React from "react";
 import { TriangleAlert } from "lucide-react";
@@ -50,7 +52,19 @@ export default function LocalPlayerProfileInsights({ profile, hero, contentView,
   const { t } = useTranslation();
   const canAccess = usePlayerInsightsConstructionAccess();
   const current = useLocalProfilePart(profile, "currentInsights");
-  const bests = useLocalProfilePart(profile, "bests");
+  const bestsEnabled = canAccess("personalBests");
+  const bests = useLocalProfilePart(profile, "bests", undefined, bestsEnabled);
+  React.useEffect(() => {
+    const reference = favoriteReference("player", profile.analytics.memberRef ?? profile.currentSeed?.rawIdentifier);
+    if (!reference || !bestsEnabled) return;
+    const controller = new AbortController();
+    // Personal bests explicitly require the full timeline and own that demand.
+    // Current values, comparison and charts never wait for this independent job.
+    void acquireProfileArchiveHistory(reference, profile.analytics.scannedAtMs, {
+      signal: controller.signal, all: true, consumer: "player-personal-bests",
+    }).catch(error => { if (!controller.signal.aborted) console.error("Personal best history acquisition failed", error); });
+    return () => controller.abort();
+  }, [bestsEnabled, profile.sourceScanId, profile.analytics.scannedAtMs, profile.analytics.memberRef]);
   const model = { ...EMPTY_MODEL, ...current.value, personalBests: bests.value ?? EMPTY_MODEL.personalBests };
 
   return (
