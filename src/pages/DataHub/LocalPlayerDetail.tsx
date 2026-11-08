@@ -1,3 +1,4 @@
+import { acquireProfileEntrySource, ProfileEntryAcquisitionError } from "../../lib/data-hub/profileEntryAcquisition";
 import { useAnalyticsView } from "../../lib/analytics/localEvents";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import { auditEnabled } from "../../lib/data-hub/runtimeAudit";
@@ -29,6 +30,7 @@ export default function LocalPlayerDetail({ overlay = false }: { overlay?: boole
   const state = loaded.key === renderKey ? loaded : { profile: null, error: null };
   const retryCause = React.useRef<{ key: string; retry: number; cause?: import("../../lib/local-data/localDataDependencies").LocalDependencyNotification }>();
   const closing = React.useRef(false);
+  const entryPending = React.useRef(false);
   const close = React.useCallback(() => {
     if (closing.current || hasBackCloseLayer()) return;
     closing.current = true;
@@ -37,14 +39,24 @@ export default function LocalPlayerDetail({ overlay = false }: { overlay?: boole
   }, [overlay, navigate, location.state]);
   React.useEffect(() => {
     let stopped = false; closing.current = false;
+    const controller = new AbortController();
+    entryPending.current = true;
     setState(previous => previous.key === renderKey && previous.profile ? previous : { key: renderKey, profile: null, error: null });
     const entity = parseLocalEntity("player", server, identifier);
-    if (!entity) { setState({ key: renderKey, profile: null, error: "invalid" }); return; }
-    void resolveLocalProfileEntry({ entity, observation: parseObservation(location.search) }, preparedProfileSeed(location), () => !stopped, undefined, auditEnabled() ? { ...(retryCause.current?.key === renderKey && retryCause.current.retry === retry ? retryCause.current.cause : undefined), trigger: retryCause.current?.key === renderKey && retryCause.current.retry === retry ? retryCause.current.cause?.trigger ?? "profile-entry-retry-effect" : "profile-entry-route-effect", consumer: overlay ? "profile-overlay-entry" : "profile-route-entry", retry } : undefined, !overlay)
-      .then(profile => { if (!stopped && !closing.current && renderKeyRef.current === renderKey) setState({ key: renderKey, profile, error: null }); }, error => {
-        if (!stopped && !closing.current && renderKeyRef.current === renderKey) setState({ key: renderKey, profile: null, error: error instanceof LocalProfileEntryError ? error.code : "failed" });
+    if (!entity) { entryPending.current = false; setState({ key: renderKey, profile: null, error: "invalid" }); return; }
+    const entry = { entity, observation: parseObservation(location.search) };
+    const resolve = () => resolveLocalProfileEntry(entry, preparedProfileSeed(location), () => !stopped, undefined, auditEnabled() ? { ...(retryCause.current?.key === renderKey && retryCause.current.retry === retry ? retryCause.current.cause : undefined), trigger: retryCause.current?.key === renderKey && retryCause.current.retry === retry ? retryCause.current.cause?.trigger ?? "profile-entry-retry-effect" : "profile-entry-route-effect", consumer: overlay ? "profile-overlay-entry" : "profile-route-entry", retry } : undefined, !overlay);
+    void resolve().catch(async error => {
+      if (!(error instanceof LocalProfileEntryError) || error.code !== "missing") throw error;
+      entry.observation = await acquireProfileEntrySource("player", entity, entry.observation, controller.signal);
+      return resolve().catch(error => {
+        if (entry.observation.kind === "exact" && error instanceof LocalProfileEntryError && error.code === "missing") throw new ProfileEntryAcquisitionError("historicalMissing");
+        throw error;
       });
-    return () => { stopped = true; };
+    }).then(profile => { if (!stopped && !closing.current && renderKeyRef.current === renderKey) setState({ key: renderKey, profile, error: null }); }, error => {
+        if (!stopped && !closing.current && renderKeyRef.current === renderKey) setState({ key: renderKey, profile: null, error: error instanceof LocalProfileEntryError || error instanceof ProfileEntryAcquisitionError ? error.code : "failed" });
+      }).finally(() => { if (!stopped) entryPending.current = false; });
+    return () => { stopped = true; controller.abort(); entryPending.current = false; };
   }, [server, identifier, location.search, location.key, retry]);
   useRuntimeAuditCommit(state.profile, !!state.profile && !state.error, overlay ? "profile-entry-overlay" : "profile-entry-route");
   const preparedLifetime = React.useRef(0);
@@ -54,12 +66,12 @@ export default function LocalPlayerDetail({ overlay = false }: { overlay?: boole
   }, [location.pathname, location.search]);
   React.useEffect(() => {
     const anchor = parseObservation(location.search);
-    const notify = (cause?: import("../../lib/local-data/localDataDependencies").LocalDependencyNotification) => setRetry(n => {
+    const notify = (cause?: import("../../lib/local-data/localDataDependencies").LocalDependencyNotification) => { if (entryPending.current) return; setRetry(n => {
       if (auditEnabled()) retryCause.current = { key: renderKeyRef.current, retry: n + 1, cause };
       return n + 1;
-    });
+    }); };
     const diagnostic = { consumer: overlay ? "profile-overlay-entry" : "profile-route-entry" };
-    if (anchor.kind === "exact") return subscribeToLocalDataDependencies({ allIdentities: true, sourceIds: [anchor.anchor.source] }, notify, undefined, diagnostic);
+    if (anchor.kind === "exact") return subscribeToLocalDataDependencies({ allIdentities: true, sourceIds: [state.profile?.sourceScanId ?? anchor.anchor.source] }, notify, undefined, diagnostic);
     // Keep the existing conservative subscription until the confirmed player
     // scope is ready. A new VS archive must not unmount an unrelated profile.
     let stopped = false;

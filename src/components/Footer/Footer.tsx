@@ -21,7 +21,7 @@ export default function Footer() {
   const berlinToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
   const today = ["year", "month", "day"].map(key => berlinToday.find(part => part.type === key)!.value).join("-");
   const expired = manifest && Date.now() - Date.parse(manifest.asOf) > 2 * 3600000;
-  const ready = manifest?.state === "ready" && !expired;
+  const ready = manifest?.state === "ready";
   const rows = [
     ["websiteToday", ready && manifest.today === today ? manifest.website?.today : null],
     ["websiteTotal", ready ? manifest.website?.total : null],

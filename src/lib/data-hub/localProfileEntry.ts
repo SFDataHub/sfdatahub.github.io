@@ -79,13 +79,17 @@ export async function resolveLocalProfileEntry(entry: LocalProfileEntry, prepare
       const bindings = (metadata?.bindings ?? []).filter(b => b.localScanId === anchor.source);
       if (bindings.length === 1) {
         const b = bindings[0];
-        const { entries } = await loadScanArchiveManifestEntries({ year: b.archiveYear, active: true, manifestUrl: b.manifestUrl }); check(allowed);
-        const targets = entries.filter(e => e.id === b.archiveScanId && e.sha256 === b.sha256);
-        if (targets.length === 1) {
-          const acquired = await acquireExplicitLocalFirstArchiveScans(targets); check(allowed);
-          const source = acquired.selectedArchives[0]?.localScanId;
-          if (source === anchor.source) scan = await getGuildHubLocalScan(source);
-        }
+        const controller = new AbortController();
+        const timer = setInterval(() => { if (!allowed()) controller.abort(); }, 50);
+        try {
+          const { entries } = await loadScanArchiveManifestEntries({ year: b.archiveYear, active: true, manifestUrl: b.manifestUrl }, { signal: controller.signal }); check(allowed);
+          const targets = entries.filter(e => e.id === b.archiveScanId && e.sha256 === b.sha256);
+          if (targets.length === 1) {
+            const acquired = await acquireExplicitLocalFirstArchiveScans(targets, { signal: controller.signal }); check(allowed);
+            const source = acquired.selectedArchives[0]?.localScanId;
+            if (source === anchor.source) scan = await getGuildHubLocalScan(source);
+          }
+        } finally { clearInterval(timer); }
       }
     }
     if (!scan) throw new LocalProfileEntryError("missing");

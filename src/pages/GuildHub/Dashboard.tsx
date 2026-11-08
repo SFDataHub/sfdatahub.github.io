@@ -192,7 +192,7 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
   const selection = useGuildHubSelection("guild-dashboard");
   const { activeGuild } = selection;
   const overviewLocation = useLocation();
-  const currentScans = useDashboardScans(activeGuild);
+  const currentScans = useDashboardScans(activeGuild, selection.observation);
   const [comparisonSelection, setComparisonSelection] = React.useState<{ guildId: string; stand: NonNullable<import("./dashboardMemberComparison").DashboardMemberComparisonRequest["selectedComparison"]> } | null>(null);
   const requestedComparison = comparisonSelection && comparisonSelection.guildId === activeGuild?.id ? comparisonSelection.stand : null;
 
@@ -408,7 +408,7 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
         {(!activeGuild || !latest || scanState.error || selection.targetError || selection.contextIssue) && <GuildOverviewTitle onClose={onClose} />}
 
         {selection.targetError ? (
-          <EmptyPanel title={t("guildDashboardState.failed")} text={t(selection.targetError)} />
+          <EmptyPanel title={t("guildDashboardState.failed")} text={t(selection.targetError)} action={<button type="button" onClick={selection.retryTarget}>{t("localProfileRoute.retry")}</button>} />
         ) : selection.contextIssue ? (
           <EmptyPanel title={t("guildDashboardState.unavailable")} text={t(`pageContext.${selection.contextIssue}`)} />
         ) : selection.targetLoading || activeGuild && (scanState.loading || scanState.detailLoading) && !latest ? (
@@ -503,9 +503,7 @@ export default function GuildHubDashboard({ overlay = false, onClose, onGoToProf
   return overlay ? content : <ContentShell centerFramed={false}>{content}</ContentShell>;
 }
 
-function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState {
-  const location = useLocation();
-  const observation = React.useMemo(() => parseObservation(location.search), [location.search]);
+function useDashboardScans(activeGuild: GuildHubSelectedGuild | null, observation: ReturnType<typeof parseObservation>): ScanState {
   // Only a target/observation change owns a new request. Metadata refreshes of
   // the same guild retain an already committed dashboard.
   const requestKey = JSON.stringify([activeGuild && [activeGuild.id, activeGuild.server, activeGuild.logoIdentifier, activeGuild.guildId], observation]);

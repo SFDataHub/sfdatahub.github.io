@@ -138,6 +138,60 @@ describe("Public visitor metric contract", () => {
     await expect(publishMetrics(async () => { throw Error("Upstream failed"); }, new Date(now.getTime() + 3600001))).rejects.toThrow("Upstream failed");
     expect(state.store.get("visitor_metrics_public/current")).toEqual(manifest);
   });
+  it.each([
+    ["2026-11-08T19:00:22+01:00", "2026-11-08T20:00:17+01:00"],
+    ["2026-11-08T20:48:50+01:00", "2026-11-08T21:01:03+01:00"],
+    ["2026-10-25T02:00:22+02:00", "2026-10-25T02:00:17+01:00"],
+    ["2026-03-29T01:00:22+01:00", "2026-03-29T03:00:17+02:00"],
+  ])("publishes the new absolute hour from %s to %s, then reuses that hour", async (before, after) => {
+    const firstTime = new Date(before), nextTime = new Date(after);
+    const startDate = berlinDay(firstTime);
+    state.store.set("analytics/visitor_config", { ...config, startDate });
+    const clock = vi.spyOn(Date, "now").mockReturnValue(firstTime.getTime());
+    const read = vi.fn(async () => [hit(WEBSITE_VISIT_PATH, 4, true), page("/help", 9)]);
+    await publishMetrics(read, firstTime);
+    const first = state.store.get("visitor_metrics_public/current");
+    clock.mockReturnValue(nextTime.getTime());
+    expect(await publishMetrics(read, nextTime)).toMatchObject({ skipped: false });
+    const next = state.store.get("visitor_metrics_public/current");
+    expect(next.generation).not.toBe(first.generation);
+    expect(next.asOf).toBe(nextTime.toISOString());
+    const repeated = new Date(Math.floor(nextTime.getTime() / 3600000) * 3600000 + 59 * 60000);
+    clock.mockReturnValue(repeated.getTime());
+    expect(await publishMetrics(read, repeated)).toEqual({ skipped: true });
+    expect(read).toHaveBeenCalledTimes(2);
+    // A saved configuration must still invalidate an otherwise current hour.
+    state.store.set("analytics/visitor_config", { ...config, startDate, revision: "changed" });
+    expect(await publishMetrics(read, repeated)).toMatchObject({ skipped: false });
+    expect(read).toHaveBeenCalledTimes(3);
+  });
+  it("keeps the lease and the last complete generation through overlapping and failed publications", async () => {
+    const now = new Date("2026-11-08T19:00:17Z");
+    vi.spyOn(Date, "now").mockReturnValue(now.getTime());
+    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-08" });
+    const previous = { generation: "complete-old", asOf: "2026-11-08T18:00:22Z", complete: true };
+    state.store.set("visitor_metrics_public/current", previous);
+    let release!: () => void;
+    const wait = new Promise<void>(resolve => { release = resolve; });
+    const first = publishMetrics(async () => { await wait; throw Error("Provider failed"); }, now);
+    // Let the first transaction acquire its lease before the second caller.
+    await vi.waitFor(() => expect(state.store.has("analytics/visitor_sync_lease")).toBe(true));
+    const read = vi.fn(async () => []);
+    expect(await publishMetrics(read, now)).toEqual({ skipped: true });
+    expect(read).not.toHaveBeenCalled();
+    release();
+    await expect(first).rejects.toThrow("Provider failed");
+    expect(state.store.get("visitor_metrics_public/current")).toEqual(previous);
+    expect(state.store.has("analytics/visitor_sync_lease")).toBe(false);
+    // A config change during construction must not publish staged page documents.
+    await expect(publishMetrics(async () => {
+      state.store.set("analytics/visitor_config", { ...config, revision: "changed-during-build" });
+      return [page("/help", 9)];
+    }, now)).rejects.toThrow("configuration or sync lease changed");
+    expect(state.writes.some(path => path.includes("/pages/"))).toBe(true);
+    expect(state.store.get("visitor_metrics_public/current")).toEqual(previous);
+    expect(await publishMetrics(read, now)).toMatchObject({ skipped: false });
+  });
   it("fully paginates documented hit rows and never treats response total as website visitors", async () => {
     const urls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: URL) => {
