@@ -46,7 +46,10 @@ const identifierFor = (row: ScanArchiveJsonRecord) => {
   return String(identifier).trim();
 };
 
-type MonthlySnapshot = { playerRows: LocalPlayerToplistRow[]; guildRows: LocalGuildToplistRow[] };
+export type MonthlySnapshot = {
+  playerRows: Pick<LocalPlayerToplistRow, "identifier" | "playerId" | "server" | "guildIdentifier" | "scanTimestamp" | "archiveScanId">[];
+  guildRows: Pick<LocalGuildToplistRow, "guildIdentifier" | "server" | "scanTimestamp" | "archiveScanId" | "memberBasisStatus" | "memberPlayerIdentifiers">[];
+};
 
 const deriveMonthlySnapshot = (scan: Pick<ScanArchiveManifestScan, "id" | "server" | "timestamp">, payload: ScanArchiveBuilderRawPayload): MonthlySnapshot => {
   // Sources stay inside the existing builder worker. Completeness is assessed
@@ -67,6 +70,8 @@ export async function prepareScanArchiveMonthlyAdd(
   conflicts: ScanArchiveBuilderConflict[],
   loadRaw?: (scan: ScanArchiveManifestScan) => Promise<ScanArchiveBuilderRawPayload>,
   onMember?: (scan: ScanArchiveManifestScan, current: number, total: number) => void,
+  loadSnapshot?: (scan: Pick<ScanArchiveManifestScan, "id" | "server" | "timestamp"> & Partial<ScanArchiveManifestScan>, payload?: ScanArchiveBuilderRawPayload) => Promise<MonthlySnapshot>,
+  baseSnapshot?: (target: ScanArchiveBuilderMonthlyTarget) => MonthlySnapshot | undefined,
 ): Promise<ScanArchiveBatch[]> {
   const baseline = new Map<string, { players: Set<string>; groups: Set<string>; snapshots: MonthlySnapshot[] }>();
   // Resolve every affected target first. Never filter using a partial baseline.
@@ -90,6 +95,13 @@ export async function prepareScanArchiveMonthlyAdd(
     const label = scanArchiveBuilderTargetKey(target.server, target.month);
     const ids = baseline.get(label);
     if (!ids) continue;
+    const cached = baseSnapshot?.(target);
+    if (cached) {
+      ids.snapshots.push(cached);
+      for (const row of cached.playerRows) ids.players.add(toplistRowIdentity(target.server, row.identifier, "players"));
+      for (const row of cached.guildRows) ids.groups.add(toplistRowIdentity(target.server, row.guildIdentifier, "groups"));
+      continue;
+    }
     for (const member of target.baseMembers) {
       const scan = manifest.scans.find((entry) => entry.id === member.id)!;
       onMember?.(scan, current++, total);
@@ -97,7 +109,7 @@ export async function prepareScanArchiveMonthlyAdd(
         if (!loadRaw) throw new Error("Kein Local-first-Lader fuer das Ausgangsset verfuegbar.");
         const payload = await loadRaw(scan);
         validateScanArchivePayload(payload, scan);
-        ids.snapshots.push(deriveMonthlySnapshot(scan, payload));
+        ids.snapshots.push(loadSnapshot ? await loadSnapshot(scan, payload) : deriveMonthlySnapshot(scan, payload));
         for (const kind of ["players", "groups"] as const) {
           for (const row of payload[kind]) ids[kind].add(toplistRowIdentity(scan.server, identifierFor(row), kind));
         }
@@ -121,7 +133,7 @@ export async function prepareScanArchiveMonthlyAdd(
   for (const target of targets) {
     const ids = baseline.get(scanArchiveBuilderTargetKey(target.server, target.month))!;
     const candidates = batches.filter((batch) => batch.server === target.server && scanArchiveBuilderMonth(batch.timestamp) === target.month);
-    const incomingSnapshots = candidates.map(batch => deriveMonthlySnapshot(batch, batch));
+    const incomingSnapshots = await Promise.all(candidates.map(batch => loadSnapshot ? loadSnapshot(batch, batch) : deriveMonthlySnapshot(batch, batch)));
     const incoming = composeMonthlySet(incomingSnapshots);
     const base = composeMonthlySet(ids.snapshots);
     const baseGuilds = new Map(base.guildRows.map(row => [toplistRowIdentity(row.server, row.guildIdentifier, "groups"), row]));
@@ -133,7 +145,7 @@ export async function prepareScanArchiveMonthlyAdd(
     });
     const promotedMembers = new Set(retainedGuilds.filter(row => row.memberBasisStatus === "complete")
       .flatMap(row => (row.memberPlayerIdentifiers ?? []).map(identifier => `${row.archiveScanId}\u0000${identifier}`)));
-    const playerSources = new Map<string, LocalPlayerToplistRow>();
+    const playerSources = new Map<string, MonthlySnapshot["playerRows"][number]>();
     for (const row of incoming.playerRows) {
       if (!ids.players.has(toplistRowIdentity(row.server, row.identifier, "players"))) playerSources.set(`${row.archiveScanId}\u0000${row.identifier}`, row);
     }
@@ -170,6 +182,5 @@ export async function prepareScanArchiveMonthlyAdd(
     }
   }
   const kept = [...keptByBatch.values()].filter((batch) => batch.players.length || batch.groups.length);
-  if (!kept.length) conflicts.push({ code: "add_no_new_ids", message: "Keine neuen IDs und kein uebernehmbarer vollstaendiger Gildenstand. Kein Add-ZIP." });
   return kept;
 }

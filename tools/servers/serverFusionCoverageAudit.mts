@@ -1,3 +1,4 @@
+import { artifactPath, workDir } from '../codex/workspace.mjs';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -30,9 +31,9 @@ type SfgameConfigServer = {
 };
 
 const repoRoot = process.cwd();
-const outPath = path.join(repoRoot, "tools/servers/server-fusion-coverage-audit.latest.txt");
-const firestoreSnapshotPath = path.join(repoRoot, ".tmp/sfdatahub-firestore-servers.json");
-const sfgameConfigPath = path.join(repoRoot, ".tmp/sfgame-config.json");
+const outPath = artifactPath('tools/servers/server-fusion-coverage-audit.latest.txt');
+const firestoreSnapshotPath = path.join(workDir, "test-runs/server-inputs/sfdatahub-firestore-servers.json");
+const sfgameConfigPath = path.join(workDir, "test-runs/server-inputs/sfgame-config.json");
 
 const today = "2026-09-23";
 
@@ -269,7 +270,7 @@ line();
 
 line("## E. Existing Firestore `servers` Registry Snapshot");
 if (!firestoreRows.length) {
-  line("No Firestore snapshot found. Expected optional input: .tmp/sfdatahub-firestore-servers.json");
+  line("No Firestore snapshot found. Expected optional external input: test-runs/server-inputs/sfdatahub-firestore-servers.json");
 } else {
   table(
     ["code", "docId", "host", "numericId", "numeric field", "type", "active", "releaseDate?", "aliases?"],
@@ -295,7 +296,7 @@ line();
 
 line("## F. Official sfgame.net Config Snapshot");
 if (!configServers.length) {
-  line("No official config snapshot found. Expected optional input: .tmp/sfgame-config.json");
+  line("No official config snapshot found. Expected optional external input: test-runs/server-inputs/sfgame-config.json");
 } else {
   const relevantTargets = [...configFusionGroups.keys()].filter((target) => target.endsWith(".sfgame.net"));
   table(

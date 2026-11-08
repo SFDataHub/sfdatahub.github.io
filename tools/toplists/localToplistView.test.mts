@@ -378,3 +378,22 @@ describe("local toplist view", () => {
 });
 
 console.log("localToplistView.test: ok");
+
+test("local column text and timestamp sorting uses actual values and keeps missing values last", () => {
+ const rows=[player({identifier:"a",name:"Zeta",guild:"Alpha",class:"Warrior",server:"EU2",latestScanAtSec:300}),player({identifier:"b",name:"Alpha",guild:"Zeta",class:"Mage",server:"EU1",latestScanAtSec:100}),{...player({identifier:"c",name:"",guild:null}),latestScanAtSec:null}];
+ const ids=(metricKey:string,direction:"asc"|"desc")=>buildLocalPlayerToplistView(rows,{sort:{metricKey,direction}}).rows.map(r=>r.identifier);
+ assert.deepEqual(ids("name","asc"),["b","a","c"]);assert.deepEqual(ids("name","desc"),["a","b","c"]);
+ assert.deepEqual(ids("guild","asc"),["a","b","c"]);assert.equal(ids("class","asc")[0],"b");assert.equal(ids("server","asc")[0],"b");
+ assert.deepEqual(ids("lastScan","asc"),["b","a","c"]);assert.deepEqual(ids("lastScan","desc"),["a","b","c"]);
+ const guilds=[guild({guildIdentifier:"a",name:"Zeta",petLevel:5,latestScanAtSec:300}),guild({guildIdentifier:"b",name:"Alpha",petLevel:10,latestScanAtSec:100}),{...guild({guildIdentifier:"c",name:""}),latestScanAtSec:0}];
+ for(const [metricKey,direction,expected] of [["guildName","asc",["b","a","c"]],["guildPetLevel","desc",["b","a","c"]],["guildLastScan","asc",["b","a","c"]]] as const)assert.deepEqual(buildLocalGuildToplistView(guilds,{sort:{metricKey,direction}}).rows.map(r=>r.guildIdentifier),expected);
+});
+
+test("Stats/Day uses supplied comparison values without deriving or changing the cohort", () => {
+ const rows=[player({identifier:"a",name:"A",sum:100}),player({identifier:"b",name:"B",sum:200}),player({identifier:"c",name:"C",sum:300})];
+ for(const metricKey of ["statsDay","statsDayTotal"]){
+  const options={sort:{metricKey,direction:"desc" as const},playerStatsDayValues:{a:20,b:10,c:null}};
+  assert.deepEqual(buildLocalPlayerToplistView(rows,options).rows.map(r=>r.identifier),["a","b","c"]);
+  assert.deepEqual(buildLocalPlayerToplistView(rows,{...options,sort:{metricKey,direction:"asc"}}).rows.map(r=>r.identifier),["b","a","c"]);
+ }
+});

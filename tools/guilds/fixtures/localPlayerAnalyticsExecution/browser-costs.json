@@ -1,0 +1,1098 @@
+[
+  {
+    "mode": "before",
+    "size": 2,
+    "sources": 6,
+    "rows": 13,
+    "currentUsableMs": 31.899999976158142,
+    "profileUsableMs": 186.80000001192093,
+    "elapsedMs": 582.1999999880791,
+    "workerStats": {
+      "starts": 2,
+      "startCallMs": 0.5999999642372131,
+      "sendCallMs": 0.30000001192092896,
+      "live": 0,
+      "peak": 2,
+      "releases": 2,
+      "releaseCallMs": 0.19999998807907104
+    },
+    "counters": {
+      "preparation": 1,
+      "sourceBuilds": 5,
+      "indexBuilds": 1,
+      "completenessBuilds": 1,
+      "performanceBuilds": 1,
+      "analyticsProjections": 0,
+      "currentProjections": 0,
+      "bestsProjections": 0,
+      "currentRawReads": 0,
+      "historicalRawReads": 5,
+      "basisJoins": 0,
+      "projectionJoins": 0,
+      "basisHits": 0,
+      "projectionHits": 0,
+      "metadataElapsedMs": 20.80000001192093,
+      "historicalReadElapsedMs": 129,
+      "indexCpuMs": 1.9000000357627869,
+      "performanceCpuMs": 2.5,
+      "analyticsCpuMs": 8.699999988079071,
+      "bestsElapsedMs": 0
+    },
+    "events": {
+      "held": 0,
+      "calls": [],
+      "metrics": [
+        {
+          "phase": "raw",
+          "at": 10741.2788
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 10745.9699
+        },
+        {
+          "phase": "raw",
+          "at": 10773.6825
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 10779.3698
+        },
+        {
+          "phase": "raw",
+          "at": 10799.0683
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 10800.275
+        },
+        {
+          "phase": "raw",
+          "at": 10844.4546
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 10845.3335
+        },
+        {
+          "phase": "raw",
+          "at": 10846.393
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 10850.0447
+        },
+        {
+          "phase": "index",
+          "at": 10862.7084
+        },
+        {
+          "phase": "completeness",
+          "at": 10863.6861
+        },
+        {
+          "phase": "raw",
+          "at": 11155.1769
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 11161.3545
+        },
+        {
+          "phase": "raw",
+          "at": 11187.418
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 11193.6821
+        },
+        {
+          "phase": "raw",
+          "at": 11206.6463
+        },
+        {
+          "phase": "raw",
+          "at": 11218.3283
+        },
+        {
+          "phase": "raw",
+          "at": 11226.9013
+        },
+        {
+          "phase": "raw",
+          "at": 11234.4041
+        },
+        {
+          "phase": "raw",
+          "at": 11239.7369
+        },
+        {
+          "phase": "raw",
+          "at": 11250.4072
+        },
+        {
+          "phase": "index",
+          "at": 11254.764
+        },
+        {
+          "phase": "completeness",
+          "at": 11255.9153
+        },
+        {
+          "phase": "completeness",
+          "at": 11257.9485
+        }
+      ]
+    },
+    "afterRelease": {
+      "sourceJobs": 0,
+      "sourceJoins": 0,
+      "sourceHits": 0,
+      "indexSourceBuilds": 0,
+      "completenessSourceBuilds": 0,
+      "rawReads": 0,
+      "sourceBuilds": 0,
+      "projectionJobs": 0,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 0,
+      "indexCpuMs": 0,
+      "dispatches": 0,
+      "roundtripMs": 0,
+      "inputJsonBytes": 0,
+      "resultJsonBytes": 0,
+      "sourceCpuMs": 0,
+      "cardCpuMs": 0,
+      "trendCpuMs": 0,
+      "rawReadElapsedMs": 0,
+      "writeElapsedMs": 0,
+      "memberBuildElapsedMs": 0,
+      "processedSources": 0,
+      "processedRows": 0,
+      "resultRows": 0,
+      "inputSourceDescriptors": 0,
+      "inputDerivedRows": 0,
+      "inputIndexEntries": 0,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 0,
+        "startCallMs": 0,
+        "sendCallMs": 0,
+        "responseElapsedMs": 0,
+        "releases": 0,
+        "cleanupMs": 0,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 0
+      }
+    }
+  },
+  {
+    "mode": "after",
+    "size": 2,
+    "sources": 6,
+    "rows": 13,
+    "currentUsableMs": 16.80000001192093,
+    "profileUsableMs": 660.1000000238419,
+    "elapsedMs": 798.8999999761581,
+    "workerStats": {
+      "starts": 1,
+      "startCallMs": 0.5,
+      "sendCallMs": 1.5000000596046448,
+      "live": 0,
+      "peak": 1,
+      "releases": 1,
+      "releaseCallMs": 0.10000002384185791
+    },
+    "counters": {
+      "execution": {
+        "sourceJobs": 6,
+        "sourceJoins": 11,
+        "sourceHits": 0,
+        "indexSourceBuilds": 6,
+        "completenessSourceBuilds": 6,
+        "rawReads": 6,
+        "sourceBuilds": 6,
+        "projectionJobs": 8,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 3,
+        "sourceElapsedMs": 198.9999998807907,
+        "indexCpuMs": 2.599999964237213,
+        "dispatches": 14,
+        "roundtripMs": 633.7000000476837,
+        "inputJsonBytes": 93028,
+        "resultJsonBytes": 46730,
+        "sourceCpuMs": 28.30000001192093,
+        "cardCpuMs": 21.799999952316284,
+        "trendCpuMs": 2.5,
+        "rawReadElapsedMs": 38.199999928474426,
+        "writeElapsedMs": 44.59999990463257,
+        "memberBuildElapsedMs": 19.799999952316284,
+        "processedSources": 24,
+        "processedRows": 39,
+        "resultRows": 35,
+        "inputSourceDescriptors": 24,
+        "inputDerivedRows": 26,
+        "inputIndexEntries": 13,
+        "sources": 6,
+        "projections": 2,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.6000000238418579,
+          "sendCallMs": 1.5000000596046448,
+          "responseElapsedMs": 627.4000000953674,
+          "releases": 0,
+          "cleanupMs": 0,
+          "workers": 1,
+          "awaits": 0,
+          "generation": 0
+        }
+      },
+      "profile": {
+        "preparation": 1,
+        "sourceBuilds": 0,
+        "indexBuilds": 1,
+        "completenessBuilds": 1,
+        "performanceBuilds": 1,
+        "analyticsProjections": 1,
+        "currentProjections": 0,
+        "bestsProjections": 0,
+        "currentRawReads": 0,
+        "historicalRawReads": 0,
+        "basisJoins": 0,
+        "projectionJoins": 0,
+        "basisHits": 0,
+        "projectionHits": 0,
+        "metadataElapsedMs": 30.30000001192093,
+        "historicalReadElapsedMs": 560.6999999880791,
+        "indexCpuMs": 0.2999999523162842,
+        "performanceCpuMs": 1.800000011920929,
+        "analyticsCpuMs": 11.100000023841858,
+        "bestsElapsedMs": 0
+      }
+    },
+    "events": {
+      "held": 0,
+      "calls": [
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-current",
+          "at": 12948.9623
+        },
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-mid",
+          "at": 13025.5737
+        },
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-tie-a",
+          "at": 13058.6342
+        },
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-old",
+          "at": 13089.9758
+        },
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-partial",
+          "at": 13121.0645
+        },
+        {
+          "kind": "source",
+          "id": "baseline-2-w06-missing-start",
+          "at": 13141.0493
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13171.4854
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13209.702
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13230.4976
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13253.2631
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13269.7605
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 13288.8234
+        },
+        {
+          "kind": "trend",
+          "id": "projection",
+          "at": 13305.9282
+        },
+        {
+          "kind": "cards",
+          "id": "projection",
+          "at": 13321.5214
+        }
+      ],
+      "metrics": [
+        {
+          "phase": "raw",
+          "at": 12964.2567
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 12971.405
+        },
+        {
+          "phase": "index",
+          "at": 13022.8537
+        },
+        {
+          "phase": "completeness",
+          "at": 13023.3705
+        },
+        {
+          "phase": "raw",
+          "at": 13033.7063
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 13036.7049
+        },
+        {
+          "phase": "index",
+          "at": 13055.6445
+        },
+        {
+          "phase": "completeness",
+          "at": 13056.2661
+        },
+        {
+          "phase": "raw",
+          "at": 13064.605
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 13067.2418
+        },
+        {
+          "phase": "index",
+          "at": 13087.9264
+        },
+        {
+          "phase": "completeness",
+          "at": 13088.3897
+        },
+        {
+          "phase": "raw",
+          "at": 13096.6575
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 13099.6928
+        },
+        {
+          "phase": "index",
+          "at": 13118.7743
+        },
+        {
+          "phase": "completeness",
+          "at": 13119.4665
+        },
+        {
+          "phase": "raw",
+          "at": 13125.0563
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 13128.0691
+        },
+        {
+          "phase": "index",
+          "at": 13138.8595
+        },
+        {
+          "phase": "completeness",
+          "at": 13139.2639
+        },
+        {
+          "phase": "raw",
+          "at": 13147.1554
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 13149.4249
+        },
+        {
+          "phase": "index",
+          "at": 13163.6019
+        },
+        {
+          "phase": "completeness",
+          "at": 13165.085
+        },
+        {
+          "phase": "raw",
+          "at": 13174.5573
+        },
+        {
+          "phase": "raw",
+          "at": 13213.0151
+        },
+        {
+          "phase": "raw",
+          "at": 13234.4648
+        },
+        {
+          "phase": "raw",
+          "at": 13256.1985
+        },
+        {
+          "phase": "raw",
+          "at": 13272.4671
+        },
+        {
+          "phase": "raw",
+          "at": 13291.8222
+        }
+      ]
+    },
+    "afterRelease": {
+      "sourceJobs": 6,
+      "sourceJoins": 11,
+      "sourceHits": 0,
+      "indexSourceBuilds": 6,
+      "completenessSourceBuilds": 6,
+      "rawReads": 6,
+      "sourceBuilds": 6,
+      "projectionJobs": 8,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 198.9999998807907,
+      "indexCpuMs": 2.599999964237213,
+      "dispatches": 14,
+      "roundtripMs": 633.7000000476837,
+      "inputJsonBytes": 93028,
+      "resultJsonBytes": 46730,
+      "sourceCpuMs": 28.30000001192093,
+      "cardCpuMs": 21.799999952316284,
+      "trendCpuMs": 2.5,
+      "rawReadElapsedMs": 38.199999928474426,
+      "writeElapsedMs": 44.59999990463257,
+      "memberBuildElapsedMs": 19.799999952316284,
+      "processedSources": 24,
+      "processedRows": 39,
+      "resultRows": 35,
+      "inputSourceDescriptors": 24,
+      "inputDerivedRows": 26,
+      "inputIndexEntries": 13,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 1,
+        "startCallMs": 0.6000000238418579,
+        "sendCallMs": 1.5000000596046448,
+        "responseElapsedMs": 627.4000000953674,
+        "releases": 1,
+        "cleanupMs": 0.10000002384185791,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 1
+      }
+    }
+  },
+  {
+    "mode": "before",
+    "size": 50,
+    "sources": 6,
+    "rows": 325,
+    "currentUsableMs": 26.69999998807907,
+    "profileUsableMs": 741.5,
+    "elapsedMs": 1102.9000000357628,
+    "workerStats": {
+      "starts": 2,
+      "startCallMs": 0.3999999761581421,
+      "sendCallMs": 0.30000001192092896,
+      "live": 0,
+      "peak": 2,
+      "releases": 2,
+      "releaseCallMs": 0.2999999523162842
+    },
+    "counters": {
+      "preparation": 1,
+      "sourceBuilds": 5,
+      "indexBuilds": 1,
+      "completenessBuilds": 1,
+      "performanceBuilds": 1,
+      "analyticsProjections": 0,
+      "currentProjections": 0,
+      "bestsProjections": 0,
+      "currentRawReads": 0,
+      "historicalRawReads": 5,
+      "basisJoins": 0,
+      "projectionJoins": 0,
+      "basisHits": 0,
+      "projectionHits": 0,
+      "metadataElapsedMs": 18.399999976158142,
+      "historicalReadElapsedMs": 676.3000000119209,
+      "indexCpuMs": 5,
+      "performanceCpuMs": 4.5,
+      "analyticsCpuMs": 11.5,
+      "bestsElapsedMs": 0
+    },
+    "events": {
+      "held": 0,
+      "calls": [],
+      "metrics": [
+        {
+          "phase": "raw",
+          "at": 15028.8283
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15037.2854
+        },
+        {
+          "phase": "raw",
+          "at": 15355.9446
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15356.7367
+        },
+        {
+          "phase": "raw",
+          "at": 15432.961
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15437.7326
+        },
+        {
+          "phase": "raw",
+          "at": 15517.5123
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15520.1427
+        },
+        {
+          "phase": "raw",
+          "at": 15521.8351
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15531.1571
+        },
+        {
+          "phase": "raw",
+          "at": 15534.4132
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15540.7994
+        },
+        {
+          "phase": "raw",
+          "at": 15570.5725
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15573.8265
+        },
+        {
+          "phase": "raw",
+          "at": 15620.5504
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15631.068
+        },
+        {
+          "phase": "raw",
+          "at": 15635.9996
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15640.2188
+        },
+        {
+          "phase": "index",
+          "at": 15710.8306
+        },
+        {
+          "phase": "completeness",
+          "at": 15713.0992
+        },
+        {
+          "phase": "raw",
+          "at": 15771.0459
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15777.2738
+        },
+        {
+          "phase": "raw",
+          "at": 15801.2505
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 15806.5136
+        },
+        {
+          "phase": "index",
+          "at": 15888.6092
+        },
+        {
+          "phase": "completeness",
+          "at": 15890.3584
+        },
+        {
+          "phase": "raw",
+          "at": 15928.8857
+        },
+        {
+          "phase": "raw",
+          "at": 15970.882
+        },
+        {
+          "phase": "raw",
+          "at": 15998.7129
+        },
+        {
+          "phase": "raw",
+          "at": 16018.5138
+        },
+        {
+          "phase": "raw",
+          "at": 16032.9228
+        },
+        {
+          "phase": "raw",
+          "at": 16051.7619
+        },
+        {
+          "phase": "completeness",
+          "at": 16070.2311
+        }
+      ]
+    },
+    "afterRelease": {
+      "sourceJobs": 0,
+      "sourceJoins": 0,
+      "sourceHits": 0,
+      "indexSourceBuilds": 0,
+      "completenessSourceBuilds": 0,
+      "rawReads": 0,
+      "sourceBuilds": 0,
+      "projectionJobs": 0,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 0,
+      "indexCpuMs": 0,
+      "dispatches": 0,
+      "roundtripMs": 0,
+      "inputJsonBytes": 0,
+      "resultJsonBytes": 0,
+      "sourceCpuMs": 0,
+      "cardCpuMs": 0,
+      "trendCpuMs": 0,
+      "rawReadElapsedMs": 0,
+      "writeElapsedMs": 0,
+      "memberBuildElapsedMs": 0,
+      "processedSources": 0,
+      "processedRows": 0,
+      "resultRows": 0,
+      "inputSourceDescriptors": 0,
+      "inputDerivedRows": 0,
+      "inputIndexEntries": 0,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 0,
+        "startCallMs": 0,
+        "sendCallMs": 0,
+        "responseElapsedMs": 0,
+        "releases": 0,
+        "cleanupMs": 0,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 0
+      }
+    }
+  },
+  {
+    "mode": "after",
+    "size": 50,
+    "sources": 6,
+    "rows": 325,
+    "currentUsableMs": 25.600000023841858,
+    "profileUsableMs": 1446.5999999642372,
+    "elapsedMs": 1915.699999988079,
+    "workerStats": {
+      "starts": 1,
+      "startCallMs": 0.40000003576278687,
+      "sendCallMs": 3.700000047683716,
+      "live": 0,
+      "peak": 1,
+      "releases": 1,
+      "releaseCallMs": 0
+    },
+    "counters": {
+      "execution": {
+        "sourceJobs": 6,
+        "sourceJoins": 11,
+        "sourceHits": 0,
+        "indexSourceBuilds": 6,
+        "completenessSourceBuilds": 6,
+        "rawReads": 6,
+        "sourceBuilds": 6,
+        "projectionJobs": 8,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 3,
+        "sourceElapsedMs": 926.6000000834465,
+        "indexCpuMs": 8.099999964237213,
+        "dispatches": 14,
+        "roundtripMs": 1750.499999821186,
+        "inputJsonBytes": 975979,
+        "resultJsonBytes": 810979,
+        "sourceCpuMs": 245.9000000357628,
+        "cardCpuMs": 315.09999990463257,
+        "trendCpuMs": 3.699999988079071,
+        "rawReadElapsedMs": 60.5,
+        "writeElapsedMs": 93.5,
+        "memberBuildElapsedMs": 279.30000001192093,
+        "processedSources": 24,
+        "processedRows": 975,
+        "resultRows": 779,
+        "inputSourceDescriptors": 24,
+        "inputDerivedRows": 650,
+        "inputIndexEntries": 325,
+        "sources": 6,
+        "projections": 2,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.699999988079071,
+          "sendCallMs": 3.700000047683716,
+          "responseElapsedMs": 1734.199999988079,
+          "releases": 0,
+          "cleanupMs": 0,
+          "workers": 1,
+          "awaits": 0,
+          "generation": 0
+        }
+      },
+      "profile": {
+        "preparation": 1,
+        "sourceBuilds": 0,
+        "indexBuilds": 1,
+        "completenessBuilds": 1,
+        "performanceBuilds": 1,
+        "analyticsProjections": 1,
+        "currentProjections": 0,
+        "bestsProjections": 0,
+        "currentRawReads": 0,
+        "historicalRawReads": 0,
+        "basisJoins": 0,
+        "projectionJoins": 0,
+        "basisHits": 0,
+        "projectionHits": 0,
+        "metadataElapsedMs": 18.299999952316284,
+        "historicalReadElapsedMs": 1358.800000011921,
+        "indexCpuMs": 0.5,
+        "performanceCpuMs": 4.899999976158142,
+        "analyticsCpuMs": 10.099999964237213,
+        "bestsElapsedMs": 0
+      }
+    },
+    "events": {
+      "held": 0,
+      "calls": [
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-current",
+          "at": 18270.8353
+        },
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-mid",
+          "at": 18640.0854
+        },
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-tie-a",
+          "at": 18768.3568
+        },
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-old",
+          "at": 18890.629
+        },
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-partial",
+          "at": 19028.4058
+        },
+        {
+          "kind": "source",
+          "id": "baseline-50-w06-missing-start",
+          "at": 19108.8878
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19234.8694
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19345.7835
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19412.5602
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19479.9064
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19519.0735
+        },
+        {
+          "kind": "card-source",
+          "id": "projection",
+          "at": 19577.366
+        },
+        {
+          "kind": "trend",
+          "id": "projection",
+          "at": 19638.2814
+        },
+        {
+          "kind": "cards",
+          "id": "projection",
+          "at": 19670.3847
+        }
+      ],
+      "metrics": [
+        {
+          "phase": "raw",
+          "at": 18283.6337
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 18298.1447
+        },
+        {
+          "phase": "index",
+          "at": 18633.1407
+        },
+        {
+          "phase": "completeness",
+          "at": 18636.5611
+        },
+        {
+          "phase": "raw",
+          "at": 18645.8705
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 18651.785
+        },
+        {
+          "phase": "index",
+          "at": 18764.1151
+        },
+        {
+          "phase": "completeness",
+          "at": 18765.1753
+        },
+        {
+          "phase": "raw",
+          "at": 18773.8169
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 18780.1053
+        },
+        {
+          "phase": "index",
+          "at": 18885.9366
+        },
+        {
+          "phase": "completeness",
+          "at": 18888.17
+        },
+        {
+          "phase": "raw",
+          "at": 18898.1442
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 18903.6814
+        },
+        {
+          "phase": "index",
+          "at": 19025.4269
+        },
+        {
+          "phase": "completeness",
+          "at": 19026.214
+        },
+        {
+          "phase": "raw",
+          "at": 19034.1009
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 19036.8383
+        },
+        {
+          "phase": "index",
+          "at": 19104.6429
+        },
+        {
+          "phase": "completeness",
+          "at": 19105.3746
+        },
+        {
+          "phase": "raw",
+          "at": 19113.7617
+        },
+        {
+          "phase": "sourcebuild",
+          "at": 19118.8958
+        },
+        {
+          "phase": "index",
+          "at": 19225.3284
+        },
+        {
+          "phase": "completeness",
+          "at": 19227.1459
+        },
+        {
+          "phase": "raw",
+          "at": 19236.9644
+        },
+        {
+          "phase": "raw",
+          "at": 19349.8304
+        },
+        {
+          "phase": "raw",
+          "at": 19417.913
+        },
+        {
+          "phase": "raw",
+          "at": 19482.9653
+        },
+        {
+          "phase": "raw",
+          "at": 19521.9456
+        },
+        {
+          "phase": "raw",
+          "at": 19580.6066
+        }
+      ]
+    },
+    "afterRelease": {
+      "sourceJobs": 6,
+      "sourceJoins": 11,
+      "sourceHits": 0,
+      "indexSourceBuilds": 6,
+      "completenessSourceBuilds": 6,
+      "rawReads": 6,
+      "sourceBuilds": 6,
+      "projectionJobs": 8,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 926.6000000834465,
+      "indexCpuMs": 8.099999964237213,
+      "dispatches": 14,
+      "roundtripMs": 1750.499999821186,
+      "inputJsonBytes": 975979,
+      "resultJsonBytes": 810979,
+      "sourceCpuMs": 245.9000000357628,
+      "cardCpuMs": 315.09999990463257,
+      "trendCpuMs": 3.699999988079071,
+      "rawReadElapsedMs": 60.5,
+      "writeElapsedMs": 93.5,
+      "memberBuildElapsedMs": 279.30000001192093,
+      "processedSources": 24,
+      "processedRows": 975,
+      "resultRows": 779,
+      "inputSourceDescriptors": 24,
+      "inputDerivedRows": 650,
+      "inputIndexEntries": 325,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 1,
+        "startCallMs": 0.699999988079071,
+        "sendCallMs": 3.700000047683716,
+        "responseElapsedMs": 1734.199999988079,
+        "releases": 1,
+        "cleanupMs": 0.19999998807907104,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 1
+      }
+    }
+  }
+]

@@ -3,7 +3,8 @@ import React from "react";
 const FOCUSABLE_SELECTORS =
   'a[href], button:not([disabled]), textarea, input, select, details, summary, [tabindex]:not([tabindex="-1"])';
 
-export function useFocusTrap<T extends HTMLElement>(ref: React.RefObject<T>, active: boolean) {
+export function useFocusTrap<T extends HTMLElement>(ref: React.RefObject<T>, active: boolean, options?: { preventInitialScroll?: boolean }) {
+  const preventInitialScroll = options?.preventInitialScroll ?? false;
   React.useEffect(() => {
     if (!active) return undefined;
     const node = ref.current;
@@ -11,7 +12,7 @@ export function useFocusTrap<T extends HTMLElement>(ref: React.RefObject<T>, act
 
     const getFocusable = () => node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
     const focusable = getFocusable();
-    focusable[0]?.focus();
+    focusable[0]?.focus({ preventScroll: preventInitialScroll });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
@@ -35,5 +36,5 @@ export function useFocusTrap<T extends HTMLElement>(ref: React.RefObject<T>, act
 
     node.addEventListener("keydown", handleKeyDown);
     return () => node.removeEventListener("keydown", handleKeyDown);
-  }, [ref, active]);
+  }, [ref, active, preventInitialScroll]);
 }

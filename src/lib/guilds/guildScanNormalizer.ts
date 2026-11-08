@@ -1,3 +1,5 @@
+import { resolveHubSearchReference } from "../data-hub/hubSearchReference";
+import { serverComparisonKey } from "../servers/serverResolver";
 import { slimPlayer } from "../import/parsers";
 import { parseSaveStringToArray } from "../parsing/extractPortrait";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../parsing/normalizedPlayer";
@@ -231,10 +233,27 @@ const readGuildRoleForMember = (
   return null;
 };
 
+/** Identity/guild projection only: no character-core normalization. */
+export function readGuildScanMemberIdentity(player: unknown, fallbackServer: string | null = null) {
+  const record = asRecord(player);
+  if (!record) return null;
+  const slim = slimPlayer(record);
+  const evidence = resolveHubSearchReference("player", record, fallbackServer);
+  const identifier = evidence.identifier;
+  const server = evidence.server;
+  const memberRef = (evidence.reference?.identifier ?? identifier)?.toLowerCase() ?? null;
+  const name = normalizeDisplayString(slim.name) ?? readString(record, ["name", "Name", "playerName", "Player Name"]);
+  if (!memberRef || !name) return null;
+
+  return { memberRef, name, server, guildSegment: normalizeGuildSegmentForScan(slim.guildId) ?? readGuildSegment(record),
+    groupSegment: readGroupSegment(record), guildName: readGuildName(record) };
+}
+
 export function normalizeGuildScanMember(
   player: unknown,
   fallbackServer: string | null = null,
   guildRoleLookup: Map<string, Exclude<NormalizedGuildRole, null>> = new Map(),
+  onCore?: (raw: unknown, core: NormalizedPlayer | null, stats: ReturnType<typeof readSfPlayerStats>) => void,
 ): NormalizedGuildMember | null {
   const record = asRecord(player);
   if (!record) return null;
@@ -242,6 +261,7 @@ export function normalizeGuildScanMember(
   const slim = slimPlayer(record);
   const stats = readSfPlayerStats(record);
   const normalized = safeNormalizePlayer(record);
+  onCore?.(record, normalized, stats);
   const baseStats = sumNormalizedAttributeValues(normalized, "base") ?? stats.baseStats;
   const totalStats = sumNormalizedAttributeValues(normalized, "total") ?? stats.totalStats;
   const slimLevel = typeof slim.level === "number" && Number.isFinite(slim.level) && slim.level > 0 ? slim.level : null;
@@ -271,20 +291,51 @@ export function normalizeGuildScanMember(
   };
 }
 
-export function normalizeGuildScanMembers(rawData: unknown): NormalizedGuildMember[] {
+/** Fingerprint the parser/core functions actually bound to this normalizer. */
+export function guildScanNormalizationExecutionCode() {
+  return [safeNormalizePlayer, normalizeSfPlayerCharacterCore, readSfPlayerStats,
+    slimPlayer, parseSaveStringToArray].join("\n");
+}
+
+export function normalizeGuildScanMembers(rawData: unknown, onCore?: (raw: unknown, core: NormalizedPlayer | null, stats: ReturnType<typeof readSfPlayerStats>) => void): NormalizedGuildMember[] {
   const raw = asRecord(rawData);
   if (!raw || !Array.isArray(raw.players)) return [];
   const fallbackServer = normalizeGuildScanServer(raw.prefix ?? raw.server);
   const guildRoleLookup = buildGuildRoleLookup(raw, fallbackServer);
 
   return raw.players
-    .map((player) => normalizeGuildScanMember(player, fallbackServer, guildRoleLookup))
+    .map((player) => normalizeGuildScanMember(player, fallbackServer, guildRoleLookup, onCore))
     .filter((member): member is NormalizedGuildMember => Boolean(member));
 }
 
-export function isNormalizedGuildMemberInGuild(member: NormalizedGuildMember, guild: NormalizedGuildMatchIdentity) {
-  const guildServer = normalizeGuildScanServer(guild.server);
-  const memberServer = normalizeGuildScanServer(member.server);
+/** Same row and guild-role rules, with bounded work between browser turns. */
+export async function normalizeGuildScanMembersCooperatively(
+  rawData: unknown,
+  onCore?: Parameters<typeof normalizeGuildScanMembers>[1],
+  onSlice?: (durationMs: number) => void,
+): Promise<NormalizedGuildMember[]> {
+  const raw = asRecord(rawData);
+  if (!raw || !Array.isArray(raw.players)) return [];
+  let started = performance.now();
+  const fallbackServer = normalizeGuildScanServer(raw.prefix ?? raw.server);
+  const guildRoleLookup = buildGuildRoleLookup(raw, fallbackServer);
+  const members: NormalizedGuildMember[] = [];
+  for (const player of raw.players) {
+    const member = normalizeGuildScanMember(player, fallbackServer, guildRoleLookup, onCore);
+    if (member) members.push(member);
+    if (performance.now() - started >= 6) {
+      onSlice?.(performance.now() - started);
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      started = performance.now();
+    }
+  }
+  onSlice?.(performance.now() - started);
+  return members;
+}
+
+export function isNormalizedGuildMemberInGuild<T extends Pick<NormalizedGuildMember, "server" | "guildSegment" | "groupSegment" | "guildName">>(member: T, guild: NormalizedGuildMatchIdentity) {
+  const guildServer = serverComparisonKey(guild.server);
+  const memberServer = serverComparisonKey(member.server);
   const serverMatches = !guildServer || !memberServer || guildServer === memberServer;
   const guildSegment = normalizeGuildSegmentForScan(guild.guildSegment);
 

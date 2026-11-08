@@ -1,3 +1,4 @@
+import { artifactPath } from '../codex/workspace.mjs';
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -61,7 +62,7 @@ type Stats = {
 };
 
 const DEFAULT_SCAN_ROOT = "D:/SFDataHub/Guild Analytics/public/scans";
-const REPORT_PATH = path.resolve("tools/identities/player-level-progression-by-origin.latest.txt");
+const REPORT_PATH = artifactPath('tools/identities/player-level-progression-by-origin.latest.txt');
 const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"];
 const ORIGIN_SERVER_CODE_SET = new Set(ORIGIN_SERVER_CODES);
 const TARGET_SERVER_CODE = "F28";

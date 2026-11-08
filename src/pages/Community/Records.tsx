@@ -1,3 +1,6 @@
+import { hubDate, hubNumber, hubText } from "../../lib/i18n/dataHubPresentation";
+import { profileClassLabel } from "../../lib/i18n/profilePresentation";
+import { useTranslation } from "react-i18next";
 import React, { useMemo, useState } from "react";
 import SectionHeader from "../../components/ui/shared/SectionHeader";
 import { CURRENT_RECORDS } from "../../data/records/current";
@@ -8,9 +11,9 @@ import styles from "./Records.module.css";
 type SectionKey = "current" | "broken" | "milestones";
 
 const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: "current", label: "Current Records" },
-  { key: "broken", label: "Broken Records" },
-  { key: "milestones", label: "Milestones" },
+  { key: "current", label: "communityRecords.currentRecords" },
+  { key: "broken", label: "communityRecords.brokenRecords" },
+  { key: "milestones", label: "communityRecords.milestones" },
 ];
 
 const PLACEHOLDERS: Record<
@@ -18,14 +21,14 @@ const PLACEHOLDERS: Record<
   { title: string; description: string; hint?: string }
 > = {
   current: {
-    title: "Current Records",
-    description: "Live records that keep evolving with every community session. We will surface the verified winners and their stats here.",
-    hint: "Stay tuned for the data rollout in the next update.",
+    title: "communityRecords.currentRecords",
+    description: "communityRecords.liveRecordsThatKeepEvolvingWithEveryCommunitySessionWeWillSurfaceTheVerifiedWinnersAndTheirStatsHere",
+    hint: "communityRecords.stayTunedForTheDataRolloutInTheNextUpdate",
   },
   broken: {
-    title: "Broken Records",
-    description: "Historical benchmarks that were overtaken or retired. We keep them for reference and celebration.",
-    hint: "If you have a record to archive, ping the Community team.",
+    title: "communityRecords.brokenRecords",
+    description: "communityRecords.historicalBenchmarksThatWereOvertakenOrRetiredWeKeepThemForReferenceAndCelebration",
+    hint: "communityRecords.ifYouHaveARecordToArchivePingTheCommunityTeam",
   },
 };
 
@@ -65,10 +68,10 @@ const MilestoneList: React.FC = () => {
   };
 
   return (
-    <section className={styles.milestoneSection} aria-label="Records milestones">
+    <section className={styles.milestoneSection} aria-label={hubText("communityRecords.recordMilestones")}>
       <div className={styles.sectionHeader}>
-        <p>Milestones</p>
-        <h2>First-to achievements the community still celebrates</h2>
+        <p>{hubText("communityRecords.milestones")}</p>
+        <h2>{hubText("communityRecords.firsttoAchievementsTheCommunityStillCelebrates")}</h2>
       </div>
       <div className={styles.filterBar}>
         <div className={styles.filterButtons}>
@@ -85,12 +88,12 @@ const MilestoneList: React.FC = () => {
               onClick={() => handleCategoryChange(category)}
               aria-pressed={selectedCategory === category}
             >
-              {category === "all" ? "All Categories" : category}
+              {category === "all" ? hubText("communityRecords.allCategories") : categoryLabel(category)}
             </button>
           ))}
         </div>
         <label className={styles.filterSelectWrapper}>
-          <span className={styles.filterLabel}>Category</span>
+          <span className={styles.filterLabel}>{hubText("communityRecords.category")}</span>
           <select
             value={selectedCategory}
             onChange={(event) => handleCategoryChange(event.target.value)}
@@ -98,14 +101,14 @@ const MilestoneList: React.FC = () => {
           >
             {categories.map((category) => (
               <option key={category} value={category}>
-                {category === "all" ? "All Categories" : category}
+                {category === "all" ? hubText("communityRecords.allCategories") : categoryLabel(category)}
               </option>
             ))}
           </select>
         </label>
       </div>
       {visibleMilestones.length === 0 ? (
-        <p className={styles.emptyFilterMessage}>No milestones fall into this category yet.</p>
+        <p className={styles.emptyFilterMessage}>{hubText("communityRecords.noMilestonesFallIntoThisCategoryYet")}</p>
       ) : (
         <div className={styles.milestoneGrid}>
           {visibleMilestones.map((milestone) => (
@@ -113,25 +116,25 @@ const MilestoneList: React.FC = () => {
               key={`${milestone.achievement}-${milestone.name}`}
               className={styles.milestoneCard}
             >
-              <span className={styles.milestoneCategory}>{milestone.category}</span>
+              <span className={styles.milestoneCategory}>{categoryLabel(milestone.category)}</span>
               <h3 className={styles.milestoneTitle}>{milestone.achievement}</h3>
               <div className={styles.milestoneDetails}>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Name</span>
+                  <span className={styles.detailLabel}>{hubText("communityRecords.name")}</span>
                   <span className={styles.detailValue}>{milestone.name}</span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Server</span>
+                  <span className={styles.detailLabel}>{hubText("communityRecords.server")}</span>
                   <span className={styles.detailValue}>{milestone.server}</span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Date</span>
-                  <span className={styles.detailValue}>{milestone.date}</span>
+                  <span className={styles.detailLabel}>{hubText("communityRecords.date")}</span>
+                  <span className={styles.detailValue}>{recordDate(milestone.date)}</span>
                 </div>
                 {milestone.notes && <p className={styles.notes}>{milestone.notes}</p>}
                 {milestone.source && (
                   <a href={milestone.source} target="_blank" rel="noreferrer" className={styles.sourceLink}>
-                    Source
+                    {hubText("communityRecords.source")}
                   </a>
                 )}
               </div>
@@ -144,43 +147,45 @@ const MilestoneList: React.FC = () => {
 };
 
 const CurrentRecordsList: React.FC = () => (
-  <section className={styles.currentSection} aria-label="Current community records">
+  <section className={styles.currentSection} aria-label={hubText("communityRecords.currentCommunityRecords")}>
     <div className={styles.sectionHeader}>
-      <p>Current Records</p>
-      <h2>The latest verified achievements</h2>
+      <p>{hubText("communityRecords.currentRecords")}</p>
+      <h2>{hubText("communityRecords.theLatestVerifiedAchievements")}</h2>
     </div>
     <div className={styles.currentGrid}>
       {CURRENT_RECORDS.map((record, index) => (
-        <article key={`${record.category}-${record.playerName}-${index}`} className={styles.currentCard}>
-          <span className={styles.categoryLabel}>{record.category}</span>
+        <article key={`${categoryLabel(record.category)}-${record.playerName}-${index}`} className={styles.currentCard}>
+          <span className={styles.categoryLabel}>{categoryLabel(record.category)}</span>
           <h3 className={styles.recordTitle}>{record.record}</h3>
           <div className={styles.currentDetails}>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Class</span>
-              <span className={styles.detailValue}>{record.classType}</span>
+              <span className={styles.detailLabel}>{hubText("communityRecords.class")}</span>
+              <span className={styles.detailValue}>{recordClassLabel(record.classType)}</span>
             </div>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Player</span>
+              <span className={styles.detailLabel}>{hubText("communityRecords.player")}</span>
               <span className={styles.detailValue}>{record.playerName}</span>
             </div>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Server</span>
+              <span className={styles.detailLabel}>{hubText("communityRecords.server")}</span>
               <span className={styles.detailValue}>{record.server}</span>
             </div>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Days</span>
-              <span className={styles.detailValue}>{record.days}</span>
+              <span className={styles.detailLabel}>{hubText("communityRecords.days")}</span>
+              <span className={styles.detailValue}>{recordNumber(record.days)}</span>
             </div>
             {record.release && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Release</span>
+                <span className={styles.detailLabel}>{hubText("communityRecords.release")}</span>
                 <span className={styles.detailValue}>{record.release}</span>
               </div>
             )}
             {(record.previousDays || record.previousName) && (
               <p className={styles.notes}>
-                Previous: {record.previousDays ? `${record.previousDays} days` : ""}{" "}
-                {record.previousName ? `(${record.previousName})` : ""}
+                {hubText("communityRecords.previous", {
+                  days: record.previousDays ? hubText("communityRecords.daysCount", { count: Number(record.previousDays) }) : "",
+                  name: record.previousName ? `(${record.previousName})` : "",
+                })}
               </p>
             )}
             {record.notes && <p className={styles.notes}>{record.notes}</p>}
@@ -192,17 +197,33 @@ const CurrentRecordsList: React.FC = () => (
 );
 
 const DISCLAIMER = {
-  title: "Record board",
+  title: "communityRecords.recordBoard",
   paragraphs: [
-    "This is an unofficial collection of records achieved in Shakes and Fidget.",
-    "Due to the fact that we need to verify all records the posted “days” are the days between the release of the server and the achieving of the record. Records that are obtained with a new char on an old server are not counted.",
-    "If you achieved a record that you want to have listed and verified please message @aszu or @Zeraffim on Discord.",
+    "communityRecords.thisIsAnUnofficialCollectionOfRecordsAchievedInShakesAndFidget",
+    "communityRecords.toVerifyRecordsDaysMeansTheTimeBetweenTheServerOpeningAndTheAchievementRecordsSetByANewCharacterOnAnOlderServerAreNotCounted",
+    "communityRecords.ifYouAchievedARecordThatYouWantToHaveListedAndVerifiedPleaseMessageAszuOrZeraffimOnDiscord",
   ],
-  linkLabel: "Link to the record board:",
+  linkLabel: "communityRecords.linkToTheRecordBoard",
   linkUrl: "https://cutt.ly/2hTSpso",
 };
 
+const categoryKeys: Record<string, string> = {
+  Level: "level", Dungeon: "dungeons", Dungeons: "dungeons", "Features finished": "features",
+  Guild: "guild", Stats: "stats", "Arena Manager": "arenaManager", Fortress: "fortress",
+  Underworld: "underworld", IHOF: "ihof",
+};
+const categoryLabel = (value: string) => categoryKeys[value] ? hubText("communityRecords." + categoryKeys[value]) : value;
+const recordClassAliases: Record<string, string> = { Battlemage: "battle-mage", Demonhunter: "demon-hunter" };
+const recordClassLabel = (value: string) => value === "Any" || value === "Solo" || value === "Guild"
+  ? hubText("communityRecords." + value.toLowerCase()) : profileClassLabel(recordClassAliases[value] ?? value);
+const recordNumber = (value: string) => /^\d+$/.test(value) ? hubNumber(Number(value)) : value;
+const recordDate = (value: string) => {
+  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  return parts ? hubDate(new Date(Number(parts[3]), Number(parts[2]) - 1, Number(parts[1])), { day: "2-digit", month: "2-digit", year: "numeric" }) : value;
+};
+
 export default function CommunityRecords() {
+  useTranslation();
   const [activeSection, setActiveSection] = useState<SectionKey>("current");
   const infoIcon = recordsAssetThumbByKey("infoCard", 32);
 
@@ -217,9 +238,9 @@ export default function CommunityRecords() {
     const placeholder = PLACEHOLDERS[activeSection];
     return (
       <PlaceholderPanel
-        title={placeholder.title}
-        description={placeholder.description}
-        hint={placeholder.hint}
+        title={hubText(placeholder.title)}
+        description={hubText(placeholder.description)}
+        hint={placeholder.hint ? hubText(placeholder.hint) : undefined}
       />
     );
   };
@@ -227,16 +248,16 @@ export default function CommunityRecords() {
   return (
     <section className={styles.recordsPage}>
       <SectionHeader
-        title="Records"
-        meta="Community Hub"
-        description="Current benchmarks, past triumphs and milestone-firsts from our community."
+        title={hubText("communityRecords.records")}
+        meta={hubText("communityRecords.communityHub")}
+        description={hubText("communityRecords.currentBenchmarksPastTriumphsAndMilestonefirstsFromOurCommunity")}
       />
       <div className={styles.infoPanel}>
         <div className={styles.infoCard}>
           <div className={styles.infoHeader}>
             <div className={styles.infoAuthor}>
               {infoIcon ? (
-                <img src={infoIcon} alt="Community Data" className={styles.infoAuthorIcon} />
+                <img src={infoIcon} alt={hubText("communityRecords.communityData")} className={styles.infoAuthorIcon} />
               ) : null}
               <span className={styles.authorName}>S&F Tavern Info</span>
               <a
@@ -248,32 +269,30 @@ export default function CommunityRecords() {
                 Discord
               </a>
             </div>
-            <span className={styles.infoDate}>11.12.2020 14:08</span>
+            <span className={styles.infoDate}>{hubDate(new Date(2020, 11, 11, 14, 8), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
           <div className={styles.infoBody}>
-            <h3 className={styles.infoTitle}>{DISCLAIMER.title}</h3>
+            <h3 className={styles.infoTitle}>{hubText(DISCLAIMER.title)}</h3>
             {DISCLAIMER.paragraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
+              <p key={paragraph}>{hubText(paragraph)}</p>
             ))}
           </div>
           <div className={styles.infoLink}>
-            <span>{DISCLAIMER.linkLabel}</span>
+            <span>{hubText(DISCLAIMER.linkLabel)}</span>
             <a href={DISCLAIMER.linkUrl} target="_blank" rel="noreferrer">
               {DISCLAIMER.linkUrl}
             </a>
           </div>
         </div>
         <div className={styles.disclaimerCard}>
-          <h3 className={styles.infoTitle}>Disclaimer</h3>
+          <h3 className={styles.infoTitle}>{hubText("communityRecords.disclaimer")}</h3>
           <p>
-            The milestone data is sourced from the shared “Milestones (First to)” Google Sheet and
-            curated by the Community Data Stewards. If you spot missing entries or have a verified
-            source, please ping the Community Hub team so we can keep the list accurate.
+            {hubText("communityRecords.milestoneDataComesFromTheSharedMilestonesFirstToGoogleSheetAndIsCuratedByTheCommunityDataStewardsPleaseReportMissingEntriesOrVerifiedSourcesToTheCommunityHubTeam")}
           </p>
         </div>
       </div>
       <div className={styles.navArea}>
-        <nav className={styles.tabList} aria-label="Records navigation">
+        <nav className={styles.tabList} aria-label={hubText("communityRecords.recordsNavigation")}>
           {SECTIONS.map((section) => (
             <button
               key={section.key}
@@ -284,7 +303,7 @@ export default function CommunityRecords() {
               aria-pressed={activeSection === section.key}
               onClick={() => setActiveSection(section.key)}
             >
-              {section.label}
+              {hubText(section.label)}
             </button>
           ))}
         </nav>

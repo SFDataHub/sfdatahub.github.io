@@ -1,4 +1,6 @@
-﻿import React from "react";
+﻿import { useRuntimeAuditCommit } from "../../../../../lib/data-hub/useRuntimeAuditCommit";
+import {auditBegin,auditEnter,auditValue,auditReturn,auditError,auditLeave,auditAssociate} from "../../../../../lib/data-hub/runtimeAudit";
+import React from "react";
 import type { FusionMember, FusionSetupState } from "../../FusionPlanner";
 import styles from "./ResultTab.module.css";
 
@@ -43,6 +45,9 @@ export default function ResultTab({ members, scenario, setupState }: Props) {
   }
 
   const { takeMembers, benchMembers, dropMembers, undecidedMembers } = React.useMemo(() => {
+ const __w32Run0=auditBegin("F32","{ takeMembers, benchMembers, dropMembers, undecidedMembers }");
+ const __w32Sync=auditEnter(__w32Run0,"{ takeMembers, benchMembers, dropMembers, undecidedMembers }","sync-elapsed");
+ try {
     const take: FusionMember[] = [];
     const bench: FusionMember[] = [];
     const drop: FusionMember[] = [];
@@ -56,9 +61,13 @@ export default function ResultTab({ members, scenario, setupState }: Props) {
       else undecided.push(member);
     });
 
-    return { takeMembers: take, benchMembers: bench, dropMembers: drop, undecidedMembers: undecided };
-  }, [members, scenario.decisions]);
+    auditAssociate(__w32Run0, take);
+    return auditReturn(__w32Run0,{ takeMembers: take, benchMembers: bench, dropMembers: drop, undecidedMembers: undecided });
 
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
+}, [members, scenario.decisions]);
+
+  useRuntimeAuditCommit(takeMembers, members.length > 0, "fusion-scenario-result");
   const selectedCount = takeMembers.length;
   const benchCount = benchMembers.length;
   const dropCount = dropMembers.length;
@@ -66,6 +75,9 @@ export default function ResultTab({ members, scenario, setupState }: Props) {
   const utilizationPercent = scenario.maxSlots ? Math.round((selectedCount / scenario.maxSlots) * 100) : 0;
 
   const classDistribution = React.useMemo(() => {
+ const __w32Run1=auditBegin("F32","classDistribution");
+ const __w32Sync=auditEnter(__w32Run1,"classDistribution","sync-elapsed");
+ try {
     const counts = takeMembers.reduce<Record<string, number>>((acc, member) => {
       const classLabel = member.className ?? (member as any).class;
       if (!classLabel) return acc;
@@ -73,8 +85,10 @@ export default function ResultTab({ members, scenario, setupState }: Props) {
       return acc;
     }, {});
     const parts = Object.entries(counts).map(([cls, count]) => `${cls}: ${count}`);
-    return parts.join(" | ");
-  }, [takeMembers]);
+    return auditReturn(__w32Run1,parts.join(" | "));
+
+} catch (__w32Error) { auditError(__w32Run1,__w32Error); throw __w32Error; } finally {auditValue(__w32Run1,__w32Sync,undefined);auditLeave(__w32Run1);}
+}, [takeMembers]);
 
   const renderGroup = (title: string, hint: string, list: FusionMember[], badgeClass: string) => (
     <div className={styles.group}>

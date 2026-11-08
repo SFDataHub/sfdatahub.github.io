@@ -1,0 +1,41 @@
+.picker { display: inline-flex; align-items: center; gap: 6px; position: relative; margin-right: 12px; white-space: nowrap; }
+.picker button, .menu button { color: inherit; font: inherit; cursor: pointer; }
+.picker > button { background: #152b40; border: 1px solid #36536e; border-radius: 4px; padding: 1px 6px; }
+.menu { position: absolute; top: 100%; left: 0; z-index: 10000; min-width: 240px; max-width: calc(100vw - 16px); padding: 6px; border: 1px solid #36536e; border-radius: 5px; background: #14293d; color: #d6e4f2; box-shadow: 0 5px 18px #0008; font-size: 12px; text-align: left; white-space: normal; }
+.menu button { display: block; background: transparent; border: 0; text-align: left; padding: 6px 8px; width: 100%; }
+.menu button:hover, .menu button:focus-visible { background: #29445d; outline: 1px solid #8ab6df; }
+.menu button:disabled { opacity: .4; cursor: default; }
+.viewRow { position: relative; display: flex; }
+.viewRow > button:first-child { flex: 1; }
+.viewRow > button:nth-child(2) { width: 28px; }
+.sideMenu { position: absolute; left: 100%; top: 0; min-width: 120px; background: #14293d; border: 1px solid #36536e; }
+@media (max-width: 600px) { .sideMenu { left: auto; right: 0; top: 100%; z-index: 1; } }
+
+.cascade { position: fixed; top: 4px; left: 4px; box-sizing: border-box; width: 240px; min-width: 0; max-height: calc(100dvh - 8px); overflow-y: auto; }
+.cascade button[aria-haspopup] { display: flex; justify-content: space-between; gap: 12px; }
+.cascade button[aria-expanded="true"] { background: #29445d; }
+
+.renameForm { padding: 6px 8px; min-width: 180px; }
+.renameForm input { box-sizing: border-box; width: 100%; color: inherit; background: #152b40; border: 1px solid #36536e; padding: 4px; }
+.renameForm input[aria-invalid="true"] { border-color: #e8a6a6; }
+
+.resizableHeader { position: relative; }
+.resizeHandle { position: absolute; top: 0; right: 0; bottom: 0; width: 7px; cursor: col-resize; touch-action: none; user-select: none; z-index: 1; }
+
+/* Only local tables: center the label and arrow together inside each real cell. */
+.localHeader > button {
+  justify-content: center;
+  gap: 6px;
+}
+.localHeader > button > span:first-child {
+  width: auto !important;
+  flex: 0 1 auto;
+}
+.localHeader > span:not([aria-hidden]),
+.localHeader > button > span:first-child {
+  /* Override the shared table renderer's inline label alignment, never body cells. */
+  justify-content: center !important;
+}
+.localHeader > button > span[aria-hidden] {
+  flex: 0 0 auto;
+}

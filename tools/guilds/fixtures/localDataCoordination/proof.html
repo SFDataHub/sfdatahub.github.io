@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>Isolated W-04 proof</title>
+<script type="module">
+import { start, readLog } from './proof.js';
+globalThis.proof = {
+  ready: true, entered: [], readLog,
+  start(id, hold = false) {
+    start(id, hold, () => { this.entered.push(id); }, release => { this.release = release; });
+  },
+  startWorker(id, hold = false) {
+    this.workerReady = this.workerDone = this.workerEntered = false;
+    this.worker = new Worker('./proof.worker.js', {type:'module'});
+    this.worker.onmessage = ({data}) => { this[data] = true; };
+    this.worker.postMessage({id, hold});
+  },
+  async abortQueued() {
+    const controller = new AbortController();
+    const request = navigator.locks.request('sfdatahub:local-data:write:v1', {signal:controller.signal}, () => { throw Error('aborted lock acquired'); });
+    controller.abort();
+    return request.then(() => 'unexpected', e => e.name);
+  },
+};
+</script>

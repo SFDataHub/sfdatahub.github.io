@@ -18,6 +18,11 @@ type CandidateBucket = {
 };
 
 const MAX_SAMPLE_SIZE = 56;
+const resolvedPalettes = new Map<string, GuildAccentPalette>();
+export function cachedGuildAccentPalette(src: string | null | undefined) {
+  return src ? resolvedPalettes.get(src.trim()) : fallbackPalette();
+}
+
 const paletteCache = new Map<string, Promise<GuildAccentPalette>>();
 
 function clamp(value: number, min: number, max: number) {
@@ -241,7 +246,7 @@ export function getGuildAccentPalette(src: string | null | undefined): Promise<G
   const cached = paletteCache.get(key);
   if (cached) return cached;
 
-  const pending = analyzeImage(key);
+  const pending = analyzeImage(key).then(palette => { resolvedPalettes.set(key, palette); return palette; });
   paletteCache.set(key, pending);
   return pending;
 }

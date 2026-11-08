@@ -3,7 +3,7 @@ import { loadScanArchiveCatalog } from "./client";
 import { acquireExplicitLocalFirstArchiveScans } from "./localFirstScanAcquisition";
 import type { ScanArchiveBuilderManifestSource } from "./scanArchiveBuilderTypes";
 import type { ScanArchiveBuilderRawPayload } from "./scanArchiveBuilderMonthly";
-import type { ScanArchiveManifest, ScanArchiveManifestScan } from "./types";
+import type { ScanArchiveManifest, ScanArchiveManifestScan, ScanArchiveRankingMetadata } from "./types";
 import { toScanArchiveEntries, validateScanArchivePayload } from "./validation";
 
 export function createScanArchiveBuilderMonthlyLoader(options: {
@@ -37,5 +37,27 @@ export function createScanArchiveBuilderMonthlyLoader(options: {
       throw new Error("Lokaler Scan besitzt keine gueltige Bindung an das angeforderte Set-Mitglied.");
     }
     return validateScanArchivePayload(local.rawData, entry) as ScanArchiveBuilderRawPayload;
+  };
+}
+
+/** Explicit builder-only acquisition; normal search/profile/trend startup does not call this. */
+export function createScanArchiveBuilderRankingLoader(options: {
+  manifest: ScanArchiveManifest;
+  source: ScanArchiveBuilderManifestSource;
+  catalogUrl?: string;
+  signal?: AbortSignal;
+}) {
+  let manifestUrl: Promise<string> | undefined;
+  return async (reference: ScanArchiveRankingMetadata): Promise<Uint8Array> => {
+    manifestUrl ??= (async () => {
+      if (options.source.kind === "catalog") return options.source.manifestUrl;
+      const catalog = await loadScanArchiveCatalog({ catalogUrl: options.catalogUrl });
+      const url = catalog.archives.find(a => a.active && a.year === options.manifest.archiveYear)?.manifestUrl;
+      if (!url) throw new Error(`Ranking: kein Archivpfad fuer ${options.manifest.archiveYear}.`);
+      return url;
+    })();
+    const response = await fetch(new URL(reference.path, await manifestUrl), { cache: "no-cache", signal: options.signal });
+    if (!response.ok) throw new Error(`Ranking ${reference.path}: HTTP ${response.status}. Archivdatei/Verbindung pruefen.`);
+    return new Uint8Array(await response.arrayBuffer());
   };
 }

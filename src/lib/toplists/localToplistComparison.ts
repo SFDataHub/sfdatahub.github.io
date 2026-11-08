@@ -1,3 +1,5 @@
+import { resolvePlayerIdentity, type IdentityResolutionSnapshot } from "../identities/identityResolution";
+import { observationReferenceKey, serverComparisonKey } from "../servers/serverResolver";
 import {
   LOCAL_GUILD_TOPLIST_METRICS,
   LOCAL_PLAYER_TOPLIST_METRICS,
@@ -22,6 +24,7 @@ import {
 } from "./localToplistView";
 
 export type LocalToplistComparisonSnapshotSet = {
+  contentRevision?: string;
   month: string;
   snapshots: readonly LocalToplistSnapshotMeta[];
   players: readonly LocalPlayerToplistRow[];
@@ -53,6 +56,9 @@ export type LocalToplistComparisonOptions = {
   playerAverageMode?: LocalGuildAverageMode;
   guildAverageMode?: LocalGuildAverageMode;
   playerIdentityLinks?: readonly LocalToplistIdentityLink[];
+  playerIdentities?: Pick<IdentityResolutionSnapshot, "players">;
+  /** Explicit source scopes from the time-aware player selection plan. */
+  playerSources?: { previousServers: readonly string[]; currentServers: readonly string[] };
   guildIdentityLinks?: readonly LocalToplistIdentityLink[];
 };
 
@@ -92,6 +98,7 @@ export type LocalGuildToplistComparisonRow = {
 };
 
 export type LocalToplistComparisonResult = {
+  dataEvidence?: { previous: string; current: string };
   status: "complete" | "partial" | "empty";
   previousMonth: string;
   currentMonth: string;
@@ -413,7 +420,7 @@ export const compareLocalToplists = (
   const issues: LocalToplistIssue[] = [
     ...(previous.issues ?? []),
     ...(current.issues ?? []),
-    ...partialServerIssues(previous.snapshots, current.snapshots),
+    ...(options.playerSources ? [] : partialServerIssues(previous.snapshots, current.snapshots)),
   ];
   const previousMonthIndex = parseMonthIndex(previous.month);
   const currentMonthIndex = parseMonthIndex(current.month);
@@ -427,13 +434,13 @@ export const compareLocalToplists = (
   }
 
   const previousPlayerView = buildLocalPlayerToplistView(previous.players, {
-    filters: options.filters,
+    filters: options.playerSources ? { ...options.filters, servers: options.playerSources.previousServers } : options.filters,
     sort: { metricKey: options.playerSort?.metricKey ?? "sum", direction: options.playerSort?.direction },
     playerAverageMode: options.playerAverageMode,
     playerLimit: null,
   });
   const currentPlayerView = buildLocalPlayerToplistView(current.players, {
-    filters: options.filters,
+    filters: options.playerSources ? { ...options.filters, servers: options.playerSources.currentServers } : options.filters,
     sort: { metricKey: options.playerSort?.metricKey ?? "sum", direction: options.playerSort?.direction },
     playerAverageMode: options.playerAverageMode,
     playerLimit: null,
@@ -459,6 +466,7 @@ export const compareLocalToplists = (
     playerMetric,
     options.playerIdentityLinks ?? [],
     validMonthOrder,
+    options.playerIdentities,
   );
   const guildCompare = compareGuilds(
     previousGuildView.rows,
@@ -479,6 +487,7 @@ export const compareLocalToplists = (
       : "complete";
 
   return {
+    ...(previous.contentRevision && current.contentRevision ? { dataEvidence: { previous: previous.contentRevision, current: current.contentRevision } } : {}),
     status,
     previousMonth: previous.month,
     currentMonth: current.month,
@@ -516,35 +525,88 @@ export const compareLocalGuildToplists = (
   options: LocalToplistComparisonOptions = {},
 ) => compareLocalToplists(previous, current, options).guilds;
 
+// Canonicalize registered spellings only. The row's explicit server must agree
+// with its complete reference; numeric IDs/names never establish membership.
+const playerIdentifier = (row: LocalPlayerToplistRow) => observationReferenceKey(row.identifier);
+const confirmedPlayerMatches = (
+  previousRows: readonly RankedPlayer[], currentRows: readonly RankedPlayer[],
+  identities: Pick<IdentityResolutionSnapshot, "players">,
+) => {
+  const resolve = (row: LocalPlayerToplistRow) => {
+    const reference = playerIdentifier(row);
+    const match = /^(.+)_p[^_]+$/.exec(reference);
+    return match && serverComparisonKey(match[1]) === serverComparisonKey(row.server)
+      ? resolvePlayerIdentity(identities, reference) : null;
+  };
+  const previousByIdentity = new Map<string, RankedPlayer[]>();
+  for (const row of previousRows) {
+    const resolution = resolve(row);
+    if (resolution?.resolved) {
+      const group = previousByIdentity.get(resolution.identityId) ?? [];
+      group.push(row); previousByIdentity.set(resolution.identityId, group);
+    }
+  }
+  const resolutions = new Map(currentRows.map(row => [row, resolve(row)]));
+  const currentCounts = new Map<string, number>();
+  for (const resolution of resolutions.values()) if (resolution?.resolved) {
+    currentCounts.set(resolution.identityId, (currentCounts.get(resolution.identityId) ?? 0) + 1);
+  }
+  return new Map(currentRows.map(row => {
+    const resolution = resolutions.get(row);
+    const identity = resolution?.resolved ? resolution.identityId : null;
+    const previous = identity ? previousByIdentity.get(identity) ?? [] : [];
+    return [row, { identity, previous: previous.length === 1 ? previous[0] : null,
+      conflict: resolution?.status === "conflict" || previous.length > 1 || (identity ? currentCounts.get(identity)! > 1 : false),
+    }] as const;
+  }));
+};
+
 const comparePlayers = (
   previousRows: readonly RankedPlayer[],
   currentRows: readonly RankedPlayer[],
   metric: LocalToplistMetricDefinition,
   links: readonly LocalToplistIdentityLink[],
   validMonthOrder: boolean,
+  identities?: Pick<IdentityResolutionSnapshot, "players">,
 ) => {
   const issues: LocalToplistIssue[] = [];
   if (!validMonthOrder) return { rows: [] as LocalPlayerToplistComparisonRow[], issues };
 
+  const identifierOf = identities ? playerIdentifier : (row: LocalPlayerToplistRow) => row.identifier;
   const previousByKey = buildRankedMap(
     previousRows,
-    (row) => row.identifier,
+    identifierOf,
     "duplicate-comparison-identity",
     "Duplicate previous player identity; comparison match is suppressed.",
     issues,
   );
   const currentByKey = buildRankedMap(
     currentRows,
-    (row) => row.identifier,
+    identifierOf,
     "duplicate-comparison-identity",
     "Duplicate current player identity; comparison match is suppressed.",
     issues,
   );
+  const confirmed = identities ? confirmedPlayerMatches(previousRows, currentRows, identities) : null;
+  // Index legacy explicit links once; the application uses the common resolver.
+  const linksByCurrent = new Map<string, LocalToplistIdentityLink[]>();
+  const ownersByPrevious = new Map<string, Set<string>>();
+  for (const link of links) {
+    const key = linkKey(link, "current")!;
+    linksByCurrent.set(key, [...(linksByCurrent.get(key) ?? []), link]);
+    const previousKey = linkKey(link, "previous")!;
+    if (currentByKey.has(key) && previousByKey.has(previousKey)) {
+      const owners = ownersByPrevious.get(previousKey) ?? new Set<string>();
+      owners.add(key);
+      if (currentByKey.has(previousKey)) owners.add(previousKey);
+      ownersByPrevious.set(previousKey, owners);
+    }
+  }
   const usedPreviousKeys = new Set<string>();
   const rows: LocalPlayerToplistComparisonRow[] = [];
 
   currentRows.forEach((current) => {
-    const currentKey = identityKey(current.server, current.identifier);
+    const currentKey = identityKey(current.server, identifierOf(current));
     if (!currentKey || !currentByKey.has(currentKey)) return;
     const exactPrevious = previousByKey.get(currentKey) ?? null;
     let previous = exactPrevious;
@@ -553,14 +615,27 @@ const comparePlayers = (
     let identity = currentKey;
     let rowIssues: LocalToplistIssue[] = [];
 
-    if (!previous) {
+    const resolved = confirmed?.get(current);
+    if (resolved?.conflict) {
+      previous = null; previousKey = null;
+      rowIssues = [issue("ambiguous-player-fusion", "Confirmed player identity is ambiguous; no comparison match was created.", { server: current.server, identifier: current.identifier })];
+    } else if (!previous && confirmed) {
+      previous = resolved?.previous ?? null;
+      previousKey = previous ? identityKey(previous.server, identifierOf(previous)) : null;
+      if (previous && rowScanSec(current) > rowScanSec(previous)) {
+        matchType = "fusion";
+        identity = resolved?.identity ?? currentKey;
+      } else { previous = null; previousKey = null; }
+    } else if (!previous) {
       const fusion = resolveFusionMatch(
         current,
         previousByKey,
         usedPreviousKeys,
-        links,
+        (linksByCurrent.get(currentKey) ?? []).map(link => ({ ...link,
+          ambiguous: link.ambiguous || (ownersByPrevious.get(linkKey(link, "previous")!)?.size ?? 0) > 1,
+        })),
         "ambiguous-player-fusion",
-        (row) => row.identifier,
+        identifierOf,
       );
       previous = fusion.previous;
       previousKey = fusion.previousKey;
@@ -631,7 +706,7 @@ const comparePlayers = (
   });
 
   previousRows.forEach((previous) => {
-    const previousKey = identityKey(previous.server, previous.identifier);
+    const previousKey = identityKey(previous.server, identifierOf(previous));
     if (!previousKey || usedPreviousKeys.has(previousKey) || currentByKey.has(previousKey)) return;
     rows.push({
       status: "left",

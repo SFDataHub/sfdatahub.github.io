@@ -1,0 +1,37 @@
+.profile-overlay--local .local-player-direct-comparison {
+  grid-area: direct-comparison;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.local-player-direct-comparison:focus-within { z-index: 5; }
+.local-player-direct-comparison__selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: #f5f9ff;
+  font-size: 14px;
+}
+.local-player-direct-comparison__versus { flex: 0 0 auto; color: #b0c4d9; font-size: 12px; }
+.local-player-direct-comparison__identity { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.local-player-direct-comparison__identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-player-direct-comparison__identity > span { color: #b0c4d9; font-size: 12px; }
+@media (min-width: 901px) {
+  .profile-overlay--local .local-player-direct-comparison {
+    grid-column: 9 / 11;
+    grid-row: 4 / 6;
+    contain: size;
+  }
+}
+
+.local-player-direct-comparison__remove { flex: 0 0 auto; padding: 2px 6px; border: 1px solid #2b4c73; border-radius: 5px; color: #b7d4ff; background: #152a42; cursor: pointer; }
+.local-player-direct-comparison__remove:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+
+.profile-overlay--local .local-player-direct-comparison[data-comparison-count="3"] { gap: 6px; }

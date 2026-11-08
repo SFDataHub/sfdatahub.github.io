@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const compareSource = fs.readFileSync(path.join(repoRoot, "src/pages/GuildHub/compareGuilds.tsx"), "utf8");
+const compareSource = fs.readFileSync(path.join(repoRoot, "src/pages/DataHub/compareGuilds.tsx"), "utf8");
 const chartSource = fs.readFileSync(path.join(repoRoot, "src/components/ui/charts/AnchoredLineChart.tsx"), "utf8");
 
 const guildAnalyticsHiddenMarkerUses = [...compareSource.matchAll(/showDots=\{false\}/g)].length;

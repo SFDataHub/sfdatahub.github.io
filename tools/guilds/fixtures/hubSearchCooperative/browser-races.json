@@ -1,0 +1,34 @@
+[
+  {
+    "kind": "unmount",
+    "rowsAtGate": 240,
+    "rowsAfter": 240,
+    "aborted": true,
+    "persistedDocuments": 0,
+    "newerName": null
+  },
+  {
+    "kind": "reset",
+    "rowsAtGate": 240,
+    "rowsAfter": 240,
+    "aborted": "AbortError",
+    "persistedDocuments": 0,
+    "newerName": null
+  },
+  {
+    "kind": "update",
+    "rowsAtGate": 240,
+    "rowsAfter": 240,
+    "aborted": "AbortError",
+    "persistedDocuments": 1,
+    "newerName": "New Browser Source"
+  },
+  {
+    "kind": "delete",
+    "rowsAtGate": 240,
+    "rowsAfter": 240,
+    "aborted": "AbortError",
+    "persistedDocuments": 0,
+    "newerName": null
+  }
+]

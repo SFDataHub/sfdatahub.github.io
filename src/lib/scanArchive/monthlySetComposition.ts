@@ -1,3 +1,4 @@
+import { auditPhaseBegin, auditReturn, auditError, auditLeave } from "../data-hub/runtimeAudit";
 import { normalizeGuildSegmentForScan } from "../guilds/guildScanNormalizer";
 import { newestToplistRow, toplistRowIdentity } from "./toplistRowIdentity";
 
@@ -26,6 +27,8 @@ export const selectMonthlyGuildRow = <T extends GuildRow>(left: T, right: T): T 
 export function composeMonthlySet<P extends PlayerRow, G extends GuildRow>(
   snapshots: readonly { playerRows: readonly P[]; guildRows: readonly G[] }[],
 ) {
+    const __audit1 = auditPhaseBegin("composeMonthlySet", undefined, "sync-elapsed");
+    try {
   const players = new Map<string, P>();
   const guilds = new Map<string, { row: G; players: readonly P[] }>();
   for (const snapshot of snapshots) {
@@ -57,5 +60,8 @@ export function composeMonthlySet<P extends PlayerRow, G extends GuildRow>(
   }
   for (const [key, row] of members) players.set(key, row);
   const byKey = <T>(entries: Iterable<[string, T]>) => [...entries].sort(([left], [right]) => left.localeCompare(right)).map(([, row]) => row);
-  return { playerRows: byKey(players), guildRows: byKey([...guilds].map(([key, value]) => [key, value.row] as [string, G])) };
+  return auditReturn(__audit1, { playerRows: byKey(players), guildRows: byKey([...guilds].map(([key, value]) => [key, value.row] as [string, G])) });
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 }

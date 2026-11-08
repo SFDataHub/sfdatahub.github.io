@@ -1,0 +1,13 @@
+/* 1158px is the unchanged desktop Compare plot: 1200px dialog minus borders/padding. */
+.backdrop.backdrop { display:block; }
+.panel.panel { position:absolute; left:var(--compare-shell-left,20px); top:20px; width:var(--compare-shell-width,calc(100% - 40px)); height:calc(100dvh - 40px); max-height:calc(100dvh - 40px); box-sizing:border-box; }
+.body.body { display:flex; flex:1; min-height:0; overflow:visible; }
+.workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,min(1158px,calc(100% - min(280px,30%) - 24px))); gap:24px; flex:1; min-width:0; min-height:0; }
+.chartPane { min-width:0; min-height:0; }
+.memberPanel.memberPanel { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; border:0; container:dashboard-compare-members / inline-size; }
+.memberPanel .memberHeader.memberHeader { display:flex; flex:0 0 auto; align-items:center; flex-wrap:wrap; gap:8px 12px; }
+.memberPanel.memberPanel .memberHeader > div:first-child { display:block; }
+.memberPanel .memberHeader .memberKicker { position:static; margin:0 0 4px; }
+.memberPanel .memberHeader h2 { font-size:14px; }
+.memberPanel .memberActions { width:auto; flex-wrap:wrap; }
+.memberPanel .memberScroll { flex:1; min-height:0; height:auto; }

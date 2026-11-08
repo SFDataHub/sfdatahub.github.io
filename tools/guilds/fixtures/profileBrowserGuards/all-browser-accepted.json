@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "command": "node.exe tools/guilds/fixtures/dataHubFinalRegression/runBrowserGuards.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 198670.3157,
+      "stdout": "PASS guilds/localDataCoordination.browser.test.mts 2 PASS lines\nPASS toplists/localToplistRevision.browser.test.mts 20 PASS lines\nPASS guilds/pageContexts.browser.test.mts 13 PASS lines\nPASS guilds/hubFavorites.browser.test.mts 13 PASS lines\nPASS guilds/dataHubRoutes.browser.test.mts 18 PASS lines\nPASS guilds/localPlayerAnalyticsCoordinator.browser.test.mts 6 PASS lines\nPASS guilds/hubSearch.browser.test.mts 13 PASS lines\nPASS guilds/localPlayerCurrentProfile.browser.test.mts 9 PASS lines\nPASS guilds/localPlayerAnalyticsExecution.browser.test.mts 9 PASS lines\nPASS scanArchive/dataHubScanInventory.browser.test.mts 14 PASS lines\n",
+      "stderr": ""
+    }
+  ],
+  "outputs": {},
+  "savedResults": "browser-guards-results.json"
+}

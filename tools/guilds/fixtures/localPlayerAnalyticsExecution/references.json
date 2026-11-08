@@ -1,0 +1,764 @@
+{
+  "index": {
+    "players": [
+      {
+        "key": "identifier:f8_net_p1",
+        "identityKind": "identifier",
+        "name": "Hero",
+        "server": "F8",
+        "guildName": "Fixture Guild",
+        "xpTotal": 5000,
+        "scannedAtMs": 1787659200000,
+        "importedAtMs": 1785931200000,
+        "sourceScanId": "baseline-2-w06-current",
+        "sourceFilename": "baseline-2-w06-current.json",
+        "queryText": "Hero F8 Fixture Guild",
+        "card": {
+          "name": "Hero",
+          "className": "Warrior",
+          "classIconUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "classIconFallback": "🗡️",
+          "classAccent": "#4F86C6",
+          "level": 100,
+          "guildRole": "-",
+          "hofRank": 3,
+          "potions": [],
+          "hasPortrait": false,
+          "portraitFallbackUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "portraitFallbackLabel": "Klassenbild Warrior"
+        },
+        "developmentSource": {
+          "playerKey": "identifier:f8_net_p1",
+          "name": "Hero",
+          "server": "F8",
+          "memberRef": "f8_net_p1",
+          "scannedAtMs": 1787659200000,
+          "sourceScanId": "baseline-2-w06-current",
+          "guildIdentifier": "f8_g1",
+          "guildName": "Fixture Guild",
+          "level": 100,
+          "baseStats": 250
+        },
+        "development": {
+          "currentTimestamp": 1787659200000,
+          "selectedTimestamp": 1782907200000,
+          "elapsedDays": 55,
+          "baseStats": {
+            "key": "baseStats",
+            "label": "Basiswerte",
+            "playerDelta": 50,
+            "playerPerDay": 0.9090909090909091,
+            "playerTone": "turquoise",
+            "guildDelta": 25,
+            "guildPerDay": 0.45454545454545453,
+            "playerTrend": {
+              "state": "stable",
+              "rates": [
+                0.9090909090909091,
+                0.9090909090909091
+              ]
+            },
+            "guildTrend": {
+              "state": "clear-up",
+              "rates": [
+                2.909090909090909,
+                0.3333333333333333,
+                0.45454545454545453
+              ]
+            }
+          },
+          "level": {
+            "key": "level",
+            "label": "Level",
+            "playerDelta": 0,
+            "playerPerDay": 0,
+            "playerTone": "none",
+            "guildDelta": 0,
+            "guildPerDay": 0,
+            "playerTrend": {
+              "state": "stable",
+              "rates": [
+                0,
+                0,
+                0
+              ]
+            },
+            "guildTrend": {
+              "state": "stable",
+              "rates": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        "key": "identifier:f8_net_p2",
+        "identityKind": "identifier",
+        "name": "Peer",
+        "server": "F8",
+        "guildName": "Fixture Guild",
+        "xpTotal": 1000,
+        "scannedAtMs": 1787659200000,
+        "importedAtMs": 1785931200000,
+        "sourceScanId": "baseline-2-w06-current",
+        "sourceFilename": "baseline-2-w06-current.json",
+        "queryText": "Peer F8 Fixture Guild",
+        "card": {
+          "name": "Peer",
+          "className": "Warrior",
+          "classIconUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "classIconFallback": "🗡️",
+          "classAccent": "#4F86C6",
+          "level": 100,
+          "guildRole": "-",
+          "hofRank": 12,
+          "potions": [],
+          "hasPortrait": false,
+          "portraitFallbackUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "portraitFallbackLabel": "Klassenbild Warrior"
+        },
+        "developmentSource": {
+          "playerKey": "identifier:f8_net_p2",
+          "name": "Peer",
+          "server": "F8",
+          "memberRef": "f8_net_p2",
+          "scannedAtMs": 1787659200000,
+          "sourceScanId": "baseline-2-w06-current",
+          "guildIdentifier": "f8_g1",
+          "guildName": "Fixture Guild",
+          "level": 100,
+          "baseStats": 200
+        },
+        "development": {
+          "currentTimestamp": 1787659200000,
+          "selectedTimestamp": 1782907200000,
+          "elapsedDays": 55,
+          "baseStats": {
+            "key": "baseStats",
+            "label": "Basiswerte",
+            "playerDelta": 0,
+            "playerPerDay": 0,
+            "playerTone": "blue-violet",
+            "guildDelta": 25,
+            "guildPerDay": 0.45454545454545453,
+            "playerTrend": {
+              "state": "stable",
+              "rates": [
+                5.454545454545454,
+                0,
+                0
+              ]
+            },
+            "guildTrend": {
+              "state": "clear-up",
+              "rates": [
+                2.909090909090909,
+                0.3333333333333333,
+                0.45454545454545453
+              ]
+            }
+          },
+          "level": {
+            "key": "level",
+            "label": "Level",
+            "playerDelta": 0,
+            "playerPerDay": 0,
+            "playerTone": "none",
+            "guildDelta": 0,
+            "guildPerDay": 0,
+            "playerTrend": {
+              "state": "stable",
+              "rates": [
+                0,
+                0,
+                0
+              ]
+            },
+            "guildTrend": {
+              "state": "stable",
+              "rates": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        "key": "identifier:f8_net_p3",
+        "identityKind": "identifier",
+        "name": "Peer",
+        "server": "F8",
+        "guildName": "Fixture Guild",
+        "xpTotal": 1000,
+        "scannedAtMs": 1781179200000,
+        "importedAtMs": 1785931200000,
+        "sourceScanId": "baseline-2-w06-missing-start",
+        "sourceFilename": "baseline-2-w06-missing-start.json",
+        "queryText": "Peer F8 Fixture Guild",
+        "card": {
+          "name": "Peer",
+          "className": "Warrior",
+          "classIconUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "classIconFallback": "🗡️",
+          "classAccent": "#4F86C6",
+          "level": 100,
+          "guildRole": "-",
+          "hofRank": 12,
+          "potions": [],
+          "hasPortrait": false,
+          "portraitFallbackUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "portraitFallbackLabel": "Klassenbild Warrior"
+        },
+        "developmentSource": {
+          "playerKey": "identifier:f8_net_p3",
+          "name": "Peer",
+          "server": "F8",
+          "memberRef": "f8_net_p3",
+          "scannedAtMs": 1781179200000,
+          "sourceScanId": "baseline-2-w06-missing-start",
+          "guildIdentifier": "f8_g1",
+          "guildName": "Fixture Guild",
+          "level": 100,
+          "baseStats": 200
+        },
+        "development": {
+          "currentTimestamp": 1781179200000,
+          "selectedTimestamp": null,
+          "elapsedDays": null,
+          "baseStats": {
+            "key": "baseStats",
+            "label": "Basiswerte",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          },
+          "level": {
+            "key": "level",
+            "label": "Level",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          }
+        }
+      },
+      {
+        "key": "identifier:f7_net_p1",
+        "identityKind": "identifier",
+        "name": "Hero",
+        "server": "F7",
+        "guildName": "Fixture Guild",
+        "xpTotal": 0,
+        "scannedAtMs": 1780315200000,
+        "importedAtMs": 1785931200000,
+        "sourceScanId": "baseline-2-w06-old",
+        "sourceFilename": "baseline-2-w06-old.json",
+        "queryText": "Hero F7 Fixture Guild",
+        "card": {
+          "name": "Hero",
+          "className": "Warrior",
+          "classIconUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "classIconFallback": "🗡️",
+          "classAccent": "#4F86C6",
+          "level": 100,
+          "guildRole": "-",
+          "hofRank": 40,
+          "potions": [],
+          "hasPortrait": false,
+          "portraitFallbackUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "portraitFallbackLabel": "Klassenbild Warrior"
+        },
+        "developmentSource": {
+          "playerKey": "identifier:f7_net_p1",
+          "name": "Hero",
+          "server": "F7",
+          "memberRef": "f7_net_p1",
+          "scannedAtMs": 1780315200000,
+          "sourceScanId": "baseline-2-w06-old",
+          "guildIdentifier": "f7_g1",
+          "guildName": "Fixture Guild",
+          "level": 100,
+          "baseStats": 100
+        },
+        "development": {
+          "currentTimestamp": 1780315200000,
+          "selectedTimestamp": null,
+          "elapsedDays": null,
+          "baseStats": {
+            "key": "baseStats",
+            "label": "Basiswerte",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          },
+          "level": {
+            "key": "level",
+            "label": "Level",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          }
+        }
+      },
+      {
+        "key": "identifier:f7_net_p2",
+        "identityKind": "identifier",
+        "name": "Peer",
+        "server": "F7",
+        "guildName": "Fixture Guild",
+        "xpTotal": 600,
+        "scannedAtMs": 1780315200000,
+        "importedAtMs": 1785931200000,
+        "sourceScanId": "baseline-2-w06-old",
+        "sourceFilename": "baseline-2-w06-old.json",
+        "queryText": "Peer F7 Fixture Guild",
+        "card": {
+          "name": "Peer",
+          "className": "Warrior",
+          "classIconUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "classIconFallback": "🗡️",
+          "classAccent": "#4F86C6",
+          "level": 100,
+          "guildRole": "-",
+          "hofRank": 50,
+          "potions": [],
+          "hasPortrait": false,
+          "portraitFallbackUrl": "https://images.weserv.nl/?url=https%3A%2F%2Fdrive.google.com%2Fthumbnail%3Fid%3D13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt%26sz%3Dw96&w=96&h=96&fit=contain",
+          "portraitFallbackLabel": "Klassenbild Warrior"
+        },
+        "developmentSource": {
+          "playerKey": "identifier:f7_net_p2",
+          "name": "Peer",
+          "server": "F7",
+          "memberRef": "f7_net_p2",
+          "scannedAtMs": 1780315200000,
+          "sourceScanId": "baseline-2-w06-old",
+          "guildIdentifier": "f7_g1",
+          "guildName": "Fixture Guild",
+          "level": 100,
+          "baseStats": 400
+        },
+        "development": {
+          "currentTimestamp": 1780315200000,
+          "selectedTimestamp": null,
+          "elapsedDays": null,
+          "baseStats": {
+            "key": "baseStats",
+            "label": "Basiswerte",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          },
+          "level": {
+            "key": "level",
+            "label": "Level",
+            "playerDelta": null,
+            "playerPerDay": null,
+            "playerTone": "none",
+            "guildDelta": null,
+            "guildPerDay": null,
+            "playerTrend": {
+              "state": "unknown",
+              "rates": []
+            },
+            "guildTrend": {
+              "state": "unknown",
+              "rates": []
+            }
+          }
+        }
+      }
+    ],
+    "stats": {
+      "scanCount": 6,
+      "playerEntryCount": 13,
+      "indexedPlayerCount": 5
+    }
+  },
+  "trend": {
+    "status": "ready",
+    "scanCount": 6,
+    "loadedScanCount": 6,
+    "guild": {
+      "name": "Fixture Guild",
+      "identifier": "f8_g1",
+      "scopeLabel": "Fixture Guild · f8_g1"
+    },
+    "snapshots": [
+      {
+        "snapshotId": "baseline-2-w06-missing-start::1781179200000",
+        "sourceScanId": "baseline-2-w06-missing-start",
+        "sourceScanFilename": "baseline-2-w06-missing-start.json",
+        "scannedAtMs": 1781179200000,
+        "guildName": "Fixture Guild",
+        "guildIdentifier": "f8_g1",
+        "declaredMemberCount": 2,
+        "foundUniqueMemberCount": 2,
+        "validXpTotalCount": 2,
+        "validFocusedBaseStatsCount": 2,
+        "averageXpTotal": 1000,
+        "averageFocusedBaseStats": 200
+      },
+      {
+        "snapshotId": "baseline-2-w06-tie-a::1782907200000",
+        "sourceScanId": "baseline-2-w06-tie-a",
+        "sourceScanFilename": "baseline-2-w06-tie-a.json",
+        "scannedAtMs": 1782907200000,
+        "guildName": "Fixture Guild",
+        "guildIdentifier": "f8_g1",
+        "declaredMemberCount": 2,
+        "foundUniqueMemberCount": 2,
+        "validXpTotalCount": 2,
+        "validFocusedBaseStatsCount": 2,
+        "averageXpTotal": 500,
+        "averageFocusedBaseStats": 200
+      },
+      {
+        "snapshotId": "baseline-2-w06-current::1785931200000",
+        "sourceScanId": "baseline-2-w06-current",
+        "sourceScanFilename": "baseline-2-w06-current.json",
+        "scannedAtMs": 1785931200000,
+        "guildName": "Fixture Guild",
+        "guildIdentifier": "f8_g1",
+        "declaredMemberCount": 2,
+        "foundUniqueMemberCount": 2,
+        "validXpTotalCount": 2,
+        "validFocusedBaseStatsCount": 2,
+        "averageXpTotal": 1400,
+        "averageFocusedBaseStats": 360
+      },
+      {
+        "snapshotId": "baseline-2-w06-current::1787659200000",
+        "sourceScanId": "baseline-2-w06-current",
+        "sourceScanFilename": "baseline-2-w06-current.json",
+        "scannedAtMs": 1787659200000,
+        "guildName": "Fixture Guild",
+        "guildIdentifier": "f8_g1",
+        "declaredMemberCount": 2,
+        "foundUniqueMemberCount": 2,
+        "validXpTotalCount": 2,
+        "validFocusedBaseStatsCount": 2,
+        "averageXpTotal": 3000,
+        "averageFocusedBaseStats": 225
+      }
+    ],
+    "excludedGuildSnapshots": [
+      {
+        "snapshotId": "baseline-2-w06-partial::1782043200000",
+        "sourceScanId": "baseline-2-w06-partial",
+        "sourceScanFilename": "baseline-2-w06-partial.json",
+        "scannedAtMs": 1782043200000,
+        "guildName": "Fixture Guild",
+        "guildIdentifier": "f8_g1",
+        "declaredMemberCount": 2,
+        "foundUniqueMemberCount": 1,
+        "validXpTotalCount": 0,
+        "validFocusedBaseStatsCount": 0,
+        "completeForPerformance": false,
+        "exclusionReason": "Gefundene eindeutige Member (1) weichen vom deklarierten Member Count (2) ab."
+      }
+    ],
+    "periods": {
+      "short": {
+        "key": "short",
+        "label": "Kurzfristig",
+        "interval": null,
+        "missingReason": "Kein historischer vollständiger Scan im Bereich 1-14 Tagen."
+      },
+      "medium": {
+        "key": "medium",
+        "label": "Mittelfristig",
+        "interval": {
+          "start": {
+            "snapshotId": "baseline-2-w06-current::1785931200000",
+            "sourceScanId": "baseline-2-w06-current",
+            "sourceScanFilename": "baseline-2-w06-current.json",
+            "scannedAtMs": 1785931200000,
+            "guildName": "Fixture Guild",
+            "guildIdentifier": "f8_g1",
+            "declaredMemberCount": 2,
+            "foundUniqueMemberCount": 2,
+            "validXpTotalCount": 2,
+            "validFocusedBaseStatsCount": 2,
+            "averageXpTotal": 1400,
+            "averageFocusedBaseStats": 360
+          },
+          "end": {
+            "snapshotId": "baseline-2-w06-current::1787659200000",
+            "sourceScanId": "baseline-2-w06-current",
+            "sourceScanFilename": "baseline-2-w06-current.json",
+            "scannedAtMs": 1787659200000,
+            "guildName": "Fixture Guild",
+            "guildIdentifier": "f8_g1",
+            "declaredMemberCount": 2,
+            "foundUniqueMemberCount": 2,
+            "validXpTotalCount": 2,
+            "validFocusedBaseStatsCount": 2,
+            "averageXpTotal": 3000,
+            "averageFocusedBaseStats": 225
+          },
+          "elapsedDays": 20,
+          "fullDays": 20,
+          "xp": {
+            "startAverage": 1400,
+            "endAverage": 3000,
+            "absoluteGrowth": 1600,
+            "perDay": 80,
+            "trendPerDay": null
+          },
+          "base": {
+            "startAverage": 360,
+            "endAverage": 225,
+            "absoluteGrowth": -135,
+            "perDay": -6.75,
+            "trendPerDay": null
+          }
+        }
+      },
+      "long": {
+        "key": "long",
+        "label": "Langfristig",
+        "interval": {
+          "start": {
+            "snapshotId": "baseline-2-w06-missing-start::1781179200000",
+            "sourceScanId": "baseline-2-w06-missing-start",
+            "sourceScanFilename": "baseline-2-w06-missing-start.json",
+            "scannedAtMs": 1781179200000,
+            "guildName": "Fixture Guild",
+            "guildIdentifier": "f8_g1",
+            "declaredMemberCount": 2,
+            "foundUniqueMemberCount": 2,
+            "validXpTotalCount": 2,
+            "validFocusedBaseStatsCount": 2,
+            "averageXpTotal": 1000,
+            "averageFocusedBaseStats": 200
+          },
+          "end": {
+            "snapshotId": "baseline-2-w06-current::1787659200000",
+            "sourceScanId": "baseline-2-w06-current",
+            "sourceScanFilename": "baseline-2-w06-current.json",
+            "scannedAtMs": 1787659200000,
+            "guildName": "Fixture Guild",
+            "guildIdentifier": "f8_g1",
+            "declaredMemberCount": 2,
+            "foundUniqueMemberCount": 2,
+            "validXpTotalCount": 2,
+            "validFocusedBaseStatsCount": 2,
+            "averageXpTotal": 3000,
+            "averageFocusedBaseStats": 225
+          },
+          "elapsedDays": 75,
+          "fullDays": 75,
+          "xp": {
+            "startAverage": 1000,
+            "endAverage": 3000,
+            "absoluteGrowth": 2000,
+            "perDay": 26.666666666666668,
+            "trendPerDay": null
+          },
+          "base": {
+            "startAverage": 200,
+            "endAverage": 225,
+            "absoluteGrowth": 25,
+            "perDay": 0.3333333333333333,
+            "trendPerDay": null
+          }
+        }
+      }
+    },
+    "intervals": [
+      {
+        "start": {
+          "snapshotId": "baseline-2-w06-missing-start::1781179200000",
+          "sourceScanId": "baseline-2-w06-missing-start",
+          "sourceScanFilename": "baseline-2-w06-missing-start.json",
+          "scannedAtMs": 1781179200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 1000,
+          "averageFocusedBaseStats": 200
+        },
+        "end": {
+          "snapshotId": "baseline-2-w06-tie-a::1782907200000",
+          "sourceScanId": "baseline-2-w06-tie-a",
+          "sourceScanFilename": "baseline-2-w06-tie-a.json",
+          "scannedAtMs": 1782907200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 500,
+          "averageFocusedBaseStats": 200
+        },
+        "elapsedDays": 20,
+        "fullDays": 20,
+        "xp": {
+          "startAverage": 1000,
+          "endAverage": 500,
+          "absoluteGrowth": -500,
+          "perDay": -25,
+          "trendPerDay": 7.2727272727272725
+        },
+        "base": {
+          "startAverage": 200,
+          "endAverage": 200,
+          "absoluteGrowth": 0,
+          "perDay": 0,
+          "trendPerDay": 2.909090909090909
+        }
+      },
+      {
+        "start": {
+          "snapshotId": "baseline-2-w06-tie-a::1782907200000",
+          "sourceScanId": "baseline-2-w06-tie-a",
+          "sourceScanFilename": "baseline-2-w06-tie-a.json",
+          "scannedAtMs": 1782907200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 500,
+          "averageFocusedBaseStats": 200
+        },
+        "end": {
+          "snapshotId": "baseline-2-w06-current::1785931200000",
+          "sourceScanId": "baseline-2-w06-current",
+          "sourceScanFilename": "baseline-2-w06-current.json",
+          "scannedAtMs": 1785931200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 1400,
+          "averageFocusedBaseStats": 360
+        },
+        "elapsedDays": 35,
+        "fullDays": 35,
+        "xp": {
+          "startAverage": 500,
+          "endAverage": 1400,
+          "absoluteGrowth": 900,
+          "perDay": 25.714285714285715,
+          "trendPerDay": 26.666666666666668
+        },
+        "base": {
+          "startAverage": 200,
+          "endAverage": 360,
+          "absoluteGrowth": 160,
+          "perDay": 4.571428571428571,
+          "trendPerDay": 0.3333333333333333
+        }
+      },
+      {
+        "start": {
+          "snapshotId": "baseline-2-w06-current::1785931200000",
+          "sourceScanId": "baseline-2-w06-current",
+          "sourceScanFilename": "baseline-2-w06-current.json",
+          "scannedAtMs": 1785931200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 1400,
+          "averageFocusedBaseStats": 360
+        },
+        "end": {
+          "snapshotId": "baseline-2-w06-current::1787659200000",
+          "sourceScanId": "baseline-2-w06-current",
+          "sourceScanFilename": "baseline-2-w06-current.json",
+          "scannedAtMs": 1787659200000,
+          "guildName": "Fixture Guild",
+          "guildIdentifier": "f8_g1",
+          "declaredMemberCount": 2,
+          "foundUniqueMemberCount": 2,
+          "validXpTotalCount": 2,
+          "validFocusedBaseStatsCount": 2,
+          "averageXpTotal": 3000,
+          "averageFocusedBaseStats": 225
+        },
+        "elapsedDays": 20,
+        "fullDays": 20,
+        "xp": {
+          "startAverage": 1400,
+          "endAverage": 3000,
+          "absoluteGrowth": 1600,
+          "perDay": 80,
+          "trendPerDay": 45.45454545454545
+        },
+        "base": {
+          "startAverage": 360,
+          "endAverage": 225,
+          "absoluteGrowth": -135,
+          "perDay": -6.75,
+          "trendPerDay": 0.45454545454545453
+        }
+      }
+    ]
+  }
+}

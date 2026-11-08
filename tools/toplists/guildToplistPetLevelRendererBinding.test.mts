@@ -11,7 +11,7 @@ const monthlyBackfillSource = readFileSync(
   "utf8",
 );
 const guildToplistsSource = readFileSync(new URL("../../src/pages/Toplists/guildtoplists.tsx", import.meta.url), "utf8");
-const guildHubToplistSource = readFileSync(new URL("../../src/pages/GuildHub/Toplist.tsx", import.meta.url), "utf8");
+const guildHubToplistSource = readFileSync(new URL("../../src/pages/DataHub/Toplist.tsx", import.meta.url), "utf8");
 const firestoreSource = readFileSync(new URL("../../src/lib/api/toplistsFirestore.ts", import.meta.url), "utf8");
 const guildRowMapperSource = readFileSync(new URL("../../src/lib/api/toplistGuildRowMapper.ts", import.meta.url), "utf8");
 const contractsSource = readFileSync(new URL("../../src/lib/toplists/toplistContracts.ts", import.meta.url), "utf8");

@@ -1,3 +1,4 @@
+import { artifactPath } from '../codex/workspace.mjs';
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -43,7 +44,7 @@ type BaseAttributeComparison = {
 };
 
 const DEFAULT_SCAN_ROOT = "D:/SFDataHub/Guild Analytics/public/scans";
-const REPORT_PATH = path.resolve("tools/identities/player-evidence-priority-analysis.latest.txt");
+const REPORT_PATH = artifactPath('tools/identities/player-evidence-priority-analysis.latest.txt');
 const ORIGIN_SERVER_CODES = new Set(["EU1", "EU2", "EU3", "EU4"]);
 const TARGET_SERVER_CODE = "F28";
 const ATTRIBUTE_LABELS = ["STR.base", "DEX.base", "INT.base", "CON.base", "LUC.base"];

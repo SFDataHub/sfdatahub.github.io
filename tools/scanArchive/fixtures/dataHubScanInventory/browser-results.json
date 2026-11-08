@@ -1,0 +1,89 @@
+{
+  "results": [
+    "loading/unknown archive and true empty personal zero; four unchanged navigation tiles",
+    "actual validated multi-year manifests; current/monthly references do not add files",
+    "actual personal import, two physical bindings on one Raw and overlap without total",
+    "archivefirst personal duplicate, repeated duplicate stable counts and original identity/time/name",
+    "actual personal content update expires readiness; Rawdelete updates displayed counts",
+    "legacy own/name/no annotation stays unknown with explicit partial personal status",
+    "targeted cold readiness: 1 Raw read, 2 validations, 0 normalization/build/download/fullpool",
+    "warm real dashboard remount reuses proof: zero payload read/validation/normalization/derivedbuild",
+    "missed provenance event caught up from durable journal on focus",
+    "offline year leaves valid active subset and independently complete personal count",
+    "offline catalog explicitly last-known, retained date and successful retry",
+    "accessible live status, translated labels and wide layout",
+    "real navigation remains operable during held request; no late publications after unmount",
+    "390px actual shell/dashboard: stacked KPIs, no horizontal overflow and all four navigation tiles"
+  ],
+  "screenshots": [
+    {
+      "kind": "wide",
+      "values": [
+        "3",
+        "2",
+        "2"
+      ],
+      "widths": [
+        430,
+        430,
+        430
+      ]
+    },
+    {
+      "kind": "narrow",
+      "values": [
+        "3",
+        "2",
+        "2"
+      ],
+      "viewport": 390,
+      "widths": [
+        356,
+        356,
+        356
+      ]
+    }
+  ],
+  "costs": [
+    {
+      "name": "cold bound candidates",
+      "costs": {
+        "metadataReads": 32,
+        "rawReads": 1,
+        "rawPoolReads": 0,
+        "payloadValidations": 2,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "metadataSnapshots": 3,
+        "archiveNetwork": 0,
+        "rawNetwork": 0,
+        "publications": 4
+      },
+      "values": [
+        "3",
+        "2",
+        "1"
+      ]
+    },
+    {
+      "name": "warm dashboard remount",
+      "costs": {
+        "metadataReads": 41,
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "payloadValidations": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "metadataSnapshots": 4,
+        "archiveNetwork": 3,
+        "rawNetwork": 0,
+        "publications": 6
+      },
+      "values": [
+        "3",
+        "2",
+        "1"
+      ]
+    }
+  ]
+}

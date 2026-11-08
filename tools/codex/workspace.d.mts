@@ -1,0 +1,10 @@
+export const repoRoot: string;
+export const originalRepoRoot: string;
+export const workDir: string;
+export function nativePath(value: string): string;
+export function outputPath(value: string): string;
+export function artifactPath(relative: string): string;
+export function temporaryPrefix(prefix: string, category?: 'test-runs' | 'repo-copies' | 'browser-profiles'): string;
+export function historicalPath(relative: string): string;
+export function regressionFixture(relative: string): string;
+export function siblingInput(relative: string): string;

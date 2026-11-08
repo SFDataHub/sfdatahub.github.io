@@ -1,0 +1,93 @@
+{
+  "results": [
+    "All 16 production legacy registrations preserve query/state; aliases canonicalize once; consumed feature command is not replayed",
+    "Productive Guild Hub analytics action sends one recipient feature target; actual Analytics consumes it without changing Dashboard context",
+    "Real guild favorite opens addressed local Dashboard and safe return without favorite/global writes",
+    "Real Data Hub favorite links open local entities without autosave/global selection; safe page return",
+    "Actual Dashboard prepared overlay: addressable URL; Back/Forward/X; no additional Current raw/core work",
+    "Actual desktop Toplist overlay: backdrop/Escape share Close; parent DOM, dataset, filters, sort, query, scroll and focus retained",
+    "Desktop guild row opens local addressed Dashboard with source/time and local return",
+    "Actual month Compare row opens historical observation; copied/reloaded query keeps source/time instead of newest",
+    "Actual ScanManagement over profile: state/idx retained; Back and Escape close only the top layer under StrictMode",
+    "Direct invalid namespace and missing exact source render explained failures, with no Current fallback",
+    "Production FeatureGate/RootLayout auth: user access, admin-only Data Hub Sidebar, ungated entry, exact detail return query",
+    "Actual public/local FilterProviders restore and write independent keys; old source preserved",
+    "Real local filter first cutover validates and copies once; malformed legacy restore writes no empty default; later user write stays local",
+    "Real live overlay target enforces auth; hidden existing local gate denies detail while Data Hub entry remains ungated",
+    "Routed A-slow/B-fast and Close during resolution discard stale work; profile switches retain one history entry",
+    "Profile above ScanManagement: Escape and subsequent Back close the responsible top layer once",
+    "Actual reload of historical detail renders standalone page; historical source/time survive",
+    "Actual compact Toplist profile action opens narrow routed overlay and retains expanded parent DOM",
+    "Changed, ambiguous and deleted sources in actual routed page produce explained states without public fallback",
+    "Actual standalone detail and Copy link preserve root, /test/ and /beta/ deployment bases"
+  ],
+  "measurements": {
+    "preparedDashboard": {
+      "reads": [],
+      "cores": [],
+      "builds": [
+        "guild-hub-scan:muyb27c1:80ac49af-4dad-4d6b-a840-bd79efdecf3a",
+        "guild-hub-scan:muyb27c1:80ac49af-4dad-4d6b-a840-bd79efdecf3a"
+      ]
+    },
+    "coldDirect": {
+      "reads": [
+        "entry:guild-hub-scan:muyb27c1:80ac49af-4dad-4d6b-a840-bd79efdecf3a"
+      ],
+      "cores": [
+        "Current Player 1",
+        "Current Player 2"
+      ],
+      "builds": [
+        "guild-hub-scan:muyb27c1:80ac49af-4dad-4d6b-a840-bd79efdecf3a",
+        "guild-hub-scan:muyb27c1:80ac49af-4dad-4d6b-a840-bd79efdecf3a"
+      ]
+    },
+    "historicalLink": "/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab&at=1788696000000&snapshot=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab%3A%3A1788696000000&row=f8_net_p1",
+    "detail": "/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27c1%3A80ac49af-4dad-4d6b-a840-bd79efdecf3a&at=1791288000000&snapshot=guild-hub-scan%3Amuyb27c1%3A80ac49af-4dad-4d6b-a840-bd79efdecf3a%3A%3A1791288000000&row=f8_net_p1&hash=fca7d1ca2ace76e13b95e32ce3ae3f5406df1c66a3fd53258a57c01fa89877ab"
+  },
+  "reload": {
+    "url": "/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab&at=1788696000000&snapshot=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab%3A%3A1788696000000&row=f8_net_p1",
+    "measurements": {
+      "reload": {
+        "reads": [
+          "entry:guild-hub-scan:muyb27ao:347016fd-5418-49f9-b9ae-2ced301720ab"
+        ],
+        "cores": [
+          "Historical Player 1",
+          "Historical Player 2"
+        ],
+        "builds": [
+          "guild-hub-scan:muyb27ao:347016fd-5418-49f9-b9ae-2ced301720ab",
+          "guild-hub-scan:muyb27ao:347016fd-5418-49f9-b9ae-2ced301720ab"
+        ]
+      }
+    },
+    "errors": []
+  },
+  "compact": {
+    "url": "/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27c1%3A80ac49af-4dad-4d6b-a840-bd79efdecf3a&at=1791288000000&snapshot=guild-hub-scan%3Amuyb27c1%3A80ac49af-4dad-4d6b-a840-bd79efdecf3a%3A%3A1791288000000&row=f8_net_p1",
+    "parentRetained": true,
+    "errors": []
+  },
+  "mutations": {
+    "results": [
+      "Changed, ambiguous and deleted sources in actual routed page produce explained states without public fallback"
+    ],
+    "errors": []
+  },
+  "deployments": [
+    {
+      "base": "/",
+      "copied": "http://127.0.0.1:5173/#/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab&at=1788696000000&snapshot=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab%3A%3A1788696000000&row=f8_net_p1"
+    },
+    {
+      "base": "/test/",
+      "copied": "http://127.0.0.1:5173/test/#/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab&at=1788696000000&snapshot=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab%3A%3A1788696000000&row=f8_net_p1"
+    },
+    {
+      "base": "/beta/",
+      "copied": "http://127.0.0.1:5173/beta/#/data-hub/player-hub/player/f8/f8_net_p1?source=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab&at=1788696000000&snapshot=guild-hub-scan%3Amuyb27ao%3A347016fd-5418-49f9-b9ae-2ced301720ab%3A%3A1788696000000&row=f8_net_p1"
+    }
+  ]
+}

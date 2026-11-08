@@ -1,6 +1,7 @@
+import { useAnalyticsView } from "../../lib/analytics/localEvents";
+import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
 import React from "react";
 import ContentShell from "../../components/ContentShell";
-import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -55,6 +56,7 @@ export default function GuildHubWaitlist() {
 
   const [formItem, setFormItem] = React.useState<WaitlistApplicant | null>(null);
   const [isFormOpen, setFormOpen] = React.useState(false);
+  useAnalyticsView(isFormOpen ? "datahub/waitlist/form" : null);
   const formRef = React.useRef<HTMLFormElement>(null);
   useFocusTrap(formRef, isFormOpen);
 
@@ -114,9 +116,10 @@ export default function GuildHubWaitlist() {
   return (
     <ContentShell title="Guild Hub" subtitle="Waitlist" centerFramed={false}>
       <div className={styles.page}>
+        <GuildHubBackLink />
         <header className={styles.header}>
           <div className={styles.headerStack}>
-            <GuildContextBar />
+
             <div>
               <p className={styles.kicker}>Recruiting</p>
               <h1 className={styles.title}>Waitlist</h1>

@@ -248,10 +248,6 @@ export const readSfPlayerStats = (player: unknown): SfJsonPlayerStats => {
   const mainSaveBonus = mainSaveIndex == null ? null : readSfSaveNumber(saveArray, mainSaveIndex + 5);
   const conSaveBase = readSfSaveNumber(saveArray, 33);
   const conSaveBonus = readSfSaveNumber(saveArray, 38);
-  const latestStats = buildStatsModelFromLatestValues(buildLatestValuesForStats(row));
-  const latestBaseStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.base));
-  const latestTotalStats = sumKnownNumbers(latestStats.attributeComposition.map((attribute) => attribute.total));
-
   const level = readSfPlayerLevel(row);
   const baseMain =
     pickGenericPlayerNumber(row, ["baseMain", "Base Main", "Base", "Base Attribute", "Basis Attribut"]) ??
@@ -267,18 +263,22 @@ export const readSfPlayerStats = (player: unknown): SfJsonPlayerStats => {
     sumPair(conSaveBase, conSaveBonus);
   const baseStats =
     pickGenericPlayerNumber(row, ["sumBaseTotal", "baseStats", "Base Stats"]) ??
-    sumPair(baseMain, conBase) ??
-    latestBaseStats;
+    sumPair(baseMain, conBase);
   const totalStats =
     pickGenericPlayerNumber(row, ["totalStats", "Total Stats", "Total"]) ??
-    sumPair(attrTotal, conTotal) ??
-    latestTotalStats;
+    sumPair(attrTotal, conTotal);
+
+  // The full Latest Values model is a fallback, not part of every save read.
+  // Compute it once only when either sum still needs it; precedence is unchanged.
+  const latestStats = baseStats == null || totalStats == null
+    ? buildStatsModelFromLatestValues(buildLatestValuesForStats(row))
+    : null;
 
   return {
     level,
     classId,
-    baseStats,
-    totalStats,
+    baseStats: baseStats ?? sumKnownNumbers(latestStats!.attributeComposition.map((attribute) => attribute.base)),
+    totalStats: totalStats ?? sumKnownNumbers(latestStats!.attributeComposition.map((attribute) => attribute.total)),
     baseMain,
     conBase,
     attrTotal,

@@ -1,3 +1,6 @@
+import { temporaryPrefix } from '../codex/workspace.mjs';
+import { SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION } from "../../src/lib/scanArchive/types.ts";
+import { extractDerivedGuildCoaMetadata } from "../../src/lib/guilds/guildCoa.ts";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -338,14 +341,14 @@ const backfillPreparedSearchIndexes = async (
     }
     const rawJson = strictUtf8(gunzipSync(compressed));
     const payload = validateScanArchivePayload(JSON.parse(rawJson), scan) as { players: JsonRecord[]; groups: JsonRecord[] };
-    const searchPayload = searchIndexPayloadForScanArchiveEntry(scan, payload);
+    const searchPayload = searchIndexPayloadForScanArchiveEntry(scan, payload, extractDerivedGuildCoaMetadata(payload, rawJson)?.guildCoaByIdentifier);
     validateScanArchiveSearchIndexPayload(searchPayload, scan);
     const searchJson = JSON.stringify(searchPayload);
     const bytes = gzipDeterministic(searchJson);
     const entry = {
       ...scan,
       searchIndex: {
-        schemaVersion: 1,
+        schemaVersion: SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION,
         path: searchIndexPathFor(scan.path),
         sha256: sha256Hex(bytes),
         compressedBytes: bytes.byteLength,
@@ -477,7 +480,7 @@ export const applyScanArchiveBuildPlan = async (plan: ScanArchiveBuildPlan) => {
     throw new Error(`Apply abgebrochen: ${plan.conflicts.length} Konflikt(e) im Plan.`);
   }
   await verifyArchiveRoot(plan.archiveRoot, plan.year);
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "sfh-scan-archive-"));
+  const tempDir = await fs.mkdtemp(temporaryPrefix("sfh-scan-archive-", 'test-runs'));
   try {
     const writableFiles = plan.files.filter((file) => file.action === "write");
     for (const file of writableFiles) {

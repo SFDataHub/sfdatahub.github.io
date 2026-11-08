@@ -12,11 +12,10 @@ import {
   filterPlayerRowsBySearchHits,
   loadLocalToplistArchiveContext,
   normalizeToplistServerSelection,
-  resolveActiveGuildToplistServer,
+  normalizeToplistServerCode,
   resolveSelectedToplistEntries,
-  resolveToplistServerDefaultSync,
   selectEntriesForServers,
-} from "../../src/pages/GuildHub/localToplistPageModel.ts";
+} from "../../src/pages/DataHub/localToplistPageModel.ts";
 import type { ScanArchiveSearchHit } from "../../src/lib/scanArchive/searchIndexService.ts";
 import type { ScanArchiveManifest } from "../../src/lib/scanArchive/types.ts";
 import { LOCAL_SERVER_REGISTRY } from "../../src/data/serverRegistry.ts";
@@ -156,11 +155,11 @@ const guildRow = (server: string, guildIdentifier: string): LocalGuildToplistRow
 describe("local toplist page model", () => {
   test("Guild-Hub navigation contains Toplist directly after Dashboard and does not require local scans", () => {
     assert.deepEqual(GUILD_HUB_NAV_ITEMS.slice(0, 3).map((item) => item.to), [
-      "/guild-hub/dashboard",
-      "/guild-hub/toplist",
-      "/guild-hub/analytics",
+      "/data-hub/guild-hub/dashboard",
+      "/data-hub/toplist",
+      "/data-hub/analytics",
     ]);
-    assert.equal(GUILD_HUB_NAV_ITEMS.find((item) => item.to === "/guild-hub/toplist")?.requiresLocalScans, false);
+    assert.equal(GUILD_HUB_NAV_ITEMS.find((item) => item.to === "/data-hub/toplist")?.requiresLocalScans, false);
   });
 
   test("loads active manifest revision 2 and resolves three current selections", async () => {
@@ -173,26 +172,27 @@ describe("local toplist page model", () => {
     assert.equal(context.manifests[0]?.revision, 2);
     assert.deepEqual(context.entries.map((entry) => entry.server).sort(), ["f8_net", "s30_eu", "stumblesteppe_net"]);
     assert.equal(context.serverOptions.length, 3);
-    assert.deepEqual(defaultSelectedToplistServers(context.serverOptions).sort(), ["EU30", "F8", "STUMBLESTEPPE"]);
+    assert.deepEqual(defaultSelectedToplistServers(context.serverOptions), [], "archive metadata never selects servers");
+    assert.deepEqual(defaultSelectedToplistServers(), [], "ordinary navigation starts empty before metadata");
   });
 
-  test("active guild server resolves through registry aliases instead of selecting every current server", async () => {
+  test("selected server resolves through registry aliases instead of selecting every current server", async () => {
     const context = await loadLocalToplistArchiveContext({
       fetcher,
       catalogUrl: "https://example.test/catalog.json",
     });
-    const activeServer = resolveActiveGuildToplistServer("f8_net");
+    const activeServer = normalizeToplistServerCode("f8_net");
 
     assert.equal(activeServer, "F8");
     assert.deepEqual(selectEntriesForServers(context.entries, [activeServer]).map((entry) => entry.server), ["f8_net"]);
   });
 
-  test("missing active guild server is unavailable without replacing it with an available current server", async () => {
+  test("missing selected server is unavailable without replacing it with an available current server", async () => {
     const context = await loadLocalToplistArchiveContext({
       fetcher,
       catalogUrl: "https://example.test/catalog.json",
     });
-    const activeServer = resolveActiveGuildToplistServer("f28_net");
+    const activeServer = normalizeToplistServerCode("f28_net");
     const resolution = resolveSelectedToplistEntries(context.entries, [activeServer]);
 
     assert.equal(activeServer, "F28");
@@ -265,61 +265,13 @@ describe("local toplist page model", () => {
     assert.notEqual(key, buildLocalToplistViewRequestKey({ ...base, guilds: ["Beta"] }));
     assert.notEqual(key, buildLocalToplistViewRequestKey({ ...base, playerSort: { metricKey: "level", direction: "desc" } }));
     assert.notEqual(key, buildLocalToplistViewRequestKey({ ...base, playerValueMode: "total" }));
+    assert.notEqual(key, buildLocalToplistViewRequestKey({ ...base, playerSort: { metricKey: "sum", direction: "asc" } }));
+    const guildKey = buildLocalToplistViewRequestKey({ ...base, tab: "guilds" });
+    assert.notEqual(guildKey, buildLocalToplistViewRequestKey({ ...base, tab: "guilds", guildSort: { metricKey: "guildAvgLevel", direction: "asc" } }));
   });
 
-  test("same active guild default key causes no second filter write", () => {
-    const first = resolveToplistServerDefaultSync({
-      activeDefaultKey: "slot-a|guild-a|F28",
-      previousDefaultKey: null,
-      activeGuildServer: "F28",
-      defaultServers: ["F8", "EU30"],
-      currentServers: [],
-    });
-    assert.deepEqual(first, { nextDefaultKey: "slot-a|guild-a|F28", nextServers: ["F28"] });
-
-    const second = resolveToplistServerDefaultSync({
-      activeDefaultKey: "slot-a|guild-a|F28",
-      previousDefaultKey: first.nextDefaultKey,
-      activeGuildServer: "F28",
-      defaultServers: ["F8", "EU30"],
-      currentServers: ["F28"],
-    });
-    assert.deepEqual(second, { nextDefaultKey: "slot-a|guild-a|F28", nextServers: null });
-  });
-
-  test("content equal active guild default does not write a new server array", () => {
-    const decision = resolveToplistServerDefaultSync({
-      activeDefaultKey: "slot-a|guild-a|F8",
-      previousDefaultKey: null,
-      activeGuildServer: "F8",
-      defaultServers: ["EU30"],
-      currentServers: ["f8_net"],
-    });
-    assert.deepEqual(decision, { nextDefaultKey: "slot-a|guild-a|F8", nextServers: null });
-  });
-
-  test("manual selection remains until the active guild key changes", () => {
-    const sameKey = resolveToplistServerDefaultSync({
-      activeDefaultKey: "slot-a|guild-a|F28",
-      previousDefaultKey: "slot-a|guild-a|F28",
-      activeGuildServer: "F28",
-      defaultServers: ["F8", "EU30"],
-      currentServers: ["F8"],
-    });
-    assert.equal(sameKey.nextServers, null);
-
-    const slotChanged = resolveToplistServerDefaultSync({
-      activeDefaultKey: "slot-b|guild-b|EU30",
-      previousDefaultKey: "slot-a|guild-a|F28",
-      activeGuildServer: "EU30",
-      defaultServers: ["F8"],
-      currentServers: ["F8"],
-    });
-    assert.deepEqual(slotChanged, { nextDefaultKey: "slot-b|guild-b|EU30", nextServers: ["EU30"] });
-  });
-
-  test("Stumblesteppe active guild server resolves through registry typo alias", () => {
-    assert.equal(resolveActiveGuildToplistServer("stumplesteppe_net"), "STUMBLESTEPPE");
+  test("Stumblesteppe selected server resolves through registry typo alias", () => {
+    assert.equal(normalizeToplistServerCode("stumplesteppe_net"), "STUMBLESTEPPE");
   });
 
   test("server picker groups active registry servers independently from manifest availability", async () => {
@@ -329,7 +281,7 @@ describe("local toplist page model", () => {
     const namedServers = ["BLACKFOREST", "GNAROGRIM", "MAERWYNN", "STUMBLESTEPPE"];
     const allGroupedServers = Object.values(groups).flat();
     const activeRegistryCodes = LOCAL_SERVER_REGISTRY
-      .filter((server) => server.active)
+      .filter((server) => server.active && server.code !== "SPEED")
       .map((server) => server.code)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 
@@ -340,7 +292,8 @@ describe("local toplist page model", () => {
     });
     assert.equal(groups.Fusion.includes("F8"), true);
     assert.equal(groups.Fusion.includes("F28"), true);
-    assert.equal(groups.INT.includes("SPEED"), true);
+    assert.equal(groups.INT.includes("SPEED"), false);
+    assert.equal(groups.EU.includes("EU31"), true);
     assert.equal(groups.EU.includes("EU11"), true);
     assert.equal(groups.US.includes("AM1"), true);
     assert.equal(allGroupedServers.length, new Set(allGroupedServers).size);

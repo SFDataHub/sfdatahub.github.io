@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
 
 import type { FusionIdentityWorkerTiming } from "./fusionIdentityWorkerTypes";
 import type {
@@ -12,7 +13,8 @@ const FUSION_ANALYSIS_CACHE_DB_VERSION = 1;
 const ANALYSIS_REPORTS_STORE = "analysisReports";
 
 export const CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION = 2;
-export const CURRENT_FUSION_RESOLVER_VERSION = 2;
+// Evidence-based global guild claims and supporting leadership require a fresh report.
+export const CURRENT_FUSION_RESOLVER_VERSION = 4;
 
 const COMPATIBLE_FUSION_ANALYSIS_SCHEMA_VERSIONS = new Set<number>([
   CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION,
@@ -199,6 +201,22 @@ export const classifyFusionIdentityAnalysisCacheSnapshot = (
     input,
   );
 
+/** Scoped content equality does not renew a report's durable dependency receipt.
+ * In particular, an allIdentities report becomes stale after another scope's
+ * commit. Preserve the previous entry and offer the normal Analyze action. */
+export async function revalidateFusionIdentityAnalysisCache(
+  lookup: FusionIdentityAnalysisCacheLookup,
+  validate: (receipt: LocalDependencyReceipt) => Promise<{ current: boolean; receipt: LocalDependencyReceipt }> = revalidateLocalDataDependencies,
+): Promise<FusionIdentityAnalysisCacheLookup> {
+  if (lookup.state !== "fresh" || !lookup.freshEntry) return lookup;
+  const dependency = lookup.freshEntry.report.dependencies;
+  if (!dependency) return { state: "stale", freshEntry: null, previousEntry: lookup.previousEntry, staleReason: "resolver-version" };
+  const result = await validate(dependency);
+  if (result.current) return lookup;
+  return { state: "stale", freshEntry: null, previousEntry: lookup.previousEntry,
+    staleReason: result.receipt.players !== dependency.players || result.receipt.guilds !== dependency.guilds ? "identity-revision" : "scan-fingerprint" };
+}
+
 export const loadFusionIdentityAnalysisCacheSnapshot =
   async (): Promise<FusionIdentityAnalysisCacheSnapshot> => {
     const db = await getCacheDb();
@@ -217,16 +235,18 @@ export const readFusionIdentityAnalysisCache = async (input: {
     "by_scopeId",
     input.scope.id,
   );
-  return classifyFusionIdentityAnalysisCache(entries, input);
+  return revalidateFusionIdentityAnalysisCache(classifyFusionIdentityAnalysisCache(entries, input));
 };
 
 export const writeFusionIdentityAnalysisCache = async (input: {
+  resolverVersion: number;
   scope: FusionIdentityAnalysisScope;
   scanFingerprint: string;
   identityRevision: string;
   report: FusionIdentityManagementReport;
   timings: FusionIdentityWorkerTiming[];
 }): Promise<FusionIdentityAnalysisCacheEntry> => {
+  if (!isFusionResolverVersionCompatible(input.resolverVersion)) throw new Error("Fusion resolver version changed during analysis.");
   const entry: FusionIdentityAnalysisCacheEntry = {
     key: createFusionIdentityAnalysisCacheKey(input),
     scopeId: input.scope.id,
@@ -234,7 +254,7 @@ export const writeFusionIdentityAnalysisCache = async (input: {
     originServerCodes: input.scope.originServerCodes,
     scanFingerprint: input.scanFingerprint,
     identityRevision: input.identityRevision,
-    resolverVersion: CURRENT_FUSION_RESOLVER_VERSION,
+    resolverVersion: input.resolverVersion,
     schemaVersion: CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION,
     analyzedAt: new Date().toISOString(),
     summary: input.report.summary,

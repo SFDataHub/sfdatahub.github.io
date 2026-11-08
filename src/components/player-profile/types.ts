@@ -110,6 +110,7 @@ export type HeroPanelData = {
   guildJoined?: string | null;
   levelLabel?: string;
   lastScanLabel?: string;
+  lastScanAtMs?: number | null;
   lastScanAtLabel?: string;
   lastScanDays?: number | null;
   status?: "online" | "offline" | "unknown";

@@ -1,6 +1,7 @@
+import { projectPlayerAttributeValues, playerAttributeRatio } from "./playerAttributeColumns";
 import { getClassMetaById } from "../../data/classes";
 import { normalizeSfGuildsFromScan } from "../parsing/normalizedGuild";
-import { normalizeSfPlayerCharacterCore } from "../parsing/normalizedPlayer";
+import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../parsing/normalizedPlayer";
 import { validateScanArchivePayload } from "../scanArchive/validation";
 import { readSfPlayerStats as readPlayerStats } from "../parsing/parseSfJson";
 import { normalizeServerKeyFromInput } from "../players/identifier";
@@ -20,6 +21,12 @@ import type {
 import { normalizeGuildSegmentForScan } from "../guilds/guildScanNormalizer";
 
 type JsonRecord = Record<string, unknown>;
+
+/** Optional builder projection using the core/stats already prepared for a row. */
+export type LocalToplistPlayerProjection = (
+  row: LocalPlayerToplistRow, raw: JsonRecord, core: NormalizedPlayer | null,
+  stats: ReturnType<typeof readPlayerStats>,
+) => LocalPlayerToplistRow;
 
 const asRecord = (value: unknown): JsonRecord | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null;
@@ -128,6 +135,7 @@ const derivePlayerRow = (
   source: LocalToplistConfirmedScanSource,
   player: unknown,
   sourceServer: string,
+  projectPlayer?: LocalToplistPlayerProjection,
 ): LocalPlayerToplistRow | null => {
   const record = asRecord(player);
   if (!record) return null;
@@ -203,7 +211,7 @@ const derivePlayerRow = (
   const con = stats.conBase;
   const ratio = deriveRatioMain(main, con);
   const latestScanAtSec = timestampSec(source.scanTimestamp);
-  return {
+  const row: LocalPlayerToplistRow = {
     rowKey: `${sourceServer}:${identifier}`,
     identifier,
     playerId: String(normalized?.identity.id ?? playerIdFromIdentifier(identifier) ?? "") || null,
@@ -225,6 +233,9 @@ const derivePlayerRow = (
     con,
     sum,
     ratio,
+    attributeValues: projectPlayerAttributeValues(normalized, classId),
+    ratioBase: playerAttributeRatio(main, con),
+    ratioTotal: playerAttributeRatio(stats.attrTotal, stats.conTotal),
     mainTotal: stats.attrTotal,
     conTotal: stats.conTotal,
     sumTotal,
@@ -237,6 +248,7 @@ const derivePlayerRow = (
     lastScan: String(latestScanAtSec),
     latestScanAtSec,
   };
+  return projectPlayer ? projectPlayer(row, record, normalized, stats) : row;
 };
 
 const dedupeRows = <T extends { identifier?: string | null; guildIdentifier?: string | null }>(
@@ -372,6 +384,7 @@ const sourceIsConfirmed = (source: LocalToplistConfirmedScanSource) =>
 
 export function deriveLocalToplistsFromConfirmedScans(
   sources: readonly LocalToplistConfirmedScanSource[],
+  projectPlayer?: LocalToplistPlayerProjection,
 ): LocalToplistDerivationResult {
   const issues: LocalToplistIssue[] = [];
   const snapshots: LocalToplistSnapshotMeta[] = [];
@@ -405,7 +418,7 @@ export function deriveLocalToplistsFromConfirmedScans(
 
     const sourceIssues: LocalToplistIssue[] = [];
     const playerRows = rawPlayers.flatMap((player): LocalPlayerToplistRow[] => {
-      const row = derivePlayerRow(source, player, sourceServer);
+      const row = derivePlayerRow(source, player, sourceServer, projectPlayer);
       if (!row) {
         sourceIssues.push(sourceIssue(source, "missing-player-identifier", "error", "Spieler ohne Identifier uebersprungen."));
         return [];

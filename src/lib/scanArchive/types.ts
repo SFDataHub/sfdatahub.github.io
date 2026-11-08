@@ -1,3 +1,8 @@
+import type { HubSearchAppearance } from "../data-hub/hubSearchAppearance";
+
+export const SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION = 2;
+export type ScanArchiveSearchSchemaVersion = 1 | typeof SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION;
+
 export type ScanArchiveCatalogEntry = {
   year: number;
   active: boolean;
@@ -26,7 +31,7 @@ export type ScanArchiveManifestScan = {
 };
 
 export type ScanArchiveSearchIndexMetadata = {
-  schemaVersion: 1;
+  schemaVersion: ScanArchiveSearchSchemaVersion;
   path: string;
   sha256: string;
   compressedBytes: number;
@@ -47,6 +52,17 @@ export type ScanArchiveToplistReference =
       scanIds: string[];
     };
 
+export type ScanArchiveRankingMetadata = {
+  schemaVersion: 1 | 2;
+  path: string;
+  sha256: string;
+  compressedBytes: number;
+  uncompressedBytes: number;
+  cohortId: string;
+  playerCount: number;
+  guildCount: number;
+};
+
 export type ScanArchiveManifest = {
   schemaVersion: 1;
   archiveYear: number;
@@ -56,6 +72,7 @@ export type ScanArchiveManifest = {
   serverCount: number;
   scans: ScanArchiveManifestScan[];
   toplists?: ScanArchiveToplistsManifest;
+  rankings?: Record<string, Record<string, ScanArchiveRankingMetadata>>;
 };
 
 export type ScanArchiveEntry = ScanArchiveManifestScan & {
@@ -63,6 +80,8 @@ export type ScanArchiveEntry = ScanArchiveManifestScan & {
   manifestRevision: number;
   manifestUrl: string;
   fileUrl: string;
+  /** Explicit manifest memberships only; passive metadata, not a toplist selection. */
+  monthlySets?: readonly { key: string; scanIds: readonly string[]; members: readonly Pick<ScanArchiveManifestScan, "id" | "server" | "timestamp" | "sha256" | "playerCount" | "groupCount">[] }[];
   toplistSetKey?: string;
   toplistSetScanIds?: string[];
 };
@@ -80,6 +99,7 @@ export type ScanArchiveSourceMetadata = {
 };
 
 export type ScanArchiveSearchIndexPlayerEntry = {
+  appearance?: HubSearchAppearance;
   identifier: string;
   name: string;
   guildIdentifier?: string | null;
@@ -88,12 +108,13 @@ export type ScanArchiveSearchIndexPlayerEntry = {
 };
 
 export type ScanArchiveSearchIndexGuildEntry = {
+  appearance?: HubSearchAppearance;
   identifier: string;
   name: string;
 };
 
 export type ScanArchiveSearchIndexPayload = {
-  schemaVersion: 1;
+  schemaVersion: ScanArchiveSearchSchemaVersion;
   archiveScanId: string;
   sourceSha256: string;
   server: string;

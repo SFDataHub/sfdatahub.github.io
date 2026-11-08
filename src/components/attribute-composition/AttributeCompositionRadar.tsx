@@ -1,4 +1,6 @@
-import { useMemo } from "react";
+import { auditGraphBegin, auditResultId, auditCall, auditReturn, auditLeave } from "../../lib/data-hub/runtimeAudit";
+import { useRuntimeAuditGraphCommit } from "../../lib/data-hub/useRuntimeAuditGraphCommit";
+import { useMemo, useRef } from "react";
 import {
   ATTRIBUTE_COMPOSITION_RADAR_LABELS,
   buildAttributeCompositionRadarModel,
@@ -39,12 +41,17 @@ const labelAnchorForPoint = (point: { x: number; y: number }, center: number) =>
 const axisByKey = (axes: AttributeCompositionRadarAxis[]) => new Map(axes.map((axis) => [axis.key, axis]));
 
 export type AttributeCompositionRadarProps = {
+  auditInput?: object;
   composition: AttributeCompositionModel | null | undefined;
   onOpenDetails: () => void;
 };
 
-export default function AttributeCompositionRadar({ composition, onOpenDetails }: AttributeCompositionRadarProps) {
-  const radar = useMemo(() => buildAttributeCompositionRadarModel(composition), [composition]);
+export default function AttributeCompositionRadar({ composition, onOpenDetails, auditInput }: AttributeCompositionRadarProps) {
+  const rootRef = useRef<HTMLElement>(null);
+  const graphAudit = useMemo(() => auditInput ? auditGraphBegin("F18", "profile-attribute-radar", auditResultId(auditInput)) : null, [composition, auditInput]);
+  const radar = useMemo(() => auditCall(graphAudit, "graph-geometry", () => buildAttributeCompositionRadarModel(composition)), [composition]);
+  useRuntimeAuditGraphCommit(radar, !!radar, "profile-attribute-radar", rootRef, graphAudit?.id);
+  auditReturn(graphAudit, radar); auditLeave(graphAudit);
   const center = 64;
   const radius = 42;
   const labelRadius = 54;
@@ -66,7 +73,7 @@ export default function AttributeCompositionRadar({ composition, onOpenDetails }
     : "";
 
   return (
-    <section className="attribute-composition-radar-card" aria-label="Attribute composition">
+    <section ref={rootRef} className="attribute-composition-radar-card" aria-label="Attribute composition">
       <header className="attribute-composition-radar-card__head">
         <h3>ATTRIBUTE COMPOSITION</h3>
         <button

@@ -1,0 +1,60 @@
+{
+  "provenance": {
+    "source": "Furaken.json",
+    "sha256": "f63708542ea5996f72cc9c9a413759de3abaa61ad47d47af1cce357a993eff28",
+    "rawIndices": [
+      724,
+      869,
+      946,
+      968,
+      1276,
+      1298,
+      1363
+    ],
+    "fields": "Unchanged original reference/name/time fields; W197 report section 4"
+  },
+  "players": [
+    {
+      "identifier": "s1_com.pt_p377532",
+      "prefix": "s1_com.pt",
+      "name": "deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "rtl2_de_p275360",
+      "prefix": "rtl2_de",
+      "name": "deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "ingame_de_p104777",
+      "prefix": "ingame_de",
+      "name": "Deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "gamona_de_p66067",
+      "prefix": "gamona_de",
+      "name": "deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "buffed_de_p45414",
+      "prefix": "buffed_de",
+      "name": "Deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "s1_com.br_p243119",
+      "prefix": "s1_com.br",
+      "name": "deinnachbar",
+      "timestamp": 1641156167329
+    },
+    {
+      "identifier": "xchar_de_p68807",
+      "prefix": "xchar_de",
+      "name": "deinnachbar",
+      "timestamp": 1641156167329
+    }
+  ]
+}

@@ -9,30 +9,25 @@ const OPEN_LOGIN_MODAL_EVENT = "sfh:openLoginModal";
 const LoginModalHost: React.FC = () => {
   const { status, user } = useAuth();
   const location = useLocation();
-  const [isOpen, setIsOpen] = React.useState(false);
+  // Bind the request to this router location, including POP navigation.
+  const [loginLocation, setLoginLocation] = React.useState<typeof location | null>(null);
+  const isOpen = loginLocation === location && location.pathname !== "/login";
 
-  React.useEffect(() => {
-    const handler = () => setIsOpen(true);
-    window.addEventListener(OPEN_LOGIN_MODAL_EVENT, handler as EventListener);
-    return () => window.removeEventListener(OPEN_LOGIN_MODAL_EVENT, handler as EventListener);
-  }, []);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    if (location.pathname === "/login") {
-      setIsOpen(false);
-    }
-  }, [isOpen, location.pathname]);
+  React.useLayoutEffect(() => {
+    const handler = () => setLoginLocation(location);
+    window.addEventListener(OPEN_LOGIN_MODAL_EVENT, handler);
+    return () => window.removeEventListener(OPEN_LOGIN_MODAL_EVENT, handler);
+  }, [location]);
 
   React.useEffect(() => {
     if (!isOpen) return;
     const isAuthenticated = status === "authenticated" && !!user;
     if (isAuthenticated) {
-      setIsOpen(false);
+      setLoginLocation(null);
     }
   }, [isOpen, status, user]);
 
-  return <LoginModal isOpen={isOpen} onClose={() => setIsOpen(false)} />;
+  return <LoginModal isOpen={isOpen} onClose={() => setLoginLocation(null)} />;
 };
 
 export default LoginModalHost;

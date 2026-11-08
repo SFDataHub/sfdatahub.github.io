@@ -1,3 +1,6 @@
+import { seedLocalSourceValidityFixture } from "./localSourceValidityFixture.mts";
+import { GUILD_SCAN_NORMALIZER_VERSION } from "../../src/lib/guilds/guildScanNormalizer.ts";
+import { LOCAL_SCAN_CORE_NORMALIZER_VERSION } from "../../src/lib/guilds/localSourceValidity.ts";
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -9,6 +12,7 @@ import {
   type GuildAnalyticsGuildIdentity,
 } from "../../src/lib/guilds/localGuildAnalytics.ts";
 import {
+  DERIVED_ANALYTICS_VERSION,
   ensureGuildAnalyticsScopedDataFromSummaries,
   readGuildAnalyticsScopedData,
   type GuildAnalyticsDerivedSnapshot,
@@ -130,6 +134,8 @@ const identitySnapshot: IdentityResolutionSnapshot = {
 const snapshot = (id: string, timestamp: number): GuildAnalyticsDerivedSnapshot => ({
   id,
   sourceScanId: `source-${id}`,
+  sourceGeneration: `generation-${id}`,
+  derivedVersion: DERIVED_ANALYTICS_VERSION,
   sourceScanFilename: `${id}.json`,
   sourceImportedAt: new Date(timestamp).toISOString(),
   timestamp: new Date(timestamp).toISOString(),
@@ -146,6 +152,8 @@ const guildSnapshot = (
   id: `${snapshotId}::guild::${guildIdentifier}`,
   snapshotId,
   sourceScanId: `source-${snapshotId}`,
+  sourceGeneration: `generation-${snapshotId}`,
+  derivedVersion: DERIVED_ANALYTICS_VERSION,
   sourceScanFilename: `${snapshotId}.json`,
   snapshotTimestamp: timestamp,
   server: guildIdentifier.split("_")[0] ?? null,
@@ -168,6 +176,8 @@ const memberSnapshot = (
   id: `${snapshotId}::member::${memberRef}`,
   snapshotId,
   sourceScanId: `source-${snapshotId}`,
+  sourceGeneration: `generation-${snapshotId}`,
+  derivedVersion: DERIVED_ANALYTICS_VERSION,
   sourceScanFilename: `${snapshotId}.json`,
   snapshotTimestamp: timestamp,
   memberRef,
@@ -242,6 +252,17 @@ const seedAnalyticsDb = async () => {
   const db = await openAnalyticsDb();
   const tx = db.transaction([SOURCE_STORE, SNAPSHOT_STORE, MEMBER_STORE, GUILD_STORE], "readwrite");
   await Promise.all([
+    ...snapshots.map((entry) => tx.objectStore(SOURCE_STORE).put({
+      sourceScanId: entry.sourceScanId,
+      sourceUpdatedAt: entry.sourceImportedAt,
+      sourceContentHash: `hash-${entry.sourceScanId}`,
+      derivedVersion: DERIVED_ANALYTICS_VERSION,
+      sourceGeneration: entry.sourceGeneration,
+      normalizerVersion: GUILD_SCAN_NORMALIZER_VERSION,
+      coreNormalizerVersion: LOCAL_SCAN_CORE_NORMALIZER_VERSION,
+      materializedAt: entry.sourceImportedAt,
+      snapshotCount: 1,
+    })),
     ...snapshots.map((entry) => tx.objectStore(SNAPSHOT_STORE).put(entry)),
     ...members.map((entry) => tx.objectStore(MEMBER_STORE).put(entry)),
     ...guilds.map((entry) => tx.objectStore(GUILD_STORE).put(entry)),
@@ -258,6 +279,15 @@ const readModeDiagnostic = (
 ) => entries.find((entry) => entry.phase === "analytics-read-mode");
 
 await deleteDB(DB_NAME);
+for (const entry of snapshots) {
+  await seedLocalSourceValidityFixture({
+    id: entry.sourceScanId, sourceGeneration: entry.sourceGeneration,
+    normalizerVersion: GUILD_SCAN_NORMALIZER_VERSION, coreNormalizerVersion: LOCAL_SCAN_CORE_NORMALIZER_VERSION,
+    normalizedMembers: [], contentHash: `hash-${entry.sourceScanId}`, filename: entry.sourceScanFilename,
+    importedAt: entry.sourceImportedAt, scannedAt: entry.timestamp, servers: [],
+    playerCount: 0, groupCount: 0, guildCount: 0, rawData: { players: [], groups: [] },
+  });
+}
 await seedAnalyticsDb();
 
 const scopedDiagnostics: Array<{ phase: string; details?: Record<string, string | number | boolean | null> }> = [];

@@ -126,7 +126,7 @@ assert.equal(search.normalizedQuery, "ather");
 assert.equal(search.results[0].kind, "player");
 assert.equal(search.results[0].identifier, "eu1_p1");
 assert.equal(search.results[0].status, "jumpable");
-assert.equal(search.results.find((result: any) => result.identifier === "eu1_p3")?.status, "outside-toplist");
+assert.equal(search.results.find((result: any) => result.identifier === "eu1_p3")?.status, "jumpable");
 
 const guildSearch = send({
   requestId: 4,

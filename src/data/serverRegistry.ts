@@ -78,7 +78,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "BR",
     type: "origin",
     active: false,
-    aliases: ["s1_br", "s1br"],
+    aliases: ["s1_br", "s1br", "s1_com.br"],
   },
   {
     code: "BR2",
@@ -100,7 +100,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "DE",
     type: "origin",
     active: false,
-    aliases: [],
+    aliases: ["buffed_de"],
   },
   {
     code: "CA1",
@@ -1203,7 +1203,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 466,
     region: "EU",
     type: "origin",
-    active: true,
+    active: false,
     aliases: ["s5_eu", "s5eu"],
   },
   {
@@ -1214,7 +1214,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 472,
     region: "EU",
     type: "origin",
-    active: true,
+    active: false,
     aliases: ["s6_eu", "s6eu"],
   },
   {
@@ -1225,7 +1225,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 475,
     region: "EU",
     type: "origin",
-    active: true,
+    active: false,
     aliases: ["s7_eu", "s7eu"],
   },
   {
@@ -1236,7 +1236,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 479,
     region: "EU",
     type: "origin",
-    active: true,
+    active: false,
     aliases: ["s8_eu", "s8eu"],
   },
   {
@@ -1489,7 +1489,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 562,
     region: "EU",
     type: "origin",
-    active: false,
+    active: true,
     aliases: ["s31_eu", "s31eu"],
   },
   {
@@ -1808,7 +1808,7 @@ export const LOCAL_SERVER_REGISTRY = [
     numericId: 550,
     region: "Fusion",
     type: "fusion",
-    active: false,
+    active: true,
     aliases: ["f29_fu", "f29fu", "f29_net", "f29net"],
   },
   {
@@ -1985,7 +1985,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "DE",
     type: "origin",
     active: false,
-    aliases: [],
+    aliases: ["gamona_de"],
   },
   {
     code: "GNAROGRIM",
@@ -2304,7 +2304,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "DE",
     type: "origin",
     active: false,
-    aliases: [],
+    aliases: ["ingame_de"],
   },
   {
     code: "IT1",
@@ -2414,7 +2414,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "Fusion",
     type: "named",
     active: true,
-    aliases: ["maerwynn_net", "maerwynnnet"],
+    aliases: ["maerwynn_net", "maerwynnnet", "mearwynn"],
   },
   {
     code: "MINIJUEGOS",
@@ -2920,7 +2920,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "PT",
     type: "origin",
     active: false,
-    aliases: ["s1_pt", "s1pt"],
+    aliases: ["s1_pt", "s1pt", "s1_com.pt"],
   },
   {
     code: "PT2",
@@ -3030,7 +3030,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "DE",
     type: "origin",
     active: false,
-    aliases: [],
+    aliases: ["rtl2_de"],
   },
   {
     code: "RU1",
@@ -4009,7 +4009,7 @@ export const LOCAL_SERVER_REGISTRY = [
     region: "DE",
     type: "origin",
     active: false,
-    aliases: [],
+    aliases: ["xchar_de"],
   },
 ] as const satisfies readonly LocalServerDefinition[];
 

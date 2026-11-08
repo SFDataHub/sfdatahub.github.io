@@ -1,0 +1,461 @@
+{
+  "result": [
+    "actual Dashboard static Current before held worker (179.1 ms), competing Cards/Trend, profile source join/promotion, comparison, rank partial, independent Close",
+    "actual F28 Playground standard search/selection/results and Gildentrend, foreign scope no rebuild",
+    "actual default F28 GuildTrend follows Darth Monk into a newly imported guild using target-player dependencies",
+    "actual Worker stalled Card dispatch: finite watchdog error, static Current retained, late reply ignored, final Unmount cleanup (test budget 1000 ms; production 30000 ms)",
+    "real browser IDB/Worker: source jobs 6, source indexes 6, joins 18, DTO input/result 92779/43044 bytes, worker roundtrips 691.1 ms; after last release sources/projections/worker/awaits all zero; pending Close no late writes"
+  ],
+  "calls": [
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-current",
+      "at": 11460.5239
+    },
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-mid",
+      "at": 11599.4323
+    },
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-tie-a",
+      "at": 11659.7654
+    },
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-old",
+      "at": 11718.2605
+    },
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-partial",
+      "at": 11775.782
+    },
+    {
+      "kind": "source",
+      "id": "baseline-50-w06-missing-start",
+      "at": 11810.0985
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11870.4838
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11914.3275
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11934.7297
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11953.9903
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11968.9004
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 11991.5814
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 12013.6454
+    },
+    {
+      "kind": "cards",
+      "id": "projection",
+      "at": 12028.3862
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-current",
+      "at": 13859.1149
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-mid",
+      "at": 14198.0693
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-tie-a",
+      "at": 14203.9221
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-partial",
+      "at": 14220.0915
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-missing-start",
+      "at": 14236.5106
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-old",
+      "at": 14254.493
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 14273.9005
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14300.1961
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14358.3852
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14381.3332
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14417.1145
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14427.2178
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 14439.222
+    },
+    {
+      "kind": "cards",
+      "id": "projection",
+      "at": 14456.4178
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-current",
+      "at": 15072.2425
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-mid",
+      "at": 15081.8089
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-tie-a",
+      "at": 15088.185
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-partial",
+      "at": 15093.9553
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-missing-start",
+      "at": 15103.4306
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-old",
+      "at": 15111.5256
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15118.748
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15136.9721
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15145.6251
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15154.8931
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15162.4054
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15173.2427
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 15183.9476
+    },
+    {
+      "kind": "cards",
+      "id": "projection",
+      "at": 15192.8641
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu4q:424aa2de-3ee7-4b19-bbde-6f597f8a4f02",
+      "at": 15364.2097
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-current",
+      "at": 15388.7158
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu35:83204535-864c-4f46-acbd-3989e1f767e2",
+      "at": 15394.6675
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-mid",
+      "at": 15401.6642
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-tie-a",
+      "at": 15408.7635
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-partial",
+      "at": 15417.0327
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-missing-start",
+      "at": 15423.3762
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-old",
+      "at": 15429.852
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 15438.7889
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15444.2035
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15453.6991
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15462.4566
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15477.0924
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15486.3609
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15494.7973
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15504.6046
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu4q:424aa2de-3ee7-4b19-bbde-6f597f8a4f02",
+      "at": 15800.1791
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-current",
+      "at": 15831.2696
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu35:83204535-864c-4f46-acbd-3989e1f767e2",
+      "at": 15854.537
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-mid",
+      "at": 15869.9563
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-tie-a",
+      "at": 15877.639
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-partial",
+      "at": 15892.334
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-missing-start",
+      "at": 15907.5506
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-old",
+      "at": 15920.8236
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 15936.3896
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15943.1281
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15956.3764
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15972.3287
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15983.8872
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 15991.2593
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16001.6249
+    },
+    {
+      "kind": "cards",
+      "id": "projection",
+      "at": 16013.4994
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu4q:424aa2de-3ee7-4b19-bbde-6f597f8a4f02",
+      "at": 16268.4705
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-current",
+      "at": 16277.9549
+    },
+    {
+      "kind": "source",
+      "id": "guild-hub-scan:muzrzu35:83204535-864c-4f46-acbd-3989e1f767e2",
+      "at": 16284.9142
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-mid",
+      "at": 16294.1826
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-tie-a",
+      "at": 16302.7952
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-partial",
+      "at": 16308.8263
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-missing-start",
+      "at": 16314.8163
+    },
+    {
+      "kind": "source",
+      "id": "baseline-2-w06-old",
+      "at": 16321.3241
+    },
+    {
+      "kind": "trend",
+      "id": "projection",
+      "at": 16327.5648
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16335.8144
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16357.6961
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16369.3473
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16377.5534
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16387.2322
+    },
+    {
+      "kind": "card-source",
+      "id": "projection",
+      "at": 16395.1317
+    },
+    {
+      "kind": "cards",
+      "id": "projection",
+      "at": 16407.1512
+    }
+  ]
+}

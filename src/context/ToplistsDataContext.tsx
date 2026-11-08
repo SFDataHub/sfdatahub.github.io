@@ -33,7 +33,7 @@ import { normalizeServerKeyFromInput } from "../lib/players/identifier";
 
 const DEFAULT_GROUP = "EU";
 const FALLBACK_SERVER_GROUPS = buildServerGroupsFromCodes(
-  SERVERS.map((s) => s.id).filter((id): id is string => typeof id === "string" && !!id)
+  SERVERS.filter((s) => s.active !== false).map((s) => s.id).filter((id): id is string => typeof id === "string" && !!id)
 );
 
 type CachedPlayerToplist = {
@@ -227,7 +227,7 @@ export function ToplistsProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       if (result.ok) {
-        const grouped = buildServerGroupsFromCodes(result.servers);
+        const grouped = buildServerGroupsFromCodes([...result.servers, ...SERVERS.filter((s) => s.active !== false).map((s) => s.id)]);
         const hasServers = Object.values(grouped).some((list) => list.length > 0);
         if (hasServers) {
           setServerGroups(grouped);

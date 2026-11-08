@@ -4,6 +4,7 @@ import {
   CURRENT_FUSION_ANALYSIS_SCHEMA_VERSION,
   CURRENT_FUSION_RESOLVER_VERSION,
   classifyFusionIdentityAnalysisCache,
+  revalidateFusionIdentityAnalysisCache,
   classifyFusionIdentityAnalysisCacheSnapshot,
   createFusionIdentityAnalysisCacheKey,
   createFusionIdentityAnalysisCacheSnapshot,
@@ -421,4 +422,29 @@ const entry = (input: {
     identityRevision: "identity-a",
   });
   assert.equal(missingCache.state, "never-analyzed");
+}
+
+// Another scope can change an allIdentities receipt without changing this
+// scope's content hash. The normal dashboard must offer Analyze again.
+{
+  const dependency = { need: { allIdentities: true }, sources: 10, players: 4, guilds: 3 };
+  const saved = entry({ scanFingerprint: "same-source", identityRevision: "same-scope", reportOverride: { ...report, dependencies: dependency } });
+  const structural = classifyFusionIdentityAnalysisCache([saved], { scope, scanFingerprint: "same-source", identityRevision: "same-scope" });
+  assert.equal(await revalidateFusionIdentityAnalysisCache(structural, async receipt => ({ current: true, receipt })), structural, "valid report object is reused");
+  const stale = await revalidateFusionIdentityAnalysisCache(structural, async receipt => ({ current: false, receipt: { ...receipt, players: 5 } }));
+  assert.equal(stale.state, "stale"); assert.equal(stale.staleReason, "identity-revision");
+  assert.equal(stale.freshEntry, null); assert.equal(stale.previousEntry, saved, "previous evidence is preserved without cache deletion");
+  assert.equal(structural.state, "fresh", "validation never mutates the structural snapshot");
+  const sourceChanged = await revalidateFusionIdentityAnalysisCache(structural, async receipt => ({ current: false, receipt: { ...receipt, sources: 11 } }));
+  assert.equal(sourceChanged.staleReason, "scan-fingerprint");
+  const missing = classifyFusionIdentityAnalysisCache([entry({ scanFingerprint: "same-source", identityRevision: "same-scope" })], { scope, scanFingerprint: "same-source", identityRevision: "same-scope" });
+  assert.equal((await revalidateFusionIdentityAnalysisCache(missing)).state, "stale", "missing write certificate requires fresh normal analysis");
+  await assert.rejects(revalidateFusionIdentityAnalysisCache(structural, async () => { throw Error("durable receipt unavailable"); }), /durable receipt unavailable/);
+}
+
+// W122: receiving code cannot certify a late result with today's rule version.
+{
+  const { writeFusionIdentityAnalysisCache } = await import('../../src/lib/identities/fusionAnalysisCache.ts');
+  await assert.rejects(()=>writeFusionIdentityAnalysisCache({scope,scanFingerprint:'same',identityRevision:'same',report,timings:[],resolverVersion:CURRENT_FUSION_RESOLVER_VERSION-1}),/resolver version changed/);
+  await assert.rejects(()=>writeFusionIdentityAnalysisCache({scope,scanFingerprint:'same',identityRevision:'same',report,timings:[],resolverVersion:undefined as never}),/resolver version changed/);
 }

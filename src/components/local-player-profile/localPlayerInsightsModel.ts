@@ -1,22 +1,15 @@
+import { serverComparisonKey } from "../../lib/servers/serverResolver";
+import type { LocalPlayerCurrentSeed } from "../../pages/GuildHub/localPlayerCurrentSeed";
+import { getGuildHubLocalScan, type GuildHubLocalScan } from "../../lib/guilds/localScanLibrary";
+import type { LocalProfileStatus, LocalProfileEvidence } from "../../lib/local-player-profile/contract";
+import { acquireLocalPlayerProfile } from "../../lib/local-player-profile/coordinator";
 import {
-  getGuildHubLocalScan,
-  listGuildHubScanSummaries,
-  type GuildHubLocalScan,
-} from "../../lib/guilds/localScanLibrary";
-import {
-  ensureGuildAnalyticsDerivedDataFromSummaries,
-} from "../../lib/guilds/localGuildAnalyticsStore";
-import {
-  isNormalizedGuildMemberInGuild,
-  normalizeGuildScanMember,
   normalizeGuildSegmentForScan,
 } from "../../lib/guilds/guildScanNormalizer";
-import { loadIdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
 import { normalizeSfGuild } from "../../lib/parsing/normalizedGuild";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
 import {
-  buildPlayerPerformanceModel,
   type PlayerPerformanceSnapshot,
 } from "../../pages/Playground/playerPerformanceModel";
 import type { LocalBaseStatValues, LocalPlayerProfileModel } from "./types";
@@ -32,7 +25,9 @@ export type LocalPlayerAttributeComparison = {
 };
 
 export type LocalPlayerInsightsModel = {
-  status: "ready" | "loading" | "error";
+  status: "ready" | "loading" | "partial" | "error";
+  availability?: { current: LocalProfileStatus; bests: LocalProfileStatus };
+  dependencies?: { current?: LocalProfileEvidence; bests?: LocalProfileEvidence };
   message?: string;
   rankings: {
     player: number | null;
@@ -44,6 +39,7 @@ export type LocalPlayerInsightsModel = {
     itemsDiscovered: number | null;
   };
   playerVsAverage: LocalPlayerAttributeComparison[];
+  playerVsAverageTotal?: LocalPlayerAttributeComparison[];
   personalBests: {
     highestXpPerDay: number | null;
     highestDungeon: number | null;
@@ -63,61 +59,29 @@ const ATTRIBUTE_DEFS: Array<{ key: keyof LocalBaseStatValues; normalizedKey: key
 ];
 
 export async function buildLocalPlayerInsights(profile: LocalPlayerProfileModel): Promise<LocalPlayerInsightsModel> {
-  const [currentScan, summaries, identityResolutionSnapshot] = await Promise.all([
-    getGuildHubLocalScan(profile.sourceScanId),
-    listGuildHubScanSummaries(),
-    loadIdentityResolutionSnapshot(),
-  ]);
-  const analyticsData = await ensureGuildAnalyticsDerivedDataFromSummaries(summaries, {
-    loadSourceById: getGuildHubLocalScan,
-  });
-  const performance = buildPlayerPerformanceModel([], {
-    analyticsData,
-    identityResolutionSnapshot,
-    target: {
-      name: profile.analytics.playerName,
-      server: profile.analytics.server,
-      memberRef: profile.analytics.memberRef,
-    },
-  });
-  const currentScanModel = buildCurrentScanInsights(profile, currentScan);
-  const personalBests = await buildPersonalBests(performance.snapshots);
-
-  return {
-    status: "ready",
-    rankings: currentScanModel.rankings,
-    progression: currentScanModel.progression,
-    playerVsAverage: currentScanModel.playerVsAverage,
-    personalBests,
-  };
+  const lease = acquireLocalPlayerProfile(profile);
+  try {
+    const [current, bests] = await Promise.all([lease.request("currentInsights"), lease.request("bests")]);
+    if (!current.value) throw new Error(current.reason ?? "Local player observation unavailable");
+    return { status: bests.status === "error" || bests.status === "cancelled" ? "error" : bests.status === "partial" || bests.status === "empty" ? "partial" : "ready", message: bests.reason,
+      availability: { current: current.status, bests: bests.status }, dependencies: { current: current.evidence, bests: bests.evidence },
+      ...current.value, personalBests: bests.value ?? emptyPersonalBests() };
+  } finally { lease.release(); }
 }
 
-function buildCurrentScanInsights(profile: LocalPlayerProfileModel, scan: GuildHubLocalScan | null) {
-  const raw = asRecord(scan?.rawData);
-  const players = filterEntriesForTimestamp(Array.isArray(raw?.players) ? raw.players : [], profile.analytics.scannedAtMs)
-    .map(asRecord)
-    .filter((entry): entry is JsonRecord => Boolean(entry));
-  const groups = filterEntriesForTimestamp(
-    Array.isArray(raw?.groups) ? raw.groups : Array.isArray(raw?.guilds) ? raw.guilds : [],
-    profile.analytics.scannedAtMs,
-  )
-    .map(asRecord)
-    .filter((entry): entry is JsonRecord => Boolean(entry));
+export type LocalCurrentInsights = Omit<LocalPlayerInsightsModel, "status" | "message" | "personalBests" | "availability" | "dependencies">;
+export const emptyPersonalBests = (): LocalPlayerInsightsModel["personalBests"] => ({ highestXpPerDay: null, highestDungeon: null, bestServerRank: null, historyAvailable: false });
+
+export function buildCurrentScanInsights(profile: LocalPlayerProfileModel, seed: LocalPlayerCurrentSeed) {
+  if (seed.preparedInsights) return seed.preparedInsights;
+  const player = seed.rawPlayer;
+  const groups = [...seed.guildGroups];
   const fallbackServer = normalizeServer(profile.analytics.server);
-  const player = findCurrentPlayer(players, profile, fallbackServer);
-  const normalizedPlayer = safeNormalizePlayer(player);
+  const normalizedPlayer = "normalizedCore" in seed ? seed.normalizedCore ?? null : safeNormalizePlayer(player);
+  seed.normalizedCore = normalizedPlayer;
+  seed.coreLookup?.set(player, normalizedPlayer);
   const guildSegment = normalizeGuildSegmentForScan(profile.analytics.guildIdentifier);
-  const guildName = profile.analytics.guildName ?? normalizedPlayer?.guild.name ?? null;
-  const guildIdentity = {
-    name: guildName ?? "",
-    server: fallbackServer,
-    guildSegment,
-  };
-  const guildPlayers = players.filter((entry) => {
-    const member = normalizeGuildScanMember(entry, fallbackServer);
-    if (!member) return false;
-    return isNormalizedGuildMemberInGuild(member, guildIdentity);
-  });
+  const guildPlayers = seed.guildPlayers;
   const guild = findCurrentGuild(groups, profile, fallbackServer, guildSegment);
 
   return {
@@ -130,22 +94,26 @@ function buildCurrentScanInsights(profile: LocalPlayerProfileModel, scan: GuildH
       gameCompletion: null,
       itemsDiscovered: normalizedPlayer?.progressionStatus.scrapbook.count ?? null,
     },
-    playerVsAverage: buildPlayerVsAverage(normalizedPlayer, guildPlayers),
+    playerVsAverage: buildPlayerVsAverage(normalizedPlayer, guildPlayers, seed),
+    playerVsAverageTotal: buildPlayerVsAverage(normalizedPlayer, guildPlayers, seed, "total"),
   };
 }
 
 function buildPlayerVsAverage(
   normalizedPlayer: NormalizedPlayer | null,
-  guildPlayers: JsonRecord[],
+  guildPlayers: readonly JsonRecord[],
+  seed: LocalPlayerCurrentSeed,
+  mode: "base" | "total" = "base",
 ): LocalPlayerAttributeComparison[] {
   const guildValuesByKey = new Map<keyof LocalBaseStatValues, number[]>();
   ATTRIBUTE_DEFS.forEach((attribute) => guildValuesByKey.set(attribute.key, []));
 
   guildPlayers.forEach((player) => {
-    const normalized = safeNormalizePlayer(player);
+    const normalized = player === seed.rawPlayer ? normalizedPlayer
+      : seed.coreLookup?.has(player) ? seed.coreLookup.get(player) ?? null : safeNormalizePlayer(player);
     if (!normalized) return;
     ATTRIBUTE_DEFS.forEach((attribute) => {
-      const value = finiteNumber(normalized.attributes[attribute.normalizedKey].base);
+      const value = finiteNumber(normalized.attributes[attribute.normalizedKey][mode]);
       if (value != null) guildValuesByKey.get(attribute.key)?.push(value);
     });
   });
@@ -155,16 +123,16 @@ function buildPlayerVsAverage(
     return {
       key: attribute.key,
       label: attribute.label,
-      playerValue: finiteNumber(normalizedPlayer?.attributes[attribute.normalizedKey].base),
+      playerValue: finiteNumber(normalizedPlayer?.attributes[attribute.normalizedKey][mode]),
       guildAverage: average(guildValues),
       validGuildMembers: guildValues.length,
     };
   });
 }
 
-async function buildPersonalBests(snapshots: PlayerPerformanceSnapshot[]): Promise<LocalPlayerInsightsModel["personalBests"]> {
+export async function buildPersonalBests(snapshots: PlayerPerformanceSnapshot[], allowed: () => void = () => {}, onRawRead: () => void = () => {}): Promise<LocalPlayerInsightsModel["personalBests"]> {
   const highestXpPerDay = calculateHighestNonNegativeXpPerDay(snapshots);
-  const ranks = await readRanksFromMatchedSnapshots(snapshots);
+  const ranks = await readRanksFromMatchedSnapshots(snapshots, allowed, onRawRead);
 
   return {
     highestXpPerDay,
@@ -194,11 +162,13 @@ export function calculateHighestNonNegativeXpPerDay(
   return highestXpPerDay;
 }
 
-async function readRanksFromMatchedSnapshots(snapshots: PlayerPerformanceSnapshot[]) {
+async function readRanksFromMatchedSnapshots(snapshots: PlayerPerformanceSnapshot[], allowed: () => void, onRawRead: () => void) {
   const scansById = new Map<string, GuildHubLocalScan | null>();
   await Promise.all(
     [...new Set(snapshots.map((snapshot) => snapshot.scanId))].map(async (scanId) => {
+      allowed(); onRawRead();
       scansById.set(scanId, await getGuildHubLocalScan(scanId));
+      allowed();
     }),
   );
 
@@ -233,25 +203,6 @@ function findSnapshotPlayer(players: JsonRecord[], snapshot: PlayerPerformanceSn
   }) ?? null;
 }
 
-function findCurrentPlayer(players: JsonRecord[], profile: LocalPlayerProfileModel, fallbackServer: string | null) {
-  const sourceKey = profile.sourcePlayerKey.toLowerCase();
-  const memberRef = profile.analytics.memberRef?.toLowerCase() ?? null;
-  return players.find((player) => {
-    const identifier = readString(player, ["identifier", "Identifier"])?.toLowerCase() ?? null;
-    if (identifier && (identifier === sourceKey || identifier === memberRef)) return true;
-    const playerId = readString(player, ["playerId", "Player ID", "id", "ID"]);
-    const server = normalizeServer(
-      readString(player, ["server", "Server", "prefix", "world", "realm"]) ?? parseServerFromIdentifier(identifier) ?? fallbackServer,
-    );
-    if (playerId && server && `${server}_p${playerId}`.toLowerCase() === sourceKey) return true;
-    if (sourceKey.includes(":name:")) {
-      const name = readString(player, ["name", "Name", "playerName", "Player Name"]);
-      return sourceKey.endsWith(`:name:${normalizeLoose(name)}`);
-    }
-    return false;
-  }) ?? null;
-}
-
 function findCurrentGuild(
   groups: JsonRecord[],
   profile: LocalPlayerProfileModel,
@@ -264,7 +215,7 @@ function findCurrentGuild(
     .find((guild) => {
       if (!guild) return false;
       const server = normalizeServer(guild.identity.server);
-      const serverMatches = !fallbackServer || !server || fallbackServer === server;
+      const serverMatches = !fallbackServer || !server || serverComparisonKey(fallbackServer) === serverComparisonKey(server);
       const segment = normalizeGuildSegmentForScan(guild.identity.identifier);
       if (guildSegment && segment && guildSegment === segment && serverMatches) return true;
       return Boolean(guildName && normalizeLoose(guild.identity.name) === guildName && serverMatches);

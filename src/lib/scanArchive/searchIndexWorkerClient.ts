@@ -1,3 +1,4 @@
+import { auditCurrent, auditSpan, auditSpanEnd, auditEvent, auditFields, auditError, auditWorkerEnvelope, auditMergeWorker } from "../data-hub/runtimeAudit";
 import type { ScanArchiveEntry, ScanArchiveSearchIndexPayload } from "./types";
 import type {
   ScanArchiveSearchIndexProgress,
@@ -42,8 +43,13 @@ export function startScanArchiveSearchIndexWorkerRun(options: {
   workerFactory?: () => ScanArchiveSearchIndexWorkerLike;
   onProgress?: (progress: ScanArchiveSearchIndexProgress) => void;
 }): ScanArchiveSearchIndexWorkerRun {
+  const ownerAudit = auditCurrent();
   const requestId = options.requestId ?? createRequestId();
+  const constructorAudit = auditSpan(ownerAudit, "worker-constructor-call", "sync-elapsed");
   const worker = (options.workerFactory ?? createScanArchiveSearchIndexWorker)();
+  auditSpanEnd(ownerAudit, constructorAudit);
+  if (ownerAudit) auditFields(ownerAudit, { workerReady: "unknown; no readiness event", workerInstanceId: requestId, workerKind: "download-search-index" });
+  const roundtripAudit = auditSpan(ownerAudit, "worker-request-roundtrip");
   let settled = false;
   let rejectRun: (reason?: unknown) => void = () => undefined;
   let handleMessage: (event: MessageEvent<ScanArchiveSearchIndexWorkerResponse>) => void = () => undefined;
@@ -66,6 +72,9 @@ export function startScanArchiveSearchIndexWorkerRun(options: {
         return;
       }
 
+      auditMergeWorker(ownerAudit, message.auditReport);
+      auditSpanEnd(ownerAudit, roundtripAudit);
+      auditEvent(ownerAudit, "worker-response-receipt");
       settled = true;
       cleanup();
       worker.terminate();
@@ -82,6 +91,8 @@ export function startScanArchiveSearchIndexWorkerRun(options: {
     };
 
     handleError = (event) => {
+      auditError(ownerAudit, new Error(event.message));
+      auditSpanEnd(ownerAudit, roundtripAudit);
       if (settled) return;
       settled = true;
       cleanup();
@@ -91,7 +102,8 @@ export function startScanArchiveSearchIndexWorkerRun(options: {
 
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "download-search-index", requestId, entry: options.entry });
+    const sendAudit = auditSpan(ownerAudit, "postMessage-call", "sync-elapsed");
+    try { worker.postMessage({ type: "download-search-index", requestId, entry: options.entry, ...(ownerAudit ? { audit: auditWorkerEnvelope(ownerAudit, requestId, requestId) } : undefined) }); } finally { auditSpanEnd(ownerAudit, sendAudit); }
   });
 
   return {
@@ -99,6 +111,8 @@ export function startScanArchiveSearchIndexWorkerRun(options: {
     promise,
     cancel() {
       if (settled) return;
+      auditEvent(ownerAudit, "worker-cancel-and-terminate");
+      auditSpanEnd(ownerAudit, roundtripAudit);
       settled = true;
       cleanup();
       try {

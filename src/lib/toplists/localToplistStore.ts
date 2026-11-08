@@ -1,4 +1,9 @@
+import { revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
+import { withLocalDataWrite } from "../local-data/localDataCoordination";
 import {
+  readGuildHubLocalScanSourceValidity,
+  readLocalToplistResetGeneration,
+  ensureSfDataHubLocalDataReady,
   deleteSfDataHubLocalToplistSnapshotRecord,
   getSfDataHubLocalToplistSnapshotRecord,
   listSfDataHubLocalToplistSnapshotRecords,
@@ -10,7 +15,9 @@ import type {
 } from "./localToplistTypes";
 import type { LocalToplistDerivedSnapshotPayload } from "./localToplistWorkerTypes";
 
-export const LOCAL_TOPLIST_DERIVATION_VERSION = 4;
+import { hasCurrentLocalSourceValidity, matchesLocalSourceValidity, type LocalSourceValidity } from "../guilds/localSourceValidity";
+
+export const LOCAL_TOPLIST_DERIVATION_VERSION = 6;
 
 export type LocalToplistSnapshotCacheIdentity = {
   derivationVersion?: number;
@@ -18,7 +25,7 @@ export type LocalToplistSnapshotCacheIdentity = {
   archiveSha256: string;
 };
 
-export type LocalToplistSnapshotCacheExpectation = LocalToplistSnapshotCacheIdentity & {
+export type LocalToplistSnapshotCacheExpectation = LocalToplistSnapshotCacheIdentity & Partial<LocalSourceValidity> & {
   manifestYear: number;
   server: string;
   scanTimestamp: number;
@@ -27,6 +34,7 @@ export type LocalToplistSnapshotCacheExpectation = LocalToplistSnapshotCacheIden
 };
 
 export type LocalToplistCacheValidationIssue =
+  | "source-validity-mismatch"
   | "missing"
   | "archive-scan-id-mismatch"
   | "archive-sha-mismatch"
@@ -99,23 +107,42 @@ export async function getLocalToplistSnapshot(
   if (record.scanTimestamp !== expectation.scanTimestamp) return { status: "miss", cacheKey, reason: "timestamp-mismatch" };
   if (record.localScanId !== expectation.localScanId) return { status: "miss", cacheKey, reason: "local-scan-id-mismatch" };
   if (record.localContentHash !== expectation.localContentHash) return { status: "miss", cacheKey, reason: "local-content-hash-mismatch" };
+  if (!matchesLocalSourceValidity(record, expectation)) return { status: "miss", cacheKey, reason: "source-validity-mismatch" };
+  const live = (await readGuildHubLocalScanSourceValidity([record.localScanId])).get(record.localScanId);
+  if (!live || live.contentHash !== record.localContentHash || !matchesLocalSourceValidity(record, live)) {
+    return { status: "miss", cacheKey, reason: "source-validity-mismatch" };
+  }
   return { status: "hit", record };
 }
 
 export async function putLocalToplistSnapshot(
   payload: LocalToplistDerivedSnapshotPayload,
-  options: { derivationVersion?: number } = {},
+  options: { derivationVersion?: number; resetGeneration?: string; dependencies?: LocalDependencyReceipt } = {},
 ) {
-  const derivationVersion = options.derivationVersion ?? LOCAL_TOPLIST_DERIVATION_VERSION;
-  const cacheKey = localToplistSnapshotCacheKey({
-    archiveScanId: payload.archiveScanId,
-    archiveSha256: payload.archiveSha256,
-    derivationVersion,
+  await ensureSfDataHubLocalDataReady();
+  return withLocalDataWrite(async lease => {
+    if (!hasCurrentLocalSourceValidity(payload)) throw new Error("Toplist result has no current source validity.");
+    const live = (await readGuildHubLocalScanSourceValidity([payload.localScanId])).get(payload.localScanId);
+    if (!live || live.contentHash !== payload.localContentHash || !matchesLocalSourceValidity(payload, live)) {
+      throw new Error("Toplist source changed before cache commit.");
+    }
+    const dependencies = options.dependencies ?? payload.dependencies;
+    if (!dependencies || !(await revalidateLocalDataDependencies(dependencies)).current) throw new Error("Toplist source dependencies changed before cache commit.");
+    const resetGeneration = options.resetGeneration ?? payload.resetGeneration;
+    if (resetGeneration === undefined || await readLocalToplistResetGeneration(payload.localScanId) !== resetGeneration) throw new Error("Toplist reset changed before cache commit.");
+    const derivationVersion = options.derivationVersion ?? LOCAL_TOPLIST_DERIVATION_VERSION;
+    const cacheKey = localToplistSnapshotCacheKey({
+      archiveScanId: payload.archiveScanId,
+      archiveSha256: payload.archiveSha256,
+      derivationVersion,
   });
   const now = new Date().toISOString();
   return putSfDataHubLocalToplistSnapshotRecord({
     key: cacheKey,
     derivationVersion,
+    sourceGeneration: payload.sourceGeneration,
+    normalizerVersion: payload.normalizerVersion,
+    coreNormalizerVersion: payload.coreNormalizerVersion,
     manifestYear: payload.manifestYear,
     archiveScanId: payload.archiveScanId,
     archiveSha256: normalizeSha(payload.archiveSha256),
@@ -129,6 +156,7 @@ export async function putLocalToplistSnapshot(
     issues: payload.issues,
     createdAt: now,
     updatedAt: now,
+  }, { lease, resetGeneration, dependencies });
   });
 }
 

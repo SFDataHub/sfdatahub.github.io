@@ -321,6 +321,16 @@ const attributeIndexesByLayout: Record<
   legacyOther: { baseStart: 21, bonusStart: 26, purchasedStart: null },
 };
 
+/** Read only stored attribute components with the same layout offsets as core. */
+export function readSfPlayerStoredAttributes(row: Record<string, unknown>) {
+  const save = readSfPlayerSaveArray(row), layout = detectSfPlayerSaveLayout(row, save);
+  const indexes = layout === "unknown" ? null : attributeIndexesByLayout[layout];
+  return Object.fromEntries(ATTRIBUTE_KEYS.map((key, index) => [key, {
+    base: indexes ? readSfSaveNumber(save, indexes.baseStart + index) : null,
+    bonus: indexes ? readSfSaveNumber(save, indexes.bonusStart + index) : null,
+  }])) as Record<typeof ATTRIBUTE_KEYS[number], { base: number | null; bonus: number | null }>;
+}
+
 export const normalizeSfPlayerCharacterCore = (player: unknown): NormalizedPlayer => {
   const row = player && typeof player === "object" ? (player as Record<string, unknown>) : {};
   const saveArray = readSfPlayerSaveArray(row);

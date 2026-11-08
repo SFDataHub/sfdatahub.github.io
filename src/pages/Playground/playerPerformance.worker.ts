@@ -1,3 +1,4 @@
+import { captureLocalDataDependencies, revalidateLocalDataDependencies } from "../../lib/local-data/localDataDependencies";
 import { getGuildHubLocalScan } from "../../lib/guilds/localScanLibrary";
 import { ensureGuildAnalyticsDerivedDataFromSummaries } from "../../lib/guilds/localGuildAnalyticsStore";
 import { loadIdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
@@ -34,6 +35,7 @@ const runBuildPerformance = async (request: Extract<PlayerPerformanceWorkerReque
   };
 
   try {
+    const dependencies = await captureLocalDataDependencies({ allSources: true, allIdentities: true });
     const scanCache = new Map<string, Awaited<ReturnType<typeof getGuildHubLocalScan>>>();
     const loadScanById = async (sourceScanId: string) => {
       if (scanCache.has(sourceScanId)) return scanCache.get(sourceScanId) ?? null;
@@ -61,8 +63,9 @@ const runBuildPerformance = async (request: Extract<PlayerPerformanceWorkerReque
       identityResolutionSnapshot,
       guildTarget: request.guildTarget ?? null,
     });
+    if (!(await revalidateLocalDataDependencies(dependencies)).current) throw new Error("Performance dependencies changed during build.");
     emitProgress({ phase: "done", message: "Gildentrend bereit" });
-    postWorkerMessage({ type: "complete", requestId: request.requestId, result });
+    postWorkerMessage({ type: "complete", requestId: request.requestId, result, dependencies });
   } catch (error) {
     if (isCancelled(request.requestId)) {
       postWorkerMessage({ type: "cancelled", requestId: request.requestId });

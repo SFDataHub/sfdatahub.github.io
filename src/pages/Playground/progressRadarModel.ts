@@ -1,3 +1,5 @@
+import { readSfPlayerStoredAttributes } from "../../lib/parsing/normalizedPlayer";
+import { normalizeSfPlayerFortress } from "../../lib/parsing/normalizedFortress";
 import { getClassMetaById } from "../../data/classes";
 import type { GuildHubLocalScan, GuildHubScanSummary } from "../../lib/guilds/localScanLibrary";
 import {
@@ -697,8 +699,48 @@ function readBaseAttributes(
   return { primaryBase, constitutionBase };
 }
 
-export function readProgressRadarTotalXpForPlayer(player: JsonRecord) {
-  const normalizedPlayer = safeNormalizePlayer(player);
+/** Read the two analytics values from the core prepared for this exact Raw row. */
+export function readProgressRadarAnalyticsValuesForPlayer(player: JsonRecord, core: NormalizedPlayer | null, preparedStats?: ReturnType<typeof readSfPlayerStats>) {
+  const stats = preparedStats ?? readSfPlayerStats(player);
+  const classMeta = getClassMetaById(core?.identity.class ?? stats.classId ?? readString(player, ["classId", "Class ID", "class", "Class"]));
+  const { primaryBase, constitutionBase } = readBaseAttributes(core, classMeta?.primaryAttribute ?? null, stats);
+  const primary = classMeta ? core?.attributes[classMeta.primaryAttribute] : null;
+  const namedPrimary = classMeta ? { strength: "Strength", dexterity: "Dexterity", intelligence: "Intelligence" }[classMeta.primaryAttribute] : null;
+  const baseMain = primaryBase ?? (namedPrimary ? readNumber(player, ["Base " + namedPrimary]) : null);
+  const conBase = constitutionBase ?? readNumber(player, ["Base Constitution"]);
+  const attrTotal = toFiniteNumber(primary?.total) ?? toFiniteNumber(stats.attrTotal) ?? (namedPrimary ? readNumber(player, [namedPrimary]) : null);
+  const conTotal = toFiniteNumber(core?.attributes.constitution.total) ?? toFiniteNumber(stats.conTotal) ?? readNumber(player, ["Constitution"]);
+  return { baseMain, conBase, attrTotal, conTotal,
+    focusedTotalStats: attrTotal != null && conTotal != null ? attrTotal + conTotal : null,
+    mine: toFiniteNumber(core?.fortress.buildings.gemMine) ?? readNumber(player, ["Gem Mine", "mine"]),
+    treasury: toFiniteNumber(core?.fortress.buildings.treasury) ?? readNumber(player, ["Treasury", "treasury"]),
+    xpTotal: readTotalXp(player, core, stats),
+    focusedBaseStats: primaryBase != null && constitutionBase != null ? primaryBase + constitutionBase : null };
+}
+
+/** Add missing cache columns by reading stored fields only. XP, membership,
+ * scan grouping and the established trend values remain the prepared records. */
+export function readStoredGuildProgressValues(player: JsonRecord, classId: string | null) {
+  const attributes = readSfPlayerStoredAttributes(player), meta = getClassMetaById(classId);
+  const main = meta ? attributes[meta.primaryAttribute] : null, con = attributes.constitution;
+  const name = meta ? { strength: "Strength", dexterity: "Dexterity", intelligence: "Intelligence" }[meta.primaryAttribute] : null;
+  const baseMain = main?.base ?? readNumber(player, ["baseMain", "Base Main", "Base", "Base Attribute", "Basis Attribut", ...(name ? ["Base " + name] : [])]);
+  const conBase = con.base ?? readNumber(player, ["conBase", "Con Base", "Constitution Base", "Base Constitution", "Basis Konstitution"]);
+  const sum = (base: number | null, bonus: number | null | undefined) => base != null && bonus != null ? base + bonus : null;
+  const attrTotal = main?.bonus != null && main.bonus > 0 ? sum(baseMain, main.bonus)
+    : readNumber(player, ["attrTotal", "Attribute", "Attr Total", "Attribut", "Attribut Gesamt", ...(name ? [name] : [])]) ?? sum(baseMain, main?.bonus);
+  const conTotal = con.bonus != null && con.bonus > 0 ? sum(conBase, con.bonus)
+    : readNumber(player, ["conTotal", "Constitution", "Constitution Total", "Konstitution", "Konstitution Gesamt"]) ?? sum(conBase, con.bonus);
+  const fortress = normalizeSfPlayerFortress(player);
+  return { baseMain, conBase, attrTotal, conTotal,
+    focusedTotalStats: attrTotal != null && conTotal != null ? attrTotal + conTotal : null,
+    mine: fortress.buildings.gemMine ?? readNumber(player, ["Gem Mine", "mine"]),
+    treasury: fortress.buildings.treasury ?? readNumber(player, ["Treasury", "treasury"]),
+  };
+}
+
+export function readProgressRadarTotalXpForPlayer(player: JsonRecord, core?: NormalizedPlayer | null) {
+  const normalizedPlayer = core ?? safeNormalizePlayer(player);
   return readTotalXp(player, normalizedPlayer, readSfPlayerStats(player));
 }
 

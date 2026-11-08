@@ -59,3 +59,14 @@ This is analysis-only maintainer documentation. It should not be treated as runt
 - The ManInBlack / Black Pirates server list:
   - `https://blog.black-pirates.info/server/shakes-fidget/`
   - Useful as broad release-date and historical fusion-date evidence, but explicitly says entries are without guarantee. Use only as supplemental evidence until confirmed by official sources or observed config/history.
+
+
+## W-64 current picker reconciliation (2026-10-14)
+
+- Primary snapshot: https://sfgame.net/config.json, retrieved 2026-10-14 12:54:05.986 UTC (14:54:05.986 Europe/Berlin), HTTP 200. Evidence: `tmp/w64/official-config.json`, `tmp/w64/official-source.json`, `tmp/w64/server-comparison.json`.
+- Existing reconciliation follows the config `md`/`m` fusion destination/freeze fields and `p` publish field, corroborated by the official World Fusion Overview linked above. Compare as of retrieval, retaining historical registry records.
+- 363 config entries; 47 active entries including the deliberately hidden SPEED; 46 selectable entries. EU5-EU8 are still active until the announced freeze on October 15. F29 is scheduled for October 16, 15:00 UTC and remains inactive.
+- EU31 (official host `s31.sfgame.eu`, numeric ID 562) was already registered locally but inactive; it is now active. Its official `p` and `r` dates are September 25 and October 2 respectively. No duplicate registry record was created.
+- Legacy picker config now includes EU29, EU30, EU31 and Stumble Steppe. Historical F6, F7, F10, F12, F13, F15, F16, F18 and F20 remain registered but are inactive in that config.
+- Existing legacy picker value `mearwynn` is retained and added as a read alias of canonical MAERWYNN. STUMBLESTEPPE and the read alias `stumblesteppe_net` remain unchanged. BF/GN/MW/STS are display abbreviations only.
+- No runtime official-config fetch, cloud config changes or archive changes were added.

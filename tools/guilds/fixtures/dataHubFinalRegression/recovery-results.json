@@ -1,0 +1,127 @@
+{
+  "sourceBefore": "guild-hub-scan:muyhx5tn:a5da89a3-bf43-454f-aaea-8dc9a6658b80",
+  "sourceAfter": "guild-hub-scan:muyhxdij:a2b0be2a-c7ec-4dca-a413-539125af9115",
+  "at": 1788696000000,
+  "freeAt": 1791288000000,
+  "offline": {
+    "code": "missing",
+    "name": "Error",
+    "message": "Error: missing"
+  },
+  "retry": {
+    "code": "missing",
+    "name": "Error",
+    "message": "Error: missing"
+  },
+  "visible": "Historical Player 1Warrior• Fixture Guild• F8Last scanned: 31 days agoStaleⓘMount-Lvl 101XP: -XP Required: ---Total Base Stats1.500Honor-Gildenrolle-HoF#1ATTRIBUTE COMPOSITIONiComposition data unavailableTOTAL XPLoadingXP / DAYPlayer—Guild Avg.—Loading analyticsFOCUSED BASE STATSLoadingBASE STATS / DAYPlayer—Guild Avg.—Loading analyticsCAREER TIMELINELoadingLoading analyticsRANKINGS & COMPARISONLoadingPlayer—Guild—Server—PROGRESSIONGAME COMPLETION—ITEMS DISCOVERED—PLAYER VS AVERAGEStrength—Avg—Dexterity—Avg—Intelligence—Avg—Constitution—Avg—Luck—Avg—PERSONAL BESTSHIGHEST XP / DAY—HIGHEST DUNGEON—BEST SERVER RANK—Loading",
+  "downloads": [
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 258
+    }
+  ],
+  "offlineTransport": [
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 0
+    }
+  ],
+  "unusable": {
+    "code": "missing",
+    "name": "Error",
+    "message": "Error: missing"
+  },
+  "unusableTransport": [],
+  "stale": {
+    "code": 20,
+    "name": "AbortError",
+    "message": "AbortError: Profile action ended"
+  },
+  "cleanup": {
+    "controllers": [
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      }
+    ],
+    "readiness": {
+      "flights": 0,
+      "consumers": 0
+    },
+    "indexFlights": 0,
+    "acquisition": 0,
+    "preparation": {
+      "sourceJobs": 2,
+      "sourceJoins": 0,
+      "sourceHits": 0,
+      "indexSourceBuilds": 2,
+      "completenessSourceBuilds": 2,
+      "rawReads": 2,
+      "sourceBuilds": 2,
+      "projectionJobs": 0,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 29.399999976158142,
+      "indexCpuMs": 0,
+      "dispatches": 2,
+      "roundtripMs": 196.89999997615814,
+      "inputJsonBytes": 7851,
+      "resultJsonBytes": 3835,
+      "sourceCpuMs": 8.199999928474426,
+      "cardCpuMs": 0,
+      "trendCpuMs": 0,
+      "rawReadElapsedMs": 3.100000023841858,
+      "writeElapsedMs": 5.800000071525574,
+      "memberBuildElapsedMs": 2.5000001192092896,
+      "processedSources": 2,
+      "processedRows": 2,
+      "resultRows": 2,
+      "inputSourceDescriptors": 2,
+      "inputDerivedRows": 0,
+      "inputIndexEntries": 0,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 1,
+        "startCallMs": 0.2999999523162842,
+        "sendCallMs": 0.20000004768371582,
+        "responseElapsedMs": 196.29999995231628,
+        "releases": 1,
+        "cleanupMs": 0,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 7
+      }
+    }
+  }
+}

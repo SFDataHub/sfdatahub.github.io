@@ -85,3 +85,11 @@ assert.match(page, /onClick=\{handleBuild\} disabled=\{!canBuild\}/);
 assert.match(page, /zipUrl && result/);
 assert.match(page, /Reset[\s\S]*?window\.location\.reload|window\.location\.reload[\s\S]*?Reset/);
 console.log("scanArchiveBuilderUi.test: runtime blocker/build-gate logic and static UI bindings ok");
+
+// Download depends on successful ZIP bytes, including ranking-only results.
+const buildResult = section("  const handleBuild =", "  const cancelBuild =");
+assert.match(buildResult, /buildRunRef.current\?\.requestId !== run.requestId\) return/);
+assert.match(buildResult, /!nextResult.blockers.length && nextResult.zipBytes.byteLength > 0/);
+assert.match(buildResult, /URL.createObjectURL\(new Blob\(\[nextResult.zipBytes\]/);
+assert.doesNotMatch(buildResult, /summary.newScans|kind === "raw"/);
+assert.match(page, /href=\{zipUrl\} download=\{result.zipFilename\}/);

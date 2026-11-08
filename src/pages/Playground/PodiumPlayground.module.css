@@ -1,0 +1,87 @@
+.page { display: grid; gap: 24px; min-width: 0; color: var(--text, #fff); }
+.header h2 { margin: 0 0 6px; color: var(--title, #f5f9ff); font-size: 24px; }
+.header p { margin: 0; color: var(--text-soft, #b0c4d9); font-size: 13px; line-height: 1.6; }
+.variant { display: grid; gap: 12px; min-width: 0; }
+.variantTitle { margin: 0; color: var(--title, #f5f9ff); font-size: 18px; font-weight: 700; }
+/* Artwork keeps its original 1200-unit width and native body proportions.
+   The 100-unit top reserve and external value row add real layout height. */
+.podiumGroup { container-type: inline-size; min-width: 0; }
+.stage { position: relative; width: 100%; aspect-ratio: 1200 / 820; isolation: isolate; }
+.player { display: contents; }
+.wood { position: absolute; left: 0; top: calc(350 / 820 * 100%); width: 100%; height: auto; }
+.modernBody { position: absolute; width: calc(100% / 3); isolation: isolate; mask-size: 100% 100%; mask-repeat: no-repeat; }
+.modernBody > img { display: block; width: 100%; height: 100%; }
+.bodyColor { position: absolute; inset: 0; mix-blend-mode: multiply; mask-size: 100% 100%; mask-repeat: no-repeat; }
+.modernBody > .metalLayer { position: absolute; inset: 0; mask-size: 100% 100%; mask-repeat: no-repeat; }
+/* One local palette per rank, shared by its ring and numeral. The original
+   surface keeps the bevels and fine reflections inside the unchanged masks. */
+.gold { --metal-dark: #80632f; --metal-mid: #bb9649; --metal-light: #e6d09a; }
+.silver { --metal-dark: #555b60; --metal-mid: #a2a8ad; --metal-light: #dbe0e3; }
+.bronze { --metal-dark: #674331; --metal-mid: #a46f4c; --metal-light: #d6ac87; }
+.metalLayer { isolation: isolate; }
+.metalRing {
+  background: linear-gradient(100deg, var(--metal-dark) 0%, var(--metal-mid) 9%, var(--metal-light) 13%, var(--metal-mid) 19%, var(--metal-mid) 60%, var(--metal-dark) 85%, var(--metal-mid) 94%, var(--metal-light) 97%, var(--metal-mid) 100%); }
+.metalNumeral {
+  background: linear-gradient(115deg, var(--metal-dark) 8%, var(--metal-mid) 30%, var(--metal-light) 37%, var(--metal-mid) 40%, var(--metal-dark) 49%, var(--metal-mid) 56%, var(--metal-light) 61%, var(--metal-mid) 64%, var(--metal-dark) 88%); }
+.metalLayer > img { display: block; width: 100%; height: 100%; mix-blend-mode: soft-light; filter: contrast(1.15); opacity: 0.65; }
+.frontEngraving { position: absolute; inset: 0; mask-size: 100% 100%; mask-repeat: no-repeat; pointer-events: none; }
+.topEngraving { position: absolute; inset: 0; width: 100%; height: 100%; mask-size: 100% 100%; mask-repeat: no-repeat; pointer-events: none; }
+/* Same width-relative size, left crop and front-center rule on every rank. */
+.engraving { position: absolute; left: -20%; width: 72%; aspect-ratio: 1; transform: translateY(-50%); overflow: visible; pointer-events: none; }
+.avatarArea { position: absolute; width: 25%; aspect-ratio: 1; transform: translate(-50%, -100%); }
+.avatar { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); aspect-ratio: 1; box-sizing: border-box;
+  border: 1px solid #2c4a73; border-radius: 4px;
+  background-image: radial-gradient(circle, #3186fb 50%, #051020 100%); overflow: visible; }
+.normalAvatar { width: calc(224 / 300 * 100%); }
+.specialAvatar { width: calc(256 / 300 * 100%); border-color: transparent; background: none; }
+/* The 256-unit box is invisible. The frame hugs the existing 88% canvas;
+   its usual 1px border sits just outside the pre-fade image rectangle. */
+.specialFrame { position: absolute; inset: calc(6% - 1px); box-sizing: border-box;
+  border: 1px solid #2c4a73; border-radius: 4px;
+  background-image: radial-gradient(circle, #3186fb 50%, #051020 100%); }
+.portrait { width: 100%; height: 100%; gap: 0; }
+.portraitShell:global(.avatar-portrait__canvas-shell) { position: relative; width: 100%; height: 100%; box-sizing: border-box; padding: 0; border: 0; background: transparent; overflow: visible; }
+.portraitShell > .portraitCanvas:global(.avatar-portrait__canvas--popout) { position: absolute; inset-block-end: -3.5%; inset-inline: 0; margin-inline: auto; height: calc(100% * 252 / 304); width: auto; transform-origin: center bottom; }
+/* Preserve the W-88 image bounds and full special canvas. The 6% refers
+   only to the invisible envelope, with no padding inside the visible frame. */
+.specialAvatar .portraitShell > .portraitCanvas:global(.avatar-portrait__canvas--popout) { inset: 6%; width: 88%; height: 88%; scale: 1; clip-path: none; border-radius: 0; }
+.portraitShell > :global(.avatar-portrait__fallback) { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+/* Mask the rendered image itself, independently of frame and background.
+   The normal canvas already has a 3% lower crop. Measure the same 4% fade
+   against that visible height so its lower edge also reaches zero alpha. */
+.portraitShell > .portraitCanvas, .portraitShell > :global(.avatar-portrait__fallback) {
+  --portrait-visible-bottom: 100%;
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(180deg, transparent, #000 calc(var(--portrait-visible-bottom) * 0.04), #000 calc(var(--portrait-visible-bottom) * 0.96), transparent var(--portrait-visible-bottom));
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
+}
+.normalAvatar .portraitShell > .portraitCanvas { --portrait-visible-bottom: 97%; }
+.classIcon { position: absolute; width: calc(64 / 1200 * 100%); height: auto; aspect-ratio: 1; object-fit: contain; transform: translate(-50%, -50%); }
+.values { position: relative; height: 1.25em; margin-top: 1.2cqw; font-size: max(12px, 3cqw); line-height: 1.25; }
+.value { position: absolute; top: 0; width: 30%; text-align: center; transform: translateX(-50%); white-space: nowrap;
+  font-size: inherit; font-weight: 800; line-height: inherit; font-variant-numeric: tabular-nums; color: #fff; }
+.woodValues .value { color: #fff0ca; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0; padding: 0; list-style: none; }
+.legend li { display: grid; gap: 4px; font-size: 13px; }
+.legend span { color: var(--text-soft, #b0c4d9); }
+.note { margin: 0; color: var(--text-soft, #b0c4d9); font-size: 13px; line-height: 1.6; }
+.installSizes { display: grid; gap: 16px; min-width: 0; }
+.installSizes h4 { margin: 0; font-size: 16px; }
+.sizeCase { display: grid; gap: 12px; min-width: 0; padding-block: 16px; border-top: 1px solid var(--line, #2c4a73); }
+.sizeCase h5 { margin: 0; font-size: 15px; }
+.widthScroll { min-width: 0; max-width: 100%; overflow-x: auto; padding-block: 4px; scrollbar-width: thin; }
+.widthScroll:focus-visible, .heightWindow:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 2px; }
+.exactWidth { flex-shrink: 0; outline: 1px dashed #5c8bc6; }
+.heightSummary { margin: 0; color: #ffdb9a; font-size: 12px; line-height: 1.6; }
+.heightGroups { display: flex; flex-wrap: wrap; gap: 20px; min-width: 0; }
+.heightGroups > div { min-width: 0; max-width: 100%; }
+.heightGroups h6 { margin: 0 0 6px; font-size: 13px; }
+.heightWindow { position: relative; box-sizing: content-box; outline: 1px dashed #5c8bc6; }
+.heightWindow::after { content: ""; position: absolute; pointer-events: none; top: var(--available-height); left: 0; right: 0; border-top: 2px solid #d99a56; z-index: 4; }
+.metricStack { display: grid; gap: 4px; }
+.metric { min-width: 0; }
+.metricHeader { display: flex; align-items: center; justify-content: flex-end; height: 32px; gap: 4px; }
+.metricHeader > span { flex: 1; min-width: 0; color: #b0c4d9; font-size: 12px; font-weight: 800; }
+.metricHeader > svg { flex: 0 0 32px; }

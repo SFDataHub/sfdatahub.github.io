@@ -55,7 +55,7 @@ assert.equal(resolveServer("EU5")?.active, true);
 assert.equal(resolveServer(466)?.code, "EU5");
 assert.equal(resolveServer("s5.sfgame.eu")?.code, "EU5");
 assert.equal(resolveServer("F29")?.code, "F29");
-assert.equal(resolveServer("F29")?.active, false);
+assert.equal(resolveServer("F29")?.active, true);
 assert.equal(resolveServer("f29_net")?.code, "F29");
 assert.equal(resolveServer(550)?.code, "F29");
 assert.equal(resolveServer("black_forest")?.code, "BLACKFOREST");
@@ -163,3 +163,12 @@ assert.equal(
 );
 
 console.log("serverResolver test passed");
+
+// W105: activation preserves every established F29 reference and fusion date.
+for (const ref of ['F29','f29','f29_fu','f29fu','f29_net','f29net','f29.sfgame.net','https://f29.sfgame.net',550,'550']) {
+  assert.equal(resolveServer(ref)?.code,'F29');
+  assert.equal(resolveServer(ref)?.numericId,550);
+  assert.equal(resolveServer(ref)?.host,'f29.sfgame.net');
+  assert.equal(resolveServer(ref)?.active,true);
+}
+assert.deepEqual(f29?.origins,['EU5','EU6','EU7','EU8']);

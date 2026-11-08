@@ -33,9 +33,9 @@ const contractsSource = read("src/lib/toplists/toplistContracts.ts");
 const coreSource = read("src/context/ToplistsDataContextCore.tsx");
 const firestoreProviderSource = read("src/context/ToplistsDataContext.tsx");
 const firestoreSource = read("src/lib/api/toplistsFirestore.ts");
-const guildHubToplistSource = read("src/pages/GuildHub/Toplist.tsx");
-const compareModelSource = read("src/pages/GuildHub/localToplistCompareModel.ts");
-const exportModelSource = read("src/pages/GuildHub/localToplistExportModel.ts");
+const guildHubToplistSource = read("src/pages/DataHub/Toplist.tsx");
+const compareModelSource = read("src/pages/DataHub/localToplistCompareModel.ts");
+const exportModelSource = read("src/pages/DataHub/localToplistExportModel.ts");
 const playerToplistsSource = read("src/pages/Toplists/playertoplists.tsx");
 const guildToplistsSource = read("src/pages/Toplists/guildtoplists.tsx");
 const playerDecorSource = read("src/pages/Toplists/playerToplistDecor.ts");
@@ -69,7 +69,7 @@ assert.match(firestoreSource, /const mapFirestorePlayerRow = \(raw: any\): Topli
 assert.match(firestoreSource, /mapFirestoreGuildRow/);
 
 for (const [name, source] of [
-  ["GuildHub/Toplist.tsx", guildHubToplistSource],
+  ["DataHub/Toplist.tsx", guildHubToplistSource],
   ["localToplistCompareModel.ts", compareModelSource],
   ["localToplistExportModel.ts", exportModelSource],
 ] as const) {

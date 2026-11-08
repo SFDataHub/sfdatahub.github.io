@@ -1,4 +1,4 @@
-import { gzipSync, strToU8, zipSync, type Zippable } from "fflate";
+import { gzipSync, gunzipSync, strFromU8, strToU8, zipSync, type Zippable } from "fflate";
 import {
   createScanArchiveBuildPlanCore,
   inspectScanArchiveInputContent,
@@ -15,7 +15,7 @@ import type {
 import { mapCoreBuilderPhase } from "../lib/scanArchive/scanArchiveBuilderTypes";
 import { scanArchiveBuilderBlockerFromError } from "../lib/scanArchive/scanArchiveBuilderErrors";
 import type { ScanArchiveManifest } from "../lib/scanArchive/types";
-import { createScanArchiveBuilderMonthlyLoader } from "../lib/scanArchive/scanArchiveBuilderAcquisition";
+import { createScanArchiveBuilderMonthlyLoader, createScanArchiveBuilderRankingLoader } from "../lib/scanArchive/scanArchiveBuilderAcquisition";
 import { scanArchiveBuilderTargets } from "../lib/scanArchive/scanArchiveBuilderMonthly";
 
 const textEncoder = new TextEncoder();
@@ -156,7 +156,10 @@ const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuild
       manifest: request.manifest,
       inputBatches: inspected.batches,
       usageMode: request.usageMode,
-      loadMonthlyRawScan: request.usageMode === "add-monthly" ? createScanArchiveBuilderMonthlyLoader({
+      loadMonthlyRawScan: request.usageMode !== "archive-only" ? createScanArchiveBuilderMonthlyLoader({
+        manifest: request.manifest, source: request.manifestSource, catalogUrl: request.catalogUrl, signal: abort.signal,
+      }) : undefined,
+      loadMonthlyRankingBytes: request.usageMode !== "archive-only" ? createScanArchiveBuilderRankingLoader({
         manifest: request.manifest, source: request.manifestSource, catalogUrl: request.catalogUrl, signal: abort.signal,
       }) : undefined,
       allowCurrentRollback: request.allowCurrentRollback,
@@ -168,6 +171,7 @@ const buildArchive = async (requestId: string, request: Extract<ScanArchiveBuild
       },
     },
     {
+      gunzip: bytes => strFromU8(gunzipSync(bytes)),
       gzip: (content) => gzipSync(textEncoder.encode(content), { level: 9, mtime: 0 }),
       sha256: sha256Hex,
       byteLength: (bytes) => bytes.byteLength,

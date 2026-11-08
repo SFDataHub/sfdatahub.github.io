@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.js";
 import {
   getGuildAccentPalette,
+  cachedGuildAccentPalette,
   GUILD_ACCENT_FALLBACK,
   type GuildAccentPalette,
 } from "../../lib/ui/guildAccent";
@@ -10,6 +11,9 @@ import { isValidGuildCoaString } from "../../lib/guilds/guildCoa";
 import styles from "./GuildCard.module.css";
 
 const COA_CANVAS_SIZE = 240;
+// Reuse completed artwork on chart/overlay remounts, just like its palette.
+const renderedCoas = new Map<string, string | null>();
+const renderingCoas = new Map<string, Promise<string | null>>();
 
 type GuildEmblemStyle = React.CSSProperties & {
   "--guild-card-accent"?: string;
@@ -17,6 +21,7 @@ type GuildEmblemStyle = React.CSSProperties & {
 
 export type GuildEmblemVisual = {
   accent: string;
+  ready: boolean;
   visualEmblemUrl: string | null;
 };
 
@@ -41,131 +46,82 @@ function cx(...names: Array<string | false | undefined>) {
   return names.filter(Boolean).join(" ");
 }
 
-function useRenderedCoaUrl(coaString?: string | null, guildName?: string | null) {
-  const [coaUrl, setCoaUrl] = React.useState<string | null>(null);
-  const rendererRef = React.useRef<CoaRenderer | null>(null);
-  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const renderVersionRef = React.useRef(0);
-  const normalizedCoa = React.useMemo(() => String(coaString ?? "").trim(), [coaString]);
-  const normalizedGuildName = React.useMemo(() => String(guildName ?? "").trim() || undefined, [guildName]);
-  const canRenderCoa = isValidGuildCoaString(normalizedCoa);
+const coaRenderKey = (coaString?: string | null, guildName?: string | null) =>
+  JSON.stringify([String(coaString ?? "").trim(), String(guildName ?? "").trim()]);
 
+// Renderer work belongs to its exact CoA/name key, independently of a mounted
+// card. Navigation can join an existing job without restarting asset loading.
+export function prepareGuildCoa(coaString?: string | null, guildName?: string | null): Promise<string | null> {
+  const normalizedCoa = String(coaString ?? "").trim();
+  const normalizedGuildName = String(guildName ?? "").trim() || undefined;
+  if (!isValidGuildCoaString(normalizedCoa) || typeof document === "undefined") return Promise.resolve(null);
+  const cacheKey = coaRenderKey(normalizedCoa, normalizedGuildName);
+  if (renderedCoas.has(cacheKey)) return Promise.resolve(renderedCoas.get(cacheKey)!);
+  const existing = renderingCoas.get(cacheKey);
+  if (existing) return existing;
+  let complete!: (url: string | null) => void;
+  const pending = new Promise<string | null>(resolve => { complete = resolve; });
+  renderingCoas.set(cacheKey, pending);
+  const canvas = document.createElement("canvas");
+  canvas.width = COA_CANVAS_SIZE;
+  canvas.height = COA_CANVAS_SIZE;
+  let renderer: CoaRenderer | null = null;
+  let finished = false;
+  const settle = (url: string | null) => {
+    if (finished) return;
+    finished = true;
+    renderedCoas.set(cacheKey, url);
+    renderingCoas.delete(cacheKey);
+    complete(url);
+    renderer?.dispose();
+  };
+  const captureCanvas = () => {
+    if (finished) return;
+    try { settle(canvas.toDataURL("image/png")); } catch { settle(null); }
+  };
+  try {
+    renderer = new CoaRenderer(canvas, normalizedCoa, normalizedGuildName);
+    renderer.onFinish = captureCanvas;
+    renderer.onError = () => settle(null);
+  } catch { settle(null); }
+  return pending;
+}
+
+export function useRenderedCoaUrl(coaString?: string | null, guildName?: string | null) {
+  const cacheKey = coaRenderKey(coaString, guildName);
+  const canRenderCoa = isValidGuildCoaString(String(coaString ?? "").trim());
+  const [rendered, setRendered] = React.useState<{ key: string; url: string | null } | null>(() =>
+    renderedCoas.has(cacheKey) ? { key: cacheKey, url: renderedCoas.get(cacheKey)! } : null);
   React.useEffect(() => {
-    return () => {
-      rendererRef.current?.dispose();
-      rendererRef.current = null;
-      canvasRef.current = null;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    renderVersionRef.current += 1;
-    const currentVersion = renderVersionRef.current;
-
-    if (!canRenderCoa || typeof document === "undefined") {
-      rendererRef.current?.dispose();
-      rendererRef.current = null;
-      setCoaUrl(null);
+    if (!canRenderCoa) return;
+    if (renderedCoas.has(cacheKey)) {
+      // Also cover completion between render and the passive effect.
+      const url = renderedCoas.get(cacheKey)!;
+      setRendered(current => current?.key === cacheKey && current.url === url ? current : { key: cacheKey, url });
       return;
     }
-
-    let isCancelled = false;
-    let frameId: number | null = null;
-    const canvas = canvasRef.current ?? document.createElement("canvas");
-    canvasRef.current = canvas;
-    canvas.width = COA_CANVAS_SIZE;
-    canvas.height = COA_CANVAS_SIZE;
-
-    const clearCanvas = () => {
-      const context = canvas.getContext("2d");
-      context?.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
-    const captureCanvas = () => {
-      if (isCancelled || renderVersionRef.current !== currentVersion) return;
-      try {
-        const nextUrl = canvas.toDataURL("image/png");
-        setCoaUrl((previousUrl) => (previousUrl === nextUrl ? previousUrl : nextUrl));
-      } catch {
-        setCoaUrl(null);
-      }
-    };
-
-    const bindRendererCallbacks = (renderer: CoaRenderer) => {
-      renderer.onError = () => {
-        if (isCancelled || renderVersionRef.current !== currentVersion) return;
-        clearCanvas();
-        setCoaUrl(null);
-      };
-      renderer.onFinish = captureCanvas;
-    };
-
-    if (!rendererRef.current) {
-      try {
-        const renderer = new CoaRenderer(canvas, normalizedCoa, normalizedGuildName);
-        bindRendererCallbacks(renderer);
-        rendererRef.current = renderer;
-        if (typeof window !== "undefined") {
-          frameId = window.requestAnimationFrame(captureCanvas);
-        }
-      } catch {
-        clearCanvas();
-        setCoaUrl(null);
-      }
-
-      return () => {
-        isCancelled = true;
-        if (typeof window !== "undefined" && frameId != null) window.cancelAnimationFrame(frameId);
-      };
-    }
-
-    const renderer = rendererRef.current;
-    bindRendererCallbacks(renderer);
-    renderer.updateCOA(normalizedCoa, normalizedGuildName).then(captureCanvas).catch(() => {
-      if (isCancelled || renderVersionRef.current !== currentVersion) return;
-      clearCanvas();
-      setCoaUrl(null);
+    let cancelled = false;
+    void prepareGuildCoa(coaString, guildName).then(url => {
+      if (!cancelled) setRendered({ key: cacheKey, url });
     });
-
-    return () => {
-      isCancelled = true;
-      if (typeof window !== "undefined" && frameId != null) window.cancelAnimationFrame(frameId);
-    };
-  }, [canRenderCoa, normalizedCoa, normalizedGuildName]);
-
-  return canRenderCoa ? coaUrl : null;
+    return () => { cancelled = true; };
+  }, [cacheKey, canRenderCoa]);
+  // Completed entries participate in this render, including the first frame.
+  const cached = renderedCoas.has(cacheKey);
+  return { url: canRenderCoa ? (cached ? renderedCoas.get(cacheKey)! : rendered?.key === cacheKey ? rendered.url : null) : null,
+    ready: !canRenderCoa || cached || rendered?.key === cacheKey };
 }
 
 function useGuildAccent(emblemUrl?: string | null) {
-  const [palette, setPalette] = React.useState<GuildAccentPalette>(() => ({
-    accent: GUILD_ACCENT_FALLBACK,
-    candidates: [GUILD_ACCENT_FALLBACK],
-    source: "fallback",
-  }));
-
+  const [resolved, setResolved] = React.useState<{ src: string | null | undefined; palette: GuildAccentPalette } | null>(null);
+  const cached = cachedGuildAccentPalette(emblemUrl);
   React.useEffect(() => {
     let cancelled = false;
-
-    getGuildAccentPalette(emblemUrl)
-      .then((nextPalette) => {
-        if (!cancelled) setPalette(nextPalette);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPalette({
-            accent: GUILD_ACCENT_FALLBACK,
-            candidates: [GUILD_ACCENT_FALLBACK],
-            source: "fallback",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    getGuildAccentPalette(emblemUrl).then(palette => { if (!cancelled) setResolved({ src: emblemUrl, palette }); });
+    return () => { cancelled = true; };
   }, [emblemUrl]);
-
-  return palette;
+  const palette = cached ?? (resolved && resolved.src === emblemUrl ? resolved.palette : null);
+  return { accent: palette?.accent ?? GUILD_ACCENT_FALLBACK, ready: Boolean(palette) };
 }
 
 export function useGuildEmblemVisual({
@@ -180,11 +136,12 @@ export function useGuildEmblemVisual({
   const renderedCoaUrl = useRenderedCoaUrl(coaString, name);
   const normalizedCoa = React.useMemo(() => String(coaString ?? "").trim(), [coaString]);
   const hasValidCoa = Boolean(normalizedCoa && isValidGuildCoaString(normalizedCoa));
-  const visualEmblemUrl = renderedCoaUrl || (hasValidCoa ? null : emblemUrl ?? null);
+  const visualEmblemUrl = renderedCoaUrl.url || (hasValidCoa ? null : emblemUrl ?? null);
   const guildPalette = useGuildAccent(visualEmblemUrl);
 
   return {
     accent: guildPalette.accent,
+    ready: renderedCoaUrl.ready && guildPalette.ready,
     visualEmblemUrl,
   };
 }

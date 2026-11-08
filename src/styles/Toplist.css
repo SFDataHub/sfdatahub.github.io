@@ -21,21 +21,9 @@
   overflow: hidden;
 }
 
-/* Match RootLayout sidebar states exactly (desktop) */
-#app-shell[data-sidebar="collapsed"] .profile-overlay {
-  left: var(--sidebar-w);
-}
-
-#app-shell[data-sidebar="expanded"] .profile-overlay {
-  left: var(--sidebar-expanded-w);
-}
-
-/* Mobile drawer overlays content; main content starts at viewport left */
-@media (max-width: 1024px) {
-  #app-shell[data-sidebar="collapsed"] .profile-overlay,
-  #app-shell[data-sidebar="expanded"] .profile-overlay {
-    left: 0;
-  }
+/* Use the effective shell offset, including desktop drawer mode. */
+#app-shell .profile-overlay {
+  left: var(--app-shell-left, 0px);
 }
 
 .profile-overlay__panel {
@@ -666,3 +654,6 @@
     font-size: 12px;
   }
 }
+
+.local-toplist-sort-header { color: inherit; font: inherit; width: 100%; display: flex; align-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.local-toplist-sort-header:focus-visible { outline: 2px solid #81bfff; outline-offset: 3px; }

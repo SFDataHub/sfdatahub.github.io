@@ -1,0 +1,462 @@
+{
+  "provenance": {
+    "kind": "minimal anonymized projection of actual read-only browser audit",
+    "audit": "two-stand-audit-1792907441242.json",
+    "ownObservationCount": 7,
+    "sharedAxisCount": 19
+  },
+  "ownKey": "guild-5",
+  "ranks": {
+    "guild-2": 2,
+    "guild-5": 5,
+    "guild-3": 3,
+    "guild-12": 12,
+    "guild-1": 1,
+    "guild-8": 8,
+    "guild-6": 6,
+    "guild-13": 13,
+    "guild-4": 4,
+    "guild-11": 11,
+    "guild-14": 14,
+    "guild-7": 7,
+    "guild-15": 15,
+    "guild-9": 9,
+    "guild-10": 10
+  },
+  "stands": [
+    {
+      "at": 1788599136467,
+      "rows": [
+        {
+          "key": "guild-5",
+          "source": "scan-1788599136467",
+          "snapshot": "snapshot-1788599136467",
+          "at": 1788599136467,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 104645.3,
+          "compareBase": {
+            "value": 104645.3,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "at": 1788599354154,
+      "rows": [
+        {
+          "key": "guild-12",
+          "source": "scan-1788599354154",
+          "snapshot": "snapshot-1788599354154",
+          "at": 1788599354154,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 61041.54,
+          "compareBase": {
+            "value": 61041.54,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-6",
+          "source": "scan-1788599354154",
+          "snapshot": "snapshot-1788599354154",
+          "at": 1788599354154,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 94718.28,
+          "compareBase": {
+            "value": 94718.28,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-4",
+          "source": "scan-1788599354154",
+          "snapshot": "snapshot-1788599354154",
+          "at": 1788599354154,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 100488.48,
+          "compareBase": {
+            "value": 100488.48,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "at": 1792226317004,
+      "rows": [
+        {
+          "key": "guild-5",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 131407.04,
+          "compareBase": {
+            "value": 131407.04,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-2",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 155342.74,
+          "compareBase": {
+            "value": 155342.74,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-3",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 130407.2,
+          "compareBase": {
+            "value": 130407.2,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-12",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 49,
+          "found": 49,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 76878.79591836735,
+          "compareBase": {
+            "value": 76878.79591836735,
+            "coverage": {
+              "found": 49,
+              "declared": 49,
+              "used": 49,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-1",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 142483.6,
+          "compareBase": {
+            "value": 142483.6,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-8",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 126802.06,
+          "compareBase": {
+            "value": 126802.06,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-6",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 48,
+          "found": 38,
+          "complete": false,
+          "conflict": false,
+          "strictBase": null,
+          "compareBase": {
+            "value": null,
+            "coverage": {
+              "found": 38,
+              "declared": 48,
+              "used": 38,
+              "partial": false,
+              "reason": "missing"
+            }
+          }
+        },
+        {
+          "key": "guild-13",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 50,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 75373.26,
+          "compareBase": {
+            "value": 75373.26,
+            "coverage": {
+              "found": 50,
+              "declared": 50,
+              "used": 50,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-4",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 4,
+          "found": 4,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 91905.5,
+          "compareBase": {
+            "value": 91905.5,
+            "coverage": {
+              "found": 4,
+              "declared": 4,
+              "used": 4,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-11",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 46,
+          "complete": false,
+          "conflict": false,
+          "strictBase": null,
+          "compareBase": {
+            "value": 62055.15217391304,
+            "coverage": {
+              "found": 46,
+              "declared": 50,
+              "used": 46,
+              "partial": true,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-14",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 49,
+          "complete": false,
+          "conflict": false,
+          "strictBase": null,
+          "compareBase": {
+            "value": 39923.183673469386,
+            "coverage": {
+              "found": 49,
+              "declared": 50,
+              "used": 49,
+              "partial": true,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-7",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 24,
+          "found": 24,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 40435.833333333336,
+          "compareBase": {
+            "value": 40435.833333333336,
+            "coverage": {
+              "found": 24,
+              "declared": 24,
+              "used": 24,
+              "partial": false,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-15",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 47,
+          "complete": false,
+          "conflict": false,
+          "strictBase": null,
+          "compareBase": {
+            "value": 55019.36170212766,
+            "coverage": {
+              "found": 47,
+              "declared": 50,
+              "used": 47,
+              "partial": true,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-9",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 50,
+          "found": 49,
+          "complete": false,
+          "conflict": false,
+          "strictBase": null,
+          "compareBase": {
+            "value": 42229.510204081635,
+            "coverage": {
+              "found": 49,
+              "declared": 50,
+              "used": 49,
+              "partial": true,
+              "reason": null
+            }
+          }
+        },
+        {
+          "key": "guild-10",
+          "source": "scan-1792226317004",
+          "snapshot": "snapshot-1792226317004",
+          "at": 1792226317004,
+          "declared": 1,
+          "found": 1,
+          "complete": true,
+          "conflict": false,
+          "strictBase": 81171,
+          "compareBase": {
+            "value": 81171,
+            "coverage": {
+              "found": 1,
+              "declared": 1,
+              "used": 1,
+              "partial": false,
+              "reason": null
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "player": {
+    "key": "player",
+    "points": [
+      {
+        "at": 1788599136467,
+        "observed": true,
+        "value": 113990
+      },
+      {
+        "at": 1788599354154,
+        "observed": false,
+        "value": null
+      },
+      {
+        "at": 1792226317004,
+        "observed": true,
+        "value": 135567
+      }
+    ]
+  }
+}

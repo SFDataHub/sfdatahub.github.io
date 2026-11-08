@@ -25,19 +25,21 @@
 .profile-overlay--local .profile-overlay__local-title {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(24px, 1fr) auto minmax(24px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   min-width: 0;
-  color: rgba(230, 240, 255, 0.92);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
+  color: #b0c4d9;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: inherit;
+  letter-spacing: 0.06em;
   text-align: center;
   text-transform: uppercase;
 }
 
-.profile-overlay--local .profile-overlay__local-title span {
+.profile-overlay--local .profile-overlay__local-title [data-title-stripe],
+.profile-overlay--local .local-profile-section-divider {
   height: 1px;
   min-width: 0;
   background: linear-gradient(90deg, transparent, rgba(134, 177, 226, 0.44), transparent);
@@ -46,24 +48,42 @@
 .profile-overlay--local .profile-overlay__local-title strong {
   min-width: 0;
   white-space: nowrap;
+  font-weight: inherit;
 }
 
-.profile-overlay--local .profile-overlay__close--local {
-  position: absolute;
-  top: 10px;
-  right: 16px;
-  z-index: 2;
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
+.profile-overlay--local .profile-overlay__local-title [data-title-stripe] {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #5c8bc6, transparent);
 }
+
+/* Equal title wings keep the label centered regardless of navigation width. */
+.profile-overlay--local .local-profile-title-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.profile-overlay--local .local-profile-title-side > span { flex: 1; }
+/* Guild averageHud + sectionHud supply the gradient and border treatment. */
+.profile-overlay--local .local-profile-title-nav {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  inline-size: calc(8ch + 24px);
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: #b0c4d9;
+  text-transform: none;
+  cursor: pointer;
+}
+.profile-overlay--local .local-profile-title-nav::after { border-color: transparent; }
+.profile-overlay--local .local-profile-title-nav:hover { color: #f5f9ff; }
+.profile-overlay--local .local-profile-title-nav:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
 
 .profile-overlay--local .profile-overlay__content--local {
   min-width: 0;
@@ -80,20 +100,22 @@
   --local-profile-row-min: clamp(62px, 6.2vh, 82px);
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: repeat(12, minmax(var(--local-profile-row-min), 1fr));
+  grid-template-rows: repeat(14, minmax(var(--local-profile-row-min), 1fr));
   grid-template-areas:
-    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
-    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
-    "identity identity identity summary summary summary summary summary summary rankings rankings rankings"
-    "identity identity identity xp xp xp xp xp xp progression progression progression"
-    "identity identity identity xp xp xp xp xp xp progression progression progression"
-    "identity identity identity xp xp xp xp xp xp progression progression progression"
-    "identity identity identity xp xp xp xp xp xp player-average player-average player-average"
-    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev player-average player-average player-average"
-    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev player-average player-average player-average"
-    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev personal-bests personal-bests personal-bests"
-    "identity identity identity career career career career career career personal-bests personal-bests personal-bests"
-    "identity identity identity career career career career career career personal-bests personal-bests personal-bests";
+    "identity identity identity . attribute-mode attribute-mode attribute-mode attribute-mode . primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary . . ."
+    "identity identity identity . actions actions actions actions . . . ."
+    "identity identity identity xp xp xp xp xp xp insights insights insights"
+    "identity identity identity xp xp xp xp xp xp insights insights insights"
+    "identity identity identity xp xp xp xp xp xp insights insights insights"
+    "identity identity identity xp xp xp xp xp xp insights insights insights"
+    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev insights insights insights"
+    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev insights insights insights"
+    "identity identity identity stats-dev stats-dev stats-dev stats-dev stats-dev stats-dev insights insights insights"
+    ". . . . . . . . . insights insights insights"
+    ". . . . . . . . . insights insights insights";
   gap: var(--local-profile-grid-gap);
   width: 100%;
   height: auto;
@@ -168,10 +190,6 @@
 
 .profile-overlay--local .local-player-analytics--stats-dev {
   grid-area: stats-dev;
-}
-
-.profile-overlay--local .local-player-analytics--career {
-  grid-area: career;
 }
 
 .profile-overlay--local .local-player-insights {
@@ -381,7 +399,7 @@
   overflow: hidden;
 }
 
-.profile-overlay--local .local-player-analytics__range-select {
+:is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select {
   min-width: 0;
   min-height: 30px;
   display: grid;
@@ -393,13 +411,13 @@
   line-height: 1.2;
 }
 
-.profile-overlay--local .local-player-analytics__range-select span {
+:is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select span {
   color: rgba(230, 240, 255, 0.82);
   font-weight: 700;
   white-space: nowrap;
 }
 
-.profile-overlay--local .local-player-analytics__range-select select {
+:is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select select {
   min-width: 0;
   height: 28px;
   border: 1px solid rgba(92, 139, 198, 0.34);
@@ -411,11 +429,11 @@
   outline: none;
 }
 
-.profile-overlay--local .local-player-analytics__range-select select:disabled {
+:is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select select:disabled {
   color: rgba(176, 196, 217, 0.62);
 }
 
-.profile-overlay--local .local-player-analytics__range-select small {
+:is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select small {
   min-width: 0;
   color: rgba(176, 196, 217, 0.72);
   font-size: 10px;
@@ -755,6 +773,12 @@
   min-width: 0;
 }
 
+.profile-overlay--local .player-profile__hero-summary-base-stats .player-profile__attribute-bars {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .profile-overlay--local .player-profile__hero-summary-base-stats .player-profile__attribute-bars-head,
 .profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bars-head {
   align-items: flex-start;
@@ -794,6 +818,72 @@
   flex: 1 1 100%;
 }
 
+/* Preserve the remaining metric's existing height after relocating the gauges. */
+.profile-overlay--local .player-profile__hero--local-profile .player-profile__hero-metrics--local-compact {
+  grid-auto-rows: 104px;
+}
+
+.profile-overlay--local .local-player-guild-slot {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 104px;
+  flex: 0 0 104px;
+}
+
+.profile-overlay--local .local-player-guild-emblem {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.profile-overlay--local .local-player-guild-emblem:focus-visible {
+  outline: 2px solid #67d7ff;
+  outline-offset: 2px;
+}
+
+/* Same unobtrusive lift as the existing profile fortress icon buttons. */
+.profile-overlay--local .local-player-guild-emblem:hover img {
+  transform: translateY(-1px);
+}
+
+/* Keep the four-column bar width and the existing column-four stack. */
+@media (min-width: 901px) {
+  /* Equal clearances around the selector; opposite margins retain the grid's
+     intrinsic contribution and the card's allocated height. */
+  .profile-overlay--local .player-profile__hero--local-summary {
+    min-block-size: var(--local-profile-attribute-height, 0px);
+    margin-block-start: var(--local-profile-attribute-start, 0px);
+    margin-block-end: calc(0px - var(--local-profile-attribute-start, 0px));
+  }
+
+  .profile-overlay--local .player-profile__hero-summary-base-stats { grid-column: 2 / span 4; }
+
+  .profile-overlay--local .player-profile__hero-metrics--column-four {
+    grid-column: 4;
+    grid-row: 1 / span 5;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-overlay--local .player-profile__hero-metrics--column-four > .player-profile__hero-metric {
+    flex: 0 0 104px;
+    height: 104px;
+  }
+
+  /* Keep the remaining metric and badges in their existing two-row positions. */
+  .profile-overlay--local .player-profile__hero--local-profile .player-profile__hero-metric {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
 @media (max-width: 1180px) {
   .profile-overlay--local .profile-overlay__local-grid {
     min-height: 860px;
@@ -805,6 +895,10 @@
 }
 
 @media (max-width: 900px) {
+  .profile-overlay--local .player-profile__hero-metrics--column-four {
+    grid-area: hero-metrics;
+  }
+
   .profile-overlay--local {
     padding: 12px;
   }
@@ -821,15 +915,18 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     grid-template-areas:
+      "attribute-mode"
       "summary"
+      "actions"
+      "primary-radar"
+      "direct-comparison"
+      "divider"
       "xp"
       "stats-dev"
-      "career"
-      "rankings"
-      "progression"
-      "player-average"
-      "personal-bests"
-      "identity";
+      "left-insights"
+      "insights"
+      "identity"
+      "hero-metrics";
     min-height: 0;
   }
 
@@ -887,7 +984,7 @@
 
   .profile-overlay--local .profile-overlay__local-header {
     gap: 10px;
-    padding: 12px 44px 8px 10px;
+    padding: 12px 10px 8px;
   }
 
   .profile-overlay--local .profile-overlay__local-title {
@@ -896,16 +993,13 @@
     letter-spacing: 0;
   }
 
-  .profile-overlay--local .profile-overlay__close--local {
-    top: 8px;
-    right: 10px;
-  }
+  .profile-overlay--local .local-profile-title-side { gap: 6px; }
 
   .profile-overlay--local .profile-overlay__content--local {
     padding: 0 10px 10px;
   }
 
-  .profile-overlay--local .local-player-analytics__range-select {
+  :is(.profile-overlay--local, .local-player-compact-header) .local-player-analytics__range-select {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -939,5 +1033,508 @@
   .profile-overlay--local .player-profile__hero-summary-base-stats .player-profile__attribute-bar-values,
   .profile-overlay--local .player-profile__hero--local-stats .player-profile__attribute-bar-values {
     text-align: left;
+  }
+}
+
+.local-favorite-action { display: inline-flex; flex-wrap: wrap; gap: 10px; align-items: center; flex-shrink: 0; min-width: 0; color: #b0c4d9; font-size: 13px; }
+.local-favorite-action button:not(.player-profile__favorite-star-button) { border: 1px solid #3f6b9a; background: #14273e; color: #f5f9ff; padding: 8px 12px; cursor: pointer; font: inherit; }
+.local-favorite-action button:disabled { opacity: .5; cursor: default; }
+.local-favorite-action button:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+.profile-overlay--local .player-profile__identity .player-profile__class-avatar {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Use the existing Frame surface while the document remains the
+   page scroll owner. No rails, second frame, viewport lock or extra padding. */
+.local-profile-shell { min-width: 0; }
+.local-profile-shell > section { overflow: clip; }
+.local-profile-shell > section > div > .flex { height: auto !important; }
+.local-profile-shell [style*="--left"] > .grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.local-profile-shell main { height: auto; overflow: visible; }
+/* Compensate the Frame's 1px border on both sides, preserving inner width. */
+.local-profile-page { min-width: 0; padding: 15px; }
+.local-profile-page .profile-overlay__local-grid { min-height: 760px; }
+/* Keep the existing title and its flow height while compact groups fade below. */
+.local-profile-page .profile-overlay__local-header {
+  position: sticky;
+  top: var(--app-topbar-h, 90px);
+  /* Clear the existing logo image's transparent hit area at the scroll edge. */
+  padding-block-start: 24px;
+  z-index: 16;
+  background: transparent;
+  border-color: transparent;
+}
+/* As in the guild title, cover scrolling content with the matching shell
+   image. This layer has no layout size and keeps the title surface seamless. */
+.local-profile-page .profile-overlay__local-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--head-surface-color, var(--page));
+  background-image: var(--head-surface-image, none);
+  background-size: var(--head-surface-width) var(--head-surface-height);
+  background-repeat: no-repeat;
+  background-position: calc(var(--head-surface-x) - var(--head-viewport-x)) calc(var(--head-surface-y) - var(--head-dock-y));
+}
+.local-profile-route-actions { display: flex; gap: 12px; padding: 12px; }
+@media (max-width: 760px) { .local-profile-page { padding: 5px; } }
+
+/* Only the standalone page delegates vertical wheel scrolling to the document. */
+.local-profile-page .profile-overlay__content--local { overscroll-behavior-y: auto; }
+.local-profile-page--loading { min-height: calc(100dvh - 180px); }
+.profile-overlay--local .local-profile-loading {
+  background: rgba(7, 14, 23, 0.66);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+
+.profile-overlay--local .local-profile-actions-card {
+  grid-area: actions;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+  overflow: visible;
+}
+.profile-overlay--local .local-profile-action-button {
+  padding: 8px 12px;
+  border: 1px solid rgba(92, 139, 198, 0.35);
+  border-radius: 8px;
+  background: #1b3554;
+  color: #eef5ff;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.profile-overlay--local .local-profile-action-button:hover { background: #23446c; }
+.profile-overlay--local .local-profile-action-button:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+.profile-overlay--local .local-profile-action-button:disabled { opacity: .5; cursor: default; }
+.profile-overlay--local .local-profile-section-divider {
+  grid-column: 1 / -1;
+  grid-row: 6;
+  align-self: start;
+  margin-block-start: 0;
+  pointer-events: none;
+}
+.profile-overlay--local .local-profile-right-content {
+  grid-area: insights;
+  display: flex;
+  flex-direction: column;
+  gap: var(--local-profile-grid-gap);
+  min-width: 0;
+  align-self: start;
+}
+.profile-overlay--local .local-profile-right-content > .local-player-insights { flex: 0 0 auto; overflow: visible; }
+
+@media (min-width: 901px) {
+  /* Preserve the 15px clearance below the divider without resizing grid tracks. */
+  .profile-overlay--local :is(.local-player-analytics--xp, .local-player-analytics--stats-dev, .local-profile-left-content, .local-profile-right-content) {
+    margin-block: 16px -16px;
+  }
+  /* Reserve the shared offset at the end of the normal scrollable content. */
+  .profile-overlay--local .profile-overlay__local-grid {
+    padding-block-end: 16px;
+  }
+}
+
+/* Reuse the guild header's surface, group fades, lead-in visibility and reduced
+   motion rules. Only the player-specific measured anchors differ. */
+.local-player-compact-header.local-player-compact-header {
+  --head-title-height: 0px;
+  --head-row-overlap: 0px;
+  position: fixed;
+  top: var(--player-compact-top);
+  left: var(--player-compact-left);
+  width: var(--player-compact-width);
+  color: var(--text, #d2e5ff);
+  --pp-title: var(--title, #f5f9ff);
+  --pp-border: var(--line, #2c4a73);
+  --pp-accent: var(--active, #2d7be6);
+  --pp-soft: var(--text-soft, #96aec7);
+}
+.local-player-compact-header .local-player-compact-avatar .avatar-portrait { width: 100%; }
+.local-player-compact-header .local-player-compact-avatar .avatar-portrait__canvas-shell {
+  width: 100%;
+  height: var(--compact-logo-size);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.local-player-compact-header .local-player-compact-avatar :is(.avatar-portrait__canvas, .avatar-portrait__fallback) {
+  width: 100%;
+  height: 100%;
+  scale: none;
+  transform: none;
+  clip-path: none;
+  object-fit: contain;
+}
+.local-player-compact-header .local-player-compact-freshness { gap: 4px; }
+.local-player-compact-header .local-player-compact-name {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 14px;
+}
+.local-player-compact-header .player-profile__freshness { margin: 0; padding: 0; font-size: 10px; line-height: 14px; gap: 6px; pointer-events: auto; }
+.local-player-compact-header [data-compact-modes] {
+  position: absolute;
+  z-index: 2;
+  left: var(--compact-modes-left);
+  top: var(--compact-modes-top);
+}
+@media (max-width: 900px) {
+  .profile-overlay--local .local-profile-section-divider { grid-area: divider; margin-block-start: 0; }
+}
+
+/* The local profile reuses the existing selector and metric in their new slots. */
+.profile-overlay--local .local-profile-attribute-mode {
+  grid-area: attribute-mode;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+}
+.profile-overlay--local .local-profile-attribute-sum {
+  display: block;
+  width: calc(37.5% + 5.25px);
+  flex: 0 0 auto;
+}
+.profile-overlay--local .local-profile-attribute-sum .player-profile__hero-metric {
+  flex-direction: row;
+  height: 42px;
+  min-height: 42px;
+  padding-block: 2px;
+}
+.profile-overlay--local .local-profile-attribute-sum .player-profile__hero-metric-value {
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .profile-overlay--local .local-profile-attribute-sum { width: auto; max-width: 100%; }
+}
+
+/* Local copy of the guild profile's mode rules; no dashboard import or global toggle changes. */
+.local-profile-view-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  padding: 0;
+  background: linear-gradient(90deg, transparent, #152a4280, transparent);
+}
+.local-profile-view-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-block: 1px solid #2b4c73;
+  pointer-events: none;
+}
+.local-profile-view-toggle button {
+  /* Preserve the previous selector's 42px slot and the card's measured start. */
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #b0c4d9;
+  box-shadow: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.local-profile-view-toggle button:not(:disabled):not([aria-pressed="true"]):hover {
+  background: rgba(43, 76, 115, 0.35);
+  color: #f5f9ff;
+}
+.local-profile-view-toggle button[aria-pressed="true"] {
+  background: linear-gradient(180deg, #1b4168, #193654);
+  color: #f5f9ff;
+  box-shadow: inset 0 0 12px rgba(103, 215, 255, 0.15), inset 0 -2px 0 #67d7ff;
+}
+.local-profile-view-toggle button:focus-visible {
+  outline: 2px solid #67d7ff;
+  outline-offset: -3px;
+}
+.local-profile-view-toggle button:disabled { opacity: 0.35; cursor: not-allowed; }
+/* Retain the original intrinsic size and outer card while hiding all content. */
+.profile-overlay--local [data-empty-view] .player-profile__attribute-bars > * { visibility: hidden; }
+@media (max-width: 980px) {
+  .local-profile-view-toggle { gap: 0; }
+  .local-profile-view-toggle button { padding-inline: 6px; }
+  .local-player-compact-header [data-compact-modes] {
+    max-width: calc(var(--player-compact-width) - 2 * var(--head-compact-padding));
+  }
+}
+
+/* Guild Info HUD/row styling, scoped here to preserve guild CSS import order. */
+.profile-overlay--local .player-profile__hero-summary-base-stats { position: relative; }
+.profile-overlay--local .local-profile-attribute-content { display: contents; }
+.profile-overlay--local .local-profile-player-info {
+  position: absolute;
+  inset: 0;
+  padding: 13px 15px;
+}
+.profile-overlay--local .local-profile-player-info h3 {
+  display: grid;
+  align-items: center;
+  min-height: 32px;
+  margin: 0 0 18px;
+  border-block: 1px solid #2b4c73;
+  background: linear-gradient(90deg, transparent, #203b5880, transparent);
+  color: #b0c4d9;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+.profile-overlay--local .local-profile-player-info dl { display: grid; gap: 18px; margin: 0; }
+.profile-overlay--local .local-profile-player-info dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+.profile-overlay--local .local-profile-player-info dt {
+  min-width: 0;
+  color: #b0c4d9;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.profile-overlay--local .local-profile-player-info dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #f5f9ff;
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.18;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.profile-overlay--local .local-profile-player-info .local-profile-player-info-guild { margin-top: 10px; }
+
+/* Use the clearance left by the upward summary alignment without moving tracks. */
+@media (min-width: 901px) {
+  .profile-overlay--local .local-profile-fortress-info {
+    bottom: min(0px, var(--local-profile-attribute-start, 0px));
+  }
+}
+.profile-overlay--local .local-profile-fortress-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+@media (max-width: 980px) {
+  .profile-overlay--local .local-profile-fortress-groups { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The member overlay shares the upper profile, without the full-page tracks. */
+.profile-overlay--local .profile-overlay__panel--local {
+  height: auto;
+  max-height: 100%;
+  align-self: start;
+}
+.profile-overlay--local .profile-overlay__local-grid--upper {
+  grid-template-rows: repeat(5, minmax(var(--local-profile-row-min), 1fr));
+  grid-template-areas:
+    "identity identity identity . attribute-mode attribute-mode attribute-mode attribute-mode . primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary primary-radar primary-radar primary-radar"
+    "identity identity identity summary summary summary summary summary summary . . ."
+    "identity identity identity . actions actions actions actions . . . .";
+  min-height: 0;
+  padding-block-end: 0;
+}
+@media (max-width: 900px) {
+  .profile-overlay--local .profile-overlay__local-grid--upper {
+    grid-template-rows: none;
+    grid-template-areas:
+      "attribute-mode"
+      "summary"
+      "actions"
+      "primary-radar"
+      "direct-comparison"
+      "identity"
+      "hero-metrics";
+  }
+}
+
+/* Keep the existing narrow chart control until its separate layout decision.
+   At 1400px the action card fits its unchanged three-button row plus a 30px
+   comparison row. Absolute placement uses the existing free bottom space. */
+.local-profile-action-comparison,
+.local-player-compact-comparison { display: none; }
+@media (min-width: 1400px) {
+  .local-profile-page .local-profile-actions-card { position: relative; }
+  .local-profile-action-comparison {
+    display: block;
+    position: absolute;
+    inset-inline: 12px;
+    bottom: 4px;
+  }
+  .local-profile-chart-comparison { display: none; }
+  .local-player-compact-comparison {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    width: 460px;
+    transform: translateX(-50%);
+    pointer-events: auto;
+  }
+  :is(.local-profile-action-comparison, .local-player-compact-comparison) .local-profile-comparison-select {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr);
+  }
+  :is(.local-profile-action-comparison, .local-player-compact-comparison) .local-profile-comparison-select > span {
+    text-align: right;
+  }
+}
+
+/* Additional charts continue the existing tracks below the protected upper grid. */
+@media (min-width: 901px) {
+  .profile-overlay--local .profile-overlay__local-grid--three-charts {
+    grid-auto-rows: minmax(var(--local-profile-row-min), 1fr);
+  }
+  .profile-overlay--local .local-player-analytics--third {
+    grid-column: 4 / 10;
+    grid-row: 13 / span 3;
+    margin-block: 16px -16px;
+  }
+}
+@media (max-width: 900px) {
+  .profile-overlay--local .profile-overlay__local-grid--three-charts {
+    grid-template-areas: "attribute-mode" "summary" "actions" "primary-radar" "direct-comparison" "divider" "xp" "stats-dev" "third" "left-insights" "insights" "identity" "hero-metrics";
+  }
+  .profile-overlay--local .local-player-analytics--third { grid-area: third; }
+}
+
+/* Lower insights are explicitly placed; size containment prevents their intrinsic
+   content from enlarging the shared upper fractional tracks. No content clipping. */
+.profile-overlay--local .local-profile-left-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--local-profile-grid-gap);
+  min-width: 0;
+}
+.profile-overlay--local .local-profile-left-content > .local-player-insights {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.profile-overlay--local .local-player-analytics[data-player-chart] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+@media (min-width: 901px) {
+  .profile-overlay--local .local-profile-left-content {
+    grid-column: 1 / 4;
+    grid-row: 6 / 15;
+    min-height: 0;
+    contain: size;
+    /* The identity area intentionally still spans rows 1–12. Keep the lower
+       cards above its empty tail for both painting and pointer hit testing. */
+    position: relative;
+    z-index: 1;
+  }
+  .profile-overlay--local .local-player-insights--rankings {
+    /* Absorb the former two cards and their gaps, using their existing
+       typography, row spacing and padding. Personal Bests keeps its anchor. */
+    --former-progression-size: calc(22px + 12px * 1.2 + 10px + 2 * 13px * 1.15 + 17px);
+    --former-average-size: calc(22px + 12px * 1.2 + 10px + 5 * (12px * 1.5 + 10px + 5px + 10px * 1.15) + 4 * 8px);
+    padding-block-end: calc(10px + var(--former-progression-size) + var(--former-average-size) + 2 * var(--local-profile-grid-gap));
+  }
+}
+@media (max-width: 900px) {
+  .profile-overlay--local .local-profile-left-content { grid-area: left-insights; }
+}
+
+/* Metadata in the lower card participates in its own content flow. The upper
+   summary keeps its existing absolute overlay layout. */
+.profile-overlay--local .local-profile-left-content .local-profile-player-info {
+  position: static;
+  inset: auto;
+}
+
+/* Construction uses the dashboard banner verbatim, fitted to this card's padding.
+   Reserve the former body space without rendering its values or controls. */
+.profile-overlay--local .local-player-insights__construction {
+  margin: 0 -12px -10px;
+}
+.profile-overlay--local .local-player-insights--player-average[data-construction] {
+  min-height: calc(22px + 12px * 1.2 + 10px + 5 * (12px * 1.5 + 10px + 5px + 10px * 1.15) + 4 * 8px);
+}
+.profile-overlay--local [data-content-view="general"] .local-player-insights--player-average[data-construction] {
+  min-height: calc(22px + 12px * 1.2 + 10px + 26px + 5 * 24px + 4 * 18px + 10px);
+}
+.profile-overlay--local [data-content-view="progress"] .local-player-insights--player-average[data-construction] {
+  min-height: calc(22px + 12px * 1.2 + 10px + 26px + 24px);
+}
+.profile-overlay--local [data-content-view="fortress"] .local-player-insights--player-average[data-construction] {
+  min-height: calc(22px + 12px * 1.2 + 10px + 26px + 12 * 24px + 11 * 18px);
+}
+.profile-overlay--local .local-player-insights--personal-bests[data-construction] {
+  min-height: calc(22px + 12px * 1.2 + 10px + 3 * 13px * 1.15 + 2 * 17px);
+}
+@media (min-width: 901px) {
+  /* Follow the existing outer tracks: Progression in rows 6–7, Average in row 8.
+     Subgrid consumes those tracks without changing the parent grid or its size. */
+  .profile-overlay--local .local-profile-left-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: subgrid;
+    /* Preserve the existing 16px clearance without shortening a subgrid row. */
+    margin-block: 0;
+    top: 16px;
+  }
+  .profile-overlay--local .local-profile-left-content > .local-player-insights--progression {
+    grid-column: 1 / -1;
+    grid-row: 1 / span 2;
+  }
+  .profile-overlay--local .local-profile-left-content > .local-player-insights--player-average {
+    grid-column: 1 / -1;
+    grid-row: 3 / -1;
+    align-self: start;
+  }
+  .profile-overlay--local .local-player-insights--rankings[data-construction] {
+    min-height: calc(22px + 12px * 1.2 + 10px + 3 * 13px * 1.15 + 2 * 17px + var(--former-progression-size) + var(--former-average-size) + 2 * var(--local-profile-grid-gap));
+    padding-block-end: 10px;
+  }
+}
+
+/* Move the full page's lower start using half an actual, unchanged grid track.
+   The 1px divider is followed by 20px. Opposite margins retain item sizes;
+   the left subgrid uses the same offset without consuming its own tracks. */
+@media (min-width: 901px) {
+  .local-profile-page .profile-overlay__content--local {
+    --local-profile-lower-offset: calc(var(--local-profile-row-half, 0px) + 21px);
+  }
+  .local-profile-page .local-profile-section-divider {
+    margin-block-start: var(--local-profile-row-half, 0px);
+  }
+  .local-profile-page :is(.local-player-analytics--xp, .local-player-analytics--stats-dev, .local-player-analytics--third, .local-profile-right-content) {
+    margin-block: var(--local-profile-lower-offset) calc(-1 * var(--local-profile-lower-offset));
+  }
+  .local-profile-page .local-profile-left-content {
+    top: var(--local-profile-lower-offset);
+  }
+  .local-profile-page .profile-overlay__content--local::after {
+    content: "";
+    display: block;
+    height: calc(var(--local-profile-lower-offset) - 16px);
   }
 }

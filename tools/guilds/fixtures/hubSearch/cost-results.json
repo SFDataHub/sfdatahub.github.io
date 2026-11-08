@@ -1,0 +1,29 @@
+{
+  "samples": [
+    {
+      "count": 1000,
+      "projectionBytes": 329752,
+      "projectionBuildMs": 63.74979999999994,
+      "queryMs": [
+        7.505400000000009,
+        5.208100000000059,
+        5.992899999999963,
+        4.1924999999999955,
+        10.336799999999926
+      ]
+    },
+    {
+      "count": 10000,
+      "projectionBytes": 3354754,
+      "projectionBuildMs": 313.05779999999993,
+      "queryMs": [
+        36.670700000000124,
+        36.006000000000085,
+        27.98109999999997,
+        21.55250000000001,
+        31.253800000000183
+      ]
+    }
+  ],
+  "note": "Synthetic parser/projection and aggregation CPU; serialized UTF-8 size. No Raw transport/DB commit, RAM/heap or clone measurement."
+}

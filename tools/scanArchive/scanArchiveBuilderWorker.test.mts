@@ -23,6 +23,8 @@ const base = await createScanArchiveBuildPlanCore({ year: 2026, manifest: empty,
   byteLength: (bytes) => bytes.length, utf8ByteLength: (content) => encoder.encode(content).length,
 });
 assert.equal(base.conflicts.length, 0);
+// Exercise legacy local-first baseline initialization; ranked-baseline acquisition is covered below.
+delete base.manifestAfter.rankings;
 const manifestUrl = "https://example.test/2026/manifest.json";
 const entries = toScanArchiveEntries(base.manifestAfter, manifestUrl);
 const rawFiles = new Map(base.files.filter((file) => file.kind === "raw").map((file) => [file.scanId, file.bytes!]));
@@ -68,7 +70,7 @@ assert.equal(added.result.monthlyTargets[0].baseMembers.length, 2);
 assert.equal(added.result.monthlyTargets[0].addedPlayers, 1);
 assert.equal(added.result.monthlyTargets[0].skippedPlayers, 1);
 assert.equal(added.result.monthlyTargets[0].skippedGuilds, 1);
-assert.equal(added.result.files.length, 2);
+assert.equal(added.result.files.length, 3);
 const zip = unzipSync(new Uint8Array(added.result.zipBytes));
 const rawPath = added.result.files.find((file) => file.kind === "raw")!.relativePath;
 const raw = JSON.parse(new TextDecoder().decode(gunzipSync(zip[rawPath])));
@@ -96,7 +98,7 @@ const rebuilt = await run(buildRequest("rebuilt", "create-monthly"));
 assert.equal(rebuilt.type, "complete");
 assert.equal(parseCount, 1);
 
-// Fully redundant Add returns an understandable blocker and no ZIP, through
+// Identical legacy Add emits a ranking-only ZIP, then a validated repeat blocks, through
 // the real worker path and production local-first acquisition.
 const redundantInput = await run({ type: "inspect", requestId: "redundant-inspect", inputFile: { text: async () => JSON.stringify({ players: [row("f8_p1", t3)], groups: [row("f8_g1", t3)] }) } as File });
 assert.equal(redundantInput.type, "inspected");
@@ -107,9 +109,38 @@ redundantRequest.inspectionId = redundantInput.inspection.inspectionId;
 const redundant = await run(redundantRequest);
 assert.equal(redundant.type, "complete");
 if (redundant.type !== "complete") throw new Error("Redundant build failed");
-assert(redundant.result.blockers.some((blocker) => blocker.code === "add_no_new_ids"));
-assert.equal(redundant.result.zipBytes.byteLength, 0);
-assert.equal(redundant.result.files.length, 0);
+assert.deepEqual(redundant.result.blockers, []);
+assert(redundant.result.zipBytes.byteLength > 0);
+assert.deepEqual(redundant.result.files.map(file => file.kind), ["ranking"]);
+assert.equal(redundant.result.summary.newScans, 0);
+assert(redundant.result.monthlyTargets.every(t => t.addedPlayers === 0 && t.addedGuilds === 0 && t.updatedPlayers === 0 && t.updatedGuilds === 0));
+assert.deepEqual(redundant.result.manifestAfter.scans, base.manifestAfter.scans);
+assert.deepEqual(redundant.result.manifestAfter.toplists, base.manifestAfter.toplists);
+const backfillZip = unzipSync(new Uint8Array(redundant.result.zipBytes));
+assert.deepEqual(Object.keys(backfillZip).sort(), ["manifest.json", redundant.result.files[0].relativePath].sort());
+assert.deepEqual(JSON.parse(new TextDecoder().decode(backfillZip["manifest.json"])), redundant.result.manifestAfter);
+const backfillRef = redundant.result.manifestAfter.rankings!["2026-09"].f8_net;
+assert.equal(createHash("sha256").update(backfillZip[backfillRef.path]).digest("hex"), backfillRef.sha256);
+assert.equal(backfillZip[backfillRef.path].length, backfillRef.compressedBytes);
+globalThis.fetch = async input => {
+  assert.equal(String(input), new URL(backfillRef.path, manifestUrl).toString());
+  return new Response(new Uint8Array(backfillZip[backfillRef.path]).buffer);
+};
+const backfillRepeated = await run({ ...redundantRequest, requestId: "backfill-repeat", manifest: redundant.result.manifestAfter });
+if (backfillRepeated.type !== "complete") throw new Error("Backfill repeat failed");
+assert(backfillRepeated.result.blockers.some(blocker => blocker.code === "add_no_new_ids"));
+assert.equal(backfillRepeated.result.zipBytes.byteLength, 0);
+assert.equal(backfillRepeated.result.files.length, 0);
+assert.deepEqual(backfillRepeated.result.manifestAfter, redundant.result.manifestAfter);
+globalThis.fetch = async () => { throw new Error("Unexpected network access: bound baseline is local"); };
+// Discard the ranking-only backfill while its compressed output is prepared.
+onProgress = response => {
+  if (response.requestId === "backfill-discarded" && response.progress.phase === "compressing") {
+    send({ type: "discard-build", requestId: "backfill-discarded" });
+  }
+};
+assert.equal((await run({ ...redundantRequest, requestId: "backfill-discarded" })).type, "cancelled");
+onProgress = undefined;
 const unavailableManifest = structuredClone(base.manifestAfter);
 for (const scan of unavailableManifest.scans) scan.sha256 = "f".repeat(64);
 const unavailable = await run({ ...redundantRequest, requestId: "unavailable", manifest: unavailableManifest });
@@ -195,7 +226,7 @@ assert.deepEqual(historicalResult.result.manifestAfter.toplists!.current, curren
 assert.equal(historicalResult.result.toplistChanges.current.length, 0);
 assert.deepEqual(historicalResult.result.warnings.filter(w => w.code === "current_preserved").map(w => w.preservedCurrent!.server).sort(), historicalServers.slice().sort());
 const historicalZip = unzipSync(new Uint8Array(historicalResult.result.zipBytes));
-assert.equal(Object.keys(historicalZip).length, 13);
+assert.equal(Object.keys(historicalZip).length, 16);
 assert.deepEqual(JSON.parse(new TextDecoder().decode(historicalZip["manifest.json"])), historicalResult.result.manifestAfter);
 for (const server of historicalServers) {
   assert.deepEqual(historicalResult.result.manifestAfter.toplists!.monthly!["2026-09"][server], { scanIds: [`${server}:${oldTimestamp}`, `${server}:${oldTimestamp + 1}`] });
@@ -219,5 +250,30 @@ const pageSource = (await import("node:fs")).readFileSync(new URL("../../src/pag
 assert.match(pageSource, /!result.blockers.length && result.warnings.some/);
 assert.match(pageSource, /result.warnings.filter\(\(warning\) => warning.code === "current_preserved"\).map/);
 assert.match(pageSource, /role="status"[\s\S]*?warning.message/);
+// Ranked Add loads the referenced compressed ranking through the actual worker
+// acquisition path. ZIP metadata refers to those exact replacement bytes.
+const rankingPath = added.result.manifestAfter.rankings!["2026-09"].f8_net.path;
+const rankingRequests: string[] = [];
+globalThis.fetch = async input => {
+  const url = String(input); rankingRequests.push(url);
+  assert.equal(url, new URL(rankingPath, manifestUrl).toString());
+  return new Response(new Uint8Array(zip[rankingPath]).buffer);
+};
+const rankedInspection = await run({ type: "inspect", requestId: "ranked-inspect", inputFile: { text: async () => JSON.stringify({players:[row("f8_p3",t3+1000)],groups:[]}) } as File });
+assert.equal(rankedInspection.type,"inspected");
+if (rankedInspection.type !== "inspected") throw new Error("Ranked inspection failed");
+const rankedAdded = await run({ type:"build",requestId:"ranked-add",inspectionId:rankedInspection.inspection.inspectionId,manifest:added.result.manifestAfter,manifestSource:{kind:"catalog",manifestUrl,year:2026,scanCount:added.result.manifestAfter.scanCount},usageMode:"add-monthly" });
+assert.equal(rankedAdded.type,"complete");
+if (rankedAdded.type !== "complete") throw new Error("Ranked Add failed");
+assert.deepEqual(rankedAdded.result.blockers,[]);assert.equal(rankingRequests.length,1);
+const rankedZip=unzipSync(new Uint8Array(rankedAdded.result.zipBytes));
+for(const file of rankedAdded.result.files){if(file.action!=="write")continue;assert.equal(createHash("sha256").update(rankedZip[file.relativePath]).digest("hex"),file.sha256);assert.equal(rankedZip[file.relativePath].length,file.compressedBytes);}
+const rankingRef=rankedAdded.result.manifestAfter.rankings!["2026-09"].f8_net;
+assert.equal(rankingRef.path,rankingPath);assert.notEqual(rankingRef.cohortId,added.result.manifestAfter.rankings!["2026-09"].f8_net.cohortId);
+assert.equal(new TextEncoder().encode(new TextDecoder().decode(gunzipSync(rankedZip[rankingPath]))).length,rankingRef.uncompressedBytes);
+const userInspection=await run({type:"inspect",requestId:"user-ranking-inspect",inputFile:{text:async()=>JSON.stringify({players:[row("f8_p99",t3+2000)],groups:[]})} as File});
+if(userInspection.type!=="inspected")throw new Error("User inspection failed");
+const userRanked=await run({type:"build",requestId:"user-ranked",inspectionId:userInspection.inspection.inspectionId,manifest:rankedAdded.result.manifestAfter,manifestSource:{kind:"catalog",manifestUrl,year:2026,scanCount:rankedAdded.result.manifestAfter.scanCount},usageMode:"archive-only"});
+if(userRanked.type!=="complete")throw new Error("User build failed");assert.deepEqual(userRanked.result.blockers,[]);assert.equal(rankingRequests.length,1);assert.equal(userRanked.result.files.filter(f=>f.kind==="ranking").length,0);assert.deepEqual(userRanked.result.manifestAfter.rankings,rankedAdded.result.manifestAfter.rankings);
 globalThis.fetch = originalFetch;
 console.log("scanArchiveBuilderWorker.test: ok");

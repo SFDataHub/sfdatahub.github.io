@@ -1,3 +1,5 @@
+import { isFusionResolverVersionCompatible } from "./fusionAnalysisCache";
+import { type LocalDependencyReceipt, revalidateLocalDataDependencies } from "../local-data/localDataDependencies";
 import type { FusionIdentityManagementReport } from "./fusionIdentityManagement";
 import type { FusionIdentityScopeInventory } from "./fusionDashboardInventory";
 import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
@@ -26,6 +28,8 @@ export type FusionIdentityWorkerLike = {
 };
 
 export type FusionIdentityWorkerRunResult = {
+  resolverVersion: number;
+  dependencies?: LocalDependencyReceipt;
   report: FusionIdentityManagementReport;
   timings: FusionIdentityWorkerTiming[];
 };
@@ -101,6 +105,10 @@ export const startFusionIdentityWorkerRun = (
       cleanup();
 
       if (message.type === "complete") {
+        if (!isFusionResolverVersionCompatible(message.resolverVersion)) {
+          worker.terminate(); reject(new Error("Fusion resolver version changed during analysis.")); return;
+        }
+        if (!message.dependencies && !options.workerFactory) { worker.terminate(); reject(new Error("Fusion worker result has no dependency certificate.")); return; }
         const workerComputeMs =
           message.timings.find((timing) => timing.phase === "worker:compute")?.durationMs ??
           message.timings.find((timing) => timing.phase === "total")?.durationMs ??
@@ -125,7 +133,10 @@ export const startFusionIdentityWorkerRun = (
             count: 1,
           },
         ];
-        resolve({ report: message.report, timings });
+        const validate = message.dependencies ? revalidateLocalDataDependencies(message.dependencies).then(result => {
+          if (!result.current) throw new Error("Fusion dependencies changed before delivery.");
+        }) : Promise.resolve();
+        void validate.then(() => resolve({ resolverVersion: message.resolverVersion, report: message.report, dependencies: message.dependencies, timings }), reject);
         worker.terminate();
         return;
       }

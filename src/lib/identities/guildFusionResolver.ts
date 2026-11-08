@@ -511,7 +511,7 @@ const hasRelevantStrongIdentityHypothesis = (candidate: GuildFusionCandidate) =>
   hasSubstantialBidirectionalCore(candidate);
 
 const isRelevantGuildIdentityCompetitor = (winner: GuildFusionCandidate, competitor: GuildFusionCandidate) => {
-  if (competitor.assignmentConflict) return true;
+  // Assignment conflicts are derived constraints, never independent identity evidence.
   if (normalizeIdentifierKey(competitor.oldGuildIdentifier) === normalizeIdentifierKey(winner.oldGuildIdentifier)) return false;
   const winnerRank = getGuildFusionClassificationRank(winner.classification);
   const competitorRank = getGuildFusionClassificationRank(competitor.classification);
@@ -721,7 +721,10 @@ const classifyGuildCandidate = (
   if (exactName && strongFlow) return "strong";
   if (!exactName && sameCoA && substantialMemberContinuity) return "strong";
   if (sameCoA && (strongFlow || leadership.leadershipCoreOverlap > 0)) return "strong";
-  if (leadership.sameLogicalLeader === true) return "strong";
+  // A leader can migrate with a smaller group while the origin guild continues.
+  // Require another continuity signal, using the existing flow/core criteria.
+  if (leadership.sameLogicalLeader === true &&
+      (strongFlow || exactName || sameCoA || leadership.continuedOfficers >= 2)) return "strong";
   if (leadership.continuedOfficers >= 2 && (exactName || sameCoA || strongFlow)) return "strong";
   if (
     hasOnlyCollidingExactNameEvidence(
@@ -1211,13 +1214,23 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
     return draft;
   }));
 
+  // Compare outgoing identity hypotheses before deriving global constraints.
+  // A minor coat/leadership-supported flow must not manufacture a split when
+  // an independently supported continuation exists. Comparable hypotheses stay
+  // in the claim set together; no member-count or identifier tie-break wins.
+  const readyClaimsByOld = new Map<string, GuildFusionCandidate[]>();
+  relationDrafts.forEach(draft => draft.identityCandidates.forEach(candidate => {
+    if (!isGuildFusionReadyCandidate(candidate)) return;
+    const oldKey = normalizeIdentifierKey(candidate.oldGuildIdentifier);
+    readyClaimsByOld.set(oldKey, [...(readyClaimsByOld.get(oldKey) ?? []), candidate]);
+  }));
   const strongContinuityCountsByOld = new Map<string, number>();
-  relationDrafts.forEach((draft) => {
-    draft.identityCandidates.forEach((candidate) => {
-      if (!isGuildFusionReadyCandidate(candidate)) return;
-      const oldKey = normalizeIdentifierKey(candidate.oldGuildIdentifier);
-      strongContinuityCountsByOld.set(oldKey, (strongContinuityCountsByOld.get(oldKey) ?? 0) + 1);
-    });
+  const viableClaimKeys = new Set<string>();
+  readyClaimsByOld.forEach((claims, oldKey) => {
+    const independent = claims.filter(hasRelevantStrongIdentityHypothesis);
+    const viable = independent.length ? independent : claims;
+    strongContinuityCountsByOld.set(oldKey, viable.length);
+    viable.forEach(candidate => viableClaimKeys.add(createEdgeKey(candidate.oldGuildIdentifier, candidate.newGuildIdentifier)));
   });
 
   const reservedReadyOwnerByOld = new Map<string, string>();
@@ -1225,6 +1238,7 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
     const comparableReadyCandidates = draft.identityCandidates.filter(
       (candidate) =>
         isGuildFusionReadyCandidate(candidate) &&
+        viableClaimKeys.has(createEdgeKey(candidate.oldGuildIdentifier, candidate.newGuildIdentifier)) &&
         (strongContinuityCountsByOld.get(normalizeIdentifierKey(candidate.oldGuildIdentifier)) ?? 0) === 1,
     );
     if (comparableReadyCandidates.length !== 1) return;
@@ -1239,7 +1253,8 @@ export const resolveGuildFusions = (input: GuildFusionResolverInput): GuildFusio
       draft.identityCandidates.map((candidate) => {
         const oldKey = normalizeIdentifierKey(candidate.oldGuildIdentifier);
         const strongClaimCount = strongContinuityCountsByOld.get(oldKey) ?? 0;
-        const assignmentConflict = isGuildFusionReadyCandidate(candidate) && strongClaimCount > 1;
+        const assignmentConflict = isGuildFusionReadyCandidate(candidate) &&
+          (strongClaimCount > 1 || !viableClaimKeys.has(createEdgeKey(candidate.oldGuildIdentifier, candidate.newGuildIdentifier)));
         const reservedOwner = reservedReadyOwnerByOld.get(oldKey);
         const reservedByReadyAssignment = Boolean(
           reservedOwner && reservedOwner !== normalizeIdentifierKey(candidate.newGuildIdentifier),

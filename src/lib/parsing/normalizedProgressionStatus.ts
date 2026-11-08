@@ -49,7 +49,14 @@ export type NormalizedPlayerProgressionStatus = {
   };
 };
 
-const SCRAPBOOK_MAXIMUM = 2484;
+const SCRAPBOOK_MAXIMUM = 2506;
+
+/** Refresh only calculated Scrapbook fields in reused prepared profile data. */
+export function refreshScrapbookSummary(summary: NormalizedScrapbookSummary): NormalizedScrapbookSummary {
+  const percentage = summary.count == null ? null : summary.count / SCRAPBOOK_MAXIMUM;
+  if (summary.maximum === SCRAPBOOK_MAXIMUM && summary.percentage === percentage) return summary;
+  return { ...summary, maximum: SCRAPBOOK_MAXIMUM, percentage };
+}
 const ACHIEVEMENT_MAXIMUM = 141;
 const MOUNT_BONUSES: Record<number, number> = {
   0: 0,

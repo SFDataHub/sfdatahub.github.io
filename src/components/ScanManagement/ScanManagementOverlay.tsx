@@ -1,4 +1,11 @@
+import { profileClassLabel, profileRoleLabel } from "../../lib/i18n/profilePresentation";
+import { hubText, hubLocale, hubNumber, hubPercent, hubMessage } from "../../lib/i18n/dataHubPresentation";
+import { uploadViewEvents, scanViewEvents, trackLocalEvent, useAnalyticsView } from "../../lib/analytics/localEvents";
+import { useRuntimeAuditCommit } from "../../lib/data-hub/useRuntimeAuditCommit";
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditCaught, auditAccept, auditFinish, auditCount, auditObserveInputs } from "../../lib/data-hub/runtimeAudit";
 import React from "react";
+import { useProfileTranslation as useTranslation } from "../../lib/i18n/useProfileTranslation";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { createPortal } from "react-dom";
 import {
   Check,
@@ -21,9 +28,8 @@ import {
   X,
 } from "lucide-react";
 
-import { useBackClose } from "../../hooks/useBackClose";
+import { useBackClose, hasBackCloseLayer } from "../../hooks/useBackClose";
 import {
-  createSfDataHubLocalScanImportPreview,
   deleteSfDataHubLocalScans,
   deriveGuildHubLogicalScanSnapshots,
   getSfDataHubLocalScan,
@@ -36,18 +42,20 @@ import {
   type GuildHubScanMergeMode,
   type GuildHubScanSummary,
   type SfDataHubLocalScan,
+  type GuildHubScanPreviewStatistics,
 } from "../../lib/guilds/localScanLibrary";
 import {
   loadScanArchiveEntries,
 } from "../../lib/scanArchive/client";
 import {
   startScanArchiveDownloadWorkerRun,
+  prepareLocalScanImportInWorker,
   type ScanArchiveDownloadRun,
 } from "../../lib/scanArchive/downloadWorkerClient";
 import type { ScanArchiveDownloadProgress } from "../../lib/scanArchive/downloadWorkerTypes";
 import { acquireExplicitLocalFirstArchiveScans } from "../../lib/scanArchive/localFirstScanAcquisition";
 import { loadScanArchiveSearchIndexSet, ScanArchiveSearchIndexSet } from "../../lib/scanArchive/searchIndexService";
-import { archiveGroupLocalIds, findArchiveOverviewLocal, groupArchiveOverviewDays, type ArchiveOverviewDay } from "./scanArchiveOverview";
+import { archiveGroupLocalIds, findArchiveOverviewLocal, getArchiveOverviewStatus, groupArchiveOverviewDays, type ArchiveOverviewDay } from "./scanArchiveOverview";
 import { validateScanArchiveSearchIndexPayload } from "../../lib/scanArchive/validation";
 import type { ScanArchiveEntry } from "../../lib/scanArchive/types";
 import type { GuildSnapshotCoverageStatus } from "../../lib/guilds/guildCoverage";
@@ -65,12 +73,12 @@ import {
   stringifySfDataHubTransfer,
   type SfDataHubAnyTransferEnvelope,
 } from "../../lib/transfer/sfDataHubTransfer";
-import { getDataJobDetail, getDataJobProgress, useDataJobs, type DataJob } from "../../context/DataJobsContext";
+import { getDataJobProgress, useDataJobs, type DataJob } from "../../context/DataJobsContext";
 import { DataHubLoadingState } from "../ui/shared/DataHubLoadingState";
 import styles from "./ScanManagementOverlay.module.css";
 import {
   buildScanExplorerData,
-  formatCoverageStatus,
+  formatCoverageStatus as rawCoverageStatus,
   getScanExplorerGuildDetail,
   getLimitedScanExplorerResults,
   linkScanExplorerPlayerToGuildMember,
@@ -89,6 +97,12 @@ import {
 } from "./scanExplorerFormatting";
 import type { NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 import type { NormalizedGuild, NormalizedGuildMember, NormalizedPlayerGuildMemberLink } from "../../lib/parsing/normalizedGuild";
+
+function formatCoverageStatus(status: GuildSnapshotCoverageStatus) {
+  const raw = rawCoverageStatus(status);
+  const labelKey = status === "complete" ? "coverage" : status === "overcount" ? "coverageOvercount" : status === "unknown" ? "unknown" : "coverageIncomplete";
+  return { ...raw, label: hubText("dataHubI18n." + labelKey) };
+}
 
 type ScanManagementOverlayProps = {
   isOpen: boolean;
@@ -118,6 +132,7 @@ type PendingScanJsonImport = {
   filename: string;
   file: File;
   scan: SfDataHubLocalScan;
+  statistics: GuildHubScanPreviewStatistics;
 };
 
 type PendingScanMergeImport = {
@@ -176,22 +191,22 @@ function hasFeedback(feedback: ImportFeedback | null) {
 }
 
 function formatScanDate(value: string | null | undefined) {
-  if (!value) return "Unbekannt";
+  if (!value) return hubText("dataHubI18n.unknown");
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Unbekannt";
+  if (!Number.isFinite(date.getTime())) return hubText("dataHubI18n.unknown");
 
-  return new Intl.DateTimeFormat("de-DE", {
+  return new Intl.DateTimeFormat(hubLocale(), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
 function formatScanDateShort(value: string | null | undefined) {
-  if (!value) return "Unbekannt";
+  if (!value) return hubText("dataHubI18n.unknown");
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Unbekannt";
+  if (!Number.isFinite(date.getTime())) return hubText("dataHubI18n.unknown");
 
-  return new Intl.DateTimeFormat("de-DE", {
+  return new Intl.DateTimeFormat(hubLocale(), {
     dateStyle: "medium",
   }).format(date);
 }
@@ -209,9 +224,9 @@ function formatScanSnapshotCell(summary: GuildHubScanSummary) {
   }
 
   return {
-    label: `${summary.logicalScanCount} Scans / ${formatScanDateShort(
+    label: hubText("dataHubI18n.scanRange", { v1: summary.logicalScanCount, v2: formatScanDateShort(
       isoFromSummaryTimestamp(summary.firstSnapshotTimestamp),
-    )} - ${formatScanDateShort(isoFromSummaryTimestamp(summary.lastSnapshotTimestamp))}`,
+    ), v3: formatScanDateShort(isoFromSummaryTimestamp(summary.lastSnapshotTimestamp)) }),
     title: summary.snapshotTimestamps.map((timestamp) => formatScanDate(new Date(timestamp).toISOString())).join("\n"),
   };
 }
@@ -224,18 +239,18 @@ function formatArchiveScanSnapshotCell(entry: ScanArchiveEntry) {
 }
 
 function formatOptionalDate(value: string | null | undefined) {
-  if (!value) return "Unbekannt";
+  if (!value) return hubText("dataHubI18n.unknown");
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Unbekannt";
+  if (!Number.isFinite(date.getTime())) return hubText("dataHubI18n.unknown");
 
-  return new Intl.DateTimeFormat("de-DE", {
+  return new Intl.DateTimeFormat(hubLocale(), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
 function formatServerList(scan: Pick<SfDataHubLocalScan, "servers"> | Pick<GuildHubScanSummary, "servers">) {
-  return scan.servers.length ? scan.servers.join(", ") : "Unbekannt";
+  return scan.servers.length ? scan.servers.join(", ") : hubText("dataHubI18n.unknown");
 }
 
 function getArchiveDisplayName(entry: ScanArchiveEntry) {
@@ -258,8 +273,8 @@ function getArchiveRowServerSortKey(row: ArchiveTableRow) {
 
 function formatArchiveMonthLabel(timestamp: number) {
   const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime())) return "Unbekannter Monat";
-  return new Intl.DateTimeFormat("de-DE", {
+  if (!Number.isFinite(date.getTime())) return hubText("dataHubI18n.unknownMonth");
+  return new Intl.DateTimeFormat(hubLocale(), {
     month: "long",
     year: "numeric",
   }).format(date);
@@ -313,20 +328,20 @@ function getDataManagementTabForTransferType(type: SfDataHubAnyTransferEnvelope[
 }
 
 function formatSelectedCount(count: number) {
-  return `${count} ausgewählt`;
+  return hubText("dataHubI18n.selectedCount", { v1: count });
 }
 
 function formatCompactNames(names: string[], limit = 5) {
   const visible = names.slice(0, limit).join(", ");
   const remaining = names.length - limit;
-  return remaining > 0 ? `${visible} +${remaining} weitere` : visible || "Unbekannt";
+  return remaining > 0 ? hubText("dataHubI18n.moreFiles", { v1: visible, v2: remaining }) : visible || hubText("dataHubI18n.unknown");
 }
 
 function normalizeMergeFilenameInput(filename: string) {
   const trimmed = filename.trim();
-  if (!trimmed) throw new Error("Dateiname darf nicht leer sein.");
+  if (!trimmed) throw new Error(hubText("dataHubI18n.filenameMustNotBeEmpty"));
   if (/[<>:"/\\|?*\u0000-\u001f]/.test(trimmed)) {
-    throw new Error("Dateiname enthält ungültige Zeichen.");
+    throw new Error(hubText("dataHubI18n.filenameContainsInvalidCharacters"));
   }
   return trimmed.toLowerCase().endsWith(".json") ? trimmed : `${trimmed}.json`;
 }
@@ -354,14 +369,14 @@ function createScanSlotNameSuggestion(scans: Array<Pick<GuildHubScanSummary, "se
   const servers = new Set(scans.flatMap((scan) => scan.servers.map((server) => server.trim()).filter(Boolean)));
   if (servers.size === 1) {
     const [server] = [...servers];
-    return `${server} - Historie`;
+    return hubText("dataHubI18n.historyName", { v1: server });
   }
-  return "Neuer Scan-Slot";
+  return hubText("dataHubI18n.newScanSlot");
 }
 
 function normalizeScanSlotNameInput(displayName: string) {
   const normalized = displayName.trim().replace(/\s+/g, " ");
-  if (!normalized) throw new Error("Scan-Slot-Name darf nicht leer sein.");
+  if (!normalized) throw new Error(hubText("dataHubI18n.scanSlotNameMustNotBeEmpty"));
   return normalized;
 }
 
@@ -395,17 +410,17 @@ function getScanExportFilename(scan: Pick<GuildHubScanSummary, "displayName" | "
 function getScanSlotSourceInfo(scan: Pick<GuildHubScanSummary, "isScanSlot" | "mergedSourceIds" | "logicalScanCount">) {
   if (!scan.isScanSlot) return null;
   const sourceCount = scan.mergedSourceIds?.length ?? 0;
-  return `${sourceCount.toLocaleString("de-DE")} Quelldateien · ${scan.logicalScanCount.toLocaleString("de-DE")} Scans`;
+  return hubText("dataHubI18n.slotSourceCounts", { v1: sourceCount, v2: scan.logicalScanCount });
 }
 
 function formatCount(value: number) {
-  return value.toLocaleString("de-DE");
+  return value.toLocaleString(hubLocale());
 }
 
 function getScanSourceTypeLabel(scan: Pick<GuildHubScanSummary, "isScanSlot" | "isMergedBundle">) {
-  if (scan.isScanSlot) return "Slot";
-  if (scan.isMergedBundle) return "Bundle";
-  return "Scan";
+  if (scan.isScanSlot) return hubText("dataHubI18n.slot");
+  if (scan.isMergedBundle) return hubText("dataHubI18n.bundle");
+  return hubText("dataHubI18n.scanLabel");
 }
 
 function formatCoverageRatio(row: ScanExplorerGuildGroup["rows"][number]) {
@@ -449,19 +464,47 @@ function buildScanDetailsMetadata(summary: GuildHubScanSummary, data: ScanDetail
     : summary.servers;
 
   return [
-    { label: "Name", value: getScanDisplayName(summary) },
-    { label: "Datei", value: summary.filename },
-    { label: "Typ", value: getScanSourceTypeLabel(summary) },
-    { label: "Logical Scans", value: formatCount(data?.snapshots.length ?? summary.logicalScanCount) },
-    { label: "Erster Timestamp", value: formatScanDate(isoFromSummaryTimestamp(firstTimestamp)) },
-    { label: "Letzter Timestamp", value: formatScanDate(isoFromSummaryTimestamp(lastTimestamp)) },
-    { label: "Server", value: servers.length ? servers.join(", ") : "Unbekannt" },
-    { label: "Player", value: formatCount(data?.players.length ?? summary.playerCount) },
-    { label: "Guilds", value: formatCount(data?.guilds.length ?? summary.guildCount) },
+    { label: hubText("dataHubI18n.name"), value: getScanDisplayName(summary) },
+    { label: hubText("dataHubI18n.file"), value: summary.filename },
+    { label: hubText("dataHubI18n.type"), value: getScanSourceTypeLabel(summary) },
+    { label: hubText("dataHubI18n.logicalScans"), value: formatCount(data?.snapshots.length ?? summary.logicalScanCount) },
+    { label: hubText("dataHubI18n.firstTimestamp"), value: formatScanDate(isoFromSummaryTimestamp(firstTimestamp)) },
+    { label: hubText("dataHubI18n.lastTimestamp"), value: formatScanDate(isoFromSummaryTimestamp(lastTimestamp)) },
+    { label: hubText("dataHubI18n.server"), value: servers.length ? servers.join(", ") : hubText("dataHubI18n.unknown") },
+    { label: hubText("dataHubI18n.player"), value: formatCount(data?.players.length ?? summary.playerCount) },
+    { label: hubText("dataHubI18n.guilds"), value: formatCount(data?.guilds.length ?? summary.guildCount) },
   ];
 }
 
-export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagementOverlayProps) {
+export default function ScanManagementOverlay(props: ScanManagementOverlayProps) {
+  return <ScanManagementContent {...props} overlay />;
+}
+
+function ScanManagementFrame({ overlay, onClose, titleId, children }: {
+  overlay: boolean; onClose: () => void; titleId: string; children: React.ReactNode;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!overlay) return;
+    const previous = document.activeElement;
+    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
+  }, [overlay]);
+  useFocusTrap(ref, overlay, { preventInitialScroll: true });
+  if (!overlay) return <div className={styles.pageContent}>{children}</div>;
+  return <div className={styles.backdrop} role="dialog" aria-modal="true" aria-labelledby={titleId}
+    onClick={event => { if (event.currentTarget === event.target) onClose(); }}>
+    <div ref={ref} className={styles.panel} onClick={event => event.stopPropagation()}>{children}</div>
+  </div>;
+}
+
+const keepPageOpen = () => {};
+
+/** One local management implementation; only the outer presentation is modal. */
+export function ScanManagementContent({ isOpen = true, onClose = keepPageOpen, overlay = false, trackViews = true, initialTab = "scans" }: {
+  isOpen?: boolean; onClose?: () => void; overlay?: boolean; trackViews?: boolean; initialTab?: DataManagementTab;
+}) {
+  const { t } = useTranslation();
+  const titleId = React.useId();
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateInputRef = React.useRef<HTMLInputElement | null>(null);
   const updateTargetIdRef = React.useRef<string | null>(null);
@@ -482,12 +525,15 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   const [busy, setBusy] = React.useState(false);
   const [feedback, setFeedback] = React.useState<ImportFeedback | null>(null);
   const [storageError, setStorageError] = React.useState<string | null>(null);
-  const [activeTab, setActiveTab] = React.useState<DataManagementTab>("scans");
+  const [activeTab, setActiveTab] = React.useState<DataManagementTab>(initialTab);
+  useAnalyticsView(isOpen && trackViews ? uploadViewEvents[activeTab] : null);
   const [trackerSummaries, setTrackerSummaries] = React.useState<FightTrackerSummary[]>([]);
   const [selectedTrackerIds, setSelectedTrackerIds] = React.useState<Set<string>>(() => new Set());
   const [trackersLoading, setTrackersLoading] = React.useState(false);
   const [trackersError, setTrackersError] = React.useState<string | null>(null);
   const [pendingImport, setPendingImport] = React.useState<PendingImport | null>(null);
+  useAnalyticsView(isOpen && trackViews && pendingImport ? "datahub/uploads/import-preview" : null);
+  const previewControllerRef = React.useRef<AbortController | null>(null);
   const [renamingSlot, setRenamingSlot] = React.useState<GuildHubScanSummary | null>(null);
   const [renameSlotValue, setRenameSlotValue] = React.useState("");
   const detailsRequestIdRef = React.useRef(0);
@@ -503,7 +549,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     startScanMergeJob,
   } = useDataJobs();
 
-  useBackClose(isOpen, onClose);
+  useBackClose(isOpen && overlay, onClose);
 
   const closeScanDetails = React.useCallback(() => {
     detailsRequestIdRef.current += 1;
@@ -514,43 +560,60 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   }, []);
 
   React.useEffect(() => {
-    if (isOpen) setActiveTab("scans");
+    if (isOpen) setActiveTab(initialTab);
     else {
+      if (previewControllerRef.current) {
+        previewControllerRef.current.abort();
+        previewControllerRef.current = null;
+        setBusy(false);
+      }
       setPendingImport(null);
       setExpandedArchiveMonths({});
       closeScanDetails();
     }
-  }, [closeScanDetails, isOpen]);
+  }, [closeScanDetails, isOpen, initialTab]);
+  React.useEffect(() => () => { previewControllerRef.current?.abort(); }, []);
 
   const loadScans = React.useCallback(async () => {
+    const __audit1 = auditBegin("F33", "loadScans");
+    try {
     setStorageError(null);
     setLoading(true);
     try {
-      const rows = await listSfDataHubScanSummaries();
-      setScans(rows);
+      const rows = await (auditValue(__audit1, auditEnter(__audit1, "listSfDataHubScanSummaries"), (listSfDataHubScanSummaries())));
+      auditAccept(__audit1, rows);
+      (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setScans", "sync-elapsed"), (setScans(rows))));
       const visibleIds = new Set(rows.map((scan) => scan.sourceScanId));
       setSelectedIds((current) => new Set([...current].filter((id) => visibleIds.has(id))));
-    } catch (error) {
+    } catch (error) { auditError(__audit1, error);
       console.error("[ScanManagement] failed to load scans", error);
-      setStorageError("Lokale Scans konnten nicht geladen werden.");
+      setStorageError("dataHubI18n.localScansCouldNotBeLoaded");
     } finally {
       setLoading(false);
     }
-  }, []);
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+}, []);
 
   const loadArchiveEntries = React.useCallback(async () => {
+    const __audit2 = auditBegin("F34", "loadArchiveEntries");
+    try {
     setArchiveError(null);
     setArchiveLoading(true);
     try {
-      setArchiveEntries(await loadScanArchiveEntries());
-    } catch (error) {
+      setArchiveEntries(await (auditValue(__audit2, auditEnter(__audit2, "loadScanArchiveEntries"), (loadScanArchiveEntries()))));
+    } catch (error) { auditError(__audit2, error);
       console.error("[ScanManagement] failed to load scan archive", error);
       setArchiveEntries([]);
-      setArchiveError("Scanarchiv konnte nicht geladen werden. Lokale Scans bleiben nutzbar.");
+      setArchiveError("dataHubI18n.theScanArchiveCouldNotBeLoadedLocalScansRemainUsable");
     } finally {
       setArchiveLoading(false);
     }
-  }, []);
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
+}, []);
 
   const loadFightTrackers = React.useCallback(async () => {
     setTrackersError(null);
@@ -561,7 +624,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
       setSelectedTrackerIds((current) => new Set(rows.filter((summary) => current.has(summary.tracker.id)).map((summary) => summary.tracker.id)));
     } catch (error) {
       console.error("[DataManagement] failed to load fight trackers", error);
-      setTrackersError("Fight Tracker konnten nicht geladen werden.");
+      setTrackersError("dataHubI18n.fightTrackersCouldNotBeLoaded");
     } finally {
       setTrackersLoading(false);
     }
@@ -591,26 +654,27 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   React.useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
       if (detailsSummary) {
         closeScanDetails();
         return;
       }
-      onClose();
+      if (overlay && hasBackCloseLayer()) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeScanDetails, detailsSummary, isOpen, onClose]);
+  }, [closeScanDetails, detailsSummary, isOpen, onClose, overlay]);
 
   React.useEffect(() => {
-    if (!isOpen || typeof document === "undefined") return;
+    if (!isOpen || (!overlay && !detailsSummary) || typeof document === "undefined") return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, overlay, detailsSummary]);
 
+  useRuntimeAuditCommit(scans, isOpen && !loading, "scan-management-inventory");
   const visibleScans = React.useMemo(() => scans.filter((scan) => !scan.containedInScanSlotId), [scans]);
   const ownVisibleScans = React.useMemo(
     () =>
@@ -627,15 +691,24 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     [visibleScans],
   );
   const archiveManifestEntries = React.useMemo(() => {
+ const __w32Run0=auditBegin("F34","archiveManifestEntries");
+ const __w32Sync=auditEnter(__w32Run0,"archiveManifestEntries","sync-elapsed");
+ try {
     const byId = new Map<string, ScanArchiveEntry>();
     for (const entry of archiveEntries) {
       if (!byId.has(entry.id)) byId.set(entry.id, entry);
     }
-    return [...byId.values()].sort((left, right) => right.timestamp - left.timestamp || left.server.localeCompare(right.server) || left.id.localeCompare(right.id));
-  }, [archiveEntries]);
+    return auditReturn(__w32Run0,[...byId.values()].sort((left, right) => right.timestamp - left.timestamp || left.server.localeCompare(right.server) || left.id.localeCompare(right.id)));
+
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
+}, [archiveEntries]);
   const archiveRows = React.useMemo<ArchiveTableRow[]>(() => {
+ const __w32Run1=auditBegin("F34","archiveRows");
+ auditObserveInputs(__w32Run1, [archiveManifestEntries, scans]);
+ const __w32Sync=auditEnter(__w32Run1,"archiveRows","sync-elapsed");
+ try {
     if (archiveManifestEntries.length) {
-      return archiveManifestEntries
+      return auditReturn(__w32Run1,archiveManifestEntries
         .map((entry) => ({
         id: entry.id,
         entry,
@@ -649,10 +722,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
               sensitivity: "base",
             }) ||
             left.id.localeCompare(right.id),
-        );
+        ));
     }
 
-    return localArchiveScans
+    return auditReturn(__w32Run1,localArchiveScans
       .map((scan) => ({
         id: scan.archiveSource?.archiveScanId ?? scan.sourceScanId,
         entry: null,
@@ -666,18 +739,26 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             sensitivity: "base",
           }) ||
           left.id.localeCompare(right.id),
-      );
-  }, [archiveManifestEntries, localArchiveScans, scans]);
+      ));
+
+} catch (__w32Error) { auditError(__w32Run1,__w32Error); throw __w32Error; } finally {auditValue(__w32Run1,__w32Sync,undefined);auditLeave(__w32Run1);}
+}, [archiveManifestEntries, localArchiveScans, scans]);
+  useRuntimeAuditCommit(archiveRows, isOpen && activeTab === "archive" && !archiveLoading && !loading, "scan-archive-view");
   const archiveDays = React.useMemo(() => groupArchiveOverviewDays(archiveRows), [archiveRows]);
   const archiveGroups = React.useMemo<ArchiveTableGroup[]>(() => {
+ const __w32Run2=auditBegin("F34","archiveGroups");
+ const __w32Sync=auditEnter(__w32Run2,"archiveGroups","sync-elapsed");
+ try {
     const groups = new Map<string, ArchiveTableGroup>();
     for (const day of archiveDays) {
       const group = groups.get(day.month);
       if (group) group.rows.push(day);
       else groups.set(day.month, { id: day.month, label: formatArchiveMonthLabel(day.firstTimestamp), rows: [day] });
     }
-    return [...groups.values()];
-  }, [archiveDays]);
+    return auditReturn(__w32Run2,[...groups.values()]);
+
+} catch (__w32Error) { auditError(__w32Run2,__w32Error); throw __w32Error; } finally {auditValue(__w32Run2,__w32Sync,undefined);auditLeave(__w32Run2);}
+}, [archiveDays]);
   const archiveDayKey = (day: ArchiveOverviewDay) => JSON.stringify(day.members.map(row => [row.id, row.entry?.sha256, row.entry?.searchIndex?.sha256]));
   React.useEffect(() => {
     if (!isOpen) return;
@@ -685,26 +766,31 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     // Opening the overview reads existing sidecar caches only. Expanding a
     // day may acquire its small indexes; neither path requests raw scans.
     void (async () => {
+      const countsAudit = auditBegin("F34", "archive-day-counts");
+      try {
       for (const day of archiveDays) {
         const entries = day.members.flatMap(row => row.entry ? [row.entry] : []);
         if (!entries.length || entries.length !== day.members.length) continue;
         let counts: { players: number; guilds: number } | null = null;
         if (expandedArchiveDays[day.id]) {
-          const result = await loadScanArchiveSearchIndexSet(entries, { signal: controller.signal });
+          const result = await auditValue(countsAudit, auditEnter(countsAudit, "expanded-day-sidecars"), loadScanArchiveSearchIndexSet(entries, { signal: controller.signal }));
           if (result.status === "complete") counts = result.searchSet.getUniqueEntityCounts();
         } else {
           const cached = await Promise.all(entries.map(async entry => {
             try {
-              const record = await getSfDataHubArchiveSearchIndexCache(entry);
+              const record = await auditValue(countsAudit, auditEnter(countsAudit, "collapsed-day-cache-only"), getSfDataHubArchiveSearchIndexCache(entry));
               return record ? { entry, payload: validateScanArchiveSearchIndexPayload(record.payload, entry), source: "cache" as const } : null;
             } catch { return null; }
           }));
           const indexes = cached.flatMap(index => index ? [index] : []);
           if (indexes.length === entries.length) counts = new ScanArchiveSearchIndexSet(indexes).getUniqueEntityCounts();
         }
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) { auditFinish(countsAudit, "stale-discarded"); return; }
+        if (countsAudit) { auditCount(countsAudit, "days", 1); auditCount(countsAudit, "entries", entries.length); }
+        if (counts) auditAccept(countsAudit, counts);
         if (counts) setArchiveDayCounts(current => ({ ...current, [archiveDayKey(day)]: counts }));
       }
+      } catch (error) { auditError(countsAudit, error); throw error; } finally { auditFinish(countsAudit); }
     })().catch(error => { if (!controller.signal.aborted) console.error("[ScanManagement] archive counts", error); });
     return () => controller.abort();
   }, [archiveDays, expandedArchiveDays, isOpen]);
@@ -721,7 +807,10 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
       return changed ? next : current;
     });
   }, [archiveGroups, isOpen]);
-  const archiveLocalCount = archiveRows.filter(row => row.entry && row.localSummary).length;
+  const archiveStatuses = React.useMemo(() => new Map(archiveDays.map(day => [day.id, getArchiveOverviewStatus(day, scans)])), [archiveDays, scans]);
+  const archiveLocalCount = [...archiveStatuses.values()].filter(status => status.complete).length;
+  const archivePartialCount = [...archiveStatuses.values()].filter(status => status.local && !status.complete).length;
+  const archiveReadyCount = [...archiveStatuses.values()].filter(status => status.ready).length;
   const selectedVisibleScans = activeTab === "archive"
     ? [...new Map(archiveRows.flatMap(row => row.localSummary ? [[row.localSummary.sourceScanId, row.localSummary] as const] : [])).values()]
     : ownVisibleScans;
@@ -730,7 +819,13 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   );
 
   const handleImportFiles = async (files: File[]) => {
-    if (!files.length) return;
+    const __audit3 = auditBegin("F36", "handleImportFiles");
+    try {
+    if (!files.length) return auditReturn(__audit3, undefined);
+    if (previewControllerRef.current) return auditReturn(__audit3, undefined);
+    const controller = new AbortController();
+    previewControllerRef.current = controller;
+    try {
     setBusy(true);
     setStorageError(null);
     setPendingImport(null);
@@ -741,11 +836,11 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     for (const file of files) {
       try {
         if (getFileExtension(file.name) === ".sfdata") {
-          const content = await file.text();
+          const content = await (auditValue(__audit3, auditEnter(__audit3, "file.text"), (file.text())));
           if (nextPendingImport) {
             nextFeedback.errors.push({
               filename: file.name,
-              message: "Bitte Transferdateien einzeln importieren.",
+              message: hubText("dataHubI18n.pleaseImportTransferFilesIndividually"),
             });
             continue;
           }
@@ -758,28 +853,32 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
           continue;
         }
 
-        const content = await file.text();
+        const content = await (auditValue(__audit3, auditEnter(__audit3, "file.text"), (file.text())));
         if (nextPendingImport) {
           nextFeedback.errors.push({
             filename: file.name,
-            message: "Bitte Importdateien einzeln bestätigen.",
+            message: hubText("dataHubI18n.pleaseConfirmImportFilesIndividually"),
           });
           continue;
         }
 
+        const prepared = await (auditValue(__audit3, auditEnter(__audit3, "prepareLocalScanImportInWorker"), (prepareLocalScanImportInWorker({ filename: file.name, content, signal: controller.signal }))));
         nextPendingImport = {
           kind: "scanJson",
           id: createImportPreviewId(),
           filename: file.name,
           file,
-          scan: await createSfDataHubLocalScanImportPreview(file.name, content),
+          scan: prepared.scan,
+          statistics: prepared.statistics,
         };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Datei konnte nicht importiert werden.";
+      } catch (error) { auditCaught(__audit3, error);
+        if (controller.signal.aborted) return auditReturn(__audit3, undefined);
+        const message = error instanceof Error ? error.message : hubText("dataHubI18n.theFileCouldNotBeImported");
         nextFeedback.errors.push({ filename: file.name, message });
       }
     }
 
+    if (controller.signal.aborted) return auditReturn(__audit3, undefined);
     setFeedback(nextFeedback);
     setPendingImport(nextPendingImport);
     if (nextPendingImport?.kind === "transfer") {
@@ -787,9 +886,17 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     } else if (nextPendingImport?.kind === "scanJson") {
       setActiveTab("scans");
     }
-    await loadScans();
-    setBusy(false);
-  };
+    await (auditValue(__audit3, auditEnter(__audit3, "loadScans"), (loadScans())));
+    } finally {
+      if (previewControllerRef.current === controller) {
+        previewControllerRef.current = null;
+        setBusy(false);
+      }
+    }
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
+};
 
   const handleImportInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -798,27 +905,33 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const handleUpdateInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const __audit4 = auditBegin("F36", "handleUpdateInputChange");
+    try {
     const file = event.target.files?.[0] ?? null;
     event.target.value = "";
     const scanId = updateTargetIdRef.current;
     updateTargetIdRef.current = null;
-    if (!file || !scanId) return;
+    if (!file || !scanId) return auditReturn(__audit4, undefined);
 
     setBusy(true);
     setStorageError(null);
     const nextFeedback = createEmptyFeedback();
     try {
-      const content = await file.text();
-      await updateSfDataHubLocalScan(scanId, file.name, content);
+      const content = await (auditValue(__audit4, auditEnter(__audit4, "file.text"), (file.text())));
+      await (auditValue(__audit4, auditEnter(__audit4, "updateSfDataHubLocalScan"), (updateSfDataHubLocalScan(scanId, file.name, content))));
       nextFeedback.updated.push(file.name);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Scan konnte nicht aktualisiert werden.";
+      trackLocalEvent("datahub/uploads/update-success");
+    } catch (error) { auditError(__audit4, error);
+      const message = error instanceof Error ? error.message : hubText("dataHubI18n.theScanCouldNotBeUpdated");
       nextFeedback.errors.push({ filename: file.name, message });
     }
     setFeedback(nextFeedback);
-    await loadScans();
+    await (auditValue(__audit4, auditEnter(__audit4, "loadScans"), (loadScans())));
     setBusy(false);
-  };
+
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
+};
 
   const toggleScan = (id: string) => {
     setSelectedIds((current) => {
@@ -843,33 +956,39 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const deleteScans = async (ids: string[]) => {
-    if (!ids.length) return;
+    const __audit5 = auditBegin("F36", "deleteScans");
+    try {
+    if (!ids.length) return auditReturn(__audit5, undefined);
     const selectedScans = visibleScans.filter((scan) => ids.includes(scan.sourceScanId));
     const slotCount = selectedScans.filter((scan) => scan.isScanSlot).length;
     if (
       slotCount > 0 &&
       !window.confirm(
         slotCount === 1
-          ? "Scan-Slot auflösen? Die enthaltenen Originalscans werden wieder sichtbar und aktiv."
-          : "Scan-Slots auflösen? Die enthaltenen Originalscans werden wieder sichtbar und aktiv.",
+          ? hubText("dataHubI18n.dissolveThisScanSlotTheOriginalScansItContainsWillBecomeVisible")
+          : hubText("dataHubI18n.dissolveTheseScanSlotsTheOriginalScansTheyContainWillBecomeVisible"),
       )
     ) {
-      return;
+      return auditReturn(__audit5, undefined);
     }
     setBusy(true);
     setStorageError(null);
     try {
-      await deleteSfDataHubLocalScans(ids);
+      await (auditValue(__audit5, auditEnter(__audit5, "deleteSfDataHubLocalScans"), (deleteSfDataHubLocalScans(ids))));
+      trackLocalEvent("datahub/uploads/delete-success");
       setFeedback(mergeFeedback(EMPTY_FEEDBACK, { deleted: ids.length }));
       setSelectedIds(new Set());
-      await loadScans();
-    } catch (error) {
+      await (auditValue(__audit5, auditEnter(__audit5, "loadScans"), (loadScans())));
+    } catch (error) { auditError(__audit5, error);
       console.error("[ScanManagement] failed to delete scans", error);
-      setStorageError("Scans konnten nicht gelöscht werden.");
+      setStorageError("dataHubI18n.scansCouldNotBeDeleted");
     } finally {
       setBusy(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit5, __auditError); throw __auditError; }
+    finally { auditLeave(__audit5); }
+};
 
   const startUpdate = (scanId: string) => {
     updateTargetIdRef.current = scanId;
@@ -885,20 +1004,25 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     setDetailsLoading(true);
 
     void (async () => {
+    const __audit6 = auditBegin("F35", "@callback");
+    try {
       try {
-        const scan = await getSfDataHubLocalScan(summary.sourceScanId);
-        if (!scan) throw new Error("Scan wurde nicht gefunden.");
-        const data = buildScanDetailsData(scan);
-        if (detailsRequestIdRef.current === requestId) setDetailsData(data);
-      } catch (error) {
+        const scan = await (auditValue(__audit6, auditEnter(__audit6, "getSfDataHubLocalScan"), (getSfDataHubLocalScan(summary.sourceScanId))));
+        if (!scan) throw new Error(hubText("dataHubI18n.scanNotFound"));
+        const data = (auditValue(__audit6, auditEnter(__audit6, "buildScanDetailsData", "sync-elapsed"), (buildScanDetailsData(scan))));
+        if (detailsRequestIdRef.current === requestId) { auditAccept(__audit6, data); setDetailsData(data); } else auditFinish(__audit6, "stale-discarded");
+      } catch (error) { auditError(__audit6, error);
         console.error("[ScanManagement] failed to load scan details", error);
         if (detailsRequestIdRef.current === requestId) {
-          setDetailsError("Scan-Details konnten nicht geladen werden.");
+          setDetailsError("dataHubI18n.scanDetailsCouldNotBeLoaded");
         }
       } finally {
         if (detailsRequestIdRef.current === requestId) setDetailsLoading(false);
       }
-    })();
+
+    } catch (__auditError) { auditError(__audit6, __auditError); throw __auditError; }
+    finally { auditLeave(__audit6); }
+})();
   };
 
   const toggleTracker = (id: string) => {
@@ -918,55 +1042,63 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const exportSelectedScans = async () => {
+    const __audit7 = auditBegin("F36", "exportSelectedScans");
+    try {
     const selectedScans = selectedExportableScans;
-    if (!selectedScans.length) return;
+    if (!selectedScans.length) return auditReturn(__audit7, undefined);
     setBusy(true);
     setStorageError(null);
     try {
-      const scanPairs = await Promise.all(
+      const scanPairs = await (auditValue(__audit7, auditEnter(__audit7, "Promise.all"), (Promise.all(
         selectedScans.map(async (summary) => ({
           summary,
           scan: await getSfDataHubLocalScan(summary.sourceScanId),
         })),
-      );
+      ))));
       if (scanPairs.some((pair) => !pair.scan)) {
-        setStorageError("Mindestens ein ausgewählter Scan wurde nicht gefunden.");
-        return;
+        setStorageError("dataHubI18n.atLeastOneSelectedScanWasNotFound");
+        return auditReturn(__audit7, undefined);
       }
 
       const exportablePairs = scanPairs.filter(
         (pair): pair is { summary: GuildHubScanSummary; scan: SfDataHubLocalScan } =>
           pair.scan != null && !pair.summary.archiveSource && !pair.scan.archiveSource,
       );
-      if (!exportablePairs.length) return;
+      if (!exportablePairs.length) return auditReturn(__audit7, undefined);
 
       const rawScans = exportablePairs.map((pair) => pair.scan);
       if (rawScans.length === 1) {
         if (rawScans[0].isMergedBundle) {
           downloadJsonFile(getScanExportFilename(exportablePairs[0].summary), rawScans[0].rawData);
-          return;
+          return auditReturn(__audit7, undefined);
         }
         const envelope = createSfDataHubTransferEnvelope("scan", rawScans[0]);
         downloadSfDataFile(
           createSfDataFileName("scan", null, dateFromOptionalTimestamp(rawScans[0].scannedAt ?? rawScans[0].importedAt)),
           envelope,
         );
-        return;
+        return auditReturn(__audit7, undefined);
       }
 
       const envelope = createSfDataHubTransferEnvelope("scanpack", { scans: rawScans });
       downloadSfDataFile(createSfDataFileName("scanpack"), envelope);
-    } catch (error) {
+    } catch (error) { auditError(__audit7, error);
       console.error("[ScanManagement] failed to export scans", error);
-      setStorageError("Scans konnten nicht exportiert werden.");
+      setStorageError("dataHubI18n.scansCouldNotBeExported");
     } finally {
       setBusy(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit7, __auditError); throw __auditError; }
+    finally { auditLeave(__audit7); }
+};
 
   const startMergePreview = () => {
+ const __w32Run3=auditBegin("F36","startMergePreview");
+ const __w32Sync=auditEnter(__w32Run3,"startMergePreview","sync-elapsed");
+ try {
     const selectedScans = ownVisibleScans.filter((scan) => selectedIds.has(scan.sourceScanId));
-    if (selectedScans.length < 2) return;
+    if (selectedScans.length < 2) return auditReturn(__w32Run3,undefined);
     setPendingImport({
       kind: "scanMerge",
       id: createImportPreviewId(),
@@ -977,37 +1109,46 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
       summaries: selectedScans,
     });
     setActiveTab("scans");
-  };
+
+} catch (__w32Error) { auditError(__w32Run3,__w32Error); throw __w32Error; } finally {auditValue(__w32Run3,__w32Sync,undefined);auditLeave(__w32Run3);}
+};
 
   const exportSelectedFightTrackers = async () => {
+    const __audit8 = auditBegin("F36", "exportSelectedFightTrackers");
+    try {
     const selectedSummaries = trackerSummaries.filter((summary) => selectedTrackerIds.has(summary.tracker.id));
-    if (!selectedSummaries.length) return;
+    if (!selectedSummaries.length) return auditReturn(__audit8, undefined);
     setBusy(true);
     setTrackersError(null);
     try {
-      const states = await Promise.all(selectedSummaries.map((summary) => readFightTrackerTransferState(summary.tracker.id)));
+      const states = await (auditValue(__audit8, auditEnter(__audit8, "Promise.all"), (Promise.all(selectedSummaries.map((summary) => readFightTrackerTransferState(summary.tracker.id))))));
       if (states.some((state) => !state)) {
-        setTrackersError("Fight Tracker wurde nicht gefunden.");
-        return;
+        setTrackersError("dataHubI18n.fightTrackerNotFound");
+        return auditReturn(__audit8, undefined);
       }
       const transferStates = states.filter((state): state is NonNullable<typeof state> => Boolean(state));
       if (transferStates.length === 1) {
         const envelope = createSfDataHubTransferEnvelope("fighttracker", transferStates[0]);
         downloadSfDataFile(createSfDataFileName("fighttracker", transferStates[0].tracker.name), envelope);
-        return;
+        return auditReturn(__audit8, undefined);
       }
       const envelope = createSfDataHubTransferEnvelope("fighttrackerpack", { trackers: transferStates });
       downloadSfDataFile(createSfDataFileName("fighttrackerpack"), envelope);
-    } catch (error) {
+    } catch (error) { auditError(__audit8, error);
       console.error("[DataManagement] failed to export fight tracker", error);
-      setTrackersError("Fight Tracker konnte nicht exportiert werden.");
+      setTrackersError("dataHubI18n.fightTrackerCouldNotBeExported");
     } finally {
       setBusy(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit8, __auditError); throw __auditError; }
+    finally { auditLeave(__audit8); }
+};
 
   const confirmTransferImport = async () => {
-    if (!pendingImport) return;
+    const __audit9 = auditBegin("F36", "confirmTransferImport");
+    try {
+    if (!pendingImport) return auditReturn(__audit9, undefined);
     setBusy(true);
     setStorageError(null);
     setTrackersError(null);
@@ -1016,60 +1157,64 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     const { filename } = pendingImport;
     try {
       if (pendingImport.kind === "scanJson") {
-        await startSfToolsImportJob(pendingImport.file);
+        await (auditValue(__audit9, auditEnter(__audit9, "startSfToolsImportJob"), (startSfToolsImportJob(pendingImport.file, { scan: pendingImport.scan, statistics: pendingImport.statistics }))));
         setActiveTab("scans");
         setPendingImport(null);
-        return;
+        return auditReturn(__audit9, undefined);
       }
 
       if (pendingImport.kind === "scanMerge") {
         if (pendingImport.mode === "scan-slot") {
           const displayName = normalizeScanSlotNameInput(pendingImport.displayName);
           const filename = createScanSlotTechnicalFilename(displayName, scans);
-          await startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "scan-slot", displayName });
+          await (auditValue(__audit9, auditEnter(__audit9, "startScanMergeJob"), (startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "scan-slot", displayName }))));
         } else {
           const filename = normalizeMergeFilenameInput(pendingImport.filename);
-          await startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "merged-file" });
+          await (auditValue(__audit9, auditEnter(__audit9, "startScanMergeJob"), (startScanMergeJob({ sourceScanIds: pendingImport.sourceIds, filename, mode: "merged-file" }))));
         }
         setSelectedIds(new Set());
         setActiveTab("scans");
         setPendingImport(null);
-        return;
+        return auditReturn(__audit9, undefined);
       }
 
       const { envelope } = pendingImport;
       if (envelope.type === "scan") {
-        const result = await importSfDataHubLocalScanRecords([envelope.payload]);
+        const result = await (auditValue(__audit9, auditEnter(__audit9, "importSfDataHubLocalScanRecords"), (importSfDataHubLocalScanRecords([envelope.payload]))));
         nextFeedback.imported.push(...result.imported.map((scan) => scan.filename));
         nextFeedback.duplicates.push(...result.duplicates.map((scan) => scan.filename));
         setActiveTab("scans");
-        await loadScans();
+        await (auditValue(__audit9, auditEnter(__audit9, "loadScans"), (loadScans())));
       } else if (envelope.type === "scanpack") {
-        const result = await importSfDataHubLocalScanRecords(envelope.payload.scans);
+        const result = await (auditValue(__audit9, auditEnter(__audit9, "importSfDataHubLocalScanRecords"), (importSfDataHubLocalScanRecords(envelope.payload.scans))));
         nextFeedback.imported.push(...result.imported.map((scan) => scan.filename));
         nextFeedback.duplicates.push(...result.duplicates.map((scan) => scan.filename));
         setActiveTab("scans");
-        await loadScans();
+        await (auditValue(__audit9, auditEnter(__audit9, "loadScans"), (loadScans())));
       } else if (envelope.type === "fighttracker") {
-        const [state] = await importFightTrackerTransferStates([envelope.payload]);
+        const [state] = await (auditValue(__audit9, auditEnter(__audit9, "importFightTrackerTransferStates"), (importFightTrackerTransferStates([envelope.payload]))));
         nextFeedback.imported.push(`Fight Tracker: ${state.tracker?.name ?? filename}`);
         setActiveTab("fightTracker");
-        await loadFightTrackers();
+        await (auditValue(__audit9, auditEnter(__audit9, "loadFightTrackers"), (loadFightTrackers())));
       } else {
-        const states = await importFightTrackerTransferStates(envelope.payload.trackers);
+        const states = await (auditValue(__audit9, auditEnter(__audit9, "importFightTrackerTransferStates"), (importFightTrackerTransferStates(envelope.payload.trackers))));
         nextFeedback.imported.push(...states.map((state) => `Fight Tracker: ${state.tracker?.name ?? filename}`));
         setActiveTab("fightTracker");
-        await loadFightTrackers();
+        await (auditValue(__audit9, auditEnter(__audit9, "loadFightTrackers"), (loadFightTrackers())));
       }
+      if (nextFeedback.imported.length) trackLocalEvent("datahub/uploads/import-success");
       setPendingImport(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Transferdatei konnte nicht importiert werden.";
+    } catch (error) { auditError(__audit9, error);
+      const message = error instanceof Error ? error.message : hubText("dataHubI18n.theTransferFileCouldNotBeImported");
       nextFeedback.errors.push({ filename, message });
     } finally {
       setFeedback(nextFeedback);
       setBusy(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit9, __auditError); throw __auditError; }
+    finally { auditLeave(__audit9); }
+};
 
   const updatePendingMergeFilename = (filename: string) => {
     setPendingImport((current) => (current?.kind === "scanMerge" ? { ...current, filename } : current));
@@ -1089,27 +1234,35 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
   };
 
   const confirmRenameSlot = async () => {
-    if (!renamingSlot) return;
+    const __audit10 = auditBegin("F36", "confirmRenameSlot");
+    try {
+    if (!renamingSlot) return auditReturn(__audit10, undefined);
     setBusy(true);
     setStorageError(null);
     const nextFeedback = createEmptyFeedback();
     try {
       const displayName = normalizeScanSlotNameInput(renameSlotValue);
-      await renameSfDataHubScanSlot(renamingSlot.sourceScanId, displayName);
+      await (auditValue(__audit10, auditEnter(__audit10, "renameSfDataHubScanSlot"), (renameSfDataHubScanSlot(renamingSlot.sourceScanId, displayName))));
       nextFeedback.updated.push(displayName);
+      trackLocalEvent("datahub/uploads/update-success");
       setRenamingSlot(null);
-      await loadScans();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Scan-Slot konnte nicht umbenannt werden.";
+      await (auditValue(__audit10, auditEnter(__audit10, "loadScans"), (loadScans())));
+    } catch (error) { auditError(__audit10, error);
+      const message = error instanceof Error ? error.message : hubText("dataHubI18n.theScanSlotCouldNotBeRenamed");
       nextFeedback.errors.push({ filename: getScanDisplayName(renamingSlot), message });
     } finally {
       setFeedback(nextFeedback);
       setBusy(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit10, __auditError); throw __auditError; }
+    finally { auditLeave(__audit10); }
+};
 
   const saveArchiveEntries = async (entries: ScanArchiveEntry[]) => {
-    if (busy || archiveAcquisitionRef.current) return;
+    const __audit11 = auditBegin("F36", "saveArchiveEntries");
+    try {
+    if (busy || archiveAcquisitionRef.current) return auditReturn(__audit11, undefined);
     const controller = new AbortController();
     archiveAcquisitionRef.current = controller;
     setBusy(true);
@@ -1122,7 +1275,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
     });
     const nextFeedback = createEmptyFeedback();
     try {
-      const result = await acquireExplicitLocalFirstArchiveScans(entries, {
+      const result = await (auditValue(__audit11, auditEnter(__audit11, "acquireExplicitLocalFirstArchiveScans"), (acquireExplicitLocalFirstArchiveScans(entries, {
         signal: controller.signal,
         dependencies: { downloadArchiveEntry: async (entry, signal) => {
           setDownloadingArchiveIds(current => new Set(current).add(entry.id));
@@ -1141,24 +1294,28 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             setArchiveDownloadProgress(current => { const next = { ...current }; delete next[entry.id]; return next; });
           }
         } },
-      });
-      if (controller.signal.aborted) return;
+      }))));
+      if (controller.signal.aborted) return auditReturn(__audit11, undefined);
       result.selectedArchives.forEach(item => {
         (item.status === "imported" ? nextFeedback.imported : nextFeedback.duplicates).push(item.archiveScanId);
       });
+      if (nextFeedback.imported.length) trackLocalEvent("datahub/uploads/import-success");
       result.failedArchives.forEach(item => nextFeedback.errors.push({ filename: item.archiveScanId, message: item.message }));
       setArchiveEntryErrors(current => ({ ...current, ...Object.fromEntries(result.failedArchives.map(item => [item.archiveScanId, item.message])) }));
       setFeedback(nextFeedback);
-      await loadScans();
-    } catch (error) {
-      if (!controller.signal.aborted) setFeedback({ ...nextFeedback, errors: [{ filename: "Archivgruppe", message: error instanceof Error ? error.message : "Speichern fehlgeschlagen" }] });
+      await (auditValue(__audit11, auditEnter(__audit11, "loadScans"), (loadScans())));
+    } catch (error) { auditError(__audit11, error);
+      if (!controller.signal.aborted) setFeedback({ ...nextFeedback, errors: [{ filename: "Archivgruppe", message: error instanceof Error ? error.message : hubText("dataHubI18n.savingFailed") }] });
     } finally {
       if (archiveAcquisitionRef.current === controller) {
         archiveAcquisitionRef.current = null;
         setBusy(false);
       }
     }
-  };
+
+    } catch (__auditError) { auditError(__audit11, __auditError); throw __auditError; }
+    finally { auditLeave(__audit11); }
+};
 
   const isArchiveMonthExpanded = (monthId: string, groupIndex: number) =>
     Object.prototype.hasOwnProperty.call(expandedArchiveMonths, monthId) ? expandedArchiveMonths[monthId] : groupIndex === 0;
@@ -1181,30 +1338,21 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
 
   if (!isOpen || typeof document === "undefined") return null;
 
-  return createPortal(
+  const content = (
     <>
-      <div
-        className={styles.backdrop}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="data-management-title"
-        onClick={(event) => {
-          if (event.currentTarget === event.target) onClose();
-        }}
-      >
-        <div className={styles.panel} onClick={(event) => event.stopPropagation()}>
-        <header className={styles.header}>
+      <ScanManagementFrame overlay={overlay} onClose={onClose} titleId={titleId}>
+        {overlay ? <header className={styles.header}>
           <div className={styles.titleBlock}>
-            <h2 id="data-management-title" className={styles.title}>
-              Datenverwaltung
+            <h2 id={titleId} className={styles.title}>
+              {hubText("dataHubI18n.dataManagement")}
             </h2>
-            <p className={styles.subtitle}>Lokale Daten des SF Data Hub verwalten</p>
+            <p className={styles.subtitle}>{t("hubNavigation.scanManagementHint")}</p>
           </div>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Datenverwaltung schließen">
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label={hubText("dataHubI18n.closeDataManagement")}>
             <X size={18} aria-hidden />
-            <span>Schließen</span>
+            <span>{hubText("dataHubI18n.close")}</span>
           </button>
-        </header>
+        </header> : <p className={styles.subtitle}>{t("hubNavigation.scanManagementHint")}</p>}
 
         <div className={styles.body}>
           <input
@@ -1223,34 +1371,34 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             onChange={handleUpdateInputChange}
           />
           {renamingSlot ? (
-            <div className={styles.inlineDialog} role="dialog" aria-modal="true" aria-label="Scan-Slot umbenennen">
+            <div className={styles.inlineDialog} role="dialog" aria-modal="true" aria-label={hubText("dataHubI18n.renameScanSlot")}>
               <div className={styles.inlineDialogPanel}>
                 <div className={styles.inlineDialogHeader}>
-                  <h3>Scan-Slot umbenennen</h3>
+                  <h3>{hubText("dataHubI18n.renameScanSlot")}</h3>
                   <button
                     type="button"
                     className={styles.iconButton}
                     onClick={() => setRenamingSlot(null)}
                     disabled={busy}
-                    aria-label="Dialog schließen"
-                    title="Schließen"
+                    aria-label={hubText("dataHubI18n.closeDialog")}
+                    title={hubText("dataHubI18n.close")}
                   >
                     <X size={15} aria-hidden />
                   </button>
                 </div>
                 <label className={styles.filenameField}>
-                  <span>Name</span>
+                  <span>{hubText("dataHubI18n.name")}</span>
                   <input value={renameSlotValue} onChange={(event) => setRenameSlotValue(event.target.value)} autoFocus />
                 </label>
-                <p className={styles.dialogHint}>Die technische JSON-Datei bleibt {renamingSlot.filename}.</p>
+                <p className={styles.dialogHint}>{hubText("dataHubI18n.theUnderlyingJsonFileStays")} {renamingSlot.filename}.</p>
                 <div className={styles.previewActions}>
                   <button type="button" className={styles.secondaryButton} onClick={() => setRenamingSlot(null)} disabled={busy}>
                     <X size={15} aria-hidden />
-                    <span>Abbrechen</span>
+                    <span>{hubText("dataHubI18n.cancel")}</span>
                   </button>
                   <button type="button" className={styles.primaryButton} onClick={() => void confirmRenameSlot()} disabled={busy}>
                     <Check size={15} aria-hidden />
-                    <span>{busy ? "Speichert..." : "Speichern"}</span>
+                    <span>{busy ? "Speichert..." : hubText("dataHubI18n.save")}</span>
                   </button>
                 </div>
               </div>
@@ -1265,56 +1413,56 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
               disabled={importDisabled}
             >
               <Upload size={16} aria-hidden />
-              <span>{activeDataJob ? "Job läuft..." : busy ? "Verarbeite..." : "Importieren"}</span>
+              <span>{activeDataJob ? hubText("dataHubI18n.jobRunning") : busy ? hubText("dataHubI18n.processing") : hubText("dataHubI18n.import")}</span>
             </button>
           </div>
 
-          <div className={styles.tabs} role="tablist" aria-label="Datentypen">
+          <div className={styles.tabs} role="tablist" aria-label={hubText("dataHubI18n.dataTypes")}>
             <button
-              id="data-management-scans-tab"
+              id={`${titleId}-scans-tab`}
               type="button"
               role="tab"
               aria-selected={activeTab === "scans"}
-              aria-controls="data-management-scans-panel"
+              aria-controls={`${titleId}-scans-panel`}
               className={`${styles.tabButton} ${activeTab === "scans" ? styles.tabButtonActive : ""}`}
               onClick={() => setActiveTab("scans")}
             >
               <Database size={15} aria-hidden />
-              <span>SFtools-Scans</span>
+              <span>{hubText("dataHubI18n.sftoolsScans")}</span>
             </button>
             <button
-              id="data-management-archive-tab"
+              id={`${titleId}-archive-tab`}
               type="button"
               role="tab"
               aria-selected={activeTab === "archive"}
-              aria-controls="data-management-archive-panel"
+              aria-controls={`${titleId}-archive-panel`}
               className={`${styles.tabButton} ${activeTab === "archive" ? styles.tabButtonActive : ""}`}
               onClick={() => setActiveTab("archive")}
             >
               <Download size={15} aria-hidden />
-              <span>Scan-Archiv</span>
+              <span>{hubText("dataHubI18n.scanArchive")}</span>
             </button>
             <button
-              id="data-management-fight-trackers-tab"
+              id={`${titleId}-fight-trackers-tab`}
               type="button"
               role="tab"
               aria-selected={activeTab === "fightTracker"}
-              aria-controls="data-management-fight-trackers-panel"
+              aria-controls={`${titleId}-fight-trackers-panel`}
               className={`${styles.tabButton} ${activeTab === "fightTracker" ? styles.tabButtonActive : ""}`}
               onClick={() => setActiveTab("fightTracker")}
             >
               <Swords size={15} aria-hidden />
-              <span>Fight Tracker</span>
+              <span>{t("hubNavigation.fightTracking")}</span>
             </button>
           </div>
 
           <div className={styles.contentScroll}>
-            {storageError ? <div className={styles.errorBox}>{storageError}</div> : null}
+            {storageError ? <div className={styles.errorBox}>{hubMessage(storageError)}</div> : null}
             {archiveError ? (
               <div className={styles.errorBox}>
-                <span>{archiveError}</span>
+                <span>{hubMessage(archiveError)}</span>
                 <button type="button" className={styles.inlineRetryButton} onClick={() => void loadArchiveEntries()}>
-                  Erneut versuchen
+                  {hubText("dataHubI18n.retry")}
                 </button>
               </div>
             ) : null}
@@ -1333,12 +1481,12 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             ) : null}
 
             {activeTab === "scans" ? (
-              <div id="data-management-scans-panel" role="tabpanel" aria-labelledby="data-management-scans-tab">
+              <div id={`${titleId}-scans-panel`} role="tabpanel" aria-labelledby={`${titleId}-scans-tab`}>
                 <div className={styles.toolbar}>
                   {selectedExportableCount > 0 ? (
                     <button type="button" className={styles.primaryButton} onClick={() => void exportSelectedScans()} disabled={busy}>
                       <Download size={16} aria-hidden />
-                      <span>{selectedExportableCount === 1 ? "Scan exportieren" : "Scanpack exportieren"}</span>
+                      <span>{selectedExportableCount === 1 ? hubText("dataHubI18n.exportScan") : hubText("dataHubI18n.exportScanPack")}</span>
                     </button>
                   ) : null}
                   {selectedVisibleCount >= 2 ? (
@@ -1349,7 +1497,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                       disabled={!canMergeSelectedScans}
                     >
                       <Database size={15} aria-hidden />
-                      <span>Zusammenführen</span>
+                      <span>{hubText("dataHubI18n.merge")}</span>
                     </button>
                   ) : null}
                   {selectedVisibleCount > 0 ? (
@@ -1360,19 +1508,19 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                       disabled={busy}
                     >
                       <Trash2 size={15} aria-hidden />
-                      <span>Ausgewählte löschen</span>
+                      <span>{hubText("dataHubI18n.deleteSelected")}</span>
                     </button>
                   ) : null}
                 </div>
 
-                <section className={styles.scanSection} aria-label="Vorhandene Scans">
+                <section className={styles.scanSection} aria-label={hubText("dataHubI18n.availableScans")}>
                   <div className={styles.sectionHeader}>
-                    <h3>Vorhandene Scans</h3>
-                    <span>{loading ? "Lädt..." : `${ownVisibleScans.length} lokal`}</span>
+                    <h3>{hubText("dataHubI18n.availableScans")}</h3>
+                    <span>{loading ? hubText("dataHubI18n.loading") : hubText("dataHubI18n.localCount", { v1: ownVisibleScans.length })}</span>
                   </div>
 
                   {loading ? (
-                    <DataHubLoadingState title="Lokale Scans werden geladen" message="Scan-Metadaten werden gelesen." />
+                    <DataHubLoadingState title={hubText("dataHubI18n.loadingLocalScans")} message={hubText("dataHubI18n.readingScanMetadata")} />
                   ) : ownVisibleScans.length ? (
                     <div className={styles.tableWrap}>
                       <table className={styles.table}>
@@ -1381,17 +1529,17 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                             <th className={styles.checkCell}>
                               <input
                                 type="checkbox"
-                                aria-label="Alle sichtbaren Scans auswählen"
+                                aria-label={hubText("dataHubI18n.selectAllVisibleScans")}
                                 checked={allVisibleSelected}
                                 onChange={toggleAllVisible}
                               />
                             </th>
-                            <th>Scanzeit</th>
-                            <th>Server</th>
-                            <th className={styles.numericCell}>Spieler</th>
-                            <th className={styles.numericCell}>Gilden</th>
-                            <th>Datei</th>
-                            <th className={styles.actionCell}>Aktion</th>
+                            <th>{hubText("dataHubI18n.scanTime")}</th>
+                            <th>{hubText("dataHubI18n.server")}</th>
+                            <th className={styles.numericCell}>{hubText("dataHubI18n.players")}</th>
+                            <th className={styles.numericCell}>{hubText("dataHubI18n.guilds")}</th>
+                            <th>{hubText("dataHubI18n.file")}</th>
+                            <th className={styles.actionCell}>{hubText("dataHubI18n.action")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1404,7 +1552,7 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                 <td className={styles.checkCell}>
                                   <input
                                     type="checkbox"
-                                    aria-label={`${displayName} auswählen`}
+                                    aria-label={hubText("dataHubI18n.selectName", { v1: displayName })}
                                     checked={selectedIds.has(scan.sourceScanId)}
                                     onChange={() => toggleScan(scan.sourceScanId)}
                                   />
@@ -1415,8 +1563,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                     {formatServerList(scan)}
                                   </span>
                                 </td>
-                                <td className={styles.numericCell}>{scan.playerCount}</td>
-                                <td className={styles.numericCell}>{getScanGuildCount(scan)}</td>
+                                <td className={styles.numericCell}>{formatCount(scan.playerCount)}</td>
+                                <td className={styles.numericCell}>{formatCount(getScanGuildCount(scan))}</td>
                                 <td>
                                   <span className={styles.truncate} title={displayName}>
                                     {displayName}
@@ -1428,9 +1576,9 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                     </span>
                                   ) : null}
                                   {scan.isScanSlot ? (
-                                    <span className={`${styles.bundleBadge} ${styles.slotBadge}`}>Slot</span>
+                                    <span className={`${styles.bundleBadge} ${styles.slotBadge}`}>{hubText("dataHubI18n.slot")}</span>
                                   ) : scan.isMergedBundle ? (
-                                    <span className={styles.bundleBadge}>Bundle</span>
+                                    <span className={styles.bundleBadge}>{hubText("dataHubI18n.bundle")}</span>
                                   ) : null}
                                 </td>
                                 <td className={styles.actionCell}>
@@ -1440,11 +1588,11 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                       className={`${styles.iconButton} ${styles.detailsButton}`}
                                       onClick={() => openScanDetails(scan)}
                                       disabled={busy}
-                                      aria-label={`${displayName} Details anzeigen`}
-                                      title="Scan-Details anzeigen"
+                                      aria-label={hubText("dataHubI18n.showNameDetails", { v1: displayName })}
+                                      title={hubText("dataHubI18n.showScanDetails")}
                                     >
                                       <Eye size={15} aria-hidden />
-                                      <span>Details</span>
+                                      <span>{hubText("dataHubI18n.details")}</span>
                                     </button>
                                     {scan.isScanSlot ? (
                                       <button
@@ -1452,8 +1600,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                         className={styles.iconButton}
                                         onClick={() => startRenameSlot(scan)}
                                         disabled={busy}
-                                        aria-label={`${displayName} umbenennen`}
-                                        title="Scan-Slot umbenennen"
+                                        aria-label={hubText("dataHubI18n.renameName", { v1: displayName })}
+                                        title={hubText("dataHubI18n.renameScanSlot")}
                                       >
                                         <Pencil size={15} aria-hidden />
                                       </button>
@@ -1463,8 +1611,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                         className={styles.iconButton}
                                         onClick={() => startUpdate(scan.sourceScanId)}
                                         disabled={busy}
-                                        aria-label={`${displayName} aktualisieren`}
-                                        title="Scan aktualisieren"
+                                        aria-label={hubText("dataHubI18n.updateName", { v1: displayName })}
+                                        title={hubText("dataHubI18n.updateScan")}
                                       >
                                         <RefreshCw size={15} aria-hidden />
                                       </button>
@@ -1474,8 +1622,8 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                       className={`${styles.iconButton} ${styles.iconButtonDanger}`}
                                       onClick={() => void deleteScans([scan.sourceScanId])}
                                       disabled={busy}
-                                      aria-label={`${displayName} löschen`}
-                                      title={scan.isScanSlot ? "Scan-Slot auflösen" : "Scan löschen"}
+                                      aria-label={hubText("dataHubI18n.deleteName", { v1: displayName })}
+                                      title={scan.isScanSlot ? hubText("dataHubI18n.dissolveScanSlot") : hubText("dataHubI18n.deleteScan")}
                                     >
                                       <Trash2 size={15} aria-hidden />
                                     </button>
@@ -1488,12 +1636,12 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                       </table>
                     </div>
                   ) : (
-                    <div className={styles.emptyState}>Noch keine Scans importiert.</div>
+                    <div className={styles.emptyState}>{hubText("dataHubI18n.noScansImportedYet")}</div>
                   )}
                 </section>
               </div>
             ) : activeTab === "archive" ? (
-              <div id="data-management-archive-panel" role="tabpanel" aria-labelledby="data-management-archive-tab">
+              <div id={`${titleId}-archive-panel`} role="tabpanel" aria-labelledby={`${titleId}-archive-tab`}>
                 <div className={styles.toolbar}>
                   {selectedVisibleCount > 0 ? (
                     <button
@@ -1503,25 +1651,25 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                       disabled={busy}
                     >
                       <Trash2 size={15} aria-hidden />
-                      <span>Ausgewählte löschen</span>
+                      <span>{hubText("dataHubI18n.deleteSelected")}</span>
                     </button>
                   ) : null}
                 </div>
 
-                <section className={styles.scanSection} aria-label="Scan-Archiv">
+                <section className={styles.scanSection} aria-label={hubText("dataHubI18n.scanArchive")}>
                   <div className={styles.sectionHeader}>
-                    <h3>Scan-Archiv</h3>
+                    <h3>{hubText("dataHubI18n.scanArchive")}</h3>
                     <span>
                       {archiveLoading
-                        ? "Lädt..."
+                        ? hubText("dataHubI18n.loading")
                         : archiveError
-                          ? `${localArchiveScans.length} lokal gespeichert`
-                          : `${archiveLocalCount} von ${archiveManifestEntries.length} lokal gespeichert`}
+                          ? t("scanArchiveOverview.localSummary", { count: archiveLocalCount })
+                          : t("scanArchiveOverview.summary", { count: archiveDays.length, local: archiveLocalCount, partial: archivePartialCount, ready: archiveReadyCount })}
                     </span>
                   </div>
 
                   {loading || archiveLoading ? (
-                    <DataHubLoadingState title="Scan-Archiv wird geladen" message="Archiv- und lokale Scan-Metadaten werden gelesen." />
+                    <DataHubLoadingState title={hubText("dataHubI18n.loadingScanArchive")} message={hubText("dataHubI18n.readingArchiveAndLocalScanMetadata")} />
                   ) : archiveRows.length ? (
                     <div className={styles.tableWrap}>
                       <table className={`${styles.table} ${styles.archiveTable}`}>
@@ -1530,17 +1678,17 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                             <th className={styles.checkCell}>
                               <input
                                 type="checkbox"
-                                aria-label="Alle lokal gespeicherten Archivscans auswählen"
+                                aria-label={hubText("dataHubI18n.selectAllLocallySavedArchiveScans")}
                                 checked={allVisibleSelected}
                                 onChange={toggleAllVisible}
                               />
                             </th>
-                            <th>Scanzeitpunkt</th>
-                            <th>Server</th>
-                            <th className={styles.numericCell}>Spieler</th>
-                            <th className={styles.numericCell}>Gilden</th>
-                            <th>Status</th>
-                            <th className={styles.actionCell}>Aktion</th>
+                            <th>{hubText("dataHubI18n.scanTimedcb3e")}</th>
+                            <th>{hubText("dataHubI18n.server")}</th>
+                            <th className={styles.numericCell}>{hubText("dataHubI18n.players")}</th>
+                            <th className={styles.numericCell}>{hubText("dataHubI18n.guilds")}</th>
+                            <th>{hubText("dataHubI18n.status")}</th>
+                            <th className={styles.actionCell}>{hubText("dataHubI18n.action")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1561,39 +1709,39 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                       ) : (
                                         <ChevronRight size={15} aria-hidden />
                                       )}
-                                      <span>{group.label}</span>
+                                      <span>{formatArchiveMonthLabel(group.rows[0].firstTimestamp)}</span>
                                     </button>
                                   </th>
                                 </tr>
                                 {isExpanded
                                   ? group.rows.map(day => {
                                       const localIds = archiveGroupLocalIds(day.members);
-                                      const localCount = day.members.filter(row => row.localSummary).length;
+                                      const status = archiveStatuses.get(day.id)!;
                                       const expanded = Boolean(expandedArchiveDays[day.id]);
                                       const counts = archiveDayCounts[archiveDayKey(day)];
                                       const entries = day.members.flatMap(row => row.entry ? [row.entry] : []);
                                       const dayDate = isoFromSummaryTimestamp(day.firstTimestamp);
                                       const label = `${formatScanDateShort(dayDate)} · ${day.server}`;
-                                      const time = (timestamp: number) => Number.isFinite(timestamp) ? new Intl.DateTimeFormat("de-DE", { timeStyle: "short" }).format(timestamp) : "Unbekannt";
+                                      const time = (timestamp: number) => Number.isFinite(timestamp) ? new Intl.DateTimeFormat(hubLocale(), { timeStyle: "short" }).format(timestamp) : hubText("dataHubI18n.unknown");
                                       return <React.Fragment key={day.id}>
                                         <tr className={styles.archiveDayRow}>
-                                          <td className={styles.checkCell}>{localIds.length ? <input type="checkbox" aria-label={`${label} auswählen`}
+                                          <td className={styles.checkCell}>{localIds.length ? <input type="checkbox" aria-label={hubText("dataHubI18n.selectName", { v1: label })}
                                             checked={localIds.every(id => selectedIds.has(id))}
                                             ref={input => { if (input) input.indeterminate = localIds.some(id => selectedIds.has(id)) && !localIds.every(id => selectedIds.has(id)); }}
                                             onChange={() => setSelectedIds(current => { const next = new Set(current); const remove = localIds.every(id => next.has(id)); localIds.forEach(id => remove ? next.delete(id) : next.add(id)); return next; })} /> : null}</td>
                                           <td>{formatScanDateShort(dayDate)}
-                                            <small className={styles.archiveMemberCaption}>{time(day.firstTimestamp)}{day.lastTimestamp !== day.firstTimestamp ? `–${time(day.lastTimestamp)}` : ""} · {day.members.length} Teilscans</small></td>
+                                            <small className={styles.archiveMemberCaption}>{time(day.firstTimestamp)}{day.lastTimestamp !== day.firstTimestamp ? `–${time(day.lastTimestamp)}` : ""}</small></td>
                                           <td>{day.server}</td>
-                                          <td className={styles.numericCell} title="Eindeutige Spieler; — = noch unbekannt">{counts?.players ?? "—"}</td>
-                                          <td className={styles.numericCell} title="Eindeutige Gilden; — = noch unbekannt">{counts?.guilds ?? "—"}</td>
-                                          <td><span className={styles.statusBadge}>{localCount} von {day.members.length} lokal</span></td>
+                                          <td className={styles.numericCell} title={hubText("dataHubI18n.uniquePlayersNotYetKnown")}>{counts?.players == null ? "—" : formatCount(counts.players)}</td>
+                                          <td className={styles.numericCell} title={hubText("dataHubI18n.uniqueGuildsNotYetKnown")}>{counts?.guilds == null ? "—" : formatCount(counts.guilds)}</td>
+                                          <td><span className={styles.statusBadge}>{t(`scanArchiveOverview.${status.complete ? "stored" : status.local ? "partial" : "online"}`)}{status.ready ? ` · ${t("scanArchiveOverview.ready")}` : ""}</span></td>
                                           <td className={styles.actionCell}><div className={styles.rowActions}>
-                                            <button type="button" className={styles.iconButton} aria-expanded={expanded} aria-label={`${label} Teilscans anzeigen`}
-                                              onClick={() => setExpandedArchiveDays(current => ({ ...current, [day.id]: !expanded }))}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />} Teilscans</button>
-                                            {localCount < day.members.length && entries.length ? <button type="button" className={styles.iconButton} disabled={busy}
-                                              onClick={() => void saveArchiveEntries(entries)} aria-label={`${label} lokal speichern`}><Download size={15} /> Speichern</button> : null}
+                                            <button type="button" className={`${styles.iconButton} ${styles.archiveTextButton}`} aria-expanded={expanded} aria-label={t("scanArchiveOverview.showSources", { label })}
+                                              onClick={() => setExpandedArchiveDays(current => ({ ...current, [day.id]: !expanded }))}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />} {t("scanArchiveOverview.sources")}</button>
+                                            {!status.complete && entries.length ? <button type="button" className={`${styles.iconButton} ${styles.archiveTextButton}`} disabled={busy}
+                                              onClick={() => void saveArchiveEntries(entries)} aria-label={t("scanArchiveOverview.saveLocally", { label })}><Download size={15} /> {t("scanArchiveOverview.save")}</button> : null}
                                             {localIds.length ? <button type="button" className={`${styles.iconButton} ${styles.iconButtonDanger}`} disabled={busy}
-                                              onClick={() => void deleteScans(localIds)} aria-label={`${label} lokale Scans löschen`}><Trash2 size={15} /></button> : null}
+                                              onClick={() => void deleteScans(localIds)} aria-label={hubText("dataHubI18n.deleteLocalNameScans", { v1: label })}><Trash2 size={15} /></button> : null}
                                           </div></td>
                                         </tr>
                                         {expanded ? day.members.map((row) => {
@@ -1612,27 +1760,27 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                             {scan ? (
                                               <input
                                                 type="checkbox"
-                                                aria-label={`${displayName} auswählen`}
+                                                aria-label={hubText("dataHubI18n.selectName", { v1: displayName })}
                                                 checked={selectedIds.has(scan.sourceScanId)}
                                                 onChange={() => toggleScan(scan.sourceScanId)}
                                               />
                                             ) : null}
                                           </td>
-                                          <td title={scanTimeCell.title}>{scanTimeCell.label}<small className={styles.archiveMemberCaption}>{entry?.path ?? scan?.filename} · Rohzeilen</small></td>
+                                          <td title={scanTimeCell.title}>{scanTimeCell.label}<small className={styles.archiveMemberCaption}>{entry?.path ?? scan?.filename} {hubText("dataHubI18n.rawRows")}</small></td>
                                           <td>
                                             <span className={styles.truncate} title={serverLabel}>
                                               {serverLabel}
                                             </span>
                                           </td>
-                                          <td className={styles.numericCell}>{playerCount}</td>
-                                          <td className={styles.numericCell}>{groupCount}</td>
+                                          <td className={styles.numericCell}>{formatCount(playerCount)}</td>
+                                          <td className={styles.numericCell}>{formatCount(groupCount)}</td>
                                           <td>
-                                            {entry && archiveEntryErrors[entry.id] ? <span className={styles.archiveEntryError}>{archiveEntryErrors[entry.id]}</span> : scan ? (
-                                              <span className={styles.statusBadge}>lokal gespeichert</span>
+                                            {entry && archiveEntryErrors[entry.id] ? <span className={styles.archiveEntryError}>{hubMessage(archiveEntryErrors[entry.id])}</span> : scan ? (
+                                              <span className={styles.statusBadge}>{hubText("dataHubI18n.savedLocally")}</span>
                                             ) : isDownloadingArchive ? (
-                                              <span className={styles.statusBadge}>{archiveProgress?.message ?? "Download läuft"}</span>
+                                              <span className={styles.statusBadge}>{hubMessage(archiveProgress?.message) || hubText("dataHubI18n.downloading")}</span>
                                             ) : (
-                                              <span className={styles.statusBadge}>online verfügbar</span>
+                                              <span className={styles.statusBadge}>{hubText("dataHubI18n.availableOnline")}</span>
                                             )}
                                           </td>
                                           <td className={styles.actionCell}>
@@ -1644,19 +1792,19 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                                     className={`${styles.iconButton} ${styles.detailsButton}`}
                                                     onClick={() => openScanDetails(scan)}
                                                     disabled={busy}
-                                                    aria-label={`${displayName} Details anzeigen`}
-                                                    title="Scan-Details anzeigen"
+                                                    aria-label={hubText("dataHubI18n.showNameDetails", { v1: displayName })}
+                                                    title={hubText("dataHubI18n.showScanDetails")}
                                                   >
                                                     <Eye size={15} aria-hidden />
-                                                    <span>Details</span>
+                                                    <span>{hubText("dataHubI18n.details")}</span>
                                                   </button>
                                                   <button
                                                     type="button"
                                                     className={`${styles.iconButton} ${styles.iconButtonDanger}`}
                                                     onClick={() => void deleteScans([scan.sourceScanId])}
                                                     disabled={busy}
-                                                    aria-label={`${displayName} löschen`}
-                                                    title="Lokale Archivkopie löschen"
+                                                    aria-label={hubText("dataHubI18n.deleteName", { v1: displayName })}
+                                                    title={hubText("dataHubI18n.deleteLocalArchiveCopy")}
                                                   >
                                                     <Trash2 size={15} aria-hidden />
                                                   </button>
@@ -1667,15 +1815,15 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                                                   className={`${styles.iconButton} ${styles.detailsButton}`}
                                                   onClick={() => void saveArchiveEntries([entry])}
                                                   disabled={busy || isDownloadingArchive}
-                                                  aria-label={`${displayName} lokal speichern`}
-                                                  title="Archivscan lokal speichern"
+                                                  aria-label={hubText("dataHubI18n.saveNameLocally", { v1: displayName })}
+                                                  title={hubText("dataHubI18n.saveArchiveScanLocally")}
                                                 >
                                                   {isDownloadingArchive ? (
                                                     <Loader2 size={15} aria-hidden className={styles.spinIcon} />
                                                   ) : (
                                                     <Download size={15} aria-hidden />
                                                   )}
-                                                  <span>{isDownloadingArchive ? "Lädt" : "Speichern"}</span>
+                                                  <span>{isDownloadingArchive ? hubText("dataHubI18n.loadingdc380") : hubText("dataHubI18n.save")}</span>
                                                 </button>
                                               ) : null}
                                             </div>
@@ -1693,12 +1841,13 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
                       </table>
                     </div>
                   ) : (
-                    <div className={styles.emptyState}>{archiveError ? "Keine lokalen Archivscans gefunden." : "Keine Archiveinträge gefunden."}</div>
+                    <div className={styles.emptyState}>{archiveError ? hubText("dataHubI18n.noLocalArchiveScansFound") : hubText("dataHubI18n.noArchiveEntriesFound")}</div>
                   )}
                 </section>
               </div>
             ) : (
               <FightTrackerOverview
+                titleId={titleId}
                 summaries={trackerSummaries}
                 loading={trackersLoading}
                 error={trackersError}
@@ -1714,20 +1863,19 @@ export default function ScanManagementOverlay({ isOpen, onClose }: ScanManagemen
             )}
           </div>
         </div>
-        </div>
-      </div>
-      {detailsSummary ? (
+      </ScanManagementFrame>
+      {detailsSummary ? createPortal(
         <ScanDetailsOverlay
           summary={detailsSummary}
           data={detailsData}
           loading={detailsLoading}
           error={detailsError}
           onClose={closeScanDetails}
-        />
+        />, document.body,
       ) : null}
-    </>,
-    document.body,
+    </>
   );
+  return overlay ? createPortal(content, document.body) : content;
 }
 
 function ScanDetailsOverlay({
@@ -1753,6 +1901,7 @@ function ScanDetailsOverlay({
   const [view, setView] = React.useState<
     { kind: "results" } | { kind: "player"; playerKey: string } | { kind: "guild"; guildKey: string }
   >({ kind: "results" });
+  useAnalyticsView(scanViewEvents[view.kind]);
 
   React.useEffect(() => {
     setQuery("");
@@ -1780,6 +1929,8 @@ function ScanDetailsOverlay({
           },
     [data, deferredQuery],
   );
+  useRuntimeAuditCommit(limitedResults, !!data && !loading, "scan-explorer-results");
+  useRuntimeAuditCommit(data, !!data && !loading, "scan-details");
   const selectedPlayer = data && view.kind === "player" ? data.playerLookup.get(view.playerKey) ?? null : null;
   const selectedGuild = data && view.kind === "guild" ? data.guildLookup.get(view.guildKey) ?? null : null;
   const selectedNormalizedPlayer = React.useMemo(() => {
@@ -1790,6 +1941,7 @@ function ScanDetailsOverlay({
     normalizedPlayerCacheRef.current.set(selectedPlayer.key, normalized);
     return normalized;
   }, [selectedPlayer]);
+  useRuntimeAuditCommit(selectedNormalizedPlayer, !!selectedNormalizedPlayer, "scan-explorer-player");
   const selectedPlayerGuildLink = React.useMemo(() => {
     if (!data || !selectedNormalizedPlayer) return null;
     return linkScanExplorerPlayerToGuildMember(data, selectedNormalizedPlayer);
@@ -1809,13 +1961,13 @@ function ScanDetailsOverlay({
         <header className={styles.header}>
           <div className={styles.titleBlock}>
             <h2 id="scan-details-title" className={styles.title}>
-              Scan Details
+              {hubText("dataHubI18n.scanDetails")}
             </h2>
             <p className={styles.subtitle}>{displayName}</p>
           </div>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Scan-Details schließen">
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label={hubText("dataHubI18n.closeScanDetails")}>
             <X size={18} aria-hidden />
-            <span>Schließen</span>
+            <span>{hubText("dataHubI18n.close")}</span>
           </button>
         </header>
 
@@ -1832,28 +1984,28 @@ function ScanDetailsOverlay({
           {loading ? (
             <div className={styles.detailsLoading}>
               <Loader2 size={18} aria-hidden />
-              <span>Scan-Details werden geladen.</span>
+              <span>{hubText("dataHubI18n.loadingScanDetails")}</span>
             </div>
           ) : error ? (
-            <div className={styles.errorBox}>{error}</div>
+            <div className={styles.errorBox}>{hubMessage(error)}</div>
           ) : data ? (
             <>
               <dl className={styles.detailsKpiGrid}>
-                <ScanDetailsKpi label="Player" value={data.players.length} />
-                <ScanDetailsKpi label="Guilds" value={data.guilds.length} />
-                <ScanDetailsKpi label="Vertretene Gilden" value={coverage.uniqueGuildCount} />
-                <ScanDetailsKpi label="Vollständig gescannte Gilden" value={coverage.completeUniqueGuildCount} />
-                <ScanDetailsKpi label="Guild-Snapshots" value={coverage.guildSnapshotCount} />
-                <ScanDetailsKpi label="Vollständige Guild-Snapshots" value={coverage.completeGuildSnapshotCount} />
-                <ScanDetailsKpi label="Server" value={coverage.byServer.length} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.player")} value={data.players.length} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.guilds")} value={data.guilds.length} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.guildsRepresented")} value={coverage.uniqueGuildCount} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.fullyScannedGuilds")} value={coverage.completeUniqueGuildCount} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.guildSnapshots")} value={coverage.guildSnapshotCount} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.completeGuildSnapshots")} value={coverage.completeGuildSnapshotCount} />
+                <ScanDetailsKpi label={hubText("dataHubI18n.server")} value={coverage.byServer.length} />
                 {coverage.incompleteGuildSnapshotCount ? (
-                  <ScanDetailsKpi label="Incomplete" value={coverage.incompleteGuildSnapshotCount} />
+                  <ScanDetailsKpi label={hubText("dataHubI18n.coverageIncomplete")} value={coverage.incompleteGuildSnapshotCount} />
                 ) : null}
                 {coverage.overcountGuildSnapshotCount ? (
-                  <ScanDetailsKpi label="Overcount" value={coverage.overcountGuildSnapshotCount} />
+                  <ScanDetailsKpi label={hubText("dataHubI18n.coverageOvercount")} value={coverage.overcountGuildSnapshotCount} />
                 ) : null}
                 {coverage.unknownGuildSnapshotCount ? (
-                  <ScanDetailsKpi label="Unknown" value={coverage.unknownGuildSnapshotCount} />
+                  <ScanDetailsKpi label={hubText("dataHubI18n.unknown")} value={coverage.unknownGuildSnapshotCount} />
                 ) : null}
               </dl>
 
@@ -1881,7 +2033,7 @@ function ScanDetailsOverlay({
                   onBack={() => setView({ kind: "results" })}
                 />
               ) : (
-                <div className={styles.emptyState}>Der ausgewählte Eintrag ist in diesem Scan nicht mehr verfügbar.</div>
+                <div className={styles.emptyState}>{hubText("dataHubI18n.theSelectedEntryIsNoLongerAvailableInThisScan")}</div>
               )}
             </>
           ) : null}
@@ -1891,27 +2043,12 @@ function ScanDetailsOverlay({
   );
 }
 
-const PLAYER_CLASS_NAMES: Record<number, string> = {
-  1: "Warrior",
-  2: "Mage",
-  3: "Scout",
-  4: "Assassin",
-  5: "Battle Mage",
-  6: "Berserker",
-  7: "Demon Hunter",
-  8: "Druid",
-  9: "Bard",
-  10: "Necromancer",
-  11: "Paladin",
-  12: "Demon Warrior",
-};
-
 const ATTRIBUTE_LABELS = [
-  ["strength", "Strength"],
-  ["dexterity", "Dexterity"],
-  ["intelligence", "Intelligence"],
-  ["constitution", "Constitution"],
-  ["luck", "Luck"],
+  ["strength", hubText("dataHubI18n.strength")],
+  ["dexterity", hubText("dataHubI18n.dexterity")],
+  ["intelligence", hubText("dataHubI18n.intelligence")],
+  ["constitution", hubText("dataHubI18n.constitution")],
+  ["luck", hubText("dataHubI18n.luck")],
 ] as const;
 
 type ScanMetric = {
@@ -1929,12 +2066,12 @@ function formatOptionalValue(value: unknown) {
 }
 
 function formatValueOrUnavailable(value: unknown) {
-  return formatOptionalValue(value) ?? "Unavailable";
+  return formatOptionalValue(value) ?? hubText("dataHubI18n.unavailable");
 }
 
 function formatPercentValue(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return null;
-  return `${(value * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+  return hubPercent(value, 1);
 }
 
 function formatTimestampMs(value: number | null | undefined) {
@@ -1948,18 +2085,18 @@ function formatDamageRange(range: { min: number | null; max: number | null } | n
 }
 
 function formatClassName(value: number | null) {
-  return value == null ? null : PLAYER_CLASS_NAMES[value] ?? `Class ${value}`;
+  return value == null ? null : profileClassLabel(String(value));
 }
 
 function formatGuildRole(value: NormalizedGuildMember["role"]["name"]) {
-  return value ? value.charAt(0).toUpperCase() + value.slice(1) : null;
+  return value ? profileRoleLabel(value) : null;
 }
 
 function formatSourceStatus(normalized: NormalizedPlayer, path: string, value: unknown) {
   const formatted = formatOptionalValue(value);
   if (formatted != null) return formatted;
   const status = normalized.metadata.fields[path]?.status;
-  return status === "invalid" ? "Unavailable" : null;
+  return status === "invalid" ? hubText("dataHubI18n.unavailable") : null;
 }
 
 function compactEntries(record: Record<string, unknown> | null | undefined, limit = 8): ScanMetric[] {
@@ -1972,12 +2109,13 @@ function compactEntries(record: Record<string, unknown> | null | undefined, limi
 }
 
 function formatCompactEntryValue(value: unknown) {
-  return formatScanExplorerCompactEntryValue(value, { formatNumber: formatCount, formatLabel: formatCamelLabel });
+  return formatScanExplorerCompactEntryValue(value, { formatNumber: formatCount, formatLabel: label => hubMessage(formatCamelLabel(label)) });
 }
 
 function formatCamelLabel(value: string) {
   return value
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
     .replace(/_/g, " ")
     .replace(/^./, (first) => first.toUpperCase());
 }
@@ -2008,14 +2146,14 @@ function ScanExplorerResults({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search players or guilds..."
+          placeholder={hubText("dataHubI18n.searchPlayersOrGuilds")}
         />
       </label>
 
       {hasResults ? (
         <div className={styles.entityGroups}>
-          <section className={styles.detailsSection} aria-label="Players">
-            <h3>Players ({formatCount(result.playerTotal)})</h3>
+          <section className={styles.detailsSection} aria-label={hubText("dataHubI18n.players")}>
+            <h3>{hubText("dataHubI18n.players")} ({formatCount(result.playerTotal)})</h3>
             <ScanExplorerResultLimitNote
               kind="players"
               total={result.playerTotal}
@@ -2032,7 +2170,7 @@ function ScanExplorerResults({
                       <strong>{player.name}</strong>
                       <span>
                         {[
-                          player.level == null ? null : `Level ${formatCount(player.level)}`,
+                          player.level == null ? null : hubText("dataHubI18n.levelNumber", { v1: player.level }),
                           formatClassName(player.classId),
                         ]
                           .filter(Boolean)
@@ -2046,12 +2184,12 @@ function ScanExplorerResults({
                 ))}
               </div>
             ) : (
-              <div className={styles.emptyState}>Keine Player gefunden.</div>
+              <div className={styles.emptyState}>{hubText("dataHubI18n.noPlayersFound")}</div>
             )}
           </section>
 
-          <section className={styles.detailsSection} aria-label="Guilds">
-            <h3>Guilds ({formatCount(result.guildTotal)})</h3>
+          <section className={styles.detailsSection} aria-label={hubText("dataHubI18n.guilds")}>
+            <h3>{hubText("dataHubI18n.guilds")} ({formatCount(result.guildTotal)})</h3>
             <ScanExplorerResultLimitNote
               kind="guilds"
               total={result.guildTotal}
@@ -2073,7 +2211,7 @@ function ScanExplorerResults({
                         guild.group.server,
                         guild.group.rows[0]?.declaredMemberCount == null
                           ? null
-                          : `${formatCount(guild.group.rows[0].declaredMemberCount)} Members`,
+                          : hubText("dataHubI18n.memberCount", { v1: guild.group.rows[0].declaredMemberCount }),
                       ]
                         .filter(Boolean)
                         .join(" - ")}
@@ -2082,13 +2220,13 @@ function ScanExplorerResults({
                 ))}
               </div>
             ) : (
-              <div className={styles.emptyState}>Keine Guilds gefunden.</div>
+              <div className={styles.emptyState}>{hubText("dataHubI18n.noGuildsFound")}</div>
             )}
           </section>
         </div>
       ) : (
         <div className={styles.emptyState}>
-          Keine Treffer in {formatCount(data.players.length)} Playern und {formatCount(data.guilds.length)} Guilds.
+          {hubText("dataHubI18n.noResults", { players: data.players.length, guilds: data.guilds.length })}
         </div>
       )}
     </>
@@ -2096,7 +2234,7 @@ function ScanExplorerResults({
 }
 
 function ScanExplorerResultLimitNote({
-  kind,
+  kind: _kind,
   total,
   visible,
   limit,
@@ -2112,10 +2250,8 @@ function ScanExplorerResultLimitNote({
   const capped = total > visible;
   return (
     <p className={styles.resultLimitNote}>
-      {capped
-        ? `Showing first ${formatCount(visible)} of ${formatCount(total)} ${searching ? "matches" : kind}.`
-        : `Showing ${formatCount(visible)} of ${formatCount(total)} ${searching ? "matches" : kind}.`}
-      {!searching && total > limit ? " Use search to narrow the list." : ""}
+      {hubText(capped ? "dataHubI18n.listLimitFirst" : "dataHubI18n.listLimit", { visible, total })}
+      {!searching && total > limit ? " " + hubText("dataHubI18n.useSearchToNarrowTheList") : ""}
     </p>
   );
 }
@@ -2124,7 +2260,7 @@ function ScanExplorerBackButton({ onBack }: { onBack: () => void }) {
   return (
     <button type="button" className={styles.detailBackButton} onClick={onBack}>
       <ChevronLeft size={16} aria-hidden />
-      <span>Back</span>
+      <span>{hubText("dataHubI18n.back")}</span>
     </button>
   );
 }
@@ -2148,13 +2284,13 @@ function ScanExplorerPlayerDetail({
       <div className={styles.detailNav}>
         <ScanExplorerBackButton onBack={onBack} />
       </div>
-      <section className={styles.entityDetailHeader} aria-label="Player">
+      <section className={styles.entityDetailHeader} aria-label={hubText("dataHubI18n.player")}>
         <User size={18} aria-hidden />
         <div>
           <h3>{player.name}</h3>
           <p>
             {[
-              normalized.progression.level == null ? null : `Level ${formatCount(normalized.progression.level)}`,
+              normalized.progression.level == null ? null : hubText("dataHubI18n.levelNumber", { v1: normalized.progression.level }),
               className,
               player.server,
               player.guildName,
@@ -2165,19 +2301,19 @@ function ScanExplorerPlayerDetail({
         </div>
       </section>
 
-      <ScanDetailSection title="Overview">
+      <ScanDetailSection title={hubText("dataHubI18n.overview")}>
         <MetricGrid
           items={[
-            { label: "Identifier", value: normalized.identity.identifier },
-            { label: "Player ID", value: normalized.identity.id },
-            { label: "Name", value: normalized.identity.name },
-            { label: "Server", value: normalized.identity.server ?? player.server },
-            { label: "Level", value: normalized.progression.level },
-            { label: "XP", value: normalized.progression.xp },
-            { label: "XP Next", value: normalized.progression.xpNext },
-            { label: "Honor", value: normalized.progression.honor },
-            { label: "Rank", value: normalized.progression.rank },
-            { label: "Class", value: className },
+            { label: hubText("dataHubI18n.identifier"), value: normalized.identity.identifier },
+            { label: hubText("dataHubI18n.playerId"), value: normalized.identity.id },
+            { label: hubText("dataHubI18n.name"), value: normalized.identity.name },
+            { label: hubText("dataHubI18n.server"), value: normalized.identity.server ?? player.server },
+            { label: hubText("dataHubI18n.level"), value: normalized.progression.level },
+            { label: hubText("dataHubI18n.xp"), value: normalized.progression.xp },
+            { label: hubText("dataHubI18n.xpToNextLevel"), value: normalized.progression.xpNext },
+            { label: hubText("dataHubI18n.honor"), value: normalized.progression.honor },
+            { label: hubText("dataHubI18n.rank"), value: normalized.progression.rank },
+            { label: hubText("dataHubI18n.class"), value: className },
           ]}
         />
       </ScanDetailSection>
@@ -2185,23 +2321,23 @@ function ScanExplorerPlayerDetail({
       {guildLink?.linked ? (
         <ScanExplorerPlayerGuildMemberSection guildLink={guildLink} />
       ) : guildLink?.ambiguous ? (
-        <ScanDetailSection title="Guild Member">
-          <div className={styles.unsupportedNote}>Guild member data is ambiguous for this player identifier in this scan.</div>
+        <ScanDetailSection title={hubText("dataHubI18n.guildMember")}>
+          <div className={styles.unsupportedNote}>{hubText("dataHubI18n.guildMemberDataIsAmbiguousForThisPlayerIdentifierInThisScan")}</div>
         </ScanDetailSection>
       ) : guildLink?.guildReference ? (
-        <ScanDetailSection title="Guild Member">
+        <ScanDetailSection title={hubText("dataHubI18n.guildMember")}>
           <MetricGrid
             items={[
-              { label: "Guild", value: guildLink.guildReference.name },
-              { label: "Guild Identifier", value: guildLink.guildReference.identifier },
-              { label: "Server", value: guildLink.guildReference.server },
+              { label: hubText("dataHubI18n.guild"), value: guildLink.guildReference.name },
+              { label: hubText("dataHubI18n.guildIdentifier"), value: guildLink.guildReference.identifier },
+              { label: hubText("dataHubI18n.server"), value: guildLink.guildReference.server },
             ]}
           />
-          <div className={styles.unsupportedNote}>No matching GuildMember entry is available in this scan.</div>
+          <div className={styles.unsupportedNote}>{hubText("dataHubI18n.noMatchingGuildMemberEntryIsAvailableInThisScan")}</div>
         </ScanDetailSection>
       ) : null}
 
-      <ScanDetailSection title="Attributes">
+      <ScanDetailSection title={hubText("dataHubI18n.attributes")}>
         <div className={styles.attributeGrid}>
           {ATTRIBUTE_LABELS.map(([key, label]) => {
             const attribute = normalized.attributes[key];
@@ -2211,13 +2347,13 @@ function ScanExplorerPlayerDetail({
             return (
               <div className={styles.attributeCard} key={key}>
                 <div className={styles.attributeTop}>
-                  <strong>{label}</strong>
+                  <strong>{hubMessage(label)}</strong>
                   <span>{formatValueOrUnavailable(attribute.total)}</span>
                 </div>
-                <span>Base {formatValueOrUnavailable(attribute.base)}</span>
+                <span>{hubText("dataHubI18n.base")} {formatValueOrUnavailable(attribute.base)}</span>
                 {details.length ? (
                   <details className={styles.compactDetails}>
-                    <summary>Components</summary>
+                    <summary>{hubText("dataHubI18n.components")}</summary>
                     <MetricGrid items={details} compact />
                   </details>
                 ) : null}
@@ -2227,33 +2363,33 @@ function ScanExplorerPlayerDetail({
         </div>
       </ScanDetailSection>
 
-      <ScanDetailSection title="Combat">
+      <ScanDetailSection title={hubText("dataHubI18n.combat")}>
         <MetricGrid
           items={[
-            { label: "Armor", value: formatSourceStatus(normalized, "combat.armor", normalized.combat.armor) },
-            { label: "Damage", value: formatDamageRange(normalized.combat.damage) },
-            { label: "Secondary Damage", value: formatDamageRange(normalized.combat.damage.secondary) },
-            { label: "Health", value: formatSourceStatus(normalized, "combat.health", normalized.combat.health) },
+            { label: hubText("dataHubI18n.armor"), value: formatSourceStatus(normalized, "combat.armor", normalized.combat.armor) },
+            { label: hubText("dataHubI18n.damage"), value: formatDamageRange(normalized.combat.damage) },
+            { label: hubText("dataHubI18n.secondaryDamage"), value: formatDamageRange(normalized.combat.damage.secondary) },
+            { label: hubText("dataHubI18n.health"), value: formatSourceStatus(normalized, "combat.health", normalized.combat.health) },
           ]}
         />
       </ScanDetailSection>
 
-      <ScanDetailSection title="Progression / Bonuses">
+      <ScanDetailSection title={hubText("dataHubI18n.progressBonuses")}>
         <MetricGrid
           items={[
-            { label: "Scrapbook", value: formatValueWithMaximum(normalized.progressionStatus.scrapbook.count, normalized.progressionStatus.scrapbook.maximum) },
-            { label: "Scrapbook %", value: formatPercentValue(normalized.progressionStatus.scrapbook.percentage) },
-            { label: "Achievements", value: formatValueWithMaximum(normalized.progressionStatus.achievements.count, normalized.progressionStatus.achievements.maximum) },
-            { label: "Mount Type", value: normalized.progressionStatus.mount.type },
-            { label: "Mount Bonus", value: normalized.progressionStatus.mount.bonus == null ? null : `${formatCount(normalized.progressionStatus.mount.bonus)}%` },
-            { label: "Mount Expires", value: formatTimestampMs(normalized.progressionStatus.mount.expiresAt) },
-            { label: "Portal Health", value: normalized.progressionStatus.portalBonuses.health },
-            { label: "Portal Damage", value: normalized.progressionStatus.portalBonuses.damage },
+            { label: hubText("dataHubI18n.scrapbook"), value: formatValueWithMaximum(normalized.progressionStatus.scrapbook.count, normalized.progressionStatus.scrapbook.maximum) },
+            { label: hubText("dataHubI18n.scrapbookbf08c"), value: formatPercentValue(normalized.progressionStatus.scrapbook.percentage) },
+            { label: hubText("dataHubI18n.achievements"), value: formatValueWithMaximum(normalized.progressionStatus.achievements.count, normalized.progressionStatus.achievements.maximum) },
+            { label: hubText("dataHubI18n.mountType"), value: normalized.progressionStatus.mount.type },
+            { label: hubText("dataHubI18n.mountBonus"), value: normalized.progressionStatus.mount.bonus == null ? null : hubPercent(normalized.progressionStatus.mount.bonus / 100) },
+            { label: hubText("dataHubI18n.mountExpires"), value: formatTimestampMs(normalized.progressionStatus.mount.expiresAt) },
+            { label: hubText("dataHubI18n.portalHealth"), value: normalized.progressionStatus.portalBonuses.health },
+            { label: hubText("dataHubI18n.portalDamage"), value: normalized.progressionStatus.portalBonuses.damage },
             ...(showLegacyGuildBonuses
               ? [
-                  { label: "Guild Treasure", value: guildLink?.guildBonuses.treasure ?? normalized.progressionStatus.guildBonuses.treasure },
-                  { label: "Guild Instructor", value: guildLink?.guildBonuses.instructor ?? normalized.progressionStatus.guildBonuses.instructor },
-                  { label: "Guild Pet", value: guildLink?.guildBonuses.pet ?? normalized.progressionStatus.guildBonuses.pet },
+                  { label: hubText("dataHubI18n.guildTreasure"), value: guildLink?.guildBonuses.treasure ?? normalized.progressionStatus.guildBonuses.treasure },
+                  { label: hubText("dataHubI18n.guildInstructor"), value: guildLink?.guildBonuses.instructor ?? normalized.progressionStatus.guildBonuses.instructor },
+                  { label: hubText("dataHubI18n.guildPet"), value: guildLink?.guildBonuses.pet ?? normalized.progressionStatus.guildBonuses.pet },
                 ]
               : []),
           ]}
@@ -2269,24 +2405,24 @@ function ScanExplorerPlayerDetail({
 
 function ScanExplorerPlayerGuildMemberSection({ guildLink }: { guildLink: NormalizedPlayerGuildMemberLink }) {
   return (
-    <ScanDetailSection title="Guild Member">
+    <ScanDetailSection title={hubText("dataHubI18n.guildMember")}>
       <MetricGrid
         items={[
-          { label: "Guild", value: guildLink.guildReference?.name },
-          { label: "Guild Identifier", value: guildLink.guildReference?.identifier },
-          { label: "Server", value: guildLink.guildReference?.server },
-          { label: "Role", value: formatGuildRole(guildLink.role) },
-          { label: "Last Active", value: formatTimestampMs(guildLink.lastActive) },
-          { label: "Ready Attack", value: guildLink.readyAttack },
-          { label: "Ready Defense", value: guildLink.readyDefense },
-          { label: "Hydra Action", value: guildLink.actions.hydra },
-          { label: "Attack Action", value: guildLink.actions.attack },
-          { label: "Defense Action", value: guildLink.actions.defense },
-          { label: "Raid Action", value: guildLink.actions.raid },
-          { label: "Guild Treasure", value: guildLink.guildBonuses.treasure },
-          { label: "Guild Instructor", value: guildLink.guildBonuses.instructor },
-          { label: "Guild Pet", value: guildLink.guildBonuses.pet },
-          { label: "Knights Contribution", value: guildLink.knightsContribution },
+          { label: hubText("dataHubI18n.guild"), value: guildLink.guildReference?.name },
+          { label: hubText("dataHubI18n.guildIdentifier"), value: guildLink.guildReference?.identifier },
+          { label: hubText("dataHubI18n.server"), value: guildLink.guildReference?.server },
+          { label: hubText("dataHubI18n.role"), value: formatGuildRole(guildLink.role) },
+          { label: hubText("dataHubI18n.lastActive"), value: formatTimestampMs(guildLink.lastActive) },
+          { label: hubText("dataHubI18n.readyForAttack"), value: guildLink.readyAttack },
+          { label: hubText("dataHubI18n.readyForDefense"), value: guildLink.readyDefense },
+          { label: hubText("dataHubI18n.hydraAction"), value: guildLink.actions.hydra },
+          { label: hubText("dataHubI18n.attackAction"), value: guildLink.actions.attack },
+          { label: hubText("dataHubI18n.defenseAction"), value: guildLink.actions.defense },
+          { label: hubText("dataHubI18n.raidAction"), value: guildLink.actions.raid },
+          { label: hubText("dataHubI18n.guildTreasure"), value: guildLink.guildBonuses.treasure },
+          { label: hubText("dataHubI18n.guildInstructor"), value: guildLink.guildBonuses.instructor },
+          { label: hubText("dataHubI18n.guildPet"), value: guildLink.guildBonuses.pet },
+          { label: hubText("dataHubI18n.knightsContributed"), value: guildLink.knightsContribution },
         ]}
       />
     </ScanDetailSection>
@@ -2308,23 +2444,23 @@ function ScanExplorerFortressSection({ normalized }: { normalized: NormalizedPla
     isPresent(fortress.currentBuilding.active);
 
   return (
-    <ScanDetailSection title="Fortress">
+    <ScanDetailSection title={hubText("dataHubI18n.fortress")}>
       {hasAnyFortressValue ? (
         <>
           <MetricGrid
             items={[
-              { label: "Upgrades", value: fortress.upgrades },
-              { label: "Rank", value: fortress.rank },
-              { label: "Honor", value: fortress.honor },
-              { label: "Raid Honor", value: fortress.raidHonor },
-              { label: "Gladiator", value: fortress.gladiator },
-              { label: "Knights", value: fortress.knights },
-              { label: "Current Building", value: fortress.currentBuilding.building },
-              { label: "Upgrade Active", value: fortress.currentBuilding.active },
+              { label: hubText("dataHubI18n.upgrades"), value: fortress.upgrades },
+              { label: hubText("dataHubI18n.rank"), value: fortress.rank },
+              { label: hubText("dataHubI18n.honor"), value: fortress.honor },
+              { label: hubText("dataHubI18n.raidHonor"), value: fortress.raidHonor },
+              { label: hubText("dataHubI18n.gladiator"), value: fortress.gladiator },
+              { label: hubText("dataHubI18n.knights"), value: fortress.knights },
+              { label: hubText("dataHubI18n.currentBuilding"), value: fortress.currentBuilding.building ? hubMessage(formatCamelLabel(fortress.currentBuilding.building)) : null },
+              { label: hubText("dataHubI18n.upgradeActive"), value: fortress.currentBuilding.active },
               ...(fortress.currentBuilding.active
                 ? [
-                    { label: "Starts", value: formatTimestampMs(fortress.currentBuilding.startsAt) },
-                    { label: "Finishes", value: formatTimestampMs(fortress.currentBuilding.finishesAt) },
+                    { label: hubText("dataHubI18n.starts"), value: formatTimestampMs(fortress.currentBuilding.startsAt) },
+                    { label: hubText("dataHubI18n.finishes"), value: formatTimestampMs(fortress.currentBuilding.finishesAt) },
                   ]
                 : []),
             ]}
@@ -2332,7 +2468,7 @@ function ScanExplorerFortressSection({ normalized }: { normalized: NormalizedPla
           {buildings.length ? <MetricGrid items={buildings} compact /> : null}
         </>
       ) : (
-        <div className={styles.unsupportedNote}>Fortress data is not available for this player in this scan.</div>
+        <div className={styles.unsupportedNote}>{hubText("dataHubI18n.fortressDataIsNotAvailableForThisPlayerInThisScan")}</div>
       )}
     </ScanDetailSection>
   );
@@ -2341,30 +2477,30 @@ function ScanExplorerFortressSection({ normalized }: { normalized: NormalizedPla
 function ScanExplorerDungeonsSection({ normalized }: { normalized: NormalizedPlayer }) {
   const dungeons = normalized.dungeons;
   return (
-    <ScanDetailSection title="Dungeons">
+    <ScanDetailSection title={hubText("dataHubI18n.dungeons")}>
       <MetricGrid
         items={[
-          { label: "Normal Total", value: dungeons.totals.normal },
-          { label: "Normal Unlocked", value: dungeons.totals.normalUnlocked },
-          { label: "Shadow Total", value: dungeons.totals.shadow },
-          { label: "Shadow Unlocked", value: dungeons.totals.shadowUnlocked },
-          { label: "Class Total", value: dungeons.totals.class },
-          { label: "Class Unlocked", value: dungeons.totals.classUnlocked },
-          { label: "Tower", value: dungeons.tower.displayProgress },
-          { label: "Twister", value: dungeons.twister.displayProgress },
-          { label: "Raid", value: dungeons.raid.displayProgress },
-          { label: "Player Portal", value: dungeons.portals.player.displayProgress },
-          { label: "Guild Portal", value: dungeons.portals.guild.displayProgress },
+          { label: hubText("dataHubI18n.normalTotal"), value: dungeons.totals.normal },
+          { label: hubText("dataHubI18n.normalUnlocked"), value: dungeons.totals.normalUnlocked },
+          { label: hubText("dataHubI18n.shadowTotal"), value: dungeons.totals.shadow },
+          { label: hubText("dataHubI18n.shadowUnlocked"), value: dungeons.totals.shadowUnlocked },
+          { label: hubText("dataHubI18n.classTotal"), value: dungeons.totals.class },
+          { label: hubText("dataHubI18n.classUnlocked"), value: dungeons.totals.classUnlocked },
+          { label: hubText("dataHubI18n.tower"), value: dungeons.tower.displayProgress },
+          { label: hubText("dataHubI18n.twister"), value: dungeons.twister.displayProgress },
+          { label: hubText("dataHubI18n.raid"), value: dungeons.raid.displayProgress },
+          { label: hubText("dataHubI18n.playerPortal"), value: dungeons.portals.player.displayProgress },
+          { label: hubText("dataHubI18n.guildPortal"), value: dungeons.portals.guild.displayProgress },
         ]}
       />
       <MetricGrid
         items={[
-          { label: "Normal Entries", value: dungeons.normal.count },
-          { label: "Normal Progress", value: dungeons.normal.totalProgress },
-          { label: "Shadow Entries", value: dungeons.shadow.count },
-          { label: "Shadow Progress", value: dungeons.shadow.totalProgress },
-          { label: "Class Entries", value: dungeons.class.count },
-          { label: "Class Progress", value: dungeons.class.totalProgress },
+          { label: hubText("dataHubI18n.normalEntries"), value: dungeons.normal.count },
+          { label: hubText("dataHubI18n.normalProgress"), value: dungeons.normal.totalProgress },
+          { label: hubText("dataHubI18n.shadowEntries"), value: dungeons.shadow.count },
+          { label: hubText("dataHubI18n.shadowProgress"), value: dungeons.shadow.totalProgress },
+          { label: hubText("dataHubI18n.classEntries"), value: dungeons.class.count },
+          { label: hubText("dataHubI18n.classProgress"), value: dungeons.class.totalProgress },
         ]}
         compact
       />
@@ -2377,8 +2513,8 @@ function ScanExplorerAdvancedSections({ normalized }: { normalized: NormalizedPl
     .map(([slot, item]) => ({
       label: formatCamelLabel(slot),
       value: [
-        item?.type == null ? null : `Type ${item.type}`,
-        item?.armor == null ? null : `Armor ${formatCount(item.armor)}`,
+        item?.type == null ? null : hubText("dataHubI18n.itemType", { v1: item.type }),
+        item?.armor == null ? null : hubText("dataHubI18n.itemArmor", { v1: item.armor }),
         formatDamageRange(item?.damage),
       ]
         .filter(Boolean)
@@ -2388,10 +2524,10 @@ function ScanExplorerAdvancedSections({ normalized }: { normalized: NormalizedPl
   const potionEntries =
     normalized.potions?.slots
       .map((slot) => ({
-        label: `Slot ${slot.slot + 1}`,
+        label: hubText("dataHubI18n.slotNumber", { v1: slot.slot + 1 }),
         value: [
-          slot.attribute ? formatCamelLabel(slot.attribute) : null,
-          slot.size == null ? null : `${slot.size}%`,
+          slot.attribute ? hubMessage(formatCamelLabel(slot.attribute)) : null,
+          slot.size == null ? null : hubPercent(slot.size / 100),
           slot.expires == null ? null : formatTimestampMs(slot.expires),
         ]
           .filter(Boolean)
@@ -2399,45 +2535,33 @@ function ScanExplorerAdvancedSections({ normalized }: { normalized: NormalizedPl
       }))
       .filter((entry) => entry.value) ?? [];
   const pets = normalized.pets;
-  const extended = normalized.extended;
-  const resourceGroups = [
-    compactEntries(normalized.resources.currencies as unknown as Record<string, unknown>, 8),
-    compactEntries(normalized.resources.fortress as unknown as Record<string, unknown>, 8),
-    compactEntries(normalized.resources.smithy as unknown as Record<string, unknown>, 8),
-    compactEntries(normalized.resources.underworld as unknown as Record<string, unknown>, 8),
-  ].filter((group) => group.length > 0);
-  const underworldGroups = [
-    compactEntries(normalized.underworld.buildings as unknown as Record<string, unknown>, 12),
-    compactEntries(normalized.underworld.units as unknown as Record<string, unknown>, 8),
-    compactEntries(normalized.underworld.resources as unknown as Record<string, unknown>, 12),
-  ].filter((group) => group.length > 0);
 
   return (
     <details className={styles.advancedDetails}>
-      <summary>Advanced</summary>
+      <summary>{hubText("dataHubI18n.advanced")}</summary>
       <div className={styles.advancedStack}>
-        <ScanDetailSection title="Items">
-          {itemEntries.length ? <MetricGrid items={itemEntries} compact /> : <div className={styles.unsupportedNote}>Equipped items are not available.</div>}
+        <ScanDetailSection title={hubText("dataHubI18n.items")}>
+          {itemEntries.length ? <MetricGrid items={itemEntries} compact /> : <div className={styles.unsupportedNote}>{hubText("dataHubI18n.equippedItemsAreNotAvailable")}</div>}
         </ScanDetailSection>
-        <ScanDetailSection title="Potions">
+        <ScanDetailSection title={hubText("dataHubI18n.potions")}>
           <MetricGrid
             items={[
-              { label: "Life Active", value: normalized.potions?.life.active },
-              { label: "Life Size", value: normalized.potions?.life.size },
+              { label: hubText("dataHubI18n.lifePotionActive"), value: normalized.potions?.life.active },
+              { label: hubText("dataHubI18n.lifePotionSize"), value: normalized.potions?.life.size },
               ...potionEntries,
             ]}
             compact
           />
         </ScanDetailSection>
-        <ScanDetailSection title="Pets">
+        <ScanDetailSection title={hubText("dataHubI18n.pets")}>
           {pets ? (
             <>
               <MetricGrid
                 items={[
-                  { label: "Rank", value: pets.rank },
-                  { label: "Honor", value: pets.honor },
-                  { label: "Total Count", value: pets.own?.totalCount ?? pets.collection?.totalPets },
-                  { label: "Total Level", value: pets.own?.totalLevel },
+                  { label: hubText("dataHubI18n.rank"), value: pets.rank },
+                  { label: hubText("dataHubI18n.honor"), value: pets.honor },
+                  { label: hubText("dataHubI18n.totalCount"), value: pets.own?.totalCount ?? pets.collection?.totalPets },
+                  { label: hubText("dataHubI18n.totalLevel"), value: pets.own?.totalLevel },
                 ]}
                 compact
               />
@@ -2445,113 +2569,25 @@ function ScanExplorerAdvancedSections({ normalized }: { normalized: NormalizedPl
               <MetricGrid items={compactEntries(pets.foods as unknown as Record<string, unknown>, 8)} compact />
             </>
           ) : (
-            <div className={styles.unsupportedNote}>Pet data is not available.</div>
+            <div className={styles.unsupportedNote}>{hubText("dataHubI18n.petDataIsNotAvailable")}</div>
           )}
         </ScanDetailSection>
-        <ScanDetailSection title="Runes">
+        <ScanDetailSection title={hubText("dataHubI18n.runes")}>
           <MetricGrid
             items={[
-              { label: "Gold", value: normalized.runes.gold },
-              { label: "XP", value: normalized.runes.xp },
-              { label: "Epic Chance", value: normalized.runes.epicChance },
-              { label: "Item Quality", value: normalized.runes.itemQuality },
-              { label: "Health", value: normalized.runes.health },
-              { label: "Damage", value: normalized.runes.damage.total },
-              { label: "Resistance", value: normalized.runes.resistance.total },
+              { label: hubText("dataHubI18n.gold"), value: normalized.runes.gold },
+              { label: hubText("dataHubI18n.xp"), value: normalized.runes.xp },
+              { label: hubText("dataHubI18n.epicChance"), value: normalized.runes.epicChance },
+              { label: hubText("dataHubI18n.itemQuality"), value: normalized.runes.itemQuality },
+              { label: hubText("dataHubI18n.health"), value: normalized.runes.health },
+              { label: hubText("dataHubI18n.damage"), value: normalized.runes.damage.total },
+              { label: hubText("dataHubI18n.resistance"), value: normalized.runes.resistance.total },
             ]}
             compact
           />
         </ScanDetailSection>
-        <ScanDetailSection title="Resources">
-          {resourceGroups.length ? (
-            resourceGroups.map((items, index) => <MetricGrid items={items} compact key={`resources:${index}`} />)
-          ) : (
-            <div className={styles.unsupportedNote}>Resource data is not available.</div>
-          )}
-        </ScanDetailSection>
-        <ScanDetailSection title="Underworld">
-          {underworldGroups.length ? (
-            underworldGroups.map((items, index) => <MetricGrid items={items} compact key={`underworld:${index}`} />)
-          ) : (
-            <div className={styles.unsupportedNote}>Underworld data is not available.</div>
-          )}
-        </ScanDetailSection>
-        <ScanDetailSection title="Witch">
-          <ScanExplorerWitchDetail witch={extended.witch} />
-        </ScanDetailSection>
-        <ScanDetailSection title="Idle">
-          <ScanExplorerIdleDetail idle={extended.idle} />
-        </ScanDetailSection>
-        <ScanDetailSection title="Toilet">
-          <MetricGrid items={compactEntries(extended.toilet as unknown as Record<string, unknown>, 8)} compact />
-        </ScanDetailSection>
-        <ScanDetailSection title="Extras">
-          <MetricGrid items={compactEntries(extended.extras as unknown as Record<string, unknown>, 8)} compact />
-        </ScanDetailSection>
       </div>
     </details>
-  );
-}
-
-function ScanExplorerWitchDetail({ witch }: { witch: NormalizedPlayer["extended"]["witch"] }) {
-  const ownedScrolls = witch.scrolls.filter((scroll) => scroll.owned === true).length;
-  const knownScrolls = witch.scrolls.filter((scroll) => scroll.owned != null || scroll.type != null || scroll.picIndex != null).length;
-  const scrollItems = witch.scrolls
-    .filter((scroll) => scroll.owned != null || scroll.type != null || scroll.picIndex != null || scroll.date != null)
-    .map((scroll) => ({
-      label: `Scroll ${scroll.index + 1}`,
-      value: [
-        scroll.type == null ? null : `Type ${formatCount(scroll.type)}`,
-        scroll.owned == null ? null : scroll.owned ? "Owned" : "Open",
-        formatTimestampMs(scroll.date),
-      ]
-        .filter(Boolean)
-        .join(" - "),
-    }))
-    .filter((entry) => entry.value);
-
-  const summaryItems: ScanMetric[] = [
-    { label: "Stage", value: witch.stage },
-    { label: "Items", value: formatValueWithMaximum(witch.items, witch.itemsNext) },
-    { label: "Item", value: witch.item },
-    { label: "Finish", value: formatTimestampMs(witch.finish) },
-    ...(knownScrolls ? [{ label: "Scrolls", value: `${formatCount(ownedScrolls)} / ${formatCount(knownScrolls)} owned` }] : []),
-  ];
-
-  return (
-    <>
-      <MetricGrid items={summaryItems} compact />
-      {scrollItems.length ? <MetricGrid items={scrollItems} compact /> : null}
-      {!summaryItems.some((item) => item.value != null) && !scrollItems.length ? (
-        <div className={styles.unsupportedNote}>Witch data is not available.</div>
-      ) : null}
-    </>
-  );
-}
-
-function summarizeNumericArray(values: number[], label: string) {
-  if (!values.length) return null;
-  const active = values.filter((value) => value > 0).length;
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return `${formatCount(values.length)} ${label}${active ? ` - ${formatCount(active)} active` : ""}${total ? ` - total ${formatCount(total)}` : ""}`;
-}
-
-function ScanExplorerIdleDetail({ idle }: { idle: NormalizedPlayer["extended"]["idle"] }) {
-  const items: ScanMetric[] = [
-    { label: "Sacrifices", value: idle.sacrifices },
-    { label: "Buildings", value: summarizeNumericArray(idle.buildings, "buildings") },
-    { label: "Money", value: idle.money },
-    { label: "Ready Runes", value: idle.readyRunes },
-    { label: "Runes", value: idle.runes },
-    { label: "Speed Upgrades", value: summarizeNumericArray(idle.upgrades.speed, "upgrades") },
-    { label: "Money Upgrades", value: summarizeNumericArray(idle.upgrades.money, "upgrades") },
-    { label: "Upgrade Total", value: idle.upgrades.total },
-  ];
-
-  return items.some((item) => item.value != null && item.value !== "") ? (
-    <MetricGrid items={items} compact />
-  ) : (
-    <div className={styles.unsupportedNote}>Idle data is not available.</div>
   );
 }
 
@@ -2580,7 +2616,7 @@ function ScanExplorerGuildDetail({
       <div className={styles.detailNav}>
         <ScanExplorerBackButton onBack={onBack} />
       </div>
-      <section className={styles.entityDetailHeader} aria-label="Guild">
+      <section className={styles.entityDetailHeader} aria-label={hubText("dataHubI18n.guild")}>
         <Shield size={18} aria-hidden />
         <div>
           <h3>{displayName}</h3>
@@ -2588,36 +2624,36 @@ function ScanExplorerGuildDetail({
         </div>
       </section>
 
-      <ScanDetailSection title="Overview">
+      <ScanDetailSection title={hubText("dataHubI18n.overview")}>
         <MetricGrid
           items={[
-            { label: "Name", value: displayName },
-            { label: "Identifier", value: displayIdentifier },
-            { label: "Server", value: displayServer },
-            { label: "CoA", value: coa },
-            { label: "Rank", value: normalizedGuild?.progression.rank },
-            { label: "Honor", value: normalizedGuild?.progression.honor },
-            { label: "Snapshots", value: group.rows.length },
-            { label: "Complete Snapshots", value: group.completeSnapshotCount },
-            { label: "Members", value: normalizedGuild?.totals.membersTotal ?? group.rows[0]?.declaredMemberCount ?? members.length },
-            { label: "Description", value: normalizedGuild?.identity.description },
+            { label: hubText("dataHubI18n.name"), value: displayName },
+            { label: hubText("dataHubI18n.identifier"), value: displayIdentifier },
+            { label: hubText("dataHubI18n.server"), value: displayServer },
+            { label: hubText("dataHubI18n.coatOfArms"), value: coa },
+            { label: hubText("dataHubI18n.rank"), value: normalizedGuild?.progression.rank },
+            { label: hubText("dataHubI18n.honor"), value: normalizedGuild?.progression.honor },
+            { label: hubText("dataHubI18n.snapshots"), value: group.rows.length },
+            { label: hubText("dataHubI18n.completeSnapshots"), value: group.completeSnapshotCount },
+            { label: hubText("dataHubI18n.members"), value: normalizedGuild?.totals.membersTotal ?? group.rows[0]?.declaredMemberCount ?? members.length },
+            { label: hubText("dataHubI18n.description"), value: normalizedGuild?.identity.description },
           ]}
         />
       </ScanDetailSection>
 
       {normalizedGuild ? <ScanExplorerGuildNormalizedSections guild={normalizedGuild} /> : null}
 
-      <ScanDetailSection title="Coverage">
+      <ScanDetailSection title={hubText("dataHubI18n.coverageLabel")}>
         {group.rows.length ? (
           <div className={styles.detailsGuildList}>
             <ScanDetailsGuildRow group={group} />
           </div>
         ) : (
-          <div className={styles.emptyState}>Keine Guild-Coverage gefunden.</div>
+          <div className={styles.emptyState}>{hubText("dataHubI18n.noGuildCoverageFound")}</div>
         )}
       </ScanDetailSection>
 
-      <ScanDetailSection title={`Members (${formatCount(members.length)})`}>
+      <ScanDetailSection title={hubText("dataHubI18n.membersHeading", { v1: members.length })}>
         {members.length ? (
           <div className={styles.memberList}>
             {members.map((member) => (
@@ -2625,7 +2661,7 @@ function ScanExplorerGuildDetail({
             ))}
           </div>
         ) : (
-          <div className={styles.emptyState}>Keine Memberliste aus der NormalizedGuild-Semantik verfügbar.</div>
+          <div className={styles.emptyState}>{hubText("dataHubI18n.noMemberListIsAvailableFromNormalizedGuildData")}</div>
         )}
       </ScanDetailSection>
     </>
@@ -2635,41 +2671,41 @@ function ScanExplorerGuildDetail({
 function ScanExplorerGuildNormalizedSections({ guild }: { guild: NormalizedGuild }) {
   return (
     <>
-      <ScanDetailSection title="Bonuses / Totals">
+      <ScanDetailSection title={hubText("dataHubI18n.bonusesTotals")}>
         <MetricGrid
           items={[
-            { label: "Total Treasure", value: guild.bonuses.totalTreasure },
-            { label: "Total Instructor", value: guild.bonuses.totalInstructor },
-            { label: "Total Knights", value: guild.totals.totalKnights },
-            { label: "Total Knights 15", value: guild.totals.totalKnights15 },
-            { label: "Guild Pet ID", value: guild.combatProgress.pet.id },
-            { label: "Guild Pet Level", value: guild.combatProgress.pet.level },
-            { label: "Guild Pet Class", value: guild.combatProgress.pet.class },
+            { label: hubText("dataHubI18n.totalTreasure"), value: guild.bonuses.totalTreasure },
+            { label: hubText("dataHubI18n.totalInstructor"), value: guild.bonuses.totalInstructor },
+            { label: hubText("dataHubI18n.totalKnights"), value: guild.totals.totalKnights },
+            { label: hubText("dataHubI18n.totalKnights15"), value: guild.totals.totalKnights15 },
+            { label: hubText("dataHubI18n.guildPetId"), value: guild.combatProgress.pet.id },
+            { label: hubText("dataHubI18n.guildPetLevel"), value: guild.combatProgress.pet.level },
+            { label: hubText("dataHubI18n.guildPetClass"), value: guild.combatProgress.pet.class },
           ]}
         />
       </ScanDetailSection>
-      <ScanDetailSection title="Combat Progress">
+      <ScanDetailSection title={hubText("dataHubI18n.combatProgress")}>
         <MetricGrid
           items={[
-            { label: "Raid", value: guild.combatProgress.raid },
-            { label: "Portal Floor", value: guild.combatProgress.portal.floor },
-            { label: "Portal Life", value: guild.combatProgress.portal.life },
-            { label: "Portal Percent", value: guild.combatProgress.portal.percent },
-            { label: "Hydra Level", value: guild.combatProgress.hydra.level },
-            { label: "Hydra Max", value: guild.combatProgress.hydra.max },
-            { label: "Under Attack", value: guild.combatProgress.combatState.isUnderAttack },
-            { label: "Under Attack ID", value: guild.combatProgress.combatState.underAttackId },
-            { label: "Attacking", value: guild.combatProgress.combatState.isAttacking },
-            { label: "Attacking ID", value: guild.combatProgress.combatState.attackingId },
+            { label: hubText("dataHubI18n.raid"), value: guild.combatProgress.raid },
+            { label: hubText("dataHubI18n.portalFloor"), value: guild.combatProgress.portal.floor },
+            { label: hubText("dataHubI18n.portalLife"), value: guild.combatProgress.portal.life },
+            { label: hubText("dataHubI18n.portalPercent"), value: guild.combatProgress.portal.percent },
+            { label: hubText("dataHubI18n.hydraLevel"), value: guild.combatProgress.hydra.level },
+            { label: hubText("dataHubI18n.hydraMaximum"), value: guild.combatProgress.hydra.max },
+            { label: hubText("dataHubI18n.underAttack"), value: guild.combatProgress.combatState.isUnderAttack },
+            { label: hubText("dataHubI18n.attackerId"), value: guild.combatProgress.combatState.underAttackId },
+            { label: hubText("dataHubI18n.attacking"), value: guild.combatProgress.combatState.isAttacking },
+            { label: hubText("dataHubI18n.attackTargetId"), value: guild.combatProgress.combatState.attackingId },
           ]}
         />
       </ScanDetailSection>
       {guild.tournament ? (
-        <ScanDetailSection title="Tournament">
+        <ScanDetailSection title={hubText("dataHubI18n.tournament")}>
           <MetricGrid
             items={[
-              { label: "Rank", value: guild.tournament.rank },
-              { label: "Tokens", value: guild.tournament.tokens },
+              { label: hubText("dataHubI18n.rank"), value: guild.tournament.rank },
+              { label: hubText("dataHubI18n.tokens"), value: guild.tournament.tokens },
             ]}
           />
         </ScanDetailSection>
@@ -2681,11 +2717,11 @@ function ScanExplorerGuildNormalizedSections({ guild }: { guild: NormalizedGuild
 function ScanExplorerGuildMemberRow({ member }: { member: NormalizedGuildMember }) {
   return (
     <div className={styles.memberRow}>
-      <strong>{member.identity.name ?? member.identity.playerIdentifier ?? `Slot ${member.identity.slot + 1}`}</strong>
+      <strong>{member.identity.name ?? member.identity.playerIdentifier ?? hubText("dataHubI18n.slotNumber", { v1: member.identity.slot + 1 })}</strong>
       <span>
         {[
           formatGuildRole(member.role.name),
-          member.identity.level == null ? null : `Level ${formatCount(member.identity.level)}`,
+          member.identity.level == null ? null : hubText("dataHubI18n.levelNumber", { v1: member.identity.level }),
           member.identity.playerIdentifier,
         ]
           .filter(Boolean)
@@ -2694,29 +2730,29 @@ function ScanExplorerGuildMemberRow({ member }: { member: NormalizedGuildMember 
       <span>
         {[
           formatTimestampMs(member.activity.lastActive),
-          member.readyAttack == null ? null : `Attack ${formatOptionalValue(member.readyAttack)}`,
-          member.readyDefense == null ? null : `Defense ${formatOptionalValue(member.readyDefense)}`,
+          member.readyAttack == null ? null : hubText("dataHubI18n.attackValue", { v1: formatOptionalValue(member.readyAttack) }),
+          member.readyDefense == null ? null : hubText("dataHubI18n.defenseValue", { v1: formatOptionalValue(member.readyDefense) }),
         ]
           .filter(Boolean)
           .join(" - ")}
       </span>
       <details className={styles.compactDetails}>
-        <summary>Member details</summary>
+        <summary>{hubText("dataHubI18n.memberDetails")}</summary>
         <MetricGrid
           items={[
-            { label: "Slot", value: member.identity.slot + 1 },
-            { label: "Player ID", value: member.identity.playerId },
-            { label: "Player Identifier", value: member.identity.playerIdentifier },
-            { label: "State", value: member.activity.state },
-            { label: "Last Active", value: formatTimestampMs(member.activity.lastActive) },
-            { label: "Hydra Action", value: member.actions.hydra },
-            { label: "Attack Action", value: member.actions.attack },
-            { label: "Defense Action", value: member.actions.defense },
-            { label: "Raid Action", value: member.actions.raid },
-            { label: "Guild Treasure", value: member.bonuses.treasure },
-            { label: "Guild Instructor", value: member.bonuses.instructor },
-            { label: "Guild Pet", value: member.bonuses.pet },
-            { label: "Knights Contribution", value: member.contributions.knights },
+            { label: hubText("dataHubI18n.slot"), value: member.identity.slot + 1 },
+            { label: hubText("dataHubI18n.playerId"), value: member.identity.playerId },
+            { label: hubText("dataHubI18n.playerIdentifier"), value: member.identity.playerIdentifier },
+            { label: hubText("dataHubI18n.state"), value: member.activity.state },
+            { label: hubText("dataHubI18n.lastActive"), value: formatTimestampMs(member.activity.lastActive) },
+            { label: hubText("dataHubI18n.hydraAction"), value: member.actions.hydra },
+            { label: hubText("dataHubI18n.attackAction"), value: member.actions.attack },
+            { label: hubText("dataHubI18n.defenseAction"), value: member.actions.defense },
+            { label: hubText("dataHubI18n.raidAction"), value: member.actions.raid },
+            { label: hubText("dataHubI18n.guildTreasure"), value: member.bonuses.treasure },
+            { label: hubText("dataHubI18n.guildInstructor"), value: member.bonuses.instructor },
+            { label: hubText("dataHubI18n.guildPet"), value: member.bonuses.pet },
+            { label: hubText("dataHubI18n.knightsContributed"), value: member.contributions.knights },
           ]}
           compact
         />
@@ -2767,7 +2803,7 @@ function MetricGrid({ items, compact = false }: { items: ScanMetric[]; compact?:
     <dl className={`${styles.metricGrid} ${compact ? styles.metricGridCompact : ""}`}>
       {visibleItems.map((item) => (
         <div key={`${item.label}:${String(item.value)}`} title={item.title}>
-          <dt>{item.label}</dt>
+          <dt>{hubMessage(item.label)}</dt>
           <dd>{item.value}</dd>
         </div>
       ))}
@@ -2796,7 +2832,7 @@ function ScanDetailsGuildRow({ group }: { group: ScanExplorerGuildGroup }) {
           <span>{group.guildIdentifier}</span>
         </div>
         <span>{group.server}</span>
-        <span>1 Scan</span>
+        <span>{hubText("dataHubI18n.quantityScans", { count: 1 })}</span>
         <span>{formatCoverageRatio(singleRow)}</span>
         <span title={status.label}>
           {status.symbol} {status.label}
@@ -2813,8 +2849,8 @@ function ScanDetailsGuildRow({ group }: { group: ScanExplorerGuildGroup }) {
           <span>{group.guildIdentifier}</span>
         </div>
         <span>{group.server}</span>
-        <span>{formatCount(group.rows.length)} Scans</span>
-        <span>{formatCount(group.completeSnapshotCount)} vollständig</span>
+        <span>{hubText("dataHubI18n.quantityScans", { count: group.rows.length })}</span>
+        <span>{hubText("dataHubI18n.completeCount", { count: group.completeSnapshotCount })}</span>
         <span>{formatGroupStatus(group)}</span>
       </summary>
       <div className={styles.detailsGuildSnapshots}>
@@ -2836,6 +2872,7 @@ function ScanDetailsGuildRow({ group }: { group: ScanExplorerGuildGroup }) {
 }
 
 function FightTrackerOverview({
+  titleId,
   summaries,
   loading,
   error,
@@ -2848,6 +2885,7 @@ function FightTrackerOverview({
   onExportSelected,
   busy,
 }: {
+  titleId: string;
   summaries: FightTrackerSummary[];
   loading: boolean;
   error: string | null;
@@ -2861,21 +2899,21 @@ function FightTrackerOverview({
   busy: boolean;
 }) {
   return (
-    <div id="data-management-fight-trackers-panel" role="tabpanel" aria-labelledby="data-management-fight-trackers-tab">
-      {error ? <div className={styles.errorBox}>{error}</div> : null}
+    <div id={`${titleId}-fight-trackers-panel`} role="tabpanel" aria-labelledby={`${titleId}-fight-trackers-tab`}>
+      {error ? <div className={styles.errorBox}>{hubMessage(error)}</div> : null}
 
       <section className={styles.scanSection} aria-label="Fight Tracker">
         <div className={styles.sectionHeader}>
           <h3>Fight Tracker</h3>
           <div className={styles.sectionHeaderActions}>
-            <span>{loading ? "Lädt..." : `${summaries.length} gespeichert`}</span>
+            <span>{loading ? hubText("dataHubI18n.loading") : hubText("dataHubI18n.savedCount", { v1: summaries.length })}</span>
             <button
               type="button"
               className={styles.iconButton}
               onClick={onRefresh}
               disabled={loading}
-              aria-label="Fight Tracker aktualisieren"
-              title="Fight Tracker aktualisieren"
+              aria-label={hubText("dataHubI18n.refreshFightTrackers")}
+              title={hubText("dataHubI18n.refreshFightTrackers")}
             >
               <RefreshCw size={15} aria-hidden />
             </button>
@@ -2884,8 +2922,8 @@ function FightTrackerOverview({
 
         {loading ? (
           <DataHubLoadingState
-            title="Fight Tracker werden geladen"
-            message="Lokale Tracker-Metadaten werden gelesen."
+            title={hubText("dataHubI18n.loadingFightTrackers")}
+            message={hubText("dataHubI18n.readingLocalTrackerMetadata")}
           />
         ) : summaries.length ? (
           <>
@@ -2898,7 +2936,7 @@ function FightTrackerOverview({
                 disabled={busy || selectedTrackerCount === 0}
               >
                 <Download size={16} aria-hidden />
-                <span>{selectedTrackerCount === 1 ? "Fight Tracker exportieren" : "Fight-Tracker-Pack exportieren"}</span>
+                <span>{selectedTrackerCount === 1 ? hubText("dataHubI18n.exportFightTracker") : hubText("dataHubI18n.exportFightTrackerPack")}</span>
               </button>
             </div>
             <div className={`${styles.tableWrap} ${styles.trackerTableWrap}`}>
@@ -2908,17 +2946,17 @@ function FightTrackerOverview({
                     <th className={styles.checkCell}>
                       <input
                         type="checkbox"
-                        aria-label="Alle Fight Tracker auswählen"
+                        aria-label={hubText("dataHubI18n.selectAllFightTrackers")}
                         checked={allTrackersSelected}
                         onChange={onToggleAll}
                       />
                     </th>
-                    <th>Tracker/Gilde</th>
-                    <th>Server</th>
-                    <th className={styles.numericCell}>Member</th>
-                    <th className={styles.numericCell}>Aktiv</th>
-                    <th className={styles.numericCell}>Fights</th>
-                    <th>Stand</th>
+                    <th>{hubText("dataHubI18n.trackerGuild")}</th>
+                    <th>{hubText("dataHubI18n.server")}</th>
+                    <th className={styles.numericCell}>{hubText("dataHubI18n.member")}</th>
+                    <th className={styles.numericCell}>{hubText("dataHubI18n.active")}</th>
+                    <th className={styles.numericCell}>{hubText("dataHubI18n.fights")}</th>
+                    <th>{hubText("dataHubI18n.updated")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2927,7 +2965,7 @@ function FightTrackerOverview({
                       <td className={styles.checkCell}>
                         <input
                           type="checkbox"
-                          aria-label={`${summary.tracker.name} auswählen`}
+                          aria-label={hubText("dataHubI18n.selectName", { v1: summary.tracker.name })}
                           checked={selectedTrackerIds.has(summary.tracker.id)}
                           onChange={() => onToggleTracker(summary.tracker.id)}
                         />
@@ -2937,13 +2975,13 @@ function FightTrackerOverview({
                           <span className={styles.truncate} title={summary.tracker.name}>
                             {summary.tracker.name}
                           </span>
-                          {summary.tracker.importedAt ? <span className={styles.importBadge}>Importiert</span> : null}
+                          {summary.tracker.importedAt ? <span className={styles.importBadge}>{hubText("dataHubI18n.imported")}</span> : null}
                         </div>
                       </td>
-                      <td>{summary.tracker.server || "Unbekannt"}</td>
-                      <td className={styles.numericCell}>{summary.memberCount}</td>
-                      <td className={styles.numericCell}>{summary.activeMemberCount}</td>
-                      <td className={styles.numericCell}>{summary.fightCount}</td>
+                      <td>{summary.tracker.server || hubText("dataHubI18n.unknown")}</td>
+                      <td className={styles.numericCell}>{formatCount(summary.memberCount)}</td>
+                      <td className={styles.numericCell}>{formatCount(summary.activeMemberCount)}</td>
+                      <td className={styles.numericCell}>{formatCount(summary.fightCount)}</td>
                       <td>{formatOptionalDate(summary.tracker.lastSyncedScanAt ?? summary.tracker.updatedAt)}</td>
                     </tr>
                   ))}
@@ -2958,30 +2996,30 @@ function FightTrackerOverview({
                     <label className={styles.trackerListTitleRow}>
                       <input
                         type="checkbox"
-                        aria-label={`${summary.tracker.name} auswählen`}
+                        aria-label={hubText("dataHubI18n.selectName", { v1: summary.tracker.name })}
                         checked={selectedTrackerIds.has(summary.tracker.id)}
                         onChange={() => onToggleTracker(summary.tracker.id)}
                       />
                       <strong>{summary.tracker.name}</strong>
                     </label>
-                    <span>{summary.tracker.server || "Unbekannt"}</span>
+                    <span>{summary.tracker.server || hubText("dataHubI18n.unknown")}</span>
                   </div>
-                  {summary.tracker.importedAt ? <span className={styles.importBadge}>Importiert</span> : null}
+                  {summary.tracker.importedAt ? <span className={styles.importBadge}>{hubText("dataHubI18n.imported")}</span> : null}
                   <dl className={styles.trackerStats}>
                     <div>
-                      <dt>Member</dt>
-                      <dd>{summary.memberCount}</dd>
+                      <dt>{hubText("dataHubI18n.member")}</dt>
+                      <dd>{formatCount(summary.memberCount)}</dd>
                     </div>
                     <div>
-                      <dt>Aktiv</dt>
-                      <dd>{summary.activeMemberCount}</dd>
+                      <dt>{hubText("dataHubI18n.active")}</dt>
+                      <dd>{formatCount(summary.activeMemberCount)}</dd>
                     </div>
                     <div>
-                      <dt>Fights</dt>
-                      <dd>{summary.fightCount}</dd>
+                      <dt>{hubText("dataHubI18n.fights")}</dt>
+                      <dd>{formatCount(summary.fightCount)}</dd>
                     </div>
                     <div>
-                      <dt>Stand</dt>
+                      <dt>{hubText("dataHubI18n.updated")}</dt>
                       <dd>{formatOptionalDate(summary.tracker.lastSyncedScanAt ?? summary.tracker.updatedAt)}</dd>
                     </div>
                   </dl>
@@ -2990,7 +3028,7 @@ function FightTrackerOverview({
             </div>
           </>
         ) : (
-          <div className={styles.emptyState}>Noch keine Fight Tracker vorhanden.</div>
+          <div className={styles.emptyState}>{hubText("dataHubI18n.noFightTrackersAvailableYet")}</div>
         )}
       </section>
     </div>
@@ -2999,23 +3037,25 @@ function FightTrackerOverview({
 
 function DataJobStatusBox({ job }: { job: DataJob }) {
   const progress = getDataJobProgress(job);
-  const detail = getDataJobDetail(job);
+  const detail = job.message ? hubMessage(job.message) : hubMessage(job.phase) + (
+    job.metadata?.detectedMembers && job.metadata.detectedMembers > 0 ? ` - ${hubNumber(job.metadata.processedMembers ?? 0)}/${hubText("dataHubI18n.quantityPlayers", { count: job.metadata.detectedMembers })}` :
+    job.metadata?.detectedSnapshots && job.metadata.detectedSnapshots > 0 ? ` - ${hubNumber(job.metadata.processedSnapshots ?? 0)}/${hubText("dataHubI18n.quantityScans", { count: job.metadata.detectedSnapshots })}` : "");
   const percent =
     progress && progress.total > 0 ? Math.max(0, Math.min(100, (progress.current / progress.total) * 100)) : null;
 
   return (
-    <section className={styles.jobStatusBox} aria-label="Laufender Import">
+    <section className={styles.jobStatusBox} aria-label={hubText("dataHubI18n.importInProgress")}>
       <div className={styles.jobStatusHeader}>
         <span className={styles.jobStatusIcon} aria-hidden>
           <Loader2 size={16} />
         </span>
         <div>
-          <h3>{job.title}</h3>
-          <p>{detail}</p>
+          <h3>{hubMessage(job.title)}</h3>
+          <p>{hubMessage(detail)}</p>
         </div>
         {progress ? (
           <span className={styles.jobStatusCount}>
-            {progress.current}/{progress.total}
+            {hubNumber(progress.current)}/{hubNumber(progress.total)}
           </span>
         ) : null}
       </div>
@@ -3049,11 +3089,11 @@ function TransferImportPreview({
 }) {
   const title = getImportPreviewTitle(pending);
   const rows = buildImportPreviewRows(pending);
-  const confirmLabel = pending.kind === "scanMerge" ? "Zusammenführen" : pending.kind === "scanJson" ? "Importieren" : "Import bestätigen";
+  const confirmLabel = pending.kind === "scanMerge" ? hubText("dataHubI18n.merge") : pending.kind === "scanJson" ? hubText("dataHubI18n.import") : hubText("dataHubI18n.confirmImport");
   const selectedContainsSlot = pending.kind === "scanMerge" && pending.summaries.some((summary) => summary.isScanSlot);
 
   return (
-    <section className={styles.previewBox} aria-label="Import-Vorschau">
+    <section className={styles.previewBox} aria-label={hubText("dataHubI18n.importPreview")}>
       <div className={styles.previewHeader}>
         <div>
           <h3>{title}</h3>
@@ -3072,7 +3112,7 @@ function TransferImportPreview({
       {pending.kind === "scanMerge" ? (
         <>
           <fieldset className={styles.mergeModeField}>
-            <legend>Art der Zusammenführung</legend>
+            <legend>{hubText("dataHubI18n.mergeType")}</legend>
             <label className={styles.mergeModeOption}>
               <input
                 type="radio"
@@ -3082,8 +3122,8 @@ function TransferImportPreview({
                 onChange={() => onMergeModeChange?.("merged-file")}
               />
               <span>
-                <strong>Zusammengeführte Datei</strong>
-                <small>Erstellt eine zusätzliche JSON. Die ausgewählten Scans bleiben einzeln erhalten.</small>
+                <strong>{hubText("dataHubI18n.mergedFile")}</strong>
+                <small>{hubText("dataHubI18n.createsAnAdditionalJsonFileTheSelectedScansAreKeptIndividually")}</small>
               </span>
             </label>
             <label className={styles.mergeModeOption}>
@@ -3096,19 +3136,19 @@ function TransferImportPreview({
                 onChange={() => onMergeModeChange?.("scan-slot")}
               />
               <span>
-                <strong>Neuer Scan-Slot</strong>
-                <small>Bündelt die ausgewählten Scans unter einem gemeinsamen Namen.</small>
+                <strong>{hubText("dataHubI18n.newScanSlot")}</strong>
+                <small>{hubText("dataHubI18n.groupsTheSelectedScansUnderASharedName")}</small>
               </span>
             </label>
           </fieldset>
           {pending.mode === "scan-slot" ? (
             <label className={styles.filenameField}>
-              <span>Scan-Slot-Name</span>
+              <span>{hubText("dataHubI18n.scanSlotName")}</span>
               <input value={pending.displayName} onChange={(event) => onDisplayNameChange?.(event.target.value)} />
             </label>
           ) : (
             <label className={styles.filenameField}>
-              <span>Dateiname</span>
+              <span>{hubText("dataHubI18n.filename")}</span>
               <input value={pending.filename} onChange={(event) => onFilenameChange?.(event.target.value)} />
             </label>
           )}
@@ -3117,7 +3157,7 @@ function TransferImportPreview({
       <div className={styles.previewActions}>
         <button type="button" className={styles.secondaryButton} onClick={onCancel} disabled={busy}>
           <X size={15} aria-hidden />
-          <span>Abbrechen</span>
+          <span>{hubText("dataHubI18n.cancel")}</span>
         </button>
         <button type="button" className={styles.primaryButton} onClick={onConfirm} disabled={busy}>
           <Check size={15} aria-hidden />
@@ -3129,25 +3169,28 @@ function TransferImportPreview({
 }
 
 function getImportPreviewTitle(pending: PendingImport) {
-  if (pending.kind === "scanJson") return "SFtools-Scan importieren";
-  if (pending.kind === "scanMerge") return "Scans zusammenführen";
-  if (pending.envelope.type === "scan") return "SFtools-Scan importieren";
-  if (pending.envelope.type === "scanpack") return "Scanpack importieren";
-  if (pending.envelope.type === "fighttrackerpack") return "Fight-Tracker-Pack importieren";
-  return "Fight Tracker importieren";
+  if (pending.kind === "scanJson") return hubText("dataHubI18n.importSftoolsScan");
+  if (pending.kind === "scanMerge") return hubText("dataHubI18n.mergeScans");
+  if (pending.envelope.type === "scan") return hubText("dataHubI18n.importSftoolsScan");
+  if (pending.envelope.type === "scanpack") return hubText("dataHubI18n.importScanPack");
+  if (pending.envelope.type === "fighttrackerpack") return hubText("dataHubI18n.importFightTrackerPack");
+  return hubText("dataHubI18n.importFightTracker");
 }
 
 function buildImportPreviewRows(pending: PendingImport): Array<{ label: string; value: string }> {
+ const __w32Run4=auditBegin("F36","buildImportPreviewRows");
+ const __w32Sync=auditEnter(__w32Run4,"buildImportPreviewRows","sync-elapsed");
+ try {
   if (pending.kind === "scanJson") {
-    return buildScanPreviewRows(pending.scan);
+    return auditReturn(__w32Run4,buildScanPreviewRows(pending.scan, pending.statistics));
   }
   if (pending.kind === "scanMerge") {
-    return buildMergePreviewRows(pending);
+    return auditReturn(__w32Run4,buildMergePreviewRows(pending));
   }
 
   const { envelope } = pending;
   if (envelope.type === "scan") {
-    return buildScanPreviewRows(envelope.payload);
+    return auditReturn(__w32Run4,buildScanPreviewRows(envelope.payload));
   }
 
   if (envelope.type === "scanpack") {
@@ -3161,38 +3204,43 @@ function buildImportPreviewRows(pending: PendingImport): Array<{ label: string; 
         ? `${formatOptionalDate(new Date(Math.min(...scanTimes)).toISOString())} - ${formatOptionalDate(
             new Date(Math.max(...scanTimes)).toISOString(),
           )}`
-        : "Unbekannt";
+        : hubText("dataHubI18n.unknown");
 
-    return [
-      { label: "Scans", value: scans.length.toLocaleString("de-DE") },
-      { label: "Server", value: servers.size ? [...servers].join(", ") : "Unbekannt" },
-      { label: "Zeitraum", value: period },
-    ];
+    return auditReturn(__w32Run4,[
+      { label: hubText("dataHubI18n.scans"), value: scans.length.toLocaleString(hubLocale()) },
+      { label: hubText("dataHubI18n.server"), value: servers.size ? [...servers].join(", ") : hubText("dataHubI18n.unknown") },
+      { label: hubText("dataHubI18n.period"), value: period },
+    ]);
   }
 
   if (envelope.type === "fighttrackerpack") {
     const trackers = envelope.payload.trackers;
     const totalMembers = trackers.reduce((sum, tracker) => sum + tracker.members.length, 0);
     const totalFights = trackers.reduce((sum, tracker) => sum + tracker.fights.length, 0);
-    return [
-      { label: "Tracker", value: trackers.length.toLocaleString("de-DE") },
-      { label: "Member gesamt", value: totalMembers.toLocaleString("de-DE") },
-      { label: "Fights gesamt", value: totalFights.toLocaleString("de-DE") },
-      { label: "Namen", value: formatCompactNames(trackers.map((tracker) => tracker.tracker.name)) },
-      { label: "Exportzeit", value: formatOptionalDate(envelope.createdAt) },
-    ];
+    return auditReturn(__w32Run4,[
+      { label: hubText("dataHubI18n.tracker"), value: trackers.length.toLocaleString(hubLocale()) },
+      { label: hubText("dataHubI18n.totalMembers"), value: totalMembers.toLocaleString(hubLocale()) },
+      { label: hubText("dataHubI18n.totalFights"), value: totalFights.toLocaleString(hubLocale()) },
+      { label: hubText("dataHubI18n.names"), value: formatCompactNames(trackers.map((tracker) => tracker.tracker.name)) },
+      { label: hubText("dataHubI18n.exportTime"), value: formatOptionalDate(envelope.createdAt) },
+    ]);
   }
 
-  return [
-    { label: "Tracker/Gilde", value: envelope.payload.tracker.name },
-    { label: "Server", value: envelope.payload.tracker.server || "Unbekannt" },
-    { label: "Member", value: envelope.payload.members.length.toLocaleString("de-DE") },
-    { label: "Fights", value: envelope.payload.fights.length.toLocaleString("de-DE") },
-    { label: "Exportzeit", value: formatOptionalDate(envelope.createdAt) },
-  ];
+  return auditReturn(__w32Run4,[
+    { label: hubText("dataHubI18n.trackerGuild"), value: envelope.payload.tracker.name },
+    { label: hubText("dataHubI18n.server"), value: envelope.payload.tracker.server || hubText("dataHubI18n.unknown") },
+    { label: hubText("dataHubI18n.member"), value: envelope.payload.members.length.toLocaleString(hubLocale()) },
+    { label: hubText("dataHubI18n.fights"), value: envelope.payload.fights.length.toLocaleString(hubLocale()) },
+    { label: hubText("dataHubI18n.exportTime"), value: formatOptionalDate(envelope.createdAt) },
+  ]);
+
+} catch (__w32Error) { auditError(__w32Run4,__w32Error); throw __w32Error; } finally {auditValue(__w32Run4,__w32Sync,undefined);auditLeave(__w32Run4);}
 }
 
 function buildMergePreviewRows(pending: PendingScanMergeImport): Array<{ label: string; value: string }> {
+ const __w32Run5=auditBegin("F36","buildMergePreviewRows");
+ const __w32Sync=auditEnter(__w32Run5,"buildMergePreviewRows","sync-elapsed");
+ try {
   const snapshotTimes = pending.summaries.flatMap((summary) => summary.snapshotTimestamps).filter((value) => Number.isFinite(value));
   const servers = new Set(pending.summaries.flatMap((scan) => scan.servers));
   const period =
@@ -3200,60 +3248,67 @@ function buildMergePreviewRows(pending: PendingScanMergeImport): Array<{ label: 
       ? `${formatOptionalDate(new Date(Math.min(...snapshotTimes)).toISOString())} - ${formatOptionalDate(
           new Date(Math.max(...snapshotTimes)).toISOString(),
         )}`
-      : "Unbekannt";
+      : hubText("dataHubI18n.unknown");
   const logicalScanCount = pending.summaries.reduce((sum, summary) => sum + summary.logicalScanCount, 0);
   const playerCount = pending.summaries.reduce((sum, summary) => sum + summary.playerCount, 0);
   const guildCount = pending.summaries.reduce((sum, summary) => sum + summary.guildCount, 0);
 
-  return [
-    { label: "Modus", value: pending.mode === "scan-slot" ? "Neuer Scan-Slot" : "Zusammengeführte Datei" },
-    ...(pending.mode === "scan-slot" ? [{ label: "Name", value: pending.displayName || "Unbenannt" }] : []),
-    { label: "Dateien", value: `${pending.summaries.length.toLocaleString("de-DE")} ausgewählt` },
-    { label: "Zeitraum", value: period },
-    { label: "Server", value: servers.size ? [...servers].join(", ") : "Unbekannt" },
-    { label: "Enthaltene Scans", value: `${logicalScanCount.toLocaleString("de-DE")} Scans` },
-    { label: "Spieler", value: playerCount.toLocaleString("de-DE") },
-    { label: "Gilden", value: guildCount.toLocaleString("de-DE") },
-    { label: "Quellen", value: formatCompactNames(pending.summaries.map((scan) => scan.filename), 6) },
-  ];
+  return auditReturn(__w32Run5,[
+    { label: hubText("dataHubI18n.mode"), value: pending.mode === "scan-slot" ? hubText("dataHubI18n.newScanSlot") : hubText("dataHubI18n.mergedFile") },
+    ...(pending.mode === "scan-slot" ? [{ label: hubText("dataHubI18n.name"), value: pending.displayName || hubText("dataHubI18n.unnamed") }] : []),
+    { label: hubText("dataHubI18n.files"), value: hubText("dataHubI18n.selectedCount", { v1: pending.summaries.length }) },
+    { label: hubText("dataHubI18n.period"), value: period },
+    { label: hubText("dataHubI18n.server"), value: servers.size ? [...servers].join(", ") : hubText("dataHubI18n.unknown") },
+    { label: hubText("dataHubI18n.includedScans"), value: hubText("dataHubI18n.scanCountLabel", { v1: logicalScanCount }) },
+    { label: hubText("dataHubI18n.players"), value: playerCount.toLocaleString(hubLocale()) },
+    { label: hubText("dataHubI18n.guilds"), value: guildCount.toLocaleString(hubLocale()) },
+    { label: hubText("dataHubI18n.sources"), value: formatCompactNames(pending.summaries.map((scan) => scan.filename), 6) },
+  ]);
+
+} catch (__w32Error) { auditError(__w32Run5,__w32Error); throw __w32Error; } finally {auditValue(__w32Run5,__w32Sync,undefined);auditLeave(__w32Run5);}
 }
 
-function buildScanPreviewRows(scan: SfDataHubLocalScan): Array<{ label: string; value: string }> {
-  const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
+function buildScanPreviewRows(scan: SfDataHubLocalScan, statistics?: GuildHubScanPreviewStatistics): Array<{ label: string; value: string }> {
+ const __w32Run6=auditBegin("F36","buildScanPreviewRows");
+ const __w32Sync=auditEnter(__w32Run6,"buildScanPreviewRows","sync-elapsed");
+ try {
+  const snapshots = statistics?.snapshots ?? deriveGuildHubLogicalScanSnapshots(scan);
   if (snapshots.length > 1) {
     const first = snapshots[0];
     const last = snapshots[snapshots.length - 1];
     const playerCount = snapshots.reduce((sum, snapshot) => sum + snapshot.playerCount, 0);
     const guildCount = snapshots.reduce((sum, snapshot) => sum + snapshot.guildCount, 0);
-    return [
-      { label: "Datei", value: scan.filename || "Unbekannt" },
-      { label: "Erkannte Scans", value: `${snapshots.length.toLocaleString("de-DE")} Scans` },
-      { label: "Datumsbereich", value: `${formatOptionalDate(first.timestamp)} - ${formatOptionalDate(last.timestamp)}` },
-      { label: "Server", value: formatServerList(scan) },
-      { label: "Spieler", value: playerCount.toLocaleString("de-DE") },
-      { label: "Gilden", value: guildCount.toLocaleString("de-DE") },
-    ];
+    return auditReturn(__w32Run6,[
+      { label: hubText("dataHubI18n.file"), value: scan.filename || hubText("dataHubI18n.unknown") },
+      { label: hubText("dataHubI18n.detectedScans"), value: hubText("dataHubI18n.scanCountLabel", { v1: snapshots.length }) },
+      { label: hubText("dataHubI18n.dateRange"), value: `${formatOptionalDate(first.timestamp)} - ${formatOptionalDate(last.timestamp)}` },
+      { label: hubText("dataHubI18n.server"), value: formatServerList(scan) },
+      { label: hubText("dataHubI18n.players"), value: playerCount.toLocaleString(hubLocale()) },
+      { label: hubText("dataHubI18n.guilds"), value: guildCount.toLocaleString(hubLocale()) },
+    ]);
   }
 
-  return [
-    { label: "Datei", value: scan.filename || "Unbekannt" },
-    { label: "Scanzeit", value: formatOptionalDate(scan.scannedAt) },
-    { label: "Server", value: formatServerList(scan) },
-    { label: "Spieler", value: scan.playerCount.toLocaleString("de-DE") },
-    { label: "Gilden", value: getScanGuildCount(scan).toLocaleString("de-DE") },
-  ];
+  return auditReturn(__w32Run6,[
+    { label: hubText("dataHubI18n.file"), value: scan.filename || hubText("dataHubI18n.unknown") },
+    { label: hubText("dataHubI18n.scanTime"), value: formatOptionalDate(scan.scannedAt) },
+    { label: hubText("dataHubI18n.server"), value: formatServerList(scan) },
+    { label: hubText("dataHubI18n.players"), value: scan.playerCount.toLocaleString(hubLocale()) },
+    { label: hubText("dataHubI18n.guilds"), value: getScanGuildCount(scan).toLocaleString(hubLocale()) },
+  ]);
+
+} catch (__w32Error) { auditError(__w32Run6,__w32Error); throw __w32Error; } finally {auditValue(__w32Run6,__w32Sync,undefined);auditLeave(__w32Run6);}
 }
 
 function FeedbackBox({ feedback }: { feedback: ImportFeedback }) {
   return (
     <div className={styles.feedbackBox}>
-      {feedback.imported.length ? <p>Importiert: {feedback.imported.join(", ")}</p> : null}
-      {feedback.updated.length ? <p>Aktualisiert: {feedback.updated.join(", ")}</p> : null}
-      {feedback.deleted ? <p>Gelöscht: {feedback.deleted}</p> : null}
-      {feedback.duplicates.length ? <p>Bereits vorhanden: {feedback.duplicates.join(", ")}</p> : null}
+      {feedback.imported.length ? <p>{hubText("dataHubI18n.imported1cf90")} {feedback.imported.join(", ")}</p> : null}
+      {feedback.updated.length ? <p>{hubText("dataHubI18n.updated29d00")} {feedback.updated.join(", ")}</p> : null}
+      {feedback.deleted ? <p>{hubText("dataHubI18n.deleted")} {formatCount(feedback.deleted)}</p> : null}
+      {feedback.duplicates.length ? <p>{hubText("dataHubI18n.alreadyPresent")} {feedback.duplicates.join(", ")}</p> : null}
       {feedback.errors.map((entry) => (
         <p className={styles.feedbackError} key={`${entry.filename}:${entry.message}`}>
-          {entry.filename}: {entry.message}
+          {entry.filename === "Archivgruppe" ? hubText("dataHubI18n.archiveGroup") : entry.filename}: {hubMessage(entry.message)}
         </p>
       ))}
     </div>

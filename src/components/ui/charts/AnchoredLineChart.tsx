@@ -1,4 +1,10 @@
+import { profileLocale, profileDateTime } from "../../../lib/i18n/profilePresentation";
+import { useProfileTranslation as useTranslation } from "../../../lib/i18n/useProfileTranslation";
+import { auditGraphBegin, auditResultId, auditCall, auditReturn, auditLeave, associateAuditResultId, auditFields, auditLink, auditEnabled, auditDependencyId, type AuditFields } from "../../../lib/data-hub/runtimeAudit";
+import { useRuntimeAuditGraphCommit } from "../../../lib/data-hub/useRuntimeAuditGraphCommit";
 import React, { useMemo, useId } from "react";
+import { projectChartGaps, type GapChartScanPoint } from "./anchoredLineChartGaps";
+export type { GapChartScanPoint } from "./anchoredLineChartGaps";
 
 export type AnchoredLineChartSeries = {
   key: string;
@@ -11,6 +17,9 @@ export type AnchoredLineChartSeries = {
 
 export type AnchoredLineChartTimePoint = {
   timestampMs: number;
+  observationKey?: string;
+  partial?: boolean;
+  note?: string;
   value: number | null;
   tooltipIndex?: number;
   color?: string;
@@ -27,6 +36,7 @@ export type AnchoredLineChartTimeTick = {
 };
 
 export type AnchoredLineChartVerticalMarker = {
+  hint?: React.ReactNode;
   key: string;
   timestampMs: number;
   label?: string;
@@ -35,6 +45,22 @@ export type AnchoredLineChartVerticalMarker = {
 };
 
 type AnchoredLineChartProps = {
+  progressStyle?: boolean;
+  showMissingObservations?: boolean;
+  rankAxis?: boolean;
+  initialSize?: { width: number; height: number };
+  showMissingConnections?: boolean;
+  showScanPoints?: boolean;
+  connectMissingValues?: boolean;
+  hideMissingScanPoints?: boolean;
+  onHoverScanPointChange?: (point: GapChartScanPoint | null) => void;
+  onScanPointSelect?: (point: GapChartScanPoint) => void;
+  scanPointLabel?: (point: GapChartScanPoint) => string;
+  isPartialScanPoint?: (point: GapChartScanPoint) => boolean;
+  auditContext?: AuditFields;
+  auditInput?: object;
+  auditArea?: string;
+  auditFamily?: import("../../../lib/data-hub/runtimeAudit").AuditFamily;
   points: number[];
   series?: AnchoredLineChartSeries[];
   timeDomain?: AnchoredLineChartTimeDomain | null;
@@ -51,6 +77,7 @@ type AnchoredLineChartProps = {
   yValueFormatter?: (value: number) => string;
   semanticKey?: string;
   highlightedSeriesKeys?: readonly string[];
+  emphasizedSeriesKeys?: readonly string[];
   onHoverSeriesKeyChange?: (seriesKey: string | null) => void;
 };
 
@@ -90,6 +117,7 @@ type AnchoredLinePath = {
   prominent: boolean;
   opacity: number;
   drawProgress: number;
+  partial?: boolean;
   gradient?: AnchoredLineGradient;
 };
 
@@ -101,6 +129,7 @@ type AnchoredLineSegment = {
   segmentStartDistance: number;
   segmentLength: number;
   runTotalLength: number;
+  partial?: boolean;
   gradient?: AnchoredLineGradient;
 };
 
@@ -127,6 +156,10 @@ type AnchoredLineSeriesGeometry = {
 
 type ProjectedChartPoint = {
   pointKey: string;
+  timestampMs?: number;
+  observationKey?: string;
+  partial?: boolean;
+  note?: string;
   x: number;
   y: number;
   value: number;
@@ -140,7 +173,7 @@ type ProjectedChartPoint = {
 
 type ProjectedChartCoord =
   | ProjectedChartPoint
-  | { pointKey: string; x: number; y: null; color: string; opacity: number };
+  | { pointKey: string; timestampMs?: number; observationKey?: string; seriesLabel?: string; partial?: boolean; note?: string; x: number; y: null; color: string; opacity: number };
 
 type HoverState = {
   x: number;
@@ -150,6 +183,7 @@ type HoverState = {
 };
 
 type ProjectedVerticalMarker = {
+  hint?: React.ReactNode;
   key: string;
   x: number;
   description?: string;
@@ -160,12 +194,14 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 const defaultYValueFormatter = (value: number) => {
   const rounded = Math.round(value);
-  if (Math.abs(value) >= 100000) return `${new Intl.NumberFormat("de-DE").format(Math.round(value / 1000))}k`;
-  if (Math.abs(value - rounded) < 0.05) return new Intl.NumberFormat("de-DE").format(rounded);
-  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value);
+  if (Math.abs(value) >= 100000) return `${new Intl.NumberFormat(profileLocale()).format(Math.round(value / 1000))}k`;
+  if (Math.abs(value - rounded) < 0.05) return new Intl.NumberFormat(profileLocale()).format(rounded);
+  return new Intl.NumberFormat(profileLocale(), { maximumFractionDigits: 1 }).format(value);
 };
 
 export function AnchoredLineChart({
+  initialSize, progressStyle = false, showMissingObservations = false, rankAxis = false,
+  showMissingConnections = false, showScanPoints = showMissingConnections, connectMissingValues = false, hideMissingScanPoints = false, onScanPointSelect, onHoverScanPointChange, scanPointLabel, isPartialScanPoint,
   points,
   series,
   avgValue = null,
@@ -182,13 +218,17 @@ export function AnchoredLineChart({
   yValueFormatter = defaultYValueFormatter,
   semanticKey,
   highlightedSeriesKeys,
+  emphasizedSeriesKeys,
   onHoverSeriesKeyChange,
+  auditInput, auditArea, auditContext, auditFamily = "F13",
 }: AnchoredLineChartProps) {
+  const { t } = useTranslation();
   const gradientId = useId();
   const lineGradientBaseId = `anchored-line-${sanitizeSvgId(useId())}`;
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
-  const [chartSize, setChartSize] = React.useState({ width: FALLBACK_CHART_WIDTH, height: FALLBACK_CHART_HEIGHT });
+  const previousMemoDependencies = React.useRef<AuditFields>();
+  const [chartSize, setChartSize] = React.useState(initialSize ?? { width: FALLBACK_CHART_WIDTH, height: FALLBACK_CHART_HEIGHT });
   const [hover, setHover] = React.useState<HoverState | null>(null);
   const chartWidth = Math.max(1, chartSize.width);
   const chartHeight = Math.max(1, chartSize.height);
@@ -200,8 +240,8 @@ export function AnchoredLineChart({
     () =>
       series?.length
         ? series
-        : [{ key: "value", label: "Wert", points, color: DEFAULT_LINE_COLOR }],
-    [points, series],
+        : [{ key: "value", label: t("guildChartDetails.value"), points, color: DEFAULT_LINE_COLOR }],
+    [points, series, t],
   );
   const isTimeSeries = Boolean(timeDomain && chartSeries.some((entry) => entry.timePoints?.length));
   const pointCount = Math.max(...chartSeries.map((entry) => (isTimeSeries ? entry.timePoints?.length ?? 0 : entry.points.length)), 0);
@@ -210,7 +250,9 @@ export function AnchoredLineChart({
     () => buildAutoYDomain(chartSeries, isTimeSeries, showAvg && !isMultiSeries ? avgValue : null),
     [chartSeries, isTimeSeries, showAvg, isMultiSeries, avgValue],
   );
-  const currentYDomain = autoYDomain;
+  const currentYDomain = useMemo(() => rankAxis
+    ? { min: Math.max(1, Math.floor(autoYDomain.min)), max: Math.max(2, Math.ceil(autoYDomain.max)) }
+    : autoYDomain, [autoYDomain, rankAxis]);
 
   React.useEffect(() => {
     const node = wrapperRef.current;
@@ -240,7 +282,20 @@ export function AnchoredLineChart({
   }, [chartWidth, chartHeight]);
 
   const targetGeometry = useMemo<AnchoredLineChartGeometry>(() => {
-    const emptyYTicks = buildYTicks(currentYDomain, yValueFormatter, plotBottom);
+    const graphAudit = auditArea ? auditGraphBegin(auditFamily, auditArea, auditResultId(auditInput)) : null;
+    auditFields(graphAudit, { seriesCount: chartSeries.length,
+      passedDataPoints: chartSeries.reduce((count, row) => count + (row.timePoints?.length ?? row.points.length), 0),
+      observedDataPoints: chartSeries.reduce((count, row) => count + (row.timePoints?.filter(point => point.value != null).length ?? row.points.length), 0) });
+    if (graphAudit && auditEnabled()) {
+      // Only scalar values and WeakMap identities, never retained chart inputs.
+      const dependencies: AuditFields = { pointCount, chartSeries: auditDependencyId(chartSeries), timeDomain: auditDependencyId(timeDomain), timeTicks: auditDependencyId(timeTicks), verticalMarkers: auditDependencyId(verticalMarkers), formatter: auditDependencyId(yValueFormatter), plotWidth, plotHeight, avgValue, showAvg, showDots, xLabels: auditDependencyId(xLabels), yDomain: auditDependencyId(currentYDomain) };
+      const changed = previousMemoDependencies.current ? Object.keys(dependencies).filter(key => !Object.is(dependencies[key], previousMemoDependencies.current![key])).join(",") : "first-geometry";
+      previousMemoDependencies.current = dependencies;
+      auditFields(graphAudit, { ...auditContext, graphInputResultId: auditResultId(auditInput), graphInputDependencyId: auditDependencyId(auditInput), memoChangedDependencies: changed || "other-existing-dependency; unknown", memoFormatterId: dependencies.formatter });
+      if (typeof auditContext?.notificationStoreRunId === "string") auditLink(graphAudit, auditContext.notificationStoreRunId, "notification-input");
+    }
+    try { return auditReturn(graphAudit, auditCall(graphAudit, "graph-geometry", () => {
+    const emptyYTicks = buildYTicks(currentYDomain, yValueFormatter, plotBottom, rankAxis);
     const defaultGridX = buildDefaultGridX(plotRight);
     if (!pointCount) {
       return {
@@ -270,7 +325,7 @@ export function AnchoredLineChart({
 
     const { min, max } = currentYDomain;
     const range = Math.max(1e-9, max - min);
-    const yTicks = buildYTicks(currentYDomain, yValueFormatter, plotBottom);
+    const yTicks = buildYTicks(currentYDomain, yValueFormatter, plotBottom, rankAxis);
 
     const scaleX = (idx: number) =>
       pointCount > 1 ? PLOT_LEFT + (idx / (pointCount - 1)) * plotWidth : PLOT_LEFT;
@@ -293,6 +348,7 @@ export function AnchoredLineChart({
             return [
               {
                 key: marker.key,
+                hint: marker.hint,
                 x,
                 description: marker.description,
                 tooltipIndex: marker.tooltipIndex,
@@ -300,7 +356,7 @@ export function AnchoredLineChart({
             ];
           })
         : [];
-    const scaleY = (v: number) => clamp(PLOT_TOP + (1 - (v - min) / range) * plotHeight, PLOT_TOP, plotBottom);
+    const scaleY = (v: number) => clamp(PLOT_TOP + (rankAxis ? (v - min) / range : 1 - (v - min) / range) * plotHeight, PLOT_TOP, plotBottom);
     const projectPoint = (
       x: number,
       value: number | null,
@@ -311,7 +367,7 @@ export function AnchoredLineChart({
     ): ProjectedChartCoord => {
       const pointColor = color ?? entry.color ?? DEFAULT_LINE_COLOR;
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        return { pointKey, x, y: null, color: pointColor, opacity: 1 };
+        return { pointKey, x, y: null, color: pointColor, opacity: 1, seriesLabel: entry.label };
       }
       return {
         pointKey,
@@ -333,9 +389,11 @@ export function AnchoredLineChart({
         renderKey: entry.key,
         color: entry.color ?? DEFAULT_LINE_COLOR,
         prominent: Boolean(entry.prominent),
-        coords: (entry.timePoints ?? []).map((point, idx) =>
-          projectPoint(scaleTimeX(point.timestampMs), point.value, point.tooltipIndex ?? idx, entry, String(point.timestampMs), point.color),
-        ),
+        coords: (entry.timePoints ?? []).map((point, idx): ProjectedChartCoord => ({
+          ...projectPoint(scaleTimeX(point.timestampMs), point.value, point.tooltipIndex ?? idx, entry,
+            point.observationKey ? JSON.stringify([point.timestampMs, point.observationKey]) : String(point.timestampMs), point.color),
+          timestampMs: point.timestampMs, observationKey: point.observationKey, partial: point.partial, note: point.note,
+        })),
         opacity: 1,
         drawProgress: 1,
       }));
@@ -424,17 +482,22 @@ export function AnchoredLineChart({
     const labels = Array.from({ length: pointCount }, (_, idx) => ({ x: scaleX(idx), text: xLabels?.[idx] ?? `t${idx}` }));
 
     return { seriesGeometries: seriesCoords, areaPath, dots, avgY, labels, gridX: defaultGridX, yTicks, verticalMarkers: [] };
-  }, [pointCount, chartSeries, isTimeSeries, timeDomain, timeTicks, verticalMarkers, avgValue, showAvg, showDots, plotWidth, plotHeight, xLabels, isMultiSeries, lineGradientBaseId, currentYDomain, yValueFormatter, plotBottom, plotRight, chartHeight]);
+    })); } finally { auditLeave(graphAudit); }
+  }, [pointCount, chartSeries, isTimeSeries, timeDomain, timeTicks, verticalMarkers, avgValue, showAvg, showDots, plotWidth, plotHeight, xLabels, isMultiSeries, lineGradientBaseId, currentYDomain, yValueFormatter, plotBottom, plotRight, chartHeight, auditFamily, auditArea, rankAxis]);
 
   const layoutKey = `${chartWidth}:${chartHeight}:${plotWidth}:${plotHeight}:${plotRight}:${plotBottom}`;
   const visibleGeometry = useAnimatedChartGeometry(targetGeometry, {
     semanticKey: semanticKey ?? "",
-    layoutKey,
+    layoutKey, strictSelection: progressStyle,
   });
+  const currentSeriesKeys = useMemo(() => new Set(chartSeries.map(row => row.key)), [chartSeries]);
+  const drawingGeometry = useMemo(() => progressStyle ? { ...visibleGeometry, seriesGeometries: visibleGeometry.seriesGeometries.filter(row => currentSeriesKeys.has(row.key)) } : visibleGeometry, [visibleGeometry, progressStyle, currentSeriesKeys]);
+  const targetRevisionDrawn = auditResultId(visibleGeometry) === auditResultId(targetGeometry) && visibleGeometry.seriesGeometries.some(entry => entry.drawProgress > 0 && entry.opacity > 0 && entry.coords.some(coord => coord.y != null));
+  useRuntimeAuditGraphCommit(targetGeometry, pointCount > 0 && targetRevisionDrawn, auditArea ?? "untracked-chart", svgRef);
   const areaOpacity = visibleGeometry.seriesGeometries[0]?.opacity ?? 1;
   const { linePaths, areaPath, dots, avgY, labels, gridX, yTicks, verticalMarkers: projectedVerticalMarkers } = useMemo(
-    () => buildRenderableGeometry(visibleGeometry, lineGradientBaseId, chartHeight),
-    [visibleGeometry, lineGradientBaseId, chartHeight],
+    () => buildRenderableGeometry(drawingGeometry, lineGradientBaseId, chartHeight, connectMissingValues, progressStyle ? undefined : isPartialScanPoint),
+    [drawingGeometry, lineGradientBaseId, chartHeight, connectMissingValues, isPartialScanPoint, progressStyle],
   );
   const singlePointSeriesKeys = useMemo(
     () =>
@@ -446,8 +509,23 @@ export function AnchoredLineChart({
     [visibleGeometry.seriesGeometries],
   );
   const idleDots = showDots ? dots : dots.filter((dot) => singlePointSeriesKeys.has(dot.seriesKey));
+  const [scanHover, setScanHover] = React.useState<GapChartScanPoint | null>(null);
+  const reportScanHover = React.useCallback((point: GapChartScanPoint | null) => {
+    if (progressStyle) setScanHover(current => current?.seriesKey === point?.seriesKey && current?.timestampMs === point?.timestampMs ? current : point);
+    onHoverScanPointChange?.(point);
+  }, [onHoverScanPointChange, progressStyle]);
+  React.useEffect(() => { if (progressStyle) { setScanHover(null); setHover(null); } }, [semanticKey, chartSeries, progressStyle]);
+  const [focusedScan, setFocusedScan] = React.useState(0);
+  const gapProjection = useMemo(() => {
+    if (!showScanPoints && !showMissingConnections) return null;
+    const projection = projectChartGaps(drawingGeometry.seriesGeometries, new Map(chartSeries.map(row => [row.key, row.label])), plotBottom + 13, progressStyle && !showMissingObservations);
+    return hideMissingScanPoints ? { ...projection, markers: projection.markers.filter(marker => marker.point.value != null) } : projection;
+  }, [showScanPoints, showMissingConnections, drawingGeometry, chartSeries, plotBottom, progressStyle, showMissingObservations, hideMissingScanPoints]);
   const highlightedSeriesKeySet = useMemo(() => new Set(highlightedSeriesKeys ?? []), [highlightedSeriesKeys]);
+  const emphasizedSeriesKeySet = useMemo(() => new Set(emphasizedSeriesKeys ?? []), [emphasizedSeriesKeys]);
   const hasHighlightedSeries = highlightedSeriesKeySet.size > 0;
+  const interactiveScanIndices = gapProjection?.markers.flatMap((marker, index) => !hasHighlightedSeries || highlightedSeriesKeySet.has(marker.point.seriesKey) ? [index] : []) ?? [];
+  const focusedScanIndex = interactiveScanIndices.includes(focusedScan) ? focusedScan : interactiveScanIndices[0];
   const lineGradients = linePaths.flatMap((line) => (line.gradient ? [line.gradient] : []));
   const hoverTooltipNodes = hover
     ? hover.tooltipIndexes
@@ -464,15 +542,19 @@ export function AnchoredLineChart({
   const handlePointerMove = React.useCallback(
     (event: React.PointerEvent<SVGElement>) => {
       const svg = svgRef.current;
+      const markerNode = event.target instanceof Element ? event.target.closest('[data-scan-index]') : null;
+      const marker = markerNode ? gapProjection?.markers[Number(markerNode.getAttribute('data-scan-index'))]?.point : null;
       if (!svg || !dots.length) {
         setHover(null);
         onHoverSeriesKeyChange?.(null);
+        reportScanHover(marker ?? null);
         return;
       }
       const pointer = getSvgPointerPosition(svg, event.clientX, event.clientY, chartWidth, chartHeight);
       if (!pointer || pointer.x < PLOT_LEFT || pointer.x > plotRight || pointer.y < PLOT_TOP || pointer.y > plotBottom) {
         setHover(null);
         onHoverSeriesKeyChange?.(null);
+        reportScanHover(marker ?? null);
         return;
       }
       const rect = svg.getBoundingClientRect();
@@ -487,6 +569,7 @@ export function AnchoredLineChart({
         setHover(null);
         const targetSeriesKey = readEventTargetSeriesKey(event.target);
         onHoverSeriesKeyChange?.(targetSeriesKey);
+        reportScanHover(marker ?? null);
         return;
       }
 
@@ -498,8 +581,9 @@ export function AnchoredLineChart({
       const sortedCluster = sortHoverPoints(cluster);
       setHover({ x: nearestPoint.x, y: nearestPoint.y, points: sortedCluster, tooltipIndexes: uniqueTooltipIndexes(sortedCluster) });
       onHoverSeriesKeyChange?.(nearestPoint.seriesKey);
+      reportScanHover(marker ?? { seriesKey: nearestPoint.seriesKey, seriesLabel: nearestPoint.seriesLabel, timestampMs: Number(nearestPoint.pointKey), value: nearestPoint.value });
     },
-    [dots, chartWidth, chartHeight, plotRight, plotBottom, onHoverSeriesKeyChange],
+    [dots, chartWidth, chartHeight, plotRight, plotBottom, onHoverSeriesKeyChange, reportScanHover, gapProjection],
   );
 
   return (
@@ -511,11 +595,12 @@ export function AnchoredLineChart({
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className={`player-profile__trend-chart ${className ?? ""}`.trim()}
         role="img"
-        aria-label="Anchored trend"
+        aria-label={t("guildChartDetails.trend")}
         onPointerMove={handlePointerMove}
         onPointerLeave={() => {
           setHover(null);
           onHoverSeriesKeyChange?.(null);
+          reportScanHover(null);
         }}
       >
         <g className="player-profile__trend-grid" opacity="0.55" stroke="rgba(43,76,115,0.55)" strokeWidth={1}>
@@ -528,9 +613,9 @@ export function AnchoredLineChart({
         </g>
 
         {projectedVerticalMarkers.length ? (
-          <g className="player-profile__trend-vertical-markers" aria-hidden="true">
+          <g className="player-profile__trend-vertical-markers" aria-hidden={projectedVerticalMarkers.some(marker => marker.hint) ? undefined : true}>
             {projectedVerticalMarkers.map((marker) => (
-              <g key={marker.key} className="player-profile__trend-vertical-marker">
+              <g key={marker.key} className="player-profile__trend-vertical-marker" data-fusion-marker={marker.hint ? marker.key : undefined}>
                 <line x1={marker.x} x2={marker.x} y1={PLOT_TOP} y2={plotBottom} />
                 <line
                   className="player-profile__trend-vertical-marker-hitline"
@@ -551,6 +636,7 @@ export function AnchoredLineChart({
                     }
                   }}
                 />
+                {marker.hint && <foreignObject x={marker.x - 8} y={PLOT_TOP - 20} width={16} height={16} style={{ overflow: "visible" }}>{marker.hint}</foreignObject>}
               </g>
             ))}
           </g>
@@ -614,6 +700,7 @@ export function AnchoredLineChart({
         {linePaths.map((line) => {
           const isHighlighted = highlightedSeriesKeySet.has(line.seriesKey);
           const isDimmed = hasHighlightedSeries && !isHighlighted;
+          const isEmphasized = emphasizedSeriesKeySet.has(line.seriesKey);
           return (
             <path
               key={line.key}
@@ -621,20 +708,51 @@ export function AnchoredLineChart({
               d={line.path}
               className="player-profile__trend-line"
               fill="none"
-              pathLength={1}
+              data-partial-connection={line.partial ? line.seriesKey : undefined}
+              pathLength={line.partial ? undefined : 1}
               style={{
                 stroke: line.gradient ? `url(#${line.gradient.id})` : line.color,
-                strokeWidth: (line.prominent ? 3.4 : 2.4) + (isHighlighted ? 1.2 : 0),
-                opacity: line.opacity * (line.prominent ? 1 : 0.86) * (isDimmed ? 0.42 : 1),
+                strokeWidth: (line.prominent ? 3.4 : 2.4) + (isHighlighted ? 1.2 : 0) + (isEmphasized ? 1 : 0),
+                opacity: line.opacity * (line.prominent || isEmphasized ? 1 : 0.86) * (isDimmed ? 0.42 : 1),
+                transition: progressStyle ? "opacity var(--progress-emphasis-duration, 180ms) ease, stroke-width var(--progress-emphasis-duration, 180ms) ease" : undefined,
                 pointerEvents: "stroke",
-                strokeDasharray: line.drawProgress < 0.999 ? 1 : undefined,
+                strokeLinecap: line.partial ? "butt" : undefined,
+                strokeDasharray: line.partial ? "4 5" : line.drawProgress < 0.999 ? 1 : undefined,
                 strokeDashoffset: line.drawProgress < 0.999 ? 1 - line.drawProgress : undefined,
               }}
             />
           );
         })}
 
-        {idleDots.map((dot, idx) => (
+        {showMissingConnections && gapProjection?.connections.map(connection => <path key={connection.key} data-gap-connection={connection.seriesKey} d={connection.path} fill="none" stroke={connection.color} strokeWidth={(highlightedSeriesKeySet.has(connection.seriesKey) ? 3.6 : 2.4) + (emphasizedSeriesKeySet.has(connection.seriesKey) ? 1 : 0)} style={{ transition: progressStyle ? "opacity var(--progress-emphasis-duration, 180ms) ease, stroke-width var(--progress-emphasis-duration, 180ms) ease" : undefined }} strokeDasharray="4 5" opacity={connection.opacity * (hasHighlightedSeries && !highlightedSeriesKeySet.has(connection.seriesKey) ? 0.42 : 0.86)} pointerEvents="none" />)}
+        {progressStyle && <defs>{chartSeries.map(row => <pattern key={row.key} id={`${lineGradientBaseId}-partial-${sanitizeSvgId(row.key)}`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0 V5" stroke={row.color ?? DEFAULT_LINE_COLOR} strokeWidth="1.4" /></pattern>)}</defs>}
+        {gapProjection?.markers.map((marker, index) => {
+          const missing = marker.point.value == null;
+          const partial = !missing && (marker.point.partial ?? Boolean(isPartialScanPoint?.(marker.point)));
+          const interactive = Boolean(onScanPointSelect) && interactiveScanIndices.includes(index);
+          const label = scanPointLabel?.(marker.point) ?? `${marker.point.seriesLabel}: ${profileDateTime(marker.point.timestampMs)} · ${missing ? t("guildHistory.unavailable") : yValueFormatter(marker.point.value!)}`;
+          return <g key={marker.key} role={interactive ? "button" : undefined} tabIndex={interactive ? index === focusedScanIndex ? 0 : -1 : undefined}
+            data-scan-marker={missing ? "missing" : partial ? "partial" : "available"} data-scan-series={marker.point.seriesKey} data-scan-at={marker.point.timestampMs} data-scan-index={index} data-on-rail={marker.onRail || undefined}
+            aria-label={label} opacity={marker.opacity * (hasHighlightedSeries && !highlightedSeriesKeySet.has(marker.point.seriesKey) ? 0.42 : 1)}
+            onClick={interactive ? () => onScanPointSelect?.(marker.point) : undefined} onFocus={() => { setFocusedScan(index); reportScanHover(marker.point); }} onBlur={() => reportScanHover(null)}
+            onKeyDown={interactive ? event => {
+              if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onScanPointSelect?.(marker.point); }
+              else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+                event.preventDefault(); const step = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+                const next = interactiveScanIndices[Math.max(0, Math.min(interactiveScanIndices.length - 1, interactiveScanIndices.indexOf(index) + step))]; setFocusedScan(next); svgRef.current?.querySelector<SVGGElement>(`[data-scan-index="${next}"]`)?.focus();
+              }
+            } : undefined}>
+            {interactive && <circle cx={marker.x} cy={marker.y} r={8} fill="transparent" stroke="none" pointerEvents="all" />}
+            {progressStyle && !missing && <circle data-measurement cx={marker.x} cy={marker.y} r={2.5} fill={marker.color} pointerEvents="none" />}
+            {progressStyle && scanHover?.seriesKey === marker.point.seriesKey && scanHover.timestampMs === marker.point.timestampMs && <circle className="player-profile__trend-hover-dot" data-partial-hover={partial || undefined} cx={marker.x} cy={marker.y} r={7.5} stroke={marker.color} style={{ color: marker.color, fill: partial ? `url(#${lineGradientBaseId}-partial-${sanitizeSvgId(marker.point.seriesKey)})` : "transparent", strokeWidth: 2 }} pointerEvents="none" />}
+            {!progressStyle && marker.isolated && !partial && <circle data-isolated-measurement cx={marker.x} cy={marker.y} r={2.5} fill={marker.color} pointerEvents="none" />}
+            {!progressStyle && partial && <circle data-partial-marker cx={marker.x} cy={marker.y} r={3} fill="none" stroke="#929cab" strokeWidth={1.4} pointerEvents="none" />}
+            {missing && <circle data-gap-marker cx={marker.x} cy={marker.y} r={3} fill="none" stroke="#929cab" strokeWidth={1.4} pointerEvents={interactive ? "all" : "none"} />}
+            <title>{label}</title>
+          </g>;
+        })}
+
+        {(gapProjection ? [] : idleDots).map((dot, idx) => (
               <g key={`dot-${dot.seriesKey}-${dot.pointKey}-${idx}`} className="player-profile__trend-dot-svg-group" style={{ opacity: dot.opacity }}>
                 <circle className="player-profile__trend-dot-halo" cx={dot.x} cy={dot.y} r={dot.prominent ? 7.5 : 6.5} fill={dot.color} />
                 <circle
@@ -648,7 +766,7 @@ export function AnchoredLineChart({
               </g>
             ))}
 
-        {hover
+        {hover && !progressStyle
           ? hover.points.map((dot, idx) => (
               <circle
                 key={`hover-${dot.seriesKey}-${dot.pointKey}-${idx}`}
@@ -694,7 +812,7 @@ export default AnchoredLineChart;
 
 function useAnimatedChartGeometry(
   targetGeometry: AnchoredLineChartGeometry,
-  options: { semanticKey: string; layoutKey: string },
+  options: { semanticKey: string; layoutKey: string; strictSelection: boolean },
 ) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [visibleGeometry, setVisibleGeometry] = React.useState<AnchoredLineChartGeometry>(() =>
@@ -716,7 +834,7 @@ function useAnimatedChartGeometry(
     };
   }, []);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (frameRef.current != null) {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
@@ -727,19 +845,26 @@ function useAnimatedChartGeometry(
     const semanticChanged = Boolean(previousKeys && previousKeys.semanticKey !== options.semanticKey);
     previousKeysRef.current = options;
 
-    if (prefersReducedMotion || layoutChanged) {
+    const entering = targetGeometry.seriesGeometries.some(row => !visibleGeometryRef.current.seriesGeometries.some(old => old.key === row.key));
+    const building = visibleGeometryRef.current.seriesGeometries.some(row => row.drawProgress < 1);
+    if (prefersReducedMotion || (layoutChanged && (!options.strictSelection || (!semanticChanged && !entering && !building)))) {
       visibleGeometryRef.current = targetGeometry;
       setVisibleGeometry(targetGeometry);
       return undefined;
     }
 
-    const startGeometry = visibleGeometryRef.current;
+    const startGeometry = options.strictSelection && semanticChanged ? { ...targetGeometry, seriesGeometries: [], dots: [] } : visibleGeometryRef.current;
     const startTime = performance.now();
 
     const tick = (now: number) => {
       const rawProgress = clamp((now - startTime) / CHART_ANIMATION_DURATION_MS, 0, 1);
       const progress = easeInOut(rawProgress);
-      const nextGeometry = interpolateChartGeometry(startGeometry, targetGeometry, progress, semanticChanged);
+      const nextGeometry = interpolateChartGeometry(startGeometry, targetGeometry, progress, semanticChanged, options.strictSelection);
+      if (options.strictSelection) {
+        const keys = new Set(targetGeometry.seriesGeometries.map(row => row.key));
+        nextGeometry.seriesGeometries = nextGeometry.seriesGeometries.filter(row => keys.has(row.key));
+      }
+      associateAuditResultId(nextGeometry, auditResultId(targetGeometry));
       visibleGeometryRef.current = nextGeometry;
       setVisibleGeometry(nextGeometry);
 
@@ -760,7 +885,7 @@ function useAnimatedChartGeometry(
         frameRef.current = null;
       }
     };
-  }, [targetGeometry, options.semanticKey, options.layoutKey, prefersReducedMotion]);
+  }, [targetGeometry, options.semanticKey, options.layoutKey, options.strictSelection, prefersReducedMotion]);
 
   return visibleGeometry;
 }
@@ -793,6 +918,7 @@ function interpolateChartGeometry(
   target: AnchoredLineChartGeometry,
   progress: number,
   semanticChanged: boolean,
+  strictSelection: boolean,
 ): AnchoredLineChartGeometry {
   const targetKeys = new Set(target.seriesGeometries.map((series) => series.key));
   const targetSeries: AnchoredLineSeriesGeometry[] = [];
@@ -812,6 +938,12 @@ function interpolateChartGeometry(
       continue;
     }
 
+    if (strictSelection && !semanticChanged) {
+      // Existing Progress rows keep their reveal when other guilds/metrics add
+      // timestamps or change the scale. Only genuinely new keys start at zero.
+      targetSeries.push(interpolateSeriesGeometry(startSeries, series, progress, true));
+      continue;
+    }
     if (semanticChanged || !isSeriesTopologyCompatible(startSeries, series)) {
       targetSeries.push(
         withSingleSeriesAnimationState(
@@ -848,12 +980,14 @@ function interpolateSeriesGeometry(
   start: AnchoredLineSeriesGeometry,
   target: AnchoredLineSeriesGeometry,
   progress: number,
+  matchPoints = false,
 ): AnchoredLineSeriesGeometry {
+  const byKey = matchPoints ? new Map(start.coords.map(coord => [coord.pointKey, coord])) : null;
   return {
     ...target,
     opacity: lerp(start.opacity, target.opacity, progress),
-    drawProgress: 1,
-    coords: target.coords.map((targetCoord, index) => interpolateCoord(start.coords[index], targetCoord, progress)),
+    drawProgress: matchPoints ? lerp(start.drawProgress, target.drawProgress, progress) : 1,
+    coords: target.coords.map((targetCoord, index) => interpolateCoord(byKey?.get(targetCoord.pointKey) ?? (matchPoints ? targetCoord : start.coords[index]), targetCoord, progress)),
   };
 }
 
@@ -917,9 +1051,13 @@ function buildRenderableGeometry(
   geometry: AnchoredLineChartGeometry,
   lineGradientBaseId: string,
   chartHeight: number,
+  connectMissingValues: boolean,
+  isPartialScanPoint?: (point: GapChartScanPoint) => boolean,
 ): AnchoredLineChartGeometry & { linePaths: AnchoredLinePath[] } {
   const linePaths = geometry.seriesGeometries.flatMap((series) =>
-    buildSegmentedLinePaths(series.coords, `${lineGradientBaseId}-${sanitizeSvgId(series.renderKey)}`).flatMap((segment, index) => {
+    // Connect observed endpoints for this view only; keep null scan records for details.
+    buildSegmentedLinePaths((connectMissingValues ? series.coords.filter(coord => coord.y != null) : series.coords).map(coord => isPartialScanPoint && coord.y != null
+      ? { ...coord, partial: coord.partial ?? isPartialScanPoint({ seriesKey: series.key, seriesLabel: coord.seriesLabel, timestampMs: coord.timestampMs ?? Number(coord.pointKey), value: coord.value, observationKey: coord.observationKey }) } : coord), `${lineGradientBaseId}-${sanitizeSvgId(series.renderKey)}`).flatMap((segment, index) => {
       const revealedSegment = revealSegment(segment, series.drawProgress);
       if (!revealedSegment) return [];
       return [
@@ -932,6 +1070,7 @@ function buildRenderableGeometry(
           opacity: series.opacity,
           drawProgress: 1,
           gradient: revealedSegment.gradient,
+          partial: segment.partial,
         },
       ];
     }),
@@ -1042,9 +1181,9 @@ function buildAutoYDomain(series: AnchoredLineChartSeries[], isTimeSeries: boole
   return { min: observedMin - padding, max: observedMax + padding };
 }
 
-function buildYTicks(domain: YDomain, formatter: (value: number) => string, plotBottom: number) {
+function buildYTicks(domain: YDomain, formatter: (value: number) => string, plotBottom: number, rankAxis = false) {
   const span = Math.max(1e-9, domain.max - domain.min);
-  const step = niceStep(span / 5);
+  const step = rankAxis ? Math.max(1, Math.ceil(niceStep(span / 5))) : niceStep(span / 5);
   const start = Math.ceil(domain.min / step) * step;
   const ticks: Array<{ value: number; y: number; label: string }> = [];
 
@@ -1053,7 +1192,7 @@ function buildYTicks(domain: YDomain, formatter: (value: number) => string, plot
     if (rounded < domain.min - step * 0.25 || rounded > domain.max + step * 0.25) continue;
     ticks.push({
       value: rounded,
-      y: PLOT_TOP + (1 - (rounded - domain.min) / span) * (plotBottom - PLOT_TOP),
+      y: PLOT_TOP + (rankAxis ? (rounded - domain.min) / span : 1 - (rounded - domain.min) / span) * (plotBottom - PLOT_TOP),
       label: formatter(rounded),
     });
   }
@@ -1061,7 +1200,7 @@ function buildYTicks(domain: YDomain, formatter: (value: number) => string, plot
   if (ticks.length >= 2) return ticks;
   return [domain.min, domain.max].map((value) => ({
     value,
-    y: PLOT_TOP + (1 - (value - domain.min) / span) * (plotBottom - PLOT_TOP),
+    y: PLOT_TOP + (rankAxis ? (value - domain.min) / span : 1 - (value - domain.min) / span) * (plotBottom - PLOT_TOP),
     label: formatter(value),
   }));
 }
@@ -1112,9 +1251,9 @@ function distanceBetween(start: { x: number; y: number }, end: { x: number; y: n
   return Math.hypot(end.x - start.x, end.y - start.y);
 }
 
-function buildSegmentedLinePaths(coords: Array<{ x: number; y: number | null; color: string }>, gradientIdPrefix: string) {
+function buildSegmentedLinePaths(coords: Array<{ x: number; y: number | null; color: string; partial?: boolean }>, gradientIdPrefix: string) {
   const segments: AnchoredLineSegment[] = [];
-  let run: Array<{ x: number; y: number; color: string }> = [];
+  let run: Array<{ x: number; y: number; color: string; partial?: boolean }> = [];
 
   const flushRun = () => {
     if (!run.length) return;
@@ -1158,6 +1297,7 @@ function buildSegmentedLinePaths(coords: Array<{ x: number; y: number | null; co
       segments.push({
         path,
         color: previousCoord.color,
+        partial: previousCoord.partial || coord.partial,
         start: { x: previousCoord.x, y: previousCoord.y },
         end: { x: coord.x, y: coord.y },
         segmentStartDistance: runDistances[index - 1] ?? 0,
@@ -1176,7 +1316,7 @@ function buildSegmentedLinePaths(coords: Array<{ x: number; y: number | null; co
       return;
     }
 
-    run.push({ x: coord.x, y: coord.y, color: coord.color });
+    run.push({ x: coord.x, y: coord.y, color: coord.color, partial: coord.partial });
   });
   flushRun();
 

@@ -1,3 +1,4 @@
+import { CURRENT_FUSION_RESOLVER_VERSION } from "../../src/lib/identities/fusionAnalysisCache.ts";
 import assert from "node:assert/strict";
 
 import {
@@ -175,7 +176,7 @@ class FakeWorker implements FusionIdentityWorkerLike {
   const worker = new FakeWorker();
   const run = startFusionIdentityWorkerRun({ requestId: "a", workerFactory: () => worker });
   assert.deepEqual(worker.messages, [{ type: "build-report", requestId: "a" }]);
-  worker.emit({ type: "complete", requestId: "a", report: emptyReport, timings: [{ phase: "total", durationMs: 42 }] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "a", report: emptyReport, timings: [{ phase: "total", durationMs: 42 }] });
   const result = await run.promise;
   assert.equal(result.report.summary.total, 0);
   assert.equal(result.timings[0]?.durationMs, 42);
@@ -228,7 +229,7 @@ class FakeWorker implements FusionIdentityWorkerLike {
 {
   const worker = new FakeWorker();
   const run = startFusionIdentityWorkerRun({ requestId: "guild-classification", workerFactory: () => worker });
-  worker.emit({ type: "complete", requestId: "guild-classification", report: guildClassificationReport as typeof emptyReport, timings: [] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "guild-classification", report: guildClassificationReport as typeof emptyReport, timings: [] });
   const result = await run.promise;
   const candidate = result.report.items[0]?.candidates[0];
   assert.equal(candidate?.entityType, "guild");
@@ -245,7 +246,7 @@ class FakeWorker implements FusionIdentityWorkerLike {
     onProgress: (progress) => progressMessages.push(progress.message),
   });
   worker.emit({ type: "progress", requestId: "b", progress: { phase: "loading", message: "Loading local scans" } });
-  worker.emit({ type: "complete", requestId: "b", report: emptyReport, timings: [] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "b", report: emptyReport, timings: [] });
   await run.promise;
   assert.deepEqual(progressMessages, ["Loading local scans"]);
 }
@@ -260,7 +261,7 @@ class FakeWorker implements FusionIdentityWorkerLike {
   });
   worker.emit({ type: "progress", requestId: "stale-request", progress: { phase: "loading", message: "Stale progress" } });
   worker.emit({ type: "progress", requestId: "fresh-request", progress: { phase: "loading", message: "Fresh progress" } });
-  worker.emit({ type: "complete", requestId: "fresh-request", report: emptyReport, timings: [] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "fresh-request", report: emptyReport, timings: [] });
   await run.promise;
   assert.deepEqual(progressMessages, ["Fresh progress"]);
 }
@@ -268,8 +269,8 @@ class FakeWorker implements FusionIdentityWorkerLike {
 {
   const worker = new FakeWorker();
   const run = startFusionIdentityWorkerRun({ requestId: "c", workerFactory: () => worker });
-  worker.emit({ type: "complete", requestId: "stale", report: { ...emptyReport, summary: { ...emptyReport.summary, total: 99 } }, timings: [] });
-  worker.emit({ type: "complete", requestId: "c", report: emptyReport, timings: [] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "stale", report: { ...emptyReport, summary: { ...emptyReport.summary, total: 99 } }, timings: [] });
+  worker.emit({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId: "c", report: emptyReport, timings: [] });
   const result = await run.promise;
   assert.equal(result.report.summary.total, 0);
 }
@@ -446,3 +447,11 @@ class FakeWorker implements FusionIdentityWorkerLike {
 }
 
 console.log("fusionIdentityWorkerClient test passed");
+
+// W122: a late worker using the previous rules cannot reach the UI/cache.
+{
+  const worker = new FakeWorker();
+  const run = startFusionIdentityWorkerRun({requestId:'old-rules',workerFactory:()=>worker});
+  worker.emit({type:'complete',requestId:'old-rules',resolverVersion:CURRENT_FUSION_RESOLVER_VERSION-1,report:emptyReport,timings:[]});
+  await assert.rejects(run.promise,/resolver version changed/);
+}

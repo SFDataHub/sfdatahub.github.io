@@ -1,11 +1,13 @@
 // src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { migrateW158FixtureData } from "./lib/guilds/localScanLibrary";
+import { cleanupLegacySearchStorage } from "./lib/search/legacySearchStorageMigration";
 
 import "./styles/index.css";
 import "./i18n";
 
-import { HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { HashRouter, Route, Routes, Navigate, useLocation, createRoutesFromChildren } from "react-router-dom";
 import RootLayout from "./layout/RootLayout";
 
 import Home from "./pages/Home";
@@ -74,21 +76,10 @@ import ScansLatest from "./pages/Scans/Latest";
 import ScansArchive from "./pages/Scans/Archive";
 import ScansFusionIdentity from "./pages/Scans/FusionIdentity";
 
-// GuildHub
-import GuildHubIndex from "./pages/GuildHub/Index";
-import GuildHubDashboard from "./pages/GuildHub/Dashboard";
-import GuildHubToplist from "./pages/GuildHub/Toplist";
-import GuildHubPlanner from "./pages/GuildHub/Planner";
-import GuildHubFusionPlanner from "./pages/GuildHub/FusionPlanner/FusionPlanner";
-import GuildHubCompareGuilds from "./pages/GuildHub/compareGuilds";
-import GuildHubFightTracking from "./pages/GuildHub/FightTracking";
-import GuildHubWaitlist from "./pages/GuildHub/Waitlist";
-import GuildHubActivity from "./pages/GuildHub/Activity";
-import GuildHubImports from "./pages/GuildHub/Imports";
-import GuildHubAnnouncements from "./pages/GuildHub/Announcements";
-import GuildHubEvents from "./pages/GuildHub/Events";
-import GuildHubRoles from "./pages/GuildHub/Roles";
-import GuildHubSettings from "./pages/GuildHub/Settings";
+// Local Data Hub registration and retained routed overlays
+import { dataHubRouteElements } from "./pages/DataHub/routes";
+import { registerAppReturnRoutes } from "./lib/data-hub/routes";
+import DataHubRouteHost from "./pages/DataHub/RouteHost";
 
 // Admin
 import AdminScansUploaded from "./pages/Admin/ScansUploaded";
@@ -99,7 +90,7 @@ import AdminUsersAdminPage from "./pages/Admin/UsersAdminPage";
 import AdminVisitorAnalyticsPage from "./pages/Admin/VisitorAnalytics";
 
 // Settings
-import AccountSettingsPage from "./pages/Settings/AccountSettingsPage";
+import { settingsRouteElements } from "./pages/Settings/routes";
 
 // Playground
 import PlaygroundIndex from "./pages/Playground/index";
@@ -124,6 +115,8 @@ import PlayerCardsPage from "./pages/Playground/PlayerCardsPage";
 import PlayerPerformancePage from "./pages/Playground/PlayerPerformancePage";
 import ProgressVisualsPage from "./pages/Playground/ProgressVisualsPage";
 import PotionIconsPage from "./pages/Playground/PotionIconsPage";
+import RankingIconsPage from "./pages/Playground/RankingIconsPage";
+import PodiumPlayground from "./pages/Playground/PodiumPlayground";
 import RescanWidget from "./pages/Playground/RescanWidget";
 import UploadSim from "./pages/Playground/UploadSim";
 import PortraitMakerDemoPage from "./pages/Playground/PortraitMakerDemo/Index";
@@ -191,6 +184,7 @@ import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import { DataJobsProvider } from "./context/DataJobsContext";
 import FeatureGate from "./components/FeatureGate";
+import LegacyToplistsGate from "./components/LegacyToplistsGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
 import UploadCenterPage from "./pages/UploadCenter/Index";
 import UploadCenterV2Page from "./pages/UploadCenter/V2";
@@ -229,6 +223,15 @@ const withFeatureGate = (
   </FeatureGate>
 );
 
+// Reuse the production route declarations to validate global search return destinations.
+function AppRoutes(props: React.ComponentProps<typeof Routes>) {
+  React.useMemo(() => registerAppReturnRoutes(createRoutesFromChildren(props.children)), [props.children]);
+  return <Routes {...props} />;
+}
+
+async function startApp() {
+  cleanupLegacySearchStorage();
+  await migrateW158FixtureData().catch(error => console.error("[W158 cleanup] Incomplete local migration", error));
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <NotificationsProvider>
@@ -239,7 +242,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <UploadCenterProvider>
                 <UploadCenterSessionsProvider>
                   <HashRouter>
-                  <Routes>
+                  <DataHubRouteHost>{routeLocation => <AppRoutes location={routeLocation}>
                     <Route element={<RootLayout />}>
                 {/* Home */}
                 <Route
@@ -275,7 +278,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* Toplists */}
                 <Route
                   path="/toplists"
-                  element={withFeatureGate("main.toplists", "/toplists", <ToplistsIndex />)}
+                  element={<LegacyToplistsGate>{withFeatureGate("main.toplists", "/toplists", <ToplistsIndex />)}</LegacyToplistsGate>}
                 />
 
                 {/* SF Magazine */}
@@ -394,65 +397,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.scans", "/scans", <ScansFusionIdentity />)}
                 />
 
-                {/* Guild Hub */}
-                <Route
-                  path="/guild-hub"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubIndex />)}
-                />
-                <Route
-                  path="/guild-hub/dashboard"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubDashboard />)}
-                />
-                <Route
-                  path="/guild-hub/toplist"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubToplist />)}
-                />
-                <Route
-                  path="/guild-hub/planner"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubPlanner />)}
-                />
-                <Route
-                  path="/guild-hub/fusion-planner"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFusionPlanner />)}
-                />
-                <Route
-                  path="/guild-hub/analytics"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubCompareGuilds />)}
-                />
-                <Route path="/guild-hub/compare-guilds" element={<Navigate to="/guild-hub/analytics" replace />} />
-                <Route
-                  path="/guild-hub/fight-tracking"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubFightTracking />)}
-                />
-                <Route
-                  path="/guild-hub/waitlist"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubWaitlist />)}
-                />
-                <Route
-                  path="/guild-hub/activity"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubActivity />)}
-                />
-                <Route
-                  path="/guild-hub/import"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubImports />)}
-                />
-                <Route path="/guild-hub/imports" element={<Navigate to="/guild-hub/import" replace />} />
-                <Route
-                  path="/guild-hub/announcements"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubAnnouncements />)}
-                />
-                <Route
-                  path="/guild-hub/events"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubEvents />)}
-                />
-                <Route
-                  path="/guild-hub/roles"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubRoles />)}
-                />
-                <Route
-                  path="/guild-hub/settings"
-                  element={withFeatureGate("main.guildHub", "/guild-hub", <GuildHubSettings />)}
-                />
+                {dataHubRouteElements()}
 
                 {/* Admin */}
                 <Route
@@ -492,14 +437,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
 
                 {/* Settings */}
-                <Route
-                  path="/settings"
-                  element={withFeatureGate("main.settings", "/settings", <Navigate to="/settings/account" replace />)}
-                />
-                <Route
-                  path="/settings/account"
-                  element={withFeatureGate("main.settings", "/settings", <AccountSettingsPage />)}
-                />
+                {settingsRouteElements()}
 
                 {/* Playground */}
                 <Route
@@ -527,6 +465,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="progress-visuals" element={<ProgressVisualsPage />} />
                   <Route path="player-performance" element={<PlayerPerformancePage />} />
                   <Route path="potion-icons" element={<PotionIconsPage />} />
+                  <Route path="ranking-icons" element={<RankingIconsPage />} />
+                  <Route path="podiums" element={<PodiumPlayground />} />
                   <Route path="am-rune-bonuses-demos" element={<AMRuneBonusesDemos />} />
                   <Route path="templates/content-shell" element={<ContentShellTemplatePage />} />
                   <Route path="templates/blank" element={<BlankTemplatePage />} />
@@ -596,8 +536,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/guilds/planner" element={NotFoundOld()} />
                 <Route path="/guilds/fusion" element={NotFoundOld()} />
                 <Route path="/guilds/academy" element={NotFoundOld()} />
-                <Route path="/toplists/players" element={<ToplistsLegacyRedirect tab="players" />} />
-                <Route path="/toplists/guilds" element={<ToplistsLegacyRedirect tab="guilds" />} />
+                <Route path="/toplists/players" element={<LegacyToplistsGate><ToplistsLegacyRedirect tab="players" /></LegacyToplistsGate>} />
+                <Route path="/toplists/guilds" element={<LegacyToplistsGate><ToplistsLegacyRedirect tab="guilds" /></LegacyToplistsGate>} />
                 <Route path="/toplists/servers" element={NotFoundOld()} />
                 <Route path="/settings/profile" element={NotFoundOld()} />
                 <Route path="/settings/appearance" element={NotFoundOld()} />
@@ -610,7 +550,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
-                  </Routes>
+                  </AppRoutes>}</DataHubRouteHost>
                   </HashRouter>
 
                   {/* Modal am Root */}
@@ -624,3 +564,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </NotificationsProvider>
   </React.StrictMode>
 );
+
+}
+void startApp();

@@ -1,3 +1,4 @@
+import { startSharedGuildTrendRun } from "../../lib/local-player-profile/cardTrendExecution";
 import React from "react";
 import SharedGuildTrendChart from "../../components/guild-trend/GuildTrendChart";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
@@ -12,7 +13,6 @@ import type {
 } from "./playerPerformanceModel";
 import {
   PlayerPerformanceWorkerCancelledError,
-  startPlayerPerformanceWorkerRun,
   type PlayerPerformanceProgress,
   type PlayerPerformanceWorkerRun,
 } from "./playerPerformanceWorkerClient";
@@ -42,7 +42,10 @@ export default function PlayerPerformancePage() {
         const inventoryKey = buildScanInventoryKey(summaries);
         if (activeInventoryKeyRef.current === inventoryKey) return;
         activeInventoryKeyRef.current = inventoryKey;
-        workerRun = startPlayerPerformanceWorkerRun({
+        workerRun = startSharedGuildTrendRun({
+          onInvalidating: () => { if (!cancelled) setLoading(true); },
+          onError: () => { if (!cancelled) { setLoading(false); setError("Gildentrend konnte nicht geladen werden."); } },
+          onRefresh: value => { if (!cancelled) { setResult(value); setLoading(false); setError(null); } },
           summaries,
           onProgress: (nextProgress) => {
             if (!cancelled) setProgress(nextProgress);

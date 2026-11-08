@@ -1,9 +1,9 @@
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench, Info
+  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench, Info, Database
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import homeStyles from "../../pages/Home.module.css";
@@ -11,10 +11,12 @@ import SubmenuPortal from "./SubmenuPortal";
 import submenuStyles from "./SubmenuPortal.module.css";
 import { useAuth } from "../../context/AuthContext";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
+import { useLegacyToplistsAccess } from "../../lib/toplists/legacyAccess";
 import { useTranslation } from "react-i18next";
 import { buildPlayerIdentifier } from "../../lib/players/identifier";
 import discordLogo from "../../assets/discord-logo.svg";
 import SidebarLanguageSwitch from "./SidebarLanguageSwitch";
+import { useAnalyticsConstructionAccess } from "../../lib/data-hub/constructionAccess";
 
 /* ---------------- Daten ---------------- */
 /* ---------------- Daten ---------------- */
@@ -26,6 +28,8 @@ type Item = {
   icon: React.ReactNode;
   end?: boolean;
   featureId?: string;
+  adminOnly?: boolean;
+  publicLocalSettings?: boolean;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
@@ -34,15 +38,16 @@ const main: Item[] = [
   { to: "/",           labelKey: "nav.home",      icon: <Home className="ico" />, end: true, featureId: "main.home" },
   { to: "/discover",   labelKey: "nav.discover",  icon: <Compass className="ico" />, featureId: "main.discover" },
   { to: "/dashboard",  labelKey: "nav.dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
-  { to: "/settings",   labelKey: "nav.settings",  icon: <SettingsIco className="ico" />, featureId: "main.settings" },
-  { to: "/guild-hub",  labelKey: "nav.guildHub",  icon: <Shield className="ico" />, featureId: "main.guildHub" },
+  { to: "/settings",   labelKey: "nav.settings",  icon: <SettingsIco className="ico" />, publicLocalSettings: true },
+  { to: "/data-hub/guild-hub",  labelKey: "nav.guildHub",  icon: <Shield className="ico" />, featureId: "main.guildHub" },
   { to: "/admin",      labelKey: "nav.admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
+  { to: "/toplists",  labelKey: "nav.toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists", adminOnly: true },
   { to: "/playground", labelKey: "nav.playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
 ];
 
 
 const categories: Item[] = [
-  { to: "/toplists",  labelKey: "nav.toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists" },
+  { to: "/data-hub",   labelKey: "nav.dataHub",   icon: <Database className="ico" /> },
   { to: "/guidehub-v2",    labelKey: "nav.guideHub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
   { to: "/tools",    labelKey: "nav.tools", icon: <Wrench className="ico" />, featureId: "main.tools" },
   { to: "/community", labelKey: "nav.community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
@@ -50,12 +55,12 @@ const categories: Item[] = [
 ];
 
 const SUBTABS: Record<string, SubItem[]> = {
-  "/guild-hub": [
-    { to: "/guild-hub", labelKey: "nav.overview" },
-    { to: "/guild-hub/analytics", labelKey: "nav.analytics" },
-    { to: "/guild-hub/fusion-planner", labelKey: "nav.fusionPlanner" },
-    { to: "/guild-hub/waitlist", labelKey: "nav.waitlist" },
-    { to: "/guild-hub/settings", labelKey: "nav.settings" },
+  "/data-hub/guild-hub": [
+    { to: "/data-hub/guild-hub", labelKey: "nav.overview" },
+    { to: "/data-hub/analytics", labelKey: "nav.analytics" },
+    { to: "/data-hub/guild-hub/fusion-planner", labelKey: "nav.fusionPlanner" },
+    { to: "/data-hub/guild-hub/waitlist", labelKey: "nav.waitlist" },
+    { to: "/data-hub/guild-hub/settings", labelKey: "nav.settings" },
   ],
   "/discover": [
     { to: "/players",            labelKey: "nav.players" },
@@ -73,9 +78,6 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/admin/scan-archive-builder", labelKey: "nav.scanArchiveBuilder", minRole: "mod" },
     { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", minRole: "admin" },
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
-  ],
-  "/settings": [
-    { to: "/settings/account",    labelKey: "nav.account" },
   ],
    "/playground": [
     { to: "/playground/list-views",       labelKey: "nav.listViews" },
@@ -174,9 +176,15 @@ function CategoryItem({
   subItems: Array<{ to: string; label: string }>;
   onNavigate?: () => void;
 }) {
+  const { canAccess: canOpenAnalytics } = useAnalyticsConstructionAccess();
+  const submenuId = React.useId();
   const hasSub = subItems.length > 0;
   const { open, onEnter, onLeave, setOpen } = useDelayedHover();
   const rowRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!allowSubmenus) setOpen(false);
+  }, [allowSubmenus, setOpen]);
 
   const handleEnter = React.useCallback(() => {
     if (!allowSubmenus || !hasSub) { setOpen(false); return; }
@@ -189,6 +197,12 @@ function CategoryItem({
       className={`${styles.navItemWrap} ${open ? styles.isOpen : ""}`}
       onMouseEnter={handleEnter}
       onMouseLeave={onLeave}
+      onKeyDown={event => {
+        if (event.key === "ArrowLeft" && open) {
+          event.preventDefault(); setOpen(false);
+          rowRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
+        }
+      }}
     >
       <NavLink
         to={it.to}
@@ -197,6 +211,16 @@ function CategoryItem({
           `${styles.navBtn} ${isActive ? styles.navBtnActive : ""}`
         }
         onClick={onNavigate}
+        aria-haspopup={hasSub ? "menu" : undefined}
+        aria-expanded={hasSub ? open : undefined}
+        aria-controls={hasSub ? submenuId : undefined}
+        onKeyDown={event => {
+          if (event.key === "ArrowRight" && allowSubmenus && hasSub) {
+            event.preventDefault(); setOpen(true);
+            // Let the visibility transition enter its visible frame before focusing.
+            requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(submenuId)?.querySelector<HTMLElement>("a")?.focus()));
+          }
+        }}
       >
         {it.icon}
         <AnimatedLabel text={label} isOpen={!collapsed} />
@@ -209,10 +233,15 @@ function CategoryItem({
 
       {hasSub && (
         <SubmenuPortal
+          id={submenuId}
           anchorEl={rowRef.current}
-          open={open}
+          open={open && allowSubmenus}
           items={subItems.map(({ to, label }) => ({ to, label }))}
-          renderLink={(s) => (
+          renderLink={(s) => s.to === "/data-hub/analytics" && !canOpenAnalytics ? (
+            <a key={s.to} role="link" aria-disabled="true" tabIndex={0} className={submenuStyles.link}>
+              {s.label}
+            </a>
+          ) : (
             <NavLink
               key={s.to}
               to={s.to}
@@ -310,6 +339,7 @@ export default function Sidebar({
   setPinned,
   hoverToExpand = true,
   variant = "default",
+  visible = true,
   onNavigate,
 }: {
   expanded: boolean;
@@ -317,7 +347,8 @@ export default function Sidebar({
   pinned: boolean;
   setPinned: (v: boolean) => void;
   hoverToExpand?: boolean;
-  variant?: "default" | "drawer";
+  variant?: "default" | "burger";
+  visible?: boolean;
   onNavigate?: () => void;
 }) {
   const openTimer = React.useRef<number | null>(null);
@@ -365,14 +396,22 @@ export default function Sidebar({
   }, [expanded, pinned]);
 
   const collapsed = !expanded;
-  const allowSubmenus = pinned || (expanded && submenuArmed);
+  const allowSubmenus = visible && (pinned || (expanded && submenuArmed));
   const navigate = useNavigate();
+  const location = useLocation();
+  const helpEntryState = location.pathname === "/help" ? (
+    typeof location.state?.returnTo === "string" && location.state.returnTo.split("?")[0] === "/help"
+      ? location.state.profileReturnState : location.state
+  ) : {
+    returnTo: location.pathname + location.search, profileReturnState: location.state,
+  };
   const { t } = useTranslation();
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
   const linkedPlayers = React.useMemo(() => user?.linkedPlayers ?? [], [user?.linkedPlayers]);
   const { isVisibleInSidebar } = useFeatureAccess();
+  const { canAccess: canAccessLegacyToplists } = useLegacyToplistsAccess();
   const canSeeConnectedCharacters = React.useMemo(() => {
     if (!userRoles.length) return false;
     const normalized = userRoles
@@ -391,6 +430,7 @@ export default function Sidebar({
     if (isAuthed) {
       logout();
     } else {
+      onNavigate?.();
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("sfh:openLoginModal"));
       } else {
@@ -413,7 +453,7 @@ export default function Sidebar({
     if (isAuthed) {
       navigate("/settings/account?tab=connected-characters&openHelp=1");
     } else {
-      navigate("/help#linking");
+      navigate("/help#linking", { state: helpEntryState });
     }
     onNavigate?.();
   };
@@ -441,7 +481,9 @@ export default function Sidebar({
   return (
     <aside
       id="sidebar-root"
-      className={`${styles.root} ${expanded ? styles.expanded : ""} ${variant === "drawer" ? styles.drawer : ""}`}
+      ref={element => { if (element) element.inert = !visible; }}
+      aria-hidden={!visible || undefined}
+      className={`${styles.root} ${expanded ? styles.expanded : ""} ${variant === "burger" ? styles.burger : ""} ${visible ? "" : styles.closed} sfdatahub-scrollbar`}
       data-collapsed={collapsed ? "true" : "false"}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
@@ -452,7 +494,7 @@ export default function Sidebar({
         <div className={styles.headTitle}>
           <span className={styles.headDot} /> <span className={styles.headLabel}>{t("sidebar.navigation", { defaultValue: "Navigation" })}</span>
         </div>
-        <button
+        {variant === "default" && <button
           className={styles.pinBtn}
           aria-pressed={pinned}
           title={pinned ? t("sidebar.unpin", { defaultValue: "Unpin" }) : t("sidebar.pin", { defaultValue: "Pin" })}
@@ -460,7 +502,7 @@ export default function Sidebar({
           type="button"
         >
           {pinned ? <Pin className="ico" /> : <PinOff className="ico" />}
-        </button>
+        </button>}
       </div>
 
       <div className={styles.navScroll}>
@@ -473,7 +515,9 @@ export default function Sidebar({
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
               translate={t}
-              isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
+              isItemVisible={(item) => item.publicLocalSettings || (item.adminOnly
+                ? canAccessLegacyToplists
+                : isVisibleInSidebar(item.featureId ?? item.to))}
               onNavigate={onNavigate}
             />
           </div>
@@ -488,7 +532,7 @@ export default function Sidebar({
               allowSubmenus={allowSubmenus}
               userRoles={userRoles}
               translate={t}
-              isItemVisible={(item) => isVisibleInSidebar(item.featureId ?? item.to)}
+              isItemVisible={(item) => item.to === "/data-hub" || isVisibleInSidebar(item.featureId ?? item.to)}
               onNavigate={onNavigate}
             />
           </div>
@@ -573,6 +617,7 @@ export default function Sidebar({
           <div className={styles.footerRowCell}>
             <NavLink
               to="/help"
+              state={helpEntryState}
               className={`${styles.footerHelpIcon} ${styles.footerRowHelpIcon}`}
               onClick={onNavigate}
               aria-label={t("nav.help", { defaultValue: "Help" })}

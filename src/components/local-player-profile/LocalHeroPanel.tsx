@@ -1,8 +1,10 @@
+import { profileLocale, profilePercent, profileClassLabel } from "../../lib/i18n/profilePresentation";
+import { usePlayerFreshness } from "../player-profile/usePlayerFreshness";
+import { useProfileAttributeSumMode } from "../../lib/settings/usePreferences";
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useTranslation } from "react-i18next";
+import { useProfileTranslation as useTranslation } from "../../lib/i18n/useProfileTranslation";
 import AttributeCompositionCard from "../attribute-composition/AttributeCompositionCard";
-import AttributeCompositionRadar from "../attribute-composition/AttributeCompositionRadar";
 import type { AttributeCompositionModel } from "../attribute-composition/attributeCompositionModel";
 import PortraitPreview from "../avatar/PortraitPreview";
 import PlayerAttributeBars from "../player-profile/AttributeBars/PlayerAttributeBars";
@@ -13,87 +15,44 @@ import { guideAssetByKey } from "../../data/guidehub/assets";
 import { toDriveThumbProxy } from "../../lib/urls";
 import { resolvePotionAssetKey } from "../potions/potionAssets";
 import type { LocalHeroPanelData } from "./types";
+import LocalPlayerCompactHeader from "./LocalPlayerCompactHeader";
 import "../../pages/players/player-profile.css";
 
-type FreshnessLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "unknown";
-type TranslateFn = (key: string, options?: any) => string;
+import type { PlayerContentView as ContentView } from "../../lib/local-player-profile/viewCharts";
+
+function LocalProfileViewToggle({ activeView, hasTotalStats, onViewChange }: {
+  activeView: ContentView;
+  hasTotalStats: boolean;
+  onViewChange: (view: ContentView) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="local-profile-view-toggle" role="group"
+      aria-label={t("playerProfile.heroPanel.stats.attributeBars.viewModeAriaLabel", { defaultValue: "Attribute view" })}>
+      {(["general", "progress", "base", "total", "fortress"] as const).map(view => (
+        <button key={view} type="button" aria-pressed={activeView === view}
+          disabled={view === "total" && !hasTotalStats} onClick={() => onViewChange(view)}>
+          {t(`playerProfile.heroPanel.stats.attributeBars.mode${view[0].toUpperCase() + view.slice(1)}`, {
+            defaultValue: view[0].toUpperCase() + view.slice(1),
+          })}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 
 type LocalHeroPanelProps = {
   data: LocalHeroPanelData;
+  auditInput?: object;
+  favoriteAction?: React.ReactNode;
+  guildEmblem?: React.ReactNode;
+  generalGuildName?: string | null;
+  generalOriginServer?: string | null;
+  comparisonSelect?: React.ReactNode;
+  contentView?: ContentView;
+  onContentViewChange?: (view: ContentView) => void;
   loading?: boolean;
-};
-
-const computeFreshness = (
-  t: TranslateFn,
-  lastScanDays?: number | null,
-): { level: FreshnessLevel; label: string; hint: string } => {
-  if (lastScanDays == null || !Number.isFinite(lastScanDays)) {
-    return {
-      level: "unknown",
-      label: t("playerProfile.heroPanel.states.freshness.unknown.label", { defaultValue: "Unknown" }),
-      hint: t("playerProfile.heroPanel.states.freshness.unknown.hint", {
-        defaultValue: "Scan history unavailable",
-      }),
-    };
-  }
-  const days = Math.max(0, Math.floor(lastScanDays));
-  if (days === 0) {
-    return {
-      level: 0,
-      label: t("playerProfile.heroPanel.states.freshness.scannedToday.label", { defaultValue: "Scanned today" }),
-      hint: t("playerProfile.heroPanel.states.freshness.scannedToday.hint", { defaultValue: "No rescan needed" }),
-    };
-  }
-  if (days === 1) {
-    return {
-      level: 1,
-      label: t("playerProfile.heroPanel.states.freshness.veryFresh.label", { defaultValue: "Very fresh" }),
-      hint: t("playerProfile.heroPanel.states.freshness.veryFresh.hint", { defaultValue: "No rescan needed" }),
-    };
-  }
-  if (days <= 3) {
-    return {
-      level: 2,
-      label: t("playerProfile.heroPanel.states.freshness.fresh.label", { defaultValue: "Fresh" }),
-      hint: t("playerProfile.heroPanel.states.freshness.fresh.hint", { defaultValue: "No rescan needed" }),
-    };
-  }
-  if (days <= 7) {
-    return {
-      level: 3,
-      label: t("playerProfile.heroPanel.states.freshness.recent.label", { defaultValue: "Recent" }),
-      hint: t("playerProfile.heroPanel.states.freshness.recent.hint", { defaultValue: "Rescan recommended" }),
-    };
-  }
-  if (days <= 14) {
-    return {
-      level: 4,
-      label: t("playerProfile.heroPanel.states.freshness.aging.label", { defaultValue: "Aging" }),
-      hint: t("playerProfile.heroPanel.states.freshness.aging.hint", { defaultValue: "Rescan recommended" }),
-    };
-  }
-  if (days <= 30) {
-    return {
-      level: 5,
-      label: t("playerProfile.heroPanel.states.freshness.outdated.label", { defaultValue: "Outdated" }),
-      hint: t("playerProfile.heroPanel.states.freshness.outdated.hint", {
-        defaultValue: "Rescan strongly recommended",
-      }),
-    };
-  }
-  return {
-    level: 6,
-    label: t("playerProfile.heroPanel.states.freshness.stale.label", { defaultValue: "Stale" }),
-    hint: t("playerProfile.heroPanel.states.freshness.stale.hint", { defaultValue: "Rescan strongly recommended" }),
-  };
-};
-
-const formatAgeLabel = (t: TranslateFn, lastScanDays?: number | null) => {
-  if (lastScanDays == null || !Number.isFinite(lastScanDays)) return null;
-  const days = Math.max(0, Math.floor(lastScanDays));
-  if (days === 0) return t("playerProfile.heroPanel.tooltips.age.today", { defaultValue: "today" });
-  if (days === 1) return t("playerProfile.heroPanel.tooltips.age.oneDayAgo", { defaultValue: "1 day ago" });
-  return t("playerProfile.heroPanel.tooltips.age.daysAgo", { days, defaultValue: "{{days}} days ago" });
 };
 
 function AvatarCircle({ label, size = 40 }: { label: string; size?: number }) {
@@ -139,44 +98,22 @@ function ClassAvatar({
   );
 }
 
-function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
-  const { t } = useTranslation();
-  const [mode, setMode] = useState<"base" | "total">("base");
-  const [isCompositionDetailsOpen, setIsCompositionDetailsOpen] = useState(false);
+function LocalHeroPanel({ data, loading, auditInput, favoriteAction, guildEmblem, generalGuildName, generalOriginServer, comparisonSelect, contentView, onContentViewChange }: LocalHeroPanelProps) {
+  const { t, i18n } = useTranslation();
+  const [lastAttributeMode, setMode] = useState<"base" | "total">("base");
+  const mode = contentView === "base" || contentView === "total" ? contentView : lastAttributeMode;
+  // Non-attribute views are transient; keep the last attribute mode and its data intact.
+  const [localEmptyView, setEmptyView] = useState<Exclude<ContentView, "base" | "total"> | null>(null);
+  const emptyView = contentView ? contentView === "base" || contentView === "total" ? null : contentView : localEmptyView;
   const portraitFrameRef = useRef<HTMLDivElement | null>(null);
   const portraitModuleRef = useRef<HTMLDivElement | null>(null);
+  const freshnessRef = useRef<HTMLDivElement | null>(null);
+  const attributeModeRef = useRef<HTMLDivElement | null>(null);
+  const attributeSummaryRef = useRef<HTMLElement | null>(null);
+  const compactPortraitId = React.useId();
   const [portraitLayout, setPortraitLayout] = useState({ scale: 1, height: 0 });
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const freshness = useMemo(() => computeFreshness(t, data.lastScanDays), [data.lastScanDays, t]);
-  const freshnessTooltip = useMemo(() => {
-    const lines: string[] = [];
-    if (data.lastScanAtLabel) {
-      lines.push(
-        t("playerProfile.heroPanel.tooltips.lastScanAt", {
-          value: data.lastScanAtLabel,
-          defaultValue: "Last scan: {{value}}",
-        }),
-      );
-    }
-    const ageLabel = formatAgeLabel(t, data.lastScanDays);
-    if (ageLabel) {
-      lines.push(
-        t("playerProfile.heroPanel.tooltips.age.label", {
-          value: ageLabel,
-          defaultValue: "Age: {{value}}",
-        }),
-      );
-    }
-    if (freshness.hint) lines.push(freshness.hint);
-    if (!lines.length) return null;
-    return (
-      <div className="player-profile__freshness-tooltip-lines">
-        {lines.map((line, index) => (
-          <div key={`${line}-${index}`}>{line}</div>
-        ))}
-      </div>
-    );
-  }, [data.lastScanAtLabel, data.lastScanDays, freshness.hint, t]);
+  const { freshness, freshnessTooltip, ageLabel } = usePlayerFreshness(data.lastScanAtMs, data.lastScanAtLabel);
 
   const classMeta =
     CLASSES.find((item) => normalize(item.label) === normalize(data.className || "")) ||
@@ -187,23 +124,42 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
     );
   const portraitFallbackUrl =
     data.portraitFallbackUrl || (classMeta ? toDriveThumbProxy(classMeta.iconUrl, 420) : undefined) || "/assets/demo-avatar-special.png";
-  const portraitFallbackLabel = data.portraitFallbackLabel || data.className || data.playerName;
+  const portraitFallbackLabel = data.className ? t("profileI18n.classPortrait", { name: profileClassLabel(data.className) }) : t("profileI18n.portraitPlaceholder");
   const portraitConfig = data.hasPortrait === false ? undefined : data.portrait;
 
   const formatNumber = (value?: number | null) =>
-    typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("de-DE") : "-";
+    typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(profileLocale()) : "-";
   const totalBaseStatsLabel = t("playerProfile.heroPanel.stats.totalBaseStats", { defaultValue: "Total Base Stats" });
   const totalStatsLabel = t("playerProfile.heroPanel.stats.totalStats", { defaultValue: "Total Stats" });
-  const localizedLastScanLabel = formatAgeLabel(t, data.lastScanDays) ?? data.lastScanLabel;
+  const localizedLastScanLabel = ageLabel;
 
+  const attributeSumMode = useProfileAttributeSumMode();
   const heroMetrics = useMemo(() => {
     return data.metrics.map((metric) => {
-      if ((metric.label === totalBaseStatsLabel || metric.label === "Total Base Stats") && mode === "total") {
-        return { ...metric, label: totalStatsLabel, value: formatNumber(data.totalStatsValue ?? null) };
+      if (metric.label === totalBaseStatsLabel || metric.label === "Total Base Stats") {
+        const sums = data.profileAttributeSums?.[attributeSumMode];
+        return { ...metric, label: mode === "total" ? totalStatsLabel : totalBaseStatsLabel,
+          value: sums ? formatNumber(mode === "total" ? sums.total : sums.base)
+            : attributeSumMode === "all-five" ? formatNumber(null) : mode === "total" ? formatNumber(data.totalStatsValue ?? null) : metric.value };
       }
-      return metric;
+      const raw = data.metricValues;
+      const labelKey: Record<string, string> = { Mount: "mount", Level: "level", Scrapbook: "scrapbook" };
+      const label = labelKey[metric.label] ? t("playerProfile.heroPanel.stats." + labelKey[metric.label]) : metric.label;
+      if (metric.label === "Mount") return { ...metric, label, value: data.mountPercentValue == null ? "-" : profilePercent(Math.round(data.mountPercentValue)) };
+      if (raw && metric.label === "Level") {
+        const value = t("profileI18n.levelValue", { value: formatNumber(raw.level) });
+        return { ...metric, label, value, gauge: metric.gauge && { ...metric.gauge, centerTop: value,
+          centerBottom: profilePercent(Math.round(metric.gauge.progress * 100)),
+          details: [t("profileI18n.xpValue", { value: formatNumber(raw.xp) }), t("profileI18n.xpRequiredValue", { value: formatNumber(raw.xpNext) })] } };
+      }
+      if (raw && metric.label === "Scrapbook") {
+        const value = raw.scrapbookRatio == null ? "-" : profilePercent(raw.scrapbookRatio * 100, 2);
+        const count = raw.scrapbookCount == null ? "-" : formatNumber(raw.scrapbookCount) + " / " + formatNumber(raw.scrapbookMaximum);
+        return { ...metric, label, value, gauge: metric.gauge && { ...metric.gauge, centerTop: value, centerBottom: count, details: [count] } };
+      }
+      return { ...metric, label };
     });
-  }, [data.metrics, data.totalStatsValue, mode, totalBaseStatsLabel, totalStatsLabel]);
+  }, [data.metrics, data.metricValues, data.mountPercentValue, data.totalStatsValue, data.profileAttributeSums, attributeSumMode, mode, totalBaseStatsLabel, totalStatsLabel, t, i18n.resolvedLanguage]);
 
   const potionSlots = data.potionsSlots ?? [];
   const hasActivePotions = potionSlots.some((slot) => Boolean(slot.type) || slot.size != null);
@@ -280,7 +236,7 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
             : [];
       const hoverDetails =
         hoverLines.length > 0 ? (
-          <div className="player-profile__hero-metric-hex-details" aria-hidden="true">
+          <div>
             {hoverLines.map((line) => (
               <div key={line}>{line}</div>
             ))}
@@ -289,14 +245,17 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
 
       return (
         <div key={`${metric.label}-${metricIndex}`} className="player-profile__hero-metric player-profile__hero-metric--gauge">
-          <HexGauge
-            className="player-profile__hero-metric-hex"
-            value={progress}
-            size={96}
-            stroke={8}
-            center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
-            hoverDetails={hoverDetails}
-          />
+          <Tooltip content={hoverDetails}>
+            <div tabIndex={0} aria-label={metric.label} style={{ display: "flex" }}>
+              <HexGauge
+                className="player-profile__hero-metric-hex"
+                value={progress}
+                size={96}
+                stroke={8}
+                center={<div className="player-profile__hero-metric-hex-center">{metric.gauge.centerTop}</div>}
+              />
+            </div>
+          </Tooltip>
         </div>
       );
     }
@@ -330,6 +289,11 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
     );
   });
 
+  const attributeSumMetricIndex = data.metrics.findIndex(
+    (metric) => metric.label === totalBaseStatsLabel || metric.label === "Total Base Stats",
+  );
+  const remainingMetricCards = heroMetricCards.filter((_, index) => index >= 3 && index !== attributeSumMetricIndex);
+
   useLayoutEffect(() => {
     const frame = portraitFrameRef.current;
     const module = portraitModuleRef.current;
@@ -361,10 +325,67 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    const summary = attributeSummaryRef.current;
+    const toggle = attributeModeRef.current?.querySelector<HTMLElement>(".local-profile-view-toggle");
+    const header = summary?.closest(".profile-overlay__content--local")?.parentElement
+      ?.querySelector<HTMLElement>(".profile-overlay__local-header");
+    const title = header?.querySelector<HTMLElement>(".profile-overlay__local-title");
+    const line = title?.querySelector<HTMLElement>(".local-profile-title-side > span");
+    if (!summary || !toggle || !header || !title || !line) return;
+
+    const alignAttributes = () => {
+      const card = summary.querySelector<HTMLElement>(".player-profile__attribute-bars");
+      if (card) summary.style.setProperty("--local-profile-attribute-height", `${card.getBoundingClientRect().height}px`);
+      const current = parseFloat(summary.style.getPropertyValue("--local-profile-attribute-start")) || 0;
+      // Read the title's normal-flow clearance, including while its header is sticky.
+      const clearance = parseFloat(getComputedStyle(header).paddingBottom)
+        + (title.getBoundingClientRect().height - line.getBoundingClientRect().height) / 2;
+      const next = window.matchMedia("(min-width: 901px)").matches
+        ? toggle.getBoundingClientRect().bottom + clearance - (summary.getBoundingClientRect().top - current)
+        : 0;
+      if (Math.abs(next - current) > 0.01) summary.style.setProperty("--local-profile-attribute-start", `${next}px`);
+    };
+    alignAttributes();
+    const observer = new ResizeObserver(alignAttributes);
+    for (const element of [summary, toggle, header]) observer.observe(element);
+    window.addEventListener("resize", alignAttributes);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", alignAttributes);
+    };
+  }, [Boolean(data.baseStats)]);
+
   const portraitFrameStyle = {
     "--local-profile-portrait-scale": portraitLayout.scale,
     "--local-profile-portrait-frame-height": portraitLayout.height ? `${portraitLayout.height}px` : undefined,
   } as React.CSSProperties;
+
+  const renderFreshness = (compact = false) => (
+    <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
+      <div ref={compact ? undefined : freshnessRef} className="player-profile__freshness" data-local-player-freshness={compact ? undefined : ""}>
+        <span
+          aria-hidden
+          className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
+        />
+        <span className="player-profile__freshness-label">{freshness.label}</span>
+        <span aria-hidden className="player-profile__freshness-info">{"\u24d8"}</span>
+      </div>
+    </Tooltip>
+  );
+  const hasTotalStats = Object.values(data.totalStats ?? {}).some(value => typeof value === "number" && Number.isFinite(value));
+  const activeMode = mode === "total" && hasTotalStats ? "total" : "base";
+  const activeView = contentView ?? emptyView ?? activeMode;
+  const selectView = (view: ContentView) => {
+    if (view === "base" || view === "total") {
+      if (view === "total" && !hasTotalStats) return;
+      setMode(view);
+      setEmptyView(null);
+    } else {
+      setEmptyView(view);
+    }
+    onContentViewChange?.(view);
+  };
 
   return (
     <>
@@ -385,9 +406,10 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
                   }}
                 >
                   <div className="player-profile__player-name">{data.playerName}</div>
+                  {favoriteAction}
                 </div>
                 <div className="player-profile__player-meta">
-                  <span>{data.className || t("playerProfile.heroPanel.meta.classUnknown", { defaultValue: "Class ?" })}</span>
+                  <span>{profileClassLabel(data.className)}</span>
                   {data.guild && <span>{"\u2022"} {data.guild}</span>}
                   {data.server && <span>{"\u2022"} {data.server}</span>}
                 </div>
@@ -396,16 +418,7 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
                     {t("playerProfile.heroPanel.meta.lastScanned", { defaultValue: "Last scanned" })}: {localizedLastScanLabel}
                   </div>
                 )}
-                <Tooltip content={freshnessTooltip} contentClassName="player-profile__freshness-tooltip-card">
-                  <div className="player-profile__freshness">
-                    <span
-                      aria-hidden
-                      className={`player-profile__freshness-dot player-profile__freshness-dot--${freshness.level}`}
-                    />
-                    <span className="player-profile__freshness-label">{freshness.label}</span>
-                    <span aria-hidden className="player-profile__freshness-info">{"\u24d8"}</span>
-                  </div>
-                </Tooltip>
+                {renderFreshness()}
               </div>
             </div>
             <PortraitPreview
@@ -417,59 +430,101 @@ function LocalHeroPanel({ data, loading }: LocalHeroPanelProps) {
           </div>
         </div>
         {potionSlotRow}
-        <div className="player-profile__hero-metrics player-profile__hero-metrics--local-compact">
-          {heroMetricCards}
-        </div>
-        {data.badges.length > 0 && (
-          <div className="player-profile__hero-meta-row">
-            <div className="player-profile__hero-badges">
-              {data.badges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className={`player-profile__hero-badge player-profile__hero-badge--${badge.tone || "neutral"}`}
-                  title={badge.hint}
-                >
-                  {badge.icon && <span aria-hidden className="player-profile__hero-badge-icon">{badge.icon}</span>}
-                  <span>{badge.label}</span>
-                  <strong>{badge.value}</strong>
-                </span>
-              ))}
-            </div>
+        {remainingMetricCards.length > 0 && (
+          <div className="player-profile__hero-metrics player-profile__hero-metrics--local-compact">
+            {remainingMetricCards}
           </div>
         )}
       </section>
 
-      <section className="player-profile__hero player-profile__hero--local-summary" aria-busy={loading}>
+      <div className="player-profile__hero-metrics player-profile__hero-metrics--local-compact player-profile__hero-metrics--column-four">
+        {guildEmblem}
+        {heroMetricCards[1]}
+        {heroMetricCards[2]}
+        {heroMetricCards[0]}
+      </div>
+
+      {data.baseStats && (
+        <div ref={attributeModeRef} className="local-profile-attribute-mode">
+          <LocalProfileViewToggle activeView={activeView} hasTotalStats={hasTotalStats} onViewChange={selectView} />
+        </div>
+      )}
+
+      <section ref={attributeSummaryRef} className="player-profile__hero player-profile__hero--local-summary" aria-busy={loading}>
         <div className="player-profile__hero-summary-grid">
-          <div className="player-profile__hero-summary-base-stats">
-            {data.baseStats && (
-              <PlayerAttributeBars
-                baseStats={data.baseStats}
-                totalStats={data.totalStats}
-                mode={mode}
-                onModeChange={setMode}
-              />
+          <div className="player-profile__hero-summary-base-stats" data-empty-view={emptyView ? "" : undefined}>
+            {activeView === "general" && (
+              <div className="local-profile-player-info">
+                <h3>{t("playerProfile.heroPanel.playerInfo.title", { defaultValue: "Player Info" })}</h3>
+                <dl>
+                  <div><dt>{t("localProfileRoute.ogServer")}</dt><dd>{generalOriginServer ?? "-"}</dd></div>
+                  <div><dt>{t("playerProfile.heroPanel.playerInfo.hallOfFame", { defaultValue: "Hall of Fame" })}</dt><dd>{data.playerInfo?.hofRank != null ? `#${formatNumber(data.playerInfo.hofRank)}` : "-"}</dd></div>
+                  <div><dt>{t("playerProfile.heroPanel.stats.honor")}</dt><dd>{formatNumber(data.playerInfo?.honor)}</dd></div>
+                  <div className="local-profile-player-info-guild"><dt>{t("playerProfile.heroPanel.stats.attributeBars.guild")}</dt><dd>{generalGuildName ?? data.guild ?? "-"}</dd></div>
+                  <div><dt>{t("playerProfile.heroPanel.stats.guildRole")}</dt><dd>{data.playerInfo?.roleKey ? t(`playerProfile.heroPanel.playerInfo.roles.${data.playerInfo.roleKey}`) : data.playerInfo?.guildRole ?? "-"}</dd></div>
+                </dl>
+              </div>
             )}
-          </div>
-          <div className="player-profile__hero-summary-reserved">
-            <AttributeCompositionRadar
-              composition={data.attributeComposition}
-              onOpenDetails={() => setIsCompositionDetailsOpen(true)}
-            />
+            {activeView === "progress" && (
+              <div className="local-profile-player-info">
+                <h3>{t("playerProfile.heroPanel.stats.attributeBars.modeProgress")}</h3>
+                <dl>
+                  <div><dt>{t("playerProfile.heroPanel.stats.level")}</dt><dd>{formatNumber(data.playerInfo?.level)}</dd></div>
+                </dl>
+              </div>
+            )}
+            {activeView === "fortress" && (
+              <div className="local-profile-player-info local-profile-fortress-info">
+                <h3>{t("playerProfile.heroPanel.stats.attributeBars.modeFortress")}</h3>
+                <div className="local-profile-fortress-groups">
+                  {([
+                    ["fortress", "quarters", "woodcutter", "quarry", "gemMine", "academy"],
+                    ["archeryGuild", "barracks", "mageTower", "treasury", "smithy", "fortifications"],
+                  ] as const).map((group, index) => (
+                    <dl key={index}>
+                      {group.map(key => (
+                        <div key={key}><dt>{t(`playerProfile.statsTab.fortress.labels.${key}`)}</dt><dd>{formatNumber(data.fortressBuildings?.[key])}</dd></div>
+                      ))}
+                    </dl>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data.baseStats && (
+              <div className="local-profile-attribute-content" aria-hidden={emptyView ? true : undefined}>
+                <PlayerAttributeBars
+                  auditInput={auditInput}
+                  baseStats={data.baseStats}
+                  totalStats={data.totalStats}
+                  mode={mode}
+                  onModeChange={setMode}
+                  headerEnd={
+                    <div className="player-profile__hero-metrics player-profile__hero-metrics--local-compact local-profile-attribute-sum">
+                      {heroMetricCards[attributeSumMetricIndex]}
+                    </div>
+                  }
+                />
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      <AttributeCompositionDetailOverlay
-        composition={data.attributeComposition}
-        isOpen={isCompositionDetailsOpen}
-        onClose={() => setIsCompositionDetailsOpen(false)}
+      <LocalPlayerCompactHeader expandedRef={portraitModuleRef} freshnessRef={freshnessRef} geometryKey={data}
+        name={data.playerName}
+        portrait={<PortraitPreview config={portraitConfig} label={data.playerName} fallbackImage={portraitFallbackUrl}
+          fallbackLabel={portraitFallbackLabel} canvasId={`local-player-compact-${compactPortraitId}`} showStatus={false} />}
+        freshness={renderFreshness(true)}
+        comparisonSelect={comparisonSelect}
+        modes={data.baseStats && <LocalProfileViewToggle activeView={activeView} hasTotalStats={hasTotalStats}
+          onViewChange={selectView} />}
       />
+
     </>
   );
 }
 
-function AttributeCompositionDetailOverlay({
+export function AttributeCompositionDetailOverlay({
   composition,
   isOpen,
   onClose,
@@ -478,6 +533,7 @@ function AttributeCompositionDetailOverlay({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   React.useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -499,7 +555,7 @@ function AttributeCompositionDetailOverlay({
         className="attribute-composition-detail-overlay__panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Attribute Composition"
+        aria-label={t("playerProfile.statsTab.attrComposition.title")}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="attribute-composition-detail-overlay__header">
@@ -507,8 +563,8 @@ function AttributeCompositionDetailOverlay({
             type="button"
             className="attribute-composition-detail-overlay__close"
             onClick={onClose}
-            aria-label="Close attribute composition details"
-            title="Close"
+            aria-label={t("profileI18n.closeComposition")}
+            title={t("localProfileRoute.close")}
           >
             X
           </button>

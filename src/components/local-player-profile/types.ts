@@ -1,3 +1,4 @@
+import type { LocalPlayerCurrentSeed } from "../../pages/GuildHub/localPlayerCurrentSeed";
 import type { PortraitOptions } from "../player-profile/types";
 import type { AttributeCompositionModel } from "../attribute-composition/attributeCompositionModel";
 
@@ -33,12 +34,25 @@ export type LocalPotionSlot = {
 };
 
 export type LocalHeroPanelData = {
+  metricValues?: { level: number | null; xp: number | null; xpNext: number | null; scrapbookRatio: number | null;
+    scrapbookCount: number | null; scrapbookMaximum: number | null };
+  playerInfo?: {
+    level: number | null;
+    hofRank: number | null;
+    honor: number | null;
+    guildRole: string | null;
+    roleKey?: "leader" | "officer" | "member" | null;
+  };
+  fortressBuildings?: import("../../lib/parsing/normalizedFortress").NormalizedFortress["buildings"] | null;
+  profileAttributeSums?: import("../../lib/players/profileAttributeSums").ProfileAttributeSums;
   playerName: string;
   className?: string | null;
   guild?: string | null;
+  guildIdentifier?: string | null;
   server?: string | null;
   levelLabel?: string;
   lastScanLabel?: string;
+  lastScanAtMs?: number | null;
   lastScanAtLabel?: string;
   lastScanDays?: number | null;
   metrics: LocalHeroMetric[];
@@ -62,6 +76,7 @@ export type LocalHeroPanelData = {
 };
 
 export type LocalPlayerProfileModel = {
+  currentSeed?: LocalPlayerCurrentSeed;
   sourceScanId: string;
   sourcePlayerKey: string;
   analytics: {

@@ -1,8 +1,9 @@
+import { compareComparisonScanAge, resolveSelectedComparisonTimestamp } from "../../src/lib/player-progress/comparisonScanSelection";
 import assert from "node:assert/strict";
 import { buildGuildIdentityResolutionIndex, type IdentityResolutionSnapshot } from "../../src/lib/identities/identityResolution";
 import type { GuildAnalyticsDerivedData, GuildAnalyticsMemberSnapshot } from "../../src/lib/guilds/localGuildAnalyticsStore";
 import type { PlayerPerformanceSnapshot } from "../../src/pages/Playground/playerPerformanceModel";
-import { buildTimeAxisTicks } from "../../src/components/local-player-profile/LocalPlayerAnalytics";
+import { buildTimeAxisTicks } from "../../src/lib/player-progress/chartTimeAxis";
 import {
   buildChartTimeDomain,
   buildComparisonOptions,
@@ -25,6 +26,25 @@ type TestCase = {
 };
 
 const tests: TestCase[] = [
+  {
+    name: "28-day guild preference, boundary, fallback and valid manual override",
+    run() {
+      const current = SEPTEMBER;
+      const options = [1, 27.999, 28, 29, 30, 70].map(days => ({ timestamp: current - days * DAY_MS }));
+      const choose = (rows = options, manual: number | null = null) => resolveSelectedComparisonTimestamp(rows, current, manual, 28);
+      assert.equal(choose(), current - 28 * DAY_MS);
+      assert.equal(choose(options.filter(o => o.timestamp !== current - 28 * DAY_MS)), current - 29 * DAY_MS);
+      assert.equal(choose(options.slice(0, 2)), current - 27.999 * DAY_MS);
+      assert.equal(choose([]), null);
+      assert.equal(choose(options, options[0].timestamp), options[0].timestamp);
+      assert.equal(choose(options, current + DAY_MS), current - 28 * DAY_MS);
+      assert.equal(resolveSelectedComparisonTimestamp(options, current), current - 30 * DAY_MS, "other consumers retain 30 days");
+      for (const rows of [options, options.slice(0, 2), options.slice(0, 1)]) {
+        const guildOrder = [...rows].sort((a, b) => compareComparisonScanAge(a.timestamp, b.timestamp, current));
+        assert.equal(choose(rows), guildOrder[0]?.timestamp ?? null);
+      }
+    },
+  },
   {
     name: "aktueller Guild-Identifier wird erkannt",
     run() {

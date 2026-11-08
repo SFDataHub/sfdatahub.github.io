@@ -198,6 +198,7 @@
 .guildDailyPoint[data-dimmed="true"],
 g[data-dimmed="true"] .guildStandBar,
 g[data-dimmed="true"] .guildGrowthBar,
+g[data-dimmed="true"] [data-trend-hatching],
 g[data-dimmed="true"] .guildStartMarker,
 g[data-dimmed="true"] .guildEndMarker {
   opacity: 0.46;
@@ -316,3 +317,54 @@ g[data-dimmed="true"] .guildEndMarker {
     width: auto;
   }
 }
+
+.fitContainer {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.fitContainer .chartWrap {
+  min-height: 0;
+}
+
+.fitContainer .chart {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Dashboard-only legend access, using the existing local info popup. */
+.inChartLegend { grid-template-rows: minmax(0, 1fr); }
+.inChartLegend > .legendInfoButton {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+}
+.inChartLegend .infoPopup { box-sizing: border-box; }
+.inChartLegend .infoPopup .legend { margin-bottom: 10px; }
+.inChartLegend .infoPopup p { margin-bottom: 8px; }
+
+/* Ordinary content when the dashboard provides its information grid slot. */
+.separateInformation { min-width:0; color:#f5f9ff; font-size:11px; line-height:1.35; }
+.separateInformation strong { display:block; margin-bottom:6px; font-size:12px; overflow-wrap:anywhere; }
+.separateInformation dl { display:grid; grid-template-columns:minmax(56px,.65fr) minmax(0,1fr); gap:2px 8px; align-items:baseline; margin:0; }
+.separateInformation dt { color:#b0c4d9; }
+.separateInformation dd { margin:0; font-weight:800; font-variant-numeric:tabular-nums; }
+
+.fusionLine { stroke:rgba(177,195,230,.42); stroke-dasharray:4 6; stroke-width:1.25; pointer-events:none; }
+.fusionHint { --guild-trend-muted:var(--radar-muted, #b0c4d9); --guild-trend-bg:var(--radar-bg, #0d1b2d); --guild-trend-text:var(--radar-text, #f5f9ff); --guild-trend-accent:var(--radar-accent, #67d7ff); width:16px; height:16px; min-width:16px; padding:0; font-size:10px; line-height:14px; pointer-events:auto; }
+
+/* Swatches use the same SVG patterns and stand fill as the plotted bars. */
+.coverageHelp { display:grid; gap:10px; margin-bottom:10px; }
+.coverageLegendItem { display:flex; align-items:flex-start; gap:9px; }
+.coverageLegendItem svg { flex:0 0 28px; margin-top:2px; }
+.coverageLegendItem strong { margin-bottom:3px; }
+.coverageHelp p { overflow-wrap:anywhere; }
+
+.inChartLegend .infoPopup:has(.coverageHelp) { max-height:min(540px, calc(100dvh - 100px)); overflow:auto; overscroll-behavior:contain; }
+
+.tooltip [data-trend-coverage] { margin:8px 0 0; font-size:11px; line-height:1.45; overflow-wrap:anywhere; }
+
+.infoPopup:has(.coverageHelp) { box-sizing:border-box; max-height:min(300px, calc(100dvh - 100px)); overflow:auto; overscroll-behavior:contain; }

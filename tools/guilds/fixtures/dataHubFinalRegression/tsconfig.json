@@ -1,0 +1,6 @@
+{
+ "extends": "../../../../tsconfig.json",
+ "compilerOptions": { "strict": true, "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"], "jsx": "react-jsx" },
+ "include": ["../../dataHubFinalRegression.browser.test.mts", "../../dataHubNeighbors.test.mts", "../dataHubRoutes/fixture.tsx", "../../../scanArchive/fixtures/dataHubScanInventory/fixture.tsx", "./fixture.tsx", "./metrics.ts", "./mocks.tsx", "../../../../src/**/*.d.ts"],
+ "exclude": []
+}

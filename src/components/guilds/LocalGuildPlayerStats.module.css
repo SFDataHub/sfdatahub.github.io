@@ -1,0 +1,100 @@
+.panel {
+  min-width: 0;
+  padding: 16px;
+  color: #f5f9ff;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
+}
+
+.toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #2b4c73;
+  border-radius: 999px;
+  background: rgba(20, 39, 62, 0.7);
+}
+
+.toggle button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #b0c4d9;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle button[aria-pressed="true"] { background: #1e3657; color: #f5f9ff; }
+.toggle button:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+
+.groups { display: grid; gap: 16px; margin-top: 24px; }
+.group { min-width: 0; }
+.groupHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.groupHeader h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.average { display: flex; align-items: center; gap: 12px; margin-left: auto; text-align: right; }
+.average span { color: #b0c4d9; font-size: 12px; text-transform: uppercase; }
+.average strong { font-size: 18px; }
+.entries { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+.entries > li { min-width: 0; }
+
+.entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: 0 0 0 1px rgba(43, 76, 115, 0.88) inset;
+}
+
+.bar { position: absolute; inset: 0 auto 0 0; pointer-events: none; }
+.classIcon { position: relative; flex: 0 0 24px; height: 24px; margin-right: 40px; border-radius: 12px; box-shadow: 0 0 0 1px var(--stats-accent) inset; }
+.classIcon img { position: absolute; top: 50%; left: 50%; width: 80px; height: 80px; max-width: none; transform: translate(-50%, -50%); object-fit: contain; pointer-events: none; }
+.name { position: relative; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+.value { position: relative; flex: 0 0 auto; text-align: right; font-size: 14px; font-weight: 600; }
+.values { position: relative; display: inline-flex; flex: 0 0 auto; align-items: baseline; gap: 8px; white-space: nowrap; }
+.delta { font-size: 12px; color: #b0c4d9; }
+.delta[data-direction="positive"] { color: #6ee7a8; }
+.delta[data-direction="negative"] { color: #f0a183; }
+.delta[data-direction="missing"] { color: #839bb4; }
+.rankingButton { width: 100%; padding: 8px 12px; border: 1px solid #2b4c73; border-radius: 16px; background: #14273e; color: #b0c4d9; font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+.rankingButton:hover { background: #1e3657; color: #f5f9ff; }
+.rankingButton:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .rankingCard { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px; }
+  .rankingCard .classIcon { margin-right: 0; grid-row: 1 / 3; }
+  .rankingCard .values { grid-column: 2; justify-self: end; }
+}
+
+@media (max-width: 640px) { .panel { padding: 14px; } }
+
+.compactRow { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; }
+.compactRank { display: flex; gap: 8px; justify-content: flex-end; align-items: center; white-space: nowrap; font-size: 13px; font-variant-numeric: tabular-nums; }
+.compactRank > span { color: #839bb4; font-size: 12px; }
+.compactRank > span[data-direction="positive"] { color: #6ee7a8; }
+.compactRank > span[data-direction="negative"] { color: #f0a183; }
+.compactCard[data-selected="true"] { box-shadow: 0 0 0 1px #67d7ff inset; background: rgba(103, 215, 255, 0.08); }
+.emptyNeighbor { min-height: 36px; }

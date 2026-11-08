@@ -1,3 +1,4 @@
+import { hubText } from "../../lib/i18n/dataHubPresentation";
 export type ScanExplorerMetric = {
   label: string;
   value: unknown;
@@ -12,7 +13,7 @@ export function isScanExplorerDebugMetricKey(value: string) {
 
 export function formatScanExplorerPrimitiveValue(value: unknown, formatNumber: (value: number) => string = String) {
   if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? hubText("dataHubI18n.yes") : hubText("dataHubI18n.no");
   if (typeof value === "number") return Number.isFinite(value) ? formatNumber(value) : null;
   if (typeof value === "string") return value;
   return null;
@@ -34,7 +35,7 @@ export function formatScanExplorerArraySummary(
   if (!primitiveValues.length || primitiveValues.length !== value.length) return null;
   if (primitiveValues.length > 6) {
     const positiveCount = value.filter((entry) => typeof entry === "number" && Number.isFinite(entry) && entry > 0).length;
-    return `${formatNumber(value.length)} values${positiveCount ? ` - ${formatNumber(positiveCount)} active` : ""}`;
+    return hubText("dataHubI18n.quantityValues", { count: value.length }) + (positiveCount ? " - " + hubText("dataHubI18n.activeValues", { count: positiveCount }) : "");
   }
   return primitiveValues.join(" - ");
 }

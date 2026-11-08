@@ -1,3 +1,4 @@
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditCaught, auditCurrent, auditLink, auditPromiseId, auditEvent } from "../data-hub/runtimeAudit";
 import {
   resolveLocalFirstScanPlan,
   resolveLocalFirstScanSegments,
@@ -154,7 +155,7 @@ const loadManifestYear = (
 ) => {
   const key = `${archive.year}:${archive.manifestUrl}`;
   const existing = manifestInflight.get(key);
-  if (existing) return existing;
+  if (existing) { auditLink(auditCurrent(), auditPromiseId(existing), "in-flight-join"); auditEvent(auditCurrent(), "in-flight-join"); return existing; }
 
   const promise = (async (): Promise<ManifestYearLoad> => {
     try {
@@ -415,10 +416,12 @@ export async function prepareLocalFirstFeatureAcquisition(
   featureRequest: LocalFirstFeatureRequest,
   options: LocalFirstFeaturePrepareOptions = {},
 ): Promise<LocalFirstFeaturePreparedAcquisition> {
+    const __audit1 = auditBegin("S01", "prepareLocalFirstFeatureAcquisition");
+    try {
   const dependencies = createDependencies(options);
   const localScanSummaries = options.localScanSummaries
     ? [...options.localScanSummaries]
-    : await dependencies.listLocalScanSummaries();
+    : await (auditValue(__audit1, auditEnter(__audit1, "dependencies.listLocalScanSummaries"), (dependencies.listLocalScanSummaries())));
   throwIfAborted(options.signal);
 
   const unboundedRequest = latestRequest(featureRequest);
@@ -431,8 +434,8 @@ export async function prepareLocalFirstFeatureAcquisition(
   let catalog: ScanArchiveCatalog | null = null;
 
   try {
-    catalog = await dependencies.loadScanArchiveCatalog(options.signal);
-  } catch (error) {
+    catalog = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.loadScanArchiveCatalog"), (dependencies.loadScanArchiveCatalog(options.signal))));
+  } catch (error) { auditCaught(__audit1, error);
     if (isAbortError(error)) throw error;
     manifestFailures = [{ year: 0, errorCode: classifyManifestError(error), message: errorMessage(error) }];
     manifestStatus = "offline";
@@ -454,19 +457,19 @@ export async function prepareLocalFirstFeatureAcquisition(
   if (catalog) {
     if (featureRequest.time.kind === "exact") {
       concreteTime = { kind: "exact", timestamp: featureRequest.time.timestamp };
-      addLoaded(await loadEntriesForYears([yearFromTimestamp(featureRequest.time.timestamp)], catalog, dependencies, options.signal));
+      addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadEntriesForYears"), (loadEntriesForYears([yearFromTimestamp(featureRequest.time.timestamp)], catalog, dependencies, options.signal)))));
     } else if (featureRequest.time.kind === "interval") {
       concreteTime = { kind: "interval", from: featureRequest.time.from, to: featureRequest.time.to };
-      addLoaded(await loadEntriesForYears(yearsForInterval(featureRequest.time.from, featureRequest.time.to), catalog, dependencies, options.signal));
+      addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadEntriesForYears"), (loadEntriesForYears(yearsForInterval(featureRequest.time.from, featureRequest.time.to), catalog, dependencies, options.signal)))));
     } else if (featureRequest.time.kind === "all") {
-      addLoaded(await loadEntriesForYears(activeYears, catalog, dependencies, options.signal));
+      addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadEntriesForYears"), (loadEntriesForYears(activeYears, catalog, dependencies, options.signal)))));
       const scopedArchiveEntries = filterLocalFirstFeatureArchiveEntries(archiveEntries, unboundedRequest);
       const timestamps = [...localTimestamps, ...scopedArchiveEntries.map((entry) => entry.timestamp)];
       concreteTime = timestamps.length
         ? { kind: "interval", from: Math.min(...timestamps), to: Math.max(...timestamps) }
         : { kind: "latest" };
     } else if (featureRequest.time.kind === "relative") {
-      addLoaded(await loadNewestRelevantEntries(catalog, featureRequest, dependencies, options.signal));
+      addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadNewestRelevantEntries"), (loadNewestRelevantEntries(catalog, featureRequest, dependencies, options.signal)))));
       const scopedArchiveEntries = filterLocalFirstFeatureArchiveEntries(archiveEntries, unboundedRequest);
       const archiveLatest = scopedArchiveEntries.length ? Math.max(...scopedArchiveEntries.map((entry) => entry.timestamp)) : null;
       const localLatest = localTimestamps.length ? Math.max(...localTimestamps) : null;
@@ -477,10 +480,10 @@ export async function prepareLocalFirstFeatureAcquisition(
           : latest - (featureRequest.time.durationMs ?? 0);
         concreteTime = { kind: "interval", from, to: latest };
         const missingYears = yearsForInterval(from, latest).filter((year) => !availableManifestYears.includes(year));
-        if (missingYears.length) addLoaded(await loadEntriesForYears(missingYears, catalog, dependencies, options.signal));
+        if (missingYears.length) addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadEntriesForYears"), (loadEntriesForYears(missingYears, catalog, dependencies, options.signal)))));
       }
     } else {
-      addLoaded(await loadNewestRelevantEntries(catalog, featureRequest, dependencies, options.signal));
+      addLoaded(await (auditValue(__audit1, auditEnter(__audit1, "loadNewestRelevantEntries"), (loadNewestRelevantEntries(catalog, featureRequest, dependencies, options.signal)))));
       concreteTime = { kind: "latest" };
     }
   } else if (featureRequest.time.kind === "exact") {
@@ -501,8 +504,8 @@ export async function prepareLocalFirstFeatureAcquisition(
   const segments = resolveLocalFirstScanSegments(request);
   const filteredEntries = filterLocalFirstFeatureArchiveEntries(archiveEntries, request);
   const localPlan = localPlanFrom(request, localScanSummaries, filteredEntries, availableManifestYears);
-  return {
-    key: buildLocalFirstFeatureRequestKey({ ...featureRequest, time: concreteTime }),
+  return auditReturn(__audit1, {
+    key: (auditValue(__audit1, auditEnter(__audit1, "buildLocalFirstFeatureRequestKey", "sync-elapsed"), (buildLocalFirstFeatureRequestKey({ ...featureRequest, time: concreteTime })))),
     featureRequest,
     request,
     segments,
@@ -512,26 +515,31 @@ export async function prepareLocalFirstFeatureAcquisition(
     manifestFailures,
     manifestStatus,
     localPlan,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 }
 
 export async function acquirePreparedLocalFirstFeatureScans(
   prepared: LocalFirstFeaturePreparedAcquisition,
   options: Omit<LocalFirstFeatureAcquisitionOptions, "localScanSummaries"> = {},
 ): Promise<LocalFirstFeatureAcquisitionResult> {
+    const __audit2 = auditBegin("S01", "acquirePreparedLocalFirstFeatureScans");
+    try {
   if (options.shouldAcquirePreparedRequest?.(prepared) === false) {
-    return syntheticResult(prepared, "duplicate-or-failed");
+    return auditReturn(__audit2, syntheticResult(prepared, "duplicate-or-failed"));
   }
-  if (prepared.manifestStatus === "offline") return syntheticResult(prepared);
+  if (prepared.manifestStatus === "offline") return auditReturn(__audit2, syntheticResult(prepared));
 
   const dependencies = createDependencies(options);
-  const acquisition = await dependencies.acquireLocalFirstScans(prepared.request, {
+  const acquisition = await (auditValue(__audit2, auditEnter(__audit2, "dependencies.acquireLocalFirstScans"), (dependencies.acquireLocalFirstScans(prepared.request, {
     ...options.acquisitionOptions,
     archiveEntries: prepared.archiveEntries,
     availableManifestYears: prepared.availableManifestYears,
-  });
+  }))));
   const storedScanCount = acquisition.acquiredArchives.filter((entry) => entry.status === "imported").length;
-  return {
+  return auditReturn(__audit2, {
     key: prepared.key,
     preparedRequest: prepared,
     status: acquisition.status,
@@ -547,7 +555,10 @@ export async function acquirePreparedLocalFirstFeatureScans(
     storedScanCount,
     shouldReloadLocalScanPool:
       storedScanCount > 0 || acquisition.skippedArchives.some((entry) => entry.reason === "race-already-local"),
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 }
 
 export async function acquireLocalFirstFeatureScans(
@@ -579,7 +590,7 @@ export function createLocalFirstFeatureAcquisitionCoordinator() {
     run: (request: LocalFirstFeatureRequest, options: LocalFirstFeatureAcquisitionOptions = {}) => {
       const requestKey = buildLocalFirstFeatureRequestKey(request);
       const existing = inFlight.get(requestKey);
-      if (existing) return existing;
+      if (existing) { auditLink(auditCurrent(), auditPromiseId(existing), "in-flight-join"); auditEvent(auditCurrent(), "in-flight-join"); return existing; }
 
       const controller = new AbortController();
       const runSequence = ++sequence;

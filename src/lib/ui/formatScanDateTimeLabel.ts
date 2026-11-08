@@ -59,7 +59,7 @@ const parseLegacyDmyToMs = (raw: string): number | null => {
   return date.getTime();
 };
 
-const toScanDateTimeMs = (value: unknown): number | null => {
+export const toScanDateTimeMs = (value: unknown): number | null => {
   if (value == null) return null;
 
   if (value instanceof Date) {
@@ -119,4 +119,15 @@ export function formatScanDateTimeLabel(value: unknown): string {
   const date = new Date(ms);
   if (!Number.isFinite(date.getTime())) return DASH;
   return formatFixedDateTime(date);
+}
+
+/** Calendar dates in the same browser-local timezone as the displayed scan date.
+ * UTC date ordinals avoid treating DST's 23/25-hour days as partial days. */
+export function getScanAgeDays(value: unknown, nowMs = Date.now()): number | null {
+  const ms = toScanDateTimeMs(value);
+  if (ms == null || ms <= 0) return null;
+  const scan = new Date(ms), now = new Date(nowMs);
+  if (!Number.isFinite(scan.getTime()) || !Number.isFinite(now.getTime())) return null;
+  const ordinal = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.max(0, Math.round((ordinal(now) - ordinal(scan)) / 86_400_000));
 }

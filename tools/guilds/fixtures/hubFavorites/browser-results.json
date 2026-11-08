@@ -1,0 +1,219 @@
+{
+  "results": [
+    "real IDB: held restore gates both UIs, independent profile remains; migration abort/visible retry/cutover preserve recovery and active guild",
+    "real local Overlay/Hero/current coordinator/action: save, remove, repeat save and dashboard synchronization; extra Raw/normalizer/derived/download counts zero",
+    "actual action write failure preserves saved state; visible Retry commits remove",
+    "late action completion after actual profile switch/unmount cannot publish old player saved status",
+    "N02 actual dashboard: missing/stale schema, guild/core versions and contradicted Raw hash remain unknown; valid metadata update restores availability, favorites and compatibility retained, independent KPI metadata counted separately",
+    "real ContextBar Fast Select and committed metadata projection; independent tracker remains assigned; pure display costs zero",
+    "actual GuildHubIndex picker add, keyboard reorder and confirmation remove all write same dashboard collection",
+    "held older projection settles after unlink; actual hook retains newer conflict display",
+    "dashboard Identity unlink conflict remains removable; Rawdelete changes availability, retains favorites and tracker content; recovery read-only",
+    "390px actual dashboard/guild/contextbar/profile-action layout fits; favorites and controls remain available",
+    "two actual browser tabs: simultaneous stale saves under W-04 lock preserve both entities and durable revisions",
+    "missed BroadcastChannel notification: actual focus handler recovers persisted newer revision",
+    "native CDP keyboard Enter on focused production reorder button commits at narrow width"
+  ],
+  "screenshots": [
+    {
+      "kind": "profile-wide"
+    },
+    {
+      "kind": "guild-wide"
+    },
+    {
+      "kind": "wide"
+    },
+    {
+      "kind": "narrow"
+    },
+    {
+      "kind": "guild-narrow"
+    },
+    {
+      "kind": "profile-narrow"
+    }
+  ],
+  "costs": [
+    {
+      "name": "initial favorites display with existing hydrated scan summaries",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      }
+    },
+    {
+      "name": "save from actual already-open local profile",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      }
+    },
+    {
+      "name": "pure favorites/dashboard/contextbar display after warm restore",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      }
+    },
+    {
+      "name": "narrow pure favorites display",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      }
+    }
+  ],
+  "summaryValidity": [
+    {
+      "name": "Raw present, Summary missing: actual favorites retained with unknown availability",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 0
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    },
+    {
+      "name": "Raw present, Summary schema stale: no positive or negative evidence",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 1
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    },
+    {
+      "name": "Raw present, guild normalizer stale: unknown availability",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 1
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    },
+    {
+      "name": "Raw present, core normalizer stale: unknown availability",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 1
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    },
+    {
+      "name": "Raw index hash contradicts Summary: unknown availability",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 1
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    },
+    {
+      "name": "Current Summary restored: production subscription confirms available without Raw reads",
+      "costs": {
+        "rawReads": 0,
+        "rawPoolReads": 0,
+        "normalizations": 0,
+        "derivedBuilds": 0,
+        "archivePayloadRequests": 0
+      },
+      "writes": {
+        "summaryRepairs": 0,
+        "favoriteWrites": 0,
+        "controlledSummaryWrites": 1
+      },
+      "work": {
+        "favoriteMetadataReads": 1,
+        "favoriteProjectionCompletions": 1,
+        "kpiMetadataReads": 1,
+        "archiveReadinessRuns": 0,
+        "currentSeedResolutions": 0,
+        "summaryEnsureRuns": 0
+      }
+    }
+  ]
+}

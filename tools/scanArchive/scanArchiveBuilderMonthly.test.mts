@@ -15,6 +15,7 @@ const s = "f8_net";
 const empty: ScanArchiveManifest = { schemaVersion: 1, archiveYear: year, revision: 0, updatedAt: "2026-01-01T00:00:00Z", scanCount: 0, serverCount: 0, scans: [] };
 const encoder = new TextEncoder();
 const deps = {
+  gunzip: (bytes: Uint8Array) => new TextDecoder().decode(gunzipSync(bytes)),
   gzip: (content: string) => gzipSync(encoder.encode(content), { level: 9, mtime: 0 }),
   sha256: (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex"),
   byteLength: (bytes: Uint8Array) => bytes.byteLength,
@@ -22,7 +23,12 @@ const deps = {
 };
 const row = (identifier: string, timestamp = t1, server = s, name = identifier) => ({ prefix: server, timestamp, identifier, name });
 const batches = (players: ReturnType<typeof row>[], groups: ReturnType<typeof row>[]) => buildScanArchiveBatches(JSON.stringify({ players, groups }), year);
-const build = (options: Omit<ScanArchiveBuilderCoreOptions<Uint8Array>, "year">) => createScanArchiveBuildPlanCore({ year, ...options }, deps);
+const rankingFiles = new Map<string, Uint8Array>();
+const build = async (options: Omit<ScanArchiveBuilderCoreOptions<Uint8Array>, "year">) => {
+  const result = await createScanArchiveBuildPlanCore({ year, loadMonthlyRankingBytes: async ref => rankingFiles.get(ref.sha256)!, ...options }, deps);
+  for (const file of result.files) if (file.kind === "ranking" && file.bytes) rankingFiles.set(file.sha256, file.bytes);
+  return result;
+};
 const payloads = (plan: Awaited<ReturnType<typeof build>>) => new Map(plan.files.filter((file) => file.kind === "raw" && file.bytes).map((file) => [file.scanId, JSON.parse(new TextDecoder().decode(gunzipSync(file.bytes!))) as ScanArchiveBuilderRawPayload]));
 const base = await build({ manifest: empty, inputBatches: batches([row("f8_p1")], [row("f8_g1")]), setImportedAsMonthly: "2026-09", setImportedAsCurrent: true });
 assert.equal(base.conflicts.length, 0);
@@ -68,7 +74,7 @@ assert.deepEqual(addRaw.get(`${s}:${t3}`)?.players.map((player) => player.identi
 assert.equal(addRaw.get(`${s}:${t3}`)?.groups.length, 0);
 assert.equal(addRaw.get(`${s}:${t3}`)?.players[0].name, "older");
 assert.equal(addRaw.get(`${s}:${t4}`)?.players.length, 0);
-for (const file of add.files) {
+for (const file of add.files.filter(file => file.kind !== "ranking")) {
   assert(file.bytes);
   const entry = add.manifestAfter.scans.find((scan) => scan.id === file.scanId)!;
   const payload = JSON.parse(new TextDecoder().decode(gunzipSync(file.bytes)));
@@ -107,7 +113,7 @@ const missing = await build({ manifest: empty, inputBatches: batches([row("p1", 
 assert.deepEqual(missing.conflicts.map((conflict) => conflict.code), ["add_target_missing", "add_target_missing"]);
 assert(missing.conflicts[0].message.includes("f8_net/2026-09"));
 assert(missing.conflicts[1].message.includes("s30_eu/2026-09"));
-const partial = await build({ manifest: add.manifestAfter, inputBatches: batches([row("new", t4 + 1)], []), usageMode: "add-monthly", loadMonthlyRawScan: async (scan) => {
+const partial = await build({ manifest: { ...add.manifestAfter, rankings: undefined }, inputBatches: batches([row("new", t4 + 1)], []), usageMode: "add-monthly", loadMonthlyRawScan: async (scan) => {
   if (scan.timestamp === t1) return baseRaw.get(scan.id)!;
   if (scan.timestamp === t3) throw new Error("SHA mismatch");
   return { players: [], groups: [] };
@@ -164,7 +170,7 @@ const historical = await build({ manifest: currentBase.manifestAfter, usageMode:
 assert.deepEqual(historical.conflicts, []);
 assert.equal(JSON.stringify(currentBase.manifestAfter), beforeHistorical);
 assert.deepEqual(historical.manifestAfter.toplists!.current, currentBase.manifestAfter.toplists!.current);
-assert.equal(historical.summary.filesToWrite, 12);
+assert.equal(historical.summary.filesToWrite, 15);
 assert.equal(historical.manifestAfter.scans.length, currentBase.manifestAfter.scans.length + 6);
 for (const server of servers) {
   assert.deepEqual(historical.manifestAfter.toplists!.monthly!["2026-09"][server], { scanIds: [`${server}:${sept5}`, `${server}:${sept5 + 1}`] });

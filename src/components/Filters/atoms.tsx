@@ -1,9 +1,11 @@
 // src/components/Filters/atoms.tsx
 import React from "react";
+import { CLASSES, getExactClassMeta, type ClassSelection, type GameClassKey } from "../../data/classes";
 import {
   toDriveDirectProxy,
   toDriveThumbProxy,
 } from "../../lib/urls";
+import styles from "./filters.module.css";
 
 /* ===========================
    Icon-only Class Button (Proxy-first, CORS-clean)
@@ -22,6 +24,8 @@ type ClassIconButtonProps = {
   fallback?: string;  // z.B. Emoji
   size?: number;      // Button-Kante in px
   onClick?: () => void;
+  localDropdown?: boolean;
+  classAccent?: string;
 };
 
 export function ClassIconButton({
@@ -31,8 +35,10 @@ export function ClassIconButton({
   fallback = "❓",
   size = 40,
   onClick,
+  localDropdown = false,
+  classAccent,
 }: ClassIconButtonProps) {
-  const imgSize = Math.round(size * 0.7);
+  const imgSize = localDropdown ? 36 : Math.round(size * 0.7);
 
   // Proxy-first Quellen (vermeidet CORS-Fehler in der Konsole)
   const sources = React.useMemo(() => {
@@ -72,12 +78,23 @@ export function ClassIconButton({
   if (hover) btnStyle.background = "rgba(255,255,255,.04)";
   if (active) btnStyle.outline = "2px solid #5C8BC6";
 
+  // Opt-in styles must also clear the legacy inline button states.
+  const localStyle = localDropdown ? {
+    ...btnStyle,
+    border: "none",
+    background: "transparent",
+    boxShadow: "none",
+    outline: undefined,
+    transition: "none",
+    "--class-accent": classAccent,
+  } as React.CSSProperties : btnStyle;
+
   const imgStyle: React.CSSProperties = {
     display: "block",
     width: imgSize,
     height: imgSize,
     objectFit: "contain",
-    filter: "drop-shadow(0 0 8px rgba(92,139,198,.25))",
+    filter: localDropdown ? undefined : "drop-shadow(0 0 8px rgba(92,139,198,.25))",
     pointerEvents: "none",
   };
 
@@ -91,7 +108,8 @@ export function ClassIconButton({
       onMouseLeave={() => setHover(false)}
       onFocus={() => setFocus(true)}
       onBlur={() => setFocus(false)}
-      style={btnStyle}
+      className={localDropdown ? styles.localClassButton : undefined}
+      style={localStyle}
     >
       {src ? (
         <img
@@ -100,6 +118,7 @@ export function ClassIconButton({
           width={imgSize}
           height={imgSize}
           loading="lazy"
+          className={localDropdown ? styles.localClassIcon : undefined}
           style={imgStyle}
           onError={() => {
             // Nächsten Fallback probieren, ansonsten Emoji
@@ -107,7 +126,7 @@ export function ClassIconButton({
           }}
         />
       ) : (
-        <span style={{ fontSize: Math.round(size * 0.6), lineHeight: 1 }}>{fallback}</span>
+        <span className={localDropdown ? styles.localClassIcon : undefined} style={{ fontSize: Math.round(size * 0.6), lineHeight: 1 }}>{fallback}</span>
       )}
     </button>
   );
@@ -173,4 +192,21 @@ export function Badge({
       {children}
     </span>
   );
+}
+
+/** Native, keyboard-accessible class selection shared by guild ranking views. */
+export function ClassSelect({ value, onChange, label, allLabel, className }: {
+  value: ClassSelection; onChange: (value: GameClassKey | null) => void;
+  label: string; allLabel: string; className?: string;
+}) {
+  const values = typeof value === "string" ? [value] : value ?? [];
+  const single = values.length === 1 ? getExactClassMeta(values[0]) : null;
+  const summary = values.length > 0 && !single ? values.join(" + ") : null;
+  return <label className={className} data-ranking-class-filter><span>{label}</span>
+    <select value={summary ? "__selection" : single?.key ?? ""} onChange={event => onChange(CLASSES.find(item => item.key === event.target.value)?.key ?? null)}>
+      <option value="">{allLabel}</option>
+      {summary && <option value="__selection" disabled>{summary}</option>}
+      {CLASSES.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+    </select>
+  </label>;
 }

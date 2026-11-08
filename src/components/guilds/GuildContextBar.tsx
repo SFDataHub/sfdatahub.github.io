@@ -1,39 +1,40 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { safeLocalReturn, GUILD_HUB } from "../../lib/data-hub/routes";
+import { Link, useLocation } from "react-router-dom";
 import Tooltip from "../ui/Tooltip/Tooltip";
 import { guildIconByIdentifier } from "../../data/guilds";
-import {
-  listGuildHubLocalGuildsForServerFromScanSummaries,
-  listGuildHubScanSummaries,
-  subscribeToSfDataHubLocalScanChanges,
-  type GuildHubScanSummary,
-} from "../../lib/guilds/localScanLibrary";
 import GuildEmblem from "./GuildEmblem";
 import styles from "./GuildContextBar.module.css";
-import {
-  mapLocalGuildIdentityToSelection,
-  useGuildHubSelection,
-  type GuildHubSelectedGuild,
-} from "../../pages/GuildHub/hooks/useGuildHubSelection";
+import type { useGuildHubSelection } from "../../pages/GuildHub/hooks/useGuildHubSelection";
+
+import { useGuildFavoritesSelection } from "../../lib/data-hub/useGuildFavoritesSelection";
+import type { HubFavorite } from "../../lib/data-hub/hubFavoritesContract";
+import type { GuildHubSelectionGuild } from "../../lib/guilds/localScanLibrary";
 
 function formatGuildTooltip(name: string, server: string) {
   return `${name} · ${server}`;
 }
 
-export default function GuildContextBar({ useImageFallback = true }: { useImageFallback?: boolean }) {
-  const { activeGuildId, selectedGuilds, setActiveGuildId } = useGuildHubSelection();
-  const localScanSummaries = useLocalScanSummariesForCoa(useImageFallback);
-  const visibleGuilds = React.useMemo(
-    () =>
-      useImageFallback ? selectedGuilds : enrichGuildsWithLocalCoa(selectedGuilds, localScanSummaries),
-    [localScanSummaries, selectedGuilds, useImageFallback],
-  );
+export default function GuildContextBar({ useImageFallback = true, selection, onSelectGuild }: {
+  useImageFallback?: boolean;
+  selection?: ReturnType<typeof useGuildHubSelection>;
+  onSelectGuild?: (guild: GuildHubSelectionGuild, favorite?: HubFavorite) => void;
+}) {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const favorites = useGuildFavoritesSelection();
+  const visibleGuilds = favorites.selectedGuilds;
+  const activeGuildId = selection?.activeGuildId;
+  const error = favorites.error;
+  const retry = favorites.retry;
+  const select = onSelectGuild ?? (selection ? (guild: GuildHubSelectionGuild) => selection.chooseGuild(guild) : undefined);
 
   return (
     <nav className={styles.contextBar} aria-label="Guild-Hub-Kontextnavigation">
       {visibleGuilds.length ? (
         <div className={styles.guildRail} role="list" aria-label="Gespeicherte Guild-Slots">
           {visibleGuilds.map((guild) => {
+            const row = favorites.projection.rows.find(row => row.favorite.guild?.id === guild.id);
             const active = guild.id === activeGuildId;
             const emblemUrl = useImageFallback ? guildIconByIdentifier(guild.logoIdentifier, 96).thumb || undefined : undefined;
             const tooltip = formatGuildTooltip(guild.name, guild.server);
@@ -41,12 +42,13 @@ export default function GuildContextBar({ useImageFallback = true }: { useImageF
             return (
               <Tooltip key={guild.id} content={tooltip}>
                 <button
+                  disabled={!select || !favorites.projection.ready || row?.identity === "conflict" || row?.observation?.state === "ambiguous"}
                   type="button"
                   className={styles.guildButton}
                   aria-current={active ? "true" : undefined}
-                  aria-label={`${guild.name}, ${guild.server} auswählen`}
+                  aria-label={select ? `${guild.name}, ${guild.server} auswählen` : `${guild.name}, ${guild.server}`}
                   aria-pressed={active}
-                  onClick={() => setActiveGuildId(guild.id)}
+                  onClick={async () => { const target = row && await favorites.projection.actionFavorite(row); if (target?.guild) select?.(target.guild, target); }}
                 >
                   <GuildEmblem
                     active={active}
@@ -65,64 +67,13 @@ export default function GuildContextBar({ useImageFallback = true }: { useImageF
         <span className={styles.emptyState}>Keine Guild-Slots gespeichert.</span>
       )}
 
-      <Link to="/guild-hub" className={styles.backLink}>
-        Zurück zum Guild Hub
+      {selection?.contextIssue && <span role="alert">{t(`pageContext.${selection.contextIssue}`)}</span>}
+      {selection && selection.context.guild && <button type="button" onClick={() => selection.chooseGuild(null)}>{t("pageContext.clear")}</button>}
+      {selection && !selection.context.guild && <span>{t("pageContext.choose")}</span>}
+      {error && <span role="alert">{t("hubFavorites.error")} <button type="button" onClick={() => void retry()}>{t("hubFavorites.retry")}</button></span>}
+      <Link to={safeLocalReturn(location.state?.returnTo) ?? GUILD_HUB} className={styles.backLink}>
+        {t("localProfileRoute.back")}
       </Link>
     </nav>
   );
-}
-
-function useLocalScanSummariesForCoa(disabled: boolean) {
-  const [summaries, setSummaries] = React.useState<GuildHubScanSummary[]>([]);
-
-  React.useEffect(() => {
-    if (disabled) {
-      setSummaries([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const load = () => {
-      listGuildHubScanSummaries()
-        .then((nextSummaries) => {
-          if (!cancelled) setSummaries(nextSummaries);
-        })
-        .catch(() => {
-          if (!cancelled) setSummaries([]);
-        });
-    };
-
-    load();
-    const unsubscribe = subscribeToSfDataHubLocalScanChanges(load);
-
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [disabled]);
-
-  return summaries;
-}
-
-function enrichGuildsWithLocalCoa(
-  selectedGuilds: GuildHubSelectedGuild[],
-  summaries: GuildHubScanSummary[],
-) {
-  if (!selectedGuilds.length || !summaries.length) return selectedGuilds;
-
-  const localGuildsById = new Map<string, GuildHubSelectedGuild>();
-  const selectedServers = [...new Set(selectedGuilds.map((guild) => guild.server).filter(Boolean))];
-
-  for (const server of selectedServers) {
-    for (const option of listGuildHubLocalGuildsForServerFromScanSummaries(summaries, server)) {
-      const guild = mapLocalGuildIdentityToSelection(option);
-      if (guild) localGuildsById.set(guild.id, guild);
-    }
-  }
-
-  return selectedGuilds.map((guild) => {
-    const localGuild = localGuildsById.get(guild.id);
-    if (!localGuild?.coaString || guild.coaString) return guild;
-    return { ...guild, coaString: localGuild.coaString };
-  });
 }

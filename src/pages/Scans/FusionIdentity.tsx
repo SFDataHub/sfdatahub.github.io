@@ -1,13 +1,23 @@
+import { profileClassLabel } from "../../lib/i18n/profilePresentation";
+import { hubText, hubNumber, hubDate, hubPercent, hubMessage } from "../../lib/i18n/dataHubPresentation";
+import { fusionAnalysisRefreshReason } from "../../lib/identities/fusionAnalysisNotice";
+import { getFusionPredecessorCoverage, getFusionPredecessorCoverageRows, type FusionPredecessorCoverage } from "../../lib/identities/fusionPredecessorCoverage";
+import { trackLocalEvent, useAnalyticsView } from "../../lib/analytics/localEvents";
 import React from "react";
+import { getFusionIdentityFastLoadOptions } from "../../lib/identities/fusionIdentityFastLoad";
+import { listFusionIdentityAnalysisScopes } from "../../lib/identities/fusionIdentityScopes";
+import { useLocation, useNavigate } from "react-router-dom";
+import LocalTitleNavigation from "../../components/ui/shared/LocalTitleNavigation";
+import { DATA_HUB, safeLocalReturn } from "../../lib/data-hub/routes";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Info, Link2, Search, Undo2, X } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useProfileTranslation as useTranslation } from "../../lib/i18n/useProfileTranslation";
 
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
-import { getClassMetaById } from "../../data/classes";
 import { subscribeToSfDataHubLocalScanChanges } from "../../lib/guilds/localScanLibrary";
 import {
   classifyFusionIdentityAnalysisCacheSnapshot,
+  revalidateFusionIdentityAnalysisCache,
   loadFusionIdentityAnalysisCacheSnapshot,
   writeFusionIdentityAnalysisCache,
   type FusionIdentityAnalysisCacheLookup,
@@ -42,6 +52,7 @@ import {
 import {
   confirmFusionIdentityLink,
   listReadyFusionIdentityMergeItems,
+  listGuildFusionIdentityMergeItems,
   mergeReadyFusionIdentityItems,
   rejectFusionIdentityCandidate,
   unlinkFusionIdentityAlias,
@@ -51,6 +62,7 @@ import {
   type FusionIdentityManagementReport,
   type FusionIdentityManagementReasonCode,
   type FusionIdentityManagementStatus,
+  type FusionIdentityMergeProgress,
 } from "../../lib/identities/fusionIdentityManagement";
 import {
   clearSelectedIdentityIds,
@@ -92,6 +104,7 @@ import type {
   PlayerFusionEvidenceStrength,
 } from "../../lib/identities/playerFusionResolver";
 import styles from "./FusionIdentity.module.css";
+import FusionIdentityEntry from "./FusionIdentityEntry";
 
 type EvidenceChipHelp = {
   id: string;
@@ -111,48 +124,48 @@ const EvidencePopoverContext =
   React.createContext<EvidencePopoverContextValue | null>(null);
 
 const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "ready", label: "Ready" },
-  { key: "review", label: "Needs Review" },
-  { key: "unresolved", label: "Unresolved" },
-  { key: "noHistoricalObservation", label: "No Historical Observation" },
-  { key: "noHistory", label: "No Historical Data" },
-  { key: "completed", label: "Completed" },
+  { key: "all", get label() { return hubText("dataHubI18n.all"); } },
+  { key: "ready", get label() { return hubText("dataHubI18n.ready"); } },
+  { key: "review", get label() { return hubText("dataHubI18n.needsReview"); } },
+  { key: "unresolved", get label() { return hubText("dataHubI18n.unresolved"); } },
+  { key: "noHistoricalObservation", get label() { return hubText("dataHubI18n.noHistoricalObservation"); } },
+  { key: "noHistory", get label() { return hubText("dataHubI18n.noHistoricalData"); } },
+  { key: "completed", get label() { return hubText("dataHubI18n.completed"); } },
 ];
 
 const TYPE_FILTERS: Array<{ key: TypeFilter; label: string }> = [
-  { key: "all", label: "All types" },
-  { key: "player", label: "Players" },
-  { key: "guild", label: "Guilds" },
+  { key: "all", get label() { return hubText("dataHubI18n.allTypes"); } },
+  { key: "player", get label() { return hubText("dataHubI18n.players"); } },
+  { key: "guild", get label() { return hubText("dataHubI18n.guilds"); } },
 ];
 
 const normalizeSearch = (value: string) => value.trim().toLowerCase();
-const formatNumber = (value: number) => new Intl.NumberFormat().format(value);
-const formatShare = (value: number) => `${Math.round(value * 100)}%`;
+const numberFormatter = { format: (value: number) => hubNumber(value) };
+const dateFormatter = { format: (value: Date | number) => hubDate(value, { dateStyle: "medium", timeStyle: "short" }) };
+const formatNumber = (value: number) => numberFormatter.format(value);
+const ignorePlayerGuildAction = () => {};
+const formatShare = (value: number) => hubPercent(value);
 const fallbackTranslate = (translate: (key: string) => string, key: string) => {
   const translated = translate(key);
   return translated === key ? "" : translated;
 };
 const formatClass = (classId: string | null | undefined) => {
   const key = String(classId ?? "").trim();
-  if (!key) return "Class unknown";
-  return getClassMetaById(key)?.label ?? `Class ${key}`;
+  if (!key) return hubText("dataHubI18n.classUnknown");
+  return profileClassLabel(key);
 };
 const formatLevel = (level: number | null | undefined) =>
-  level == null ? "Level unknown" : `Level ${level}`;
+  level == null ? hubText("dataHubI18n.levelUnknown") : hubText("dataHubI18n.levelNumber", { v1: level });
 const formatDate = (timestamp: number | null | undefined) =>
   timestamp
-    ? new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(timestamp))
+    ? dateFormatter.format(new Date(timestamp))
     : "-";
 
 const statusLabel = (status: FusionIdentityManagementStatus) => {
-  if (status === "noHistoricalObservation") return "No Historical Observation";
-  if (status === "noHistory") return "No Historical Data";
-  if (status === "review") return "Needs Review";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  if (status === "noHistoricalObservation") return hubText("dataHubI18n.noHistoricalObservation");
+  if (status === "noHistory") return hubText("dataHubI18n.noHistoricalData");
+  if (status === "review") return hubText("dataHubI18n.needsReview");
+  return STATUS_FILTERS.find(filter => filter.key === status)?.label ?? status;
 };
 
 const statusClassName = (status: FusionIdentityManagementStatus) => {
@@ -165,7 +178,7 @@ const statusClassName = (status: FusionIdentityManagementStatus) => {
 };
 
 const typeLabel = (type: FusionIdentityEntityType) =>
-  type === "player" ? "Player" : "Guild";
+  type === "player" ? hubText("dataHubI18n.player") : hubText("dataHubI18n.guild");
 
 const latestObservation = (
   observations: FusionIdentityManagementItem["observations"],
@@ -201,7 +214,7 @@ const formatCurrentLevel = (level: number | null | undefined) => {
 const formatOriginScope = (item: FusionIdentityManagementItem) =>
   item.diagnostics?.originServerCodes.length
     ? item.diagnostics.originServerCodes.join(", ")
-    : (item.currentServer ?? "unknown scope");
+    : (item.currentServer ?? hubText("dataHubI18n.unknownScope"));
 
 type StatusExplanation = {
   title: string;
@@ -227,12 +240,12 @@ const formatStatusExplanation = (
     const lookup = item.diagnostics?.reliableHistoricalLookup;
     const scope = formatOriginScope(item);
     const scanCount = item.diagnostics?.historicalSnapshotCount ?? 0;
-    const entityLabel = item.entityType === "guild" ? "guild" : "player";
+    const entityLabel = typeLabel(item.entityType);
     return {
-      title: "No matching historical observation",
+      title: hubText("dataHubI18n.noMatchingHistoricalObservation"),
       body: lookup
-        ? `No matching ${entityLabel} observation was found for ${lookup.baseName} in the available pre-fusion ${scope} scans. Historical scope: ${scope}. Scans checked: ${scanCount}.`
-        : `No matching observation was found in the available historical scans. Historical scope: ${scope}. Scans checked: ${scanCount}.`,
+        ? hubText("dataHubI18n.missingHistoricalObservationForName", { v1: entityLabel, v2: lookup.baseName, v3: scope, v4: scope, v5: scanCount })
+        : hubText("dataHubI18n.missingHistoricalObservationInScope", { v1: scope, v2: scanCount }),
     };
   }
 
@@ -242,33 +255,33 @@ const formatStatusExplanation = (
       hasReasonCode(item, "insufficient-continuity")
     ) {
       return {
-        title: "Not enough reliable historical evidence for automatic matching",
-        body: "A likely historical guild was found, but too few members could be reliably tracked across the available scans.",
+        title: hubText("dataHubI18n.notEnoughReliableHistoricalEvidenceForAutomaticMatching"),
+        body: hubText("dataHubI18n.aLikelyHistoricalGuildWasFoundButTooFewMembersCouldBe"),
         action:
-          "If you recognize the guild, confirm the identity manually below.",
+          hubText("dataHubI18n.ifYouRecognizeTheGuildConfirmTheIdentityManuallyBelow"),
       };
     }
     if (hasReasonCode(item, "insufficient-player-evidence")) {
       return {
-        title: "Not enough reliable player evidence for automatic matching",
-        body: "A likely historical player was found, but the available identity evidence is not strong enough for an automatic match.",
+        title: hubText("dataHubI18n.notEnoughReliablePlayerEvidenceForAutomaticMatching"),
+        body: hubText("dataHubI18n.aLikelyHistoricalPlayerWasFoundButTheAvailableIdentityEvidenceIs"),
         action:
-          "If you recognize the player, confirm the identity manually below.",
+          hubText("dataHubI18n.ifYouRecognizeThePlayerConfirmTheIdentityManuallyBelow"),
       };
     }
     if (hasReasonCode(item, "multiple-relevant-candidates")) {
       return {
-        title: "Multiple relevant historical identities require review",
+        title: hubText("dataHubI18n.multipleRelevantHistoricalIdentitiesRequireReview"),
         body:
           item.entityType === "guild"
-            ? "More than one historical guild candidate remains relevant, so the resolver is waiting for a manual decision."
-            : "More than one historical player candidate remains relevant, so the resolver is waiting for a manual decision.",
+            ? hubText("dataHubI18n.moreThanOneHistoricalGuildCandidateRemainsRelevantSoTheResolverIs")
+            : hubText("dataHubI18n.moreThanOneHistoricalPlayerCandidateRemainsRelevantSoTheResolverIs"),
       };
     }
     if (hasReasonCode(item, "assignment-conflict")) {
       return {
-        title: "Historical identity is contested",
-        body: "This historical identity is claimed by multiple current identities and needs a manual decision.",
+        title: hubText("dataHubI18n.historicalIdentityIsContested"),
+        body: hubText("dataHubI18n.thisHistoricalIdentityIsClaimedByMultipleCurrentIdentitiesAndNeedsA"),
       };
     }
   }
@@ -277,47 +290,47 @@ const formatStatusExplanation = (
   const reason = item.reasonCodes[0];
   if (reason === "level-regression")
     return {
-      title: "No viable candidate",
-      body: "No viable identity remained after reliable level continuity checks.",
+      title: hubText("dataHubI18n.noViableCandidate"),
+      body: hubText("dataHubI18n.noViableIdentityRemainedAfterReliableLevelContinuityChecks"),
     };
   if (reason === "semantic-contradictions")
     return {
-      title: "No viable candidate",
-      body: "No viable identity remained after semantic consistency checks.",
+      title: hubText("dataHubI18n.noViableCandidate"),
+      body: hubText("dataHubI18n.noViableIdentityRemainedAfterSemanticConsistencyChecks"),
     };
   if (reason === "reserved-by-other-identity")
     return {
-      title: "Reserved candidate",
-      body: "Candidate identities were reserved by other ready assignments.",
+      title: hubText("dataHubI18n.reservedCandidate"),
+      body: hubText("dataHubI18n.candidateIdentitiesWereReservedByOtherReadyAssignments"),
     };
   if (reason === "rejected-by-exclusion")
     return {
-      title: "No remaining candidate",
-      body: "No remaining candidate after exclusions.",
+      title: hubText("dataHubI18n.noRemainingCandidate"),
+      body: hubText("dataHubI18n.noRemainingCandidateAfterExclusions"),
     };
   if (reason === "no-actionable-candidate") {
     return {
-      title: "No actionable candidate",
+      title: hubText("dataHubI18n.noActionableCandidate"),
       body:
         item.entityType === "guild"
-          ? "Historical guild data exists, but no candidate has enough positive identity evidence for review."
-          : "Only weak compatibility matches were found. No candidate currently has enough identity evidence for review.",
+          ? hubText("dataHubI18n.historicalGuildDataExistsButNoCandidateHasEnoughPositiveIdentityEvidence")
+          : hubText("dataHubI18n.onlyWeakCompatibilityMatchesWereFoundNoCandidateCurrentlyHasEnoughIdentity"),
       action:
-        "Use manual identity link if you can identify the correct historical alias.",
+        hubText("dataHubI18n.useManualIdentityLinkIfYouCanIdentifyTheCorrectHistoricalAlias"),
     };
   }
   return {
-    title: "No reliable identity continuity",
+    title: hubText("dataHubI18n.noReliableIdentityContinuity"),
     body:
       item.entityType === "guild"
-        ? "Historical guild scans exist, but no reliable continuity could be established."
-        : "Historical data exists, but no reliable identity continuity could be established.",
+        ? hubText("dataHubI18n.historicalGuildScansExistButNoReliableContinuityCouldBeEstablished")
+        : hubText("dataHubI18n.historicalDataExistsButNoReliableIdentityContinuityCouldBeEstablished"),
   };
 };
 
 const formatDuration = (durationMs: number) => {
-  if (durationMs < 1000) return `${Math.round(durationMs)} ms`;
-  return `${(durationMs / 1000).toFixed(1)} s`;
+  if (durationMs < 1000) return hubNumber(Math.round(durationMs), { style: "unit", unit: "millisecond", unitDisplay: "short" });
+  return hubNumber(durationMs / 1000, { style: "unit", unit: "second", unitDisplay: "short", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 };
 
 const reportDashboardInventoryTimings = (
@@ -619,7 +632,7 @@ function useFusionIdentityDashboard() {
     }
     setInventoryProgress({
       phase: "indexeddb-scan-metadata-load",
-      message: "Reading local scan inventory",
+      message: hubText("dataHubI18n.readingLocalScanInventory"),
     });
     setInventoryTimings([]);
     const run = startFusionDashboardInventoryWorkerRun({
@@ -692,11 +705,11 @@ function useFusionIdentityDashboard() {
             scopeInventory.currentGuildIdentifiers,
             { identityRevisionBasis },
           );
-          const cache = classifyFusionIdentityAnalysisCacheSnapshot(cacheSnapshot, {
+          const cache = await revalidateFusionIdentityAnalysisCache(classifyFusionIdentityAnalysisCacheSnapshot(cacheSnapshot, {
             scope: scopeInventory.scope,
             scanFingerprint: scopeInventory.scanFingerprint,
             identityRevision: identityState.identityRevision,
-          });
+          }));
           return {
             inventory: scopeInventory,
             identityState,
@@ -768,7 +781,7 @@ function useFusionIdentityDashboard() {
         error:
           loadError instanceof Error
             ? loadError.message
-            : "Fusion dashboard could not be prepared.",
+            : hubText("dataHubI18n.fusionDashboardCouldNotBePrepared"),
       }));
       setInventoryProgress(null);
       if (isIdentityRevisionRefresh) setProgress(null);
@@ -801,7 +814,7 @@ function useFusionIdentityDashboard() {
       if (!entry) return false;
       setReport(entry.report);
       setTimings(entry.timings);
-      setProgress({ phase: "done", message: "Cached fusion identity report" });
+      setProgress({ phase: "done", message: hubText("dataHubI18n.cachedFusionIdentityReport") });
       return true;
     },
     [],
@@ -830,14 +843,13 @@ function useFusionIdentityDashboard() {
           return null;
         const message =
           actionState.reason === "unsupported"
-            ? `Full identity analysis is not enabled for ${scope.targetServerCode} yet.`
+            ? hubText("dataHubI18n.analysisNotEnabledForServer", { v1: scope.targetServerCode })
             : !scopeModel.inventory.hasHistoricalObservations
-              ? `No historical ${scope.targetServerCode} lineage observations are available before this fusion.`
+              ? hubText("dataHubI18n.noHistoricalServerLineage", { v1: scope.targetServerCode })
               : !scopeModel.inventory.hasCurrentTargetObservations
                 ? `No current ${scope.targetServerCode} observations are available after this fusion.`
                 : actionState.reason === "no-current-data"
-                  ? `No current ${scope.targetServerCode} observations are available after this fusion.`
-                  : `${scope.targetServerCode} is not locally matchable yet.`;
+                  ? hubText("dataHubI18n.noCurrentServerObservation", { v1: scope.targetServerCode })   : hubText("dataHubI18n.serverNotLocallyMatchable", { v1: scope.targetServerCode });
         setDashboard((current) =>
           updateDashboardScope(current, scope.id, {
             cacheState: "never-analyzed",
@@ -856,7 +868,7 @@ function useFusionIdentityDashboard() {
       setRunningScopeId(scope.id);
       setProgress({
         phase: "loading",
-        message: `Starting ${scope.targetServerCode} fusion worker`,
+        message: hubText("dataHubI18n.startingServerWorker", { v1: scope.targetServerCode }),
       });
       setTimings([]);
       if (options.source === "identity-refresh") {
@@ -912,8 +924,10 @@ function useFusionIdentityDashboard() {
           });
           return null;
         }
+        result.report.predecessorCoverage = getFusionPredecessorCoverage(scope, scopeModel.inventory.coverage);
         const cacheWriteStartedAt = performance.now();
         await writeFusionIdentityAnalysisCache({
+          resolverVersion: result.resolverVersion,
           scope,
           scanFingerprint: scopeModel.inventory.scanFingerprint,
           identityRevision: scopeModel.identityState.identityRevision,
@@ -926,9 +940,10 @@ function useFusionIdentityDashboard() {
           count: 1,
         });
         const reactStateStartedAt = performance.now();
+        if (options.source !== "identity-refresh") trackLocalEvent("datahub/identity/analyze-success");
         setReport(result.report);
         setTimings(nextTimings);
-        setProgress({ phase: "done", message: "Fusion identity report ready" });
+        setProgress({ phase: "done", message: hubText("dataHubI18n.fusionIdentityReportReady") });
         nextTimings.push({
           phase: "main:react-state-enqueue",
           durationMs: performance.now() - reactStateStartedAt,
@@ -957,7 +972,7 @@ function useFusionIdentityDashboard() {
         const message =
           loadError instanceof Error
             ? loadError.message
-            : "Fusion identity data could not be loaded.";
+            : hubText("dataHubI18n.fusionIdentityDataCouldNotBeLoaded");
         setDashboard((current) =>
           updateDashboardScope(current, scope.id, {
             cacheState: "error",
@@ -1036,11 +1051,11 @@ const PLAYER_CANDIDATE_CLASSIFICATION_LABELS: Record<
   PlayerFusionCandidateClassification,
   string
 > = {
-  rejected: "Rejected",
-  weak: "Weak",
-  plausible: "Plausible",
-  strong: "Strong",
-  anchored: "Anchored",
+  get rejected() { return hubText("dataHubI18n.rejected"); },
+  get weak() { return hubText("dataHubI18n.weak"); },
+  get plausible() { return hubText("dataHubI18n.plausible"); },
+  get strong() { return hubText("dataHubI18n.strong"); },
+  get anchored() { return hubText("dataHubI18n.anchored"); },
 };
 
 const PLAYER_CANDIDATE_CLASSIFICATION_STRENGTHS: Record<
@@ -1067,11 +1082,11 @@ const GUILD_CANDIDATE_CLASSIFICATION_LABELS: Record<
   GuildFusionCandidateClassification,
   string
 > = {
-  rejected: "Rejected",
-  weak: "Weak",
-  plausible: "Plausible",
-  strong: "Strong",
-  anchored: "Anchored",
+  get rejected() { return hubText("dataHubI18n.rejected"); },
+  get weak() { return hubText("dataHubI18n.weak"); },
+  get plausible() { return hubText("dataHubI18n.plausible"); },
+  get strong() { return hubText("dataHubI18n.strong"); },
+  get anchored() { return hubText("dataHubI18n.anchored"); },
 };
 
 const GUILD_CANDIDATE_CLASSIFICATION_STRENGTHS: Record<
@@ -1089,21 +1104,21 @@ const PLAYER_EVIDENCE_TYPE_LABELS: Record<
   PlayerFusionEvidenceEntryType,
   string
 > = {
-  "origin-compatibility": "Origin compatibility",
-  "class-compatibility": "Class compatibility",
-  "level-monotonicity": "Level monotonicity",
-  "level-progression": "Level progression",
-  "base-monotonicity": "Base monotonicity",
-  "base-unchanged-stats": "Unchanged base stats",
-  "base-secondary-stability": "Secondary base stability",
-  "base-ordering": "Base-stat ordering",
-  "fortress-continuity": "Fortress continuity",
-  "pet-continuity": "Pet continuity",
-  "portrait-continuity": "Portrait continuity",
-  "guild-continuity": "Guild continuity",
-  "exact-name": "Exact name",
-  "fusion-base-name": "Fusion base name",
-  assignment: "Assignment",
+  get "origin-compatibility"() { return hubText("dataHubI18n.originCompatibility"); },
+  get "class-compatibility"() { return hubText("dataHubI18n.classCompatibility"); },
+  get "level-monotonicity"() { return hubText("dataHubI18n.levelMonotonicity"); },
+  get "level-progression"() { return hubText("dataHubI18n.levelProgression"); },
+  get "base-monotonicity"() { return hubText("fusionIdentity.evidenceHelp.player.baseMonotonicity.title"); },
+  get "base-unchanged-stats"() { return hubText("dataHubI18n.unchangedBaseStats"); },
+  get "base-secondary-stability"() { return hubText("dataHubI18n.secondaryBaseStability"); },
+  get "base-ordering"() { return hubText("fusionIdentity.evidenceHelp.player.baseOrdering.title"); },
+  get "fortress-continuity"() { return hubText("dataHubI18n.fortressContinuity"); },
+  get "pet-continuity"() { return hubText("dataHubI18n.petContinuity"); },
+  get "portrait-continuity"() { return hubText("dataHubI18n.portraitContinuity"); },
+  get "guild-continuity"() { return hubText("dataHubI18n.guildContinuity"); },
+  get "exact-name"() { return hubText("dataHubI18n.exactName"); },
+  get "fusion-base-name"() { return hubText("dataHubI18n.fusionBaseName"); },
+  get assignment() { return hubText("dataHubI18n.assignment"); },
 };
 
 const isPlayerEvidenceStrength = (
@@ -1246,7 +1261,7 @@ function EvidenceChip({
   };
 
   const title = help?.definition
-    ? fallbackTranslate(t, help.definition.titleKey) || help.fallbackTitle
+    ? fallbackTranslate(t, help.definition.titleKey) || hubMessage(help.fallbackTitle)
     : help?.fallbackTitle;
   const description = help?.definition
     ? fallbackTranslate(t, help.definition.descriptionKey)
@@ -1287,10 +1302,10 @@ function EvidenceChip({
               style={{ top: position.top, left: position.left }}
               role="tooltip"
             >
-              <div className={styles.evidencePopoverTitle}>{title}</div>
+              <div className={styles.evidencePopoverTitle}>{hubMessage(title)}</div>
               {rankTitle ? (
                 <div className={styles.evidencePopoverRank}>
-                  {help.kind === "classification" ? "Classification" : "Rank"}:{" "}
+                  {help.kind === "classification" ? hubText("dataHubI18n.classification") : hubText("dataHubI18n.rank")}:{" "}
                   {rankTitle}
                 </div>
               ) : null}
@@ -1299,17 +1314,17 @@ function EvidenceChip({
               ) : (
                 <p>
                   {help.fallbackDescription ??
-                    "This chip uses contextual resolver evidence. Review it together with the other signals."}
+                    hubText("dataHubI18n.thisChipUsesContextualResolverEvidenceReviewItTogetherWithTheOther")}
                 </p>
               )}
               {effect ? (
                 <p>
-                  <strong>Effect:</strong> {effect}
+                  <strong>{hubText("dataHubI18n.effect")}</strong> {effect}
                 </p>
               ) : null}
               {caution ? (
                 <p>
-                  <strong>Important:</strong> {caution}
+                  <strong>{hubText("dataHubI18n.important")}</strong> {caution}
                 </p>
               ) : null}
             </div>,
@@ -1360,7 +1375,7 @@ const getPlayerCandidateClassificationChip = (
   }
 
   return {
-    label: candidate.rejected ? "Rejected" : "Unclassified candidate",
+    label: candidate.rejected ? hubText("dataHubI18n.rejected") : hubText("dataHubI18n.unclassifiedCandidate"),
     strength: candidate.rejected
       ? ("hardContradiction" as const)
       : ("neutral" as const),
@@ -1383,7 +1398,7 @@ const normalizePlayerEvidenceEntry = (
   const label =
     typeof record.label === "string" && record.label.trim()
       ? record.label
-      : (typedLabel ?? "Evidence");
+      : (typedLabel ?? hubText("dataHubI18n.evidence"));
 
   return {
     type,
@@ -1403,52 +1418,52 @@ const legacyPlayerEvidenceEntries = (
     legacyBooleanEvidenceEntry(
       "origin-compatibility",
       evidence.originMatches,
-      "Origin compatible",
-      "Origin contradiction",
+      hubText("dataHubI18n.originCompatible"),
+      hubText("dataHubI18n.originContradiction"),
       "hardContradiction",
     ),
     legacyBooleanEvidenceEntry(
       "class-compatibility",
       evidence.sameClass,
-      "Class compatible",
-      "Class contradiction",
+      hubText("dataHubI18n.classCompatible"),
+      hubText("dataHubI18n.classContradiction"),
       "hardContradiction",
     ),
     legacyBooleanEvidenceEntry(
       "level-monotonicity",
       evidence.levelConsistent,
-      "Level non-decreasing",
-      "Level regression",
+      hubText("dataHubI18n.levelNonDecreasing"),
+      hubText("dataHubI18n.levelRegression"),
       "hardContradiction",
     ),
     legacyBooleanEvidenceEntry(
       "base-monotonicity",
       evidence.baseAttributesConsistent,
-      "Base stats non-decreasing",
-      "Base-stat regression",
+      hubText("dataHubI18n.baseStatsNonDecreasing"),
+      hubText("dataHubI18n.baseStatRegression86335"),
       "hardContradiction",
     ),
     legacyBooleanEvidenceEntry(
       "fortress-continuity",
       evidence.fortressContinuity,
-      "Fortress continuity",
-      "Fortress differs",
+      hubText("dataHubI18n.fortressContinuity"),
+      hubText("dataHubI18n.fortressDiffers"),
       "neutral",
       "strongSupport",
     ),
     legacyBooleanEvidenceEntry(
       "pet-continuity",
       evidence.petContinuity,
-      "Pet continuity",
-      "Pets differ",
+      hubText("dataHubI18n.petContinuity"),
+      hubText("dataHubI18n.petsDiffer"),
       "neutral",
       "weakSupport",
     ),
     legacyBooleanEvidenceEntry(
       "guild-continuity",
       evidence.sameGuild,
-      "Guild continuity",
-      "Guild differs",
+      hubText("dataHubI18n.guildContinuity"),
+      hubText("dataHubI18n.guildDiffers"),
       "neutral",
       "support",
     ),
@@ -1458,19 +1473,19 @@ const legacyPlayerEvidenceEntries = (
     entries.push({
       type: "level-progression",
       strength: "support",
-      label: "Normal level progression",
+      label: hubText("dataHubI18n.normalLevelProgression"),
     });
   } else if (evidence.levelProgression?.category === "plausible-burst") {
     entries.push({
       type: "level-progression",
       strength: "weakSupport",
-      label: "Plausible level burst",
+      label: hubText("dataHubI18n.plausibleLevelBurst"),
     });
   } else if (evidence.levelProgression?.category === "extreme-contradiction") {
     entries.push({
       type: "level-progression",
       strength: "strongContradiction",
-      label: "Unusually high level progression",
+      label: hubText("dataHubI18n.unusuallyHighLevelProgression"),
     });
   }
   if (
@@ -1480,7 +1495,7 @@ const legacyPlayerEvidenceEntries = (
     entries.push({
       type: "base-unchanged-stats",
       strength: "strongSupport",
-      label: "3+ unchanged base stats",
+      label: hubText("dataHubI18n.3UnchangedBaseStats"),
     });
   }
   if (
@@ -1490,27 +1505,27 @@ const legacyPlayerEvidenceEntries = (
     entries.push({
       type: "base-secondary-stability",
       strength: "strongSupport",
-      label: "2 unchanged secondary base stats",
+      label: hubText("dataHubI18n.2UnchangedSecondaryBaseStats"),
     });
   }
   if (evidence.baseFingerprint?.orderingStable === true) {
     entries.push({
       type: "base-ordering",
       strength: "support",
-      label: "Base-stat ordering stable",
+      label: hubText("dataHubI18n.baseStatOrderingStable"),
     });
   }
   if (evidence.exactName)
     entries.push({
       type: "exact-name",
       strength: "identityAnchor",
-      label: "Exact name",
+      label: hubText("dataHubI18n.exactName"),
     });
   if (evidence.fusionBaseName)
     entries.push({
       type: "fusion-base-name",
       strength: "identityAnchor",
-      label: "Fusion base name",
+      label: hubText("dataHubI18n.fusionBaseName"),
     });
 
   return entries.filter((entry): entry is RenderablePlayerEvidenceEntry =>
@@ -1539,7 +1554,7 @@ const normalizeGuildEvidenceEntry = (
   const label =
     typeof record.label === "string" && record.label.trim()
       ? record.label
-      : "Guild evidence";
+      : hubText("dataHubI18n.guildEvidence");
   return {
     type,
     strength: isGuildEvidenceStrength(record.strength)
@@ -1559,7 +1574,7 @@ const getGuildCandidateClassificationChip = (
         GUILD_CANDIDATE_CLASSIFICATION_STRENGTHS[candidate.classification],
     };
   }
-  return { label: "Unclassified candidate", strength: "neutral" as const };
+  return { label: hubText("dataHubI18n.unclassifiedCandidate"), strength: "neutral" as const };
 };
 
 const getRenderableGuildEvidenceEntries = (
@@ -1576,24 +1591,24 @@ const getRenderableGuildEvidenceEntries = (
       ? {
           type: "exact-name",
           strength: "strongSupport" as const,
-          label: "Exact guild name",
+          label: hubText("dataHubI18n.exactGuildName"),
         }
       : null,
     candidate.sameCoA
-      ? { type: "same-coa", strength: "support" as const, label: "Same CoA" }
+      ? { type: "same-coa", strength: "support" as const, label: hubText("dataHubI18n.sameCoa") }
       : null,
     candidate.mutualDominant
       ? {
           type: "member-flow",
           strength: "strongSupport" as const,
-          label: "Mutual dominant flow",
+          label: hubText("dataHubI18n.mutualDominantFlow"),
         }
       : null,
     candidate.matchedMemberCount > 0
       ? {
           type: "member-flow-count",
           strength: "support" as const,
-          label: `${candidate.matchedMemberCount} matched players`,
+          label: hubText("dataHubI18n.matchedPlayerCount", { v1: candidate.matchedMemberCount }),
         }
       : null,
   ];
@@ -1620,7 +1635,7 @@ const evidenceChipHelp = (
   strength: FusionEvidenceRank,
   fallbackTitle: string,
 ): EvidenceChipHelp => ({
-  id: `evidence-${entityType}-${type}-${strength}-${fallbackTitle}`,
+  id: `evidence-${entityType}-${type}-${strength}`,
   kind: "evidence",
   definition: getEvidenceHelp(entityType, type),
   strength,
@@ -1632,25 +1647,25 @@ const rejectReasonChipHelp = (reason: string): EvidenceChipHelp => ({
   kind: "reject",
   definition: getPlayerRejectReasonHelp(reason),
   strength: "hardContradiction",
-  fallbackTitle: reason,
+  fallbackTitle: getPlayerRejectReasonHelp(reason) ? hubText(getPlayerRejectReasonHelp(reason)!.titleKey) : hubMessage(reason),
 });
 
 const readyQueueChipHelp = (): EvidenceChipHelp => ({
   id: "queue-ready-candidate",
   kind: "classification",
   definition: getClassificationHelp("anchored"),
-  fallbackTitle: "Ready queue candidate",
+  fallbackTitle: hubText("dataHubI18n.readyQueueCandidate"),
   fallbackDescription:
-    "This candidate is the selected automatic-linking option for the current identity.",
+    hubText("dataHubI18n.thisCandidateIsTheSelectedAutomaticLinkingOptionForTheCurrentIdentity"),
 });
 
 const guildReadyCandidateHelp = (): EvidenceChipHelp => ({
   id: "guild-ready-candidate",
   kind: "classification",
   definition: getClassificationHelp("anchored"),
-  fallbackTitle: "Ready candidate",
+  fallbackTitle: hubText("dataHubI18n.readyCandidate"),
   fallbackDescription:
-    "This guild candidate currently has enough consistent evidence to be eligible for automatic linking.",
+    hubText("dataHubI18n.thisGuildCandidateCurrentlyHasEnoughConsistentEvidenceToBeEligibleFor"),
 });
 
 function DetailDataList({ rows }: { rows: Array<[string, React.ReactNode]> }) {
@@ -1684,7 +1699,7 @@ function PlayerEvidence({ candidate }: { candidate: PlayerFusionCandidate }) {
       </EvidenceChip>
       {evidenceEntries.map((entry, index) => (
         <EvidenceChip
-          key={`${entry.type}-${entry.label}-${index}`}
+          key={`${entry.type}-${index}`}
           strength={entry.strength}
           help={evidenceChipHelp(
             "player",
@@ -1693,7 +1708,7 @@ function PlayerEvidence({ candidate }: { candidate: PlayerFusionCandidate }) {
             entry.label,
           )}
         >
-          {entry.label}
+          {hubMessage(entry.label)}
         </EvidenceChip>
       ))}
       {candidate.rejectReasons.map((reason) => (
@@ -1702,7 +1717,7 @@ function PlayerEvidence({ candidate }: { candidate: PlayerFusionCandidate }) {
           strength="hardContradiction"
           help={rejectReasonChipHelp(reason)}
         >
-          {reason}
+          {getPlayerRejectReasonHelp(reason) ? hubText(getPlayerRejectReasonHelp(reason)!.titleKey) : hubMessage(reason)}
         </EvidenceChip>
       ))}
     </div>
@@ -1727,7 +1742,7 @@ function GuildEvidence({ candidate }: { candidate: GuildFusionCandidate }) {
       </EvidenceChip>
       {evidenceEntries.map((entry, index) => (
         <EvidenceChip
-          key={`${entry.type}-${entry.label}-${index}`}
+          key={`${entry.type}-${index}`}
           strength={entry.strength}
           help={evidenceChipHelp(
             "guild",
@@ -1736,7 +1751,7 @@ function GuildEvidence({ candidate }: { candidate: GuildFusionCandidate }) {
             entry.label,
           )}
         >
-          {entry.label}
+          {hubMessage(entry.label)}
         </EvidenceChip>
       ))}
       {candidate.autoEligible ? (
@@ -1744,7 +1759,7 @@ function GuildEvidence({ candidate }: { candidate: GuildFusionCandidate }) {
           strength="identityAnchor"
           help={guildReadyCandidateHelp()}
         >
-          Ready candidate
+          {hubText("dataHubI18n.readyCandidate")}
         </EvidenceChip>
       ) : null}
       {!candidate.autoEligible && candidate.assignmentConflict ? (
@@ -1754,10 +1769,10 @@ function GuildEvidence({ candidate }: { candidate: GuildFusionCandidate }) {
             "guild",
             "assignment",
             "warning",
-            "Assignment conflict",
+            hubText("dataHubI18n.assignmentConflict"),
           )}
         >
-          Assignment conflict
+          {hubText("dataHubI18n.assignmentConflict")}
         </EvidenceChip>
       ) : null}
     </div>
@@ -1795,18 +1810,17 @@ function EvidenceInfoDialog({ onClose }: { onClose: () => void }) {
         <header className={styles.dialogHeader}>
           <div>
             <h2 id="fusion-evidence-info-title" className={styles.dialogTitle}>
-              Matching evidence
+              {hubText("dataHubI18n.matchingEvidence")}
             </h2>
             <div className={styles.muted}>
-              How Fusion &amp; Identity decides between Ready, Review and
-              Unresolved.
+              {hubText("dataHubI18n.howFusionIdentityDecidesBetweenReadyReviewAndUnresolved")}
             </div>
           </div>
           <button
             type="button"
             className={styles.closeButton}
             onClick={onClose}
-            aria-label="Close evidence info"
+            aria-label={hubText("dataHubI18n.closeEvidenceInfo")}
           >
             <X size={16} aria-hidden />
           </button>
@@ -1814,63 +1828,50 @@ function EvidenceInfoDialog({ onClose }: { onClose: () => void }) {
 
         <div className={`${styles.dialogBody} ${styles.infoBody}`}>
           <section className={styles.infoSection}>
-            <h3>How matching works</h3>
+            <h3>{hubText("dataHubI18n.howMatchingWorks")}</h3>
             <p>
-              The system compares historical identities from EU1-EU4 with
-              current F28 identities. It collects independent evidence,
-              classifies each candidate, and then places the current identity
-              into Ready, Needs Review, Unresolved or one of the no-history
-              states.
+              {hubText("dataHubI18n.theSystemComparesHistoricalIdentitiesFromEu1Eu4WithCurrentF28Identities")}
             </p>
             <p>
-              A single visible candidate is not enough on its own. Automatic
-              matching needs evidence that is strong enough, consistent, and not
-              contested by another current identity.
+              {hubText("dataHubI18n.aSingleVisibleCandidateIsNotEnoughOnItsOwnAutomaticMatching")}
             </p>
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Evidence strengths</h3>
+            <h3>{hubText("dataHubI18n.evidenceStrengths")}</h3>
             <div className={styles.infoStrengthGrid}>
               <div>
-                <strong>Weak</strong>
-                <span>Compatible, but too generic or too thin to rely on.</span>
+                <strong>{hubText("dataHubI18n.weak")}</strong>
+                <span>{hubText("dataHubI18n.compatibleButTooGenericOrTooThinToRelyOn")}</span>
               </div>
               <div>
-                <strong>Plausible</strong>
+                <strong>{hubText("dataHubI18n.plausible")}</strong>
                 <span>
-                  A reasonable identity hypothesis that usually still needs a
-                  human check.
+                  {hubText("dataHubI18n.aReasonableIdentityHypothesisThatUsuallyStillNeedsAHumanCheck")}
                 </span>
               </div>
               <div>
-                <strong>Strong</strong>
+                <strong>{hubText("dataHubI18n.strong")}</strong>
                 <span>
-                  Several reliable signals point to the same historical
-                  identity.
+                  {hubText("dataHubI18n.severalReliableSignalsPointToTheSameHistoricalIdentity")}
                 </span>
               </div>
               <div>
-                <strong>Anchored</strong>
+                <strong>{hubText("dataHubI18n.anchored")}</strong>
                 <span>
-                  A direct identity anchor exists, such as a robust name/fusion
-                  signal or dominant continuity.
+                  {hubText("dataHubI18n.aDirectIdentityAnchorExistsSuchAsARobustNameFusionSignal")}
                 </span>
               </div>
             </div>
             <p>
-              These levels are ordinal guidance, not percentage confidence
-              scores.
+              {hubText("dataHubI18n.theseLevelsAreOrdinalGuidanceNotPercentageConfidenceScores")}
             </p>
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Evidence signal ranks</h3>
+            <h3>{hubText("dataHubI18n.evidenceSignalRanks")}</h3>
             <p>
-              Signal ranks describe how helpful a single chip is in context.
-              They are ordinal labels, not scores, and the final classification
-              does not simply count chips. Independent evidence families matter
-              more than many copies of the same weak hint.
+              {hubText("dataHubI18n.signalRanksDescribeHowHelpfulASingleChipIsInContextThey")}
             </p>
             <div className={styles.rankGuide}>
               {FUSION_EVIDENCE_RANKS.map((rank) => (
@@ -1893,47 +1894,37 @@ function EvidenceInfoDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Typical evidence signals</h3>
+            <h3>{hubText("dataHubI18n.typicalEvidenceSignals")}</h3>
             <ul className={styles.infoList}>
               <li>
-                <strong>Exact name</strong> means the current and historical
-                names match after normalization.
+                <strong>{hubText("dataHubI18n.exactName")}</strong> {hubText("dataHubI18n.meansTheCurrentAndHistoricalNamesMatchAfterNormalization")}
               </li>
               <li>
-                <strong>Unique exact name</strong> means that exact historical
-                name appears as a unique candidate in the covered pool.
+                <strong>{hubText("dataHubI18n.uniqueExactName")}</strong> {hubText("dataHubI18n.meansThatExactHistoricalNameAppearsAsAUniqueCandidateInThe")}
               </li>
               <li>
-                <strong>Same CoA</strong> means the guild crest evidence stayed
-                consistent.
+                <strong>{hubText("dataHubI18n.sameCoa")}</strong> {hubText("dataHubI18n.meansTheGuildCrestEvidenceStayedConsistent")}
               </li>
               <li>
-                <strong>Mutual dominant member flow</strong> means resolved
-                players mostly point from one old guild into one new guild, and
-                back.
+                <strong>{hubText("dataHubI18n.mutualDominantMemberFlow")}</strong> {hubText("dataHubI18n.meansResolvedPlayersMostlyPointFromOneOldGuildIntoOneNew")}
               </li>
               <li>
-                <strong>Reliable member matches</strong> count resolved player
-                identities, not the total guild roster.
+                <strong>{hubText("dataHubI18n.reliableMemberMatches")}</strong> {hubText("dataHubI18n.countResolvedPlayerIdentitiesNotTheTotalGuildRoster")}
               </li>
               <li>
-                <strong>Leader continuity</strong> compares resolved leader
-                identities when the data is available.
+                <strong>{hubText("dataHubI18n.leaderContinuity")}</strong> {hubText("dataHubI18n.comparesResolvedLeaderIdentitiesWhenTheDataIsAvailable")}
               </li>
               <li>
-                <strong>Structural rename</strong> covers strong member-flow
-                continuity even when the guild name changed.
+                <strong>{hubText("dataHubI18n.structuralRename")}</strong> {hubText("dataHubI18n.coversStrongMemberFlowContinuityEvenWhenTheGuildNameChanged")}
               </li>
               <li>
-                <strong>Warnings</strong> such as unavailable leader continuity
-                or a different resolved leader reduce certainty or require
-                review.
+                <strong>{hubText("dataHubI18n.warnings")}</strong> {hubText("dataHubI18n.suchAsUnavailableLeaderContinuityOrADifferentResolvedLeaderReduceCertainty")}
               </li>
             </ul>
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Player evidence by rank</h3>
+            <h3>{hubText("dataHubI18n.playerEvidenceByRank")}</h3>
             <div className={styles.signalMatrix}>
               {FUSION_EVIDENCE_RANKS.map((rank) => {
                 const signals = signalsByEntity.player.filter(
@@ -1964,7 +1955,7 @@ function EvidenceInfoDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Guild evidence by rank</h3>
+            <h3>{hubText("dataHubI18n.guildEvidenceByRank")}</h3>
             <div className={styles.signalMatrix}>
               {FUSION_EVIDENCE_RANKS.map((rank) => {
                 const signals = signalsByEntity.guild.filter(
@@ -1995,70 +1986,61 @@ function EvidenceInfoDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Why review can remain</h3>
+            <h3>{hubText("dataHubI18n.whyReviewCanRemain")}</h3>
             <p>
-              Chips describe evidence that exists, but they do not guarantee
-              automatic linking. A guild can show one plausible candidate, exact
-              name evidence and 1 matched player, yet still stay in review
-              because only a tiny part of the roster was reliably resolved.
+              {hubText("dataHubI18n.chipsDescribeEvidenceThatExistsButTheyDoNotGuaranteeAutomaticLinking")}
             </p>
             <p>
-              For example, 1 matched player does not mean the guild had 1
-              member. It means 1 current player identity could be reliably
-              linked across the available scans. Low coverage can come from
-              missing scans, sparse observations or incomplete historical data.
+              {hubText("dataHubI18n.forExample1MatchedPlayerDoesNotMeanTheGuildHad1")}
             </p>
           </section>
 
           <section className={styles.infoSection}>
-            <h3>Final statuses</h3>
+            <h3>{hubText("dataHubI18n.finalStatuses")}</h3>
             <div className={styles.infoStatusList}>
               <div>
                 <span className={`${styles.statusBadge} ${styles.statusHigh}`}>
-                  Ready
+                  {hubText("dataHubI18n.ready")}
                 </span>
-                <p>Enough reliable evidence for automatic linking.</p>
+                <p>{hubText("dataHubI18n.enoughReliableEvidenceForAutomaticLinking")}</p>
               </div>
               <div>
                 <span
                   className={`${styles.statusBadge} ${styles.statusAmbiguous}`}
                 >
-                  Needs Review
+                  {hubText("dataHubI18n.needsReview")}
                 </span>
                 <p>
-                  A useful candidate exists, but evidence is thin, ambiguous or
-                  contested.
+                  {hubText("dataHubI18n.aUsefulCandidateExistsButEvidenceIsThinAmbiguousOrContested")}
                 </p>
               </div>
               <div>
                 <span
                   className={`${styles.statusBadge} ${styles.statusUnresolved}`}
                 >
-                  Unresolved
+                  {hubText("dataHubI18n.unresolved")}
                 </span>
                 <p>
-                  Historical data exists, but no actionable identity hypothesis
-                  remains.
+                  {hubText("dataHubI18n.historicalDataExistsButNoActionableIdentityHypothesisRemains")}
                 </p>
               </div>
               <div>
                 <span
                   className={`${styles.statusBadge} ${styles.statusNative}`}
                 >
-                  No Historical Observation
+                  {hubText("dataHubI18n.noHistoricalObservation")}
                 </span>
                 <p>
-                  The expected historical scope was checked, but no matching
-                  observation was found.
+                  {hubText("dataHubI18n.theExpectedHistoricalScopeWasCheckedButNoMatchingObservationWasFound")}
                 </p>
               </div>
               <div>
                 <span
                   className={`${styles.statusBadge} ${styles.statusNative}`}
                 >
-                  No Historical Data
+                  {hubText("dataHubI18n.noHistoricalData")}
                 </span>
-                <p>The required historical scan coverage is not available.</p>
+                <p>{hubText("dataHubI18n.theRequiredHistoricalScanCoverageIsNotAvailable")}</p>
               </div>
             </div>
           </section>
@@ -2082,28 +2064,26 @@ function GuildResolvedFlow({ candidate }: { candidate: GuildFusionCandidate }) {
   return (
     <div className={styles.guildFlow}>
       <div>
-        <strong>Reliable member matches:</strong>{" "}
+        <strong>{hubText("dataHubI18n.reliableMemberMatchesa1688")}</strong>{" "}
         {formatNumber(candidate.matchedMemberCount)}
       </div>
       <div>
-        <strong>Resolved member flow:</strong>{" "}
+        <strong>{hubText("dataHubI18n.resolvedMemberFlow")}</strong>{" "}
         {formatNumber(candidate.matchedMemberCount)} /{" "}
-        {formatNumber(oldResolvedCount)} resolved historical players matched (
-        {formatShare(candidate.oldShare)} of resolved players) ·{" "}
+        {formatNumber(oldResolvedCount)} {hubText("dataHubI18n.resolvedHistoricalPlayersMatched")}
+        {formatShare(candidate.oldShare)} {hubText("dataHubI18n.ofResolvedPlayers")}{" "}
         {formatNumber(candidate.matchedMemberCount)} /{" "}
-        {formatNumber(newResolvedCount)} resolved current players matched (
-        {formatShare(candidate.newShare)} of resolved players)
+        {formatNumber(newResolvedCount)} {hubText("dataHubI18n.resolvedCurrentPlayersMatched")}
+        {formatShare(candidate.newShare)} {hubText("dataHubI18n.ofResolvedPlayers60546")}
       </div>
       {historicalMembers && currentMembers ? (
         <div>
-          <strong>Resolved identity coverage:</strong> historical{" "}
-          {formatNumber(oldResolvedCount)} / {historicalMembers} members ·
-          current {formatNumber(newResolvedCount)} / {currentMembers} members
+          <strong>{hubText("dataHubI18n.resolvedIdentityCoverage")}</strong> {hubText("dataHubI18n.historical")}{" "}
+          {formatNumber(oldResolvedCount)} / {historicalMembers} {hubText("dataHubI18n.membersCurrent")} {formatNumber(newResolvedCount)} / {currentMembers} {hubText("dataHubI18n.members17373")}
         </div>
       ) : (
         <div>
-          <strong>Roster coverage unavailable.</strong> Reliable identities
-          available: historical {formatNumber(oldResolvedCount)} · current{" "}
+          <strong>{hubText("dataHubI18n.rosterCoverageUnavailable")}</strong> {hubText("dataHubI18n.reliableIdentitiesAvailableHistorical")} {formatNumber(oldResolvedCount)} {hubText("dataHubI18n.current9e606")}{" "}
           {formatNumber(newResolvedCount)}
         </div>
       )}
@@ -2133,7 +2113,7 @@ function CandidateRow({
           </div>
           <div className={styles.muted}>
             {candidate.historicalIdentifier} ·{" "}
-            {candidate.historicalServer ?? "Server unknown"}
+            {candidate.historicalServer ?? hubText("dataHubI18n.serverUnknown")}
           </div>
         </div>
         <div className={styles.rowActions}>
@@ -2143,7 +2123,7 @@ function CandidateRow({
             onClick={() => onConfirm(candidate)}
             disabled={disabled}
           >
-            <Check size={15} aria-hidden /> Confirm identity
+            <Check size={15} aria-hidden /> {hubText("dataHubI18n.confirmIdentity")}
           </button>
           <button
             type="button"
@@ -2151,15 +2131,15 @@ function CandidateRow({
             onClick={() => onReject(candidate)}
             disabled={candidate.rejected}
           >
-            <X size={15} aria-hidden /> Reject
+            <X size={15} aria-hidden /> {hubText("dataHubI18n.reject")}
           </button>
         </div>
       </div>
       {candidate.assignedToOtherIdentity ? (
-        <p className={styles.muted}>Already linked to another identity.</p>
+        <p className={styles.muted}>{hubText("dataHubI18n.alreadyLinkedToAnotherIdentity")}</p>
       ) : null}
       {candidate.rejected ? (
-        <p className={styles.muted}>Rejected for this current identity.</p>
+        <p className={styles.muted}>{hubText("dataHubI18n.rejectedForThisCurrentIdentity")}</p>
       ) : null}
       {candidate.entityType === "player" ? (
         <>
@@ -2168,7 +2148,7 @@ function CandidateRow({
             {formatLevel(candidate.evidence.oldLevel)} ·{" "}
             {candidate.evidence.oldGuildName ??
               candidate.evidence.oldGuildIdentifier ??
-              "Guild unknown"}
+              hubText("dataHubI18n.guildUnknown")}
           </div>
           <PlayerEvidence candidate={candidate.evidence} />
         </>
@@ -2182,7 +2162,7 @@ function CandidateRow({
       item.readyCandidateIdentifier === candidate.historicalIdentifier ? (
         <div className={styles.evidenceList}>
           <EvidenceChip strength="support" help={readyQueueChipHelp()}>
-            Ready queue candidate
+            {hubText("dataHubI18n.readyQueueCandidate")}
           </EvidenceChip>
         </div>
       ) : null}
@@ -2197,34 +2177,44 @@ function MigrationRow({ edge }: { edge: GuildFusionMigrationEdge }) {
         {edge.oldName ?? edge.oldGuildIdentifier}
       </div>
       <div className={styles.muted}>
-        {edge.oldGuildIdentifier} · {edge.oldServer ?? "Server unknown"} ·{" "}
-        {edge.matchedMemberCount} matched players
+        {edge.oldGuildIdentifier} · {edge.oldServer ?? hubText("dataHubI18n.serverUnknown")} ·{" "}
+        {hubText("dataHubI18n.matchedPlayerQuantity", { count: edge.matchedMemberCount })}
       </div>
       <div className={styles.muted}>
-        Flow share: {formatShare(edge.oldShare)} from old ·{" "}
-        {formatShare(edge.newShare)} into new
+        {hubText("dataHubI18n.flowShare")} {formatShare(edge.oldShare)} {hubText("dataHubI18n.fromOld")}{" "}
+        {formatShare(edge.newShare)} {hubText("dataHubI18n.intoNew")}
       </div>
     </article>
   );
 }
 
 function IdentityDetails({
-  item,
+  item, dependencies,
   onClose,
   onChanged,
 }: {
   item: FusionIdentityManagementItem;
+  dependencies?: FusionIdentityManagementReport["dependencies"];
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
+  const mutationLock = React.useRef(false);
+  const [mutationError, setMutationError] = React.useState<string | null>(null);
+  const route = window.location.hash;
   const handleConfirm = async (candidate: FusionIdentityCandidate) => {
-    await confirmFusionIdentityLink(
-      item.entityType,
-      item.currentIdentifier,
-      candidate.historicalIdentifier,
-    );
-    onChanged();
-    onClose();
+    if (mutationLock.current) return;
+    mutationLock.current = true;
+    setMutationError(null);
+    try {
+      if (!dependencies) throw Error("fresh-matching-report-required");
+      await confirmFusionIdentityLink(item.entityType, item.currentIdentifier, candidate.historicalIdentifier,
+        { dependencies, isCurrent: () => window.location.hash === route });
+      trackLocalEvent("datahub/identity/link-success");
+      await onChanged();
+      onClose();
+    } catch (error) { setMutationError(error instanceof Error ? error.message : String(error)); }
+    finally { mutationLock.current = false; }
   };
   const handleReject = async (candidate: FusionIdentityCandidate) => {
     await rejectFusionIdentityCandidate(
@@ -2242,55 +2232,55 @@ function IdentityDetails({
   const statusExplanation = formatStatusExplanation(item);
   const candidateHeading =
     item.status === "noHistoricalObservation"
-      ? "Historical observation"
+      ? hubText("dataHubI18n.historicalObservation")
       : item.status === "ready"
         ? item.entityType === "guild"
-          ? "Matched historical guild"
-          : "Matched historical identity"
+          ? hubText("dataHubI18n.matchedHistoricalGuild")
+          : hubText("dataHubI18n.matchedHistoricalIdentity")
         : item.status === "review"
-          ? "Possible historical identities"
-          : "Historical identity candidates";
+          ? hubText("dataHubI18n.possibleHistoricalIdentities")
+          : hubText("dataHubI18n.historicalIdentityCandidates");
   const currentObservation = latestObservation(item.observations);
   const firstObservation = earliestObservation(item.observations);
   const currentIdentityRows: Array<[string, React.ReactNode]> = [
-    ["Type", typeLabel(item.entityType)],
-    ["Name", item.currentName ?? "-"],
-    ["Identifier", item.currentIdentifier],
-    ["Server", item.currentServer ?? "-"],
+    [hubText("dataHubI18n.type"), typeLabel(item.entityType)],
+    [hubText("dataHubI18n.name"), item.currentName ?? "-"],
+    [hubText("dataHubI18n.identifier"), item.currentIdentifier],
+    [hubText("dataHubI18n.server"), item.currentServer ?? "-"],
   ];
 
   if (item.entityType === "player") {
     currentIdentityRows.push(
       [
-        "Class",
+        hubText("dataHubI18n.class"),
         currentObservation?.classId
           ? formatClass(currentObservation.classId)
           : null,
       ],
-      ["Level", formatCurrentLevel(currentObservation?.level)],
-      ["Guild", currentObservation?.guildName?.trim() || null],
+      [hubText("dataHubI18n.level"), formatCurrentLevel(currentObservation?.level)],
+      [hubText("dataHubI18n.guild"), currentObservation?.guildName?.trim() || null],
     );
   }
 
   currentIdentityRows.push(
-    ["Observed", item.observations.length],
-    ["Last seen", formatDate(item.lastSeen)],
+    [hubText("dataHubI18n.observed64fa8"), item.observations.length],
+    [hubText("dataHubI18n.lastSeen"), formatDate(item.lastSeen)],
   );
   const statusRows: Array<[string, React.ReactNode]> = [
-    ["Status", statusLabel(item.status)],
-    ["First seen", formatDate(firstObservation?.timestamp ?? item.firstSeen)],
+    [hubText("dataHubI18n.status"), statusLabel(item.status)],
+    [hubText("dataHubI18n.firstSeen"), formatDate(firstObservation?.timestamp ?? item.firstSeen)],
   ];
 
   if (item.entityType === "player") {
     statusRows.push(
-      ["First seen level", formatCurrentLevel(firstObservation?.level)],
-      ["First seen guild", firstObservation?.guildName?.trim() || null],
+      [hubText("dataHubI18n.firstSeenLevel"), formatCurrentLevel(firstObservation?.level)],
+      [hubText("dataHubI18n.firstSeenGuild"), firstObservation?.guildName?.trim() || null],
     );
   }
 
   statusRows.push(
-    ["Candidate", item.readyCandidateIdentifier ?? "-"],
-    ["Reason", item.reasons.join("; ") || "-"],
+    [hubText("dataHubI18n.candidate"), item.readyCandidateIdentifier ?? "-"],
+    [hubText("dataHubI18n.reason"), item.reasons.map(hubMessage).join("; ") || "-"],
   );
 
   return (
@@ -2323,24 +2313,25 @@ function IdentityDetails({
             type="button"
             className={styles.closeButton}
             onClick={onClose}
-            aria-label="Close details"
+            aria-label={hubText("dataHubI18n.closeDetails")}
           >
             <X size={16} aria-hidden />
           </button>
         </header>
 
         <div className={styles.dialogBody}>
+          {mutationError ? <p role="alert" className={styles.errorState}>{t(`fusionIdentity.merge.reasons.${mutationError}`, { defaultValue: mutationError })}</p> : null}
           <div className={styles.detailGrid}>
             <section className={styles.detailCard}>
-              <h3>Current identity</h3>
+              <h3>{hubText("dataHubI18n.currentIdentity")}</h3>
               <DetailDataList rows={currentIdentityRows} />
             </section>
             <section className={styles.detailCard}>
-              <h3>Status</h3>
+              <h3>{hubText("dataHubI18n.status")}</h3>
               <DetailDataList rows={statusRows} />
             </section>
             <section className={styles.detailCard}>
-              <h3>Completed links</h3>
+              <h3>{hubText("dataHubI18n.completedLinks")}</h3>
               {item.completedAliases.length ? (
                 <div className={styles.candidateList}>
                   {item.completedAliases.map((alias) => (
@@ -2351,13 +2342,13 @@ function IdentityDetails({
                         className={styles.closeButton}
                         onClick={() => handleUndo(alias)}
                       >
-                        <Undo2 size={15} aria-hidden /> Undo
+                        <Undo2 size={15} aria-hidden /> {hubText("dataHubI18n.undo")}
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className={styles.muted}>No confirmed aliases yet.</p>
+                <p className={styles.muted}>{hubText("dataHubI18n.noConfirmedAliasesYet")}</p>
               )}
             </section>
           </div>
@@ -2389,14 +2380,14 @@ function IdentityDetails({
               </div>
             ) : (
               <p className={styles.muted}>
-                No resolver candidate is currently available.
+                {hubText("dataHubI18n.noResolverCandidateIsCurrentlyAvailable")}
               </p>
             )}
           </section>
 
           {item.entityType === "guild" && item.memberMigrationEdges.length ? (
             <section className={styles.detailCard}>
-              <h3>Other member sources</h3>
+              <h3>{hubText("dataHubI18n.otherMemberSources")}</h3>
               <div className={styles.candidateList}>
                 {item.memberMigrationEdges.map((edge) => (
                   <MigrationRow
@@ -2422,6 +2413,7 @@ function ManualLinkDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
   const [entityType, setEntityType] =
     React.useState<FusionIdentityEntityType>("player");
   const currentOptions = report.currentAliases.filter(
@@ -2453,14 +2445,22 @@ function ManualLinkDialog({
     setHistoricalIdentifier(nextHistorical);
   }, [entityType, report.currentAliases, report.historicalAliases]);
 
+  const mutationLock = React.useRef(false);
+  const [mutationError, setMutationError] = React.useState<string | null>(null);
   const handleSubmit = async () => {
-    await confirmFusionIdentityLink(
-      entityType,
-      currentIdentifier,
-      historicalIdentifier,
-    );
-    onChanged();
-    onClose();
+    if (mutationLock.current) return;
+    mutationLock.current = true;
+    const route = window.location.hash;
+    setMutationError(null);
+    try {
+      if (!report.dependencies) throw Error("fresh-matching-report-required");
+      await confirmFusionIdentityLink(entityType, currentIdentifier, historicalIdentifier,
+        { dependencies: report.dependencies, isCurrent: () => window.location.hash === route });
+      trackLocalEvent("datahub/identity/link-success");
+      await onChanged();
+      onClose();
+    } catch (error) { setMutationError(error instanceof Error ? error.message : String(error)); }
+    finally { mutationLock.current = false; }
   };
 
   return (
@@ -2480,25 +2480,26 @@ function ManualLinkDialog({
         <header className={styles.dialogHeader}>
           <div>
             <h2 id="fusion-manual-link-title" className={styles.dialogTitle}>
-              Manual identity link
+              {hubText("dataHubI18n.manualIdentityLink")}
             </h2>
             <div className={styles.muted}>
-              Resolver-independent link across the whole fusion pool.
+              {hubText("dataHubI18n.resolverIndependentLinkAcrossTheWholeFusionPool")}
             </div>
           </div>
           <button
             type="button"
             className={styles.closeButton}
             onClick={onClose}
-            aria-label="Close manual link"
+            aria-label={hubText("dataHubI18n.closeManualLink")}
           >
             <X size={16} aria-hidden />
           </button>
         </header>
         <div className={styles.dialogBody}>
+          {mutationError ? <p role="alert" className={styles.errorState}>{t(`fusionIdentity.merge.reasons.${mutationError}`, { defaultValue: mutationError })}</p> : null}
           <div className={styles.detailGrid}>
             <label className={styles.fieldLabel}>
-              Type
+              {hubText("dataHubI18n.type")}
               <select
                 className={styles.select}
                 value={entityType}
@@ -2506,12 +2507,12 @@ function ManualLinkDialog({
                   setEntityType(event.target.value as FusionIdentityEntityType)
                 }
               >
-                <option value="player">Players</option>
-                <option value="guild">Guilds</option>
+                <option value="player">{hubText("dataHubI18n.players")}</option>
+                <option value="guild">{hubText("dataHubI18n.guilds")}</option>
               </select>
             </label>
             <label className={styles.fieldLabel}>
-              Current F28 alias
+              {hubText("dataHubI18n.currentF28Alias")}
               <select
                 className={styles.select}
                 value={currentIdentifier}
@@ -2525,7 +2526,7 @@ function ManualLinkDialog({
               </select>
             </label>
             <label className={styles.fieldLabel}>
-              Historical alias
+              {hubText("dataHubI18n.historicalAlias")}
               <select
                 className={styles.select}
                 value={historicalIdentifier}
@@ -2536,7 +2537,7 @@ function ManualLinkDialog({
                 {historicalOptions.map((option) => (
                   <option key={option.identifier} value={option.identifier}>
                     {option.name ?? option.identifier} · {option.identifier}
-                    {option.linkedEntityId ? " · Already linked" : ""}
+                    {option.linkedEntityId ? hubText("dataHubI18n.alreadyLinked") : ""}
                   </option>
                 ))}
               </select>
@@ -2544,8 +2545,7 @@ function ManualLinkDialog({
           </div>
           {alreadyLinked ? (
             <div className={styles.errorState}>
-              Already linked: this historical alias is part of an existing
-              identity.
+              {hubText("dataHubI18n.alreadyLinkedThisHistoricalAliasIsPartOfAnExistingIdentity")}
             </div>
           ) : null}
           <div className={styles.rowActions}>
@@ -2554,7 +2554,7 @@ function ManualLinkDialog({
               className={styles.closeButton}
               onClick={onClose}
             >
-              Cancel
+              {hubText("dataHubI18n.cancel")}
             </button>
             <button
               type="button"
@@ -2564,7 +2564,7 @@ function ManualLinkDialog({
                 !currentIdentifier || !historicalIdentifier || alreadyLinked
               }
             >
-              <Link2 size={15} aria-hidden /> Link identity
+              <Link2 size={15} aria-hidden /> {hubText("dataHubI18n.linkIdentity")}
             </button>
           </div>
         </div>
@@ -2581,7 +2581,6 @@ function GuildMemberStatusSummary({
   const { t } = useTranslation();
   const summary = item.memberStatusSummary;
   if (item.entityType !== "guild" || !summary) return null;
-  const resolvedMembers = summary.resolvedMembers ?? 0;
   const totalMembers = summary.totalMembers ?? 0;
   const reviewMembers = summary.reviewMembers ?? 0;
   const unresolvedMembers = summary.unresolvedMembers ?? 0;
@@ -2597,23 +2596,23 @@ function GuildMemberStatusSummary({
         })
       : null,
     unresolvedMembers
-      ? `${formatNumber(unresolvedMembers)} unresolved`
+      ? hubText("dataHubI18n.unresolvedCount", { v1: unresolvedMembers })
       : null,
     noHistoricalObservationMembers
-      ? `${formatNumber(noHistoricalObservationMembers)} no observation`
+      ? hubText("dataHubI18n.noObservationCount", { v1: noHistoricalObservationMembers })
       : null,
     noHistoricalDataMembers
-      ? `${formatNumber(noHistoricalDataMembers)} no history`
+      ? hubText("dataHubI18n.noHistoryCount", { v1: noHistoricalDataMembers })
       : null,
     missingManagementEntries
-      ? `${formatNumber(missingManagementEntries)} missing`
+      ? hubText("dataHubI18n.missingCount", { v1: missingManagementEntries })
       : null,
   ].filter((value): value is string => Boolean(value));
 
   return (
     <span className={styles.guildMemberInlineSummary}>
       <span>
-        {formatNumber(resolvedMembers)} / {formatNumber(totalMembers)} resolved
+        {t("identityRosterBatch.memberCounts", { count: totalMembers, stored: summary.completedMembers ?? 0, ready: summary.readyMembers ?? 0, total: totalMembers })}
       </span>
       {problemParts.map((part, index) => (
         <React.Fragment key={index}>
@@ -2651,9 +2650,9 @@ function GuildMemberRowActions({
     noHistory: [],
   };
   const reviewMembers = summary.reviewMembers ?? 0;
-  const readyRefs = memberRefsByStatus.ready ?? [];
+  const readyRefs = (item.mergeReadyPlayerIdentifiers ?? memberRefsByStatus.ready?.map(ref => ref.identifier) ?? []);
   const readyButtonDisabled =
-    !readyRefs.length || completingGuildIdentifier === item.currentIdentifier;
+    !readyRefs.length || completingGuildIdentifier !== null;
 
   if (!readyRefs.length && !memberRefsByStatus.review.length) return null;
 
@@ -2672,7 +2671,7 @@ function GuildMemberRowActions({
             guildName,
           })}
         >
-          Review
+          {hubText("dataHubI18n.review")}
         </button>
       ) : null}
       {readyRefs.length ? (
@@ -2685,14 +2684,14 @@ function GuildMemberRowActions({
           }}
           disabled={readyButtonDisabled}
         >
-          Complete ready players ({formatNumber(readyRefs.length)})
+          {t("fusionIdentity.merge.guildPlayers", { count: readyRefs.length })}
         </button>
       ) : null}
     </div>
   );
 }
 
-function QueueRow({
+const QueueRow = React.memo(function QueueRow({
   item,
   onOpen,
   onFocusMembersByStatus,
@@ -2700,7 +2699,7 @@ function QueueRow({
   completingGuildIdentifier,
 }: {
   item: FusionIdentityManagementItem;
-  onOpen: () => void;
+  onOpen: (itemId: string) => void;
   onFocusMembersByStatus: (
     item: FusionIdentityManagementItem,
     status: FusionIdentityMemberSelectionStatus,
@@ -2708,11 +2707,12 @@ function QueueRow({
   onCompleteReadyPlayers: (item: FusionIdentityManagementItem) => void;
   completingGuildIdentifier: string | null;
 }) {
+  const { t } = useTranslation();
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.currentTarget !== event.target) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    onOpen();
+    onOpen(item.id);
   };
 
   return (
@@ -2720,7 +2720,7 @@ function QueueRow({
       role="button"
       tabIndex={0}
       className={styles.resultRow}
-      onClick={onOpen}
+      onClick={() => onOpen(item.id)}
       onKeyDown={handleKeyDown}
     >
       <div className={styles.resultMain}>
@@ -2740,17 +2740,17 @@ function QueueRow({
         <div>
           <div>{typeLabel(item.entityType)}</div>
           <div className={styles.muted}>
-            {item.currentServer ?? "Server unknown"} · observed{" "}
+            {item.currentServer ?? hubText("dataHubI18n.serverUnknown")} {hubText("dataHubI18n.observed")}{" "}
             {item.observations.length}x
           </div>
         </div>
         <div>
           <div>
             {item.status === "completed"
-              ? `${item.historicalIdentifiers.length} historical aliases`
+              ? hubText("dataHubI18n.historicalAliasCount", { v1: item.historicalIdentifiers.length })
               : item.readyCandidateIdentifier
-                ? `Candidate: ${item.readyCandidateIdentifier}`
-                : `${item.candidates.length} candidates`}
+                ? hubText("dataHubI18n.candidateName", { v1: item.readyCandidateIdentifier })
+                : hubText("dataHubI18n.candidateCount", { v1: item.candidates.length })}
           </div>
           <div className={styles.muted}>
             {formatDate(item.firstSeen)} - {formatDate(item.lastSeen)}
@@ -2766,19 +2766,64 @@ function QueueRow({
           <span
             className={`${styles.statusBadge} ${statusClassName(item.status)}`}
           >
-            {statusLabel(item.status)}
+            {item.entityType === "guild" && item.status === "completed" ? t("identityRosterBatch.guildStored") : statusLabel(item.status)}
           </span>
         </div>
       </div>
     </div>
   );
-}
+});
 
 type FusionIdentityPageView = "dashboard" | "workspace";
 
-const isCacheStaleDueToNewScan = (
-  cache: FusionIdentityAnalysisCacheLookup,
-) => cache.state === "stale" && cache.staleReason === "scan-fingerprint";
+type MergeFeedbackState = {
+  progress: FusionIdentityMergeProgress;
+  phase: "running" | "refreshing" | "finished";
+  error?: string;
+};
+type MergeFeedbackHandle = { show: (state: MergeFeedbackState) => void };
+
+// Keep frequent progress updates local: the potentially large identity queue
+// does not need to render again for each completed batch.
+const MergeFeedback = React.forwardRef<MergeFeedbackHandle>(function MergeFeedback(_, ref) {
+  const { t } = useTranslation();
+  const [state, setState] = React.useState<MergeFeedbackState | null>(null);
+  React.useImperativeHandle(ref, () => ({ show: setState }), []);
+  if (!state) return null;
+  const { progress: p, phase, error } = state;
+  const failures = p.failedPlayers + p.failedGuilds + p.excluded + p.unresolved;
+  const title = phase === "running" ? "running"
+    : failures || error ? (p.players + p.guilds + p.skipped ? "partial" : "failed")
+    : "success";
+  return (
+    <section className={styles.mergeFeedback} data-identity-merge={phase} aria-busy={phase !== "finished"}>
+      <div role="status" aria-live="polite" aria-atomic="true">
+        <strong>{t(`fusionIdentity.merge.${title}`)}</strong>
+        <p>{t("fusionIdentity.merge.processed", { current: p.processed, total: p.total })}</p>
+        <progress value={p.processed} max={Math.max(1, p.total)} aria-label={t("fusionIdentity.merge.progress")} />
+        <p>{t("fusionIdentity.merge.players", { success: p.players, failed: p.failedPlayers })}</p>
+        <p>{t("fusionIdentity.merge.guilds", { success: p.guilds, failed: p.failedGuilds })}</p>
+        <p>{t("fusionIdentity.merge.skipped", { count: p.skipped })}</p>
+        <p>{t("fusionIdentity.merge.excluded", { count: p.excluded })}</p>
+        <p>{t("fusionIdentity.merge.unresolved", { count: p.unresolved })}</p>
+        {phase === "refreshing" ? <p>{t("fusionIdentity.merge.refreshing")}</p> : null}
+      </div>
+      {error ? <p role="alert">{t("fusionIdentity.merge.unexpected", { reason: error })}</p> : null}
+      {p.errors.length ? (
+        <details>
+          <summary>{t("fusionIdentity.merge.errors", { count: p.errors.length })}</summary>
+          <ul className={styles.mergeErrors}>
+            {p.errors.map((entry, index) => (
+              <li key={`${entry.itemId}-${index}`}>
+                {entry.currentIdentifier} → {entry.historicalIdentifier}: {t(`fusionIdentity.merge.reasons.${entry.message}`, { defaultValue: entry.message.slice(0, 500) })}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
+  );
+});
 
 const isCacheStaleDueToCompatibility = (
   cache: FusionIdentityAnalysisCacheLookup,
@@ -2819,15 +2864,15 @@ const cacheStatusLabel = (
   state: FusionIdentityAnalysisCacheState,
   cache?: FusionIdentityAnalysisCacheLookup,
 ) => {
-  if (state === "fresh") return "Analysis up to date";
+  if (state === "fresh") return hubText("dataHubI18n.analysisUpToDate");
   if (state === "stale") {
     if (cache && isCacheStaleDueToCompatibility(cache))
-      return "Analysis update required";
-    return "New data available";
+      return hubText("dataHubI18n.analysisUpdateRequired");
+    return hubText("dataHubI18n.analysisUpdateRequired");
   }
-  if (state === "running") return "Analysis running";
-  if (state === "error") return "Analysis failed";
-  return "Not analyzed yet";
+  if (state === "running") return hubText("dataHubI18n.analysisRunning");
+  if (state === "error") return hubText("dataHubI18n.analysisFailed");
+  return hubText("dataHubI18n.notAnalyzedYet");
 };
 
 const cacheStatusClassName = (state: FusionIdentityAnalysisCacheState) => {
@@ -2838,18 +2883,18 @@ const cacheStatusClassName = (state: FusionIdentityAnalysisCacheState) => {
 };
 
 const roleLabel = (role: FusionIdentityScopeInventory["coverage"][number]["role"]) => {
-  if (role === "current-target") return "Current target";
-  if (role === "intermediate-fusion-target") return "Intermediate target";
-  if (role === "historical-origin") return "Historical origin";
-  if (role === "transitive-historical-origin") return "Transitive origin";
-  return "Out of scope";
+  if (role === "current-target") return hubText("dataHubI18n.currentTarget");
+  if (role === "intermediate-fusion-target") return hubText("dataHubI18n.intermediateTarget");
+  if (role === "historical-origin") return hubText("dataHubI18n.historicalOrigin");
+  if (role === "transitive-historical-origin") return hubText("dataHubI18n.transitiveOrigin");
+  return hubText("dataHubI18n.outOfScope");
 };
 
 const scopeTemporalLabel = (scope: FusionIdentityScopeInventory["scope"]) => {
-  if (scope.temporalStatus === "future") return "Future event";
-  if (scope.temporalStatus === "unknown-date") return "Unknown date";
-  if (scope.isCurrentTerminalTarget) return "Current terminal";
-  return "Historical intermediate";
+  if (scope.temporalStatus === "future") return hubText("dataHubI18n.futureEvent");
+  if (scope.temporalStatus === "unknown-date") return hubText("dataHubI18n.unknownDate");
+  if (scope.isCurrentTerminalTarget) return hubText("dataHubI18n.currentTerminal");
+  return hubText("dataHubI18n.historicalIntermediate");
 };
 
 const buildReportEntitySummary = (
@@ -2890,39 +2935,62 @@ function DashboardResolutionSummary({
       <strong>{label}</strong>
       <span>
         {formatNumber(summary.ready)} / {formatNumber(summary.total)}{" "}
-        auto-linkable
+        {hubText("dataHubI18n.autoLinkable")}
         {summary.autoLinkShare == null
           ? ""
           : ` · ${formatShare(summary.autoLinkShare)}`}
       </span>
       <span className={styles.muted}>
-        {formatNumber(summary.review)} review ·{" "}
-        {formatNumber(summary.unresolved)} unresolved ·{" "}
-        {formatNumber(summary.noHistoricalObservation)} no observation ·{" "}
-        {formatNumber(summary.noHistory)} no data ·{" "}
-        {formatNumber(summary.completed)} completed
+        {formatNumber(summary.review)} {hubText("dataHubI18n.review6a40f")}{" "}
+        {formatNumber(summary.unresolved)} {hubText("dataHubI18n.unresolved8e5e7")}{" "}
+        {formatNumber(summary.noHistoricalObservation)} {hubText("dataHubI18n.noObservation")}{" "}
+        {formatNumber(summary.noHistory)} {hubText("dataHubI18n.noData")}{" "}
+        {formatNumber(summary.completed)} {hubText("dataHubI18n.completed4ddb3")}
       </span>
     </div>
   );
 
   return (
     <div className={styles.dashboardMetrics}>
-      {previous ? <div className={styles.muted}>Previous analysis</div> : null}
-      {renderLine("Players", playerSummary)}
-      {renderLine("Guilds", guildSummary)}
+      {previous ? <div className={styles.muted}>{hubText("dataHubI18n.previousAnalysis")}</div> : null}
+      {renderLine(hubText("dataHubI18n.players"), playerSummary)}
+      {renderLine(hubText("dataHubI18n.guilds"), guildSummary)}
     </div>
   );
 }
 
+function PredecessorBasisNotice({ basis, reportBasis = false }: {
+  basis?: FusionPredecessorCoverage; reportBasis?: boolean;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate(), location = useLocation();
+  if (!basis) return reportBasis ? <p className={styles.muted} data-predecessor-basis="report">{t("fusionIdentity.basis.unknownReport")}</p> : null;
+  if (!basis.missingServerCodes.length) return null;
+  return <aside className={`${styles.emptyState} ${styles.evidenceWarning}`} data-predecessor-basis={reportBasis ? "report" : "local"}>
+    <strong>{t(reportBasis ? "fusionIdentity.basis.reportLabel" : "fusionIdentity.basis.localLabel")}</strong>
+    {basis ? <>
+      <p><strong>{t("fusionIdentity.basis.incomplete", { count: basis.coveredServerCodes.length, total: basis.requiredServerCodes.length })}</strong></p>
+      <p>{t("fusionIdentity.basis.missing", { servers: basis.missingServerCodes.join(", ") })}</p>
+    </> : <p>{t("fusionIdentity.basis.unknownReport")}</p>}
+    {!reportBasis && <button type="button" className={styles.closeButton}
+      onClick={() => navigate(`${DATA_HUB}/scan-management?tab=archive`, { state: { returnTo: location.pathname + location.search, profileReturnState: location.state } })}>
+      {t("identityEntry.toArchive")}
+    </button>}
+  </aside>;
+}
+
 function ScanCoverageAccordion({
   coverage,
+  basis,
   expandedServers,
   onToggle,
 }: {
   coverage: FusionIdentityScopeInventory["coverage"];
+  basis: FusionPredecessorCoverage;
   expandedServers: Set<string>;
   onToggle: (serverCode: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={styles.coverageList}>
       {coverage.map((server) => {
@@ -2940,8 +3008,11 @@ function ScanCoverageAccordion({
             >
               <span className={styles.coverageServer}>{server.serverCode}</span>
               <span>
-                {formatNumber(server.count)} scans ·{" "}
-                {formatDate(server.firstSeen)} - {formatDate(server.lastSeen)}
+                {basis.missingServerCodes.includes(server.serverCode) ? <>
+                  <strong>{t("fusionIdentity.basis.noSuitable")}</strong><br />
+                  {t(server.count ? "fusionIdentity.basis.unsuitableSource" : "fusionIdentity.basis.noSource")}
+                  {server.count ? <><br />{hubText("dataHubI18n.coverageScans", { count: server.count })} {formatDate(server.firstSeen)} - {formatDate(server.lastSeen)}</> : null}
+                </> : server.count ? <>{hubText("dataHubI18n.coverageScans", { count: server.count })} {formatDate(server.firstSeen)} - {formatDate(server.lastSeen)}</> : t("fusionIdentity.basis.noSource")}
               </span>
               <span className={styles.coverageRole}>{roleLabel(server.role)}</span>
               <ChevronDown
@@ -2958,8 +3029,8 @@ function ScanCoverageAccordion({
                   <div key={observation.id}>
                     <span>{formatDate(observation.timestampMs)}</span>
                     <span>
-                      {formatNumber(observation.playerCount)} players ·{" "}
-                      {formatNumber(observation.guildCount)} guilds
+                      {formatNumber(observation.playerCount)} {hubText("dataHubI18n.playersd02d0")}{" "}
+                      {formatNumber(observation.guildCount)} {hubText("dataHubI18n.guildsb90cb")}
                     </span>
                     <span className={styles.muted}>
                       {observation.sourceScanFilename}
@@ -2975,7 +3046,9 @@ function ScanCoverageAccordion({
   );
 }
 
-export default function FusionIdentityPage() {
+export default function FusionIdentityPage({ dataHub = false }: { dataHub?: boolean }) {
+  const location = useLocation(), navigate = useNavigate();
+  const returnTo = safeLocalReturn(location.state?.returnTo, location.pathname);
   const { t } = useTranslation();
   const {
     dashboard,
@@ -2990,6 +3063,7 @@ export default function FusionIdentityPage() {
     clearReport,
   } = useFusionIdentityDashboard();
   const [view, setView] = React.useState<FusionIdentityPageView>("dashboard");
+  useAnalyticsView(view === "dashboard" ? "datahub/identity/dashboard" : "datahub/identity/workspace");
   const [selectedDashboardScopeId, setSelectedDashboardScopeId] =
     React.useState<string | null>(null);
   const [expandedCoverageServers, setExpandedCoverageServers] = React.useState<
@@ -3005,40 +3079,37 @@ export default function FusionIdentityPage() {
     React.useState<FusionIdentityMemberSelectionContext | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [manualOpen, setManualOpen] = React.useState(false);
+  useAnalyticsView(manualOpen && report ? "datahub/identity/manual-link" : null);
   const [evidenceInfoOpen, setEvidenceInfoOpen] = React.useState(false);
+  useAnalyticsView(evidenceInfoOpen ? "datahub/identity/evidence" : null);
   const [activeEvidenceChipId, setActiveEvidenceChipId] = React.useState<
     string | null
   >(null);
   const [completingGuildIdentifier, setCompletingGuildIdentifier] =
     React.useState<string | null>(null);
-
-  const locallyMatchableScopes = React.useMemo(
-    () => dashboard.scopes.filter((scope) => scope.inventory.isLocallyMatchable),
-    [dashboard.scopes],
-  );
-
+  const mergeLockRef = React.useRef(false);
+  const mergeFeedbackRef = React.useRef<MergeFeedbackHandle>(null);
+  const [mergeRunning, setMergeRunning] = React.useState(false);
+  const mountedRef = React.useRef(true);
   React.useEffect(() => {
-    if (!locallyMatchableScopes.length) {
-      if (selectedDashboardScopeId) setSelectedDashboardScopeId(null);
-      return;
-    }
-    if (
-      selectedDashboardScopeId &&
-      locallyMatchableScopes.some(
-        (scope) => scope.inventory.scope.id === selectedDashboardScopeId,
-      )
-    ) {
-      return;
-    }
-    setSelectedDashboardScopeId(locallyMatchableScopes[0].inventory.scope.id);
-  }, [locallyMatchableScopes, selectedDashboardScopeId]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
-  const selectedDashboardScope =
-    locallyMatchableScopes.find(
-      (scope) => scope.inventory.scope.id === selectedDashboardScopeId,
-    ) ??
-    locallyMatchableScopes[0] ??
-    null;
+  const dashboardServers = React.useMemo(() => {
+    const definitions = listFusionIdentityAnalysisScopes();
+    return getFusionIdentityFastLoadOptions([], definitions).map(option =>
+      definitions.find(scope => scope.targetServerCode === option.server)!,
+    );
+  }, []);
+  const selectedServer = dashboardServers.find(scope => scope.id === selectedDashboardScopeId)
+    ?? dashboardServers[0];
+  const selectedDashboardScope = dashboard.scopes.find(
+    model => model.inventory.scope.id === selectedServer?.id,
+  );
+  const serverDrag = React.useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
+  const suppressServerClick = React.useRef(false);
+  const [draggingServers, setDraggingServers] = React.useState(false);
 
   const expandedCoverageServerSet = React.useMemo(
     () => new Set(expandedCoverageServers),
@@ -3176,6 +3247,7 @@ export default function FusionIdentityPage() {
     () => report?.items.find((item) => item.id === selectedId) ?? null,
     [report, selectedId],
   );
+  useAnalyticsView(selectedItem ? "datahub/identity/details" : null);
 
   const readyPlayers =
     report?.items.filter(
@@ -3186,61 +3258,86 @@ export default function FusionIdentityPage() {
       (item) => item.entityType === "guild" && item.status === "ready",
     ).length ?? 0;
 
-  const handleMergeReady = async () => {
-    if (!report) return;
-    const approved = window.confirm(
-      `Merge ready identities?\n\nPlayers ready: ${readyPlayers}\nGuilds ready: ${readyGuilds}\nRaw scans will not be changed.`,
-    );
-    if (!approved) return;
-    const refreshScope = report.scope;
-    await mergeReadyFusionIdentityItems(report);
-    clearReport();
-    setView("dashboard");
-    await refreshDashboard({
-      reason: "identity-revision",
-      targetServerCode: refreshScope.targetServerCode,
-      autoAnalyzeIdentityRevision: true,
-    });
-  };
-
-  const handleMergeGuildReadyPlayers = async (
-    guildItem: FusionIdentityManagementItem,
+  const runReadyMerge = React.useCallback(async (
+    selectedReport: FusionIdentityManagementReport,
+    guildIdentifier: string | null = null,
   ) => {
-    if (!report || guildItem.entityType !== "guild") return;
-    const readyIdentifiers =
-      guildItem.memberStatusSummary?.memberRefsByStatus?.ready.map(
-        (member) => member.identifier,
-      ) ?? [];
-    const readyItems = listReadyFusionIdentityMergeItems(report, {
-      entityType: "player",
-      currentIdentifiers: readyIdentifiers,
-    });
-    if (!readyItems.length) return;
-    const guildName = guildItem.currentName ?? guildItem.currentIdentifier;
-    const approved = window.confirm(
-      `Complete ready players for "${guildName}"?\n\nPlayers ready: ${readyItems.length}\nNeeds Review, Unresolved and No Historical Data stay unchanged.`,
-    );
-    if (!approved) return;
-    setCompletingGuildIdentifier(guildItem.currentIdentifier);
+    if (mergeLockRef.current) return;
+    mergeLockRef.current = true;
+    setMergeRunning(true);
+    setCompletingGuildIdentifier(guildIdentifier);
+    const mergeRoute = window.location.hash;
+    let latest: FusionIdentityMergeProgress = {
+      total: selectedReport.items.length, processed: 0, players: 0, guilds: 0,
+      failedPlayers: 0, failedGuilds: 0, skipped: 0, excluded: 0, unresolved: 0, entries: [], errors: [],
+    };
+    let error: string | undefined;
+    const show = (phase: MergeFeedbackState["phase"]) => {
+      if (mountedRef.current) mergeFeedbackRef.current?.show({ progress: latest, phase, error });
+    };
+    show("running");
     try {
-      const refreshScope = report.scope;
-      await mergeReadyFusionIdentityItems(report, {
-        filter: {
-          entityType: "player",
-          currentIdentifiers: readyIdentifiers,
-        },
+      latest = await mergeReadyFusionIdentityItems(selectedReport, {
+        onProgress(next) { latest = next; show("running"); },
+        isCurrent: () => mountedRef.current && window.location.hash === mergeRoute,
       });
+      if (latest.players || latest.guilds) trackLocalEvent("datahub/identity/matching-success");
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : t("fusionIdentity.merge.reasons.merge_failed");
+    }
+    try {
+      if (!mountedRef.current) return;
+      show("refreshing");
+      // Never offer successful entries from the old report for another merge.
       clearReport();
       setView("dashboard");
       await refreshDashboard({
         reason: "identity-revision",
-        targetServerCode: refreshScope.targetServerCode,
+        targetServerCode: selectedReport.scope.targetServerCode,
         autoAnalyzeIdentityRevision: true,
       });
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : t("fusionIdentity.merge.reasons.merge_failed");
+      error = error ? `${error}; ${reason}` : reason;
     } finally {
-      setCompletingGuildIdentifier(null);
+      show("finished");
+      mergeLockRef.current = false;
+      if (mountedRef.current) {
+        setMergeRunning(false);
+        setCompletingGuildIdentifier(null);
+      }
     }
+  }, [clearReport, refreshDashboard, t]);
+
+  const handleMergeReady = async () => {
+    if (!report || mergeLockRef.current) return;
+    const selectedReport = { ...report, items: listReadyFusionIdentityMergeItems(report).map(item => ({ ...item })) };
+    if (!selectedReport.items.length) return;
+    const approved = window.confirm(
+      t("fusionIdentity.merge.confirm", { players: selectedReport.items.filter(item => item.entityType === "player").length, guilds: selectedReport.items.filter(item => item.entityType === "guild").length }),
+    );
+    if (!approved) return;
+    await runReadyMerge(selectedReport);
   };
+
+  const handleMergeGuildReadyPlayers = React.useCallback(async (
+    guildItem: FusionIdentityManagementItem,
+  ) => {
+    if (!report || guildItem.entityType !== "guild" || mergeLockRef.current) return;
+    const readyItems = listGuildFusionIdentityMergeItems(report, guildItem);
+    if (!readyItems.length) return;
+    const selectedReport = { ...report, items: readyItems.map(item => ({ ...item })) };
+    const guildName = guildItem.currentName ?? guildItem.currentIdentifier;
+    const approved = window.confirm(
+      t("fusionIdentity.merge.confirmGuild", { guildName, players: readyItems.length }),
+    );
+    if (!approved) return;
+    await runReadyMerge(selectedReport, guildItem.currentIdentifier);
+  }, [report, runReadyMerge, t]);
+
+  const openIdentity = React.useCallback((itemId: string) => {
+    if (!mergeLockRef.current) setSelectedId(itemId);
+  }, []);
 
   const handleIdentityChanged = async () => {
     const refreshScope = report?.scope ?? null;
@@ -3256,6 +3353,7 @@ export default function FusionIdentityPage() {
   const openReportEntry = (
     entry: FusionIdentityAnalysisCacheLookup["previousEntry"],
   ) => {
+    if (mergeLockRef.current) return;
     if (!openCachedReport(entry)) return;
     setView("workspace");
   };
@@ -3263,135 +3361,35 @@ export default function FusionIdentityPage() {
   const runScopeAnalysis = async (
     scopeModel: FusionIdentityDashboardScopeModel,
   ) => {
+    if (mergeLockRef.current) return;
     const nextReport = await analyzeScope(scopeModel);
     if (nextReport) setView("workspace");
   };
 
-  const renderDashboard = () => {
-    if (dashboard.loading && !dashboard.inventory) {
-      return (
-        <div className={styles.dashboard}>
-          <div className={styles.dashboardHeader}>
-            <div>
-              <h2>Fusion dashboard</h2>
-              <p>
-                Fast scan inventory first. Full identity resolution runs only
-                when you start a concrete fusion scope.
-              </p>
-            </div>
-            <button
-              type="button"
-              className={styles.infoButton}
-              onClick={() => setEvidenceInfoOpen(true)}
-            >
-              <Info size={16} aria-hidden /> Evidence guide
-            </button>
-          </div>
-
-          <DataHubLoadingState
-            title="Preparing Fusion Dashboard"
-            message={inventoryProgress?.message ?? "Reading local scan metadata"}
-            current={inventoryProgress?.current}
-            total={inventoryProgress?.total}
-          />
-        </div>
-      );
-    }
-
-    if (dashboard.error) {
-      return (
-        <DataHubLoadingState
-          title="Could not prepare fusion dashboard."
-          message="Local scan inventory could not be read."
-          error={dashboard.error}
-          onRetry={refreshDashboard}
-        />
-      );
-    }
-
-    if (!dashboard.inventory?.scanCount) {
-      return (
-        <div className={styles.emptyState}>
-          No scan data available. Import local scans first to build Fusion &
-          Identity coverage.
-        </div>
-      );
-    }
-
-    if (!locallyMatchableScopes.length) {
-      return (
-        <div className={styles.emptyState}>
-          No locally matchable fusion scope detected for the available scans.
-        </div>
-      );
-    }
-
-    const model = selectedDashboardScope ?? locallyMatchableScopes[0];
+  const renderDashboardCards = (model: FusionIdentityDashboardScopeModel) => {
+    if (!dashboard.inventory) return null;
     const scope = model.inventory.scope;
+    const basis = getFusionPredecessorCoverage(scope, model.inventory.coverage);
     const previousEntry = model.cache.previousEntry;
+    const refreshReason = fusionAnalysisRefreshReason(model.cache, model.inventory);
     const openableEntry = getOpenableFusionWorkspaceEntry(model);
     const running = model.cacheState === "running";
     const analyzedAt = previousEntry?.analyzedAt
       ? Date.parse(previousEntry.analyzedAt)
       : null;
     const analyzeLabel = !scope.analysisSupported
-      ? "Analysis not enabled yet"
+      ? hubText("dataHubI18n.analysisNotEnabledYet")
       : !model.inventory.isLocallyMatchable
-        ? "Not locally matchable"
+        ? hubText("dataHubI18n.notLocallyMatchable")
       : !hasFusionAnalysisInputData(model)
-        ? "No current data"
+        ? hubText("dataHubI18n.noCurrentData")
       : model.cacheState === "fresh"
-        ? "Analysis up to date"
-      : isCacheStaleDueToNewScan(model.cache)
-        ? "Analyze new data"
-        : isCacheStaleDueToCompatibility(model.cache)
-          ? "Re-analyze"
-          : `Analyze ${scope.targetServerCode}`;
+        ? hubText("dataHubI18n.analysisUpToDate")
+      : model.cacheState === "stale"
+        ? "Re-analyze"
+        : hubText("dataHubI18n.analyzeServer", { v1: scope.targetServerCode });
 
     return (
-      <div className={styles.dashboard}>
-        <div className={styles.dashboardHeader}>
-          <div>
-            <h2>Fusion dashboard</h2>
-            <p>
-              Fast scan inventory first. Full identity resolution runs only when
-              you start a concrete fusion scope.
-            </p>
-          </div>
-          <button
-            type="button"
-            className={styles.infoButton}
-            onClick={() => setEvidenceInfoOpen(true)}
-          >
-            <Info size={16} aria-hidden /> Evidence guide
-          </button>
-        </div>
-
-        <div className={styles.dashboardNav}>
-          <button
-            type="button"
-            className={styles.tabButton}
-          >
-            All Matches
-          </button>
-          {locallyMatchableScopes.map((entry) => (
-            <button
-              key={entry.inventory.scope.id}
-              type="button"
-              className={`${styles.tabButton} ${
-                entry.inventory.scope.id === scope.id
-                  ? styles.tabButtonActive
-                  : ""
-              }`}
-              onClick={() =>
-                setSelectedDashboardScopeId(entry.inventory.scope.id)
-              }
-            >
-              {entry.inventory.scope.targetServerCode}
-            </button>
-          ))}
-        </div>
-
         <div className={styles.dashboardGrid}>
           <section className={styles.dashboardCard}>
             <div className={styles.scopeTitleRow}>
@@ -3408,7 +3406,7 @@ export default function FusionIdentityPage() {
                 </span>
                 {!scope.analysisSupported ? (
                   <span className={`${styles.statusBadge} ${styles.statusAmbiguous}`}>
-                    Inventory only
+                    {hubText("dataHubI18n.inventoryOnly")}
                   </span>
                 ) : null}
                 <span
@@ -3421,8 +3419,9 @@ export default function FusionIdentityPage() {
               </div>
             </div>
 
+            <PredecessorBasisNotice basis={basis} />
             {model.error ? (
-              <div className={styles.errorState}>{model.error}</div>
+              <div className={styles.errorState}>{hubMessage(model.error)}</div>
             ) : null}
 
             {running ? (
@@ -3438,19 +3437,19 @@ export default function FusionIdentityPage() {
 
             <div className={styles.dashboardFacts}>
               <div>
-                <span>Relevant scans</span>
+                <span>{hubText("dataHubI18n.relevantScans")}</span>
                 <strong>{formatNumber(model.inventory.relevantSnapshotIds.length)}</strong>
               </div>
               <div>
-                <span>Newest relevant scan</span>
+                <span>{hubText("dataHubI18n.newestRelevantScan")}</span>
                 <strong>{formatDate(model.inventory.newestRelevantScanTimestamp)}</strong>
               </div>
               <div>
-                <span>Current players</span>
+                <span>{hubText("dataHubI18n.currentPlayers")}</span>
                 <strong>{formatNumber(model.identityState.openCurrentPlayers)}</strong>
               </div>
               <div>
-                <span>Current guilds</span>
+                <span>{hubText("dataHubI18n.currentGuilds")}</span>
                 <strong>{formatNumber(model.identityState.openCurrentGuilds)}</strong>
               </div>
             </div>
@@ -3458,12 +3457,11 @@ export default function FusionIdentityPage() {
             {previousEntry && scope.analysisSupported ? (
               <div className={styles.analysisBlock}>
                 <div className={styles.metaLine}>
-                  Last analyzed: {formatDate(analyzedAt)} · cache{" "}
-                  {model.cacheState === "fresh" ? "fresh" : "previous"}
-                  {model.cache.staleReason
-                    ? ` · refresh reason: ${model.cache.staleReason}`
-                    : ""}
+                  {hubText("dataHubI18n.lastAnalyzed")} {formatDate(analyzedAt)} {hubText("dataHubI18n.cache")}{" "}
+                  {hubText(model.cacheState === "fresh" ? "dataHubI18n.current" : "dataHubI18n.previous")}
                 </div>
+                {refreshReason ? <p className={styles.muted} data-analysis-refresh-reason={refreshReason}>{t(`fusionIdentity.refreshReasons.${refreshReason}`)}</p> : null}
+                <PredecessorBasisNotice reportBasis basis={previousEntry.report.predecessorCoverage} />
                 <DashboardResolutionSummary
                   report={previousEntry.report}
                   previous={model.cacheState === "stale"}
@@ -3472,8 +3470,8 @@ export default function FusionIdentityPage() {
             ) : (
               <div className={styles.emptyState}>
                 {scope.analysisSupported
-                  ? `${scope.targetServerCode} has not been analyzed yet.`
-                  : `${scope.targetServerCode} is available for inventory coverage only.`}
+                  ? hubText("dataHubI18n.serverNotAnalyzed", { v1: scope.targetServerCode })
+                  : hubText("dataHubI18n.serverInventoryOnly", { v1: scope.targetServerCode })}
               </div>
             )}
 
@@ -3484,7 +3482,7 @@ export default function FusionIdentityPage() {
                   className={styles.closeButton}
                   onClick={() => openReportEntry(openableEntry)}
                 >
-                  Open matches
+                  {hubText("dataHubI18n.openMatches")}
                 </button>
               ) : null}
               <button
@@ -3501,37 +3499,109 @@ export default function FusionIdentityPage() {
           <section className={styles.dashboardCard}>
             <div className={styles.scopeTitleRow}>
               <div>
-                <h3>Scan Coverage</h3>
+                <h3>{hubText("dataHubI18n.scanCoverage")}</h3>
                 <p>
-                  {formatNumber(dashboard.inventory.allSnapshotCount)} logical
-                  snapshots · inventory{" "}
+                  {formatNumber(dashboard.inventory.allSnapshotCount)} {hubText("dataHubI18n.logicalSnapshotsInventory")}{" "}
                   {formatDuration(dashboard.inventory.durationMs)}
                 </p>
               </div>
             </div>
             <ScanCoverageAccordion
-              coverage={model.inventory.coverage}
+              coverage={getFusionPredecessorCoverageRows(model.inventory)}
+              basis={basis}
               expandedServers={expandedCoverageServerSet}
               onToggle={toggleCoverageServer}
             />
           </section>
         </div>
-      </div>
     );
   };
+
+  const renderDashboard = () => (
+    <div className={styles.dashboard}>
+      <div className={styles.dashboardHeader}>
+        <div>
+          <h2>{hubText("dataHubI18n.fusionDashboard")}</h2>
+          <p>
+            {hubText("dataHubI18n.fastScanInventoryFirstFullIdentityResolutionRunsOnlyWhenYouStart")}
+          </p>
+        </div>
+        <button type="button" className={styles.infoButton} onClick={() => setEvidenceInfoOpen(true)}>
+          <Info size={16} aria-hidden /> {hubText("dataHubI18n.evidenceGuide")}
+        </button>
+      </div>
+      <div className={`${styles.dashboardNav} ${draggingServers ? styles.dashboardNavDragging : ""}`}
+        data-fusion-server-bar
+        onPointerDown={event => {
+          if (event.pointerType !== "mouse" || event.button !== 0) return;
+          suppressServerClick.current = false;
+          serverDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: event.currentTarget.scrollLeft };
+        }}
+        onPointerMove={event => {
+          const drag = serverDrag.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          const delta = event.clientX - drag.startX;
+          if (!suppressServerClick.current && Math.abs(delta) < 5) return;
+          suppressServerClick.current = true;
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
+          setDraggingServers(true);
+          event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+        }}
+        onPointerUp={() => { serverDrag.current = null; setDraggingServers(false); }}
+        onPointerCancel={() => { serverDrag.current = null; setDraggingServers(false); }}
+        onLostPointerCapture={() => { serverDrag.current = null; setDraggingServers(false); }}
+        onPointerLeave={() => {
+          if (!suppressServerClick.current) serverDrag.current = null;
+        }}
+        onClickCapture={event => {
+          if (suppressServerClick.current && event.detail > 0) { event.preventDefault(); event.stopPropagation(); }
+        }}
+        onFocusCapture={event => {
+          const button = event.target as HTMLElement;
+          const bar = event.currentTarget;
+          if (button.offsetLeft < bar.scrollLeft) bar.scrollLeft = button.offsetLeft;
+          else if (button.offsetLeft + button.offsetWidth > bar.scrollLeft + bar.clientWidth)
+            bar.scrollLeft = button.offsetLeft + button.offsetWidth - bar.clientWidth;
+        }}>
+        <button type="button" className={styles.tabButton}>{hubText("dataHubI18n.allMatches")}</button>
+        {dashboardServers.map(scope => <button key={scope.id} type="button"
+          className={`${styles.tabButton} ${scope.id === selectedServer?.id ? styles.tabButtonActive : ""}`}
+          onClick={() => setSelectedDashboardScopeId(scope.id)}>
+          {scope.targetServerCode}
+        </button>)}
+      </div>
+      {dashboard.loading ? <DataHubLoadingState
+        title={hubText("dataHubI18n.preparingFusionDashboard")}
+        message={inventoryProgress ? t(`fusionIdentity.inventoryPhases.${inventoryProgress.phase}`, { defaultValue: hubMessage(inventoryProgress.message) }) : hubText("dataHubI18n.readingLocalScanMetadata")}
+        current={inventoryProgress?.current} total={inventoryProgress?.total} />
+        : dashboard.error ? <DataHubLoadingState
+          title={hubText("dataHubI18n.couldNotPrepareFusionDashboard")}
+          message={hubText("dataHubI18n.localScanInventoryCouldNotBeRead")}
+          error={hubMessage(dashboard.error)} onRetry={refreshDashboard} /> : null}
+      <FusionIdentityEntry
+        scanCount={dashboard.error || !dashboard.inventory ? null : dashboard.inventory.scanCount}
+        scopes={dashboard.scopes.map(model => model.inventory)}
+        server={selectedServer?.targetServerCode ?? ""}
+        inventoryLoading={dashboard.loading}
+        needed={!selectedDashboardScope?.inventory.isLocallyMatchable} />
+      {!dashboard.loading && !dashboard.error && selectedDashboardScope?.inventory.isLocallyMatchable
+        ? renderDashboardCards(selectedDashboardScope) : null}
+    </div>
+  );
 
   const renderWorkspace = () => {
     if (!report) {
       return (
         <div className={styles.emptyState}>
-          Select a cached analysis or run Analyze from the Fusion Dashboard.
+          {hubText("dataHubI18n.selectACachedAnalysisOrRunAnalyzeFromTheFusionDashboard")}
         </div>
       );
     }
     if (!report.items.length)
       return (
         <div className={styles.emptyState}>
-          No supported {report.scope.label} identity pool found locally.
+          <PredecessorBasisNotice reportBasis basis={report.predecessorCoverage} />
+          {hubText("dataHubI18n.unsupportedPool", { scope: report.scope.label })}
         </div>
       );
 
@@ -3539,7 +3609,7 @@ export default function FusionIdentityPage() {
       <>
         <div className={styles.toolbar}>
           <label className={styles.fieldLabel}>
-            Search
+            {hubText("dataHubI18n.search")}
             {selectedMemberTokens.length ? (
               <div
                 className={styles.selectedMemberScope}
@@ -3590,7 +3660,7 @@ export default function FusionIdentityPage() {
                 className={styles.search}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Name or identifier"
+                placeholder={hubText("dataHubI18n.nameOrIdentifier")}
               />
             </span>
           </label>
@@ -3602,31 +3672,32 @@ export default function FusionIdentityPage() {
                 clearReport();
                 setView("dashboard");
               }}
+              disabled={mergeRunning}
             >
-              Fusion Dashboard
+              {hubText("dataHubI18n.fusionDashboard")}
             </button>
             <button
               type="button"
               className={styles.closeButton}
               onClick={() => setManualOpen(true)}
-              disabled={!report}
+              disabled={!report || mergeRunning}
             >
-              <Link2 size={15} aria-hidden /> Manual link
+              <Link2 size={15} aria-hidden /> {hubText("dataHubI18n.manualLink")}
             </button>
             <button
               type="button"
               className={styles.closeButton}
               onClick={handleMergeReady}
-              disabled={!report || (!readyPlayers && !readyGuilds)}
+              disabled={!report || mergeRunning || (!readyPlayers && !readyGuilds)}
             >
-              <Check size={15} aria-hidden /> Merge ready identities
+              <Check size={15} aria-hidden /> {hubText("dataHubI18n.mergeReadyIdentities")}
             </button>
           </div>
         </div>
 
         <div className={styles.summaryHeader}>
           <div>
-            <h2>Identity queue</h2>
+            <h2>{hubText("dataHubI18n.identityQueue")}</h2>
             <p>
               {report.scope.targetServerCode} · {report.scope.label}
             </p>
@@ -3636,23 +3707,24 @@ export default function FusionIdentityPage() {
             className={styles.infoButton}
             onClick={() => setEvidenceInfoOpen(true)}
           >
-            <Info size={16} aria-hidden /> Evidence guide
+            <Info size={16} aria-hidden /> {hubText("dataHubI18n.evidenceGuide")}
           </button>
         </div>
+        <PredecessorBasisNotice reportBasis basis={report.predecessorCoverage} />
         <div className={styles.summaryGrid}>
-          <SummaryItem label="Total identities" value={report.summary.total} />
-          <SummaryItem label="Ready" value={report.summary.ready} />
-          <SummaryItem label="Review" value={report.summary.review} />
-          <SummaryItem label="Unresolved" value={report.summary.unresolved} />
+          <SummaryItem label={hubText("dataHubI18n.totalIdentities")} value={report.summary.total} />
+          <SummaryItem label={hubText("dataHubI18n.ready")} value={report.summary.ready} />
+          <SummaryItem label={hubText("dataHubI18n.review")} value={report.summary.review} />
+          <SummaryItem label={hubText("dataHubI18n.unresolved")} value={report.summary.unresolved} />
           <SummaryItem
-            label="No Historical Observation"
+            label={hubText("dataHubI18n.noHistoricalObservation")}
             value={report.summary.noHistoricalObservation}
           />
           <SummaryItem
-            label="No Historical Data"
+            label={hubText("dataHubI18n.noHistoricalData")}
             value={report.summary.noHistory}
           />
-          <SummaryItem label="Completed" value={report.summary.completed} />
+          <SummaryItem label={hubText("dataHubI18n.completed")} value={report.summary.completed} />
         </div>
 
         <div className={styles.filters}>
@@ -3681,29 +3753,29 @@ export default function FusionIdentityPage() {
         </div>
 
         <div className={styles.metaLine}>
-          {report.scope.label} · scans: {report.scope.historicalSnapshotCount}{" "}
-          historical, {report.scope.postFusionSnapshotCount}{" "}
-          {report.scope.targetServerCode} · history:{" "}
-          {formatDate(report.scope.firstHistoricalTimestamp)} -{" "}
-          {formatDate(report.scope.lastHistoricalTimestamp)} · showing{" "}
-          {visibleItems.length} of {report.items.length}
-          {timings.find((timing) => timing.phase === "total")
-            ? ` · worker: ${formatDuration(timings.find((timing) => timing.phase === "total")?.durationMs ?? 0)}`
-            : ""}
+          {hubText("dataHubI18n.queueMeta", {
+            scope: report.scope.label, historical: report.scope.historicalSnapshotCount,
+            current: report.scope.postFusionSnapshotCount, server: report.scope.targetServerCode,
+            from: formatDate(report.scope.firstHistoricalTimestamp), to: formatDate(report.scope.lastHistoricalTimestamp),
+            visible: visibleItems.length, total: report.items.length,
+          })}
+          {timings.find(timing => timing.phase === "total") ? hubText("dataHubI18n.workerDuration", {
+            duration: formatDuration(timings.find(timing => timing.phase === "total")?.durationMs ?? 0),
+          }) : ""}
         </div>
 
         {groupedItems.guilds.length ? (
           <section className={styles.queueGroup}>
-            <h2>Guilds</h2>
+            <h2>{hubText("dataHubI18n.guilds")}</h2>
             <div className={styles.resultList}>
               {groupedItems.guilds.map((item) => (
                 <QueueRow
                   key={item.id}
                   item={item}
-                  onOpen={() => setSelectedId(item.id)}
+                  onOpen={openIdentity}
                   onFocusMembersByStatus={focusGuildMembersByStatus}
                   onCompleteReadyPlayers={handleMergeGuildReadyPlayers}
-                  completingGuildIdentifier={completingGuildIdentifier}
+                  completingGuildIdentifier={mergeRunning ? completingGuildIdentifier ?? "global-merge" : null}
                 />
               ))}
             </div>
@@ -3712,16 +3784,16 @@ export default function FusionIdentityPage() {
 
         {groupedItems.players.length ? (
           <section className={styles.queueGroup}>
-            <h2>Players</h2>
+            <h2>{hubText("dataHubI18n.players")}</h2>
             <div className={styles.resultList}>
               {groupedItems.players.map((item) => (
                 <QueueRow
                   key={item.id}
                   item={item}
-                  onOpen={() => setSelectedId(item.id)}
-                  onFocusMembersByStatus={focusGuildMembersByStatus}
-                  onCompleteReadyPlayers={handleMergeGuildReadyPlayers}
-                  completingGuildIdentifier={completingGuildIdentifier}
+                  onOpen={openIdentity}
+                  onFocusMembersByStatus={ignorePlayerGuildAction}
+                  onCompleteReadyPlayers={ignorePlayerGuildAction}
+                  completingGuildIdentifier={null}
                 />
               ))}
             </div>
@@ -3730,7 +3802,7 @@ export default function FusionIdentityPage() {
 
         {!visibleItems.length ? (
           <div className={styles.emptyState}>
-            No identities match the current filters.
+            {hubText("dataHubI18n.noIdentitiesMatchTheCurrentFilters")}
           </div>
         ) : null}
       </>
@@ -3746,18 +3818,21 @@ export default function FusionIdentityPage() {
     >
       <section className={styles.page}>
         <header className={styles.header}>
+          {dataHub && <LocalTitleNavigation title={hubText("dataHubI18n.fusionIdentity")}
+            onBack={() => navigate(returnTo ?? DATA_HUB,
+              { replace: true, state: returnTo ? location.state?.profileReturnState : undefined })} />}
           <div>
-            <h1 className={styles.title}>Fusion &amp; Identity</h1>
+            {!dataHub && <h1 className={styles.title}>{hubText("dataHubI18n.fusionIdentity")}</h1>}
             <p className={styles.subtitle}>
-              Local fusion dashboard and scoped identity resolution.
+              {hubText("dataHubI18n.localFusionDashboardAndScopedIdentityResolution")}
             </p>
           </div>
           <div className={styles.previewBadge}>
-            Local · Links and exclusions are reversible. Raw scans stay
-            unchanged.
+            {hubText("dataHubI18n.localLinksAndExclusionsAreReversibleRawScansStayUnchanged")}
           </div>
         </header>
 
+        <MergeFeedback ref={mergeFeedbackRef} />
         <section className={styles.panel}>
           {view === "workspace" ? renderWorkspace() : renderDashboard()}
         </section>
@@ -3765,6 +3840,7 @@ export default function FusionIdentityPage() {
         {selectedItem ? (
           <IdentityDetails
             item={selectedItem}
+            dependencies={report?.dependencies}
             onClose={() => setSelectedId(null)}
             onChanged={handleIdentityChanged}
           />

@@ -1,16 +1,19 @@
+import { trackLocalEvent } from "../lib/analytics/localEvents";
+import { auditBegin, auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields } from "../lib/data-hub/runtimeAudit";
 import React from "react";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 import { useNotifications } from "./NotificationsContext";
 import {
   commitSfDataHubLocalScanPreview,
-  createSfDataHubLocalScanImportPreview,
   deriveGuildHubLogicalScanSnapshots,
   getSfDataHubLocalScan,
   mergeSfDataHubLocalScanSources,
   recoverSfDataHubScanSlotMerge,
   type GuildHubScanMergeMode,
 } from "../lib/guilds/localScanLibrary";
+import { prepareLocalScanImportInWorker } from "../lib/scanArchive/downloadWorkerClient";
+import type { PreparedLocalScanImport } from "../lib/scanArchive/downloadWorkerTypes";
 
 export type DataJobType = "sftools-import" | "scan-merge";
 export type DataJobStatus = "running" | "completed" | "failed" | "interrupted";
@@ -54,7 +57,7 @@ type DataJobsContextValue = {
   isReady: boolean;
   runningSfToolsImportJob: DataJob | null;
   runningScanMergeJob: DataJob | null;
-  startSfToolsImportJob: (file: File) => Promise<DataJob>;
+  startSfToolsImportJob: (file: File, prepared?: PreparedLocalScanImport) => Promise<DataJob>;
   startScanMergeJob: (input: {
     sourceScanIds: string[];
     filename: string;
@@ -215,24 +218,31 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateRunningJob = React.useCallback(
     async (jobId: string, patch: Partial<DataJob>) => {
+    const __audit1 = auditPhaseBegin("updateRunningJob", undefined, "async-container");
+    try {
       const current = jobsRef.current.find((job) => job.id === jobId);
-      if (!current || current.status !== "running") return current ?? null;
+      if (!current || current.status !== "running") return auditReturn(__audit1, current ?? null);
       const next: DataJob = {
         ...current,
         ...patch,
         metadata: patch.metadata ? { ...(current.metadata ?? {}), ...patch.metadata } : current.metadata,
         updatedAt: Date.now(),
       };
-      await persistAndStoreJob(next);
-      return next;
-    },
+      await (auditValue(__audit1, auditEnter(__audit1, "persistAndStoreJob"), (persistAndStoreJob(next))));
+      return auditReturn(__audit1, next);
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+},
     [persistAndStoreJob],
   );
 
   const finishJob = React.useCallback(
     async (jobId: string, status: Exclude<DataJobStatus, "running">, patch: Partial<DataJob>) => {
+    const __audit2 = auditPhaseBegin("finishJob", undefined, "async-container");
+    try {
       const current = jobsRef.current.find((job) => job.id === jobId);
-      if (!current) return null;
+      if (!current) return auditReturn(__audit2, null);
       const completedAt = Date.now();
       const next: DataJob = {
         ...current,
@@ -241,7 +251,7 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         completedAt,
         updatedAt: completedAt,
       };
-      await persistAndStoreJob(next);
+      await (auditValue(__audit2, auditEnter(__audit2, "persistAndStoreJob"), (persistAndStoreJob(next))));
 
       if (status === "completed") {
         pushActivityEvent({
@@ -266,8 +276,11 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
 
-      return next;
-    },
+      return auditReturn(__audit2, next);
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
+},
     [persistAndStoreJob, pushActivityEvent],
   );
 
@@ -390,7 +403,10 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [pushActivityEvent, removeJob]);
 
   const runSfToolsImportJob = React.useCallback(
-    async (jobId: string, file: File) => {
+    async (jobId: string, file: File, prepared?: PreparedLocalScanImport) => {
+    const __audit3 = auditBegin("F36", "runSfToolsImportJob");
+    if (__audit3) auditFields(__audit3, { dataJobId: jobId, ownerLifetime: "DataJob; independent of UI consumer", directImport: false });
+    try {
       let progressQueue = Promise.resolve();
       const queueProgressUpdate = (patch: Partial<DataJob>) => {
         progressQueue = progressQueue
@@ -402,30 +418,30 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
 
       try {
-        await updateRunningJob(jobId, {
+        await (auditValue(__audit3, auditEnter(__audit3, "updateRunningJob"), (updateRunningJob(jobId, {
           phase: "Datei lesen",
           message: "Datei wird gelesen.",
           progress: undefined,
-        });
-        const content = await file.text();
+        }))));
+        const content = prepared ? null : await (auditValue(__audit3, auditEnter(__audit3, "file.text"), (file.text())));
 
-        await updateRunningJob(jobId, {
+        await (auditValue(__audit3, auditEnter(__audit3, "updateRunningJob"), (updateRunningJob(jobId, {
           phase: "JSON analysieren",
           message: "SFtools-Struktur wird geprüft.",
-        });
-        const scan = await createSfDataHubLocalScanImportPreview(file.name, content);
+        }))));
+        const preparation = prepared ?? await (auditValue(__audit3, auditEnter(__audit3, "prepareLocalScanImportInWorker"), (prepareLocalScanImportInWorker({ filename: file.name, content: content! }))));
+        const scan = preparation.scan;
 
-        await updateRunningJob(jobId, {
+        await (auditValue(__audit3, auditEnter(__audit3, "updateRunningJob"), (updateRunningJob(jobId, {
           phase: "Snapshots erkennen",
           message: "Zeitpunkte werden aus der Datei ermittelt.",
           metadata: {
             targetSourceScanId: scan.id,
           },
-        });
-        const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
-        const detectedMembers = snapshots.reduce((sum, snapshot) => sum + snapshot.normalizedMembers.length, 0);
-        const detectedSnapshots = snapshots.length;
-        await updateRunningJob(jobId, {
+        }))));
+        const detectedMembers = preparation.statistics.normalizedMemberCount;
+        const detectedSnapshots = preparation.statistics.snapshots.length;
+        await (auditValue(__audit3, auditEnter(__audit3, "updateRunningJob"), (updateRunningJob(jobId, {
           phase: "Snapshots / Member verarbeiten",
           progress:
             detectedMembers > 0
@@ -442,9 +458,10 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             detectedMembers,
             processedMembers: 0,
           },
-        });
+        }))));
 
-        const result = await commitSfDataHubLocalScanPreview(scan, {
+        const result = await (auditValue(__audit3, auditEnter(__audit3, "commitSfDataHubLocalScanPreview"), (commitSfDataHubLocalScanPreview(scan, {
+          personalSFToolsImport: true,
           analytics: {
             onProgress: (progress) => {
               queueProgressUpdate({
@@ -475,10 +492,10 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               progress: undefined,
             });
           },
-        });
+        }))));
 
-        await progressQueue;
-        await finishJob(jobId, "completed", {
+        await (auditValue(__audit3, auditEnter(__audit3, "progressQueue"), (progressQueue)));
+        await (auditValue(__audit3, auditEnter(__audit3, "finishJob"), (finishJob(jobId, "completed", {
           title: "SFtools-Import abgeschlossen",
           phase: "Fertig",
           progress: result.status === "imported" ? { current: 1, total: 1 } : undefined,
@@ -490,19 +507,23 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             processedSnapshots: detectedSnapshots,
             processedMembers: detectedMembers,
           },
-        });
-      } catch (error) {
-        await progressQueue;
+        }))));
+        if (result.status === "imported") trackLocalEvent("datahub/uploads/sftools-import-success");
+      } catch (error) { auditError(__audit3, error);
+        await (auditValue(__audit3, auditEnter(__audit3, "progressQueue"), (progressQueue)));
         const message = getErrorMessage(error, "SFtools-Datei konnte nicht importiert werden.");
-        await finishJob(jobId, "failed", {
+        await (auditValue(__audit3, auditEnter(__audit3, "finishJob"), (finishJob(jobId, "failed", {
           title: "SFtools-Import fehlgeschlagen",
           phase: "Fehlgeschlagen",
           progress: undefined,
           message,
           error: message,
-        });
+        }))));
       }
-    },
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
+},
     [finishJob, updateRunningJob],
   );
 
@@ -514,6 +535,9 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       mode: GuildHubScanMergeMode = "merged-file",
       displayName?: string,
     ) => {
+    const __audit4 = auditBegin("F36", "runScanMergeJob");
+    if (__audit4) auditFields(__audit4, { dataJobId: jobId, ownerLifetime: "DataJob; independent of UI consumer" });
+    try {
       let progressQueue = Promise.resolve();
       const queueProgressUpdate = (patch: Partial<DataJob>) => {
         progressQueue = progressQueue
@@ -525,24 +549,24 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
 
       try {
-        await updateRunningJob(jobId, {
+        await (auditValue(__audit4, auditEnter(__audit4, "updateRunningJob"), (updateRunningJob(jobId, {
           phase: "Quelldateien werden geladen",
           message:
             mode === "scan-slot"
               ? `${sourceScanIds.length} Quellen werden für den Scan-Slot vorbereitet.`
               : `${sourceScanIds.length} Quellen werden vorbereitet.`,
           progress: { current: 0, total: sourceScanIds.length },
-        });
+        }))));
 
         const current = jobsRef.current.find((job) => job.id === jobId);
         const targetSourceScanId = current?.metadata?.targetSourceScanId ?? createTargetSourceScanId("scan-merge");
         if (!current?.metadata?.targetSourceScanId) {
-          await updateRunningJob(jobId, {
+          await (auditValue(__audit4, auditEnter(__audit4, "updateRunningJob"), (updateRunningJob(jobId, {
             metadata: { targetSourceScanId },
-          });
+          }))));
         }
 
-        const bundle = await mergeSfDataHubLocalScanSources(sourceScanIds, filename, {
+        const bundle = await (auditValue(__audit4, auditEnter(__audit4, "mergeSfDataHubLocalScanSources"), (mergeSfDataHubLocalScanSources(sourceScanIds, filename, {
           targetScanId: targetSourceScanId,
           mode,
           displayName,
@@ -567,11 +591,11 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               },
             });
           },
-        });
-        const bundleSnapshots = deriveGuildHubLogicalScanSnapshots(bundle);
+        }))));
+        const bundleSnapshots = (auditValue(__audit4, auditEnter(__audit4, "deriveGuildHubLogicalScanSnapshots", "sync-elapsed"), (deriveGuildHubLogicalScanSnapshots(bundle))));
 
-        await progressQueue;
-        await finishJob(jobId, "completed", {
+        await (auditValue(__audit4, auditEnter(__audit4, "progressQueue"), (progressQueue)));
+        await (auditValue(__audit4, auditEnter(__audit4, "finishJob"), (finishJob(jobId, "completed", {
           title: mode === "scan-slot" ? "Scan-Slot erstellt" : "Scan-Bundle erstellt",
           phase: "Fertig",
           progress: { current: 1, total: 1 },
@@ -588,24 +612,27 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             mergeMode: mode,
             ...(displayName ? { displayName } : {}),
           },
-        });
-      } catch (error) {
-        await progressQueue;
+        }))));
+      } catch (error) { auditError(__audit4, error);
+        await (auditValue(__audit4, auditEnter(__audit4, "progressQueue"), (progressQueue)));
         const message = getErrorMessage(error, "Scan-Zusammenführung konnte nicht abgeschlossen werden.");
-        await finishJob(jobId, "failed", {
+        await (auditValue(__audit4, auditEnter(__audit4, "finishJob"), (finishJob(jobId, "failed", {
           title: "Scan-Zusammenführung fehlgeschlagen",
           phase: "Fehlgeschlagen",
           progress: undefined,
           message,
           error: message,
-        });
+        }))));
       }
-    },
+
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
+},
     [finishJob, updateRunningJob],
   );
 
   const startSfToolsImportJob = React.useCallback(
-    async (file: File) => {
+    async (file: File, prepared?: PreparedLocalScanImport) => {
       if (!isReady) {
         throw new Error("Data-Job-System wird noch initialisiert.");
       }
@@ -630,7 +657,7 @@ export const DataJobsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
       };
       await persistAndStoreJob(job);
-      void runSfToolsImportJob(job.id, file);
+      void runSfToolsImportJob(job.id, file, prepared);
       return job;
     },
     [isReady, persistAndStoreJob, runSfToolsImportJob],

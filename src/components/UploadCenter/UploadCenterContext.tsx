@@ -26,7 +26,6 @@ export function UploadCenterProvider({ children }: Props) {
   const canUse = canAccessFeature("main.uploadCenter");
 
   const open = useCallback((opts?: { tab?: TabKey }) => {
-    if (!canUse) return;
     if (opts?.tab) {
       setActiveTab(opts.tab);
     } else {
@@ -34,7 +33,7 @@ export function UploadCenterProvider({ children }: Props) {
       setActiveTab("json");
     }
     setOpen(true);
-  }, [canUse]);
+  }, []);
 
   const close = useCallback(() => setOpen(false), []);
 

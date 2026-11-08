@@ -1,3 +1,4 @@
+import { normalizeServerKeyFromInput } from "../players/identifier";
 import {
   LOCAL_SERVER_FUSION_EVENTS,
   type LocalServerFusionEvent,
@@ -242,6 +243,7 @@ export const createServerGraph = (
     const codeKey = normalizeLookupKey(server.code);
     codeLookup.set(codeKey, server);
     addStringLookup(server.code, server);
+    addStringLookup(server.displayName, server);
     addHostLookup(server.host, server);
     server.hosts.forEach((host) => addHostLookup(host, server));
     server.aliases.forEach((alias) => addStringLookup(alias, server));
@@ -462,3 +464,31 @@ export const getFusionOrigins = defaultGraph.getFusionOrigins;
 export const getFusionAncestorEvents = defaultGraph.getFusionAncestorEvents;
 export const areFusionRelated = defaultGraph.areFusionRelated;
 export const isFusionAncestor = defaultGraph.isFusionAncestor;
+
+/** Ephemeral equality key. Preserve source identifiers, stored normalizer output
+ * and archive/cache keys. Registered aliases do not imply fusion ancestry. */
+export const serverComparisonKey = (value: unknown): string | null => {
+  const input = typeof value === "number" ? value : String(value ?? "").trim();
+  if (input === "") return null;
+  return resolveServer(input)?.code ?? normalizeServerKeyFromInput(value);
+};
+
+/** Ephemeral key for a full player/guild observation in one registered server
+ * namespace. Never implies fusion ancestry or stored entity membership. */
+export function observationReferenceKey(identifier: string): string {
+  const raw = identifier.trim().toLowerCase();
+  const match = /^(.+)_([pg][^_]+)$/i.exec(raw);
+  const server = match && (resolveServer(match[1]) ?? resolveServer(serverComparisonKey(match[1])))?.code;
+  return match && server ? `${server.toLowerCase()}_${match[2]}` : raw;
+}
+
+/** Lookup spellings only; original stored/source references stay unchanged. */
+export function observationReferenceCandidates(identifier: string): string[] {
+  const raw = identifier.trim();
+  const match = /^(.+)_([pg][^_]+)$/i.exec(raw);
+  const server = match && (resolveServer(match[1]) ?? resolveServer(serverComparisonKey(match[1])));
+  if (!match || !server) return [raw];
+  return [...new Set([raw.toLowerCase(), ...[server.code, ...server.aliases, ...server.hosts]
+    .filter(namespace => resolveServer(namespace)?.code === server.code)
+    .map(namespace => `${namespace.toLowerCase()}_${match[2].toLowerCase()}`)])];
+}

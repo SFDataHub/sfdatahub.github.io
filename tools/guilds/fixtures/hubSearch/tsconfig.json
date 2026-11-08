@@ -1,0 +1,6 @@
+{
+ "extends": "../../../../tsconfig.json",
+ "compilerOptions": { "strict": true, "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"], "jsx": "react-jsx" },
+ "include": ["../../hubSearch.test.mts", "../../hubSearchLifecycle.test.mts", "../../hubSearchCosts.test.mts", "../../hubSearchArchive.test.mts", "../../../scanArchive/hubSearchIndexFlights.test.mts", "../../hubSearch.browser.test.mts", "./fixture.tsx", "./mocks.tsx", "../../../../src/**/*.d.ts"],
+ "exclude": []
+}

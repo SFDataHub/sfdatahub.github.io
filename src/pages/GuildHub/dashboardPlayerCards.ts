@@ -1,3 +1,4 @@
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditObserveInputs, auditAssociate } from "../../lib/data-hub/runtimeAudit";
 import type { PlayerCardData, PlayerCardPotion } from "../../components/player-card/types";
 import { resolvePotionAssetKey } from "../../components/potions/potionAssets";
 import { getGuildClassAccent } from "../../components/guilds/classColors";
@@ -7,7 +8,7 @@ import type { NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
 import type { LocalPlayerIndexPlayer } from "../../lib/player-search/localPlayerIndex";
 import type { PlayerCardDevelopmentSummary } from "../../lib/player-progress/playerCardDevelopment";
 import { normalizeSfPlayerPotions } from "../../lib/parsing/normalizedConsumables";
-import { normalizeSfPlayerCharacterCore } from "../../lib/parsing/normalizedPlayer";
+import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 import { readSfPlayerStats } from "../../lib/parsing/parseSfJson";
 import { readSfPlayerSaveArray } from "../../lib/parsing/playerSaveLayout";
 import { createPortraitOptionsFromSaveArray } from "../../lib/portraitFromSave";
@@ -26,6 +27,7 @@ export type DashboardPlayerCardMember = {
   level: number | null;
   hofRank: number | null;
   guildRole?: NormalizedGuildRole;
+  playerStats?: import("./localGuildPlayerStats").LocalGuildPlayerStats;
   localRef?: {
     sourceScanId: string;
     sourcePlayerKey: string;
@@ -82,7 +84,7 @@ export function buildDashboardPlayerCardItems<TMember extends DashboardPlayerCar
   currentSourceScanId,
   currentTimestampMs,
   baseItems,
-  developmentStatus = "ready",
+  developmentStatus,
   developmentError = null,
 }: {
   members: TMember[];
@@ -93,6 +95,10 @@ export function buildDashboardPlayerCardItems<TMember extends DashboardPlayerCar
   developmentStatus?: DashboardPlayerCardDevelopmentStatus;
   developmentError?: string | null;
 }): DashboardPlayerCardItem<TMember>[] {
+ const __w32Run0=auditBegin("F10","buildDashboardPlayerCardItems");
+ auditObserveInputs(__w32Run0, [players, members, baseItems]);
+ const __w32Sync=auditEnter(__w32Run0,"buildDashboardPlayerCardItems","sync-elapsed");
+ try {
   const currentPlayersByKey = new Map<string, LocalPlayerIndexPlayer>();
   const baseByMemberKey = new Map((baseItems ?? []).map((item) => [item.member.key, item]));
   players.forEach((player) => {
@@ -100,41 +106,55 @@ export function buildDashboardPlayerCardItems<TMember extends DashboardPlayerCar
     currentPlayersByKey.set(player.key.toLowerCase(), player);
   });
 
-  return members.map((member) => {
+  return auditReturn(__w32Run0,members.map((member) => {
     const indexedPlayer = findIndexedPlayerForMember(member, currentPlayersByKey);
     const baseItem = baseByMemberKey.get(member.key) ?? null;
     const baseCard = baseItem?.card ?? buildFallbackPlayerCard(member);
     const development = indexedPlayer?.development ?? null;
+    auditAssociate(__w32Run0, development?.baseStats.playerTrend);
+    auditAssociate(__w32Run0, development?.baseStats.guildTrend);
+    auditAssociate(__w32Run0, development?.level.playerTrend);
+    auditAssociate(__w32Run0, development?.level.guildTrend);
     return {
       member,
       indexedPlayer,
       card: baseCard,
       development,
-      developmentStatus: development ? "ready" : baseItem?.developmentStatus ?? developmentStatus,
+      developmentStatus: development ? "ready" : developmentStatus ?? baseItem?.developmentStatus ?? "ready",
       developmentError,
     };
-  });
+  }));
+
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
 }
 
 export function buildDashboardStaticPlayerCardItems<TMember extends DashboardPlayerCardMember>({
   members,
   playerLookup,
+  coreLookup,
   developmentStatus = "loading",
   developmentError = null,
 }: {
   members: TMember[];
   playerLookup: ReadonlyMap<string, JsonRecord>;
+  coreLookup?: Map<JsonRecord, NormalizedPlayer | null>;
   developmentStatus?: DashboardPlayerCardDevelopmentStatus;
   developmentError?: string | null;
 }): DashboardPlayerCardItem<TMember>[] {
-  return members.map((member) => ({
+ const __w32Run1=auditBegin("F10","buildDashboardStaticPlayerCardItems");
+ auditObserveInputs(__w32Run1, [members]);
+ const __w32Sync=auditEnter(__w32Run1,"buildDashboardStaticPlayerCardItems","sync-elapsed");
+ try {
+  return auditReturn(__w32Run1,members.map((member) => ({
     member,
     indexedPlayer: null,
-    card: buildStaticPlayerCard(member, resolveRawPlayerForMember(member, playerLookup)),
+    card: buildStaticPlayerCard(member, resolveRawPlayerForMember(member, playerLookup), coreLookup),
     development: null,
     developmentStatus,
     developmentError,
-  }));
+  })));
+
+} catch (__w32Error) { auditError(__w32Run1,__w32Error); throw __w32Error; } finally {auditValue(__w32Run1,__w32Sync,undefined);auditLeave(__w32Run1);}
 }
 
 export function findIndexedPlayerForMember(
@@ -175,9 +195,11 @@ function resolveRawPlayerForMember(member: DashboardPlayerCardMember, playerLook
 function buildStaticPlayerCard(
   member: DashboardPlayerCardMember,
   rawPlayer: JsonRecord | null,
+  coreLookup?: Map<JsonRecord, NormalizedPlayer | null>,
 ): PlayerCardData {
   if (!rawPlayer) return buildFallbackPlayerCard(member);
-  const normalized = safeNormalizePlayer(rawPlayer);
+  const normalized = coreLookup?.has(rawPlayer) ? coreLookup.get(rawPlayer) ?? null : safeNormalizePlayer(rawPlayer);
+  coreLookup?.set(rawPlayer, normalized);
   const stats = readSfPlayerStats(rawPlayer);
   const classId = normalized?.identity.class ?? stats.classId ?? member.classLabel;
   const classMeta = getClassMetaById(classId) ?? member.classMeta;

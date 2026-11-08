@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./FeaturedPreviewRow.module.css";
 
 type FeaturedPreviewRowProps = {
@@ -7,6 +8,7 @@ type FeaturedPreviewRowProps = {
 };
 
 const FeaturedPreviewRow: React.FC<FeaturedPreviewRowProps> = ({ children, className }) => {
+  const { t } = useTranslation();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
@@ -66,7 +68,7 @@ const FeaturedPreviewRow: React.FC<FeaturedPreviewRowProps> = ({ children, class
         className={`${styles.navBtn} ${styles.navPrev}`}
         onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
         disabled={!canGoPrev}
-        aria-label="Previous"
+        aria-label={t("home.preview.previous")}
       >
         {"<"}
       </button>
@@ -83,7 +85,7 @@ const FeaturedPreviewRow: React.FC<FeaturedPreviewRowProps> = ({ children, class
         className={`${styles.navBtn} ${styles.navNext}`}
         onClick={() => setIndex((prev) => Math.min(maxIndex, prev + 1))}
         disabled={!canGoNext}
-        aria-label="Next"
+        aria-label={t("home.preview.next")}
       >
         {">"}
       </button>

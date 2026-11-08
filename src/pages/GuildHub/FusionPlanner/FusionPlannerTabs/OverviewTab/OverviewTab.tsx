@@ -1,3 +1,5 @@
+import { auditBegin, auditEnter, auditValue, auditCount, auditAssociate, auditFinish } from "../../../../../lib/data-hub/runtimeAudit";
+import { useRuntimeAuditCommit } from "../../../../../lib/data-hub/useRuntimeAuditCommit";
 import React from "react";
 import type {
   FusionMember,
@@ -40,6 +42,8 @@ export default function OverviewTab({
         }))
       : [{ id: "partner-default", label: "Partner guild" }];
 
+  const projectionAudit = members.length ? auditBegin("F32", "scenario-allocation-render") : null;
+  const projectionSpan = auditEnter(projectionAudit, "scenario-allocation", "sync-elapsed");
   const mainList = members.filter((member) => decisions[member.id] === "take" && targets[member.id] === "main");
   const watchList = members.filter((member) => decisions[member.id] === "bench");
   const partnerBuckets = partnerColumns.reduce<Record<string, FusionMember[]>>((acc, col) => {
@@ -56,6 +60,9 @@ export default function OverviewTab({
       !Object.values(partnerBuckets).some((list) => list.includes(member)),
   );
 
+  auditValue(projectionAudit, projectionSpan, undefined);
+  if (projectionAudit) { auditCount(projectionAudit, "members", members.length); auditCount(projectionAudit, "main", mainList.length); auditCount(projectionAudit, "watch", watchList.length); auditCount(projectionAudit, "unassigned", unassignedList.length); auditAssociate(projectionAudit, mainList); auditFinish(projectionAudit); }
+  useRuntimeAuditCommit(mainList, !!scenario && members.length > 0, "fusion-scenario-allocation");
   const [dragOver, setDragOver] = React.useState<ColumnKey | null>(null);
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null);
   const longPressTimer = React.useRef<number | null>(null);

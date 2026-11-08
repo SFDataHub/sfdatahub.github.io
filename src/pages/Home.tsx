@@ -16,6 +16,7 @@ import type {
 import guideHubLogo from "../assets/logo_guidehub.png";
 import { guideAssetByKey } from "../data/guidehub/assets";
 import { AUTH_BASE_URL } from "../lib/auth/config";
+import { trackTwitchLiveClick } from "../lib/analytics/localEvents";
 
 const GUIDEHUB_ROUTE = "/guidehub-v2";
 const SFTOOLS_ASSET = guideAssetByKey("sftools", 512);
@@ -94,19 +95,20 @@ function parseCsv(input: string): AnyRecord[] {
   });
 }
 
-function formatTimeAgo(isoOrEpoch?: string | number): string {
+function formatTimeAgo(isoOrEpoch: string | number | undefined, locale: string): string {
   try {
     const now = Date.now();
     const t = typeof isoOrEpoch === "number" ? isoOrEpoch : Date.parse(String(isoOrEpoch ?? now));
     const diff = Math.max(0, now - t);
     const sec = Math.floor(diff / 1000);
-    if (sec < 60) return `${sec}s`;
+    const format = (value: number, unit: string) => new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "narrow" }).format(value);
+    if (sec < 60) return format(sec, "second");
     const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m`;
+    if (min < 60) return format(min, "minute");
     const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h`;
+    if (hr < 24) return format(hr, "hour");
     const d = Math.floor(hr / 24);
-    return `${d}d`;
+    return format(d, "day");
   } catch { return ""; }
 }
 
@@ -224,7 +226,7 @@ const TwitchHeaderLogo: React.FC = () => (
 const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapshot | null) => void }> = ({
   onSnapshotChange,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [index, setIndex] = useState<number>(0);
   const [data, setData] = useState<DiscordByChannelSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -376,7 +378,7 @@ const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapsho
   const channelEmpty = !loading && activeEntry && !activeEntry.item;
 
   const item = activeEntry?.item ?? null;
-  const timeLabel = item ? formatTimeAgo(item.timestamp) : "";
+  const timeLabel = item ? formatTimeAgo(item.timestamp, i18n.resolvedLanguage ?? i18n.language) : "";
   const authorLabel = item?.author || "Discord";
   const displayText = item?.contentText ? clampText(item.contentText, 240) : "";
   const cardLabel = item ? `${authorLabel} ${timeLabel}`.trim() : undefined;
@@ -473,7 +475,7 @@ const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapsho
           <div className={styles.empty} data-i18n="home.news.empty">{t("home.news.empty")}</div>
         )}
       </div>
-      {error && <div className={styles.errorNote} aria-live="polite">{error}</div>}
+      {error && <div className={styles.errorNote} aria-live="polite">{t("home.news.loadError")}</div>}
     </section>
   );
 };
@@ -522,7 +524,7 @@ const YouTubeCarousel: React.FC = () => {
           <button className={styles.navBtn} onClick={next} aria-label={t("home.youtube.next")}>▶</button>
         </div>
       </header>
-      <div className={styles.carousel} tabIndex={0} onKeyDown={onKey} aria-roledescription="carousel">
+      <div className={styles.carousel} tabIndex={0} onKeyDown={onKey} aria-roledescription={t("home.youtube.carousel")}>
         {items.length === 0 ? (
           <div className={styles.empty} data-i18n="home.youtube.empty">{t("home.youtube.empty")}</div>
         ) : (
@@ -552,7 +554,7 @@ type TwitchLiveResponse =
       }>;
     };
 const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [live, setLive] = useState<TwitchLiveResponse | null>(null);
 
   useEffect(() => {
@@ -618,11 +620,12 @@ const LiveNow: React.FC<{ onOpenSchedule: () => void }> = ({ onOpenSchedule }) =
                   <div className={styles.liveViewRow}>
                     {typeof item.stream.viewerCount === "number" && (
                       <span className={styles.liveViewers}>
-                        {t("home.live.viewers", { viewers: item.stream.viewerCount.toLocaleString() })}
+                        {t("home.live.viewers", { count: item.stream.viewerCount, viewers: item.stream.viewerCount.toLocaleString(i18n.resolvedLanguage ?? i18n.language) })}
                       </span>
                     )}
                     <a
                       href={item.channel.url}
+                      onClick={() => trackTwitchLiveClick(item.channel.login)}
                       target="_blank"
                       rel="noreferrer"
                       className={`${styles.primaryBtn} ${styles.liveOpenBtn}`}

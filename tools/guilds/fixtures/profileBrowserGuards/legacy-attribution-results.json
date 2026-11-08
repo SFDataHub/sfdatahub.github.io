@@ -1,0 +1,403 @@
+{
+  "error": "Error: prepared no current normalization\n    at assert (http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:29:21)\n    at Object.run (http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:357:3)",
+  "measurements": {
+    "preparedDashboard": {
+      "reads": [
+        "history/parent:guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081"
+      ],
+      "cores": [
+        "Current Player 1",
+        "Current Player 2"
+      ],
+      "builds": [
+        "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+        "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081"
+      ]
+    },
+    "legacyCoreWindow": [
+      {
+        "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+        "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+        "row": 0,
+        "name": "Current Player 1",
+        "ref": "f8_net_p1",
+        "at": 1791288000000,
+        "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+      },
+      {
+        "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+        "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+        "row": 1,
+        "name": "Current Player 2",
+        "ref": "f8_net_p2",
+        "at": 1791288000000,
+        "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+      }
+    ],
+    "legacyReadWindow": [
+      {
+        "id": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+        "stack": "Error\n    at getGuildHubLocalScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1965:41)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:332:30)",
+        "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a"
+      }
+    ]
+  },
+  "readDetails": [
+    {
+      "id": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "stack": "Error\n    at getGuildHubLocalScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1965:41)\n    at read (http://127.0.0.1:5173/src/lib/data-hub/localProfileEntry.ts:50:22)\n    at async seed (http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:622:13)\n    at async http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:632:44",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a"
+    },
+    {
+      "id": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "stack": "Error\n    at getGuildHubLocalScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1965:41)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:332:30)",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a"
+    },
+    {
+      "id": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "stack": "Error\n    at getGuildHubLocalScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1965:41)\n    at read (http://127.0.0.1:5173/src/lib/data-hub/localProfileEntry.ts:50:22)",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a"
+    },
+    {
+      "id": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "stack": "Error\n    at getGuildHubLocalScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1965:41)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:332:30)",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a"
+    }
+  ],
+  "coreDetails": [
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1786017600000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 1",
+      "ref": "f8_net_p1",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Historical Player 2",
+      "ref": "f8_net_p2",
+      "at": 1788696000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildLocalScanRecord (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1842:29)\n    at Object.createGuildHubLocalScanImportPreview [as createLocalScanImportPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1988:10)\n    at async importArchiveEntry (http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:161:21)\n    at async http://127.0.0.1:5173/src/lib/scanArchive/localFirstScanAcquisition.ts:243:16"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at createGuildHubScanSummary (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1131:21)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at collectGuildIdentitiesForScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:820:21)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:551:31\n    at Array.flatMap (<anonymous>)\n    at deriveGuildHubLogicalScanSnapshots (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:546:45)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:549:21)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at buildRawPlayerLookup (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:749:24)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:674:34)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarTotalXpForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:808:28)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:734:26)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)\n    at async Object.commitGuildHubLocalScanPreview [as commitLocalScanPreview] (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:2038:5)"
+    },
+    {
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:900:12)\n    at readProgressRadarBaseAttributesForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:812:28)\n    at readProgressRadarCombinedBaseStatsForPlayer (http://127.0.0.1:5173/src/pages/Playground/progressRadarModel.ts:818:45)\n    at toMemberSnapshot (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:735:35)\n    at buildDerivedRecords (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:680:26)\n    at buildAndCommitSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:571:44)\n    at materializeSourceIntoDb (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:539:15)\n    at async materializeGuildAnalyticsSource (http://127.0.0.1:5173/src/lib/guilds/localGuildAnalyticsStore.ts:400:3)\n    at async materializeGuildAnalyticsScan (http://127.0.0.1:5173/src/lib/guilds/localScanLibrary.ts:1717:3)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 0,
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/GuildHub/localPlayerProfileAdapter.ts:79:12)\n    at buildLocalPlayerProfileModel (http://127.0.0.1:5173/src/pages/GuildHub/localPlayerProfileAdapter.ts:119:173)\n    at finish (http://127.0.0.1:5173/src/lib/data-hub/localProfileEntry.ts:34:12)\n    at async seed (http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:622:13)\n    at async http://127.0.0.1:5173/tools/guilds/fixtures/profileBrowserGuards/legacyRouterFixture.tsx:632:44"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 0,
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 1,
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 0,
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/pages/GuildHub/localPlayerProfileAdapter.ts:79:12)\n    at buildLocalPlayerProfileModel (http://127.0.0.1:5173/src/pages/GuildHub/localPlayerProfileAdapter.ts:119:173)\n    at finish (http://127.0.0.1:5173/src/lib/data-hub/localProfileEntry.ts:34:12)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 1,
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/components/local-player-profile/localPlayerInsightsModel.ts:167:12)\n    at http://127.0.0.1:5173/src/components/local-player-profile/localPlayerInsightsModel.ts:62:140\n    at Array.forEach (<anonymous>)\n    at buildPlayerVsAverage (http://127.0.0.1:5173/src/components/local-player-profile/localPlayerInsightsModel.ts:61:16)\n    at buildCurrentScanInsights (http://127.0.0.1:5173/src/components/local-player-profile/localPlayerInsightsModel.ts:55:22)\n    at http://127.0.0.1:5173/src/lib/local-player-profile/coordinator.ts:269:47\n    at http://127.0.0.1:5173/src/lib/local-player-profile/coordinator.ts:328:26\n    at http://127.0.0.1:5173/src/lib/local-player-profile/coordinator.ts:214:14\n    at async ProfileContext.request (http://127.0.0.1:5173/src/lib/local-player-profile/coordinator.ts:266:18)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 0,
+      "name": "Current Player 1",
+      "ref": "f8_net_p1",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+    },
+    {
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "row": 1,
+      "name": "Current Player 2",
+      "ref": "f8_net_p2",
+      "at": 1791288000000,
+      "stack": "Error\n    at normalizeSfPlayerCharacterCore (http://127.0.0.1:5173/src/lib/parsing/normalizedPlayer.ts:178:279)\n    at safeNormalizePlayer (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:55:12)\n    at normalizeGuildScanMember (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:176:22)\n    at http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:38\n    at Array.map (<anonymous>)\n    at normalizeGuildScanMembers (http://127.0.0.1:5173/src/lib/guilds/guildScanNormalizer.ts:206:22)\n    at buildGuildScanView (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:1394:29)\n    at load (http://127.0.0.1:5173/src/pages/GuildHub/Dashboard.tsx:337:80)"
+    }
+  ],
+  "validities": [
+    {
+      "valid": true,
+      "source": "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081",
+      "generation": "guild-hub-scan:muzr22wz:a337364f-d1e7-4c72-9e6d-86091b8fca5a",
+      "dependencies": {
+        "need": {
+          "sourceIds": [
+            "guild-hub-scan:muzr22ww:38e61046-8b30-4374-9fb1-3407127ad081"
+          ]
+        },
+        "sources": 16,
+        "players": 0,
+        "guilds": 0
+      },
+      "at": 1791288000000,
+      "hasCore": true
+    }
+  ]
+}

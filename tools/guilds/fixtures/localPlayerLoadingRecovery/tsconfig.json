@@ -1,0 +1,6 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": { "strict": true, "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"], "jsx": "react-jsx" },
+  "include": ["./*.tsx", "./*.mts", "../../localPlayerLoadingRecovery*.mts", "../../localPlayerWorkerUpdate*.mts", "../../localPlayerWorkerProductionUpdate.browser.test.mts", "../../localPlayerAnalyticsExecution*.mts", "../../localPlayerAnalyticsCoordinator.test.mts", "../../localSourceValidity.test.mts", "../../../../src/**/*.d.ts"],
+  "exclude": []
+}

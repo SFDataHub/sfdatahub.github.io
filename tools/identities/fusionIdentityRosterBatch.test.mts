@@ -1,0 +1,97 @@
+import "fake-indexeddb/auto";
+import assert from "node:assert/strict";
+import { buildFusionIdentityManagementReportFromSnapshots } from "../../src/lib/identities/fusionIdentityManagement.ts";
+import { listFusionIdentityAnalysisScopes } from "../../src/lib/identities/fusionIdentityScopes.ts";
+import { prepareFusionIdentityRosterBatch, executeFusionIdentityRosterBatch, rosterPlayerReferenceKey, type RosterBatchReference } from "../../src/lib/identities/fusionIdentityRosterBatch.ts";
+import { captureLocalDataDependencies, subscribeToLocalDataDependencies } from "../../src/lib/local-data/localDataDependencies.ts";
+import { getPlayerIdentity, linkPlayerIdentifiers, rejectPlayerMatch, listPlayerEntities, listPlayerExclusions, readPlayerIdentityChanges } from "../../src/lib/identities/playerIdentityStore.ts";
+import type { GuildHubLogicalScanSnapshot } from "../../src/lib/guilds/localScanLibrary.ts";
+const historicalAt=Date.parse("2026-09-05T09:05:36Z"),currentAt=Date.parse("2026-10-17T08:38:37Z");
+const mk=(identifier:string,name:string,guildSegment="g46")=>({id:identifier,name,memberRef:identifier,server:identifier.split('_p')[0],guildSegment,groupSegment:guildSegment,guildName:guildSegment==='g46'?"Sharkdom":"Other",guildRole:"member" as const,classId:"1",level:identifier.startsWith('f29')?585:570,baseStats:null,totalStats:null});
+const old=[mk('s8_eu_p10320','Free Monk'),mk('s8_eu_p2','Former'),mk('s8_eu_p18072','Dean Winchester'),mk('s8_eu_p99','Unrelated','g99')];
+const current=[mk('f29_net_p261250','Free Monk (s8_eu)'),mk('f29_net_p202','Former (s8_eu)','g99'),mk('f29_net_p303','Dean Winchester (s8_eu)'),mk('f29_net_p999','Unrelated (s8_eu)','g99')];
+const snap=(id:string,at:number,members:ReturnType<typeof mk>[]):GuildHubLogicalScanSnapshot=>({id,timestampMs:at,timestamp:new Date(at).toISOString(),players:members.map(m=>({identifier:m.id})),groups:[],normalizedMembers:members,servers:[members[0].server],playerCount:members.length,groupCount:0,guildCount:0,rawData:{players:[],groups:[]},sourceScanId:id,sourceScanFilename:id+'.json',sourceImportedAt:new Date(at).toISOString()});
+const scope=listFusionIdentityAnalysisScopes().find(s=>s.targetServerCode==='F29')!;
+const report=await buildFusionIdentityManagementReportFromSnapshots({snapshots:[snap('old',historicalAt,old),snap('current',currentAt,current)]},{scope});
+assert(report.items.find(i=>i.currentIdentifier==='f29_net_p261250')?.status==='ready','real resolver supplies Ready evidence');
+const references:RosterBatchReference[]=[{identifier:'f29_net_p261250',name:'Free Monk',side:'current'},{identifier:'s8_eu_p10320',name:'Free Monk',side:'historical'},{identifier:'s8_eu_p2',name:'Former',side:'historical'},{identifier:'s8_eu_p18072',name:'Dean',side:'historical'}];
+const prepare=()=>captureLocalDataDependencies({allIdentities:true,allSources:true}).then(dependencies=>prepareFusionIdentityRosterBatch({report,references,dependencies,excludedIdentifiers:['s8_eu_p18072']}));
+assert.equal(rosterPlayerReferenceKey('s8_eu_p10320'),rosterPlayerReferenceKey('EU8_p10320'));
+assert.notEqual(rosterPlayerReferenceKey('s8_eu_p10320'),rosterPlayerReferenceKey('f29_net_p10320'));
+assert.equal(rosterPlayerReferenceKey('10320'),null);
+const noiseReport=structuredClone(report);
+const noise=noiseReport.items.find(i=>i.currentIdentifier==='f29_net_p999')!;
+noise.candidates.push(structuredClone(report.items.find(i=>i.currentIdentifier==='f29_net_p261250')!.candidates[0]));
+const noiseBatch=await prepareFusionIdentityRosterBatch({report:noiseReport,references,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true}),excludedIdentifiers:['s8_eu_p18072']});
+assert(!noiseBatch.entries.some(e=>e.currentIdentifier==='f29_net_p999'),'discarded candidate cannot select an unrelated winning pair');
+const promotedReport=structuredClone(report);
+promotedReport.items.find(i=>i.currentIdentifier==='f29_net_p261250')!.candidates.find(c=>c.historicalIdentifier==='s8_eu_p10320')!.ready=false;
+const promoted=await prepareFusionIdentityRosterBatch({report:promotedReport,references,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true}),excludedIdentifiers:['s8_eu_p18072']});
+assert.equal(promoted.entries.find(e=>e.currentIdentifier==='f29_net_p261250')?.decision,'ready','globally promoted ready item retains established strong evidence despite stale DTO flag');
+for(const guard of ['review','weak','rejected','reserved'] as const){
+ const guardedReport=structuredClone(promotedReport),item=guardedReport.items.find(i=>i.currentIdentifier==='f29_net_p261250')!,candidate=item.candidates.find(c=>c.historicalIdentifier==='s8_eu_p10320')!;
+ if(guard==='review')item.status='review';
+ if(guard==='weak')candidate.evidence.classification='weak';
+ if(guard==='rejected')candidate.rejected=true;
+ if(guard==='reserved')candidate.assignedToOtherIdentity=true;
+ const guarded=await prepareFusionIdentityRosterBatch({report:guardedReport,references,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+ assert.notEqual(guarded.entries.find(e=>e.currentIdentifier==='f29_net_p261250')?.decision,'ready',guard+' still prevents promotion');
+}
+const completedNoise=structuredClone(noiseReport);
+const completedItem=completedNoise.items.find(i=>i.currentIdentifier==='f29_net_p999')!;
+completedItem.status='completed';completedItem.readyCandidateIdentifier=null;completedItem.historicalIdentifiers=['s8_eu_p99'];completedItem.completedAliases=['f29_net_p999','s8_eu_p99'];
+completedItem.candidates.push(structuredClone(report.items.find(i=>i.currentIdentifier==='f29_net_p303')!.candidates[0]));
+const completedBatch=await prepareFusionIdentityRosterBatch({report:completedNoise,references,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true}),excludedIdentifiers:['s8_eu_p18072']});
+assert(!completedBatch.entries.some(e=>e.currentIdentifier==='f29_net_p999'),'completed items cannot cover roster references via discarded candidates, including explicit exceptions');
+const batch=await prepare();
+assert.deepEqual(batch.entries.filter(e=>e.decision==='ready').map(e=>e.currentIdentifier).sort(),['f29_net_p202','f29_net_p261250']);
+assert.equal(batch.entries.filter(e=>e.decision==='excluded').length,1);
+assert(!batch.entries.some(e=>e.currentIdentifier==='f29_net_p999'));
+assert.equal((await readPlayerIdentityChanges()).length,0,'preparation has no identity write');
+// Do not trust a modified report or an imported manifest for execution.
+await assert.rejects(executeFusionIdentityRosterBatch(structuredClone(batch)),/unbound/);
+const tampered=await prepare();tampered.entries[0].historicalIdentifier='s8_eu_p99';await assert.rejects(executeFusionIdentityRosterBatch(tampered),/modified/);
+let notified=0;const unsubscribe=subscribeToLocalDataDependencies({allIdentities:true},()=>notified++);
+await new Promise(resolve=>setTimeout(resolve,5));
+// Once bound, later report edits cannot retarget the actual transaction.
+const original=report.items[0].readyCandidateIdentifier;report.items[0].readyCandidateIdentifier='s8_eu_p99';
+const progresses:number[]=[];
+const running=executeFusionIdentityRosterBatch(batch,{onProgress:r=>{progresses.push(r.entries.length)}});
+await assert.rejects(executeFusionIdentityRosterBatch(batch),/already-running/);
+const result=await running;report.items[0].readyCandidateIdentifier=original;
+assert.equal(result.entries.filter(e=>e.status==='stored').length,2,JSON.stringify(result));
+assert(result.entries.every(e=>e.journal.length===1&&e.entityId));assert.equal(result.preservation?.unchanged,true);
+assert((await getPlayerIdentity('f29_net_p261250'))?.entityId===(await getPlayerIdentity('s8_eu_p10320'))?.entityId);
+assert.equal(await getPlayerIdentity('s8_eu_p18072'),null);
+assert.equal(await getPlayerIdentity('f29_net_p999'),null);
+await new Promise(resolve=>setTimeout(resolve,10));assert(notified>0,'durable subscriptions notified without restart');unsubscribe();
+assert.deepEqual(progresses,[0,1,2,2]);
+const beforeRepeat=JSON.stringify(await listPlayerEntities()),revision=(await readPlayerIdentityChanges()).length;
+const repeat=await executeFusionIdentityRosterBatch(batch);assert(repeat.entries.every(e=>e.status==='skipped'));assert.equal(repeat.preservation?.unchanged,true);
+assert.equal(JSON.stringify(await listPlayerEntities()),beforeRepeat);assert.equal((await readPlayerIdentityChanges()).length,revision,'repeat performs no successful writes again');
+// An exclusion added after approval is retained. No stale batch may merge it.
+const extra=mk('f29_net_p404','Race (s8_eu)');const extraOld=mk('s8_eu_p4','Race');
+const raceReport=await buildFusionIdentityManagementReportFromSnapshots({snapshots:[snap('old2',historicalAt,[extraOld]),snap('new2',currentAt,[extra])]},{scope});
+const refs:RosterBatchReference[]=[{identifier:extra.id,name:extra.name,side:'current'}];
+const race=await prepareFusionIdentityRosterBatch({report:raceReport,references:refs,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+await rejectPlayerMatch(extra.id,extraOld.id,{source:'manual'});const exclusions=JSON.stringify(await listPlayerExclusions());
+const raced=await executeFusionIdentityRosterBatch(race);assert.equal(raced.entries[0].status,'failed');assert.equal(await getPlayerIdentity(extra.id),null);assert.equal(JSON.stringify(await listPlayerExclusions()),exclusions);
+// A pre-existing different decision is never absorbed by automatic repair.
+await linkPlayerIdentifiers('f29_net_p404','s8_eu_p44',{source:'manual'});
+const conflict=await prepareFusionIdentityRosterBatch({report:raceReport,references:refs,dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+assert.equal(conflict.entries[0].decision,'conflict');
+// Failure/rollback only in fixture: second pair fails inside normal native alias transaction.
+const faultCurrent=[mk('f29_net_p505','First (s8_eu)'),mk('f29_net_p606','Second (s8_eu)')],faultOld=[mk('s8_eu_p5','First'),mk('s8_eu_p6','Second')];
+const faultReport=await buildFusionIdentityManagementReportFromSnapshots({snapshots:[snap('faultold',historicalAt,faultOld),snap('faultnew',currentAt,faultCurrent)]},{scope});
+const fault=await prepareFusionIdentityRosterBatch({report:faultReport,references:faultCurrent.map(m=>({identifier:m.id,name:m.name,side:'current'})),dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+const add=IDBObjectStore.prototype.add;IDBObjectStore.prototype.add=function(...args:Parameters<typeof add>){if(this.name==='playerAliases'&&(args[0] as any).identifier==='f29_net_p606')throw Error('fixture-native-write-failure');return add.apply(this,args)};
+const partial=await executeFusionIdentityRosterBatch(fault);IDBObjectStore.prototype.add=add;
+assert.equal(partial.entries.filter(e=>e.status==='stored').length,1);assert.equal(partial.entries.filter(e=>e.status==='failed').length,1);
+assert.equal(await getPlayerIdentity('f29_net_p606'),null);assert.equal(await getPlayerIdentity('s8_eu_p6'),null);
+// An interrupted route cannot proceed to store a prepared pair.
+const stopped=await prepareFusionIdentityRosterBatch({report:faultReport,references:[{identifier:'f29_net_p606',name:'Second',side:'current'}],dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+const stop=await executeFusionIdentityRosterBatch(stopped,{isCurrent:()=>false});assert.equal(stop.entries[0].status,'failed');assert.equal(await getPlayerIdentity('f29_net_p606'),null);
+await linkPlayerIdentifiers('EU8_p6','f29_net_p888',{source:'manual'});
+const alternate=await prepareFusionIdentityRosterBatch({report:faultReport,references:[{identifier:'f29_net_p606',name:'Second',side:'current'}],dependencies:await captureLocalDataDependencies({allIdentities:true,allSources:true})});
+assert.equal(alternate.entries[0].decision,'conflict','registered spelling decision is preserved');
+console.log('PASS real resolver, two-roster scope including former member in other guild, explicit exception, no unrelated F29 writes, bound evidence, durable store/journal verification, double start, no-op repeat, subscriptions, stale exclusions, other decisions, partial failure/rollback, navigation cancellation');

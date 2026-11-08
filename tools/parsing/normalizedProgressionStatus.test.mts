@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { buildLocalPlayerProfileModel } from "../../src/pages/GuildHub/localPlayerProfileAdapter.ts";
 
 import { normalizeSfPlayerFortress } from "../../src/lib/parsing/normalizedFortress.ts";
 import { normalizeSfPlayerCharacterCore } from "../../src/lib/parsing/normalizedPlayer.ts";
@@ -42,7 +43,7 @@ const currentSave = (): unknown[] => {
   });
 
   assert.equal(status.metadata.layout, "currentCompact");
-  assert.deepEqual(status.scrapbook, { count: 2440, maximum: 2484, percentage: 2440 / 2484 });
+  assert.deepEqual(status.scrapbook, { count: 2440, maximum: 2506, percentage: 2440 / 2506 });
   assert.deepEqual(status.achievements, { count: 112, maximum: 141 });
   assert.deepEqual(status.mount, { type: 4, active: true, bonus: 50, expiresAt: 124000 });
   assert.deepEqual(status.portalBonuses, { health: 40, damage: 50 });
@@ -68,7 +69,7 @@ const currentSave = (): unknown[] => {
   });
 
   assert.equal(status.metadata.layout, "currentCompact");
-  assert.deepEqual(status.scrapbook, { count: 0, maximum: 2484, percentage: 0 });
+  assert.deepEqual(status.scrapbook, { count: 0, maximum: 2506, percentage: 0 });
   assert.deepEqual(status.achievements, { count: 0, maximum: 141 });
   assert.deepEqual(status.mount, { type: 0, active: false, bonus: 0, expiresAt: 0 });
   assert.deepEqual(status.portalBonuses, { health: 0, damage: 0 });
@@ -117,7 +118,7 @@ const currentSave = (): unknown[] => {
   });
 
   assert.equal(status.metadata.layout, "legacyOwn");
-  assert.deepEqual(status.scrapbook, { count: 0, maximum: 2484, percentage: 0 });
+  assert.deepEqual(status.scrapbook, { count: 0, maximum: 2506, percentage: 0 });
   assert.deepEqual(status.mount, { type: 0, active: false, bonus: 0, expiresAt: 998000 });
   assert.deepEqual(status.portalBonuses, { health: 50, damage: 25 });
   assert.deepEqual(status.guildBonuses, { treasure: 15, instructor: 15, pet: 600 });
@@ -140,7 +141,7 @@ const currentSave = (): unknown[] => {
   });
 
   assert.equal(status.metadata.layout, "legacyOther");
-  assert.deepEqual(status.scrapbook, { count: 5, maximum: 2484, percentage: 5 / 2484 });
+  assert.deepEqual(status.scrapbook, { count: 5, maximum: 2506, percentage: 5 / 2506 });
   assert.deepEqual(status.mount, { type: 3, active: true, bonus: 30, expiresAt: null });
   assert.equal(status.metadata.fields["mount.expiresAt"]?.status, "unsupported");
   assert.deepEqual(status.portalBonuses, { health: 8, damage: 7 });
@@ -234,3 +235,40 @@ const currentSave = (): unknown[] => {
 }
 
 console.log("normalizedProgressionStatus.test.mts passed");
+
+// A reused pre-update seed must refresh only Scrapbook calculations on normal access.
+for (const count of [0, 2440, 2506, null]) {
+  const save = currentSave();
+  save[66] = count == null ? null : 10000 + count;
+  const rawPlayer = { own: 1, saveVersion: 2, save };
+  const core = normalizeSfPlayerCharacterCore(rawPlayer);
+  assert.equal(core.progressionStatus.scrapbook.maximum, 2506);
+  assert.equal(core.progressionStatus.scrapbook.percentage, count == null ? null : count / 2506);
+  const oldCore = { ...core, progressionStatus: { ...core.progressionStatus,
+    scrapbook: { count, maximum: 2484, percentage: count == null ? null : count / 2484 } } };
+  const input = { rawPlayer, sourceScanId: "scrapbook-contract", sourcePlayerKey: "f28_net_p101",
+    scannedAtMs: 1, scannedAtIso: null, guild: { name: null, server: "f28_net" } };
+  const coreLookup = new Map([[rawPlayer, oldCore]]);
+  const seed = { ...input, normalizedCore: oldCore, coreLookup } as any;
+  const before = JSON.stringify(rawPlayer);
+  const profile = buildLocalPlayerProfileModel({ ...input, currentSeed: seed });
+  assert.deepEqual(seed.normalizedCore.progressionStatus.scrapbook,
+    { count, maximum: 2506, percentage: count == null ? null : count / 2506 });
+  assert.equal(seed.normalizedCore.progressionStatus.mount, oldCore.progressionStatus.mount);
+  assert.equal(seed.normalizedCore.attributes, oldCore.attributes);
+  assert.equal(coreLookup.get(rawPlayer), seed.normalizedCore);
+  assert.equal(profile.currentSeed?.normalizedCore, seed.normalizedCore);
+  assert.equal(oldCore.progressionStatus.scrapbook.maximum, 2484);
+  assert.equal(JSON.stringify(rawPlayer), before);
+  if (count === 2506) assert.equal(profile.hero.metrics[2].gauge?.progress, 1);
+  if (count === null) assert.equal(profile.hero.metrics[2].gauge?.centerTop, "-");
+  const refreshed = seed.normalizedCore;
+  buildLocalPlayerProfileModel({ ...input, currentSeed: seed });
+  assert.equal(seed.normalizedCore, refreshed);
+  // The dashboard's lookup path must receive the same upgrade without a full normalization.
+  const lookupSeed = { ...input, coreLookup: new Map([[rawPlayer, oldCore]]) } as any;
+  buildLocalPlayerProfileModel({ ...input, currentSeed: lookupSeed });
+  assert.deepEqual(lookupSeed.normalizedCore.progressionStatus.scrapbook,
+    refreshed.progressionStatus.scrapbook);
+}
+console.log("Scrapbook 2506 and reused 2484 seed contracts passed");

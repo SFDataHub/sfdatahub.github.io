@@ -1,5 +1,6 @@
+import { profileLocale } from "../../lib/i18n/profilePresentation";
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useProfileTranslation as useTranslation } from "../../lib/i18n/useProfileTranslation";
 import type { AttributeCompositionItem } from "../../lib/parsing/latestValues";
 import {
   ATTRIBUTE_COMPOSITION_SHADE_ACCENT_WEIGHTS,
@@ -22,14 +23,14 @@ const ATTRIBUTE_COMPOSITION_OTHER_ACCENT_WEIGHT = 0.35;
 function formatPlainNumber(value: number) {
   if (!Number.isFinite(value)) return DASH;
   const hasFraction = Math.abs(value % 1) > 0.000001;
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(profileLocale(), {
     maximumFractionDigits: hasFraction ? 2 : 0,
   }).format(value);
 }
 
 function formatCompactNumber(value: number) {
   if (!Number.isFinite(value)) return DASH;
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(profileLocale(), {
     notation: "compact",
     compactDisplay: "short",
     maximumFractionDigits: Math.abs(value) >= 100 ? 0 : 1,

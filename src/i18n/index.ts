@@ -4,15 +4,17 @@ import en from "./en.json";
 import de from "./de.json";
 import hu from "./hu.json";
 import cs from "./cs.json";
+import pl from "./pl.json";
 import { getInitialActiveLocale } from "../lib/i18n/localePreferences";
 
-export type Lang = "en" | "de" | "hu" | "cs";
+export type Lang = "en" | "de" | "hu" | "cs" | "pl";
 
 const resources = {
   en: { translation: en },
   de: { translation: de },
   hu: { translation: hu },
   cs: { translation: cs },
+  pl: { translation: pl },
 };
 
 i18next

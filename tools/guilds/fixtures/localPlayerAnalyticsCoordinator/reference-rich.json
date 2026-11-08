@@ -1,0 +1,171 @@
+{
+  "analytics": {
+    "status": "ready",
+    "playerName": "Hero",
+    "identityKey": "member-ref:s50_net_p1",
+    "periodLabel": "01 Jun 26 - 05 Aug 26 (65d)",
+    "snapshotCount": 2,
+    "comparison": {
+      "currentTimestamp": 1785931200000,
+      "currentLabel": "05 Aug 26",
+      "selectedTimestamp": 1780315200000,
+      "selectedPlayerAtStart": true,
+      "chartTimeDomain": {
+        "min": 1780315200000,
+        "max": 1785931200000
+      },
+      "options": [
+        {
+          "timestamp": 1780315200000,
+          "sourceScanId": "w06-rich-0",
+          "snapshotId": "w06-rich-0::1780315200000",
+          "label": "01.06.26",
+          "distanceLabel": "vor 65 Tagen"
+        }
+      ],
+      "emptyReason": null
+    },
+    "xp": {
+      "series": [
+        {
+          "id": "player-xp",
+          "label": "Hero",
+          "color": "#3ff1c3",
+          "points": [
+            {
+              "timestamp": 1780315200000,
+              "label": "01 Jun 26",
+              "value": 1500,
+              "rawValue": 1500,
+              "detail": "01 Jun 26: 1.5K XP"
+            },
+            {
+              "timestamp": 1785931200000,
+              "label": "05 Aug 26",
+              "value": 1500,
+              "rawValue": 1500,
+              "detail": "05 Aug 26: 1.5K XP"
+            }
+          ]
+        },
+        {
+          "id": "guild-average-xp",
+          "label": "Guild Average",
+          "color": "#5c8bc6",
+          "points": [
+            {
+              "timestamp": 1780315200000,
+              "label": "01 Jun 26",
+              "value": 2000,
+              "rawValue": 2000,
+              "detail": "01 Jun 26: 2K avg XP"
+            },
+            {
+              "timestamp": 1785931200000,
+              "label": "05 Aug 26",
+              "value": 2000,
+              "rawValue": 2000,
+              "detail": "05 Aug 26: 2K avg XP"
+            }
+          ]
+        }
+      ],
+      "hasGuildAverage": true,
+      "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+      "rateSummary": {
+        "player": 0,
+        "guildAverage": 0
+      }
+    },
+    "stats": {
+      "series": [
+        {
+          "id": "focused-base-stats",
+          "label": "Focused Base Stats",
+          "color": "#5c8bc6",
+          "points": [
+            {
+              "timestamp": 1780315200000,
+              "label": "01 Jun 26",
+              "value": 100,
+              "rawValue": 100,
+              "detail": "01 Jun 26: 100"
+            },
+            {
+              "timestamp": 1785931200000,
+              "label": "05 Aug 26",
+              "value": 100,
+              "rawValue": 100,
+              "detail": "05 Aug 26: 100"
+            }
+          ]
+        }
+      ],
+      "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+      "rateSummary": {
+        "player": 0,
+        "guildAverage": 0
+      }
+    },
+    "career": {
+      "title": "CAREER TIMELINE",
+      "events": [],
+      "emptyReason": "No confirmed fusion events in player history"
+    }
+  },
+  "insights": {
+    "status": "ready",
+    "rankings": {
+      "player": 3,
+      "guild": 5,
+      "server": null
+    },
+    "progression": {
+      "gameCompletion": null,
+      "itemsDiscovered": 0
+    },
+    "playerVsAverage": [
+      {
+        "key": "str",
+        "label": "Strength",
+        "playerValue": 0,
+        "guildAverage": 150,
+        "validGuildMembers": 2
+      },
+      {
+        "key": "dex",
+        "label": "Dexterity",
+        "playerValue": null,
+        "guildAverage": 50,
+        "validGuildMembers": 1
+      },
+      {
+        "key": "int",
+        "label": "Intelligence",
+        "playerValue": 30,
+        "guildAverage": 30,
+        "validGuildMembers": 2
+      },
+      {
+        "key": "con",
+        "label": "Constitution",
+        "playerValue": 100,
+        "guildAverage": 100,
+        "validGuildMembers": 2
+      },
+      {
+        "key": "lck",
+        "label": "Luck",
+        "playerValue": 20,
+        "guildAverage": 20,
+        "validGuildMembers": 2
+      }
+    ],
+    "personalBests": {
+      "highestXpPerDay": 0,
+      "highestDungeon": null,
+      "bestServerRank": 3,
+      "historyAvailable": true
+    }
+  }
+}

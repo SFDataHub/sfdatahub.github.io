@@ -8,7 +8,7 @@ export const ATTRIBUTE_STAT_ROWS: { key: AttributeStatKey; label: string }[] = [
   { key: "str", label: "STR" },
   { key: "dex", label: "DEX" },
   { key: "int", label: "INT" },
-  { key: "con", label: "CON" },
+  { key: "con", label: "Con" },
   { key: "lck", label: "LCK" },
 ];
 

@@ -646,7 +646,8 @@ const mapMembers = (oldPrefix: string, newPrefix: string, count: number, oldOffs
   assert.equal(result.status, "autoEligible");
   assert.equal(result.identityCandidates.find((candidate) => candidate.oldGuildIdentifier === "eu1_marathon")?.classification, "anchored");
   assert.equal(result.identityCandidates.find((candidate) => candidate.oldGuildIdentifier === "eu1_marathon")?.autoEligible, true);
-  assert.equal(result.identityCandidates.find((candidate) => candidate.oldGuildIdentifier === "eu4_storm")?.classification, "strong");
+  // W122: one migrated leader/officer without independent continuity supports review.
+  assert.equal(result.identityCandidates.find((candidate) => candidate.oldGuildIdentifier === "eu4_storm")?.classification, "plausible");
   assert.equal(result.identityCandidates.find((candidate) => candidate.oldGuildIdentifier === "eu4_storm")?.relevantCompetitor, false);
 }
 

@@ -1,3 +1,4 @@
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields, auditCaught, auditCall, auditCurrent, auditLink, auditPromiseId, auditAliasPromise, auditEvent } from "../data-hub/runtimeAudit";
 import {
   bindSfDataHubLocalScanToArchiveEntry,
   commitSfDataHubLocalScanPreview,
@@ -291,52 +292,65 @@ const importArchiveEntry = async (
   dependencies: LocalFirstScanAcquisitionDependencies,
   signal?: AbortSignal,
 ): Promise<InFlightArchiveResult> => {
-  const boundBeforeDownload = await dependencies.findLocalScanByArchiveBinding(entry);
+    const __audit1 = auditBegin("S02", "importArchiveEntry");
+  if (__audit1) auditFields(__audit1, { archiveEntryId: entry.id, archiveSha256: entry.sha256, sourceOperationId: __audit1.id });
+    try {
+  const boundBeforeDownload = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.findLocalScanByArchiveBinding"), (dependencies.findLocalScanByArchiveBinding(entry))));
   if (boundBeforeDownload) {
-    return { status: "sidecar-local", archiveScanId: entry.id, localScanId: boundBeforeDownload.id, networkAccessed: false };
+    auditEvent(__audit1, "binding-hit-before-download");
+    return auditReturn(__audit1, { status: "sidecar-local", archiveScanId: entry.id, localScanId: boundBeforeDownload.id, networkAccessed: false });
   }
 
-  const beforeDownload = await dependencies.findLocalScanByArchiveScanId(entry.id);
+  if (__audit1) auditEvent(__audit1, "archive-id-lookup", { lookupOrdinal: 1, stage: "before-download-before-import" });
+  const beforeDownload = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.findLocalScanByArchiveScanId"), (dependencies.findLocalScanByArchiveScanId(entry.id))));
   if (beforeDownload?.archiveSource?.sha256 === entry.sha256) {
-    return { status: "already-local", archiveScanId: entry.id, localScanId: beforeDownload.id, networkAccessed: false };
+    return auditReturn(__audit1, { status: "already-local", archiveScanId: entry.id, localScanId: beforeDownload.id, networkAccessed: false });
   }
 
+  auditEvent(__audit1, "binding-miss-or-unusable-before-download");
   throwIfAborted(signal);
-  const downloaded = await dependencies.downloadArchiveEntry(entry, signal);
+  const downloaded = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.downloadArchiveEntry"), (dependencies.downloadArchiveEntry(entry, signal))));
   throwIfAborted(signal);
 
-  const boundBeforeCommit = await dependencies.findLocalScanByArchiveBinding(entry);
+  const boundBeforeCommit = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.findLocalScanByArchiveBinding"), (dependencies.findLocalScanByArchiveBinding(entry))));
   if (boundBeforeCommit) {
-    return { status: "race-sidecar-local", archiveScanId: entry.id, localScanId: boundBeforeCommit.id, networkAccessed: true };
+    return auditReturn(__audit1, { status: "race-sidecar-local", archiveScanId: entry.id, localScanId: boundBeforeCommit.id, networkAccessed: true });
   }
 
-  const beforeCommit = await dependencies.findLocalScanByArchiveScanId(entry.id);
+  if (__audit1) auditEvent(__audit1, "archive-id-lookup", { lookupOrdinal: 2, stage: "after-download-before-preview-and-import" });
+  const beforeCommit = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.findLocalScanByArchiveScanId"), (dependencies.findLocalScanByArchiveScanId(entry.id))));
   if (beforeCommit?.archiveSource?.sha256 === entry.sha256) {
-    return { status: "race-already-local", archiveScanId: entry.id, localScanId: beforeCommit.id, networkAccessed: true };
+    return auditReturn(__audit1, { status: "race-already-local", archiveScanId: entry.id, localScanId: beforeCommit.id, networkAccessed: true });
   }
 
   try {
-    const preview = await dependencies.createLocalScanImportPreview(archiveImportFilename(entry), downloaded.content, {
+    const preview = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.createLocalScanImportPreview"), (dependencies.createLocalScanImportPreview(archiveImportFilename(entry), downloaded.content, {
       archiveSource: createScanArchiveSourceMetadata(entry),
-    });
-    const committed: GuildHubImportScanResult = await dependencies.commitLocalScanPreview(preview);
-    await dependencies.bindLocalScanToArchiveEntry(entry, committed.scan.id);
+    }))));
+    auditEvent(__audit1, "preview-ready");
+    const committed: GuildHubImportScanResult = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.commitLocalScanPreview"), (dependencies.commitLocalScanPreview(preview))));
+    if (__audit1) auditFields(__audit1, { sourceScanId: committed.scan.id, sourceGeneration: committed.scan.sourceGeneration, importStatus: committed.status });
+    auditEvent(__audit1, "raw-and-post-import-preparations-ready");
+    await (auditValue(__audit1, auditEnter(__audit1, "dependencies.bindLocalScanToArchiveEntry"), (dependencies.bindLocalScanToArchiveEntry(entry, committed.scan.id))));
     const duplicateIsArchiveCopy =
       committed.status === "duplicate" &&
       committed.scan.archiveSource?.archiveScanId === entry.id &&
       committed.scan.archiveSource.sha256 === entry.sha256;
-    return {
+    return auditReturn(__audit1, {
       status: committed.status === "duplicate" && !duplicateIsArchiveCopy ? "bound-duplicate" : committed.status,
       archiveScanId: entry.id,
       localScanId: committed.scan.id,
       networkAccessed: true,
-    };
-  } catch (error) {
+    });
+  } catch (error) { auditCaught(__audit1, error);
     if (/IndexedDB|IDB|database|transaction/i.test(errorMessage(error))) throw error;
     const wrapped = new Error(errorMessage(error));
     wrapped.name = "LocalFirstScanPreviewImportError";
     throw wrapped;
   }
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 };
 
 const acquireArchiveEntry = (
@@ -346,11 +360,13 @@ const acquireArchiveEntry = (
 ) => {
   const key = archiveInflightKey(entry);
   const existing = inFlightArchiveImports.get(key);
-  if (existing) return existing;
+  if (existing) { auditLink(auditCurrent(), auditPromiseId(existing), "in-flight-join"); auditEvent(auditCurrent(), "in-flight-join"); return existing; }
 
-  const promise = importArchiveEntry(entry, dependencies, signal).finally(() => {
+  const sourceJob = importArchiveEntry(entry, dependencies, signal);
+  const promise = sourceJob.finally(() => {
     inFlightArchiveImports.delete(key);
   });
+  auditAliasPromise(promise, sourceJob);
   inFlightArchiveImports.set(key, promise);
   return promise;
 };
@@ -419,21 +435,38 @@ const uniqueExplicitEntries = (entries: readonly ScanArchiveEntry[]) => {
 
 export async function acquireExplicitLocalFirstArchiveScans(
   selectedEntries: readonly ScanArchiveEntry[],
-  options: Omit<LocalFirstScanAcquisitionOptions, "archiveEntries" | "availableManifestYears"> = {},
+  options: Omit<LocalFirstScanAcquisitionOptions, "archiveEntries" | "availableManifestYears"> & {
+    /** Settled physical sources, including local reuse; observation never owns work. */
+    onProgress?: (progress: { total: number; succeeded: number; failed: number }) => void;
+  } = {},
 ): Promise<ExplicitLocalFirstArchiveScansResult> {
+    const __audit2 = auditBegin("S01", "acquireExplicitLocalFirstArchiveScans");
+    try {
   const dependencies = createDependencies(options);
   const { entries, failures } = uniqueExplicitEntries(selectedEntries);
+  let succeeded = 0, failed = failures.length;
+  const report = () => {
+    if (options.signal?.aborted) return;
+    try { options.onProgress?.({ total: entries.length + failures.length, succeeded, failed }); }
+    catch { /* A progress observer must not fail acquisition. */ }
+  };
+  report();
   const selectedArchives: ExplicitLocalFirstArchiveScanResult[] = [];
   let networkAccessed = false;
 
-  const results = await runWithConcurrency(
+  const results = await (auditValue(__audit2, auditEnter(__audit2, "runWithConcurrency"), (runWithConcurrency(
     entries,
     MAX_DOWNLOAD_CONCURRENCY,
     options.signal,
     async (entry): Promise<InFlightArchiveResult | ExplicitLocalFirstArchiveScanFailure> => {
       try {
-        return await acquireArchiveEntry(entry, dependencies, options.signal);
+        const result = await (__audit2 ? auditCall(__audit2, "source-consumer-wait", () => acquireArchiveEntry(entry, dependencies, options.signal), "async-container") : acquireArchiveEntry(entry, dependencies, options.signal));
+        succeeded += 1;
+        report();
+        return result;
       } catch (error) {
+        failed += 1;
+        report();
         return {
           archiveScanId: entry.id,
           archiveSha256: entry.sha256,
@@ -442,7 +475,7 @@ export async function acquireExplicitLocalFirstArchiveScans(
         };
       }
     },
-  );
+  ))));
 
   for (const result of results) {
     if ("errorCode" in result) {
@@ -459,19 +492,24 @@ export async function acquireExplicitLocalFirstArchiveScans(
   }
 
   const localScanIds = [...new Set(selectedArchives.map((entry) => entry.localScanId))].sort(compareText);
-  return {
+  return auditReturn(__audit2, {
     status: failures.length ? (selectedArchives.length ? "partial" : "empty") : "complete",
     localScanIds,
     selectedArchives: selectedArchives.sort((left, right) => compareText(left.archiveScanId, right.archiveScanId)),
     failedArchives: failures.sort((left, right) => compareText(left.archiveScanId, right.archiveScanId)),
     networkAccessed,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 }
 
 export async function acquireLocalFirstScans(
   request: LocalFirstScanRequest,
   options: LocalFirstScanAcquisitionOptions = {},
 ): Promise<LocalFirstScanAcquisitionResult> {
+    const __audit3 = auditBegin("S01", "acquireLocalFirstScans");
+    try {
   const dependencies = createDependencies(options);
   const signal = options.signal;
   const acquiredArchives: LocalFirstScanAcquiredArchive[] = [];
@@ -485,10 +523,10 @@ export async function acquireLocalFirstScans(
     ? uniqueSortedNumbers(options.availableManifestYears)
     : uniqueSortedNumbers(archiveEntries.map((entry) => entry.archiveYear));
 
-  let localScanSummaries = await dependencies.listLocalScanSummaries();
+  let localScanSummaries = await (auditValue(__audit3, auditEnter(__audit3, "dependencies.listLocalScanSummaries"), (dependencies.listLocalScanSummaries())));
   let plan = planWith(request, localScanSummaries, archiveEntries);
   if (plan.status === "complete") {
-    return {
+    return auditReturn(__audit3, {
       status: plan.status,
       localScanIds: plan.localScanIds,
       plan,
@@ -498,7 +536,7 @@ export async function acquireLocalFirstScans(
       loadedManifestYears: [],
       manifestFailures,
       networkAccessed,
-    };
+    });
   }
 
   throwIfAborted(signal);
@@ -506,7 +544,7 @@ export async function acquireLocalFirstScans(
   const missingYears = plan.missingManifestYears;
   if (missingYears.length) {
     networkAccessed = true;
-    const loaded = await dependencies.loadManifestEntriesForYears(missingYears, signal);
+    const loaded = await (auditValue(__audit3, auditEnter(__audit3, "dependencies.loadManifestEntriesForYears"), (dependencies.loadManifestEntriesForYears(missingYears, signal))));
     archiveEntries = mergeArchiveEntries(archiveEntries, loaded.entries);
     loaded.loadedYears.forEach((year) => loadedManifestYears.add(year));
     manifestFailures.push(...loaded.failures);
@@ -514,7 +552,7 @@ export async function acquireLocalFirstScans(
     plan = planWith(request, localScanSummaries, archiveEntries, availableManifestYears);
   } else if (!archiveEntries.length || request.time.kind === "latest") {
     networkAccessed = true;
-    const loaded = await dependencies.loadCandidateManifestEntries(request, signal);
+    const loaded = await (auditValue(__audit3, auditEnter(__audit3, "dependencies.loadCandidateManifestEntries"), (dependencies.loadCandidateManifestEntries(request, signal))));
     archiveEntries = mergeArchiveEntries(archiveEntries, loaded.entries);
     loaded.loadedYears.forEach((year) => loadedManifestYears.add(year));
     manifestFailures.push(...loaded.failures);
@@ -523,13 +561,13 @@ export async function acquireLocalFirstScans(
   }
 
   const candidates = collectCandidateEntries(plan);
-  const candidateResults = await runWithConcurrency(
+  const candidateResults = await (auditValue(__audit3, auditEnter(__audit3, "runWithConcurrency"), (runWithConcurrency(
     candidates,
     MAX_DOWNLOAD_CONCURRENCY,
     signal,
     async (entry): Promise<InFlightArchiveResult | LocalFirstScanFailedArchive> => {
       try {
-        return await acquireArchiveEntry(entry, dependencies, signal);
+        return await (__audit3 ? auditCall(__audit3, "source-consumer-wait", () => acquireArchiveEntry(entry, dependencies, signal), "async-container") : acquireArchiveEntry(entry, dependencies, signal));
       } catch (error) {
         return {
           archiveScanId: entry.id,
@@ -538,7 +576,7 @@ export async function acquireLocalFirstScans(
         };
       }
     },
-  );
+  ))));
 
   for (const result of candidateResults) {
     if ("errorCode" in result) {
@@ -556,10 +594,10 @@ export async function acquireLocalFirstScans(
     if (!("errorCode" in result) && result.networkAccessed) networkAccessed = true;
   }
 
-  localScanSummaries = await dependencies.listLocalScanSummaries();
+  localScanSummaries = await (auditValue(__audit3, auditEnter(__audit3, "dependencies.listLocalScanSummaries"), (dependencies.listLocalScanSummaries())));
   plan = planWith(request, localScanSummaries, archiveEntries, availableManifestYears);
 
-  return {
+  return auditReturn(__audit3, {
     status: plan.status,
     localScanIds: plan.localScanIds,
     plan,
@@ -569,7 +607,10 @@ export async function acquireLocalFirstScans(
     loadedManifestYears: uniqueSortedNumbers(loadedManifestYears),
     manifestFailures,
     networkAccessed,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 }
 
 export const __localFirstScanAcquisitionTestUtils = {

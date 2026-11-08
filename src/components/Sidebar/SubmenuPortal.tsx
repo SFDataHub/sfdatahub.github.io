@@ -11,6 +11,7 @@ function computePosition(anchor: HTMLElement, gap = 8): Pos {
 }
 
 export default function SubmenuPortal({
+  id,
   anchorEl,
   open,
   items,
@@ -18,6 +19,7 @@ export default function SubmenuPortal({
   onMouseEnter,
   onMouseLeave,
 }: {
+  id?: string;
   anchorEl: HTMLElement | null;
   open: boolean;
   items: SubItem[];
@@ -55,6 +57,7 @@ export default function SubmenuPortal({
 
   return ReactDOM.createPortal(
     <div
+      id={id}
       className={`${styles.panel} ${open ? styles.open : ""}`}
       style={{
         left: pos.left,
@@ -66,6 +69,7 @@ export default function SubmenuPortal({
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      data-navigation-submenu="true"
       role="menu"
     >
       <div className={styles.col}>

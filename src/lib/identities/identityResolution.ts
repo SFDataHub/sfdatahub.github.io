@@ -1,3 +1,8 @@
+import { observationReferenceKey } from "../servers/serverResolver";
+import { auditBegin, auditEnter, auditValue, auditCall, auditReturn, auditError, auditLeave } from "../data-hub/runtimeAudit";
+import { withLocalDataWrite } from "../local-data/localDataCoordination";
+import { readPlayerIdentityChanges } from "./playerIdentityStore";
+import { readGuildIdentityChanges } from "./guildIdentityStore";
 import {
   listGuildEntities,
   normalizeGuildIdentifierKey,
@@ -28,6 +33,8 @@ export type IdentityAliasGroup<TEntity, TAlias> = {
 export type IdentityResolutionIndex<TEntity, TAlias> = {
   byIdentifier: ReadonlyMap<string, IdentityAliasGroup<TEntity, TAlias>>;
   byIdentityId: ReadonlyMap<string, IdentityAliasGroup<TEntity, TAlias>>;
+  /** Registered spellings of the same complete observation; null means conflict. */
+  byReference?: ReadonlyMap<string, IdentityAliasGroup<TEntity, TAlias> | null>;
 };
 
 export type PlayerIdentityResolutionIndex = IdentityResolutionIndex<PlayerEntity, PlayerAlias>;
@@ -44,10 +51,12 @@ export type GuildIdentityResolutionIndex = IdentityResolutionIndex<GuildEntity, 
 export type IdentityResolutionSnapshot = {
   players: PlayerIdentityResolutionIndex;
   guilds: GuildIdentityResolutionIndex;
+  revisions?: { players: number; guilds: number };
 };
 
 export type ResolvedIdentity<TEntity, TAlias> = {
   resolved: true;
+  status: "confirmed";
   identityId: string;
   entity: TEntity;
   aliases: readonly TAlias[];
@@ -57,6 +66,7 @@ export type ResolvedIdentity<TEntity, TAlias> = {
 
 export type UnresolvedIdentity = {
   resolved: false;
+  status: "unresolved" | "conflict";
   identityId: null;
   entity: null;
   aliases: readonly [];
@@ -180,6 +190,23 @@ const sortAliasesByAddedAt = <TAlias extends { addedAt: string; identifierKey: s
     return addedCompare || left.identifierKey.localeCompare(right.identifierKey);
   });
 
+export const identityObservationReferenceKey = observationReferenceKey;
+
+function referenceIndex<TEntity, TAlias extends { identifier: string }>(groups: Iterable<IdentityAliasGroup<TEntity, TAlias>>) {
+  const index = new Map<string, IdentityAliasGroup<TEntity, TAlias> | null>();
+  for (const group of groups) for (const alias of group.aliases) {
+    const key = identityObservationReferenceKey(alias.identifier);
+    const previous = index.get(key);
+    index.set(key, previous === null || previous && previous.identityId !== group.identityId ? null : group);
+  }
+  return index;
+}
+
+function referenceGroup<TEntity, TAlias extends { identifier: string }>(index: IdentityResolutionIndex<TEntity, TAlias>, identifier: string) {
+  const references = index.byReference ?? referenceIndex(new Set([...index.byIdentifier.values(), ...index.byIdentityId.values()]));
+  return references.get(identityObservationReferenceKey(identifier));
+}
+
 export function buildPlayerIdentityResolutionIndex(
   entries: readonly { entity: PlayerEntity; aliases: readonly PlayerAlias[] }[],
 ): PlayerIdentityResolutionIndex {
@@ -198,7 +225,7 @@ export function buildPlayerIdentityResolutionIndex(
     }
   }
 
-  return { byIdentifier, byIdentityId };
+  return { byIdentifier, byIdentityId, byReference: referenceIndex(byIdentityId.values()) };
 }
 
 export function buildGuildIdentityResolutionIndex(
@@ -219,7 +246,7 @@ export function buildGuildIdentityResolutionIndex(
     }
   }
 
-  return { byIdentifier, byIdentityId };
+  return { byIdentifier, byIdentityId, byReference: referenceIndex(byIdentityId.values()) };
 }
 
 export async function loadPlayerIdentityResolutionIndex(
@@ -237,11 +264,31 @@ export async function loadGuildIdentityResolutionIndex(
 export async function loadIdentityResolutionSnapshot(
   options: LoadIdentityResolutionSnapshotOptions = {},
 ): Promise<IdentityResolutionSnapshot> {
-  const [players, guilds] = await Promise.all([
-    loadPlayerIdentityResolutionIndex(options.playerStore ?? defaultPlayerStore),
-    loadGuildIdentityResolutionIndex(options.guildStore ?? defaultGuildStore),
-  ]);
-  return { players, guilds };
+  const run = auditBegin("S07", "loadIdentityResolutionSnapshot");
+  try {
+    const read = async (): Promise<IdentityResolutionSnapshot> => {
+      const [players, guilds] = await auditValue(run, auditEnter(run, "identity-index-read"), Promise.all([
+        loadPlayerIdentityResolutionIndex(options.playerStore ?? defaultPlayerStore),
+        loadGuildIdentityResolutionIndex(options.guildStore ?? defaultGuildStore),
+      ]));
+      if (options.playerStore || options.guildStore) return { players, guilds };
+      const [playerChanges, guildChanges] = await auditValue(run, auditEnter(run, "identity-revisions-read"), Promise.all([readPlayerIdentityChanges(), readGuildIdentityChanges()]));
+      return { players, guilds, revisions: { players: playerChanges[playerChanges.length - 1]?.sequence ?? 0, guilds: guildChanges[guildChanges.length - 1]?.sequence ?? 0 } };
+    };
+    return auditReturn(run, auditCall(run, "identity-snapshot-read", () => options.playerStore || options.guildStore ? read() : withLocalDataWrite(read)));
+  } catch (error) { auditError(run, error); throw error; }
+  finally { auditLeave(run); }
+}
+
+export async function revalidateIdentityResolutionSnapshot<T extends Pick<IdentityResolutionSnapshot, "players" | "guilds">>(snapshot: T): Promise<T | IdentityResolutionSnapshot> {
+  const run = auditBegin("S07", "revalidateIdentityResolutionSnapshot");
+  try {
+    const revisions = (snapshot as IdentityResolutionSnapshot).revisions;
+    if (!revisions) return auditReturn(run, snapshot); // Explicit/injected snapshots keep their caller's ownership.
+    const [players, guilds] = await auditValue(run, auditEnter(run, "identity-changes-read"), Promise.all([readPlayerIdentityChanges(revisions.players), readGuildIdentityChanges(revisions.guilds)]));
+    return auditReturn(run, players.length || guilds.length ? auditCall(run, "identity-snapshot-refresh", () => loadIdentityResolutionSnapshot()) : snapshot);
+  } catch (error) { auditError(run, error); throw error; }
+  finally { auditLeave(run); }
 }
 
 export function resolvePlayerIdentity(
@@ -251,12 +298,14 @@ export function resolvePlayerIdentity(
   const players = "players" in snapshot ? snapshot.players : snapshot;
   const identifierKey = safeNormalize(identifier, normalizePlayerIdentifierKey);
   if (!identifierKey) return unresolvedIdentity();
-  const group = players.byIdentifier.get(identifierKey);
-  if (!group) return unresolvedIdentity();
-  const matchedAlias = group.aliases.find((alias) => alias.identifierKey === identifierKey) ?? null;
+  const group = referenceGroup(players, identifierKey);
+  if (!group) return unresolvedIdentity(group === null ? "conflict" : "unresolved");
+  const matchedAlias = group.aliases.find((alias) => alias.identifierKey === identifierKey)
+    ?? group.aliases.find(alias => identityObservationReferenceKey(alias.identifier) === identityObservationReferenceKey(identifierKey)) ?? null;
   if (!matchedAlias) return unresolvedIdentity();
   return {
     resolved: true,
+    status: "confirmed",
     identityId: group.identityId,
     entity: group.entity,
     aliases: group.aliases,
@@ -272,12 +321,14 @@ export function resolveGuildIdentity(
   const guilds = "guilds" in snapshot ? snapshot.guilds : snapshot;
   const identifierKey = safeNormalize(identifier, normalizeGuildIdentifierKey);
   if (!identifierKey) return unresolvedIdentity();
-  const group = guilds.byIdentifier.get(identifierKey);
-  if (!group) return unresolvedIdentity();
-  const matchedAlias = group.aliases.find((alias) => alias.identifierKey === identifierKey) ?? null;
+  const group = referenceGroup(guilds, identifierKey);
+  if (!group) return unresolvedIdentity(group === null ? "conflict" : "unresolved");
+  const matchedAlias = group.aliases.find((alias) => alias.identifierKey === identifierKey)
+    ?? group.aliases.find(alias => identityObservationReferenceKey(alias.identifier) === identityObservationReferenceKey(identifierKey)) ?? null;
   if (!matchedAlias) return unresolvedIdentity();
   return {
     resolved: true,
+    status: "confirmed",
     identityId: group.identityId,
     entity: group.entity,
     aliases: group.aliases,
@@ -322,9 +373,10 @@ export function collectGuildIdentityObservations<TObservation>(
   return { resolution, observations: collected };
 }
 
-function unresolvedIdentity(): UnresolvedIdentity {
+function unresolvedIdentity(status: UnresolvedIdentity["status"] = "unresolved"): UnresolvedIdentity {
   return {
     resolved: false,
+    status,
     identityId: null,
     entity: null,
     aliases: [],
@@ -338,9 +390,9 @@ function collectResolutionIdentifierKeys<TEntity, TAlias extends { identifierKey
   resolution: ResolvedIdentity<TEntity, TAlias> | UnresolvedIdentity,
   normalize: (value: string) => string,
 ) {
-  if (resolution.resolved) return new Set(resolution.aliases.map((alias) => alias.identifierKey));
+  if (resolution.resolved) return new Set(resolution.aliases.map((alias) => identityObservationReferenceKey(alias.identifierKey)));
   const identifierKey = safeNormalize(identifier, normalize);
-  return identifierKey ? new Set([identifierKey]) : new Set<string>();
+  return identifierKey ? new Set([identityObservationReferenceKey(identifierKey)]) : new Set<string>();
 }
 
 function collectIdentityObservations<TObservation>(
@@ -355,7 +407,7 @@ function collectIdentityObservations<TObservation>(
   observations.forEach((observation, index) => {
     const identifier = String(getIdentifier(observation) ?? "").trim();
     const identifierKey = safeNormalize(identifier, normalize);
-    if (!identifierKey || !identifierKeys.has(identifierKey)) return;
+    if (!identifierKey || !identifierKeys.has(identityObservationReferenceKey(identifierKey))) return;
 
     const timestampMs = toTimestampMs(readTimestampValue(observation, options));
     const observationKey = buildObservationKey(observation, identifierKey, timestampMs, index, options);

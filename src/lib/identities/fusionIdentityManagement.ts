@@ -1,16 +1,25 @@
+import type { FusionPredecessorCoverage } from "./fusionPredecessorCoverage";
+import { identityObservationReferenceKey } from "./identityResolution";
+import { captureLocalDataDependencies, revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
+import type { LocalDataChange } from "../local-data/localDataChanges";
+import { withLocalDataWrite, type LocalDataWriteLease } from "../local-data/localDataCoordination";
 import {
   deriveGuildHubLogicalScanSnapshots,
   listSfDataHubLocalScansReadOnly,
   type GuildHubLogicalScanSnapshot,
 } from "../guilds/localScanLibrary";
-import { resolveServer } from "../servers/serverResolver";
+import { resolveServer, observationReferenceCandidates, isFusionAncestor } from "../servers/serverResolver";
 import {
   createFusionIdentityGuildObservations,
+  createPlayerFusionSemanticSummary,
+  hasFusionIdentityScopeObservation,
+  type PreparedFusionPlayerSemantics,
   createFusionIdentityObservations,
 } from "./playerFusionPreviewAdapter";
 import {
   isServerInFusionIdentityScope,
   type FusionIdentityAnalysisScope,
+  listFusionIdentityAnalysisScopes,
 } from "./fusionIdentityScopes";
 import {
   FusionIdentityScopeNotLocallyMatchableError,
@@ -18,6 +27,7 @@ import {
 } from "./fusionScopeMatchability";
 import {
   createGuildIdentityStore,
+  readGuildIdentityChanges,
   getGuildAliases,
   getGuildEntityForAlias,
   isGuildLinkRejected,
@@ -30,6 +40,7 @@ import {
 } from "./guildIdentityStore";
 import {
   createPlayerIdentityStore,
+  readPlayerIdentityChanges,
   getPlayerAliases,
   getPlayerIdentity,
   isPlayerMatchRejected,
@@ -200,6 +211,9 @@ export type FusionIdentityManagementItem = {
   candidates: FusionIdentityCandidate[];
   memberMigrationEdges: GuildFusionMigrationEdge[];
   memberStatusSummary?: FusionIdentityGuildMemberStatusSummary | null;
+  /** All observed members of the selected guild lineage, including former members. */
+  memberReferenceIdentifiers?: string[];
+  mergeReadyPlayerIdentifiers?: string[];
   reasons: string[];
   reasonCodes: FusionIdentityManagementReasonCode[];
   diagnostics: FusionIdentityManagementDiagnostics | null;
@@ -246,6 +260,8 @@ export type FusionIdentityAliasOption = {
 };
 
 export type FusionIdentityManagementReport = {
+  predecessorCoverage?: FusionPredecessorCoverage;
+  dependencies?: LocalDependencyReceipt;
   scope: FusionIdentityManagementScope;
   summary: FusionIdentityManagementSummary;
   items: FusionIdentityManagementItem[];
@@ -268,6 +284,7 @@ type PlayerIdentityManagementStore = Pick<
   | "linkPlayerIdentifiers"
   | "rejectPlayerMatch"
   | "unlinkPlayerIdentifier"
+  | "readChanges"
 >;
 
 type GuildIdentityManagementStore = Pick<
@@ -280,10 +297,12 @@ type GuildIdentityManagementStore = Pick<
   | "linkGuildAliases"
   | "rejectGuildLink"
   | "unlinkGuildAlias"
+  | "readChanges"
 >;
 
 export type FusionIdentityManagementInput = FusionIdentityManagementStores & {
   snapshots: GuildHubLogicalScanSnapshot[];
+  preparedPlayerSemantics?: PreparedFusionPlayerSemantics;
 };
 
 export type FusionIdentityManagementBuildOptions = {
@@ -296,40 +315,17 @@ export type FusionIdentityManagementBuildOptions = {
   scanPoolPhaseFinishedAt?: number;
 };
 
-const ORIGIN_SERVER_CODES = ["EU1", "EU2", "EU3", "EU4"];
-const TARGET_SERVER_CODE = "F28";
-
-const getFallbackFusionIdentityScope = (): FusionIdentityAnalysisScope => ({
-  id: TARGET_SERVER_CODE,
-  eventId: "fusion-f28",
-  label: "EU1-EU4 -> F28",
-  originServerCodes: ORIGIN_SERVER_CODES,
-  originServerNames: ORIGIN_SERVER_CODES,
-  directOriginServerCodes: ORIGIN_SERVER_CODES,
-  directOriginServerNames: ORIGIN_SERVER_CODES,
-  transitiveOriginServerCodes: ORIGIN_SERVER_CODES,
-  lineageServerCodes: [...ORIGIN_SERVER_CODES, TARGET_SERVER_CODE],
-  intermediateServerCodes: [],
-  ancestorEvents: [
-    {
-      eventId: "fusion-f28",
-      targetServerCode: TARGET_SERVER_CODE,
-      originServerCodes: ORIGIN_SERVER_CODES,
-      effectiveDate: "2026-02-06",
-      temporalStatus: "effective",
-    },
-  ],
-  effectiveDate: "2026-02-06",
-  temporalStatus: "effective",
-  isCurrentTerminalTarget: true,
-  analysisSupported: true,
-  targetServerCode: TARGET_SERVER_CODE,
-  targetServerName: TARGET_SERVER_CODE,
-});
-
 const resolveBuildScope = (
   scope: FusionIdentityAnalysisScope | null | undefined,
-) => scope ?? getFallbackFusionIdentityScope();
+  snapshots: readonly GuildHubLogicalScanSnapshot[] = [],
+) => {
+  if (scope) return scope;
+  const observed = new Set(snapshots.flatMap(snapshot => snapshot.servers).map(server => resolveServer(server)?.code));
+  const scopes = listFusionIdentityAnalysisScopes().filter(candidate => candidate.analysisSupported);
+  const selected = scopes.find(candidate => observed.has(candidate.targetServerCode)) ?? (!observed.size ? scopes[0] : undefined);
+  if (!selected) throw Error("fusion-scope-required");
+  return selected;
+};
 
 const FUSION_IDENTITY_RESOLUTION_PROGRESS_BATCH_SIZE = 50;
 
@@ -952,7 +948,7 @@ const selectManagementPlayerCandidates = (
 ) => selectPlayerFusionManagementCandidates(candidates);
 
 type IdentityStoreState = {
-  aliasEntityIdByKey: Map<string, string>;
+  aliasEntityIdByKey: Map<string, string | null>;
   aliasesByEntityId: Map<string, string[]>;
   rejectedPairKeys: Set<string>;
 };
@@ -969,7 +965,7 @@ const loadPlayerIdentityState = async (
     store.listPlayerEntities(),
     store.listPlayerExclusions(),
   ]);
-  const aliasEntityIdByKey = new Map<string, string>();
+  const aliasEntityIdByKey = new Map<string, string | null>();
   const aliasesByEntityId = new Map<string, string[]>();
 
   entities.forEach(({ entity, aliases }) => {
@@ -978,14 +974,16 @@ const loadPlayerIdentityState = async (
       aliases.map((alias) => alias.identifier),
     );
     aliases.forEach((alias) => {
-      aliasEntityIdByKey.set(alias.identifierKey, entity.entityId);
+      const key = identityObservationReferenceKey(alias.identifier);
+      const previous = aliasEntityIdByKey.get(key);
+      aliasEntityIdByKey.set(key, previous === null || previous && previous !== entity.entityId ? null : entity.entityId);
     });
   });
 
   return {
     aliasEntityIdByKey,
     aliasesByEntityId,
-    rejectedPairKeys: new Set(exclusions.map((exclusion) => exclusion.pairKey)),
+    rejectedPairKeys: new Set(exclusions.map(exclusion => createIdentityPairKey(identityObservationReferenceKey(exclusion.identifierA), identityObservationReferenceKey(exclusion.identifierB)))),
   };
 };
 
@@ -996,7 +994,7 @@ const loadGuildIdentityState = async (
     store.listGuildEntities(),
     store.listGuildExclusions(),
   ]);
-  const aliasEntityIdByKey = new Map<string, string>();
+  const aliasEntityIdByKey = new Map<string, string | null>();
   const aliasesByEntityId = new Map<string, string[]>();
 
   entities.forEach(({ entity, aliases }) => {
@@ -1005,48 +1003,37 @@ const loadGuildIdentityState = async (
       aliases.map((alias) => alias.identifier),
     );
     aliases.forEach((alias) => {
-      aliasEntityIdByKey.set(alias.identifierKey, entity.entityId);
+      const key = identityObservationReferenceKey(alias.identifier);
+      const previous = aliasEntityIdByKey.get(key);
+      aliasEntityIdByKey.set(key, previous === null || previous && previous !== entity.entityId ? null : entity.entityId);
     });
   });
 
   return {
     aliasEntityIdByKey,
     aliasesByEntityId,
-    rejectedPairKeys: new Set(exclusions.map((exclusion) => exclusion.pairKey)),
+    rejectedPairKeys: new Set(exclusions.map(exclusion => createIdentityPairKey(identityObservationReferenceKey(exclusion.identifierA), identityObservationReferenceKey(exclusion.identifierB)))),
   };
 };
 
-const readLinkedAliasesFromState = (
-  state: IdentityStoreState,
-  identifier: string,
-) => {
-  const entityId =
-    state.aliasEntityIdByKey.get(normalizeIdentifierKey(identifier)) ?? null;
-  return {
-    entityId,
-    aliases: entityId ? (state.aliasesByEntityId.get(entityId) ?? []) : [],
-  };
+const readLinkedAliasesFromState = (state: IdentityStoreState, identifier: string) => {
+  const key = identityObservationReferenceKey(identifier);
+  const entityId = state.aliasEntityIdByKey.get(key) ?? null;
+  return { entityId, aliases: entityId ? state.aliasesByEntityId.get(entityId) ?? [] : [],
+    conflict: state.aliasEntityIdByKey.has(key) && state.aliasEntityIdByKey.get(key) === null };
 };
 
-const isRejectedByState = (
-  state: IdentityStoreState,
-  left: string,
-  right: string,
-) => state.rejectedPairKeys.has(createIdentityPairKey(left, right));
-
-const isAssignedToOtherIdentity = (
-  state: IdentityStoreState,
-  historicalIdentifier: string,
-  currentEntityId: string | null | undefined,
-) => {
-  const historicalEntityId = state.aliasEntityIdByKey.get(
-    normalizeIdentifierKey(historicalIdentifier),
-  );
-  return Boolean(historicalEntityId && historicalEntityId !== currentEntityId);
+const isRejectedByState = (state: IdentityStoreState, left: string, right: string) => {
+  if (!state.rejectedPairKeys.size) return false;
+  const leftAliases = [left, ...readLinkedAliasesFromState(state, left).aliases];
+  const rightAliases = [right, ...readLinkedAliasesFromState(state, right).aliases];
+  return leftAliases.some(a => rightAliases.some(b => state.rejectedPairKeys.has(createIdentityPairKey(identityObservationReferenceKey(a), identityObservationReferenceKey(b)))));
 };
 
-
-
+const isAssignedToOtherIdentity = (state: IdentityStoreState, historicalIdentifier: string, currentEntityId: string | null | undefined) => {
+  const historical = readLinkedAliasesFromState(state, historicalIdentifier);
+  return historical.conflict || Boolean(historical.entityId && historical.entityId !== currentEntityId);
+};
 
 const READY_ASSIGNMENT_CONFLICT_REASON =
   "historical identity is claimed by multiple current identities";
@@ -1240,10 +1227,20 @@ const historicalAssignmentKey = (
   historicalIdentifier: string,
 ) => `${entityType}:${normalizeIdentifierKey(historicalIdentifier)}`;
 
+const isMissingEarlierFusionStage = (identifier: string, storedHistoricalAliases: readonly string[]) => {
+  const server = resolveServer(identityObservationReferenceKey(identifier).replace(/_[pg][^_]+$/i, ""));
+  return !!server && storedHistoricalAliases.some(alias => {
+    const known = resolveServer(identityObservationReferenceKey(alias).replace(/_[pg][^_]+$/i, ""));
+    return !!known && known.code !== server.code && isFusionAncestor(server.code, known.code);
+  });
+};
+
 const recomputeNonCompletedStatus = (item: FusionIdentityManagementItem) => {
   if (item.status === "completed") return;
   const activeCandidates = item.candidates.filter(
-    (candidate) => !candidate.rejected && !candidate.assignedToOtherIdentity,
+    (candidate) => !candidate.rejected && !candidate.assignedToOtherIdentity &&
+      (!item.historicalIdentifiers.length || isMissingEarlierFusionStage(candidate.historicalIdentifier, item.historicalIdentifiers)) &&
+      !item.completedAliases.some(alias => identityObservationReferenceKey(alias) === identityObservationReferenceKey(candidate.historicalIdentifier)),
   );
   const activeActionableCandidates = activeCandidates.filter(
     isActionableManagementCandidate,
@@ -1404,6 +1401,19 @@ const applyGlobalAssignmentResolution = (
     recomputeNonCompletedStatus(item);
   });
 
+  const claims = new Map<string, FusionIdentityManagementItem[]>();
+  for (const item of items) if (item.status === "ready" && item.readyCandidateIdentifier) {
+    for (const side of ["current", "historical"] as const) {
+      const identifier = side === "current" ? item.currentIdentifier : item.readyCandidateIdentifier;
+      const key = `${item.entityType}:${side}:${identityObservationReferenceKey(identifier)}`;
+      claims.set(key, [...(claims.get(key) ?? []), item]);
+    }
+  }
+  for (const colliding of claims.values()) if (colliding.length > 1) for (const item of colliding) {
+    item.status = "review"; item.readyCandidateIdentifier = null;
+    appendReason(item, READY_ASSIGNMENT_CONFLICT_REASON); appendReasonCode(item, "assignment-conflict");
+  }
+
   items.forEach((item) => {
     if (item.status === "ready" || item.status === "completed") {
       item.reasonCodes = [];
@@ -1431,10 +1441,10 @@ const buildPlayerItems = async (
       return {
         currentIdentifier,
         entityId: linked.entityId,
+        conflict: linked.conflict,
         historicalIdentifiers: linked.aliases.filter(
-          (alias) =>
-            normalizeIdentifierKey(alias) !==
-            normalizeIdentifierKey(currentIdentifier),
+          (alias) => resolverScope.historicalServerCodes.includes(resolveServerCode(identityObservationReferenceKey(alias).replace(/_p[^_]+$/i, "")) ?? "") &&
+            identityObservationReferenceKey(alias) !== identityObservationReferenceKey(currentIdentifier),
         ),
         aliases: linked.aliases,
       };
@@ -1472,7 +1482,7 @@ const buildPlayerItems = async (
               currentIdentifier,
               candidate.oldIdentifier,
             );
-          const assignedToOtherIdentity = isAssignedToOtherIdentity(
+          const assignedToOtherIdentity = linked?.conflict || isAssignedToOtherIdentity(
             identityState,
             candidate.oldIdentifier,
             linked?.entityId,
@@ -1508,7 +1518,8 @@ const buildPlayerItems = async (
             ) && !candidate.assignedToOtherIdentity,
         );
         const readyCandidate = allCandidates.filter(
-          (candidate) => candidate.ready,
+          (candidate) => candidate.ready && (!completedHistorical.length || isMissingEarlierFusionStage(candidate.historicalIdentifier, completedHistorical)) &&
+            !completedAliases.some(alias => identityObservationReferenceKey(alias) === identityObservationReferenceKey(candidate.historicalIdentifier)),
         );
         const activeCandidates = allCandidates.filter(
           (candidate) =>
@@ -1587,11 +1598,14 @@ const buildPlayerItems = async (
                             : hasEvaluatedRejectedCandidate
                               ? "rejected-by-exclusion"
                               : "no-viable-candidate";
+        const pendingHistoricalCandidate = activeActionableCandidates.some(candidate =>
+          isMissingEarlierFusionStage(candidate.historicalIdentifier, completedHistorical) &&
+          !completedAliases.some(alias => identityObservationReferenceKey(alias) === identityObservationReferenceKey(candidate.historicalIdentifier)));
         const status: FusionIdentityManagementStatus =
-          completedHistorical.length
-            ? "completed"
-            : readyCandidate.length === 1
-              ? "ready"
+          readyCandidate.length === 1
+            ? "ready"
+            : completedHistorical.length
+              ? pendingHistoricalCandidate ? "review" : "completed"
               : activeActionableCandidates.length
                 ? "review"
                 : reasonCode === "no-historical-scans"
@@ -1695,10 +1709,10 @@ const buildGuildItems = async (
       return {
         currentIdentifier,
         entityId: linked.entityId,
+        conflict: linked.conflict,
         historicalIdentifiers: linked.aliases.filter(
-          (alias) =>
-            normalizeIdentifierKey(alias) !==
-            normalizeIdentifierKey(currentIdentifier),
+          (alias) => originServerCodes.includes(resolveServerCode(identityObservationReferenceKey(alias).replace(/_g[^_]+$/i, "")) ?? "") &&
+            identityObservationReferenceKey(alias) !== identityObservationReferenceKey(currentIdentifier),
         ),
         aliases: linked.aliases,
       };
@@ -1776,7 +1790,7 @@ const buildGuildItems = async (
               currentIdentifier,
               candidate.oldGuildIdentifier,
             );
-            const assignedToOtherIdentity = isAssignedToOtherIdentity(
+            const assignedToOtherIdentity = linked?.conflict || isAssignedToOtherIdentity(
               identityState,
               candidate.oldGuildIdentifier,
               linked?.entityId,
@@ -1845,9 +1859,12 @@ const buildGuildItems = async (
                     : hasHistoricalData
                       ? "no-actionable-candidate"
                       : "no-historical-scans";
+        const pendingHistoricalCandidate = activeActionableCandidates.some(candidate =>
+          isMissingEarlierFusionStage(candidate.historicalIdentifier, completedHistorical) &&
+          !completedAliases.some(alias => identityObservationReferenceKey(alias) === identityObservationReferenceKey(candidate.historicalIdentifier)));
         const status: FusionIdentityManagementStatus =
           completedHistorical.length
-            ? "completed"
+            ? pendingHistoricalCandidate ? "review" : "completed"
             : hasConsistentAutoIdentity
               ? "ready"
               : activeActionableCandidates.length
@@ -1925,7 +1942,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
 ): Promise<FusionIdentityManagementReport> {
   const reportBuildStartedAt = performance.now();
   const emitProgress = options.onProgress ?? (() => undefined);
-  const scopeDefinition = resolveBuildScope(options.scope);
+  const scopeDefinition = resolveBuildScope(options.scope, input.snapshots);
   const historicalServerCodeSet = new Set(
     (scopeDefinition.lineageServerCodes.length
       ? scopeDefinition.lineageServerCodes
@@ -1950,6 +1967,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
     linkPlayerIdentifiers,
     rejectPlayerMatch,
     unlinkPlayerIdentifier,
+    readChanges: readPlayerIdentityChanges,
   };
   const guildStore: GuildIdentityManagementStore = input.guildStore ?? {
     getGuildEntityForAlias,
@@ -1960,6 +1978,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
     linkGuildAliases,
     rejectGuildLink,
     unlinkGuildAlias,
+    readChanges: readGuildIdentityChanges,
   };
   const allPlayerObservations: PlayerFusionObservation[] = [];
   const allGuildObservations: GuildFusionObservation[] = [];
@@ -1979,7 +1998,7 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
   let guildObservationNormalizationMs = 0;
   snapshots.forEach((snapshot, index) => {
     const playerObservationNormalizationStartedAt = performance.now();
-    const players = createFusionIdentityObservations(snapshot);
+    const players = createFusionIdentityObservations(snapshot, input.preparedPlayerSemantics);
     playerObservationNormalizationMs +=
       performance.now() - playerObservationNormalizationStartedAt;
     const guildObservationNormalizationStartedAt = performance.now();
@@ -2419,6 +2438,14 @@ export async function buildFusionIdentityManagementReportFromSnapshots(
   });
   applyGlobalAssignmentResolution(items);
   attachGuildMemberStatusSummaries(items, currentGuildsByIdentifier);
+  for (const item of guildItems) {
+    const identifiers = new Set([item.currentIdentifier, ...item.completedAliases,
+      ...(item.readyCandidateIdentifier ? [item.readyCandidateIdentifier] : [])].map(identityObservationReferenceKey));
+    item.memberReferenceIdentifiers = [...new Set(allGuildObservations
+      .filter(observation => identifiers.has(identityObservationReferenceKey(observation.guildIdentifier)))
+      .flatMap(observation => observation.memberIdentifiers))];
+    item.mergeReadyPlayerIdentifiers = listGuildFusionIdentityMergeItems({ items } as FusionIdentityManagementReport, item).map(player => player.currentIdentifier);
+  }
   items.sort(compareByLatestThenName);
   recordFusionIdentityTiming(options, "management:final-result-assembly", finalAssemblyStartedAt, items.length);
 
@@ -2465,6 +2492,7 @@ export async function loadFusionIdentityManagementReport(
 ): Promise<FusionIdentityManagementReport> {
   const totalStartedAt = performance.now();
   const scopeDefinition = resolveBuildScope(options.scope);
+  const dependencies = stores.playerStore || stores.guildStore ? undefined : await captureLocalDataDependencies({ allSources: true, allIdentities: true });
   options.onProgress?.({ phase: "loading", message: "Loading local scans" });
   const scanLoadStartedAt = performance.now();
   const scans = await listSfDataHubLocalScansReadOnly();
@@ -2481,10 +2509,18 @@ export async function loadFusionIdentityManagementReport(
     message: "Preparing fusion scan pool",
   });
   const snapshots: GuildHubLogicalScanSnapshot[] = [];
+  const preparedPlayerSemantics: PreparedFusionPlayerSemantics = new WeakMap();
   const snapshotDerivationStartedAt = performance.now();
   let scanPoolLastItemProcessedAt: number | undefined;
   scans.forEach((scan, index) => {
-    snapshots.push(...deriveGuildHubLogicalScanSnapshots(scan));
+    snapshots.push(...deriveGuildHubLogicalScanSnapshots(scan, {
+      includeSnapshot: rawData => hasFusionIdentityScopeObservation(rawData,
+        code => isServerInFusionIdentityScope(scopeDefinition, code)),
+      onNormalizedPlayerCreated(raw, core) {
+        if (raw && typeof raw === "object" && core) preparedPlayerSemantics.set(raw,
+          createPlayerFusionSemanticSummary(raw as Record<string, unknown>, core));
+      },
+    }));
     options.onProgress?.({
       phase: "preparing-scan-pool",
       current: index + 1,
@@ -2511,36 +2547,14 @@ export async function loadFusionIdentityManagementReport(
     message: "Filtering fusion scope",
   });
   const scopeFilteringStartedAt = performance.now();
-  let scopeFilteringObservationExtractionMs = 0;
-  const scopedSnapshots = snapshots.filter((snapshot) => {
-    const observationExtractionStartedAt = performance.now();
-    const players = createFusionIdentityObservations(snapshot);
-    const guilds = createFusionIdentityGuildObservations(snapshot);
-    scopeFilteringObservationExtractionMs +=
-      performance.now() - observationExtractionStartedAt;
-    return (
-      players.some((observation) =>
-        isServerInFusionIdentityScope(
-          scopeDefinition,
-          resolveServerCode(observation.server),
-        ),
-      ) ||
-      guilds.some((observation) =>
-        isServerInFusionIdentityScope(scopeDefinition, observation.serverCode),
-      )
-    );
-  });
+  // Raw buckets have already passed the same observation identity projection.
+  // No second semantic/core normalization just to decide scope membership.
+  const scopedSnapshots = snapshots;
   recordFusionIdentityTiming(
     options,
     "management:scope-filtering",
     scopeFilteringStartedAt,
     scopedSnapshots.length,
-  );
-  recordFusionIdentityTimingDuration(
-    options,
-    "management:scope-filtering-observation-extraction",
-    scopeFilteringObservationExtractionMs,
-    snapshots.length,
   );
   const scanPoolPhaseFinishedAt = performance.now();
   if (scanPoolLastItemProcessedAt != null) {
@@ -2552,7 +2566,7 @@ export async function loadFusionIdentityManagementReport(
     );
   }
   const report = await buildFusionIdentityManagementReportFromSnapshots(
-    { snapshots: scopedSnapshots, ...stores },
+    { snapshots: scopedSnapshots, preparedPlayerSemantics, ...stores },
     {
       ...options,
       scope: scopeDefinition,
@@ -2560,36 +2574,92 @@ export async function loadFusionIdentityManagementReport(
       scanPoolPhaseFinishedAt,
     },
   );
+  if (dependencies) {
+    if (!(await revalidateLocalDataDependencies(dependencies)).current) throw Error("matching-basis-changed");
+    report.dependencies = dependencies;
+  }
   recordFusionIdentityTiming(options, "management:load-total", totalStartedAt, 1);
   return report;
 }
 
+export type FusionIdentityCommitReceipt = {
+  status: "stored" | "skipped";
+  entityId: string;
+  revisionBefore: number;
+  revisionAfter: number;
+  journal: LocalDataChange[];
+  verification: "journal" | "legacy-aliases";
+};
+
+/** One normal commit contract for single, bulk and roster confirmations.
+ * The write lease spans preflight, tx.done, durable aliases and journal readback. */
 export async function confirmFusionIdentityLink(
   entityType: FusionIdentityEntityType,
   currentIdentifier: string,
   historicalIdentifier: string,
   options: FusionIdentityManagementStores & {
     source?: PlayerAliasSource | GuildAliasSource;
+    lease?: LocalDataWriteLease;
+    dependencies?: LocalDependencyReceipt;
+    isCurrent?: () => boolean;
   } = {},
 ) {
-  const confirmedAt = new Date().toISOString();
-  if (entityType === "player") {
-    const store = options.playerStore ?? { linkPlayerIdentifiers };
-    return store.linkPlayerIdentifiers(
-      currentIdentifier,
-      historicalIdentifier,
-      {
-        source: (options.source as PlayerAliasSource | undefined) ?? "manual",
-        confirmedAt,
-      },
-    );
-  }
-
-  const store = options.guildStore ?? { linkGuildAliases };
-  return store.linkGuildAliases(currentIdentifier, historicalIdentifier, {
-    source: (options.source as GuildAliasSource | undefined) ?? "manual",
-    confirmedAt,
-  });
+  const dependencies = options.dependencies ? structuredClone(options.dependencies) : undefined;
+  const player = options.playerStore ?? { getPlayerIdentity, getPlayerAliases, linkPlayerIdentifiers, listPlayerExclusions, readChanges: readPlayerIdentityChanges };
+  const guild = options.guildStore ?? { getGuildEntityForAlias, getGuildAliases, linkGuildAliases, listGuildExclusions, readChanges: readGuildIdentityChanges };
+  const readEntity = entityType === "player" ? player.getPlayerIdentity : guild.getGuildEntityForAlias;
+  const readAliases = entityType === "player" ? player.getPlayerAliases : guild.getGuildAliases;
+  const readChanges = entityType === "player" ? player.readChanges : guild.readChanges;
+  return withLocalDataWrite(async lease => {
+    if (options.isCurrent && !options.isCurrent()) throw Error("comparison-context-changed");
+    if (typeof readChanges !== "function" || typeof readEntity !== "function" || typeof readAliases !== "function") throw Error("identity-verification-unavailable");
+    const readReference = async (identifier: string) => {
+      const candidates = observationReferenceCandidates(identifier);
+      const entities = await Promise.all(candidates.map(readEntity));
+      const ids = new Set(entities.flatMap(entity => entity ? [entity.entityId] : []));
+      if (ids.size > 1) throw Error("observation-reference-conflict");
+      const index = entities.findIndex(Boolean);
+      return { entity: index >= 0 ? entities[index] : null, identifier: index >= 0 ? candidates[index] : identifier };
+    };
+    const [leftRef, rightRef] = await Promise.all([readReference(currentIdentifier), readReference(historicalIdentifier)]);
+    const left = leftRef.entity, right = rightRef.entity;
+    const skipped = Boolean(left && left.entityId === right?.entityId);
+    // Regular jobs already own a durable revision certificate. Reading the
+    // whole growing journal before every pair would make large jobs quadratic.
+    const certifiedRevision = dependencies?.[entityType === "player" ? "players" : "guilds"];
+    const beforeJournal = certifiedRevision == null || skipped ? await readChanges() : [];
+    const revisionBefore = certifiedRevision != null && !skipped ? certifiedRevision : beforeJournal[beforeJournal.length - 1]?.sequence ?? 0;
+    const [leftAliases, rightAliases, exclusions] = await Promise.all([
+      left ? readAliases(left.entityId) : [currentIdentifier], right ? readAliases(right.entityId) : [historicalIdentifier],
+      entityType === "player" ? player.listPlayerExclusions() : guild.listGuildExclusions(),
+    ]);
+    const leftKeys = new Set([currentIdentifier, ...leftAliases].map(identityObservationReferenceKey));
+    const rightKeys = new Set([historicalIdentifier, ...rightAliases].map(identityObservationReferenceKey));
+    if (exclusions.some(exclusion => leftKeys.has(identityObservationReferenceKey(exclusion.identifierA)) && rightKeys.has(identityObservationReferenceKey(exclusion.identifierB))
+      || leftKeys.has(identityObservationReferenceKey(exclusion.identifierB)) && rightKeys.has(identityObservationReferenceKey(exclusion.identifierA)))) throw Error("identity-pair-excluded");
+    // Safe retry of a committed pair is read-only, even if its old report is stale.
+    if (!skipped && dependencies && !(await revalidateLocalDataDependencies(dependencies)).current) throw Error("matching-basis-changed");
+    if (!skipped && options.source === "automatic" && left && right && left.entityId !== right.entityId) throw Error("candidate_reserved");
+    const metadata = { source: options.source ?? "manual", confirmedAt: new Date().toISOString(), lease };
+    const result = skipped ? null : entityType === "player"
+      ? await player.linkPlayerIdentifiers(leftRef.identifier, rightRef.identifier, metadata)
+      : await guild.linkGuildAliases(leftRef.identifier, rightRef.identifier, metadata);
+    const [afterLeftRef, afterRightRef, journal] = await Promise.all([
+      readReference(currentIdentifier), readReference(historicalIdentifier), readChanges(revisionBefore),
+    ]);
+    const afterLeft = afterLeftRef.entity, afterRight = afterRightRef.entity;
+    if (!afterLeft || afterLeft.entityId !== afterRight?.entityId) throw Error("identity-commit-verification-failed");
+    const aliases = await readAliases(afterLeft.entityId);
+    const keys = [currentIdentifier, historicalIdentifier].map(identityObservationReferenceKey);
+    if (!keys.every(key => aliases.some(alias => identityObservationReferenceKey(alias) === key))) throw Error("identity-alias-verification-failed");
+    const witnesses = (skipped ? beforeJournal : journal).filter(change => change.kinds.includes("identity") &&
+      change.identityAfter?.some(group => group.identityId === afterLeft.entityId && keys.every(key => group.aliases.some(alias => identityObservationReferenceKey(alias) === key))));
+    if (!skipped && !witnesses.some(change => (change.sequence ?? 0) > revisionBefore)) throw Error("identity-journal-verification-failed");
+    const commit: FusionIdentityCommitReceipt = { status: skipped ? "skipped" : "stored", entityId: afterLeft.entityId,
+      revisionBefore, revisionAfter: skipped ? revisionBefore : journal[journal.length - 1]?.sequence ?? revisionBefore,
+      journal: skipped ? witnesses : journal, verification: witnesses.length ? "journal" : "legacy-aliases" };
+    return { entity: afterLeft, aliases: result?.aliases ?? [], commit };
+  }, { lease: options.lease });
 }
 
 export async function rejectFusionIdentityCandidate(
@@ -2651,39 +2721,138 @@ export const listReadyFusionIdentityMergeItems = (
   });
 };
 
-export async function mergeReadyFusionIdentityItems(
+export function listGuildFusionIdentityMergeItems(report: FusionIdentityManagementReport, guild: FusionIdentityManagementItem) {
+  if (guild.entityType !== "guild") return [];
+  const references = new Set((guild.memberReferenceIdentifiers ?? guild.memberStatusSummary?.memberRefsByStatus.ready.map(ref => ref.identifier) ?? []).map(identityObservationReferenceKey));
+  return listReadyFusionIdentityMergeItems(report, { entityType: "player" }).filter(item =>
+    [item.currentIdentifier, item.readyCandidateIdentifier, ...item.completedAliases]
+      .some(identifier => identifier && references.has(identityObservationReferenceKey(identifier))));
+}
+
+export type FusionIdentityMergeProgress = {
+  total: number;
+  processed: number;
+  players: number;
+  guilds: number;
+  failedPlayers: number;
+  failedGuilds: number;
+  skipped: number;
+  excluded: number;
+  unresolved: number;
+  entries: Array<{ itemId: string; currentIdentifier: string; historicalIdentifier: string; status: "stored" | "skipped" | "failed" | "excluded" | "unresolved"; commit?: FusionIdentityCommitReceipt; error?: string }>;
+  errors: Array<{
+    itemId: string;
+    entityType: FusionIdentityEntityType;
+    currentIdentifier: string;
+    historicalIdentifier: string;
+    message: string;
+  }>;
+};
+
+let normalMergeRunning = false;
+
+async function runReadyFusionIdentityItems(
   report: FusionIdentityManagementReport,
   options: FusionIdentityManagementStores & {
     filter?: FusionIdentityReadyMergeFilter;
+    onProgress?: (progress: FusionIdentityMergeProgress) => void | Promise<void>;
+    isCurrent?: () => boolean;
   } = {},
 ) {
-  const readyItems = listReadyFusionIdentityMergeItems(report, options.filter);
-  const result = {
+  // Bind the approved selection, including both identifiers, before yielding.
+  // A refreshed report must never extend or retarget this job.
+  const readyItems = listReadyFusionIdentityMergeItems(report, options.filter).map(
+    ({ id, entityType, currentIdentifier, readyCandidateIdentifier }) => ({
+      id, entityType, currentIdentifier,
+      historicalIdentifier: readyCandidateIdentifier!,
+    }),
+  );
+  const claimCounts = new Map<string, number>();
+  const claimKeys = (item: typeof readyItems[number]) => [
+    `${item.entityType}:current:${identityObservationReferenceKey(item.currentIdentifier)}`,
+    `${item.entityType}:historical:${identityObservationReferenceKey(item.historicalIdentifier)}`,
+  ];
+  for (const item of readyItems) for (const key of claimKeys(item)) claimCounts.set(key, (claimCounts.get(key) ?? 0) + 1);
+  const result: FusionIdentityMergeProgress = {
+    total: readyItems.length,
+    processed: 0,
     players: 0,
     guilds: 0,
-    errors: [] as Array<{ itemId: string; message: string }>,
+    failedPlayers: 0,
+    failedGuilds: 0,
+    skipped: 0, excluded: 0, unresolved: 0, entries: [],
+    errors: [],
   };
+  const emit = () => options.onProgress?.(structuredClone(result));
+  const yieldToUI = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  await emit();
+  await yieldToUI();
+  let lastUpdate = performance.now();
 
+  let dependencies = report.dependencies;
+  if (!dependencies && !options.playerStore && !options.guildStore) throw Error("fresh-matching-report-required");
   for (const item of readyItems) {
     try {
-      await confirmFusionIdentityLink(
+      if (claimKeys(item).some(key => (claimCounts.get(key) ?? 0) > 1)) throw Error("assignment-conflict");
+      const saved = await confirmFusionIdentityLink(
         item.entityType,
         item.currentIdentifier,
-        item.readyCandidateIdentifier ?? "",
+        item.historicalIdentifier,
         {
           ...options,
-          source: "automatic",
+          source: "automatic", dependencies, isCurrent: options.isCurrent,
         },
       );
-      if (item.entityType === "player") result.players += 1;
+      result.entries.push({ itemId: item.id, currentIdentifier: item.currentIdentifier, historicalIdentifier: item.historicalIdentifier, status: saved.commit.status, commit: saved.commit });
+      if (saved.commit.status === "skipped") result.skipped += 1;
+      else if (item.entityType === "player") result.players += 1;
       else result.guilds += 1;
+      if (dependencies && saved.commit.status === "stored") {
+        // Advance only the revision proved by our own commit. An external write
+        // between pairs remains visible to the next preflight.
+        dependencies = { ...dependencies, [item.entityType === "player" ? "players" : "guilds"]: saved.commit.revisionAfter };
+      }
     } catch (error) {
+      const message = error instanceof Error ? error.message : "merge_failed";
+      const status = ["identity-pair-excluded", "player_match_rejected", "guild_link_rejected"].includes(message) ? "excluded"
+        : ["assignment-conflict", "observation-reference-conflict", "candidate_reserved"].includes(message) ? "unresolved" : "failed";
+      result.entries.push({ itemId: item.id, currentIdentifier: item.currentIdentifier, historicalIdentifier: item.historicalIdentifier, status, error: message });
+      if (status === "excluded") result.excluded += 1;
+      else if (status === "unresolved") result.unresolved += 1;
+      else if (item.entityType === "player") result.failedPlayers += 1;
+      else result.failedGuilds += 1;
       result.errors.push({
         itemId: item.id,
+        entityType: item.entityType,
+        currentIdentifier: item.currentIdentifier,
+        historicalIdentifier: item.historicalIdentifier,
         message: error instanceof Error ? error.message : "merge_failed",
       });
     }
+    result.processed += 1;
+    if (performance.now() - lastUpdate >= 50) {
+      await emit();
+      await yieldToUI();
+      lastUpdate = performance.now();
+    }
   }
-
+  await emit();
   return result;
+}
+
+/** One job per origin; a second tab cannot start a competing bound selection. */
+export async function mergeReadyFusionIdentityItems(
+  report: FusionIdentityManagementReport,
+  options: Parameters<typeof runReadyFusionIdentityItems>[1] = {},
+) {
+  if (normalMergeRunning) throw Error("identity-batch-already-running");
+  const bound = structuredClone({ ...report, items: listReadyFusionIdentityMergeItems(report, options.filter) });
+  normalMergeRunning = true;
+  try {
+    if (!globalThis.navigator?.locks) throw Error("Coordinated local writes require the Web Locks API in a secure context.");
+    return await navigator.locks.request("sfdatahub:identity-merge:v1", { mode: "exclusive", ifAvailable: true }, lock => {
+      if (!lock) throw Error("identity-batch-already-running");
+      return runReadyFusionIdentityItems(bound, { ...options, filter: undefined });
+    });
+  } finally { normalMergeRunning = false; }
 }

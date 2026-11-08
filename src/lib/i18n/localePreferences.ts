@@ -23,6 +23,12 @@ export const SUPPORTED_LOCALE_OPTIONS = [
     defaultLabel: "Czech",
     flagAsset: "/assets/flags/Flag_of_the_Czech_Republic.svg.png",
   },
+  {
+    code: "pl",
+    labelKey: "topbar.lang_pl",
+    defaultLabel: "Polski",
+    flagAsset: "/assets/flags/Flag_of_Poland.svg.png",
+  },
 ] as const;
 
 export type LocaleOption = (typeof SUPPORTED_LOCALE_OPTIONS)[number];
@@ -120,8 +126,9 @@ export const deriveLocaleStateFromSelection = (
 };
 
 const readStorageValue = (key: string): string | null => {
-  if (typeof window === "undefined" || !window.localStorage) return null;
+  if (typeof window === "undefined") return null;
   try {
+    if (!window.localStorage) return null;
     return window.localStorage.getItem(key);
   } catch (error) {
     console.warn("[LocalePrefs] Failed to read localStorage", { key, error });
@@ -155,9 +162,10 @@ export const readLocaleStateFromLocalStorage = (
 export const writeLocaleStateToLocalStorage = (
   value: LocalePreferenceState,
 ): void => {
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined") return;
 
   try {
+    if (!window.localStorage) return;
     window.localStorage.setItem(ACTIVE_LOCALE_STORAGE_KEY, value.activeLocale);
     window.localStorage.setItem(SECONDARY_LOCALE_STORAGE_KEY, value.preferredSecondaryLocale);
     window.localStorage.setItem(LEGACY_LANGUAGE_STORAGE_KEY, value.activeLocale);

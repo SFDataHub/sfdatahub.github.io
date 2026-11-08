@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import ContentShell from "../../components/ContentShell";
 import LoginCard from "../../components/auth/LoginCard";
@@ -18,6 +19,7 @@ const isSafeNextPath = (value: string | null): string | null => {
 };
 
 const LoginPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { status, user } = useAuth();
@@ -57,7 +59,7 @@ const LoginPage: React.FC = () => {
   }, [isAuthenticated, navigate, resolvedNext]);
 
   return (
-    <ContentShell title="Account Access" subtitle="Connect with your community identity" mode="page" padded>
+    <ContentShell title={t("account.loginPage.title")} subtitle={t("account.loginPage.subtitle")} mode="page" padded>
       <LoginCard />
     </ContentShell>
   );

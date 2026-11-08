@@ -1,7 +1,8 @@
-import { normalizeServerKeyFromInput, parsePlayerIdentifier } from "../players/identifier";
+import { serverComparisonKey } from "../servers/serverResolver";
+import { parsePlayerIdentifier } from "../players/identifier";
 
 export const toplistRowIdentity = (server: string, identifier: string, kind: "players" | "groups") => {
-  const serverKey = normalizeServerKeyFromInput(server) ?? server.trim().toLowerCase();
+  const serverKey = serverComparisonKey(server) ?? server.trim().toLowerCase();
   const entityId = kind === "players" ? parsePlayerIdentifier(identifier)?.playerId ?? identifier : identifier;
   return `${serverKey}\u0000${entityId.toLowerCase()}`;
 };

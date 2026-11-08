@@ -1,0 +1,10 @@
+{
+  "outDir": "C:\\Users\\danny\\AppData\\Local\\Temp\\sfdatahub-w13-production-An4Dpe",
+  "elapsedMs": 53239.5793,
+  "files": 929,
+  "bytes": 348395054,
+  "mode": "production",
+  "config": "vite.config.ts",
+  "publicDir": "public",
+  "deploy": false
+}

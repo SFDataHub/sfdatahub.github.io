@@ -1,0 +1,38 @@
+/* Values from UniversalSearch.sx; additions are confined to the Dashboard. */
+.wrap { position: relative; width: 100%; min-width: 0; color: #fff; }
+.field { display: flex; align-items: center; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); padding: 0 12px; gap: 10px; }
+.field:focus-within { outline: 1px solid rgba(92,139,198,.55); }
+.glyph { display: grid; place-items: center; flex: 0 0 18px; color: #b0c4d9; }
+.field input { flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: #fff; outline: none; font: inherit; font-size: 14px; }
+.field input::placeholder { color: #b0c4d9; opacity: 1; }
+.mode { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; color: #b0c4d9; font-size: 12px; }
+.mode select { max-width: 85px; color: #f5f9ff; background: #14273e; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 3px 2px; font: inherit; cursor: pointer; }
+.dropdown { position: absolute; top: 110%; left: 0; right: 0; background: rgba(12,28,46,.97); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 6px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.35); max-height: 440px; overflow-y: auto; overscroll-behavior: contain; }
+.section { margin: 6px 6px 4px; padding: 2px 6px; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: rgba(214,228,247,.85); }
+.hint, .notice { margin: 0; padding: 10px 12px; color: rgba(214,228,247,.85); font-size: 14px; }
+.notice { color: #ffb0a0; }
+.notice button { color: #f5f9ff; background: rgba(45,78,120,.4); border: 1px solid rgba(255,255,255,.2); border-radius: 6px; margin-left: 6px; padding: 3px 6px; cursor: pointer; font: inherit; }
+.entry { display: flex; align-items: center; min-width: 0; }
+.item { display: flex; align-items: center; gap: 10px; flex: 1; width: 100%; min-width: 0; border: none; background: transparent; text-align: left; padding: 10px; border-radius: 10px; cursor: pointer; color: #fff; font: inherit; }
+.item:hover:not(:disabled), .item.active { background: rgba(45,78,120,.35); outline: 1px solid rgba(92,139,198,.55); }
+.item:disabled { opacity: .55; cursor: default; }
+.artwork { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 36px; position: relative; overflow: visible; }
+.emblem { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 6px 10px rgba(0,0,0,.28)); }
+.fallback { color: #b0c4d9; display: grid; place-items: center; width: 36px; height: 36px; }
+.portrait { width: 36px; height: 36px; gap: 0; }
+.portraitShell:global(.avatar-portrait__canvas-shell) { padding: 0; border: 0; border-radius: 0; background: transparent; width: 36px; height: 36px; }
+.portraitCanvas:global(.avatar-portrait__canvas) { width: 36px; height: 36px; scale: 1; transform: none; clip-path: none; }
+.classIcon { position: absolute; bottom: -3px; right: -5px; width: 18px; height: 18px; font-size: 11px; color: #b0c4d9; display: grid; place-items: center; }
+.classIcon img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.meta { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.line1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.line1 strong { font-weight: 700; color: #f5f9ff; overflow-wrap: anywhere; }
+.line2 { color: #b0c4d9; font-size: 12px; overflow-wrap: anywhere; }
+.badge { flex-shrink: 0; font-size: 11px; color: #8aa5c4; border: 1px solid rgba(255,255,255,.2); padding: 0 6px; border-radius: 12px; }
+.remove, .disclose { background: transparent; border: 0; color: rgba(214,228,247,.85); cursor: pointer; padding: 6px; flex: 0 0 26px; }
+.observation { margin-left: 16px; border-left: 1px solid rgba(255,255,255,.12); }
+.wrap button:focus-visible, .mode select:focus-visible { outline: 2px solid #82bbff; outline-offset: 1px; }
+.spinner { animation: searchSpin 1s linear infinite; }
+@keyframes searchSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+@media (max-width: 600px) { .field { padding: 0 8px; gap: 6px; } .mode { flex-direction: column; align-items: flex-start; gap: 0; font-size: 10px; } .mode select { max-width: 70px; font-size: 11px; } .field input { font-size: 12px; } .item { padding: 10px 6px; } }

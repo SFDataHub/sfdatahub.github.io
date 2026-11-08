@@ -1,9 +1,9 @@
 import React from "react";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 import { AlertTriangle, Loader2, RefreshCcw } from "lucide-react";
 
 import ContentShell from "../../components/ContentShell";
-import { db } from "../../lib/firebase";
+import VisitorMetricsSettings, { visitorAdminRequest } from "./VisitorMetricsSettings";
 
 type RangeKey = "today" | "last7d" | "last30d";
 
@@ -229,7 +229,7 @@ function SectionPair({
 
 export default function AdminVisitorAnalyticsPage() {
   const [snapshot, setSnapshot] = React.useState<VisitorAnalyticsSnapshot | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [hasDocument, setHasDocument] = React.useState(false);
@@ -243,16 +243,7 @@ export default function AdminVisitorAnalyticsPage() {
     setError(null);
 
     try {
-      const snapshotRef = doc(db, "analytics", "visitor_analytics");
-      const docSnapshot = await getDoc(snapshotRef);
-
-      if (!docSnapshot.exists()) {
-        setSnapshot(null);
-        setHasDocument(false);
-        return;
-      }
-
-      const rawData = docSnapshot.data() as Record<string, unknown>;
+      const rawData = await visitorAdminRequest("refresh", { method: "POST" });
       setSnapshot(parseSnapshot(rawData));
       setHasDocument(true);
     } catch (loadError) {
@@ -262,10 +253,6 @@ export default function AdminVisitorAnalyticsPage() {
       setRefreshing(false);
     }
   }, []);
-
-  React.useEffect(() => {
-    void loadSnapshot(false);
-  }, [loadSnapshot]);
 
   const formattedLastUpdated = React.useMemo(() => {
     if (!snapshot?.updatedAt) return "Not available";
@@ -280,7 +267,7 @@ export default function AdminVisitorAnalyticsPage() {
   return (
     <ContentShell
       title="Visitor Analytics"
-      subtitle="Snapshot-based Visits dashboard (GoatCounter sync via auth-api)"
+      subtitle="Admin details load only on Refresh; public footer statistics update hourly."
       centerFramed
       mode="page"
       stickyTopbar
@@ -297,6 +284,7 @@ export default function AdminVisitorAnalyticsPage() {
         </button>
       )}
     >
+      <VisitorMetricsSettings />
       {loading ? (
         <div className="flex h-full items-center justify-center text-[#B0C4D9]">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -316,8 +304,7 @@ export default function AdminVisitorAnalyticsPage() {
 
           {!hasDocument || !snapshot ? (
             <section className="rounded-2xl border p-6 text-sm text-[#B0C4D9]" style={cardStyle}>
-              Visitor analytics snapshot not available yet. Trigger the internal sync endpoint or wait for the hourly
-              scheduler run.
+              Admin details have not been loaded. Use Refresh snapshot to generate and load them. Counts below are per-page visits (legacy), separate from the public website visitor counter.
             </section>
           ) : (
             <>

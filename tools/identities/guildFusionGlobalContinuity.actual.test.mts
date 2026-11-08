@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {gunzipSync} from 'node:zlib';
+import {resolveGuildFusions,type GuildFusionResolverInput} from '../../src/lib/identities/guildFusionResolver.ts';
+const {metadata,input}:{metadata:any;input:GuildFusionResolverInput}=JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/guildFusionGlobalContinuity.actual.json.gz',import.meta.url))).toString());
+assert.equal(metadata.historicalGuildObservations,726);assert.equal(input.newGuildObservations.length,222);assert.equal(input.highConfidencePlayerMatches.length,4534);
+const semantic=(i:GuildFusionResolverInput)=>resolveGuildFusions(i).results.map(r=>({id:r.newGuild.guildIdentifier,status:r.status,split:r.splitCandidate,convergence:r.convergenceCandidate,ready:r.identityCandidates.filter(c=>c.autoEligible).map(c=>c.oldGuildIdentifier).sort(),migrations:r.memberMigrationEdges.map(m=>({old:m.oldGuildIdentifier,count:m.matchedMemberCount,pairs:m.matchedMembers.map(p=>[p.oldIdentifier,p.newIdentifier]).sort()})).sort((a,b)=>a.old.localeCompare(b.old))}));
+const results=semantic(input),atm=results.find(r=>r.id==='f29_g12577')!,eco=results.find(r=>r.id==='f29_g21')!;
+assert.equal(atm.status,'autoEligible');assert.equal(eco.status,'autoEligible');assert.deepEqual(atm.ready,['eu8_g1']);assert.deepEqual(eco.ready,['eu5_g28']);assert(!atm.split&&!atm.convergence&&!eco.split&&!eco.convergence);
+assert.equal(atm.migrations.find(m=>m.old==='eu5_g28')?.count,8);
+assert(!atm.ready.includes('eu5_g28'));assert(!eco.ready.includes('eu8_g1'));
+const full=resolveGuildFusions(input).results;
+assert.equal(full.find(r=>r.newGuild.guildIdentifier==='f29_g12577')?.identityCandidates[0]?.matchedMemberCount,32);
+assert.equal(full.find(r=>r.newGuild.guildIdentifier==='f29_g21')?.identityCandidates[0]?.matchedMemberCount,31);
+assert(full.find(r=>r.newGuild.guildIdentifier==='f29_g12577')?.identityCandidates.every(c=>c.leadership.sameLogicalLeader===false));
+for(let mask=0;mask<8;mask++)assert.deepEqual(semantic({...input,historicalGuildObservations:mask&1?[...input.historicalGuildObservations].reverse():input.historicalGuildObservations,newGuildObservations:mask&2?[...input.newGuildObservations].reverse():input.newGuildObservations,highConfidencePlayerMatches:mask&4?[...input.highConfidencePlayerMatches].reverse():input.highConfidencePlayerMatches}),results);
+console.log('actual full F29 graph: 726 historical observations, 222 current guilds, 4534 player pairs, eight permutations passed');

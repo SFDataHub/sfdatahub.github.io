@@ -1,3 +1,16 @@
+import { hubLocale, hubMessage, hubNumber, hubPercent, hubText } from "../../lib/i18n/dataHubPresentation";
+import { profileClassLabel } from "../../lib/i18n/profilePresentation";
+import { fightViewEvents, useAnalyticsView } from "../../lib/analytics/localEvents";
+import { loadIdentityResolutionSnapshot, type IdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
+import { subscribeToLocalDataDependencies } from "../../lib/local-data/localDataDependencies";
+import { useRuntimeAuditCommit } from "../../lib/data-hub/useRuntimeAuditCommit";
+import { auditAccept, auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditDiscard, auditFields, auditObserveInputs, auditDependencyId, auditId, auditLink, type AuditFields } from "../../lib/data-hub/runtimeAudit";
+import type { HubFavorite } from "../../lib/data-hub/hubFavoritesContract";
+import { Trans, useTranslation } from "react-i18next";
+import { useLocalFavoritePageAction } from "../../components/data-hub/LocalFavoritesMenu";
+import LocalTitleNavigation from "../../components/ui/shared/LocalTitleNavigation";
+import { useLocation, useNavigate } from "react-router-dom";
+import { DATA_HUB, safeLocalReturn } from "../../lib/data-hub/routes";
 import React from "react";
 import html2canvas from "html2canvas";
 import {
@@ -22,9 +35,7 @@ import {
   XCircle,
 } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
-import GuildContextBar from "../../components/guilds/GuildContextBar";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
-import { getClassMetaById } from "../../data/classes";
 import { guildIconByIdentifier } from "../../data/guilds";
 import {
   listGuildHubLocalGuildsForServerFromScanSummaries,
@@ -65,10 +76,11 @@ import {
 } from "./fightTrackingScanSource";
 import {
   buildGuildLogoIdentifier,
-  mapLocalGuildIdentityToSelection,
   useGuildHubSelection,
   type GuildHubSelectedGuild,
 } from "./hooks/useGuildHubSelection";
+import { mapLocalGuildIdentityToSelection } from "../../lib/data-hub/useGuildFavoritesSelection";
+import type { LocalDependencyNotification } from "../../lib/local-data/localDataDependencies";
 import styles from "./FightTracking.module.css";
 
 type TrackerRow = FightTrackerMember & {
@@ -132,6 +144,7 @@ type ParticipationExportBusyAction = "preview" | "download";
 type ParticipationExportPreview = {
   blob: Blob;
   cacheKey: string;
+  locale: string;
   fileBaseName: string;
   height: number;
   url: string;
@@ -189,6 +202,8 @@ type LocalScreenshotImportSession = {
   screenshots: LocalScreenshotPreview[];
   review: ImportReviewState;
 };
+
+type ScanImportStatus = string | { newCount: number; formerCount: number; existingCount: number; inactiveCount: number };
 
 type ScanState = {
   status: "idle" | "scanning" | "complete" | "error";
@@ -341,7 +356,7 @@ const formatMonthLabel = (monthValue: string) => {
   const year = Number(yearValue);
   const monthIndex = Number(monthPart) - 1;
   if (!Number.isInteger(year) || !Number.isInteger(monthIndex)) return monthValue;
-  return new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(new Date(year, monthIndex, 1));
+  return new Intl.DateTimeFormat(hubLocale(), { month: "long", year: "numeric" }).format(new Date(year, monthIndex, 1));
 };
 
 const sortFightsByDateAndSlot = (fights: GuildFight[]) =>
@@ -387,25 +402,25 @@ const formatDate = (value: string) => {
   if (!value) return "-";
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat(hubLocale(), { day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
 };
 
 const formatShortDate = (value: string) => {
   if (!value) return "-";
   const date = new Date(`${getFightDateKey(value)}T00:00:00`);
   if (Number.isNaN(date.getTime())) return formatDate(value);
-  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat(hubLocale(), { day: "2-digit", month: "2-digit" }).format(date);
 };
 
 const formatFightLabel = (fight: GuildFight) =>
-  [`Fight ${fight.fightNumber}`, formatDate(fight.date), fight.opponentGuild].filter(Boolean).join(" · ");
+  [hubText("fightTrackerI18n.fightNumber", { number: fight.fightNumber }), formatDate(fight.date), fight.opponentGuild].filter(Boolean).join(" · ");
 
 const formatQuote = (missed: number, eligible: number) => {
   if (!eligible) return "—";
-  return `${Math.round((missed / eligible) * 100)}%`;
+  return hubPercent(missed / eligible);
 };
 
-const formatParticipationRate = (rate: number | null) => (rate == null ? "—" : `${Math.round(rate * 1000) / 10}%`);
+const formatParticipationRate = (rate: number | null) => (rate == null ? "—" : hubPercent(rate, 1));
 
 const getGuildActivityLevel = (rate: number | null): GuildActivityLevel => {
   if (rate == null) return "empty";
@@ -478,7 +493,7 @@ const getSimpleExportWidth = (fightCount: number) => {
 const getFiniteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
-const formatMemberClassName = (value: string | null | undefined) => getClassMetaById(value)?.label ?? "Unknown";
+const formatMemberClassName = (value: string | null | undefined) => profileClassLabel(value);
 
 const timestampMs = (value: string | null | undefined) => {
   const parsed = value ? Date.parse(value) : NaN;
@@ -606,11 +621,19 @@ const sortMembers = <T extends { name: string; active?: boolean }>(members: T[])
 
 const withoutName = (names: string[], name: string) => names.filter((entry) => normalizeNameKey(entry) !== normalizeNameKey(name));
 
-const loadTrackerGuildSources = async (selectedGuilds: GuildHubSelectedGuild[]): Promise<TrackerGuildSource[]> => {
+const loadTrackerGuildSources = async (
+  selectedGuilds: GuildHubSelectedGuild[], cause: LocalDependencyNotification | undefined, origin: AuditFields,
+  acceptance: { current: () => boolean; accept: (sources: TrackerGuildSource[]) => void },
+): Promise<TrackerGuildSource[]> => {
+    const __audit1 = auditBegin("F26", "loadTrackerGuildSources");
+    const context: AuditFields = { consumer: "fight-tracker-guild-sources", selectionDependencyId: auditDependencyId(selectedGuilds), ...origin, ...cause, trigger: cause?.trigger ?? origin?.trigger ?? "unknown" };
+    auditFields(__audit1, context);
+    if (typeof context.dependencyAuditId === "string") auditLink(__audit1, context.dependencyAuditId, "dependency-trigger");
+    try {
   const guilds = new Map<string, TrackerGuildSource>();
   selectedGuilds.forEach((guild) => guilds.set(guild.id, guild));
 
-  const summaries = await listGuildHubScanSummaries();
+  const summaries = await (auditValue(__audit1, auditEnter(__audit1, "listGuildHubScanSummaries"), (listGuildHubScanSummaries({ auditContext: context }))));
   const serverOptions = listGuildHubLocalServersFromScanSummaries(summaries);
   serverOptions.forEach((server) => {
     listGuildHubLocalGuildsForServerFromScanSummaries(summaries, server.id).forEach((guild) => {
@@ -619,11 +642,28 @@ const loadTrackerGuildSources = async (selectedGuilds: GuildHubSelectedGuild[]):
     });
   });
 
-  return [...guilds.values()].sort(
+  const sources = [...guilds.values()].sort(
     (a, b) =>
       a.name.localeCompare(b.name, "de-DE", { sensitivity: "base" }) ||
       a.server.localeCompare(b.server, "de-DE", { sensitivity: "base" }),
   );
+  if (acceptance.current()) {
+    acceptance.accept(sources);
+    auditFields(__audit1, { consumerDecision: "accepted" });
+    auditAccept(__audit1, sources);
+  } else {
+    auditFields(__audit1, { consumerDecision: "superseded" });
+    if (__audit1) auditDiscard(__audit1);
+  }
+  return auditReturn(__audit1, sources);
+
+    } catch (__auditError) {
+      auditError(__audit1, __auditError);
+      auditFields(__audit1, { consumerDecision: acceptance.current() ? "not-accepted" : "superseded" });
+      if (__audit1 && !acceptance.current()) auditDiscard(__audit1);
+      throw __auditError;
+    }
+    finally { auditLeave(__audit1); }
 };
 
 const getFightMemberStatus = (fight: GuildFight, memberId: string): FightMemberStatus => {
@@ -694,7 +734,10 @@ const deriveParticipationRows = (
   getParticipationStatus: (fight: GuildFight, memberId: string) => FightMemberStatus,
   readonlyStatsByMemberId: Map<string, FightTrackerReadonlyStats>,
 ): ParticipationDerivedRow[] =>
-  rows.map((member) => {
+  {
+ const __w32Run0=auditBegin("F31","deriveParticipationRows");
+ const __w32Sync=auditEnter(__w32Run0,"deriveParticipationRows","sync-elapsed");
+ try {return auditReturn(__w32Run0, rows.map((member) => {
     const statuses = fights.map((fight) => getParticipationStatus(fight, member.id));
     const missed = statuses.filter((status) => status === "missed").length;
     const evaluated = statuses.filter((status) => status !== "unknown").length;
@@ -721,13 +764,19 @@ const deriveParticipationRows = (
       baseStatsSum: getFiniteNumber(member.baseStats) ?? readonlyStats?.baseStatsSum ?? null,
       totalStats: getFiniteNumber(member.totalStats) ?? readonlyStats?.totalStats ?? null,
     };
-  });
+  }));
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
+};
 
 const sortParticipationRows = (
   rows: ParticipationDerivedRow[],
   sortKey: ParticipationSortKey,
   sortDirection: ParticipationSortDirection,
 ) => {
+    const __audit2 = auditBegin("F31", "sortParticipationRows");
+    auditObserveInputs(__audit2, [rows]);
+    auditFields(__audit2, { sortKey, sortDirection });
+    try {
   const byName = (a: ParticipationDerivedRow, b: ParticipationDerivedRow) =>
     a.member.name.localeCompare(b.member.name, "de-DE", { sensitivity: "base" });
   const byGuildRole = (a: ParticipationDerivedRow, b: ParticipationDerivedRow) => {
@@ -766,7 +815,7 @@ const sortParticipationRows = (
     }
   };
 
-  return [...rows].sort((a, b) => {
+  return auditReturn(__audit2, [...rows].sort((a, b) => {
     if (sortKey === "guildRole") return byGuildRole(a, b);
 
     if (sortKey === "name") {
@@ -785,11 +834,14 @@ const sortParticipationRows = (
 
     const diff = sortDirection === "asc" ? aValue - bValue : bValue - aValue;
     return diff || byName(a, b);
-  });
+  }));
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 };
 
 const formatStreak = (status: Exclude<FightMemberStatus, "unknown"> | null, count: number) =>
-  status ? `${count}x ${status === "ok" ? "dabei" : "fehlt"}` : "-";
+  status ? hubText(status === "ok" ? "fightTrackerI18n.streakPresent" : "fightTrackerI18n.streakMissed", { count }) : "-";
 
 const sanitizeFileBaseName = (value: string) =>
   value
@@ -833,11 +885,14 @@ const waitForExportAssets = async (node: HTMLElement) => {
 };
 
 const renderExportNodeToPngBlob = async (node: HTMLElement, options: { preserveCssPixelSize?: boolean } = {}) => {
-  await waitForAnimationFrame();
-  await waitForAnimationFrame();
-  if (document.fonts?.ready) await document.fonts.ready;
-  await waitForExportAssets(node);
-  await waitForStableLayout(node);
+    const __audit3 = auditBegin("F25", "renderExportNodeToPngBlob");
+  auditFields(__audit3, { consumerArea: "Kampftracking", trigger: "export-render-call" });
+    try {
+  await (auditValue(__audit3, auditEnter(__audit3, "waitForAnimationFrame"), (waitForAnimationFrame())));
+  await (auditValue(__audit3, auditEnter(__audit3, "waitForAnimationFrame"), (waitForAnimationFrame())));
+  if (document.fonts?.ready) await (auditValue(__audit3, auditEnter(__audit3, "document.fonts.ready"), (document.fonts.ready)));
+  await (auditValue(__audit3, auditEnter(__audit3, "waitForExportAssets"), (waitForExportAssets(node))));
+  await (auditValue(__audit3, auditEnter(__audit3, "waitForStableLayout"), (waitForStableLayout(node))));
 
   const rect = node.getBoundingClientRect();
   const targetWidth = Math.max(1, Math.ceil(rect.width));
@@ -848,7 +903,7 @@ const renderExportNodeToPngBlob = async (node: HTMLElement, options: { preserveC
   }
   const viewportWidth = Math.max(1, Math.ceil(document.documentElement.clientWidth || window.innerWidth));
   const viewportHeight = Math.max(1, Math.ceil(document.documentElement.clientHeight || window.innerHeight));
-  const canvas = await html2canvas(node, {
+  const canvas = await (auditValue(__audit3, auditEnter(__audit3, "html2canvas"), (html2canvas(node, {
     backgroundColor: null,
     scale,
     foreignObjectRendering: false,
@@ -869,14 +924,14 @@ const renderExportNodeToPngBlob = async (node: HTMLElement, options: { preserveC
       clonedExportNode.style.height = "auto";
       clonedExportNode.style.overflow = "visible";
     },
-  });
+  }))));
   if (options.preserveCssPixelSize && (canvas.width !== targetWidth || canvas.height !== targetHeight)) {
     throw new Error(
       `PNG konnte nicht in Originalgroesse erzeugt werden (${canvas.width}x${canvas.height} statt ${targetWidth}x${targetHeight}). Inhalte wurden nicht verkleinert.`,
     );
   }
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
+  const blob = await (auditValue(__audit3, auditEnter(__audit3, "new Promise<Blob>((resolve, reject) => {\r\n    canvas.toBlob(\r\n      (blob) => {\r\n        if (!blob) {\r\n          reject(new Error("), (new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
         if (!blob) {
@@ -888,16 +943,25 @@ const renderExportNodeToPngBlob = async (node: HTMLElement, options: { preserveC
       "image/png",
       1,
     );
-  });
+  }))));
 
-  return { blob, height: canvas.height, width: canvas.width };
+  return auditReturn(__audit3, { blob, height: canvas.height, width: canvas.width });
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 };
 
 const downloadPngUrl = (url: string, fileBaseName: string) => {
+ const __w32Run0=auditBegin("F25","downloadPngUrl");
+  auditFields(__w32Run0, { consumerArea: "Kampftracking", trigger: "download-call" });
+ const __w32Sync=auditEnter(__w32Run0,"downloadPngUrl","sync-elapsed");
+ try {
   const link = document.createElement("a");
   link.download = `${sanitizeFileBaseName(fileBaseName)}.png`;
   link.href = url;
   link.click();
+
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
 };
 
 function useMediaQuery(query: string) {
@@ -920,7 +984,26 @@ function useMediaQuery(query: string) {
 }
 
 export default function GuildHubFightTracking() {
-  const { activeGuild, selectedGuilds, isLoading: guildSelectionLoading } = useGuildHubSelection();
+  const { t } = useTranslation();
+  const [identities, setIdentities] = React.useState<IdentityResolutionSnapshot | null>(null);
+  React.useEffect(() => {
+    let stopped = false, generation = 0;
+    const refresh = async () => {
+      const own = ++generation;
+      const snapshot = await loadIdentityResolutionSnapshot();
+      if (!stopped && own === generation) setIdentities(previous =>
+        previous?.revisions && snapshot.revisions && previous.revisions.players === snapshot.revisions.players && previous.revisions.guilds === snapshot.revisions.guilds ? previous : snapshot);
+    };
+    void refresh().catch(console.error);
+    const stop = subscribeToLocalDataDependencies({ allIdentities: true }, () => { void refresh().catch(console.error); });
+    return () => { stopped = true; generation++; stop(); };
+  }, []);
+  const location = useLocation(), navigate = useNavigate();
+  const returnTo = safeLocalReturn(location.state?.returnTo, location.pathname);
+  const selection = useGuildHubSelection("fight-tracking");
+  const handlePageFavorite = React.useCallback((favorite: HubFavorite) => { if (favorite.guild) selection.chooseGuild(favorite.guild); }, [selection.chooseGuild]);
+  useLocalFavoritePageAction(t("hubNavigation.useTracker"), handlePageFavorite);
+  const { activeGuild, selectedGuilds, isLoading: guildSelectionLoading } = selection;
   const isCompactLayout = useMediaQuery("(max-width: 1024px)");
   const [overviewLoading, setOverviewLoading] = React.useState(true);
   const [guildSourcesLoading, setGuildSourcesLoading] = React.useState(false);
@@ -944,7 +1027,10 @@ export default function GuildHubFightTracking() {
   const [opponentGuild, setOpponentGuild] = React.useState("");
   const [trackerScanSnapshot, setTrackerScanSnapshot] = React.useState<FightTrackerScanSnapshot | null>(null);
   const [syncPlan, setSyncPlan] = React.useState<FightTrackerSyncPlan | null>(null);
-  const [scanImportStatus, setScanImportStatus] = React.useState<string | null>(null);
+  const syncContextRef = React.useRef({ tracker, identities });
+  syncContextRef.current = { tracker, identities };
+  React.useEffect(() => { setSyncPlan(null); }, [identities]);
+  const [scanImportStatus, setScanImportStatus] = React.useState<ScanImportStatus | null>(null);
   const [importSession, setImportSession] = React.useState<LocalScreenshotImportSession | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = React.useState<MobileFunctionPanelId | null>(null);
   const [participationStatusDrafts, setParticipationStatusDrafts] = React.useState<ParticipationStatusDrafts>({});
@@ -955,7 +1041,29 @@ export default function GuildHubFightTracking() {
     message: "",
   });
 
+  const guildSourcesRequest = React.useRef(0);
+  const guildSourcesLifecycle = React.useRef<{ selection: GuildHubSelectedGuild[]; active: boolean }>();
+  // Retire the old selection at commit, before a pending response can race the
+  // passive effect cleanup. Each setup owns a distinct lifetime, including ABA.
+  React.useLayoutEffect(() => {
+    const lifetime = { selection: selectedGuilds, active: !guildSelectionLoading };
+    guildSourcesLifecycle.current = lifetime;
+    guildSourcesRequest.current++;
+    return () => { lifetime.active = false; guildSourcesRequest.current++; };
+  }, [selectedGuilds, guildSelectionLoading]);
+
+  const invalidateGuildSources = React.useCallback(() => {
+    guildSourcesRequest.current++;
+    setGuildSourcesLoading(false);
+    setGuildSourcesError(null);
+  }, []);
+  const clearGuildSelection = React.useCallback(() => {
+    invalidateGuildSources();
+    selection.chooseGuild(null);
+  }, [invalidateGuildSources, selection.chooseGuild]);
+
   const resetTrackerView = React.useCallback(() => {
+    invalidateGuildSources();
     setTracker(null);
     setTrackerMembers([]);
     setFights([]);
@@ -970,16 +1078,37 @@ export default function GuildHubFightTracking() {
       return null;
     });
     setScanState({ status: "idle", progress: 0, message: "" });
-  }, []);
+  }, [invalidateGuildSources]);
 
+  useRuntimeAuditCommit(tracker, !!tracker && !trackerDetailLoading, "fight-tracker-detail");
+  useRuntimeAuditCommit(trackerGuildSources, trackerGuildSources.length > 0, "fight-tracker-inventory");
   const refreshTrackerSummaries = React.useCallback(async () => {
     const summaries = await readFightTrackerSummaries();
     setTrackerSummaries(summaries);
   }, []);
 
-  const refreshGuildSources = React.useCallback(async () => {
-    const guildSources = await loadTrackerGuildSources(selectedGuilds);
-    setTrackerGuildSources(guildSources);
+  const guildSourcesConsumer = React.useRef<string>();
+  const previousSourceSelection = React.useRef<GuildHubSelectedGuild[]>();
+  const refreshGuildSources = React.useCallback(async (cause?: LocalDependencyNotification, origin?: AuditFields, showLoading = false) => {
+    const lifetime = guildSourcesLifecycle.current;
+    if (!lifetime?.active || lifetime.selection !== selectedGuilds) return;
+    const request = ++guildSourcesRequest.current;
+    const current = () => lifetime.active && guildSourcesLifecycle.current === lifetime &&
+      lifetime.selection === selectedGuilds && guildSourcesRequest.current === request;
+    guildSourcesConsumer.current ??= auditId("tracker-source-consumer");
+    if (showLoading) setGuildSourcesLoading(true);
+    try {
+      await loadTrackerGuildSources(selectedGuilds, cause, { ...origin, consumerId: guildSourcesConsumer.current, requestGeneration: request }, {
+        current,
+        accept: sources => { setTrackerGuildSources(sources); setGuildSourcesError(null); },
+      });
+    } catch {
+      if (current()) setGuildSourcesError("Scan-Quellen konnten nicht geladen werden.");
+    } finally {
+      // A background refresh can supersede a visible load and inherits its
+      // loading state; only the latest request may finish that state.
+      if (current()) setGuildSourcesLoading(false);
+    }
   }, [selectedGuilds]);
 
   React.useEffect(() => {
@@ -1008,28 +1137,30 @@ export default function GuildHubFightTracking() {
   }, [guildSelectionLoading, refreshTrackerSummaries]);
 
   React.useEffect(() => {
-    let cancelled = false;
+    let stopped = false;
     if (guildSelectionLoading) return undefined;
+    const lifetime = guildSourcesLifecycle.current;
 
-    const load = (showLoading: boolean) => {
-      if (showLoading) setGuildSourcesLoading(true);
-      refreshGuildSources()
-        .then(() => {
-          if (!cancelled) setGuildSourcesError(null);
-        })
-        .catch(() => {
-          if (!cancelled) setGuildSourcesError("Scan-Quellen konnten nicht geladen werden.");
-        })
-        .finally(() => {
-          if (!cancelled && showLoading) setGuildSourcesLoading(false);
-        });
+    const previous = previousSourceSelection.current;
+    const selectionReferenceChanged = !!previous && previous !== selectedGuilds;
+    const setupTrigger = !previous ? "tracker-first-effect-setup" : selectionReferenceChanged
+      ? "tracker-selection-reference-changed" : "tracker-effect-setup-unchanged-selection";
+    previousSourceSelection.current = selectedGuilds;
+    const load = (showLoading: boolean, cause?: LocalDependencyNotification) => {
+      if (stopped) return;
+      void refreshGuildSources(cause, { trigger: setupTrigger, triggerKind: cause ? "dependency-callback" : "effect-setup",
+        selectionReferenceChanged: cause ? false : selectionReferenceChanged }, showLoading);
     };
 
     load(true);
-    const unsubscribe = subscribeToSfDataHubLocalScanChanges(() => load(false));
+    const unsubscribe = subscribeToSfDataHubLocalScanChanges(cause => load(false, cause), { consumer: "fight-tracker-guild-sources" });
 
     return () => {
-      cancelled = true;
+      stopped = true;
+      if (lifetime && guildSourcesLifecycle.current === lifetime) {
+        lifetime.active = false;
+        guildSourcesRequest.current++;
+      }
       unsubscribe();
     };
   }, [guildSelectionLoading, refreshGuildSources]);
@@ -1102,8 +1233,8 @@ export default function GuildHubFightTracking() {
   const hasInvalidFightSlots = React.useMemo(() => fights.some((fight) => !isValidFightNumber(fight.fightNumber)), [fights]);
 
   const scanImportPlan = React.useMemo(
-    () => (tracker ? buildFightTrackerSyncPlan(tracker, trackerMembers, trackerScanSnapshot) : null),
-    [tracker, trackerMembers, trackerScanSnapshot],
+    () => (tracker ? buildFightTrackerSyncPlan(tracker, trackerMembers, trackerScanSnapshot, identities) : null),
+    [tracker, trackerMembers, trackerScanSnapshot, identities],
   );
 
   const visibleScanImportPlan = syncPlan ?? scanImportPlan;
@@ -1131,17 +1262,17 @@ export default function GuildHubFightTracking() {
   const scanSourceOptions = React.useMemo(
     () =>
       trackerGuildSources.filter(
-        (source) => !trackerSummaries.some((summary) => isFightTrackerLinkedToGuild(summary.tracker, source)),
+        (source) => !trackerSummaries.some((summary) => isFightTrackerLinkedToGuild(summary.tracker, source, identities)),
       ),
-    [trackerGuildSources, trackerSummaries],
+    [trackerGuildSources, trackerSummaries, identities],
   );
 
   const activeGuildTrackerId = React.useMemo(
     () =>
       activeGuild
-        ? trackerSummaries.find((summary) => isFightTrackerLinkedToGuild(summary.tracker, activeGuild))?.tracker.id ?? null
+        ? (() => { const matches = trackerSummaries.filter(summary => isFightTrackerLinkedToGuild(summary.tracker, activeGuild, identities)); return matches.length === 1 ? matches[0].tracker.id : null; })()
         : null,
-    [activeGuild, trackerSummaries],
+    [activeGuild, trackerSummaries, identities],
   );
   const applyFightCreationTarget = (targetFights: GuildFight[]) => {
     const orderIssue = getFightCreationOrderIssue(targetFights);
@@ -1152,9 +1283,12 @@ export default function GuildHubFightTracking() {
   };
 
   const openTracker = async (trackerId: string) => {
+    const __audit4 = auditBegin("F27", "openTracker");
+    try {
     setTrackerDetailLoading(true);
     try {
-      const state = await readFightTrackerStateById(trackerId);
+      const state = await (auditValue(__audit4, auditEnter(__audit4, "readFightTrackerStateById"), (readFightTrackerStateById(trackerId))));
+      auditAccept(__audit4, state.tracker);
       setTracker(state.tracker);
       setTrackerMembers(state.members);
       setFights(state.fights);
@@ -1171,13 +1305,16 @@ export default function GuildHubFightTracking() {
     } finally {
       setTrackerDetailLoading(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
+};
 
   const backToSelection = async () => {
     resetTrackerView();
     try {
       await refreshTrackerSummaries();
-      void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
+      void refreshGuildSources(undefined, { trigger: "tracker-list-return", triggerKind: "explicit-refresh" });
       setStoreError(null);
     } catch {
       setStoreError("Fight-Tracker-Auswahl konnte nicht aktualisiert werden.");
@@ -1185,15 +1322,17 @@ export default function GuildHubFightTracking() {
   };
 
   const createTrackerFromGuildSource = async (guild: TrackerGuildSource) => {
-    const state = await createFightTracker({
+    const __audit5 = auditBegin("F29", "createTrackerFromGuildSource");
+    try {
+    const state = await (auditValue(__audit5, auditEnter(__audit5, "createFightTracker"), (createFightTracker({
       name: guild.name,
       server: guild.server,
       source: "guild_scan",
       linkedGuildHubGuildId: guild.guildId,
       linkedGuildHubLogoIdentifier: guild.logoIdentifier,
-    });
-    await refreshTrackerSummaries();
-    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
+    }))));
+    await (auditValue(__audit5, auditEnter(__audit5, "refreshTrackerSummaries"), (refreshTrackerSummaries())));
+    void refreshGuildSources(undefined, { trigger: "tracker-created-from-guild", triggerKind: "explicit-refresh" });
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
@@ -1205,7 +1344,10 @@ export default function GuildHubFightTracking() {
     setSelectedScanGuildId("");
     setParticipationStatusDrafts({});
     setIsApplyingParticipationDrafts(false);
-  };
+
+    } catch (__auditError) { auditError(__audit5, __auditError); throw __auditError; }
+    finally { auditLeave(__audit5); }
+};
 
   const createSelectedScanTracker = async () => {
     const source = scanSourceOptions.find((guild) => guild.id === selectedScanGuildId) ?? scanSourceOptions[0];
@@ -1214,11 +1356,13 @@ export default function GuildHubFightTracking() {
   };
 
   const createManualTracker = async () => {
+    const __audit6 = auditBegin("F29", "createManualTracker");
+    try {
     const name = setupGuildName.trim();
-    if (!name) return;
-    const state = await createFightTracker({ name, server: setupGuildServer, source: "manual" });
-    await refreshTrackerSummaries();
-    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
+    if (!name) return auditReturn(__audit6, undefined);
+    const state = await (auditValue(__audit6, auditEnter(__audit6, "createFightTracker"), (createFightTracker({ name, server: setupGuildServer, source: "manual" }))));
+    await (auditValue(__audit6, auditEnter(__audit6, "refreshTrackerSummaries"), (refreshTrackerSummaries())));
+    void refreshGuildSources(undefined, { trigger: "tracker-created-manually", triggerKind: "explicit-refresh" });
     setTracker(state.tracker);
     setTrackerMembers(state.members);
     setFights(state.fights);
@@ -1230,7 +1374,10 @@ export default function GuildHubFightTracking() {
     setActiveMobilePanel(null);
     setParticipationStatusDrafts({});
     setIsApplyingParticipationDrafts(false);
-  };
+
+    } catch (__auditError) { auditError(__audit6, __auditError); throw __auditError; }
+    finally { auditLeave(__audit6); }
+};
 
   const startTrackerManagement = (summary: FightTrackerSummary, mode: TrackerManagerState["mode"]) => {
     setManagerState({
@@ -1241,30 +1388,42 @@ export default function GuildHubFightTracking() {
   };
 
   const saveTrackerRename = async () => {
-    if (!managerState || managerState.mode !== "rename") return;
+    const __audit7 = auditBegin("F29", "saveTrackerRename");
+    try {
+    if (!managerState || managerState.mode !== "rename") return auditReturn(__audit7, undefined);
     const summary = trackerSummaries.find((entry) => entry.tracker.id === managerState.trackerId);
-    if (!summary) return;
-    const updated = await renameFightTracker(summary.tracker, managerState.renameValue);
+    if (!summary) return auditReturn(__audit7, undefined);
+    const updated = await (auditValue(__audit7, auditEnter(__audit7, "renameFightTracker"), (renameFightTracker(summary.tracker, managerState.renameValue))));
     setTrackerSummaries((prev) =>
       prev.map((entry) => (entry.tracker.id === updated.id ? { ...entry, tracker: updated } : entry)),
     );
     setTracker((prev) => (prev?.id === updated.id ? updated : prev));
     setManagerState(null);
-  };
+
+    } catch (__auditError) { auditError(__audit7, __auditError); throw __auditError; }
+    finally { auditLeave(__audit7); }
+};
 
   const confirmTrackerDelete = async () => {
-    if (!managerState || managerState.mode !== "delete") return;
-    await deleteFightTracker(managerState.trackerId);
+    const __audit8 = auditBegin("F29", "confirmTrackerDelete");
+    try {
+    if (!managerState || managerState.mode !== "delete") return auditReturn(__audit8, undefined);
+    await (auditValue(__audit8, auditEnter(__audit8, "deleteFightTracker"), (deleteFightTracker(managerState.trackerId))));
     if (tracker?.id === managerState.trackerId) resetTrackerView();
     setManagerState(null);
-    await refreshTrackerSummaries();
-    void refreshGuildSources().catch(() => setGuildSourcesError("Scan-Quellen konnten nicht geladen werden."));
-  };
+    await (auditValue(__audit8, auditEnter(__audit8, "refreshTrackerSummaries"), (refreshTrackerSummaries())));
+    void refreshGuildSources(undefined, { trigger: "tracker-deleted", triggerKind: "explicit-refresh" });
+
+    } catch (__auditError) { auditError(__audit8, __auditError); throw __auditError; }
+    finally { auditLeave(__audit8); }
+};
 
   const addMember = async (input: CreateFightTrackerMemberInput, options?: { markMissingInReview?: boolean }) => {
-    if (!tracker) return null;
+    const __audit9 = auditBegin("F29", "addMember");
+    try {
+    if (!tracker) return auditReturn(__audit9, null);
     const name = input.name.trim();
-    if (!name) return null;
+    if (!name) return auditReturn(__audit9, null);
     const existing = trackerMembers.find((member) => normalizeNameKey(member.name) === normalizeNameKey(name));
     if (existing) {
       if (!existing.active) {
@@ -1278,27 +1437,30 @@ export default function GuildHubFightTracking() {
           ...pickStatsFromScan(existing, input, input.lastSeenScanAt ?? null),
           lastConfirmedActiveAt: pickNewestTimestamp(getMemberPositiveConfirmationAt(existing), confirmedAt),
         };
-        await putFightTrackerMember(updated);
+        await (auditValue(__audit9, auditEnter(__audit9, "putFightTrackerMember"), (putFightTrackerMember(updated))));
         setTrackerMembers((prev) => sortMembers(prev.map((member) => (member.id === updated.id ? updated : member))));
         setSyncPlan(null);
         setTrackerScanSnapshot(null);
         void refreshTrackerSummaries();
         if (options?.markMissingInReview) markReviewMember(updated.id, name);
-        return updated;
+        return auditReturn(__audit9, updated);
       }
       if (options?.markMissingInReview) markReviewMember(existing.id, name);
-      return existing;
+      return auditReturn(__audit9, existing);
     }
 
-    const member = await addFightTrackerMember(tracker.id, input);
-    if (!member) return null;
+    const member = await (auditValue(__audit9, auditEnter(__audit9, "addFightTrackerMember"), (addFightTrackerMember(tracker.id, input))));
+    if (!member) return auditReturn(__audit9, null);
     setTrackerMembers((prev) => sortMembers([...prev, member]));
     setSyncPlan(null);
     setTrackerScanSnapshot(null);
     void refreshTrackerSummaries();
     if (options?.markMissingInReview) markReviewMember(member.id, name);
-    return member;
-  };
+    return auditReturn(__audit9, member);
+
+    } catch (__auditError) { auditError(__audit9, __auditError); throw __auditError; }
+    finally { auditLeave(__audit9); }
+};
 
   const markReviewMember = (memberId: string, ocrName: string) => {
     setImportSession((prev) =>
@@ -1322,8 +1484,10 @@ export default function GuildHubFightTracking() {
   };
 
   const handleMemberActiveChange = async (memberId: string, active: boolean) => {
+    const __audit10 = auditBegin("F29", "handleMemberActiveChange");
+    try {
     const member = trackerMembers.find((entry) => entry.id === memberId);
-    if (!member || member.active === active) return;
+    if (!member || member.active === active) return auditReturn(__audit10, undefined);
     const changedAt = new Date().toISOString();
     const updated: FightTrackerMember = {
       ...member,
@@ -1331,17 +1495,22 @@ export default function GuildHubFightTracking() {
       lastConfirmedActiveAt: active ? pickNewestTimestamp(member.lastConfirmedActiveAt, changedAt) : member.lastConfirmedActiveAt,
       updatedAt: changedAt,
     };
-    await putFightTrackerMember(updated);
+    await (auditValue(__audit10, auditEnter(__audit10, "putFightTrackerMember"), (putFightTrackerMember(updated))));
     setTrackerMembers((prev) => sortMembers(prev.map((entry) => (entry.id === memberId ? updated : entry))));
     setSyncPlan(null);
     setTrackerScanSnapshot(null);
     void refreshTrackerSummaries();
-  };
+
+    } catch (__auditError) { auditError(__audit10, __auditError); throw __auditError; }
+    finally { auditLeave(__audit10); }
+};
 
   const handleMemberDelete = async (memberId: string) => {
-    if (!tracker) return;
-    const result = await deleteFightTrackerMember(tracker.id, memberId);
-    if (!result.deleted) return;
+    const __audit11 = auditBegin("F29", "handleMemberDelete");
+    try {
+    if (!tracker) return auditReturn(__audit11, undefined);
+    const result = await (auditValue(__audit11, auditEnter(__audit11, "deleteFightTrackerMember"), (deleteFightTrackerMember(tracker.id, memberId))));
+    if (!result.deleted) return auditReturn(__audit11, undefined);
     setTrackerMembers((prev) => sortMembers(prev.filter((entry) => entry.id !== memberId)));
     setFights(result.fights);
     setSyncPlan(null);
@@ -1359,12 +1528,17 @@ export default function GuildHubFightTracking() {
         },
       };
     });
-  };
+
+    } catch (__auditError) { auditError(__audit11, __auditError); throw __auditError; }
+    finally { auditLeave(__audit11); }
+};
 
   const handleFightDelete = async (fightId: string) => {
-    if (!tracker) return;
-    const result = await deleteFightTrackerFight(tracker.id, fightId);
-    if (!result.deleted) return;
+    const __audit12 = auditBegin("F29", "handleFightDelete");
+    try {
+    if (!tracker) return auditReturn(__audit12, undefined);
+    const result = await (auditValue(__audit12, auditEnter(__audit12, "deleteFightTrackerFight"), (deleteFightTrackerFight(tracker.id, fightId))));
+    if (!result.deleted) return auditReturn(__audit12, undefined);
     setFights(result.fights);
     applyFightCreationTarget(result.fights);
     setTrackerSummaries((prev) =>
@@ -1378,40 +1552,50 @@ export default function GuildHubFightTracking() {
           : entry,
       ),
     );
-  };
+
+    } catch (__auditError) { auditError(__audit12, __auditError); throw __auditError; }
+    finally { auditLeave(__audit12); }
+};
 
   const handleFightOpponentGuildChange = async (fightId: string, opponentGuild: string) => {
+    const __audit13 = auditBegin("F29", "handleFightOpponentGuildChange");
+    try {
     const fight = fights.find((entry) => entry.id === fightId);
-    if (!fight) return;
+    if (!fight) return auditReturn(__audit13, undefined);
     const updatedFight: GuildFight = { ...fight, opponentGuild: normalizeString(opponentGuild) };
-    await putFightTrackerFight(updatedFight);
+    await (auditValue(__audit13, auditEnter(__audit13, "putFightTrackerFight"), (putFightTrackerFight(updatedFight))));
     setFights((prev) => prev.map((entry) => (entry.id === fightId ? updatedFight : entry)));
-  };
+
+    } catch (__auditError) { auditError(__audit13, __auditError); throw __auditError; }
+    finally { auditLeave(__audit13); }
+};
 
   const saveFightInDailySlot = async (fightInput: Omit<GuildFight, "id">) => {
+    const __audit14 = auditBegin("F29", "saveFightInDailySlot");
+    try {
     if (fightCreationOrderIssue) {
-      window.alert(`${fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.`);
-      return false;
+      window.alert(hubText("fightTrackerI18n.orderIssue", { issue: hubMessage(fightCreationOrderIssue) }));
+      return auditReturn(__audit14, false);
     }
     if (hasInvalidFightSlots) {
-      window.alert("Mindestens ein gespeicherter Fight hat keinen gueltigen Fight-1/Fight-2-Slot. Bitte Daten pruefen, bevor neue Fights angelegt werden.");
-      return false;
+      window.alert(hubText("fightTrackerI18n.invalidSlot"));
+      return auditReturn(__audit14, false);
     }
 
     const slotFights = getFightsForSlot(fights, fightInput.date, fightInput.fightNumber);
     if (slotFights.length > 1) {
       window.alert(
-        `Mehrere gespeicherte Fights belegen Fight ${fightInput.fightNumber} am ${formatDate(fightInput.date)}. Der Slot kann nicht automatisch ersetzt werden.`,
+        hubText("fightTrackerI18n.slotDuplicate", { number: fightInput.fightNumber, date: formatDate(fightInput.date) }),
       );
-      return false;
+      return auditReturn(__audit14, false);
     }
 
     const existingFight = slotFights[0] ?? null;
     if (existingFight) {
       const shouldOverwrite = window.confirm(
-        `Fight ${fightInput.fightNumber} fuer den ${formatDate(fightInput.date)} existiert bereits. Wirklich ueberschreiben?`,
+        hubText("fightTrackerI18n.slotConfirm", { number: fightInput.fightNumber, date: formatDate(fightInput.date) }),
       );
-      if (!shouldOverwrite) return false;
+      if (!shouldOverwrite) return auditReturn(__audit14, false);
     }
 
     const nextFight: GuildFight = {
@@ -1419,7 +1603,7 @@ export default function GuildHubFightTracking() {
       id: existingFight?.id ?? createFightId(),
     };
     const nextFights = existingFight ? fights.map((fight) => (fight.id === existingFight.id ? nextFight : fight)) : [...fights, nextFight];
-    await putFightTrackerFight(nextFight);
+    await (auditValue(__audit14, auditEnter(__audit14, "putFightTrackerFight"), (putFightTrackerFight(nextFight))));
     setFights(nextFights);
     setTrackerSummaries((summaries) =>
       summaries.map((summary) =>
@@ -1444,11 +1628,16 @@ export default function GuildHubFightTracking() {
         return next;
       });
     }
-    return true;
-  };
+    return auditReturn(__audit14, true);
+
+    } catch (__auditError) { auditError(__audit14, __auditError); throw __auditError; }
+    finally { auditLeave(__audit14); }
+};
 
   const applyMemberMergePlan = async (plan: FightTrackerSyncPlan) => {
-    if (!tracker) return { newCount: 0, formerCount: 0, existingCount: 0, inactiveCount: 0 };
+    const __audit15 = auditBegin("F28", "applyMemberMergePlan");
+    try {
+    if (!tracker) return auditReturn(__audit15, { newCount: 0, formerCount: 0, existingCount: 0, inactiveCount: 0 });
     const updatedMembers: FightTrackerMember[] = [];
     let addedCount = 0;
     let formerCount = 0;
@@ -1460,7 +1649,7 @@ export default function GuildHubFightTracking() {
       const scanMemberName = normalizeNameKey(scanMember.name);
       const scanMemberRef = normalizeString(scanMember.scanMemberRef);
       if ((scanMemberName && knownNames.has(scanMemberName)) || (scanMemberRef && knownScanRefs.has(scanMemberRef))) continue;
-      const member = await addFightTrackerMember(tracker.id, scanMember);
+      const member = await (auditValue(__audit15, auditEnter(__audit15, "addFightTrackerMember"), (addFightTrackerMember(tracker.id, scanMember))));
       if (!member) continue;
       updatedMembers.push(member);
       if (scanMember.active === false) {
@@ -1513,7 +1702,7 @@ export default function GuildHubFightTracking() {
           : entry.member.lastConfirmedActiveAt,
         updatedAt: new Date().toISOString(),
       };
-      await putFightTrackerMember(updated);
+      await (auditValue(__audit15, auditEnter(__audit15, "putFightTrackerMember"), (putFightTrackerMember(updated))));
       updatedMembers.push(updated);
     }
 
@@ -1523,7 +1712,7 @@ export default function GuildHubFightTracking() {
         active: false,
         updatedAt: new Date().toISOString(),
       };
-      await putFightTrackerMember(updated);
+      await (auditValue(__audit15, auditEnter(__audit15, "putFightTrackerMember"), (putFightTrackerMember(updated))));
       updatedMembers.push(updated);
       inactiveCount += 1;
     }
@@ -1533,13 +1722,13 @@ export default function GuildHubFightTracking() {
       plan.snapshot.scanAt && nextSyncedScanAt === new Date(Date.parse(plan.snapshot.scanAt)).toISOString()
         ? plan.snapshot.scanId
         : tracker.lastSyncedScanId;
-    const nextTracker = await updateFightTrackerSyncMetadata(
+    const nextTracker = await (auditValue(__audit15, auditEnter(__audit15, "updateFightTrackerSyncMetadata"), (updateFightTrackerSyncMetadata(
       tracker,
       nextSyncedScanId,
       nextSyncedScanAt,
       plan.snapshot.normalizerVersion,
       plan.snapshot.coaString,
-    );
+    ))));
     setTracker(nextTracker);
     setTrackerMembers((prev) => {
       const next = new Map(prev.map((member) => [member.id, member]));
@@ -1550,24 +1739,29 @@ export default function GuildHubFightTracking() {
     setTrackerScanSnapshot(null);
     void refreshTrackerSummaries();
 
-    return {
+    return auditReturn(__audit15, {
       newCount: addedCount,
       formerCount,
       existingCount: plan.existingMemberCount,
       inactiveCount,
-    };
-  };
+    });
+
+    } catch (__auditError) { auditError(__audit15, __auditError); throw __auditError; }
+    finally { auditLeave(__audit15); }
+};
 
   const handleImportScanMembers = async () => {
-    if (!visibleScanImportPlan?.hasChanges) return;
-    const result = await applyMemberMergePlan(visibleScanImportPlan);
-    const parts = [];
-    if (result.newCount) parts.push(`${result.newCount} neue Mitglieder ergaenzt`);
-    if (result.formerCount) parts.push(`${result.formerCount} ehemalige Gildenmitglieder ergaenzt`);
-    if (result.existingCount) parts.push(`${result.existingCount} bereits vorhanden`);
-    if (result.inactiveCount) parts.push(`${result.inactiveCount} nicht mehr im Scan`);
-    setScanImportStatus(parts.length ? parts.join(", ") : "Keine neuen Mitglieder gefunden");
-  };
+    const __audit16 = auditBegin("F28", "handleImportScanMembers");
+    try {
+    if (!visibleScanImportPlan?.hasChanges) return auditReturn(__audit16, undefined);
+    const result = await (auditValue(__audit16, auditEnter(__audit16, "applyMemberMergePlan"), (applyMemberMergePlan(visibleScanImportPlan))));
+    setScanImportStatus(result.newCount || result.formerCount || result.existingCount || result.inactiveCount
+      ? result
+      : "Keine neuen Mitglieder gefunden");
+
+    } catch (__auditError) { auditError(__audit16, __auditError); throw __auditError; }
+    finally { auditLeave(__audit16); }
+};
 
   const handleCreateFight = async () => {
     const opponent = opponentGuild.trim();
@@ -1677,11 +1871,10 @@ export default function GuildHubFightTracking() {
         screenshot.file,
         trackerMembers.map((member) => ({ id: member.id, name: member.name })),
         (progress: FightReportScanProgress) => {
-          const percent = Math.round(progress.progress * 100);
           setScanState({
             status: "scanning",
             progress: progress.progress,
-            message: progress.status ? `${progress.status} ${percent}%` : `OCR laeuft ${percent}%`,
+            message: progress.status,
           });
         },
       );
@@ -1724,8 +1917,10 @@ export default function GuildHubFightTracking() {
   };
 
   const handleApplyImportReview = async () => {
-    if (!tracker || !importSession?.review.date) return;
-    if (importSession.review.reportType === "unsupported_defense") return;
+    const __audit17 = auditBegin("F29", "handleApplyImportReview");
+    try {
+    if (!tracker || !importSession?.review.date) return auditReturn(__audit17, undefined);
+    if (importSession.review.reportType === "unsupported_defense") return auditReturn(__audit17, undefined);
     const createdAt = new Date().toISOString();
     const missedMemberIds = Object.entries(importSession.review.memberStates)
       .filter(([, state]) => state === "confirmed")
@@ -1738,7 +1933,7 @@ export default function GuildHubFightTracking() {
         snapshotMembers.set(memberId, toFightMemberSnapshot(member, tracker, createdAt));
       }
     });
-    const didSave = await saveFightInDailySlot({
+    const didSave = await (auditValue(__audit17, auditEnter(__audit17, "saveFightInDailySlot"), (saveFightInDailySlot({
       trackerId: tracker.id,
       guildId: tracker.id,
       type: "attack",
@@ -1749,9 +1944,12 @@ export default function GuildHubFightTracking() {
       createdAt,
       rosterSnapshot: [...snapshotMembers.values()],
       missedMemberIds,
-    });
+    }))));
     if (didSave) handleClearImportSession();
-  };
+
+    } catch (__auditError) { auditError(__audit17, __auditError); throw __auditError; }
+    finally { auditLeave(__audit17); }
+};
 
   const handleParticipationStatusDraftChange = (fightId: string, memberId: string, status: FightMemberStatus) => {
     const fight = fights.find((entry) => entry.id === fightId);
@@ -1770,9 +1968,11 @@ export default function GuildHubFightTracking() {
   };
 
   const applyParticipationStatusDrafts = async () => {
-    if (!tracker || isApplyingParticipationDrafts) return;
+    const __audit18 = auditBegin("F29", "applyParticipationStatusDrafts");
+    try {
+    if (!tracker || isApplyingParticipationDrafts) return auditReturn(__audit18, undefined);
     const draftEntries = Object.values(participationStatusDrafts);
-    if (!draftEntries.length) return;
+    if (!draftEntries.length) return auditReturn(__audit18, undefined);
 
     setIsApplyingParticipationDrafts(true);
     try {
@@ -1791,31 +1991,39 @@ export default function GuildHubFightTracking() {
 
       if (!changedFights.size) {
         setParticipationStatusDrafts({});
-        return;
+        return auditReturn(__audit18, undefined);
       }
 
       setFights(nextFights);
       for (const fight of changedFights.values()) {
-        await putFightTrackerFight(fight);
+        await (auditValue(__audit18, auditEnter(__audit18, "putFightTrackerFight"), (putFightTrackerFight(fight))));
       }
       setParticipationStatusDrafts({});
     } finally {
       setIsApplyingParticipationDrafts(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit18, __auditError); throw __auditError; }
+    finally { auditLeave(__audit18); }
+};
 
   const handleSetMemberFightStatus = async (fightId: string, memberId: string, status: FightMemberStatus) => {
-    if (!tracker) return;
+    const __audit19 = auditBegin("F29", "handleSetMemberFightStatus");
+    try {
+    if (!tracker) return auditReturn(__audit19, undefined);
     let updatedFight: GuildFight | null = null;
     const nextFights = fights.map((fight) => {
       if (fight.id !== fightId) return fight;
       updatedFight = setFightMemberStatus(fight, rosterLookup.get(memberId), tracker, status);
       return updatedFight;
     });
-    if (!updatedFight) return;
+    if (!updatedFight) return auditReturn(__audit19, undefined);
     setFights(nextFights);
-    await putFightTrackerFight(updatedFight);
-  };
+    await (auditValue(__audit19, auditEnter(__audit19, "putFightTrackerFight"), (putFightTrackerFight(updatedFight))));
+
+    } catch (__auditError) { auditError(__audit19, __auditError); throw __auditError; }
+    finally { auditLeave(__audit19); }
+};
 
   const totalMissed = fights.reduce((sum, fight) => sum + fight.missedMemberIds.length, 0);
   const canCreateFight = Boolean(tracker && date && !hasInvalidFightSlots && !fightCreationOrderIssue);
@@ -1824,13 +2032,16 @@ export default function GuildHubFightTracking() {
     importSession && tracker && importSession.review.date && importSession.review.reportType !== "unsupported_defense" && !fightCreationOrderIssue,
   );
   const loadSyncPlan = React.useCallback(async () => {
-    if (!tracker || !hasGuildScanLink || syncLoading) return;
+    const __audit20 = auditBegin("F28", "loadSyncPlan");
+    try {
+    if (!tracker || !hasGuildScanLink || syncLoading || !identities) return auditReturn(__audit20, undefined);
     setSyncLoading(true);
     setScanImportStatus(null);
     try {
-      const snapshot = await loadLatestScanSnapshotForGuild(tracker);
+      const snapshot = await (auditValue(__audit20, auditEnter(__audit20, "loadLatestScanSnapshotForGuild"), (loadLatestScanSnapshotForGuild(tracker))));
+      if (syncContextRef.current.tracker?.id !== tracker.id || syncContextRef.current.identities !== identities) return auditReturn(__audit20, undefined);
       setTrackerScanSnapshot(snapshot);
-      setSyncPlan(buildFightTrackerSyncPlan(tracker, trackerMembers, snapshot));
+      setSyncPlan((auditValue(__audit20, auditEnter(__audit20, "buildFightTrackerSyncPlan", "sync-elapsed"), (buildFightTrackerSyncPlan(tracker, trackerMembers, snapshot, identities)))));
     } catch {
       setTrackerScanSnapshot(null);
       setSyncPlan(null);
@@ -1838,7 +2049,10 @@ export default function GuildHubFightTracking() {
     } finally {
       setSyncLoading(false);
     }
-  }, [hasGuildScanLink, syncLoading, tracker, trackerMembers]);
+
+    } catch (__auditError) { auditError(__audit20, __auditError); throw __auditError; }
+    finally { auditLeave(__audit20); }
+}, [hasGuildScanLink, syncLoading, tracker, trackerMembers, identities]);
   const openFunctionPanel = (panelId: MobileFunctionPanelId) => {
     setActiveMobilePanel(panelId);
     if (panelId === "sync") void loadSyncPlan();
@@ -1847,7 +2061,7 @@ export default function GuildHubFightTracking() {
     <ScanMemberImportPanel
       plan={visibleScanImportPlan}
       snapshot={trackerScanSnapshot}
-      loading={syncLoading}
+      loading={syncLoading || !identities}
       status={scanImportStatus}
       trackerMemberCount={trackerMembers.length}
       onImport={handleImportScanMembers}
@@ -1890,59 +2104,57 @@ export default function GuildHubFightTracking() {
           <Swords size={18} />
         </div>
         <div>
-          <h2>Neuer Angriff</h2>
+          <h2>{hubText("fightTrackerI18n.newAttack")}</h2>
           <p>{tracker?.name ?? ""}</p>
         </div>
       </div>
       <div className={styles.formGrid}>
         <label className={styles.field}>
-          <span>Datum</span>
+          <span>{hubText("fightTrackerI18n.date")}</span>
           <span className={styles.inputWrap}>
             <CalendarDays size={16} aria-hidden />
             <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           </span>
         </label>
         <label className={styles.field}>
-          <span>Fight</span>
+          <span>{hubText("fightTrackerI18n.fight")}</span>
           <select value={fightNumber} onChange={(event) => setFightNumber(normalizeFightNumber(event.target.value))}>
-            <option value="1">Fight 1</option>
-            <option value="2">Fight 2</option>
+            <option value="1">{hubText("fightTrackerI18n.fight1")}</option>
+            <option value="2">{hubText("fightTrackerI18n.fight2")}</option>
           </select>
         </label>
         {fightCreationOrderIssue ? (
           <div className={styles.slotWarning}>
             <AlertTriangle size={16} aria-hidden />
-            <span>{fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.</span>
+            <span>{hubText("fightTrackerI18n.orderIssue", { issue: hubMessage(fightCreationOrderIssue) })}</span>
           </div>
         ) : manualSelectedSlotFights.length ? (
           <div className={styles.slotWarning}>
             <AlertTriangle size={16} aria-hidden />
             <span>
-              Fight {fightNumber} fuer den {formatDate(date)} existiert bereits
-              {manualSelectedSlotFights[0]?.opponentGuild ? ` (${manualSelectedSlotFights[0].opponentGuild})` : ""}.
-              Speichern ersetzt diesen Fight nach Bestaetigung.
+              {hubText("fightTrackerI18n.slotExists", { number: fightNumber, date: formatDate(date), opponent: manualSelectedSlotFights[0]?.opponentGuild ? ` (${manualSelectedSlotFights[0].opponentGuild})` : "" })}
             </span>
           </div>
         ) : manualDefaultFightNumber ? (
-          <div className={styles.slotHint}>Freier Slot: Fight {manualDefaultFightNumber}</div>
+          <div className={styles.slotHint}>{hubText("fightTrackerI18n.freeSlot", { number: manualDefaultFightNumber })}</div>
         ) : (
           <div className={styles.slotWarning}>
             <AlertTriangle size={16} aria-hidden />
-            <span>Beide Fight-Slots an diesem Tag sind belegt. Waehle Fight 1 oder Fight 2 zum Ueberschreiben.</span>
+            <span>{hubText("fightTrackerI18n.bothFightSlotsForThisDayAreOccupiedSelectFight1OrFight2ToReplace")}</span>
           </div>
         )}
         <label className={styles.field}>
-          <span>Gegner</span>
+          <span>{hubText("fightTrackerI18n.opponent")}</span>
           <input
             type="text"
             value={opponentGuild}
-            placeholder="Gegnergilde"
+            placeholder={hubText("fightTrackerI18n.opponentGuild")}
             onChange={(event) => setOpponentGuild(event.target.value)}
           />
         </label>
         <button type="button" className={styles.primaryAction} disabled={!canCreateFight} onClick={handleCreateFight}>
           <Plus size={16} aria-hidden />
-          Anlegen
+          {hubText("fightTrackerI18n.create")}
         </button>
       </div>
     </section>
@@ -1989,33 +2201,33 @@ export default function GuildHubFightTracking() {
   }> = [
     {
       id: "fight",
-      title: "Neuer Angriff",
-      subtitle: tracker?.name ?? "Fight Tracker",
-      description: "Fight manuell erfassen",
+      title: hubText("fightTrackerI18n.newAttack"),
+      subtitle: tracker?.name ?? hubText("fightTrackerI18n.fightTracker"),
+      description: hubText("fightTrackerI18n.addAFightManually"),
       icon: <Swords size={22} aria-hidden />,
       content: fightCreatePanel,
     },
     {
       id: "screenshots",
-      title: "Screenshots scannen",
-      subtitle: tracker?.name ?? "Fight Tracker",
-      description: "Kampf per Screenshot erfassen",
+      title: hubText("fightTrackerI18n.scanScreenshots"),
+      subtitle: tracker?.name ?? hubText("fightTrackerI18n.fightTracker"),
+      description: hubText("fightTrackerI18n.addAFightFromAScreenshot"),
       icon: <FileImage size={22} aria-hidden />,
       content: screenshotPanel,
     },
     {
       id: "member",
-      title: "Member hinzufuegen",
-      subtitle: tracker?.name ?? "Fight Tracker",
-      description: "Spieler manuell zur Trackliste hinzufuegen",
+      title: hubText("fightTrackerI18n.addMember"),
+      subtitle: tracker?.name ?? hubText("fightTrackerI18n.fightTracker"),
+      description: hubText("fightTrackerI18n.addAPlayerToTheTrackerManually"),
       icon: <UserPlus size={22} aria-hidden />,
       content: memberPanel,
     },
     {
       id: "memberList",
-      title: "Liste bearbeiten",
-      subtitle: tracker?.name ?? "Fight Tracker",
-      description: "Tracker-Mitglieder aktivieren oder deaktivieren",
+      title: hubText("fightTrackerI18n.editList"),
+      subtitle: tracker?.name ?? hubText("fightTrackerI18n.fightTracker"),
+      description: hubText("fightTrackerI18n.activateOrDeactivateTrackerMembers"),
       icon: <Pencil size={22} aria-hidden />,
       content: memberStatusPanel,
     },
@@ -2023,9 +2235,9 @@ export default function GuildHubFightTracking() {
       ? [
           {
             id: "sync" as const,
-            title: "Scan & Synchronisation",
-            subtitle: tracker?.name ?? "Fight Tracker",
-            description: "Mitglieder mit Guild-Scan abgleichen",
+            title: hubText("fightTrackerI18n.scanSync"),
+            subtitle: tracker?.name ?? hubText("fightTrackerI18n.fightTracker"),
+            description: hubText("fightTrackerI18n.compareMembersWithAGuildScan"),
             icon: <UserPlus size={22} aria-hidden />,
             content: syncPanel,
           },
@@ -2042,8 +2254,8 @@ export default function GuildHubFightTracking() {
   }> = [
     {
       id: "tracklist",
-      title: "Participation",
-      description: "Teilnahmen, Fehlzeiten & Quoten",
+      title: hubText("fightTrackerI18n.participation"),
+      description: hubText("fightTrackerI18n.attendanceAbsencesRates"),
       icon: <ListChecks size={22} aria-hidden />,
       content: tracklistPanel,
     },
@@ -2053,23 +2265,31 @@ export default function GuildHubFightTracking() {
     })),
   ];
   const activePanelConfig = (isCompactLayout ? mobilePanels : desktopToolPanels).find((panel) => panel.id === activeMobilePanel) ?? null;
+  useAnalyticsView(tracker && !trackerDetailLoading && activePanelConfig && activePanelConfig.id !== "tracklist" ? fightViewEvents[activePanelConfig.id] : null);
+  useAnalyticsView(!tracker && !trackerDetailLoading && managerState && managerState.mode !== "closed" ? "datahub/fight/manager" : null);
+  useAnalyticsView(tracker && !trackerDetailLoading && activeMobilePanel === "screenshots" && importSession ? "datahub/fight/screenshot-review" : null);
   const closeActiveFunctionPanel = () => {
     if (activeMobilePanel === "tracklist" && hasParticipationStatusDrafts) {
-      const shouldDiscard = typeof window === "undefined" || window.confirm("Ungespeicherte Änderungen verwerfen?");
+      const shouldDiscard = typeof window === "undefined" || window.confirm(hubText("fightTrackerI18n.discardUnsavedChanges"));
       if (!shouldDiscard) return;
       setParticipationStatusDrafts({});
     }
     setActiveMobilePanel(null);
   };
 
+  const pageHeader = <LocalTitleNavigation title={hubText("fightTrackerI18n.fightTracking")}
+    onBack={() => navigate(returnTo ?? DATA_HUB,
+      { replace: true, state: returnTo ? location.state?.profileReturnState : undefined })} />;
+
   if (overviewLoading && !trackerSummaries.length && !tracker && !trackerDetailLoading) {
     return (
       <ContentShell centerFramed={false}>
         <div className={styles.page}>
+          {pageHeader}
           <DataHubLoadingState
             variant="page"
-            title="Fight Tracker wird geladen"
-            message="Lokale Fight-Tracker-Übersicht wird gelesen."
+            title={hubText("fightTrackerI18n.loadingFightTrackers")}
+            message={hubText("fightTrackerI18n.readingTheLocalFightTrackerOverview")}
           />
         </div>
       </ContentShell>
@@ -2080,27 +2300,25 @@ export default function GuildHubFightTracking() {
     <ContentShell centerFramed={false}>
       <div className={styles.page}>
         <header className={styles.header}>
-          <div className={styles.headerLeading}>
-            <div>
-              <p className={styles.kicker}>Guild Hub</p>
-              <h1 className={styles.title}>Fight Tracking</h1>
-            </div>
-            <GuildContextBar />
-            {tracker ? (
-              <button type="button" className={styles.selectionBackButton} onClick={backToSelection}>
-                <ArrowLeft size={16} aria-hidden />
-                Zur Gildenauswahl
-              </button>
-            ) : null}
-          </div>
+          {pageHeader}
+          {tracker ? (
+            <button type="button" className={styles.selectionBackButton} onClick={backToSelection}>
+              <ArrowLeft size={16} aria-hidden />
+              {hubText("fightTrackerI18n.backToGuildSelection")}
+            </button>
+          ) : null}
         </header>
+        {(selection.contextIssue || selection.context.guild) && <section data-page-guild-context>
+          {selection.contextIssue && <p role="alert">{t(`pageContext.${selection.contextIssue}`)}</p>}
+          {selection.context.guild && <button type="button" onClick={clearGuildSelection}>{t("pageContext.clear")}</button>}
+        </section>}
 
-        {storeError ? <section className={styles.emptyState}>{storeError}</section> : null}
+        {storeError ? <section className={styles.emptyState}>{hubMessage(storeError)}</section> : null}
 
         {trackerDetailLoading ? (
           <DataHubLoadingState
-            title="Tracker wird geladen"
-            message="Lokale Fight-Tracker-Details werden gelesen."
+            title={hubText("fightTrackerI18n.loadingTracker")}
+            message={hubText("fightTrackerI18n.readingLocalFightTrackerDetails")}
           />
         ) : !tracker ? (
           <TrackerSelectionPanel
@@ -2133,15 +2351,15 @@ export default function GuildHubFightTracking() {
         ) : (
           <>
             <section className={styles.infoStrip}>
-              <InfoPill label="Tracker-Gilde" value={tracker.name} hint={tracker.server ?? "eigene Tracker-Daten"} />
-              <InfoPill label="Members" value={String(trackerMembers.length)} hint={`${activeRoster.length} aktiv`} />
-              <InfoPill label="Fights" value={String(fights.length)} hint="IndexedDB gespeichert" />
-              <InfoPill label="Missed" value={String(totalMissed)} hint="manuell/OCR markiert" />
+              <InfoPill label={hubText("fightTrackerI18n.trackerGuild")} value={tracker.name} hint={tracker.server ?? hubText("fightTrackerI18n.customTrackerData")} />
+              <InfoPill label={hubText("fightTrackerI18n.members")} value={hubNumber(trackerMembers.length)} hint={hubText("fightTrackerI18n.activeCount", { count: activeRoster.length })} />
+              <InfoPill label={hubText("fightTrackerI18n.fights")} value={hubNumber(fights.length)} hint={hubText("fightTrackerI18n.savedInIndexedDB")} />
+              <InfoPill label={hubText("fightTrackerI18n.missed")} value={hubNumber(totalMissed)} hint={hubText("fightTrackerI18n.markedManuallybyOCR")} />
             </section>
 
 	            {isCompactLayout ? (
 	              <>
-	                <section className={styles.mobileFunctionGrid} aria-label="Fight-Tracker-Funktionen">
+	                <section className={styles.mobileFunctionGrid} aria-label={hubText("fightTrackerI18n.fightTrackerActions")}>
 	                  {mobilePanels.map((panel) => (
 	                    <FunctionTile
                         key={panel.id}
@@ -2161,7 +2379,7 @@ export default function GuildHubFightTracking() {
               </>
 	            ) : (
 	              <>
-	                <section className={styles.toolGrid} aria-label="Fight-Tracker-Werkzeuge">
+	                <section className={styles.toolGrid} aria-label={hubText("fightTrackerI18n.fightTrackerTools")}>
 	                  {desktopToolPanels.map((panel) => (
 	                    <FunctionTile
                         key={panel.id}
@@ -2258,15 +2476,15 @@ function TrackerSelectionPanel({
     <section className={styles.setupGrid}>
       <div className={styles.selectionIntro}>
         <div>
-          <h2>Fight-Tracker-Gilden</h2>
+          <h2>{hubText("fightTrackerI18n.fightTrackerGuilds")}</h2>
           <p>
             {activeGuild
-              ? `${activeGuild.name} ist aktuell im Guild Hub aktiv.`
-              : "Keine Guild-Hub-Gilde aktiv ausgewaehlt."}
+              ? hubText("fightTrackerI18n.guildSuggestion", { name: activeGuild.name })
+              : hubText("fightTrackerI18n.selectAGuildAboveAsAFightTrackingSuggestion")}
           </p>
         </div>
         {activeGuild && activeGuildTrackerId ? (
-          <span className={styles.activeGuildBadge}>Aktiver Guild-Hub-Tracker markiert</span>
+          <span className={styles.activeGuildBadge}>{hubText("fightTrackerI18n.trackerForTheSelectedSuggestionHighlighted")}</span>
         ) : null}
       </div>
 
@@ -2281,23 +2499,23 @@ function TrackerSelectionPanel({
             >
               <button type="button" className={styles.trackerCardMain} onClick={() => onOpenTracker(summary.tracker.id)}>
                 <span className={styles.trackerCardKicker}>
-                  {summary.tracker.source === "guild_scan" ? "Guild-Hub-Scan" : "Manuell"}
+                  {summary.tracker.source === "guild_scan" ? hubText("fightTrackerI18n.guildHubScan") : hubText("fightTrackerI18n.manual")}
                 </span>
                 <span className={styles.trackerCardTitleRow}>
                   <strong>{summary.tracker.name}</strong>
-                  {summary.tracker.importedAt ? <span className={styles.importedTrackerBadge}>Importiert</span> : null}
+                  {summary.tracker.importedAt ? <span className={styles.importedTrackerBadge}>{hubText("fightTrackerI18n.imported")}</span> : null}
                 </span>
-                <small>{summary.tracker.server || "ohne Server"}</small>
+                <small>{summary.tracker.server || hubText("fightTrackerI18n.noServer")}</small>
                 <span className={styles.trackerCardStats}>
-                  {summary.memberCount} Member · {summary.fightCount} Fights · {summary.missedCount} Missed
+                  {hubText("fightTrackerI18n.memberCount", { count: summary.memberCount })} · {hubText("fightTrackerI18n.fightCount", { count: summary.fightCount })} · {hubText("fightTrackerI18n.missedCount", { count: summary.missedCount })}
                 </span>
               </button>
               <div className={styles.trackerCardActions}>
                 <button
                   type="button"
                   className={styles.iconOnlyButton}
-                  aria-label={`${summary.tracker.name} verwalten`}
-                  title="Verwalten"
+                  aria-label={hubText("fightTrackerI18n.manageName", { name: summary.tracker.name })}
+                  title={hubText("fightTrackerI18n.manage")}
                   onClick={() => onStartManagement(summary, isManaged ? "closed" : "rename")}
                 >
                   <MoreVertical size={17} aria-hidden />
@@ -2305,8 +2523,8 @@ function TrackerSelectionPanel({
                 <button
                   type="button"
                   className={styles.iconOnlyButton}
-                  aria-label={`${summary.tracker.name} umbenennen`}
-                  title="Umbenennen"
+                  aria-label={hubText("fightTrackerI18n.renameName", { name: summary.tracker.name })}
+                  title={hubText("fightTrackerI18n.rename")}
                   onClick={() => onStartManagement(summary, "rename")}
                 >
                   <Pencil size={15} aria-hidden />
@@ -2314,8 +2532,8 @@ function TrackerSelectionPanel({
                 <button
                   type="button"
                   className={`${styles.iconOnlyButton} ${styles.dangerIconButton}`}
-                  aria-label={`${summary.tracker.name} loeschen`}
-                  title="Loeschen"
+                  aria-label={hubText("fightTrackerI18n.deleteName", { name: summary.tracker.name })}
+                  title={hubText("fightTrackerI18n.delete")}
                   onClick={() => onStartManagement(summary, "delete")}
                 >
                   <Trash2 size={15} aria-hidden />
@@ -2324,16 +2542,16 @@ function TrackerSelectionPanel({
               {isManaged && managerState.mode === "rename" ? (
                 <div className={styles.managerPanel}>
                   <label className={styles.field}>
-                    <span>Tracker-Name</span>
+                    <span>{hubText("fightTrackerI18n.trackerName")}</span>
                     <input value={managerState.renameValue} onChange={(event) => onManagerRenameValueChange(event.target.value)} />
                   </label>
                   <div className={styles.managerActions}>
                     <button type="button" className={styles.primaryAction} onClick={onSaveRename}>
                       <Check size={16} aria-hidden />
-                      Speichern
+                      {hubText("fightTrackerI18n.save")}
                     </button>
                     <button type="button" className={styles.secondaryAction} onClick={onCloseManagement}>
-                      Abbrechen
+                      {hubText("fightTrackerI18n.cancel")}
                     </button>
                   </div>
                 </div>
@@ -2342,15 +2560,15 @@ function TrackerSelectionPanel({
                 <div className={styles.managerPanel}>
                   <div className={styles.deleteNotice}>
                     <AlertTriangle size={16} aria-hidden />
-                    <span>Loescht nur diesen Fight Tracker samt Membern, Fights und Tracker-State. Guild-Hub-Scans bleiben unveraendert.</span>
+                    <span>{hubText("fightTrackerI18n.deletesOnlyThisTrackerItsMembersFightsAndTrackerStateGuildHubScansArePreserved")}</span>
                   </div>
                   <div className={styles.managerActions}>
                     <button type="button" className={styles.dangerAction} onClick={onConfirmDelete}>
                       <Trash2 size={16} aria-hidden />
-                      Tracker loeschen
+                      {hubText("fightTrackerI18n.deleteTracker")}
                     </button>
                     <button type="button" className={styles.secondaryAction} onClick={onCloseManagement}>
-                      Abbrechen
+                      {hubText("fightTrackerI18n.cancel")}
                     </button>
                   </div>
                 </div>
@@ -2361,12 +2579,12 @@ function TrackerSelectionPanel({
 
         <button type="button" className={styles.addTrackerCard} onClick={onToggleAddPanel}>
           <Plus size={22} aria-hidden />
-          <strong>Gilde hinzufuegen</strong>
-          <span>Scan-verknuepft oder manuell</span>
+          <strong>{hubText("fightTrackerI18n.addGuild")}</strong>
+          <span>{hubText("fightTrackerI18n.linkedToAScanOrManual")}</span>
         </button>
       </div>
 
-      {!summaries.length ? <section className={styles.emptyState}>Noch keine Fight-Tracker-Gilden vorhanden.</section> : null}
+      {!summaries.length ? <section className={styles.emptyState}>{hubText("fightTrackerI18n.noFightTrackerGuildsYet")}</section> : null}
 
       {activeGuild && !activeGuildTrackerId ? (
         <div className={styles.syncPanel}>
@@ -2376,7 +2594,7 @@ function TrackerSelectionPanel({
             </div>
             <div>
               <h2>{activeGuild.name}</h2>
-              <p>Fuer die aktive Guild-Hub-Gilde existiert noch kein Fight Tracker.</p>
+              <p>{hubText("fightTrackerI18n.noFightTrackerExistsForTheSuggestedGuildYet")}</p>
             </div>
           </div>
           <button
@@ -2388,7 +2606,7 @@ function TrackerSelectionPanel({
             }}
           >
             <Plus size={16} aria-hidden />
-            Aus Guild-Hub-Daten anlegen
+            {hubText("fightTrackerI18n.createFromGuildHubData")}
           </button>
         </div>
       ) : null}
@@ -2400,20 +2618,20 @@ function TrackerSelectionPanel({
             <Swords size={18} />
           </div>
           <div>
-            <h2>Gilde hinzufuegen</h2>
-            <p>Ein Tracker mit 0 Membern ist gueltig.</p>
+            <h2>{hubText("fightTrackerI18n.addGuild")}</h2>
+            <p>{hubText("fightTrackerI18n.aTrackerWithNoMembersIsValid")}</p>
           </div>
         </div>
 	        <div className={styles.setupActions}>
 	          <div className={styles.setupOption}>
-	            <strong>Aus Guild-Hub-Daten</strong>
+	            <strong>{hubText("fightTrackerI18n.fromGuildHubData")}</strong>
 	            <span>
 	              {scanSourceLoading
-	                ? "Scan-Quellen werden geladen."
-	                : scanSourceError ?? "Verknuepfung erstellen, Memberimport bleibt optional."}
+	                ? hubText("fightTrackerI18n.loadingScanSources")
+	                : (scanSourceError ? hubMessage(scanSourceError) : null) ?? hubText("fightTrackerI18n.createALinkImportingMembersIsOptional")}
 	            </span>
             <label className={styles.field}>
-              <span>Guild-Hub-Gilde</span>
+              <span>{hubText("fightTrackerI18n.guildHubGuild")}</span>
               <select
                 value={selectedScanValue}
                 disabled={!scanSourceOptions.length}
@@ -2426,28 +2644,28 @@ function TrackerSelectionPanel({
                     </option>
                   ))
                 ) : (
-                  <option value="">Keine freien Guild-Hub-Gilden</option>
+                  <option value="">{hubText("fightTrackerI18n.noUnlinkedGuildHubGuilds")}</option>
                 )}
               </select>
             </label>
             <button type="button" className={styles.primaryAction} disabled={!scanSourceOptions.length} onClick={onCreateFromSelectedScan}>
               <Plus size={16} aria-hidden />
-              Tracker erstellen
+              {hubText("fightTrackerI18n.createTracker")}
             </button>
           </div>
           <div className={styles.setupOption}>
-            <strong>Ohne Scan</strong>
+            <strong>{hubText("fightTrackerI18n.withoutAScan")}</strong>
             <label className={styles.field}>
-              <span>Gildenname</span>
-              <input value={setupGuildName} placeholder="Gildenname" onChange={(event) => onSetupGuildNameChange(event.target.value)} />
+              <span>{hubText("fightTrackerI18n.guildName")}</span>
+              <input value={setupGuildName} placeholder={hubText("fightTrackerI18n.guildName")} onChange={(event) => onSetupGuildNameChange(event.target.value)} />
             </label>
             <label className={styles.field}>
-              <span>Server optional</span>
-              <input value={setupGuildServer} placeholder="z. B. S1" onChange={(event) => onSetupGuildServerChange(event.target.value)} />
+              <span>{hubText("fightTrackerI18n.serverOptional")}</span>
+              <input value={setupGuildServer} placeholder={hubText("fightTrackerI18n.egS1")} onChange={(event) => onSetupGuildServerChange(event.target.value)} />
             </label>
             <button type="button" className={styles.secondaryAction} disabled={!setupGuildName.trim()} onClick={onCreateManualTracker}>
               <Plus size={16} aria-hidden />
-              Eigene Gilde erstellen
+              {hubText("fightTrackerI18n.createCustomGuild")}
             </button>
           </div>
         </div>
@@ -2469,67 +2687,69 @@ function ScanMemberImportPanel({
   plan: FightTrackerSyncPlan | null;
   snapshot: FightTrackerScanSnapshot | null;
   loading: boolean;
-  status: string | null;
+  status: ScanImportStatus | null;
   trackerMemberCount: number;
   onImport: () => void;
   detailMode?: "overlay" | "inline";
 }) {
+  const { i18n } = useTranslation();
   const [openCategory, setOpenCategory] = React.useState<string | null>(null);
+  useAnalyticsView(openCategory ? "datahub/fight/sync-details" : null);
   const meta = snapshot
     ? [
         snapshot.guildName,
         snapshot.server,
-        snapshot.scanAt ? `Scan ${formatDate(snapshot.scanAt.slice(0, 10))}` : "Scan ohne Snapshot-Datum",
-        `${snapshot.members.length} Mitglieder`,
+        snapshot.scanAt ? hubText("fightTrackerI18n.scanDate", { date: formatDate(snapshot.scanAt.slice(0, 10)) }) : hubText("fightTrackerI18n.scanWithoutASnapshotDate"),
+        hubText("fightTrackerI18n.memberCount", { count: snapshot.members.length }),
       ]
         .filter(Boolean)
         .join(" - ")
     : loading
-      ? "Scan-Synchronisierung wird vorbereitet..."
-      : "Kein passender lokaler Guild-Hub-Scan gefunden";
+      ? hubText("fightTrackerI18n.preparingScanSynchronization")
+      : hubText("fightTrackerI18n.noMatchingLocalGuildHubScanFound");
   const isInitialImport = trackerMemberCount === 0;
   const actionLabel = isInitialImport
     ? plan?.newMembers.length
-      ? `${plan.newMembers.length} Mitglieder uebernehmen`
-      : "Mitglieder aus letztem Scan uebernehmen"
-    : "Mit Fight Tracker synchronisieren";
+      ? hubText("fightTrackerI18n.importMembers", { count: plan.newMembers.length })
+      : hubText("fightTrackerI18n.importMembersFromTheLatestScan")
+    : hubText("fightTrackerI18n.syncWithFightTracker");
   const categories = React.useMemo(
     () =>
       plan
         ? [
             {
               id: "new",
-              title: "Neue Spieler",
-              hint: "neu im Scan",
+              title: hubText("fightTrackerI18n.newPlayers"),
+              hint: hubText("fightTrackerI18n.newInScan"),
               items: plan.newMembers.filter((member) => member.active !== false).map((member) => member.name),
             },
             {
               id: "confirmed",
-              title: "Bereits im Tracker / im Scan gefunden",
-              hint: "im Scan bestaetigt",
+              title: hubText("fightTrackerI18n.alreadyTrackedFoundInScan"),
+              hint: hubText("fightTrackerI18n.confirmedInScan"),
               items: plan.existingMembers.map((entry) => entry.member.name),
             },
             {
               id: "reactivated",
-              title: "Reaktiviert",
-              hint: "wieder im Scan gefunden",
+              title: hubText("fightTrackerI18n.reactivated"),
+              hint: hubText("fightTrackerI18n.foundInScanAgain"),
               items: plan.reactivatedMembers.map((entry) => entry.member.name),
             },
             {
               id: "missing",
-              title: "Nicht mehr im aktuellen Scan",
-              hint: "wird inaktiv",
+              title: hubText("fightTrackerI18n.noLongerInCurrentScan"),
+              hint: hubText("fightTrackerI18n.becomesInactive"),
               items: plan.missingMembers.map((member) => member.name),
             },
             {
               id: "former",
-              title: "Ehemalige Gildenmitglieder",
-              hint: "nur in aelterem Scan gefunden",
+              title: hubText("fightTrackerI18n.formerGuildMembers"),
+              hint: hubText("fightTrackerI18n.onlyFoundInAnOlderScan"),
               items: plan.newMembers.filter((member) => member.active === false).map((member) => member.name),
             },
           ]
         : [],
-    [plan],
+    [plan, i18n.language],
   );
   const selectedCategory = categories.find((category) => category.id === openCategory) ?? null;
 
@@ -2544,17 +2764,17 @@ function ScanMemberImportPanel({
           <UserPlus size={18} />
         </div>
         <div>
-          <h2>Guild-Scan & Synchronisation</h2>
+          <h2>{hubText("fightTrackerI18n.guildScanSync")}</h2>
           <p>{meta}</p>
         </div>
       </div>
       {snapshot && plan && !plan.hasChanges && !status ? (
-        <span className={styles.scanNotice}>Tracker-Mitglieder entsprechen diesem Scan.</span>
+        <span className={styles.scanNotice}>{hubText("fightTrackerI18n.trackerMembersMatchThisScan")}</span>
       ) : null}
       {loading ? (
-        <span className={styles.scanNotice}>Passender Scan wird geladen und abgeglichen.</span>
+        <span className={styles.scanNotice}>{hubText("fightTrackerI18n.loadingAndComparingTheMatchingScan")}</span>
       ) : !snapshot ? (
-        <span className={styles.scanNotice}>Importiere im Guild Hub zuerst einen passenden lokalen Scan fuer diese Gilde.</span>
+        <span className={styles.scanNotice}>{hubText("fightTrackerI18n.firstImportAMatchingLocalScanForThisGuildInTheGuildHub")}</span>
       ) : null}
       {plan ? (
         <div className={styles.syncLists}>
@@ -2570,7 +2790,7 @@ function ScanMemberImportPanel({
         </div>
       ) : null}
       <div className={styles.reviewActions}>
-        {status ? <span className={styles.scanNotice}>{status}</span> : null}
+        {status ? <span className={styles.scanNotice}>{typeof status === "string" ? hubMessage(status) : hubText("fightTrackerI18n.syncSummary", status)}</span> : null}
         <button type="button" className={styles.primaryAction} disabled={loading || !plan?.hasChanges} onClick={onImport}>
           <Check size={16} aria-hidden />
           {actionLabel}
@@ -2594,11 +2814,11 @@ function SyncInlineDetail({
       <div className={styles.syncDialogHeader}>
         <div>
           <h2>{category.title}</h2>
-          <p>{category.items.length} Eintraege</p>
+          <p>{hubText("fightTrackerI18n.entryCount", { count: category.items.length })}</p>
         </div>
         <button type="button" className={styles.secondaryAction} onClick={onBack}>
           <ArrowLeft size={16} aria-hidden />
-          Zurueck
+          {hubText("fightTrackerI18n.back")}
         </button>
       </div>
       <div className={styles.syncDialogBody}>
@@ -2609,7 +2829,7 @@ function SyncInlineDetail({
             ))}
           </ul>
         ) : (
-          <span>Keine Spieler in dieser Kategorie.</span>
+          <span>{hubText("fightTrackerI18n.noPlayersInThisCategory")}</span>
         )}
       </div>
     </section>
@@ -2638,7 +2858,7 @@ function FunctionTile({
 
 function FunctionOverlay({
   title,
-  subtitle = "Fight Tracker",
+  subtitle = hubText("fightTrackerI18n.fightTracker"),
   children,
   dialogClassName = "",
   bodyClassName = "",
@@ -2681,7 +2901,7 @@ function FunctionOverlay({
             <h2 id={titleId}>{title}</h2>
             <p>{subtitle}</p>
           </div>
-          <button type="button" className={styles.iconOnlyButton} aria-label="Ansicht schliessen" onClick={onClose}>
+          <button type="button" className={styles.iconOnlyButton} aria-label={hubText("fightTrackerI18n.closeView")} onClick={onClose}>
             <X size={17} aria-hidden />
           </button>
         </div>
@@ -2705,9 +2925,9 @@ function SyncSummaryTile({
   return (
     <button type="button" className={styles.syncList} onClick={onOpen} aria-haspopup="dialog">
       <h3>{title}</h3>
-      <strong>{count}</strong>
+      <strong>{hubNumber(count)}</strong>
       <span>{hint}</span>
-      <small>Klicken fuer Details</small>
+      <small>{hubText("fightTrackerI18n.clickForDetails")}</small>
     </button>
   );
 }
@@ -2731,9 +2951,9 @@ function SyncDetailOverlay({
         <div className={styles.syncDialogHeader}>
           <div>
             <h2 id="fight-sync-detail-title">{category.title}</h2>
-            <p>{category.items.length} Eintraege</p>
+            <p>{hubText("fightTrackerI18n.entryCount", { count: category.items.length })}</p>
           </div>
-          <button type="button" className={styles.iconOnlyButton} aria-label="Details schliessen" onClick={onClose}>
+          <button type="button" className={styles.iconOnlyButton} aria-label={hubText("fightTrackerI18n.closeDetails")} onClick={onClose}>
             <X size={17} aria-hidden />
           </button>
         </div>
@@ -2745,12 +2965,12 @@ function SyncDetailOverlay({
               ))}
             </ul>
           ) : (
-            <span>Keine Spieler in dieser Kategorie.</span>
+            <span>{hubText("fightTrackerI18n.noPlayersInThisCategory")}</span>
           )}
         </div>
         <div className={styles.syncDialogActions}>
           <button type="button" className={styles.secondaryAction} onClick={onClose}>
-            Schliessen
+            {hubText("fightTrackerI18n.close")}
           </button>
         </div>
       </div>
@@ -2776,18 +2996,18 @@ function MemberAddPanel({
           <UserPlus size={18} />
         </div>
         <div>
-          <h2>Member hinzufuegen</h2>
-          <p>Nur in der Fight-Tracker-Liste gespeichert</p>
+          <h2>{hubText("fightTrackerI18n.addMember")}</h2>
+          <p>{hubText("fightTrackerI18n.savedOnlyInTheFightTrackerList")}</p>
         </div>
       </div>
       <div className={styles.formGrid}>
         <label className={styles.field}>
-          <span>Name</span>
-          <input value={value} placeholder="Membername" onChange={(event) => onChange(event.target.value)} />
+          <span>{hubText("fightTrackerI18n.name")}</span>
+          <input value={value} placeholder={hubText("fightTrackerI18n.memberName")} onChange={(event) => onChange(event.target.value)} />
         </label>
         <button type="button" className={styles.secondaryAction} disabled={!canAdd} onClick={onAdd}>
           <Plus size={16} aria-hidden />
-          Hinzufuegen
+          {hubText("fightTrackerI18n.add")}
         </button>
       </div>
     </section>
@@ -2812,6 +3032,7 @@ function MemberStatusPanel({
   onFightOpponentGuildChange: (fightId: string, opponentGuild: string) => Promise<void>;
 }) {
   const [viewMode, setViewMode] = React.useState<"members" | "fights">("members");
+  useAnalyticsView(viewMode === "members" ? "datahub/fight/manager-members" : "datahub/fight/manager-fights", false);
   const [pendingMemberId, setPendingMemberId] = React.useState<string | null>(null);
   const [memberToDelete, setMemberToDelete] = React.useState<FightTrackerMember | null>(null);
   const [pendingDeleteMemberId, setPendingDeleteMemberId] = React.useState<string | null>(null);
@@ -2834,8 +3055,8 @@ function MemberStatusPanel({
   );
   const statusOptions: Array<{ status: FightMemberStatus; label: string }> = [
     { status: "unknown", label: "?" },
-    { status: "ok", label: "OK" },
-    { status: "missed", label: "Fehlt" },
+    { status: "ok", label: hubText("fightTrackerI18n.oK") },
+    { status: "missed", label: hubText("fightTrackerI18n.absent") },
   ];
 
   React.useEffect(() => {
@@ -2955,18 +3176,18 @@ function MemberStatusPanel({
                 <Pencil size={18} />
               </div>
               <div>
-                <h2>Liste bearbeiten</h2>
-                <p>Tracker-Mitglieder aktivieren oder deaktivieren</p>
+                <h2>{hubText("fightTrackerI18n.editList")}</h2>
+                <p>{hubText("fightTrackerI18n.activateOrDeactivateTrackerMembers")}</p>
               </div>
             </div>
           ) : (
             <div className={styles.headingInline}>
-              <button type="button" className={styles.iconOnlyButton} aria-label="Zur Memberliste zurueck" onClick={() => setViewMode("members")}>
+              <button type="button" className={styles.iconOnlyButton} aria-label={hubText("fightTrackerI18n.backToMemberList")} onClick={() => setViewMode("members")}>
                 <ArrowLeft size={16} aria-hidden />
               </button>
               <div>
-                <h2>Fights verwalten</h2>
-                <p>Komplette Fight-Eintraege dieses Trackers loeschen</p>
+                <h2>{hubText("fightTrackerI18n.manageFights")}</h2>
+                <p>{hubText("fightTrackerI18n.deleteEntireFightEntriesFromThisTracker")}</p>
               </div>
             </div>
           )}
@@ -2974,7 +3195,7 @@ function MemberStatusPanel({
         {viewMode === "members" ? (
           <button type="button" className={styles.secondaryAction} onClick={() => setViewMode("fights")}>
             <Swords size={16} aria-hidden />
-            Fights
+            {hubText("fightTrackerI18n.fights")}
           </button>
         ) : null}
       </div>
@@ -2984,7 +3205,7 @@ function MemberStatusPanel({
             {sortedFights.map((fight) => (
               <div key={fight.id} className={styles.fightManageRow}>
                 <div className={styles.fightManageInfo}>
-                  <strong>Fight {fight.fightNumber}</strong>
+                  <strong>{hubText("fightTrackerI18n.fight")} {fight.fightNumber}</strong>
                   <span>{formatDate(fight.date)}</span>
                   {fight.opponentGuild ? <span>{fight.opponentGuild}</span> : null}
                 </div>
@@ -2998,18 +3219,18 @@ function MemberStatusPanel({
                   >
                     <input
                       value={editingOpponentGuild}
-                      placeholder="Gegner"
-                      aria-label={`${formatFightLabel(fight)} Gegner`}
+                      placeholder={hubText("fightTrackerI18n.opponent")}
+                      aria-label={hubText("fightTrackerI18n.fightOpponent", { fight: formatFightLabel(fight) })}
                       disabled={pendingOpponentFightId === fight.id}
                       onChange={(event) => setEditingOpponentGuild(event.target.value)}
                     />
-                    <button type="submit" className={styles.iconOnlyButton} aria-label="Gegner speichern" disabled={pendingOpponentFightId === fight.id}>
+                    <button type="submit" className={styles.iconOnlyButton} aria-label={hubText("fightTrackerI18n.saveOpponent")} disabled={pendingOpponentFightId === fight.id}>
                       <Check size={16} aria-hidden />
                     </button>
                     <button
                       type="button"
                       className={styles.iconOnlyButton}
-                      aria-label="Gegner-Bearbeitung abbrechen"
+                      aria-label={hubText("fightTrackerI18n.cancelOpponentEditing")}
                       disabled={pendingOpponentFightId === fight.id}
                       onClick={cancelFightOpponentEdit}
                     >
@@ -3021,8 +3242,8 @@ function MemberStatusPanel({
                     <button
                       type="button"
                       className={styles.iconOnlyButton}
-                      aria-label={`${formatFightLabel(fight)} Gegner bearbeiten`}
-                      title="Gegner bearbeiten"
+                      aria-label={hubText("fightTrackerI18n.editFightOpponent", { fight: formatFightLabel(fight) })}
+                      title={hubText("fightTrackerI18n.editOpponent")}
                       disabled={pendingDeleteFightId === fight.id}
                       onClick={() => startFightOpponentEdit(fight)}
                     >
@@ -3031,8 +3252,8 @@ function MemberStatusPanel({
                     <button
                       type="button"
                       className={`${styles.iconOnlyButton} ${styles.dangerIconButton}`}
-                      aria-label={`${formatFightLabel(fight)} endgueltig aus dem Fight Tracker loeschen`}
-                      title="Fight endgueltig loeschen"
+                      aria-label={hubText("fightTrackerI18n.deleteFight", { fight: formatFightLabel(fight) })}
+                      title={hubText("fightTrackerI18n.permanentlyDeleteFight")}
                       disabled={pendingDeleteFightId === fight.id}
                       onClick={() => setFightToDelete(fight)}
                     >
@@ -3044,7 +3265,7 @@ function MemberStatusPanel({
             ))}
           </div>
         ) : (
-          <div className={styles.reviewEmpty}>Noch keine Fights angelegt.</div>
+          <div className={styles.reviewEmpty}>{hubText("fightTrackerI18n.noFightsCreatedYet")}</div>
         )
       ) : members.length ? (
         <div className={styles.memberManageList}>
@@ -3063,14 +3284,14 @@ function MemberStatusPanel({
                     <span>{formatMemberClassName(member.className)}</span>
                   </div>
                   <span className={`${styles.memberStatusBadge} ${member.active ? styles.memberStatusActive : styles.memberStatusInactive}`}>
-                    {member.active ? "Aktiv" : "Inaktiv"}
+                    {member.active ? hubText("fightTrackerI18n.active") : hubText("fightTrackerI18n.inactive")}
                   </span>
                   <div className={styles.memberManageActions}>
                     <button
                       type="button"
                       className={styles.iconOnlyButton}
-                      aria-label={`${member.name} Fight-Zuordnungen bearbeiten`}
-                      title="Fight-Zuordnungen bearbeiten"
+                      aria-label={hubText("fightTrackerI18n.editMemberFights", { name: member.name })}
+                      title={hubText("fightTrackerI18n.editFightAssignments")}
                       aria-expanded={expanded}
                       onClick={() => toggleMemberFightEditor(member.id)}
                     >
@@ -3083,13 +3304,13 @@ function MemberStatusPanel({
                       onClick={() => handleChange(member)}
                     >
                       {member.active ? <XCircle size={16} aria-hidden /> : <Check size={16} aria-hidden />}
-                      {member.active ? "Deaktivieren" : "Reaktivieren"}
+                      {member.active ? hubText("fightTrackerI18n.deactivate") : hubText("fightTrackerI18n.reactivate")}
                     </button>
                     <button
                       type="button"
                       className={`${styles.iconOnlyButton} ${styles.dangerIconButton}`}
-                      aria-label={`${member.name} endgueltig aus dem Fight Tracker loeschen`}
-                      title="Endgueltig aus dem Fight Tracker loeschen"
+                      aria-label={hubText("fightTrackerI18n.deleteMember", { name: member.name })}
+                      title={hubText("fightTrackerI18n.permanentlyRemoveFromTracker")}
                       disabled={pending || pendingDeleteMemberId === member.id}
                       onClick={() => setMemberToDelete(member)}
                     >
@@ -3102,7 +3323,7 @@ function MemberStatusPanel({
                     {selectedFight ? (
                       <div className={styles.memberFightRow}>
                         <label className={styles.memberFightSelect}>
-                          <span>Fight auswaehlen</span>
+                          <span>{hubText("fightTrackerI18n.selectFight")}</span>
                           <select
                             value={selectedFight.id}
                             onChange={(event) =>
@@ -3119,7 +3340,7 @@ function MemberStatusPanel({
                         <div
                           className={styles.memberFightStatusButtons}
                           role="group"
-                          aria-label={`${member.name} ${formatFightLabel(selectedFight)} Status`}
+                          aria-label={hubText("fightTrackerI18n.memberFightStatus", { name: member.name, fight: formatFightLabel(selectedFight), status: hubText("fightTrackerI18n." + (selectedStatus === "ok" ? "oK" : selectedStatus === "missed" ? "absent" : "notDetected")) })}
                         >
                           {statusOptions.map((option) => (
                             <button
@@ -3135,7 +3356,7 @@ function MemberStatusPanel({
                         </div>
                       </div>
                     ) : (
-                      <div className={styles.reviewEmpty}>Noch keine Fights angelegt.</div>
+                      <div className={styles.reviewEmpty}>{hubText("fightTrackerI18n.noFightsCreatedYet")}</div>
                     )}
                   </div>
                 ) : null}
@@ -3144,7 +3365,7 @@ function MemberStatusPanel({
           })}
         </div>
       ) : (
-        <div className={styles.reviewEmpty}>Noch keine Fight-Tracker-Member vorhanden.</div>
+        <div className={styles.reviewEmpty}>{hubText("fightTrackerI18n.noTrackerMembersYet")}</div>
       )}
       {memberToDelete ? (
         <div className={styles.memberDeleteConfirmOverlay} role="presentation">
@@ -3155,13 +3376,13 @@ function MemberStatusPanel({
             aria-labelledby="fight-member-delete-title"
           >
             <div>
-              <h3 id="fight-member-delete-title">Spieler endgültig aus dem Fight Tracker löschen?</h3>
+              <h3 id="fight-member-delete-title">{hubText("fightTrackerI18n.permanentlyRemovePlayerFromTracker")}</h3>
               <p>
-                <strong>{memberToDelete.name}</strong> wird vollständig aus diesem Fight Tracker entfernt.
+                <Trans i18nKey="fightTrackerI18n.removalSentence" values={{ name: memberToDelete.name }} components={{ strong: <strong /> }} />
               </p>
-              <p>Dabei werden auch alle im Fight Tracker gespeicherten Fight-/Participation-Daten dieses Spielers gelöscht.</p>
-              <p>Der Guild Hub und alle Scan-Daten bleiben unverändert.</p>
-              <p>Diese Aktion kann nicht rückgängig gemacht werden.</p>
+              <p>{hubText("fightTrackerI18n.allFightAndParticipationDataStoredForThisPlayerInTheTrackerWillAlsoBeDeleted")}</p>
+              <p>{hubText("fightTrackerI18n.theGuildHubAndAllScanDataArePreserved")}</p>
+              <p>{hubText("fightTrackerI18n.thisActionCannotBeUndone")}</p>
             </div>
             <div className={styles.memberDeleteConfirmActions}>
               <button
@@ -3170,7 +3391,7 @@ function MemberStatusPanel({
                 disabled={pendingDeleteMemberId === memberToDelete.id}
                 onClick={() => setMemberToDelete(null)}
               >
-                Abbrechen
+                {hubText("fightTrackerI18n.cancel")}
               </button>
               <button
                 type="button"
@@ -3179,7 +3400,7 @@ function MemberStatusPanel({
                 onClick={handleConfirmDelete}
               >
                 <Trash2 size={16} aria-hidden />
-                Endgültig löschen
+                {hubText("fightTrackerI18n.deletePermanently")}
               </button>
             </div>
           </div>
@@ -3194,12 +3415,12 @@ function MemberStatusPanel({
             aria-labelledby="fight-delete-title"
           >
             <div>
-              <h3 id="fight-delete-title">Fight endgültig löschen?</h3>
+              <h3 id="fight-delete-title">{hubText("fightTrackerI18n.permanentlyDeleteFight")}</h3>
               <p>
-                <strong>{formatFightLabel(fightToDelete)}</strong> wird vollständig aus diesem Fight Tracker entfernt.
+                <Trans i18nKey="fightTrackerI18n.removalSentence" values={{ name: formatFightLabel(fightToDelete) }} components={{ strong: <strong /> }} />
               </p>
-              <p>Dabei werden auch alle Participation-Daten dieses Fights für alle Spieler gelöscht.</p>
-              <p>Diese Aktion kann nicht rückgängig gemacht werden.</p>
+              <p>{hubText("fightTrackerI18n.participationDataForAllPlayersInThisFightWillAlsoBeDeleted")}</p>
+              <p>{hubText("fightTrackerI18n.thisActionCannotBeUndone")}</p>
             </div>
             <div className={styles.memberDeleteConfirmActions}>
               <button
@@ -3208,7 +3429,7 @@ function MemberStatusPanel({
                 disabled={pendingDeleteFightId === fightToDelete.id}
                 onClick={() => setFightToDelete(null)}
               >
-                Abbrechen
+                {hubText("fightTrackerI18n.cancel")}
               </button>
               <button
                 type="button"
@@ -3217,7 +3438,7 @@ function MemberStatusPanel({
                 onClick={handleConfirmFightDelete}
               >
                 <Trash2 size={16} aria-hidden />
-                Endgültig löschen
+                {hubText("fightTrackerI18n.deletePermanently")}
               </button>
             </div>
           </div>
@@ -3276,10 +3497,10 @@ function ScreenshotImportPanel({
   const reviewDefaultFightNumber = session ? getNextAvailableFightNumber(fights, session.review.date) : null;
   const reportTypeLabel =
     session?.review.reportType === "unsupported_defense"
-      ? "Defense nicht unterstuetzt"
+      ? hubText("fightTrackerI18n.defenseNotSupported")
       : session?.review.reportType === "uncertain"
-        ? "Unklar"
-        : "Angriff";
+        ? hubText("fightTrackerI18n.unclear")
+        : hubText("fightTrackerI18n.attack");
 
   const renderMemberReviewRows = (members: TrackerRow[]) =>
     members.map((member) => {
@@ -3288,29 +3509,29 @@ function ScreenshotImportPanel({
         <div key={member.id} className={styles.memberReviewRow}>
           <div className={styles.memberReviewName}>
             <strong>{member.name}</strong>
-            <span>{member.className || "Unknown"}{member.active ? "" : " - inaktiv"}</span>
+            <span>{formatMemberClassName(member.className)}{member.active ? "" : hubText("fightTrackerI18n.inactive")}</span>
           </div>
-          <div className={styles.reviewStateButtons} role="group" aria-label={`${member.name} Review-Status`}>
+          <div className={styles.reviewStateButtons} role="group" aria-label={hubText("fightTrackerI18n.reviewStatus", { name: member.name })}>
             <button
               type="button"
               className={`${styles.reviewStateButton} ${state === "confirmed" ? styles.reviewStateActive : ""}`}
               onClick={() => onMemberStateChange(member.id, "confirmed")}
             >
-              Sicher
+              {hubText("fightTrackerI18n.confirmed")}
             </button>
             <button
               type="button"
               className={`${styles.reviewStateButton} ${state === "uncertain" ? styles.reviewStateActive : ""}`}
               onClick={() => onMemberStateChange(member.id, "uncertain")}
             >
-              Unsicher
+              {hubText("fightTrackerI18n.uncertain")}
             </button>
             <button
               type="button"
               className={`${styles.reviewStateButton} ${state === "not_detected" ? styles.reviewStateActive : ""}`}
               onClick={() => onMemberStateChange(member.id, "not_detected")}
             >
-              Nicht erkannt
+              {hubText("fightTrackerI18n.notDetected")}
             </button>
           </div>
         </div>
@@ -3325,21 +3546,21 @@ function ScreenshotImportPanel({
             <FileImage size={18} />
           </div>
           <div>
-            <h2>Fight-Report Screenshots</h2>
-            <p>Lokale Import-Session fuer denselben Fight-Report</p>
+            <h2>{hubText("fightTrackerI18n.fightReportScreenshots")}</h2>
+            <p>{hubText("fightTrackerI18n.localImportSessionForTheSameFightReport")}</p>
           </div>
         </div>
         {session ? (
           <button type="button" className={styles.secondaryAction} onClick={onClearSession}>
             <RotateCcw size={15} aria-hidden />
-            Zuruecksetzen
+            {hubText("fightTrackerI18n.reset")}
           </button>
         ) : null}
       </div>
 
       <label className={styles.filePicker}>
         <FileImage size={18} aria-hidden />
-        <span>Bilder auswaehlen</span>
+        <span>{hubText("fightTrackerI18n.selectImages")}</span>
         <input type="file" accept="image/*" multiple onChange={onSelectScreenshots} />
       </label>
 
@@ -3348,19 +3569,23 @@ function ScreenshotImportPanel({
           <div className={styles.scanBar}>
             <button type="button" className={styles.secondaryAction} disabled={!canScan} onClick={onScanScreenshot}>
               <Search size={15} aria-hidden />
-              Screenshot scannen
+              {hubText("fightTrackerI18n.scanScreenshot")}
             </button>
             {session.screenshots.length > 1 ? (
-              <span className={styles.scanNotice}>OCR V1 scannt nur das erste ausgewaehlte Bild.</span>
+              <span className={styles.scanNotice}>{hubText("fightTrackerI18n.oCRV1ScansOnlyTheFirstSelectedImage")}</span>
             ) : null}
-            {scanState.message ? (
+            {scanState.message || scanState.status === "scanning" ? (
               <span className={`${styles.scanNotice} ${scanState.status === "error" ? styles.scanError : ""}`}>
-                {scanState.message}
+                {scanState.status === "scanning"
+                  ? scanState.message === "OCR wird lokal vorbereitet..."
+                    ? hubMessage(scanState.message)
+                    : scanState.message ? hubText("fightTrackerI18n.ocrStage", { stage: hubMessage(scanState.message), percent: hubPercent(scanState.progress) }) : hubText("fightTrackerI18n.ocrRunning", { percent: hubPercent(scanState.progress) })
+                  : hubMessage(scanState.message)}
               </span>
             ) : null}
           </div>
           {scanState.status === "scanning" ? (
-            <div className={styles.scanProgress} aria-label="OCR Fortschritt">
+            <div className={styles.scanProgress} aria-label={hubText("fightTrackerI18n.oCRProgress")}>
               <span style={{ width: `${Math.max(4, Math.min(100, Math.round(scanState.progress * 100)))}%` }} />
             </div>
           ) : null}
@@ -3376,7 +3601,7 @@ function ScreenshotImportPanel({
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`${screenshot.name} entfernen`}
+                  aria-label={hubText("fightTrackerI18n.removeName", { name: screenshot.name })}
                   onClick={() => onRemoveScreenshot(screenshot.id)}
                 >
                   <Trash2 size={15} aria-hidden />
@@ -3388,21 +3613,21 @@ function ScreenshotImportPanel({
           <div className={styles.reviewPanel}>
             <div className={styles.reviewHeader}>
               <div>
-                <h2>Import Review</h2>
-                <p>{confirmedCount} sicher fehlend, {uncertainCount} unsicher</p>
+                <h2>{hubText("fightTrackerI18n.importReview")}</h2>
+                <p>{hubText("fightTrackerI18n.reviewCounts", { confirmed: confirmedCount, uncertain: uncertainCount })}</p>
               </div>
             </div>
 
             {session.review.ocrNotice ? (
               <div className={session.review.reportType === "unsupported_defense" ? styles.warningBanner : styles.scanResultBanner}>
                 {session.review.reportType === "unsupported_defense" ? <AlertTriangle size={16} aria-hidden /> : <Check size={16} aria-hidden />}
-                <span>{session.review.ocrNotice}</span>
+                <span>{session.review.ocrNotice.split(/(?<=\.) /).map(hubMessage).join(" ")}</span>
               </div>
             ) : null}
 
             <div className={styles.reviewGrid}>
               <label className={styles.field}>
-                <span>Datum</span>
+                <span>{hubText("fightTrackerI18n.date")}</span>
                 <span className={styles.inputWrap}>
                   <CalendarDays size={16} aria-hidden />
                   <input
@@ -3413,43 +3638,41 @@ function ScreenshotImportPanel({
                 </span>
               </label>
               <label className={styles.field}>
-                <span>Fight</span>
+                <span>{hubText("fightTrackerI18n.fight")}</span>
                 <select
                   value={session.review.fightNumber}
                   onChange={(event) => onReviewChange({ fightNumber: normalizeFightNumber(event.target.value) })}
                 >
-                  <option value="1">Fight 1</option>
-                  <option value="2">Fight 2</option>
+                  <option value="1">{hubText("fightTrackerI18n.fight1")}</option>
+                  <option value="2">{hubText("fightTrackerI18n.fight2")}</option>
                 </select>
               </label>
               {fightCreationOrderIssue ? (
                 <div className={styles.slotWarning}>
                   <AlertTriangle size={16} aria-hidden />
-                  <span>{fightCreationOrderIssue} Der naechste Fight kann nicht sicher bestimmt werden.</span>
+                  <span>{hubText("fightTrackerI18n.orderIssue", { issue: hubMessage(fightCreationOrderIssue) })}</span>
                 </div>
               ) : reviewSlotFights.length ? (
                 <div className={styles.slotWarning}>
                   <AlertTriangle size={16} aria-hidden />
                   <span>
-                    Fight {session.review.fightNumber} fuer den {formatDate(session.review.date)} existiert bereits
-                    {reviewSlotFights[0]?.opponentGuild ? ` (${reviewSlotFights[0].opponentGuild})` : ""}. Speichern ersetzt diesen Fight
-                    nach Bestaetigung.
+                    {hubText("fightTrackerI18n.slotExists", { number: session.review.fightNumber, date: formatDate(session.review.date), opponent: reviewSlotFights[0]?.opponentGuild ? ` (${reviewSlotFights[0].opponentGuild})` : "" })}
                   </span>
                 </div>
               ) : reviewDefaultFightNumber ? (
-                <div className={styles.slotHint}>Freier Slot: Fight {reviewDefaultFightNumber}</div>
+                <div className={styles.slotHint}>{hubText("fightTrackerI18n.freeSlot", { number: reviewDefaultFightNumber })}</div>
               ) : (
                 <div className={styles.slotWarning}>
                   <AlertTriangle size={16} aria-hidden />
-                  <span>Beide Fight-Slots an diesem Tag sind belegt. Waehle Fight 1 oder Fight 2 zum Ueberschreiben.</span>
+                  <span>{hubText("fightTrackerI18n.bothFightSlotsForThisDayAreOccupiedSelectFight1OrFight2ToReplace")}</span>
                 </div>
               )}
               <div className={styles.reviewReadOnly}>
-                <span>Kampftyp</span>
+                <span>{hubText("fightTrackerI18n.fightType")}</span>
                 <strong>{reportTypeLabel}</strong>
               </div>
               <label className={styles.field}>
-                <span>Gegnerische Gilde</span>
+                <span>{hubText("fightTrackerI18n.opposingGuild")}</span>
                 <input
                   type="text"
                   value={session.review.opponentGuild}
@@ -3461,35 +3684,35 @@ function ScreenshotImportPanel({
 
             <div className={styles.reviewColumns}>
               <div className={styles.reviewSection}>
-                <h3>Fehlende Mitglieder</h3>
+                <h3>{hubText("fightTrackerI18n.missingMembers")}</h3>
                 {rows.length ? (
                   <>
                     {hasScanResult ? (
                       highlightedRows.length ? (
                         <div className={styles.memberReviewList}>{renderMemberReviewRows(highlightedRows)}</div>
                       ) : (
-                        <div className={styles.reviewEmpty}>Keine sicher fehlenden Mitglieder im Tracker-Roster erkannt.</div>
+                        <div className={styles.reviewEmpty}>{hubText("fightTrackerI18n.noConfirmedMissingMembersDetectedInTheTrackerRoster")}</div>
                       )
                     ) : null}
                     <details className={styles.manualReviewDetails} open={!hasScanResult}>
-                      <summary>Manuelle Korrektur</summary>
+                      <summary>{hubText("fightTrackerI18n.manualCorrection")}</summary>
                       <div className={styles.memberReviewList}>{renderMemberReviewRows(rows)}</div>
                     </details>
                   </>
                 ) : (
-                  <div className={styles.reviewEmpty}>Noch keine Fight-Tracker-Member vorhanden.</div>
+                  <div className={styles.reviewEmpty}>{hubText("fightTrackerI18n.noTrackerMembersYet")}</div>
                 )}
               </div>
 
               <div className={styles.reviewSection}>
-                <h3>OCR-Namen ohne sicheren Match</h3>
+                <h3>{hubText("fightTrackerI18n.oCRNamesWithoutAReliableMatch")}</h3>
                 {session.review.unknownNames.length || session.review.uncertainNames.length ? (
                   <ul className={styles.unknownList}>
                     {session.review.uncertainNames.map((name) => (
                       <li key={`uncertain-${name}`}>
-                        <span>{name} (unsicher)</span>
+                        <span>{name} {hubText("fightTrackerI18n.uncertain")}</span>
                         <button type="button" className={styles.inlineButton} onClick={() => onAddUnknownName(name)}>
-                          Hinzufuegen
+                          {hubText("fightTrackerI18n.add")}
                         </button>
                       </li>
                     ))}
@@ -3497,7 +3720,7 @@ function ScreenshotImportPanel({
                       <li key={name}>
                         <span>{name}</span>
                         <button type="button" className={styles.inlineButton} onClick={() => onAddUnknownName(name)}>
-                          Hinzufuegen
+                          {hubText("fightTrackerI18n.add")}
                         </button>
                       </li>
                     ))}
@@ -3511,22 +3734,22 @@ function ScreenshotImportPanel({
             <div className={styles.reviewActions}>
               <button type="button" className={styles.primaryAction} disabled={!canApplyReview} onClick={onApplyReview}>
                 <Plus size={16} aria-hidden />
-                Review als Fight anlegen
+                {hubText("fightTrackerI18n.saveReviewAsFight")}
               </button>
             </div>
           </div>
         </>
       ) : (
-        <div className={styles.importEmpty}>Keine lokale Screenshot-Session aktiv.</div>
+        <div className={styles.importEmpty}>{hubText("fightTrackerI18n.noLocalScreenshotSessionActive")}</div>
       )}
     </section>
   );
 }
 
 function formatFileSize(size: number) {
-  if (!Number.isFinite(size) || size <= 0) return "0 KB";
-  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (!Number.isFinite(size) || size <= 0) return `${hubNumber(0)} KB`;
+  if (size < 1024 * 1024) return `${hubNumber(Math.max(1, Math.round(size / 1024)))} KB`;
+  return `${hubNumber(size / (1024 * 1024), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
 }
 
 function FightTable({
@@ -3552,6 +3775,7 @@ function FightTable({
   onStatusDraftChange: (fightId: string, memberId: string, status: FightMemberStatus) => void;
   onApplyStatusDrafts: () => void | Promise<void>;
 }) {
+  useAnalyticsView("datahub/fight/participation");
   const [sortKey, setSortKey] = React.useState<ParticipationSortKey>("guildRole");
   const [sortDirection, setSortDirection] = React.useState<ParticipationSortDirection>("desc");
   const [showInactiveMembers, setShowInactiveMembers] = React.useState(true);
@@ -3561,6 +3785,7 @@ function FightTable({
   const [sharedFightWindowDirection, setSharedFightWindowDirection] = React.useState<MobileFightWindowDirection | null>(null);
   const [memberFightWindowDirections, setMemberFightWindowDirections] = React.useState<Record<string, MobileFightWindowDirection | null>>({});
   const [isExportOverlayOpen, setIsExportOverlayOpen] = React.useState(false);
+  useAnalyticsView(isExportOverlayOpen ? "datahub/fight/participation-export" : null);
   const [exportType, setExportType] = React.useState<ParticipationExportType>("simple");
   const [exportMonth, setExportMonth] = React.useState(getMonthInputValue);
   const [showFormerMembersInExport, setShowFormerMembersInExport] = React.useState(false);
@@ -3568,6 +3793,7 @@ function FightTable({
   const [exportError, setExportError] = React.useState<string | null>(null);
   const [participationExportPreview, setParticipationExportPreview] = React.useState<ParticipationExportPreview | null>(null);
   const [isExportPreviewOpen, setIsExportPreviewOpen] = React.useState(false);
+  useAnalyticsView(isExportPreviewOpen ? "datahub/fight/participation-preview" : null);
   const exportRef = React.useRef<HTMLDivElement | null>(null);
   const participationExportPreviewUrlRef = React.useRef<string | null>(null);
   const participationMouseDragStateRef = React.useRef<ParticipationMouseDragState | null>(null);
@@ -3575,17 +3801,17 @@ function FightTable({
   const suppressParticipationClickTimerRef = React.useRef<number | null>(null);
   const mobileSwipeStateRef = React.useRef<MobileFightSwipeState | null>(null);
   const suppressedMobileClickMembersRef = React.useRef<Set<string>>(new Set());
-  const subtitle = fights.length ? `${fights.length} gespeicherte Fights` : "Noch keine Fights angelegt";
+  const subtitle = fights.length ? hubText("fightTrackerI18n.savedFights", { count: fights.length }) : hubText("fightTrackerI18n.noFightsCreatedYet");
   const emptyMessage = fights.length
-    ? `${fights.length} Fights gespeichert. Noch keine Member im Fight Tracker vorhanden.`
-    : "Noch keine Member im Fight Tracker vorhanden.";
+    ? hubText("fightTrackerI18n.emptyMembersWithFights", { count: fights.length })
+    : hubText("fightTrackerI18n.noMembersInTheFightTrackerYet");
   const sortOptions: Array<{ key: ParticipationSortKey; label: string }> = [
-    { key: "guildRole", label: "Gildenrang" },
-    { key: "name", label: "Name" },
-    { key: "baseStats", label: "Base Stats" },
-    { key: "totalStats", label: "Total Stats" },
-    { key: "level", label: "Level" },
-    { key: "missed", label: "Missed Fights" },
+    { key: "guildRole", label: hubText("fightTrackerI18n.guildRank") },
+    { key: "name", label: hubText("fightTrackerI18n.name") },
+    { key: "baseStats", label: hubText("fightTrackerI18n.baseStats") },
+    { key: "totalStats", label: hubText("fightTrackerI18n.totalStats") },
+    { key: "level", label: hubText("dataHubI18n.level") },
+    { key: "missed", label: hubText("fightTrackerI18n.missedFights") },
   ];
   const fightParticipationLookup = React.useMemo(() => buildFightParticipationLookup(fights), [fights]);
   const getParticipationStatus = React.useCallback(
@@ -3836,12 +4062,14 @@ function FightTable({
     [participationRows, showInactiveMembers],
   );
   const tableEmptyMessage =
-    !showInactiveMembers && participationRows.length ? "Keine aktiven Member sichtbar." : emptyMessage;
+    !showInactiveMembers && participationRows.length ? hubText("fightTrackerI18n.noActiveMembersVisible") : emptyMessage;
 
   const sortedRows = React.useMemo(
     () => sortParticipationRows(visibleParticipationRows, sortKey, sortDirection),
     [sortDirection, sortKey, visibleParticipationRows],
   );
+  useRuntimeAuditCommit(participationRows, participationRows.length > 0, "fight-participation-derived");
+  useRuntimeAuditCommit(sortedRows, sortedRows.length > 0, "fight-participation-table");
   const exportMonthFights = React.useMemo(
     () =>
       fights
@@ -3939,12 +4167,13 @@ function FightTable({
     return {
       ...rendered,
       cacheKey: exportCacheKey,
+      locale: hubLocale(),
       fileBaseName: exportFileBaseName,
       url: URL.createObjectURL(rendered.blob),
     };
   }, [exportCacheKey, exportFileBaseName, exportType]);
   const getCurrentParticipationExportPreview = React.useCallback(async () => {
-    if (participationExportPreview?.cacheKey === exportCacheKey) return participationExportPreview;
+    if (participationExportPreview?.cacheKey === exportCacheKey && participationExportPreview.locale === hubLocale()) return participationExportPreview;
     const nextPreview = await renderParticipationExportPreview();
     storeParticipationExportPreview(nextPreview);
     return nextPreview;
@@ -3969,11 +4198,15 @@ function FightTable({
     [],
   );
   const handlePreviewParticipationExport = async () => {
-    if (isExportingParticipation || !canExportParticipation) return;
+ const __w32Run1=auditBegin("F25","handlePreviewParticipationExport");
+  auditFields(__w32Run1, { consumerArea: "Kampftracking", trigger: "preview-handler" });
+ const __w32Sync=null;
+ try {
+    if (isExportingParticipation || !canExportParticipation) return auditReturn(__w32Run1,undefined);
     setExportBusyAction("preview");
     setExportError(null);
     try {
-      await getCurrentParticipationExportPreview();
+      await auditValue(__w32Run1,auditEnter(__w32Run1,"getCurrentParticipationExportPreview"),getCurrentParticipationExportPreview());
       setIsExportPreviewOpen(true);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "PNG-Vorschau konnte nicht erzeugt werden.");
@@ -3981,20 +4214,28 @@ function FightTable({
     } finally {
       setExportBusyAction(null);
     }
-  };
+
+} catch (__w32Error) { auditError(__w32Run1,__w32Error); throw __w32Error; } finally {auditValue(__w32Run1,__w32Sync,undefined);auditLeave(__w32Run1);}
+};
   const handleExportParticipation = async () => {
-    if (isExportingParticipation || !canExportParticipation) return;
+ const __w32Run2=auditBegin("F25","handleExportParticipation");
+  auditFields(__w32Run2, { consumerArea: "Kampftracking", trigger: "export-handler" });
+ const __w32Sync=null;
+ try {
+    if (isExportingParticipation || !canExportParticipation) return auditReturn(__w32Run2,undefined);
     setExportBusyAction("download");
     setExportError(null);
     try {
-      const currentPreview = await getCurrentParticipationExportPreview();
+      const currentPreview = await auditValue(__w32Run2,auditEnter(__w32Run2,"getCurrentParticipationExportPreview"),getCurrentParticipationExportPreview());
       downloadPngUrl(currentPreview.url, currentPreview.fileBaseName);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "PNG konnte nicht erzeugt werden.");
     } finally {
       setExportBusyAction(null);
     }
-  };
+
+} catch (__w32Error) { auditError(__w32Run2,__w32Error); throw __w32Error; } finally {auditValue(__w32Run2,__w32Sync,undefined);auditLeave(__w32Run2);}
+};
   const participationTableStyle = {
     "--participation-table-width": `${PARTICIPATION_STICKY_COLUMN_WIDTH_PX + fights.length * PARTICIPATION_FIGHT_COLUMN_WIDTH_PX}px`,
   } as React.CSSProperties;
@@ -4003,13 +4244,13 @@ function FightTable({
     <section className={styles.tablePanel}>
       <div className={styles.tableHeader}>
         <div>
-          <h2>Participation</h2>
+          <h2>{hubText("fightTrackerI18n.participation")}</h2>
           <p>{subtitle}</p>
         </div>
         <div className={styles.tableHeaderActions}>
           <div className={styles.tableSortControls}>
             <label className={styles.tableSortField}>
-              <span>Sortieren</span>
+              <span>{hubText("fightTrackerI18n.sortBy")}</span>
               <select
                 value={sortKey}
                 onChange={(event) => {
@@ -4028,8 +4269,8 @@ function FightTable({
             <button
               type="button"
               className={styles.sortDirectionButton}
-              aria-label={sortDirection === "asc" ? "Aufsteigend sortieren" : "Absteigend sortieren"}
-              title={sortDirection === "asc" ? "Aufsteigend" : "Absteigend"}
+              aria-label={sortDirection === "asc" ? hubText("fightTrackerI18n.sortAscending") : hubText("fightTrackerI18n.sortDescending")}
+              title={sortDirection === "asc" ? hubText("fightTrackerI18n.ascending") : hubText("fightTrackerI18n.descending")}
               onClick={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
             >
               {sortDirection === "asc" ? "↑" : "↓"}
@@ -4040,7 +4281,7 @@ function FightTable({
                 checked={showInactiveMembers}
                 onChange={(event) => setShowInactiveMembers(event.target.checked)}
               />
-              <span>Ehemalige Gildenmitglieder</span>
+              <span>{hubText("fightTrackerI18n.formerGuildMembers")}</span>
             </label>
             {isCompactLayout ? (
               <label className={styles.tableToggleField}>
@@ -4049,13 +4290,13 @@ function FightTable({
                   checked={swipeTogether}
                   onChange={(event) => handleSwipeTogetherChange(event.target.checked)}
                 />
-                <span>Gemeinsam swipen</span>
+                <span>{hubText("fightTrackerI18n.swipeTogether")}</span>
               </label>
             ) : null}
           </div>
           <button type="button" className={styles.secondaryAction} onClick={() => setIsExportOverlayOpen(true)}>
             <Download size={16} aria-hidden />
-            Exportieren
+            {hubText("fightTrackerI18n.export")}
           </button>
           <button
             type="button"
@@ -4063,7 +4304,7 @@ function FightTable({
             disabled={!hasStatusDrafts || isApplyingStatusDrafts}
             onClick={() => void onApplyStatusDrafts()}
           >
-            Änderung übernehmen
+            {hubText("fightTrackerI18n.applyChange")}
           </button>
         </div>
       </div>
@@ -4091,14 +4332,14 @@ function FightTable({
               </colgroup>
               <thead>
                 <tr>
-                  <th className={`${styles.stickyColumn} ${styles.stickyMemberColumn}`}>Member</th>
-                  <th className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>Missed</th>
-                  <th className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>Quote</th>
-                  <th className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>Letzter Fehlkampf</th>
-                  <th className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>Serie</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyMemberColumn}`}>{hubText("fightTrackerI18n.member")}</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{hubText("fightTrackerI18n.missed")}</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>{hubText("fightTrackerI18n.absenceRate")}</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>{hubText("fightTrackerI18n.lastMissedFight")}</th>
+                  <th className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>{hubText("fightTrackerI18n.streak")}</th>
                   {fights.map((fight) => (
                     <th key={fight.id} className={styles.fightHead}>
-                      <span>Fight {fight.fightNumber}</span>
+                      <span>{hubText("fightTrackerI18n.fight")} {fight.fightNumber}</span>
                       <small>{formatDate(fight.date)}</small>
                       <small>{fight.opponentGuild || "—"}</small>
                     </th>
@@ -4109,8 +4350,8 @@ function FightTable({
                 {sortedRows.map(({ member, missed, evaluated, lastMissedFight, streakStatus, streakCount, level }) => {
                   const memberMetaParts = [
                     formatMemberClassName(member.className),
-                    level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
-                    !member.active ? "nicht mehr in aktueller Gilde" : null,
+                    level != null ? hubText("fightTrackerI18n.levelValue", { value: level }) : null,
+                    !member.active ? hubText("fightTrackerI18n.noLongerInCurrentGuild") : null,
                   ].filter((entry): entry is string => Boolean(entry));
 
                   return (
@@ -4119,13 +4360,13 @@ function FightTable({
                         <div className={styles.memberName}>{member.name}</div>
                         <div className={styles.memberMeta}>{memberMetaParts.join(" · ")}</div>
                       </td>
-                      <td className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{missed}</td>
+                      <td className={`${styles.stickyColumn} ${styles.stickyMissedColumn}`}>{hubNumber(missed)}</td>
                       <td className={`${styles.stickyColumn} ${styles.stickyQuoteColumn}`}>{formatQuote(missed, evaluated)}</td>
                       <td className={`${styles.stickyColumn} ${styles.stickyLastMissedColumn}`}>
                         {lastMissedFight ? formatDate(lastMissedFight.date) : "—"}
                       </td>
                       <td className={`${styles.stickyColumn} ${styles.stickyStreakColumn}`}>
-                        {streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : "—"}
+                        {streakStatus ? formatStreak(streakStatus, streakCount) : "—"}
                       </td>
                       {fights.map((fight) => {
                         const status = getParticipationStatus(fight, member.id);
@@ -4139,14 +4380,14 @@ function FightTable({
                               } ${hasDraft ? styles.statusDraft : ""}`}
                               disabled={isApplyingStatusDrafts}
                               onClick={() => cycleParticipationStatus(fight, member.id)}
-                              aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
+                              aria-label={hubText("fightTrackerI18n.memberFightStatus", { name: member.name, fight: formatDate(fight.date), status: hubText("fightTrackerI18n." + (status === "ok" ? "oK" : status === "missed" ? "absent" : "notDetected")) })}
                             >
                               {status === "unknown" ? (
                                 "?"
                               ) : (
                                 <>
                                   {status === "missed" ? <XCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
-                                  {status === "missed" ? "Fehlt" : "OK"}
+                                  {status === "missed" ? hubText("fightTrackerI18n.absent") : hubText("fightTrackerI18n.oK")}
                                 </>
                               )}
                             </button>
@@ -4166,12 +4407,12 @@ function FightTable({
               const canShowOlderFights = fightWindowOffset < maxFightWindowOffset;
               const canShowNewerFights = fightWindowOffset > 0;
               const fightWindowDirection = swipeTogether ? sharedFightWindowDirection : memberFightWindowDirections[member.id] ?? null;
-              const streakLabel = streakStatus ? `${streakCount}× ${streakStatus === "ok" ? "dabei" : "fehlt"}` : null;
+              const streakLabel = streakStatus ? formatStreak(streakStatus, streakCount) : null;
               const memberMetaParts = [
                 formatMemberClassName(member.className),
-                level != null ? `Level ${level.toLocaleString("de-DE")}` : null,
+                level != null ? hubText("fightTrackerI18n.levelValue", { value: level }) : null,
                 streakLabel,
-                !member.active ? "nicht mehr in aktueller Gilde" : null,
+                !member.active ? hubText("fightTrackerI18n.noLongerInCurrentGuild") : null,
               ].filter((entry): entry is string => Boolean(entry));
 
               return (
@@ -4182,15 +4423,15 @@ function FightTable({
                       <span>{memberMetaParts.join(" · ")}</span>
                     </div>
                     <div className={styles.mobileParticipationMetric}>
-                      <span>Missed</span>
-                      <strong>{missed}</strong>
+                      <span>{hubText("fightTrackerI18n.missed")}</span>
+                      <strong>{hubNumber(missed)}</strong>
                     </div>
                     <div className={styles.mobileParticipationMetric}>
-                      <span>Quote</span>
+                      <span>{hubText("fightTrackerI18n.absenceRate")}</span>
                       <strong>{formatQuote(missed, evaluated)}</strong>
                     </div>
                     <div className={styles.mobileParticipationMetric}>
-                      <span>Fehlkampf</span>
+                      <span>{hubText("fightTrackerI18n.missedFight")}</span>
                       <strong>{lastMissedFight ? formatDate(lastMissedFight.date) : "—"}</strong>
                     </div>
                   </div>
@@ -4201,8 +4442,8 @@ function FightTable({
                         className={styles.mobileFightNavButton}
                         disabled={!canShowOlderFights}
                         onClick={() => updateFightWindowOffset(member.id, 1)}
-                        aria-label={`${member.name} ältere Fights anzeigen`}
-                        title="Ältere Fights"
+                        aria-label={hubText("fightTrackerI18n.olderFightsFor", { name: member.name })}
+                        title={hubText("fightTrackerI18n.olderFights")}
                       >
                         <ChevronLeft size={14} aria-hidden />
                       </button>
@@ -4235,9 +4476,9 @@ function FightTable({
                                 disabled={isApplyingStatusDrafts}
                                 title={formatFightLabel(fight)}
                                 onClick={(event) => handleMobileStatusClick(event, fight, member.id)}
-                                aria-label={`${member.name} ${formatDate(fight.date)} Status ${status}`}
+                                aria-label={hubText("fightTrackerI18n.memberFightStatus", { name: member.name, fight: formatDate(fight.date), status: hubText("fightTrackerI18n." + (status === "ok" ? "oK" : status === "missed" ? "absent" : "notDetected")) })}
                               >
-                                {status === "unknown" ? "?" : status === "missed" ? "Fehlt" : "OK"}
+                                {status === "unknown" ? "?" : status === "missed" ? hubText("fightTrackerI18n.absent") : hubText("fightTrackerI18n.oK")}
                               </button>
                               <span>{formatDate(fight.date)}</span>
                             </div>
@@ -4249,8 +4490,8 @@ function FightTable({
                         className={styles.mobileFightNavButton}
                         disabled={!canShowNewerFights}
                         onClick={() => updateFightWindowOffset(member.id, -1)}
-                        aria-label={`${member.name} neuere Fights anzeigen`}
-                        title="Neuere Fights"
+                        aria-label={hubText("fightTrackerI18n.newerFightsFor", { name: member.name })}
+                        title={hubText("fightTrackerI18n.newerFights")}
                       >
                         <ChevronRight size={14} aria-hidden />
                       </button>
@@ -4294,7 +4535,7 @@ function FightTable({
       {isExportPreviewOpen && participationExportPreview?.cacheKey === exportCacheKey ? (
         <ParticipationExportPreviewOverlay
           preview={participationExportPreview}
-          subtitle={`${formatMonthLabel(exportMonth)} · ${exportMonthFights.length} Fights`}
+          subtitle={hubText("fightTrackerI18n.monthFights", { month: formatMonthLabel(exportMonth), count: exportMonthFights.length })}
           onDownload={() => downloadPngUrl(participationExportPreview.url, participationExportPreview.fileBaseName)}
           onClose={() => {
             setIsExportPreviewOpen(false);
@@ -4352,28 +4593,28 @@ function ParticipationExportOverlay({
   onClose: () => void;
 }) {
   return (
-    <FunctionOverlay title="Participation exportieren" subtitle={`${formatMonthLabel(exportMonth)} · ${fightCount} Fights`} onClose={onClose}>
+    <FunctionOverlay title={hubText("fightTrackerI18n.exportParticipation")} subtitle={hubText("fightTrackerI18n.monthFights", { month: formatMonthLabel(exportMonth), count: fightCount })} onClose={onClose}>
       <section className={styles.exportPanel}>
-        <div className={styles.exportModeControl} role="group" aria-label="Exporttyp">
+        <div className={styles.exportModeControl} role="group" aria-label={hubText("fightTrackerI18n.exportType")}>
           <button
             type="button"
             className={`${styles.exportModeButton} ${exportType === "simple" ? styles.exportModeButtonActive : ""}`}
             onClick={() => onExportTypeChange("simple")}
           >
-            Einfach
+            {hubText("fightTrackerI18n.simple")}
           </button>
           <button
             type="button"
             className={`${styles.exportModeButton} ${exportType === "detailed" ? styles.exportModeButtonActive : ""}`}
             onClick={() => onExportTypeChange("detailed")}
           >
-            Detailliert
+            {hubText("fightTrackerI18n.detailed")}
           </button>
         </div>
 
         <div className={styles.exportOptionsGrid}>
           <label className={styles.field}>
-            <span>Monat</span>
+            <span>{hubText("fightTrackerI18n.month")}</span>
             <input type="month" value={exportMonth} onChange={(event) => onExportMonthChange(event.target.value)} />
           </label>
           <label className={styles.tableToggleField}>
@@ -4382,37 +4623,36 @@ function ParticipationExportOverlay({
               checked={showFormerMembers}
               onChange={(event) => onShowFormerMembersChange(event.target.checked)}
             />
-            <span>Ehemalige Gildenmitglieder anzeigen</span>
+            <span>{hubText("fightTrackerI18n.showFormerGuildMembers")}</span>
           </label>
         </div>
 
         <div className={styles.exportSummaryStrip}>
-          <InfoPill label="Fights im Monat" value={String(fightCount)} />
-          <InfoPill label="Mitglieder im Export" value={String(memberCount)} />
+          <InfoPill label={hubText("fightTrackerI18n.fightsThisMonth")} value={hubNumber(fightCount)} />
+          <InfoPill label={hubText("fightTrackerI18n.membersInExport")} value={hubNumber(memberCount)} />
         </div>
 
         {duplicateSlotCount ? (
           <div className={styles.slotWarning}>
             <AlertTriangle size={16} aria-hidden />
             <span>
-              Im gewaehlten Monat belegen mehrere gespeicherte Fights denselben Tages-Slot. Der Export wird blockiert, damit kein Fight
-              still ausgeblendet wird.
+              {hubText("fightTrackerI18n.multipleSavedFightsOccupyTheSameDailySlotInTheSelectedMonthExportIsBlockedToAvoidSilentlyHidingAFight")}
             </span>
           </div>
         ) : null}
-        {exportError ? <div className={styles.warningBanner}>{exportError}</div> : null}
+        {exportError ? <div className={styles.warningBanner}>{hubMessage(exportError)}</div> : null}
 
         <div className={styles.exportActions}>
           <button type="button" className={styles.secondaryAction} onClick={onClose}>
-            Abbrechen
+            {hubText("fightTrackerI18n.cancel")}
           </button>
           <button type="button" className={styles.secondaryAction} disabled={!canExport || isExporting} onClick={onPreview}>
             <FileImage size={16} aria-hidden />
-            {exportBusyAction === "preview" ? "Vorschau wird erstellt..." : "Vorschau"}
+            {exportBusyAction === "preview" ? hubText("fightTrackerI18n.creatingPreview") : hubText("fightTrackerI18n.preview")}
           </button>
           <button type="button" className={styles.primaryAction} disabled={!canExport || isExporting} onClick={onExport}>
             <Download size={16} aria-hidden />
-            {exportBusyAction === "download" ? "Export wird erzeugt..." : "Export erzeugen"}
+            {exportBusyAction === "download" ? hubText("fightTrackerI18n.creatingExport") : hubText("fightTrackerI18n.createExport")}
           </button>
         </div>
       </section>
@@ -4458,7 +4698,7 @@ function ParticipationExportPreviewOverlay({
 
   return (
     <FunctionOverlay
-      title="Participation Vorschau"
+      title={hubText("fightTrackerI18n.participationPreview")}
       subtitle={subtitle}
       dialogClassName={styles.exportPreviewDialog}
       bodyClassName={styles.exportPreviewDialogBody}
@@ -4466,26 +4706,26 @@ function ParticipationExportPreviewOverlay({
     >
       <section className={styles.exportPreviewPanel}>
         <div className={styles.exportPreviewControls}>
-          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("out")} disabled={zoom <= PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM}>
+          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("out")} aria-label={hubText("fightTrackerI18n.zoomOut")} disabled={zoom <= PARTICIPATION_EXPORT_PREVIEW_MIN_ZOOM}>
             -
           </button>
-          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("in")} disabled={zoom >= PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM}>
+          <button type="button" className={styles.secondaryAction} onClick={() => stepZoom("in")} aria-label={hubText("fightTrackerI18n.zoomIn")} disabled={zoom >= PARTICIPATION_EXPORT_PREVIEW_MAX_ZOOM}>
             +
           </button>
           <button type="button" className={styles.secondaryAction} onClick={() => setZoom(1)}>
-            100 %
+            {hubPercent(1)}
           </button>
           <button type="button" className={styles.secondaryAction} onClick={fitWidth}>
-            An Breite anpassen
+            {hubText("fightTrackerI18n.fitToWidth")}
           </button>
           <button type="button" className={styles.primaryAction} onClick={onDownload}>
             <Download size={16} aria-hidden />
-            Export herunterladen
+            {hubText("fightTrackerI18n.downloadExport")}
           </button>
         </div>
         <div className={styles.exportPreviewViewer} ref={viewerRef}>
           <img
-            alt="Participation Export Vorschau"
+            alt={hubText("fightTrackerI18n.participationExportPreview")}
             className={styles.exportPreviewImage}
             height={preview.height}
             src={preview.url}
@@ -4543,17 +4783,17 @@ const ParticipationExportReport = React.forwardRef<
       ) : (
         <header className={styles.exportReportHeader}>
           <div>
-            <p>Fight Participation</p>
+            <p>{hubText("fightTrackerI18n.fightParticipation")}</p>
             <h2>{tracker.name}</h2>
             <span>{monthLabel}</span>
           </div>
           <div className={styles.exportReportStats}>
-            <strong>{fights.length}</strong>
-            <span>Fights</span>
+            <strong>{hubNumber(fights.length)}</strong>
+            <span>{hubText("fightTrackerI18n.fights")}</span>
             {exportType === "detailed" ? (
               <>
-                <strong>{rows.length}</strong>
-                <span>Member</span>
+                <strong>{hubNumber(rows.length)}</strong>
+                <span>{hubText("fightTrackerI18n.member")}</span>
               </>
             ) : null}
           </div>
@@ -4564,7 +4804,7 @@ const ParticipationExportReport = React.forwardRef<
         <>
           <section className={styles.exportBlock}>
             <div className={styles.exportBlockHeader}>
-              <h3>Gilden-Activity</h3>
+              <h3>{hubText("fightTrackerI18n.guildActivity")}</h3>
               <span>{monthLabel}</span>
             </div>
             <ExportCalendarGrid days={days}>
@@ -4581,9 +4821,9 @@ const ParticipationExportReport = React.forwardRef<
           </section>
 
           <section className={styles.exportHighlights}>
-            <ExportHighlightCard title="Meiste verpasste Kaempfe" value={maxMissed ? `${maxMissed} Missed` : "-"} rows={mostMissedRows} />
-            <ExportHighlightCard title="Laengste Teilnahme-Serie" value={bestStreak ? `${bestStreak}x dabei` : "-"} rows={bestStreakRows} />
-            <ExportHighlightCard title="Keinen Kampf verpasst" value={String(perfectRows.length)} rows={perfectRows} />
+            <ExportHighlightCard title={hubText("fightTrackerI18n.mostMissedFights")} value={maxMissed ? hubText("fightTrackerI18n.missedCount", { count: maxMissed }) : "-"} rows={mostMissedRows} />
+            <ExportHighlightCard title={hubText("fightTrackerI18n.longestAttendanceStreak")} value={bestStreak ? hubText("fightTrackerI18n.streakPresent", { count: bestStreak }) : "-"} rows={bestStreakRows} />
+            <ExportHighlightCard title={hubText("fightTrackerI18n.noFightsMissed")} value={hubNumber(perfectRows.length)} rows={perfectRows} />
           </section>
         </>
       ) : null}
@@ -4637,10 +4877,10 @@ function ExportSimpleGuildInfo({
     <header className={`${styles.exportReportHeader} ${styles.exportSimpleGuildInfo}`}>
       <div className={styles.exportSimpleGuildMain}>
         <div className={styles.exportGuildEmblem}>
-          {emblemUrl ? <img src={emblemUrl} alt={`${guildName} Wappen`} /> : <span aria-hidden />}
+          {emblemUrl ? <img src={emblemUrl} alt={hubText("fightTrackerI18n.emblem", { name: guildName })} /> : <span aria-hidden />}
         </div>
         <div className={styles.exportSimpleGuildText}>
-          <p>Fight Participation</p>
+          <p>{hubText("fightTrackerI18n.fightParticipation")}</p>
           <h2>{guildName}</h2>
           <span>{monthLabel}</span>
         </div>
@@ -4648,12 +4888,12 @@ function ExportSimpleGuildInfo({
       <ExportSimpleGuildActivity days={activityDays} />
       <div className={styles.exportSimpleGuildMetrics}>
         <div>
-          <strong>{fightCount}</strong>
-          <span>Fights</span>
+          <strong>{hubNumber(fightCount)}</strong>
+          <span>{hubText("fightTrackerI18n.fights")}</span>
         </div>
         <div>
           <strong>{formatParticipationRate(participationRate)}</strong>
-          <span>Ø Beteiligung</span>
+          <span>{hubText("fightTrackerI18n.averageAttendance")}</span>
         </div>
       </div>
     </header>
@@ -4666,9 +4906,9 @@ function ExportSimpleGuildActivity({ days }: { days: GuildActivityDay[] }) {
   return (
     <div
       className={styles.exportGuildActivity}
-      aria-label="Guild Activity im Monat"
+      aria-label={hubText("fightTrackerI18n.guildActivityThisMonth")}
     >
-      <div className={styles.exportGuildActivityTitle}>Guild Activity</div>
+      <div className={styles.exportGuildActivityTitle}>{hubText("fightTrackerI18n.guildActivity")}</div>
       <div className={styles.exportGuildActivityTimeline}>
         <div className={styles.exportGuildActivityDays} style={gridStyle}>
           {days.map((day) => (
@@ -4677,7 +4917,7 @@ function ExportSimpleGuildActivity({ days }: { days: GuildActivityDay[] }) {
         </div>
         {FIGHT_SLOTS.map((slot) => (
           <React.Fragment key={slot}>
-            <span className={styles.exportGuildActivityFightLabel}>F{slot}</span>
+            <span className={styles.exportGuildActivityFightLabel}>{hubText("fightTrackerI18n.fightShort")}{slot}</span>
             <div className={styles.exportGuildActivityCells} style={gridStyle}>
               {days.map((day) => {
                 const fight = day.fights[slot];
@@ -4693,14 +4933,14 @@ function ExportSimpleGuildActivity({ days }: { days: GuildActivityDay[] }) {
                           : styles.exportGuildActivityEmpty;
                 const valueLabel = fight.hasFight
                   ? fight.evaluated
-                    ? `${formatParticipationRate(fight.rate)} (${fight.ok}/${fight.evaluated})`
-                    : "keine Bewertung"
-                  : "kein Fight";
+                    ? `${formatParticipationRate(fight.rate)} (${hubNumber(fight.ok)}/${hubNumber(fight.evaluated)})`
+                    : hubText("fightTrackerI18n.notEvaluated")
+                  : hubText("fightTrackerI18n.noFight");
                 return (
                   <span
                     key={`${day.date}-${slot}`}
                     className={`${styles.exportGuildActivityDay} ${levelClass}`}
-                    title={`Fight ${slot} ${formatDate(day.date)}: ${valueLabel}`}
+                    title={hubText("fightTrackerI18n.activityTitle", { number: slot, date: formatDate(day.date), value: valueLabel })}
                   />
                 );
               })}
@@ -4715,11 +4955,11 @@ function ExportSimpleGuildActivity({ days }: { days: GuildActivityDay[] }) {
 function ExportSimpleMemberHeader() {
   return (
     <div className={`${styles.exportSimpleRow} ${styles.exportSimpleHeader}`}>
-      <span>Member</span>
-      <span>Missed</span>
-      <span>Quote</span>
-      <span>Letzter Fehlkampf</span>
-      <span>Serie</span>
+      <span>{hubText("fightTrackerI18n.member")}</span>
+      <span>{hubText("fightTrackerI18n.missed")}</span>
+      <span>{hubText("fightTrackerI18n.absenceRate")}</span>
+      <span>{hubText("fightTrackerI18n.lastMissedFight")}</span>
+      <span>{hubText("fightTrackerI18n.streak")}</span>
     </div>
   );
 }
@@ -4733,8 +4973,8 @@ function ExportSimpleMemberRow({
 }) {
   const memberMetaParts = [
     formatMemberClassName(row.member.className),
-    row.level != null ? `Level ${row.level.toLocaleString("de-DE")}` : null,
-    !row.member.active ? "nicht mehr in aktueller Gilde" : null,
+    row.level != null ? hubText("fightTrackerI18n.levelValue", { value: row.level }) : null,
+    !row.member.active ? hubText("fightTrackerI18n.noLongerInCurrentGuild") : null,
   ].filter((entry): entry is string => Boolean(entry));
 
   return (
@@ -4744,14 +4984,14 @@ function ExportSimpleMemberRow({
           <strong>
             {row.member.name}
             {hasPerfectMonthParticipation(row) ? (
-              <span className={styles.exportPerfectMarker} title="Keinen Fight verpasst">
+              <span className={styles.exportPerfectMarker} title={hubText("fightTrackerI18n.noFightsMissed")}>
                 ★
               </span>
             ) : null}
           </strong>
           {memberMetaParts.length ? <span>{memberMetaParts.join(" · ")}</span> : null}
         </div>
-        <strong>{row.missed}</strong>
+        <strong>{hubNumber(row.missed)}</strong>
         <strong>{formatQuote(row.missed, row.evaluated)}</strong>
         <strong>{row.lastMissedFight ? formatDate(row.lastMissedFight.date) : "-"}</strong>
         <strong>{formatStreak(row.streakStatus, row.streakCount)}</strong>
@@ -4770,15 +5010,15 @@ function ExportSimpleFightTimeline({ fights, memberId }: { fights: GuildFight[];
         const status = getFightMemberStatus(fight, memberId);
         const statusClass =
           status === "ok" ? styles.exportActivityOk : status === "missed" ? styles.exportActivityMissed : styles.exportActivityUnknown;
-        const statusLabel = status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?";
+        const statusLabel = status === "ok" ? hubText("fightTrackerI18n.oK") : status === "missed" ? hubText("fightTrackerI18n.absent") : "?";
         return (
           <div
             key={fight.id}
             className={styles.exportSimpleFightBlock}
-            title={`Fight ${fight.fightNumber} ${formatDate(fight.date)}: ${statusLabel}`}
+            title={hubText("fightTrackerI18n.activityTitle", { number: fight.fightNumber, date: formatDate(fight.date), value: statusLabel })}
           >
             <span className={`${styles.exportSimpleFightCell} ${statusClass}`} />
-            <strong>{formatShortDate(fight.date)} · F{fight.fightNumber}</strong>
+            <strong>{formatShortDate(fight.date)} · {hubText("fightTrackerI18n.fightShort")}{fight.fightNumber}</strong>
           </div>
         );
       })}
@@ -4789,8 +5029,8 @@ function ExportSimpleFightTimeline({ fights, memberId }: { fights: GuildFight[];
 function ExportMemberSummary({ row }: { row: ParticipationDerivedRow }) {
   const memberMetaParts = [
     formatMemberClassName(row.member.className),
-    row.level != null ? `Level ${row.level.toLocaleString("de-DE")}` : null,
-    !row.member.active ? "nicht mehr in aktueller Gilde" : null,
+    row.level != null ? hubText("fightTrackerI18n.levelValue", { value: row.level }) : null,
+    !row.member.active ? hubText("fightTrackerI18n.noLongerInCurrentGuild") : null,
   ].filter((entry): entry is string => Boolean(entry));
 
   return (
@@ -4799,10 +5039,10 @@ function ExportMemberSummary({ row }: { row: ParticipationDerivedRow }) {
         <strong>{row.member.name}</strong>
         <span>{memberMetaParts.join(" · ")}</span>
       </div>
-      <ExportMetric label="Missed" value={String(row.missed)} />
-      <ExportMetric label="Quote" value={formatQuote(row.missed, row.evaluated)} />
-      <ExportMetric label="Letzter Fehlkampf" value={row.lastMissedFight ? formatDate(row.lastMissedFight.date) : "-"} />
-      <ExportMetric label="Serie" value={formatStreak(row.streakStatus, row.streakCount)} />
+      <ExportMetric label={hubText("fightTrackerI18n.missed")} value={hubNumber(row.missed)} />
+      <ExportMetric label={hubText("fightTrackerI18n.absenceRate")} value={formatQuote(row.missed, row.evaluated)} />
+      <ExportMetric label={hubText("fightTrackerI18n.lastMissedFight")} value={row.lastMissedFight ? formatDate(row.lastMissedFight.date) : "-"} />
+      <ExportMetric label={hubText("fightTrackerI18n.streak")} value={formatStreak(row.streakStatus, row.streakCount)} />
     </div>
   );
 }
@@ -4881,7 +5121,7 @@ function ExportFightDayCells({
             <span
               key={slot}
               className={`${styles.exportActivityCell} ${rateClass}`}
-              title={`Fight ${slot} ${formatDate(date)}: ${rate == null ? "keine Bewertung" : `${Math.round(rate * 100)}%`}`}
+              title={hubText("fightTrackerI18n.activityTitle", { number: slot, date: formatDate(date), value: rate == null ? hubText("fightTrackerI18n.notEvaluated") : hubPercent(rate) })}
             />
           );
         }
@@ -4893,7 +5133,7 @@ function ExportFightDayCells({
           <span
             key={slot}
             className={`${styles.exportActivityCell} ${statusClass}`}
-            title={`Fight ${slot} ${formatDate(date)}: ${status === "ok" ? "OK" : status === "missed" ? "Fehlt" : "?"}`}
+            title={hubText("fightTrackerI18n.activityTitle", { number: slot, date: formatDate(date), value: status === "ok" ? hubText("fightTrackerI18n.oK") : status === "missed" ? hubText("fightTrackerI18n.absent") : "?" })}
           />
         );
       })}

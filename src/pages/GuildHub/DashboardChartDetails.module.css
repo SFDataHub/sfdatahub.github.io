@@ -1,0 +1,146 @@
+.detailButton { display:inline-grid; place-items:center; vertical-align:middle; margin-left:6px; width:26px; height:26px; padding:0; border:1px solid #2b4c73; border-radius:6px; color:#b7d4ff; background:#152a42; cursor:pointer; }
+.detailButton:focus-visible, .panel :is(button,input,select):focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.compare { height:var(--guild-trend-body-height); min-width:0; display:flex; flex-direction:column; }
+.heading { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:29px; }
+.heading h2 { display:flex; align-items:center; margin:0; font-size:14px; color:#b7d4ff; }
+.metric { display:flex; align-items:center; gap:8px; font-size:12px; flex-wrap:wrap; }
+.metric select,.members button { color:#f5f9ff; background:#152a42; border:1px solid #2b4c73; border-radius:6px; padding:5px; }
+.lineFrame { composes: developmentChartFrame from "./Fusion.module.css"; flex:1; height:310px; min-height:0; position:relative; min-width:0; box-sizing:border-box; padding:0; border:0; background:transparent; }
+/* Profile geometry must also win over later copies of the composed Fusion rules. */
+.compare:has(> [data-profile-chart-hud]) > .lineFrame { min-height:0; padding:0; border:0; background:transparent; }
+.lineFrame > :global(.player-profile__trend-wrapper),
+.compare:has(> [data-profile-chart-hud]) > .lineFrame > :global(.player-profile__trend-wrapper) { width:100%; height:100%; }
+.lineFrame :global(.player-profile__trend-chart),
+.compare:has(> [data-profile-chart-hud]) > .lineFrame :global(.player-profile__trend-chart) { display:block; width:100%; height:100%; }
+.panel { width:min(1200px,100%); }
+.detailGrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,240px); gap:20px; margin-top:16px; }
+.visual { min-width:0; }
+.visual > :global([data-class-distribution]) { max-width:420px; margin:auto; }
+.visual .lineFrame { height:380px; }
+.members { min-width:0; max-height:430px; overflow:auto; border:1px solid #2b4c73; border-radius:8px; }
+.members label { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; overflow-wrap:anywhere; }
+.members small { color:#b0c4d9; margin-left:auto; }
+.tableScroll { overflow:auto; max-height:360px; }
+.tableScroll table { width:100%; border-collapse:collapse; font-size:13px; }
+.tableScroll :is(th,td) { text-align:left; padding:8px; border-bottom:1px solid #2b4c73; white-space:nowrap; }
+.tableScroll caption { text-align:left; padding:12px 0; font-weight:700; }
+@media(max-width:640px) { .heading { align-items:flex-start; } .metric { max-width:150px; } .detailGrid { grid-template-columns:minmax(0,1fr); } .members { max-height:210px; } .visual .lineFrame { height:300px; } }
+.infoRoot { --guild-trend-muted:#b0c4d9; --guild-trend-bg:#0d1b2d; --guild-trend-text:#f5f9ff; --guild-trend-accent:#67d7ff; --guild-trend-border:#2b4c73; position:relative; flex:0 0 auto; }
+.infoRoot > button { width:22px; height:22px; }
+.historyInfo { width:min(340px,calc(100vw - 48px)); box-sizing:border-box; }
+.historyInfo p { display:block; margin:7px 0; }
+.legendSolid,.legendDashed { display:inline-block; width:24px; border-top:2px solid #6ee7a8; margin-right:8px; vertical-align:middle; }
+.legendDashed { border-top-style:dashed; }
+.legendHollow { display:inline-block; width:6px; height:6px; border:1.4px solid #929cab; border-radius:50%; margin-right:8px; vertical-align:middle; }
+.compare { position:relative; }
+.metricLegend { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:11px; color:#b0c4d9; margin:3px 0; flex-shrink:0; }
+/* The emblem grid lives in the overlaying display disclosure. */
+.guildLegend { display:grid; grid-template-columns:repeat(auto-fit,minmax(44px,1fr)); justify-items:center; align-content:start; gap:8px; min-width:0; scrollbar-width:thin; padding:4px; box-sizing:border-box; }
+.guildEmblem { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:transparent; opacity:.4; cursor:pointer; transition:opacity 180ms ease,box-shadow 180ms ease; }
+.guildEmblem[aria-pressed=true] { opacity:1; box-shadow:0 0 0 2px var(--guild-card-accent); }
+.guildEmblem[data-current-guild] { box-shadow:0 0 0 2px var(--guild-card-accent),0 0 10px var(--guild-card-accent); cursor:default; }
+.guildEmblem:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.scanPopover { position:absolute; z-index:5; top:32px; left:0; right:0; max-height:calc(100% - 32px); overflow:auto; background:#0d1b2d; border:1px solid #2b4c73; border-radius:8px; }
+.scanDetails { border:1px solid #2b4c73; border-radius:8px; padding:12px; margin:8px 0; }
+.scanDetails h3 { margin:0; font-size:14px; overflow-wrap:anywhere; }
+.scanDetails button,.tableScroll button { color:#b7d4ff; background:#152a42; border:1px solid #2b4c73; border-radius:5px; padding:3px 7px; cursor:pointer; }
+.scanDetails dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+.scanDetails dt { color:#b0c4d9; font-size:11px; }
+.scanDetails dd { margin:0; font-size:12px; }
+.noMeasurements { position:absolute; top:12px; left:70px; color:#b0c4d9; font-size:12px; }
+.lineFrame[data-no-measurements] :global(.player-profile__trend-y-axis text) { display:none; }
+.lineFrame :global([data-scan-marker]:focus-visible) { outline:none; }
+.lineFrame :global([data-scan-marker]:focus-visible circle) { stroke:#f5f9ff; stroke-width:2; }
+.lineFrame :global([data-scan-marker][role=button]) { cursor:pointer; }
+
+.metricToggle { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+.metricToggle input { margin:0; accent-color:#55dba6; cursor:pointer; }
+.metricToggle:has(input:checked) { color:#f5f9ff; }
+.metricToggle input:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.metricEmpty { flex:1; display:grid; place-items:center; margin:0; color:#b0c4d9; font-size:12px; text-align:center; }
+
+
+.compareDetail { min-width:0; }
+.modeToggle { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.modeToggle button { padding:6px 12px; border:1px solid #2b4c73; border-radius:6px; background:#152a42; color:#b0c4d9; cursor:pointer; }
+.modeToggle button[aria-pressed=true] { color:#f5f9ff; border-color:#55dba6; }
+.compareDetail .compare { height:auto; }
+.compareDetail .lineFrame { flex:none; height:clamp(340px,55vh,640px); margin:10px 0; }
+.compareDetail .metricEmpty { min-height:340px; }
+
+.compareActions { display:flex; align-items:center; gap:8px; }
+.displayRoot { position:relative; }
+.displayTrigger { display:flex; align-items:center; gap:6px; border:1px solid #2b4c73; border-radius:6px; padding:4px 8px; background:#152a42; color:#f5f9ff; font-size:12px; cursor:pointer; }
+.displayPopup { position:absolute; top:calc(100% + 6px); left:0; z-index:6; display:grid; grid-template-columns:minmax(0,1fr); gap:12px; width:392px; overflow:auto; overscroll-behavior:contain; max-width:calc(100vw - 48px); padding:12px; box-sizing:border-box; border:1px solid #2b4c73; border-radius:8px; background:#0d1b2d; color:#b0c4d9; box-shadow:0 8px 24px #0008; font-size:12px; }
+.metricChoices { display:grid; gap:10px; }
+.selectGuilds { padding:6px 8px; border:1px solid #2b4c73; border-radius:6px; background:#152a42; color:#f5f9ff; font:inherit; cursor:pointer; }
+.selectGuilds:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.displayChoices:has(.metricChoices) { border-top:1px solid #2b4c73; padding-top:10px; }
+.compareValues { flex:0 0 52px; min-width:0; overflow:auto; padding:3px 0; box-sizing:border-box; color:#b0c4d9; font-size:11px; line-height:13px; }
+.compareValues p { display:inline; margin:2px 0; font-size:10px; overflow-wrap:anywhere; }
+.compareValues p + p::before { content:" · "; }
+.compareValues strong { color:#f5f9ff; }
+.compareValues dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:6px; margin:3px 0 0; }
+.compareValues dt { display:inline-flex; margin-right:5px; align-items:center; gap:5px; }
+.compareValues i { width:12px; height:3px; flex:0 0 12px; }
+.compareValues dd { display:inline; margin:3px 0; color:#f5f9ff; font-variant-numeric:tabular-nums; }
+.compareValues small { font-size:10px; }
+.compareValues small[data-compare-delta] { white-space:nowrap; }
+.compareDetail .compareValues { flex:none; min-height:112px; overflow:visible; }
+@media(max-width:640px) {
+  .compareDetail .lineFrame { height:340px; }
+  .compareValues { flex-basis:142px; }
+  .compareValues p { display:block; }
+  .compareValues p + p::before { content:none; }
+  .compareValues dd { display:block; }
+  .compareValues dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .compareValues small[data-compare-delta] { display:block; }
+}
+
+@media (min-width:981px) and (max-width:1200px) {
+  .compareValues { flex-basis:80px; }
+}
+
+.displayPopup[hidden] { display:none; }
+.displayChoices { display:grid; align-content:start; gap:16px; }
+.legendHatched { display:inline-block; width:13px; height:13px; border:1.4px solid #6ee7a8; border-radius:50%; margin-right:8px; vertical-align:middle; background:repeating-linear-gradient(135deg,transparent 0 3px,#6ee7a8 3px 4px); }
+@media(prefers-reduced-motion:reduce) { .guildEmblem { transition:none; } .compare { --progress-emphasis-duration:0ms; } }
+
+.lineFrame :global(.player-profile__trend-vertical-marker > line) { stroke:rgba(177,195,230,.42); stroke-dasharray:4 6; stroke-width:1.25; pointer-events:none; }
+.lineFrame :global(.player-profile__trend-vertical-marker-hitline) { display:none; }
+
+/* Shared presentation for independent profile and member information targets. */
+.compareInformation { min-width:0; box-sizing:border-box; color:#b0c4d9; overflow-wrap:anywhere; overflow-anchor:none; }
+.compareInformation [data-compare-values] { overflow:visible; padding:0; }
+.compareInformation [data-compare-values] p { display:block; margin:0 0 6px; font-size:11px; line-height:1.35; }
+.compareInformation [data-compare-values] p + p::before { content:none; }
+.compareInformation [data-compare-values] dl { grid-template-columns:minmax(0,1fr); gap:8px; }
+.compareInformation [data-compare-values] :is(dt,dd,small) { display:block; margin:0; }
+.compareInformation [data-compare-values] dt { display:flex; }
+.compareInformation [data-compare-delta] { white-space:normal; }
+@media(max-width:980px) { .compareInformation [data-compare-values] dl { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.compareInformation [data-compare-value] {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:2px 6px;
+  align-items:baseline;
+}
+.compareInformation [data-compare-value] dd { text-align:right; }
+
+/* Profile-only preview occupies the existing space above the plot. */
+.profileGuildPreview { position:absolute; z-index:1; top:36px; left:4px; right:4px; height:24px; display:flex; align-items:center; justify-content:center; gap:4px; pointer-events:none; }
+.profileGuildPreviewEmblem { display:grid; place-items:center; flex:0 0 24px; min-width:0; height:24px; aspect-ratio:1; pointer-events:auto; }
+.profileGuildPreviewEmblem > span { zoom:calc(24 / 42); }
+.profileGuildPreview:has(~ [data-no-measurements]) { top:32px; height:16px; }
+.profileGuildPreview:has(~ [data-no-measurements]) .profileGuildPreviewEmblem { height:16px; flex-basis:16px; }
+.profileGuildPreview:has(~ [data-no-measurements]) .profileGuildPreviewEmblem > span { zoom:calc(16 / 42); }
+@container (max-width:420px) {
+  .profileGuildPreview { height:16px; }
+  .profileGuildPreviewEmblem { height:16px; flex-basis:16px; }
+  .profileGuildPreviewEmblem > span { zoom:calc(16 / 42); }
+}
+.compareInformation [data-compare-coverage] { grid-column:1 / -1; }
+
+.rangeSelect { display:grid; gap:4px; min-width:0; margin-top:8px; color:#b0c4d9; font-size:11px; }
+.rangeSelect select { width:100%; min-width:0; border:1px solid #2b4c73; border-radius:6px; padding:4px 6px; background:#0f2135; color:#f5f9ff; font:inherit; }
+.rangeSelect select:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }

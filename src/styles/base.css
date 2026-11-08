@@ -10,6 +10,7 @@
   --sidebar-total-w: var(--sidebar-w);
   /* Globaler Zusatzabstand unten für alle Seiten (klein, auch ohne Footer) */
   --content-bottom-pad: 24px; /* Desktop-Default */
+  --content-bottom-inset: calc(var(--content-bottom-pad) + 24px + env(safe-area-inset-bottom));
   --app-topbar-h: var(--topbar-h, 90px);
   --app-overlay-top: var(--app-topbar-h);
   --app-overlay-inset: var(--app-overlay-top) 0 0 0;
@@ -60,7 +61,7 @@
 .content{
   margin-left: var(--sidebar-total-w);
   /* top padding = topbar-h; unten kleine Luft + safe-area */
-  padding: var(--topbar-h) 16px calc(var(--content-bottom-pad) + 24px + env(safe-area-inset-bottom)) 16px;
+  padding: var(--topbar-h) 16px var(--content-bottom-inset) 16px;
   min-height: 100vh;
   transition: margin-left .25s ease;
 }
@@ -99,7 +100,7 @@
 /* Content räumt exakt so viel Platz wie --left frei */
 #app-shell .content{
   margin-left: var(--left);
-  padding: var(--topbar-h) 16px calc(var(--content-bottom-pad) + 24px + env(safe-area-inset-bottom)) 16px;
+  padding: var(--topbar-h) 16px var(--content-bottom-inset) 16px;
   min-height: 100vh;
   position: relative;
   z-index: 1;
@@ -107,21 +108,21 @@
 }
 
 /* Optional, aber hilfreich: Content-Inner-Struktur */
-#app-shell .content-inner{ min-height: calc(100vh - var(--topbar-h)); display:flex; flex-direction:column; }
+#app-shell .content-inner{ min-height: calc(100vh - var(--topbar-h) - var(--content-bottom-inset)); display:flex; flex-direction:column; }
 
-/* >>> SCROLL-FIX: Seite darf scrollen; Scroll findet in content-body statt */
-html, body { height: 100%; overflow: auto; }
-#app-shell, #app-shell .content, #app-shell .content-inner, #app-shell .content-body {
-  height: 100%;
-}
-#app-shell .content-body { overflow: auto !important; }
+/* The document owns page scrolling; tables, shells and dialogs keep their own bounds. */
+html { height: 100%; overflow: visible; }
+body { height: 100%; overflow: auto; }
+#app-shell { min-height: 100%; }
+#app-shell .content-body { overflow: visible !important; }
 
 /* === Scrollbar UNSICHTBAR (transparent) – global für Body & Content === */
 /* Firefox */
-#app-shell .content-body, body {
+html, #app-shell .content-body, body {
   scrollbar-width: none;              /* keine sichtbare Leiste */
 }
 /* WebKit/Blink */
+html::-webkit-scrollbar,
 #app-shell .content-body::-webkit-scrollbar,
 body::-webkit-scrollbar{
   width: 0 !important;
@@ -165,12 +166,15 @@ body::-webkit-scrollbar{
 
 /* Responsive: noch etwas kompakter unten auf kleinen Screens */
 @media (max-width: 768px){
-  :root{ --content-bottom-pad: 16px; }
+  :root{
+    --content-bottom-pad: 16px;
+    --content-bottom-inset: calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom));
+  }
   .content{
-    padding: var(--topbar-h) 12px calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom)) 12px;
+    padding: var(--topbar-h) 12px var(--content-bottom-inset) 12px;
   }
   #app-shell .content{
-    padding: var(--topbar-h) 12px calc(var(--content-bottom-pad) + 20px + env(safe-area-inset-bottom)) 12px;
+    padding: var(--topbar-h) 12px var(--content-bottom-inset) 12px;
   }
 }
 

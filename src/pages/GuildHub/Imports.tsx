@@ -1,7 +1,9 @@
+import { useRuntimeAuditCommit } from "../../lib/data-hub/useRuntimeAuditCommit";
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditCaught, auditAccept, auditFields } from "../../lib/data-hub/runtimeAudit";
+import GuildHubBackLink from "../../components/guildhub/GuildHubBackLink";
 import React from "react";
 import { Trash2, Upload } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
-import GuildContextBar from "../../components/guilds/GuildContextBar";
 import {
   deleteGuildHubLocalScans,
   importGuildHubLocalScan,
@@ -29,19 +31,26 @@ export default function GuildHubImports() {
   const [feedback, setFeedback] = React.useState<ImportFeedback | null>(null);
   const [storageError, setStorageError] = React.useState<string | null>(null);
 
+  useRuntimeAuditCommit(scans, !loading, "direct-import-inventory");
   const loadScans = React.useCallback(async () => {
+    const __audit1 = auditBegin("F33", "loadScans");
+    try {
     setStorageError(null);
     try {
-      const rows = await listGuildHubLocalScans();
-      setScans(rows);
+      const rows = await (auditValue(__audit1, auditEnter(__audit1, "listGuildHubLocalScans"), (listGuildHubLocalScans())));
+      auditAccept(__audit1, rows);
+      (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setScans", "sync-elapsed"), (setScans(rows))));
       setSelectedIds((current) => new Set(rows.filter((scan) => current.has(scan.id)).map((scan) => scan.id)));
-    } catch (error) {
+    } catch (error) { auditError(__audit1, error);
       console.error("[GuildHubImport] failed to load local scans", error);
       setStorageError("Lokale Scans konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
-  }, []);
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+}, []);
 
   React.useEffect(() => {
     void loadScans();
@@ -55,9 +64,12 @@ export default function GuildHubImports() {
   };
 
   const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const __audit2 = auditBegin("F36", "handleFilesSelected");
+    if (__audit2) auditFields(__audit2, { directImport: true, dataJobOwner: false });
+    try {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (!files.length) return;
+    if (!files.length) return auditReturn(__audit2, undefined);
 
     setImporting(true);
     setStorageError(null);
@@ -66,23 +78,26 @@ export default function GuildHubImports() {
 
     for (const file of files) {
       try {
-        const content = await file.text();
-        const result = await importGuildHubLocalScan(file.name, content);
+        const content = await (auditValue(__audit2, auditEnter(__audit2, "file.text"), (file.text())));
+        const result = await (auditValue(__audit2, auditEnter(__audit2, "importGuildHubLocalScan"), (importGuildHubLocalScan(file.name, content))));
         if (result.status === "duplicate") {
           nextFeedback.duplicates.push(file.name);
         } else {
           nextFeedback.imported.push(file.name);
         }
-      } catch (error) {
+      } catch (error) { auditCaught(__audit2, error);
         const message = error instanceof Error ? error.message : "Datei konnte nicht importiert werden.";
         nextFeedback.errors.push({ filename: file.name, message });
       }
     }
 
     setFeedback(nextFeedback);
-    await loadScans();
+    await (auditValue(__audit2, auditEnter(__audit2, "loadScans"), (loadScans())));
     setImporting(false);
-  };
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
+};
 
   const toggleScan = (id: string) => {
     setSelectedIds((current) => {
@@ -107,23 +122,28 @@ export default function GuildHubImports() {
   };
 
   const deleteSelectedScans = async () => {
+    const __audit3 = auditBegin("F36", "deleteSelectedScans");
+    try {
     const ids = [...selectedIds];
-    if (!ids.length) return;
+    if (!ids.length) return auditReturn(__audit3, undefined);
 
     setDeleting(true);
     setStorageError(null);
     try {
-      await deleteGuildHubLocalScans(ids);
+      await (auditValue(__audit3, auditEnter(__audit3, "deleteGuildHubLocalScans"), (deleteGuildHubLocalScans(ids))));
       setSelectedIds(new Set());
       setFeedback(null);
-      await loadScans();
-    } catch (error) {
+      await (auditValue(__audit3, auditEnter(__audit3, "loadScans"), (loadScans())));
+    } catch (error) { auditError(__audit3, error);
       console.error("[GuildHubImport] failed to delete local scans", error);
       setStorageError("Ausgewählte Scans konnten nicht gelöscht werden.");
     } finally {
       setDeleting(false);
     }
-  };
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
+};
 
   const allVisibleSelected = scans.length > 0 && scans.every((scan) => selectedIds.has(scan.id));
 
@@ -155,7 +175,8 @@ export default function GuildHubImports() {
       />
 
       <div className="space-y-4">
-        <GuildContextBar />
+        <GuildHubBackLink />
+
         <FeedbackPanel feedback={feedback} storageError={storageError} />
 
         <section

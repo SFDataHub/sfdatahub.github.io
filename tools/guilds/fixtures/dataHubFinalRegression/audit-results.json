@@ -1,0 +1,240 @@
+{
+  "baselineFileCount": 1131,
+  "changedExisting": [
+    "tools/guilds/fixtures/dataHubRoutes/fixture.tsx",
+    "tools/guilds/fixtures/localPlayerAnalyticsExecution/after.json",
+    "tools/scanArchive/fixtures/dataHubScanInventory/fixture.tsx",
+    "tmp/data-hub-workbook.md"
+  ],
+  "missingExisting": [],
+  "new": [
+    "tools/guilds/dataHubFinalRegression.browser.test.mts",
+    "tools/guilds/dataHubNeighbors.test.mts",
+    "tools/guilds/fixtures/dataHubFinalRegression/browser-guards-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/browser-guards-retry-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/browser-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/fixture.tsx",
+    "tools/guilds/fixtures/dataHubFinalRegression/guard-findings.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/large-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/metrics.ts",
+    "tools/guilds/fixtures/dataHubFinalRegression/mocks.tsx",
+    "tools/guilds/fixtures/dataHubFinalRegression/neighbor-node-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/neighbor-reload-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/neighbor-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/opening-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/overlay-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/prepared-dashboard-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/proof.html",
+    "tools/guilds/fixtures/dataHubFinalRegression/recovery-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/regression-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/reload-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/runBrowserGuards.mjs",
+    "tools/guilds/fixtures/dataHubFinalRegression/runChecks.mjs",
+    "tools/guilds/fixtures/dataHubFinalRegression/runNeighbors.mjs",
+    "tools/guilds/fixtures/dataHubFinalRegression/runRegression.mjs",
+    "tools/guilds/fixtures/dataHubFinalRegression/technical-results.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/tsconfig.json",
+    "tools/guilds/fixtures/dataHubFinalRegression/audit-results.json"
+  ],
+  "productionSrcByteEqual": true,
+  "analysisByteEqual": true,
+  "historicalW00toW13ByteEqual": true,
+  "HEAD": "47297c3a0e5322f5a3caeb53e1fbd5f40bf6ba23",
+  "unexpectedChangedExisting": [],
+  "whitespaceAndConflictChecks": [
+    {
+      "file": "tools/guilds/fixtures/dataHubRoutes/fixture.tsx",
+      "examinedLines": 164,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/localPlayerAnalyticsExecution/after.json",
+      "examinedLines": 174,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/scanArchive/fixtures/dataHubScanInventory/fixture.tsx",
+      "examinedLines": 182,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tmp/data-hub-workbook.md",
+      "examinedLines": 188,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/dataHubFinalRegression.browser.test.mts",
+      "examinedLines": 183,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/dataHubNeighbors.test.mts",
+      "examinedLines": 41,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/browser-guards-results.json",
+      "examinedLines": 102,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/browser-guards-retry-results.json",
+      "examinedLines": 12,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/browser-results.json",
+      "examinedLines": 284,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/fixture.tsx",
+      "examinedLines": 346,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/guard-findings.json",
+      "examinedLines": 12,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/large-results.json",
+      "examinedLines": 5649,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/metrics.ts",
+      "examinedLines": 89,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/mocks.tsx",
+      "examinedLines": 1,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/neighbor-node-results.json",
+      "examinedLines": 58,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/neighbor-reload-results.json",
+      "examinedLines": 69,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/neighbor-results.json",
+      "examinedLines": 347,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/opening-results.json",
+      "examinedLines": 1644,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/overlay-results.json",
+      "examinedLines": 1101,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/prepared-dashboard-results.json",
+      "examinedLines": 825,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/proof.html",
+      "examinedLines": 1,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/recovery-results.json",
+      "examinedLines": 127,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/regression-results.json",
+      "examinedLines": 458,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/reload-results.json",
+      "examinedLines": 2698,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/runBrowserGuards.mjs",
+      "examinedLines": 12,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/runChecks.mjs",
+      "examinedLines": 32,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/runNeighbors.mjs",
+      "examinedLines": 11,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/runRegression.mjs",
+      "examinedLines": 36,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/technical-results.json",
+      "examinedLines": 66,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    },
+    {
+      "file": "tools/guilds/fixtures/dataHubFinalRegression/tsconfig.json",
+      "examinedLines": 6,
+      "trailingWhitespaceLines": [],
+      "conflictMarkerLines": []
+    }
+  ],
+  "runtime": "Windows node.exe v22.19.0 and Windows Chrome, native browser IndexedDB/Web Locks/workers",
+  "ownProductionBuildCopiesInRepo": 0,
+  "externalBuildRemoved": true,
+  "existingRegeneratedNodeArtifact": "localPlayerAnalyticsExecution/after.json; original bytes not backed up, historic workbook evidence retained",
+  "passed": true,
+  "auditFileSelfExcludedFromRecursiveHash": true,
+  "externalTempFinalReadOnlyCheck": {
+    "temp": "C:\\Users\\danny\\AppData\\Local\\Temp",
+    "w14DirectoriesRemaining": []
+  },
+  "auditCommand": "python3 /tmp/w14-audit.py",
+  "auditExitCode": 0,
+  "nativeGitStatusCommand": "git.exe status --short --untracked-files=all",
+  "nativeGitStatusExitCode": 0
+}

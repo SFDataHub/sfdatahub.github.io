@@ -1,0 +1,6 @@
+{
+ "extends":"../../../../tsconfig.json",
+ "compilerOptions":{"strict":true,"noEmit":true,"allowImportingTsExtensions":true,"lib":["ES2022","DOM","DOM.Iterable"],"types":["node"],"jsx":"react-jsx"},
+ "include":["./*.ts","./*.tsx","./*.mts","../../localPlayerCurrentProfile.browser.test.mts","../../localPlayerAnalyticsExecution.browser.test.mts","../../dataHubRoutes.browser.test.mts","../currentProfile/*.tsx","../localPlayerAnalyticsExecution/*.ts","../localPlayerAnalyticsExecution/*.tsx","../dataHubRoutes/*.tsx","../pageContexts/fixture.tsx","../../../../src/**/*.d.ts"],
+ "exclude":[]
+}

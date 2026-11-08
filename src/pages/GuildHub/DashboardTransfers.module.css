@@ -1,0 +1,78 @@
+/* Preserve the transfer card and its existing list presentation. */
+.panel {
+  position: relative;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #2b4c73;
+  border-radius: 12px;
+  color: #f5f9ff;
+  background: linear-gradient(180deg, rgba(10, 24, 40, 0.56) 0%, rgba(8, 20, 34, 0.44) 100%);
+}
+.title { margin: 0; font-size: 14px; font-weight: 800; line-height: 20px; text-transform: uppercase; letter-spacing: 0.18em; }
+.period { display: block; margin: 2px 0 0; color: #b0c4d9; font-size: 10px; line-height: 15px; letter-spacing: 0.025em; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.group {
+  --tone: #5cc689;
+  --muted-tone: rgba(92, 198, 137, 0.18);
+  --chip-border: rgba(92, 198, 137, 0.44);
+  --chip-bg: linear-gradient(135deg, rgba(92, 198, 137, 0.32) 0%, rgba(92, 198, 137, 0.14) 100%);
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(92, 198, 137, 0.34);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 38, 30, 0.64) 0%, rgba(8, 22, 40, 0.7) 100%);
+  box-shadow: inset 0 0 0 1px var(--muted-tone);
+}
+.group[data-transfer-direction="left"] {
+  --tone: #f59e6a;
+  --muted-tone: rgba(245, 158, 106, 0.18);
+  --chip-border: rgba(245, 158, 106, 0.44);
+  --chip-bg: linear-gradient(135deg, rgba(245, 158, 106, 0.32) 0%, rgba(245, 158, 106, 0.14) 100%);
+  border-color: rgba(245, 158, 106, 0.34);
+  background: linear-gradient(180deg, rgba(45, 30, 20, 0.64) 0%, rgba(8, 22, 40, 0.7) 100%);
+}
+.header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--muted-tone); }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--chip-border); border-radius: 999px; color: var(--tone); background: var(--chip-bg); font-size: 10px; font-weight: 600; line-height: 15px; text-transform: uppercase; letter-spacing: 0.025em; }
+.dot { display: inline-block; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--tone); }
+.count { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: 20px; min-width: 2.1rem; padding: 0 6px; border: 1px solid var(--chip-border); border-radius: 6px; color: var(--tone); background: linear-gradient(180deg, rgba(9, 20, 34, 0.82) 0%, rgba(6, 14, 26, 0.74) 100%); box-shadow: inset 0 0 0 1px rgba(6, 12, 20, 0.35); font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.entries { display: grid; gap: 4px; margin: 0; padding: 0 4px 0 0; list-style: none; }
+.entry { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 24px; padding: 0 6px; border: 1px solid rgba(176, 196, 217, 0.24); border-radius: 6px; background: rgba(8, 18, 30, 0.58); font-size: 10px; line-height: 15px; }
+.entry::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--tone); }
+.name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.guild,
+.server { display: block; color: #b0c4d9; font-size: inherit; font-weight: 400; }
+.icon { display: grid; flex: 0 0 14px; width: 14px; height: 14px; place-items: center; border: 1px solid rgba(176, 196, 217, 0.24); border-radius: 4px; background: rgba(7, 14, 24, 0.34); }
+.icon img { width: 12px; height: 12px; object-fit: contain; }
+.level { flex-shrink: 0; padding: 2px 4px; border: 1px solid rgba(176, 196, 217, 0.24); border-radius: 4px; color: #b0c4d9; background: rgba(7, 14, 24, 0.34); font-weight: 600; }
+.classLabel { color: #b0c4d9; text-transform: uppercase; }
+.empty { border-style: dashed; color: #b0c4d9; }
+.state { display: flex; align-items: center; justify-content: center; min-height: 80px; margin: 8px 0 0; padding: 0 12px; border: 1px dashed rgba(176, 196, 217, 0.3); border-radius: 8px; color: #b0c4d9; background: linear-gradient(180deg, rgba(9, 21, 36, 0.62) 0%, rgba(8, 18, 30, 0.54) 100%); font-size: 11px; text-align: center; }
+@media (min-width: 768px) { .title { font-size: 15px; } }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.heading { margin: 0; }
+.headingLayout { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; color: inherit; font: inherit; text-align: left; }
+.headingText { min-width: 0; }
+/* Match the existing chart detail access without importing its implementation. */
+.detailButton { display: inline-grid; place-items: center; vertical-align: middle; margin-left: 6px; width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: 1px solid #2b4c73; border-radius: 6px; color: #b7d4ff; background: #152a42; cursor: pointer; }
+.detailButton:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+/* Existing player profile routes appear above the transfer dialog. Keep its
+   history and scroll lock alive while the profile owns interaction and focus. */
+:global(body:has(.profile-overlay--local)) .backdrop { visibility: hidden; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; font-size: 10px; line-height: 15px; font-weight: 600; }
+.summaryCount { color: #5cc689; }
+.summaryCount[data-direction="left"] { color: #f59e6a; }
+.summaryCount strong { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.collapsedState { margin: 8px 0 0; color: #b0c4d9; font-size: 11px; line-height: 16px; }
+.entries > li { min-width: 0; }
+.row { width: 100%; color: inherit; font-family: inherit; text-align: left; cursor: pointer; transition: background 0.16s ease; }
+.row:hover,
+.row:focus-visible { background: #143052; }
+.row:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .row { transition: none; } }
+
+@media (min-width: 981px) {
+  /* The narrower access may wrap its complete period. Keep the original
+     88px transfer row and centre the heading within that same envelope. */
+  .panel { box-sizing: border-box; min-height: 88px; padding-block: 6.5px; display: grid; align-content: center; }
+}

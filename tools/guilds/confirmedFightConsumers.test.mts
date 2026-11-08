@@ -1,0 +1,28 @@
+import 'fake-indexeddb/auto';
+import assert from 'node:assert/strict';
+import { linkPlayerIdentifiers } from '../../src/lib/identities/playerIdentityStore.ts';
+import { linkGuildAliases } from '../../src/lib/identities/guildIdentityStore.ts';
+import { loadIdentityResolutionSnapshot } from '../../src/lib/identities/identityResolution.ts';
+import { createFightTracker, putFightTrackerFight, readLinkedFightTrackerState, readFightTrackerTransferState, isFightTrackerLinkedToGuild } from '../../src/pages/GuildHub/fightTrackingStore.ts';
+import { buildFightTrackerSyncPlan, loadLatestScanSnapshotForGuild } from '../../src/pages/GuildHub/fightTrackingScanSource.ts';
+import { buildLocalFightParticipationSeries } from '../../src/lib/guilds/localFightAnalytics.ts';
+import { importGuildHubLocalScan } from '../../src/lib/guilds/localScanLibrary.ts';
+const oldAt=Date.parse('2026-09-01T12:00:00Z'),newAt=Date.parse('2026-10-15T12:00:00Z');
+function raw(server:string,guildId:number,id:number,name:string,at:number){return {players:[{identifier:server+'_p'+id,prefix:server,timestamp:at,name,class:1,level:100,group:server+'_g'+guildId,groupname:'Aurora'}],groups:[{identifier:server+'_g'+guildId,prefix:server,timestamp:at,name:'Aurora',memberCount:1}]}}
+await importGuildHubLocalScan('fight-old.json',JSON.stringify(raw('s7_eu',71,710,'Old Name',oldAt)));
+await importGuildHubLocalScan('fight-new.json',JSON.stringify(raw('f29_net',81,810,'New Name',newAt)));
+const state=await createFightTracker({name:'Aurora',server:'EU7',source:'guild_scan',linkedGuildHubGuildId:'71',linkedGuildHubLogoIdentifier:'s7_eu_g71',members:[{name:'Old Name',source:'scan',scanMemberRef:'s7_eu_p710',active:true}]});assert(state.tracker);assert.equal(state.members.length,1);
+const target={id:'f29_net_g81',guildId:'81',logoIdentifier:'f29_net_g81',server:'F29'};
+assert.equal((await readLinkedFightTrackerState(target)).tracker,null,'fusion ancestry alone is not identity');
+await linkGuildAliases('eu7_g71','f29_g81',{source:'manual'});await linkPlayerIdentifiers('s7_eu_p710','f29_net_p810',{source:'manual'});
+const identities=await loadIdentityResolutionSnapshot();assert(isFightTrackerLinkedToGuild(state.tracker,target,identities));
+assert.equal((await readLinkedFightTrackerState(target)).tracker?.id,state.tracker.id);
+const before=JSON.stringify(await readFightTrackerTransferState(state.tracker.id));
+const latest=await loadLatestScanSnapshotForGuild(state.tracker);assert(latest);assert.equal(latest.members[0].scanMemberRef,'f29_net_p810');assert.equal(latest.members[0].name,'New Name');
+const plan=buildFightTrackerSyncPlan(state.tracker,state.members,latest,identities);assert(plan);assert.equal(plan.newMembers.length,0);assert.equal(plan.existingMembers.length+plan.reactivatedMembers.length+plan.confirmedManualMembers.length,1,'same confirmed person survives changed name and server');
+assert.equal(JSON.stringify(await readFightTrackerTransferState(state.tracker.id)),before,'read projection changes no original tracker/member records');
+await putFightTrackerFight({id:'fight-one',trackerId:state.tracker.id,guildId:state.tracker.id,type:'attack',date:'2026-09-20',fightNumber:'1',opponentGuild:'Fixture Opponent',source:'manual',createdAt:new Date(newAt).toISOString(),rosterSnapshot:state.members.map(member=>({id:member.id,name:member.name,className:member.className,level:member.level,guildId:state.tracker!.id,guildName:'Aurora',server:'EU7',capturedAt:new Date(oldAt).toISOString()})),missedMemberIds:[]});
+const beforeChart=JSON.stringify(await readFightTrackerTransferState(state.tracker.id));const series=await buildLocalFightParticipationSeries({name:'Aurora',server:'F29',logoIdentifier:'f29_net_g81',guildId:'81'},'all');assert.equal(series.tracker?.id,state.tracker.id);assert.equal(series.allPoints.length,1);assert.equal(series.allPoints[0].participants,1);assert.equal(JSON.stringify(await readFightTrackerTransferState(state.tracker.id)),beforeChart);
+await createFightTracker({name:'Duplicate binding',server:'F29',source:'guild_scan',linkedGuildHubGuildId:'81',linkedGuildHubLogoIdentifier:'f29_net_g81'});
+await assert.rejects(()=>readLinkedFightTrackerState(target),/Mehrere Fight Tracker/,'two trackers in one confirmed lineage stay ambiguous');
+console.log('confirmedFightConsumers passed: shared guild/player identities, latest exact observation, renamed member projection, existing chart, preserved tracker/fight records, ambiguous tracker rejection');

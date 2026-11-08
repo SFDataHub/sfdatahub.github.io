@@ -1,3 +1,4 @@
+import type { PlayerAttributeValues } from "./playerAttributeColumns";
 export type ToplistPlayerRow = {
   identifier?: string | null;
   playerId?: string | null;
@@ -12,6 +13,9 @@ export type ToplistPlayerRow = {
   con: number | null;
   sum: number | null;
   ratio: string | null;
+  attributeValues?: PlayerAttributeValues;
+  ratioBase?: number | null;
+  ratioTotal?: number | null;
   mainTotal: number | null;
   conTotal: number | null;
   sumTotal: number | null;

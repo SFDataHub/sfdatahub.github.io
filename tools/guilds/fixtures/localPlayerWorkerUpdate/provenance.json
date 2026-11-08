@@ -1,0 +1,32 @@
+[
+  {
+    "source": "tmp/w19/initial/src/lib/local-player-profile/executionTransport.ts",
+    "fixture": "tools/guilds/fixtures/localPlayerWorkerUpdate/w19/src/lib/local-player-profile/executionTransport.ts",
+    "sha256": "22bb40149edce97a1dd42ddc2125f68669d077841c018c7605879e0494559ede",
+    "bytes": 5320
+  },
+  {
+    "source": "tmp/w19/initial/src/workers/playerAnalytics.worker.ts",
+    "fixture": "tools/guilds/fixtures/localPlayerWorkerUpdate/w19/src/workers/playerAnalytics.worker.ts",
+    "sha256": "3d716c74e8173924a96bdb19178904501d122ee23d3bfdb5d1a6aa62fc782f0b",
+    "bytes": 1185
+  },
+  {
+    "source": "tmp/w19n02/initial/src/lib/local-player-profile/executionTransport.ts",
+    "fixture": "tools/guilds/fixtures/localPlayerWorkerUpdate/w19n02/src/lib/local-player-profile/executionTransport.ts",
+    "sha256": "b9145c5e7686f78200d8973996bfdbddde3db00b13a30914b213b6a69adaf94f",
+    "bytes": 7334
+  },
+  {
+    "source": "tmp/w19n02/initial/src/main.tsx",
+    "fixture": "tools/guilds/fixtures/localPlayerWorkerUpdate/w19n02/src/main.tsx",
+    "sha256": "8a47ea8c2ab80b4329ccc407fdab60118e6836b6489cf16034cd300787a7a557",
+    "bytes": 28119
+  },
+  {
+    "source": "tmp/w19n02/initial/public/service-worker.js",
+    "fixture": "tools/guilds/fixtures/localPlayerWorkerUpdate/w19n02/public/service-worker.js",
+    "sha256": "33164eb357425702e78b90017dedb4153dc936904e0e0fa6df1aab7573861cef",
+    "bytes": 2346
+  }
+]

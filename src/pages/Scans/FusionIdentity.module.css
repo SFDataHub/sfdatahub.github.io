@@ -252,6 +252,7 @@
 }
 
 .dashboard {
+  min-width: 0;
   display: grid;
   gap: 14px;
 }
@@ -279,7 +280,13 @@
 
 .dashboardNav {
   display: flex;
-  flex-wrap: wrap;
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  user-select: none;
+  cursor: grab;
   gap: 8px;
   padding: 4px;
   border: 1px solid var(--line);
@@ -288,7 +295,18 @@
 }
 
 .dashboardNav .tabButton {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.dashboardNavDragging,
+.dashboardNavDragging .tabButton {
+  cursor: grabbing;
+}
+
+.dashboardNav .tabButton:focus-visible {
+  outline: 2px solid var(--title);
+  outline-offset: -2px;
 }
 
 .dashboardGrid {
@@ -634,6 +652,43 @@
   padding: 22px;
   color: var(--text-soft);
   text-align: center;
+}
+
+.entry {
+  display: grid;
+  gap: 16px;
+}
+
+.entryLead {
+  margin: 0;
+  color: var(--title);
+}
+
+.entryLoad {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.entryLoad h2 {
+  margin: 0 0 14px;
+  color: var(--title);
+  font-size: 18px;
+}
+
+.entryLoad p,
+.entryHelp p {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.entryResult {
+  margin-top: 12px;
+}
+
+.entryLoad ul {
+  color: var(--text-soft);
 }
 
 .errorState {
@@ -1117,3 +1172,16 @@
     justify-content: flex-start;
   }
 }
+.mergeFeedback {
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid var(--border, #34516a);
+  border-radius: 12px;
+  background: var(--panel, #142638);
+  overflow-wrap: anywhere;
+}
+
+.mergeFeedback p { margin: 6px 0; }
+.mergeFeedback progress { width: 100%; accent-color: #76b5e9; }
+.mergeErrors { max-height: 240px; overflow: auto; }
+

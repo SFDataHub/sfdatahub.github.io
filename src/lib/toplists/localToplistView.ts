@@ -1,3 +1,4 @@
+import { playerAttributeColumn, playerAttributeValue } from "./playerAttributeColumns";
 import { resolveServer } from "../servers/serverResolver";
 import {
   LOCAL_GUILD_TOPLIST_METRICS,
@@ -16,6 +17,8 @@ export type LocalGuildAverageMode = "base" | "total";
 export type LocalToplistFilters = {
   servers?: readonly string[];
   playerClasses?: readonly (string | number)[];
+  /** Omitted keeps the legacy empty-means-all contract. */
+  playerClassMode?: "all" | "selected";
   guilds?: readonly string[];
 };
 
@@ -30,6 +33,8 @@ export type LocalToplistViewOptions = {
   playerAverageMode?: LocalGuildAverageMode;
   guildAverageMode?: LocalGuildAverageMode;
   playerLimit?: number | null;
+  /** Existing comparison values, supplied only for a Stats/Day view. */
+  playerStatsDayValues?: Readonly<Record<string, number | null>>;
 };
 
 export type LocalToplistRankedPlayerRow = LocalPlayerToplistRow & {
@@ -46,6 +51,7 @@ export type LocalPlayerToplistViewResult = {
   filters: {
     servers: string[];
     playerClasses: string[];
+    playerClassMode?: "all" | "selected";
     guilds: string[];
   };
   sort: {
@@ -108,7 +114,7 @@ const normalizeFilters = (filters: LocalToplistFilters | undefined) => {
   const guilds = [
     ...new Set((filters?.guilds ?? []).map(normalizeLocalToplistGuild).filter((value): value is string => !!value)),
   ];
-  return { servers, playerClasses, guilds };
+  return { servers, playerClasses, guilds, ...(filters?.playerClassMode ? { playerClassMode: filters.playerClassMode } : {}) };
 };
 
 const issue = (code: LocalToplistIssue["code"], message: string): LocalToplistIssue => ({
@@ -145,10 +151,13 @@ const getFieldValue = <T extends Record<string, unknown>>(
     if (metric.metricKey === "guildAvgSum") field = "avgTotalStats";
   }
 
-  const value = row[field];
+  const attribute = metric.rowKind === "player" ? playerAttributeColumn(metric.metricKey) : undefined;
+  const value = attribute?.stat === "Ratio"
+    ? playerAttributeValue(row as unknown as LocalPlayerToplistRow, attribute)
+    : field.startsWith("attribute:") ? (row.attributeValues as Record<string, unknown> | undefined)?.[field.slice(10)] : row[field];
   if (value == null || metric.missingValueBehavior === "not-derived") return null;
   if (metric.valueType === "number" || metric.valueType === "timestamp") {
-    return isFiniteNumber(value) ? value : null;
+    return isFiniteNumber(value) && (metric.valueType !== "timestamp" || value > 0) ? value : null;
   }
   const text = String(value).trim();
   return text || null;
@@ -213,7 +222,8 @@ export const buildLocalPlayerToplistBaseCohort = (
 ) => {
   const filters = normalizeFilters(options.filters);
   const serverSet = filters.servers.length ? new Set(filters.servers) : null;
-  const classSet = filters.playerClasses.length ? new Set(filters.playerClasses) : null;
+  const classSet = filters.playerClassMode === "all" ? null
+    : filters.playerClassMode === "selected" || filters.playerClasses.length ? new Set(filters.playerClasses) : null;
   const playerLimit = normalizePlayerLimit(options.playerLimit);
   const baseMetric = getMetric(LOCAL_PLAYER_TOPLIST_METRICS, DEFAULT_PLAYER_METRIC_KEY, DEFAULT_PLAYER_METRIC_KEY);
 
@@ -272,12 +282,19 @@ export const buildLocalPlayerToplistView = (
       })
     : baseLimited;
 
+  const sortValue = (row: LocalPlayerToplistRow) => {
+    if ((metric.metricKey === "statsDay" || metric.metricKey === "statsDayTotal") && options.playerStatsDayValues) {
+      const value = options.playerStatsDayValues[row.rowKey];
+      return isFiniteNumber(value) ? value : null;
+    }
+    return getFieldValue(row as unknown as Record<string, unknown>, metric, playerAverageMode);
+  };
   const sorted = guildFiltered
     .map((row, index) => ({ row, index }))
     .sort((left, right) => {
       const metricCmp = compareMetricValues(
-        getFieldValue(left.row as unknown as Record<string, unknown>, metric, playerAverageMode),
-        getFieldValue(right.row as unknown as Record<string, unknown>, metric, playerAverageMode),
+        sortValue(left.row),
+        sortValue(right.row),
         metric,
         direction,
       );

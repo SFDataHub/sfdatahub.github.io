@@ -1,0 +1,12 @@
+{
+  "purpose": "Minimal, unchanged regression inputs extracted for W125. Historical sources remain immutable in the external repo-specific Codex workspace.",
+  "files": [
+    {
+      "fixture": "tools/toplists/fixtures/performance/archive-derived-counts.json",
+      "historicalSource": "tmp/w29/archive-derived-counts.json",
+      "migratedSource": "tmp/w29/archive-derived-counts.json",
+      "sha256": "0fccd198b6c574e6283b527c481c6dc1edd6e0d7a25eb15de1439ac4e3883cd1",
+      "size": 22709
+    }
+  ]
+}

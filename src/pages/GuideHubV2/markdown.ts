@@ -1,4 +1,6 @@
 import type { Lang } from "../../i18n";
+import { buildPath, RAW_MARKDOWN, type GuideSelection } from "./selection";
+export type { GuideSelection } from "./selection";
 
 export type Frontmatter = {
   title: string;
@@ -20,16 +22,6 @@ export type MarkdownDoc = {
   toc: TocItem[];
 };
 
-export type GuideSelection = {
-  tab?: string;
-  sub?: string;
-  sub2?: string;
-};
-
-const RAW_MARKDOWN = import.meta.glob("../../content/guidehub-v2/**/*.md", {
-  query: "?raw",
-  import: "default",
-});
 const CACHE = new Map<string, Promise<MarkdownDoc | null>>();
 
 const EMPTY_FRONTMATTER: Frontmatter = {
@@ -267,23 +259,6 @@ function buildHtml(body: string): { html: string; toc: TocItem[] } {
 
   closeList();
   return { html: html.join("\n"), toc };
-}
-
-function buildPath(lang: Lang, selection: GuideSelection): string {
-  const { tab, sub, sub2 } = selection;
-  if (!tab && !sub && !sub2) {
-    return `../../content/guidehub-v2/${lang}/home.md`;
-  }
-  if (tab && !sub && !sub2) {
-    return `../../content/guidehub-v2/${lang}/${tab}/index.md`;
-  }
-  if (tab && sub && !sub2) {
-    return `../../content/guidehub-v2/${lang}/${tab}/${sub}/index.md`;
-  }
-  if (tab && sub && sub2) {
-    return `../../content/guidehub-v2/${lang}/${tab}/${sub}/${sub2}.md`;
-  }
-  return `../../content/guidehub-v2/${lang}/home.md`;
 }
 
 export async function loadGuideMarkdown(

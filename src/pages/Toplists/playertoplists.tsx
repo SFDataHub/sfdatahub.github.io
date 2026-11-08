@@ -1,3 +1,8 @@
+import { PLAYER_ATTRIBUTE_COLUMNS, playerAttributeColumn, playerAttributeValue, playerRatioLabel } from "../../lib/toplists/playerAttributeColumns";
+import { useToplistAutoSize } from "./useToplistAutoSize";
+import ToplistViewPicker from "./ToplistViewControls";
+import LocalSortHeader from "./LocalSortHeader";
+import { toplistColumnLabel, type LocalTableColumnsProps } from "../../lib/toplists/toplistColumns";
 ﻿import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -22,7 +27,7 @@ import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
 import { ToplistsProvider } from "../../context/ToplistsDataContext";
 import { useToplistsData, type Filters, type PlayerScopeStatus, type SortSpec } from "../../context/ToplistsDataContextCore";
-import { useAuth } from "../../context/AuthContext";
+import { useFavoriteMembership } from "../../lib/data-hub/useFavoriteMembership";
 import GuildToplists, { type GuildToplistsPresetData } from "./guildtoplists";
 import type { RegionKey } from "../../components/Filters/serverGroups";
 import {
@@ -51,7 +56,7 @@ import {
   formatToplistNumberWithSpaceGrouping,
   getToplistRankDeltaDisplay,
 } from "./toplistCompareDisplay";
-import { useToplistRowFocus } from "./useToplistRowFocus";
+import { useToplistRowFocus, type ToplistFocusRequest, type ToplistFocusResult } from "./useToplistRowFocus";
 import "../../styles/Toplist.css";
 
 const splitListParam = (value: string | null) =>
@@ -95,6 +100,12 @@ type CompareSnapshotUiState = CompareSnapshotState & {
 export type PlayerPresetReadOnlyData = {
   rows: ToplistPlayerRow[];
   allRows?: ToplistPlayerRow[];
+  window?: {
+    start: number; total: number; contextKey: string;
+    onChange: (start: number) => void;
+    stats?: { average: number | null; max: number | null };
+    decor?: Record<string, import("./playerToplistDecor").PlayerToplistCellDecor>;
+  };
   tableLoading: boolean;
   compareLoading: boolean;
   compareExpected: boolean;
@@ -243,23 +254,7 @@ const buildPlayerFavoriteIdentifierFromRow = (row: ToplistPlayerRow): string | n
   return normalizeFavoriteIdentifier(resolveToplistRowIdentifier(row));
 };
 
-type ToplistColumnKey =
-  | "rank"
-  | "rankDelta"
-  | "server"
-  | "name"
-  | "class"
-  | "level"
-  | "guild"
-  | "main"
-  | "con"
-  | "sum"
-  | "statsPerDay"
-  | "ratio"
-  | "mine"
-  | "treasury"
-  | "lastScan";
-
+type ToplistColumnKey = string;
 type ToplistColumnAlign = "left" | "center" | "right";
 
 type ToplistColumnDef = {
@@ -270,7 +265,7 @@ type ToplistColumnDef = {
   hidden?: boolean;
 };
 
-const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
+const DEFAULT_TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
   { key: "rank", label: "#", width: "4%", align: "right" },
   { key: "rankDelta", label: "Δ Rank", width: "6%", align: "center" },
   { key: "server", label: "Server", width: "7%", align: "left", hidden: true },
@@ -288,8 +283,12 @@ const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
   { key: "lastScan", label: "Last Scan", width: "9%", align: "right" },
 ];
 
-const TOPLIST_VISIBLE_COLUMNS = TOPLIST_COLUMNS.filter((column) => !column.hidden);
-const TOPLIST_TABLE_COL_SPAN = TOPLIST_VISIBLE_COLUMNS.length;
+const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [...DEFAULT_TOPLIST_COLUMNS,
+  ...PLAYER_ATTRIBUTE_COLUMNS.map(c => ({ key: c.key, label: c.label, width: "6%", align: "right" as const })),
+];
+const TOPLIST_VISIBLE_COLUMNS = DEFAULT_TOPLIST_COLUMNS.filter((column) => !column.hidden);
+
+const customColumnWidth = (key: string) => key === "name" ? 250 : key === "guild" ? 160 : key === "lastScan" ? 150 : 105;
 
 const TOPLIST_TABLE_STYLE: React.CSSProperties = {
   width: "100%",
@@ -429,6 +428,11 @@ const TOPLIST_LAST_SCAN_LABEL_STYLE: React.CSSProperties = {
 
 const TOPLIST_CELL_STYLE_BY_KEY = TOPLIST_COLUMNS.reduce((acc, column) => {
   acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: column.align };
+  return acc;
+}, {} as Record<ToplistColumnKey, React.CSSProperties>);
+
+const CENTERED_TOPLIST_CELL_STYLE_BY_KEY = TOPLIST_COLUMNS.reduce((acc, column) => {
+  acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: "center" };
   return acc;
 }, {} as Record<ToplistColumnKey, React.CSSProperties>);
 
@@ -698,11 +702,13 @@ function ValueCrossfade({
   fadeKey,
   durationMs = 200,
   minWidthCh = 9,
+  textAlign = "right",
 }: {
   value: string | number;
   fadeKey: string;
   durationMs?: number;
   minWidthCh?: number;
+  textAlign?: "left" | "center" | "right";
 }) {
   const nextText = String(value ?? "");
   const [prevText, setPrevText] = React.useState<string | null>(null);
@@ -738,7 +744,7 @@ function ValueCrossfade({
 
   if (prevText == null) {
     return (
-      <span style={{ display: "inline-block", minWidth: `${minWidthCh}ch`, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+      <span style={{ display: "inline-block", minWidth: `${minWidthCh}ch`, textAlign, fontVariantNumeric: "tabular-nums" }}>
         {nextText}
       </span>
     );
@@ -750,7 +756,7 @@ function ValueCrossfade({
         position: "relative",
         display: "inline-block",
         minWidth: `${minWidthCh}ch`,
-        textAlign: "right",
+        textAlign,
         fontVariantNumeric: "tabular-nums",
         whiteSpace: "nowrap",
       }}
@@ -790,6 +796,7 @@ function PlayerAvgModeControls({
   baseLabel,
   totalLabel,
   updatingLabel,
+  disabled = false,
 }: {
   mode: "base" | "total";
   updating: boolean;
@@ -799,17 +806,20 @@ function PlayerAvgModeControls({
   baseLabel: string;
   totalLabel: string;
   updatingLabel: string;
+  disabled?: boolean;
 }) {
   return (
     <>
-      <span style={{ color: "#B0C4D9", fontSize: 12 }}>{label}</span>
+      <span style={{ color: "#B0C4D9", fontSize: 12, opacity: disabled ? 0.4 : 1 }}>{label}</span>
       <div
         role="group"
         aria-label={ariaLabel}
-        style={{ display: "inline-flex", gap: 4, background: "#14273E", border: "1px solid #2B4C73", padding: 4, borderRadius: 12 }}
+        aria-disabled={disabled}
+        style={{ opacity: disabled ? 0.4 : 1, display: "inline-flex", gap: 4, background: "#14273E", border: "1px solid #2B4C73", padding: 4, borderRadius: 12 }}
       >
         <button
           type="button"
+          disabled={disabled}
           aria-pressed={mode === "base"}
           onClick={() => onChange("base")}
           style={{
@@ -818,13 +828,14 @@ function PlayerAvgModeControls({
             color: "#F5F9FF",
             borderRadius: 10,
             padding: "6px 10px",
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
           }}
         >
           {baseLabel}
         </button>
         <button
           type="button"
+          disabled={disabled}
           aria-pressed={mode === "total"}
           onClick={() => onChange("total")}
           style={{
@@ -833,7 +844,7 @@ function PlayerAvgModeControls({
             color: "#F5F9FF",
             borderRadius: 10,
             padding: "6px 10px",
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
           }}
         >
           {totalLabel}
@@ -905,6 +916,7 @@ function PlayerToplistsPageContent() {
   const { t } = useTranslation();
   const filterCollapseStorageKey = "sf_toplists_hud_filters_collapsed_v1";
   const f = useFilters(); // MUSS innerhalb FilterProvider laufen
+  const serverPickerShellRef = React.useRef<HTMLDivElement>(null);
   const {
     filterMode,
     listView,
@@ -1255,7 +1267,8 @@ function PlayerToplistsPageContent() {
   const resolvedGuildSortBy = React.useMemo(() => resolveGuildSort(guildSortBy), [guildSortBy]);
   return (
     <>
-      <ContentShell
+      <div ref={serverPickerShellRef} data-server-picker-shell>
+        <ContentShell
         mode="card"
         leftWidth={0}
         rightWidth={0}
@@ -1366,11 +1379,13 @@ function PlayerToplistsPageContent() {
           />
         )}
       </ContentShell>
+        </div>
 
       <ServerSheet
         mode="modal"
         open={serverSheetOpen}
         onClose={() => setServerSheetOpen(false)}
+        shellRef={serverPickerShellRef}
         serversByRegion={serverGroups}
         selected={servers}
         onToggle={(s: string) =>
@@ -1430,7 +1445,13 @@ function PlayerToplistsPageContent() {
   );
 }
 
-type TableDataViewProps = {
+type TableDataViewProps = LocalTableColumnsProps & {
+  /** Optional local body state. Public consumers keep their existing defaults. */
+  localLayout?: boolean;
+  /** Share local cell alignment with the DataHub PNG capture. */
+  centerCellContents?: boolean;
+  localLoadingContent?: React.ReactNode;
+  localNoticeContent?: React.ReactNode;
   servers: string[];
   classes: string[];
   range: DaysFilter;
@@ -1443,6 +1464,8 @@ type TableDataViewProps = {
   focusIdentifier: string | null;
   focusRank: number | null;
   focusNonce?: number | string | null;
+  focusRequest?: ToplistFocusRequest | null;
+  onFocusResult?: (result: ToplistFocusResult) => void;
   tableRef: React.RefObject<HTMLDivElement>;
   renderMode?: "live" | "preset";
   presetAmount?: number | null;
@@ -1452,15 +1475,28 @@ type TableDataViewProps = {
   readOnlyHasMoreRows?: boolean;
   onReadOnlyRowsEndVisible?: () => void;
   onOpenPlayerProfile?: (row: ToplistPlayerRow) => void;
+  onOpenGuildProfile?: (row: ToplistPlayerRow) => void;
   renderFirestoreProfileOverlay?: boolean;
 };
 
 export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(function TableDataView({
-  servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, focusNonce = null, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPlayerAvgModeChange, readOnlyHasMoreRows = false, onReadOnlyRowsEndVisible, onOpenPlayerProfile, renderFirestoreProfileOverlay = true,
+  localLayout = false, centerCellContents = localLayout, localLoadingContent, localNoticeContent, localColumns, localColumnWidths, localSort, onLocalSort, servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, focusNonce = null, focusRequest, onFocusResult, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPlayerAvgModeChange, readOnlyHasMoreRows = false, onReadOnlyRowsEndVisible, onOpenPlayerProfile, onOpenGuildProfile, renderFirestoreProfileOverlay = true,
 }, ref) {
+  const activeColumns = localColumns ? localColumns.flatMap(key => { const column = TOPLIST_COLUMNS.find(c => c.key === key); return column ? [column] : []; }) : TOPLIST_VISIBLE_COLUMNS;
+  const columnCount = activeColumns.length;
+  const cellStyles = centerCellContents ? CENTERED_TOPLIST_CELL_STYLE_BY_KEY : TOPLIST_CELL_STYLE_BY_KEY;
+  const numberColumnStyle: React.CSSProperties = centerCellContents ? TOPLIST_FLEX_COLUMN_CENTER_STYLE : TOPLIST_FLEX_COLUMN_RIGHT_STYLE;
+  const lastScanStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_LAST_SCAN_CONTENT_STYLE, justifyContent: "center" } : TOPLIST_LAST_SCAN_CONTENT_STYLE;
+  const lastScanLabelStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_LAST_SCAN_LABEL_STYLE, flex: "0 1 auto", textAlign: "center" as const } : TOPLIST_LAST_SCAN_LABEL_STYLE;
+  const badgeColumnStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_BADGE_CELL_CONTAINER_STYLE, alignItems: "center" } : TOPLIST_BADGE_CELL_CONTAINER_STYLE;
+  const nameLayoutStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_NAME_CELL_LAYOUT_STYLE, justifyContent: "center" } : TOPLIST_NAME_CELL_LAYOUT_STYLE;
+  const nameStackStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_NAME_CELL_STACK_STYLE, flex: "0 1 auto", alignItems: "center" } : TOPLIST_NAME_CELL_STACK_STYLE;
+  const nameIconStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_NAME_CELL_ICON_CONTENT_STYLE, flex: "0 0 auto", minWidth: 0 } : TOPLIST_NAME_CELL_ICON_CONTENT_STYLE;
+
+  const tableStyle = localColumns ? { ...TOPLIST_TABLE_STYLE, width: activeColumns.reduce((sum, c) => sum + (localColumnWidths?.[c.key] ?? customColumnWidth(c.key)), 0) } : TOPLIST_TABLE_STYLE;
   const { t } = useTranslation();
   const { guilds, favoritesOnly } = useFilters();
-  const { user } = useAuth();
+  const { filterFavorites: sharedFavorites } = useFavoriteMembership();
   const {
     playerRows,
     playerLoading,
@@ -1625,9 +1661,9 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
       : "";
   const activeTargetCompareMonth = isCompareMonthsMode ? compareToMonthValue : "";
   const favoritePlayerSet = React.useMemo(() => {
-    const keys = Object.keys(user?.favorites?.players ?? {});
+    const keys = Object.keys(sharedFavorites.players ?? {});
     return new Set(keys.map((key) => key.trim().toLowerCase()).filter(Boolean));
-  }, [user?.favorites?.players]);
+  }, [sharedFavorites.players]);
   const selectedGuildSet = React.useMemo(() => {
     const keys = (guilds || []).map(normalizeGuildKey).filter(Boolean);
     return keys.length ? new Set(keys) : null;
@@ -1646,7 +1682,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
       });
     }
 
-    if (favoritesOnly && user) {
+    if (favoritesOnly) {
       nextRows = nextRows.filter((row) => {
         const identifier = buildPlayerFavoriteIdentifierFromRow(row);
         return !!(identifier && favoritePlayerSet.has(identifier));
@@ -1654,7 +1690,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     }
 
     return nextRows;
-  }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, user, favoritePlayerSet]);
+  }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, favoritePlayerSet]);
 
   const [compareState, setCompareState] = React.useState<CompareSnapshotUiState>({
     rows: [],
@@ -2029,7 +2065,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
       });
     }
 
-    if (favoritesOnly && user) {
+    if (favoritesOnly) {
       nextRows = nextRows.filter((row) => {
         const identifier = buildPlayerFavoriteIdentifierFromRow(row);
         return !!(identifier && favoritePlayerSet.has(identifier));
@@ -2048,7 +2084,6 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     selectedGuildSet,
     hasGuildData,
     favoritesOnly,
-    user,
     favoritePlayerSet,
     effectiveSort,
   ]);
@@ -2334,7 +2369,9 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     },
     [captureRowLimit, enhancedRows, hasReadOnlyData, isPresetRender, readOnlyVisibleRows]
   );
-  const statusRowCount = hasReadOnlyData ? enhancedRows.length : renderedRows.length;
+  const presentation = presetReadOnlyData?.window;
+  const rowWindow = !isPresetRender ? presentation : undefined;
+  const statusRowCount = rowWindow?.total ?? (hasReadOnlyData ? enhancedRows.length : renderedRows.length);
   const mobileRenderedRowKeys = React.useMemo(() => {
     const keys = new Set<string>();
     renderedRows.forEach((row) => keys.add(buildCompareKey(row)));
@@ -2346,6 +2383,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
   }, [mobileRenderedRowKeys]);
 
   const avgTop100StatsPerDay = (() => {
+    if (presentation?.stats) return presentation.stats.average;
     if (!showCompare) return null;
     const topRows = enhancedRows.slice(0, 100);
     let sum = 0;
@@ -2360,6 +2398,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     return count ? sum / count : null;
   })();
   const maxStatsPerDay = (() => {
+    if (presentation?.stats) return presentation.stats.max;
     if (!showCompare) return null;
     let max: number | null = null;
     enhancedRows.forEach((row) => {
@@ -2409,24 +2448,40 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     renderedRows.forEach((row, idx) => {
       const identifier = resolveToplistRowIdentifier(row);
       if (!identifier || indexMap.has(identifier)) return;
-      indexMap.set(identifier, idx);
+      indexMap.set(identifier, idx + (rowWindow?.start ?? 0));
     });
     return indexMap;
-  }, [renderedRows]);
+  }, [renderedRows, rowWindow?.start]);
   const rowVirtualizer = useVirtualizer({
-    count: renderedRows.length,
-    getScrollElement: () => (isPresetRender || isCompactToplistView ? null : tableScrollRef.current),
-    estimateSize: () => virtualRowHeight,
+    count: rowWindow?.total ?? renderedRows.length,
+    getScrollElement: () => isPresetRender ? null : isCompactToplistView ? rowWindow ? tableRef.current : null : tableScrollRef.current,
+    estimateSize: () => isCompactToplistView && rowWindow ? 86 : virtualRowHeight,
     overscan: 14,
-    getItemKey: (index) => virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
+    getItemKey: (index) => rowWindow ? index : virtualRowKeys[index] ?? `missing-identifier-row-${index}`,
   });
+  const windowItems = rowVirtualizer.getVirtualItems();
+  const wantedWindowStart = Math.max(0, Math.floor((windowItems[0]?.index ?? 0) / 100) * 100);
+  React.useEffect(() => {
+    if (rowWindow && windowItems.length && (wantedWindowStart < rowWindow.start ||
+        windowItems[windowItems.length - 1].index >= rowWindow.start + renderedRows.length)) {
+      rowWindow.onChange(wantedWindowStart);
+    }
+  }, [rowWindow?.contextKey, rowWindow?.start, rowWindow?.onChange, wantedWindowStart, renderedRows.length, windowItems[windowItems.length - 1]?.index]);
+  React.useLayoutEffect(() => {
+    if (!rowWindow) return;
+    rowVirtualizer.measure();
+    rowVirtualizer.scrollToOffset(0);
+  }, [rowWindow?.contextKey]);
   const highlightedIdentifier = useToplistRowFocus({
     focusIdentifier,
     focusNonce,
-    disabled: isPresetRender || !hasServers || playerLoading,
+    focusRequest,
+    onFocusResult,
+    scrollContainerRef: tableRef,
+    disabled: isPresetRender || !hasServers || tableLoading,
     rowIndexByIdentifier,
-    scrollToIndex: (targetIndex) => {
-      rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "smooth" });
+    scrollToIndex: isCompactToplistView && !rowWindow ? undefined : (targetIndex) => {
+      rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
     },
   });
   const compareExpected = isPresetRender ? (presetReadOnlyData?.compareExpected ?? false) : effectiveCompareMode !== "off";
@@ -2573,6 +2628,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
 
   const handleGuildCellClick = React.useCallback(
     async (row: ToplistPlayerRow) => {
+      if (onOpenGuildProfile) { onOpenGuildProfile(row); return; }
       const guildName = String(row.guild ?? "").trim();
       if (!guildName) return;
 
@@ -2586,7 +2642,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
         server: typeof row.server === "string" ? row.server : resolved.serverCode || null,
       });
     },
-    [resolveGuildOverlayTarget]
+    [onOpenGuildProfile, resolveGuildOverlayTarget]
   );
 
   React.useEffect(() => {
@@ -2657,7 +2713,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     const rowKey = profileIdentifier ?? `missing-identifier-row-${i}`;
     const accordionKey = buildCompareKey(r);
     const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
-    const decor = decorMap.get(buildCompareKey(r));
+    const decor = presentation ? { ...decorMap.get(buildCompareKey(r)), mainRank: undefined, conRank: undefined, levelRank: undefined, ...presentation.decor?.[buildCompareKey(r)] } : decorMap.get(buildCompareKey(r));
     const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
     const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
     const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
@@ -2755,19 +2811,30 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     </div>
   );
 
+  const compactMetricColumn = ({"name": "player", "lastScan": "lastScan", "main": "main", "mainTotal": "main", "con": "con", "conTotal": "con", "sum": "sum", "sumTotal": "sum", "statsDay": "statsPerDay", "statsDayTotal": "statsPerDay", "ratio": "ratio", "mine": "mine", "treasury": "treasury", "xpProgress": "xpProgress", "xpTotal": "xpTotal", "level": "level"} as Record<string, string>)[effectiveSort.key] ?? "level";
+
   const renderMobileAccordion = () => (
     <div
       ref={tableRef}
       className="toplists-mobile-list"
+      style={rowWindow ? { display: "block", maxHeight: "65vh", overflowY: "auto", minHeight: 160 } : undefined}
       data-toplists-export-root="true"
     >
-      {renderedRows.map((r, i) => {
+      {localLayout && <div data-local-toplist-header="true" className="toplists-mobile-summary" style={{ borderBottom: "1px solid #2C4A73", cursor: "default", fontSize: 12, fontWeight: 600 }}>
+        <span>#</span><span>{t("toplists.columns.player")} / {t("toplists.columns.server")}</span><span>{t(`toplists.columns.${compactMetricColumn}`)}</span><span aria-hidden />
+      </div>}
+      {localLayout && <div data-local-toplist-body="true">{localNoticeContent}{localLoadingContent}</div>}
+      {rowWindow && windowItems[0]?.start > 0 && <div aria-hidden style={{ height: windowItems[0].start }} />}
+      {(localLoadingContent ? [] : rowWindow ? windowItems : renderedRows.map((_, index) => ({ index }))).map(({ index: i }) => {
+        const r = renderedRows[i - (rowWindow?.start ?? 0)];
+        if (!r) return rowWindow ? <div key={`pending-${i}`} aria-hidden style={{ height: rowVirtualizer.getVirtualItems().find(item => item.index === i)?.size ?? 86 }} /> : null;
         const row = getRowDisplayData(r, i);
         const sortMetric = getSortMetric(r, row);
         const isExpanded = expandedMobileRowKey === row.accordionKey;
         const guildName = String(r.guild ?? "").trim();
         const detailId = `toplist-mobile-details-${i}`;
         const openPlayerProfile = () => {
+          if (onOpenPlayerProfile) { onOpenPlayerProfile(r); return; }
           if (!row.profileIdentifier) return;
           setSelectedPlayerProfile({
             identifier: row.profileIdentifier,
@@ -2776,11 +2843,12 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
           });
         };
 
-        return (
+        const content = (
           <div
             key={row.accordionKey}
             className={`toplists-mobile-row${row.isFocusedRow ? " toplists-mobile-row--focused" : ""}${isExpanded ? " toplists-mobile-row--open" : ""}`}
             data-sfh-identifier={row.profileIdentifier ?? undefined}
+            data-sfh-server={r.server ?? undefined}
           >
             <button
               type="button"
@@ -2790,7 +2858,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
               onClick={() => setExpandedMobileRowKey((prev) => (prev === row.accordionKey ? null : row.accordionKey))}
             >
               <span className="toplists-mobile-rank">
-                #{i + 1}
+                #{hasReadOnlyData ? ((r as any)._rank ?? (r as any).tableRank ?? i + 1) : i + 1}
                 {row.rankDeltaDisplay ? (
                   <span className={`rank-delta-chip rank-delta-chip--${row.rankDeltaDisplay.variant}`}>
                     {row.rankDeltaDisplay.text}
@@ -2833,16 +2901,16 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                   onClick={(event) => event.stopPropagation()}
                 >
                   <NeonCoreButton
-                    label={t("toplists.mobileActions.playerProfile", "Spielerprofil")}
-                    title={t("toplists.mobileActions.playerProfile", "Spielerprofil")}
+                    label={t("toplists.mobileActions.playerProfile", "Player profile")}
+                    title={t("toplists.mobileActions.playerProfile", "Player profile")}
                     icon={null}
                     disabled={!row.profileIdentifier}
                     className="toplists-mobile-action-button"
                     onClick={openPlayerProfile}
                   />
                   <NeonCoreButton
-                    label={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
-                    title={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    label={t("toplists.mobileActions.guildProfile", "Guild profile")}
+                    title={t("toplists.mobileActions.guildProfile", "Guild profile")}
                     icon={null}
                     disabled={!guildName}
                     className="toplists-mobile-action-button"
@@ -2880,8 +2948,10 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
             )}
           </div>
         );
+        return rowWindow ? <div key={row.accordionKey} data-index={i} ref={rowVirtualizer.measureElement} style={{ paddingBottom: 8 }}>{content}</div> : content;
       })}
-      {tableLoading && renderedRows.length === 0 && (
+      {rowWindow && windowItems.length > 0 && <div aria-hidden style={{ height: Math.max(0, rowVirtualizer.getTotalSize() - windowItems[windowItems.length - 1].end) }} />}
+      {tableLoading && !localLoadingContent && renderedRows.length === 0 && (
         <div className="toplists-mobile-empty">{t("toplists.table.loading", "Loading...")}</div>
       )}
       {!tableLoading && !effectivePlayerError && renderedRows.length === 0 && (
@@ -2893,25 +2963,23 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
 
   const renderToplistColGroup = () => (
     <colgroup>
-      {TOPLIST_VISIBLE_COLUMNS.map((column) => (
-        <col key={column.key} style={{ width: column.width }} />
+      {activeColumns.map((column) => (
+        <col key={column.key} style={{ width: localColumns ? (localColumnWidths?.[column.key] ?? customColumnWidth(column.key)) : column.width }} />
       ))}
     </colgroup>
   );
 
   const renderToplistHeader = () => (
-    <table className="toplists-table toplists-table--header" style={TOPLIST_TABLE_STYLE}>
+    <table className="toplists-table toplists-table--header" style={tableStyle}>
       {renderToplistColGroup()}
       <thead>
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
-          {TOPLIST_VISIBLE_COLUMNS.map((column) => (
-            <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
+          {activeColumns.map((column) => (
+            <LocalSortHeader key={column.key} kind="players" localValueMode={effectivePlayerAvgMode} columnKey={column.key} localSort={localSort} onLocalSort={onLocalSort} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
               <span style={{ ...TOPLIST_HEADER_LABEL_STYLE, ...TOPLIST_HEADER_LABEL_ALIGN_STYLE[column.align] }}>
-                {column.key === "name"
-                  ? t("toplists.columns.player", "Player")
-                  : t(`toplists.columns.${column.key}`, column.label)}
+                {toplistColumnLabel("players", column.key, t)}
               </span>
-            </th>
+            </LocalSortHeader>
           ))}
         </tr>
       </thead>
@@ -2920,26 +2988,28 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
 
   const renderToplistTableBody = (opts: {
     imgLoading: "lazy" | "eager";
+    measure?: boolean;
   }) => {
-    const rows = renderedRows;
-    const virtualItems = isPresetRender ? [] : rowVirtualizer.getVirtualItems();
-    const rowIndices = isPresetRender ? rows.map((_, idx) => idx) : virtualItems.map((virtualRow) => virtualRow.index);
+    const rows = localLoadingContent ? [] : opts.measure ? enhancedRows : renderedRows;
+    const virtualItems = isPresetRender || opts.measure ? [] : rowVirtualizer.getVirtualItems();
+    const rowIndices = opts.measure ? rows.map((_, idx) => idx) : isPresetRender ? rows.map((_, idx) => idx) : virtualItems.map((virtualRow) => virtualRow.index);
     const topSpacerHeight = isPresetRender || !virtualItems.length ? 0 : virtualItems[0].start;
     const bottomSpacerHeight = isPresetRender || !virtualItems.length
       ? 0
       : Math.max(0, rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end);
     return (
-    <table className="toplists-table toplists-table--body" style={TOPLIST_TABLE_STYLE}>
+    <table className="toplists-table toplists-table--body" style={tableStyle}>
       {renderToplistColGroup()}
       <tbody>
+        {(localNoticeContent || localLoadingContent) && <tr><td colSpan={columnCount} style={{ padding: 0 }}>{localNoticeContent}{localLoadingContent}</td></tr>}
         {!isPresetRender && rows.length > 0 && topSpacerHeight > 0 && (
           <tr aria-hidden>
-            <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
+            <td colSpan={columnCount} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
           </tr>
         )}
         {rowIndices.map((i) => {
-          const r = rows[i];
-          if (!r) return null;
+          const r = rows[i - (opts.measure ? 0 : rowWindow?.start ?? 0)];
+          if (!r) return rowWindow ? <tr key={`pending-${i}`} aria-hidden><td colSpan={columnCount} style={{ height: virtualRowHeight, padding: 0, border: 0 }} /></tr> : null;
           const rankDelta = showCompare ? (r as any)._rankDelta : null;
           const deltas = (r as any)._delta || {};
           const compareMissing = showCompare ? Boolean((r as any)._compareMissing) : false;
@@ -2967,7 +3037,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
           const profileIdentifier = resolveToplistRowIdentifier(r);
           const rowKey = profileIdentifier ?? `missing-identifier-row-${i}`;
           const isFocusedRow = Boolean(profileIdentifier && highlightedIdentifier === profileIdentifier);
-          const decor = decorMap.get(buildCompareKey(r));
+          const decor = presentation ? { ...decorMap.get(buildCompareKey(r)), mainRank: undefined, conRank: undefined, levelRank: undefined, ...presentation.decor?.[buildCompareKey(r)] } : decorMap.get(buildCompareKey(r));
           const mainTone = getRankTone(decor?.mainRank, MAIN_RANK_COLORS);
           const conTone = getRankTone(decor?.conRank, CON_RANK_COLORS);
           const levelTone = getRankTone(decor?.levelRank, LEVEL_RANK_COLORS);
@@ -3012,6 +3082,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
               key={rowKey}
               className={`toplists-row${isFocusedRow ? " toplists-row--focused" : ""}`}
               data-sfh-identifier={profileIdentifier ?? undefined}
+              data-sfh-server={r.server ?? undefined}
               style={{
                 borderBottom: "1px solid #2C4A73",
                 cursor: "pointer",
@@ -3020,8 +3091,19 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
               }}
               onClick={rowOnClick}
             >
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.rank}>{i + 1}</td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.rankDelta}>
+              {activeColumns.map(column => { const attribute = playerAttributeColumn(column.key);
+              if (attribute) {
+                const value = playerAttributeValue(r, attribute);
+                return <td key={column.key} style={cellStyles[column.key]}>
+                  <div style={numberColumnStyle}>
+                    <span>{attribute.stat === "Ratio" ? playerRatioLabel(value) : fmtNum(value)}</span>
+                    {attribute.delta && renderDelta(deltas[attribute.delta] ?? null, compareMissing)}
+                  </div>
+                </td>;
+              }
+              switch (column.key) {
+case "rank": return (<td key={column.key} style={cellStyles.rank}>{hasReadOnlyData ? ((r as any)._rank ?? (r as any).tableRank ?? i + 1) : i + 1}</td>);
+case "rankDelta": return (<td key={column.key} style={cellStyles.rankDelta}>
                 <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>
                   {rankDeltaDisplay ? (
                     <span className={`rank-delta-chip rank-delta-chip--${rankDeltaDisplay.variant}`}>
@@ -3029,10 +3111,10 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                     </span>
                   ) : ""}
                 </span>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.name}>
-                <div style={TOPLIST_NAME_CELL_LAYOUT_STYLE}>
-                  <span style={TOPLIST_NAME_CELL_ICON_CONTENT_STYLE}>
+              </td>);
+case "name": return (<td key={column.key} style={cellStyles.name}>
+                <div style={nameLayoutStyle}>
+                  <span style={nameIconStyle}>
                     {classIconUrl ? (
                       <img
                         src={classIconUrl}
@@ -3045,13 +3127,13 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                       <span>{classKey}</span>
                     )}
                   </span>
-                  <div style={TOPLIST_NAME_CELL_STACK_STYLE}>
+                  <div style={nameStackStyle}>
                     <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.name}</span>
                     <span style={TOPLIST_SECONDARY_TEXT_CELL_CONTENT_STYLE}>{sublineText}</span>
                   </div>
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.guild}>
+              </td>);
+case "guild": return (<td key={column.key} style={cellStyles.guild}>
                 {String(r.guild ?? "").trim() ? (
                   <span
                     style={{ display: "block", width: "100%", minWidth: 0 }}
@@ -3067,70 +3149,70 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                       title={String(r.guild ?? "")}
                       label={String(r.guild ?? "")}
                       icon={null}
-                      className="w-full min-w-0 justify-start rounded-lg px-2 py-1 text-xs font-medium leading-tight"
+                      className={`w-full min-w-0 ${centerCellContents ? "justify-center" : "justify-start"} rounded-lg px-2 py-1 text-xs font-medium leading-tight`}
                     />
                   </span>
                 ) : (
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{r.guild ?? ""}</span>
                 )}
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.level}>
-                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
+              </td>);
+case "level": return (<td key={column.key} style={cellStyles.level}>
+                <div style={badgeColumnStyle}>
                   <span style={getFrameStyle(levelTone)}>{fmtNum(r.level)}</span>
                   {renderDelta(deltas.level ?? null, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.main}>
-                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
+              </td>);
+case "main": return (<td key={column.key} style={cellStyles.main}>
+                <div style={badgeColumnStyle}>
                   <span style={getFrameStyle(mainTone)}>
-                    <ValueCrossfade value={fmtNum(displayMain)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
+                    <ValueCrossfade textAlign={centerCellContents ? "center" : "right"} value={fmtNum(displayMain)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(mainDeltaValue, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.con}>
-                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
+              </td>);
+case "con": return (<td key={column.key} style={cellStyles.con}>
+                <div style={badgeColumnStyle}>
                   <span style={getFrameStyle(conTone)}>
-                    <ValueCrossfade value={fmtNum(displayCon)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
+                    <ValueCrossfade textAlign={centerCellContents ? "center" : "right"} value={fmtNum(displayCon)} fadeKey={effectivePlayerAvgMode} minWidthCh={0} />
                   </span>
                   {renderDelta(conDeltaValue, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.sum}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+              </td>);
+case "sum": return (<td key={column.key} style={cellStyles.sum}>
+                <div style={numberColumnStyle}>
                   <span>
-                    <ValueCrossfade value={fmtNum(displaySum)} fadeKey={effectivePlayerAvgMode} />
+                    <ValueCrossfade textAlign={centerCellContents ? "center" : "right"} value={fmtNum(displaySum)} fadeKey={effectivePlayerAvgMode} />
                   </span>
                   {renderDelta(sumDeltaValue, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.statsPerDay}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+              </td>);
+case "statsPerDay": return (<td key={column.key} style={cellStyles.statsPerDay}>
+                <div style={numberColumnStyle}>
                   <span className={statsDayClassName}>{statsPerDayText}</span>
                   <div style={TOPLIST_DELTA_SUBTEXT_STYLE}>{statsDaysText}</div>
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.ratio}>
+              </td>);
+case "ratio": return (<td key={column.key} style={cellStyles.ratio}>
                 <div style={TOPLIST_FLEX_COLUMN_CENTER_STYLE}>
                   <span>{(r as any)._ratioLabel ?? r.ratio ?? "-"}</span>
                   {renderDelta(deltas.ratio ?? null, compareMissing, true)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.mine}>
-                <div style={TOPLIST_BADGE_CELL_CONTAINER_STYLE}>
+              </td>);
+case "mine": return (<td key={column.key} style={cellStyles.mine}>
+                <div style={badgeColumnStyle}>
                   <span style={getFrameStyle(mineTone)}>{fmtNum(r.mine)}</span>
                   {renderDelta(deltas.mine ?? null, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.treasury}>
-                <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
+              </td>);
+case "treasury": return (<td key={column.key} style={cellStyles.treasury}>
+                <div style={numberColumnStyle}>
                   <span>{fmtNum(r.treasury)}</span>
                   {renderDelta(deltas.treasury ?? null, compareMissing)}
                 </div>
-              </td>
-              <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
-                <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>
-                  <span style={TOPLIST_LAST_SCAN_LABEL_STYLE}>{lastScanLabel}</span>
+              </td>);
+case "lastScan": return (<td key={column.key} style={cellStyles.lastScan}>
+                <span style={lastScanStyle}>
+                  <span style={lastScanLabelStyle}>{lastScanLabel}</span>
                   {lastScanDotColor && (
                     <span
                       aria-hidden
@@ -3144,34 +3226,41 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                     />
                   )}
                 </span>
-              </td>
-            </tr>
+              </td>);
+case "server": return <td key={column.key} style={cellStyles.server}>{r.server ?? "-"}</td>;
+case "class": return <td key={column.key} style={cellStyles.class}>{classKey || "-"}</td>;
+default: return null;
+} })}
+</tr>
           );
         })}
-        {tableLoading && rows.length === 0 && (
-          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td></tr>
+        {tableLoading && !localLoadingContent && rows.length === 0 && (
+          <tr><td colSpan={columnCount} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td></tr>
         )}
         {!tableLoading && !effectivePlayerError && rows.length === 0 && (
-          <tr><td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td></tr>
+          <tr><td colSpan={columnCount} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td></tr>
         )}
         {!isPresetRender && rows.length > 0 && bottomSpacerHeight > 0 && (
           <tr aria-hidden>
-            <td colSpan={TOPLIST_TABLE_COL_SPAN} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
+            <td colSpan={columnCount} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
           </tr>
         )}
       </tbody>
     </table>
     );
   };
+  const autoSizePortal = useToplistAutoSize("players", localLayout && !isPresetRender, activeColumns.map(c => c.key), () => <>{renderToplistHeader()}{renderToplistTableBody({ imgLoading: "eager", measure: true })}</>);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
-      <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>{statusLabel} - {statusRowCount} {t("toplists.status.rows", "rows")}</div>
+      {autoSizePortal}
+      <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between", ...(localLayout ? { height: 18, minHeight: 18, whiteSpace: "nowrap", position: "relative" as const, zIndex: 5 } : {}) }}>
+        <div style={{ display: "flex", alignItems: "center" }}>{localLayout && <ToplistViewPicker kind="players" />}{statusLabel} - {statusRowCount} {t("toplists.status.rows", { count: statusRowCount })}</div>
         <div>{effectivePlayerLastUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(effectivePlayerLastUpdatedAt) }) : null}</div>
       </div>
       {showAvgModeControl && playerAvgModeSlot &&
         createPortal(
           <PlayerAvgModeControls
+            disabled={localLayout && !!localColumns}
             mode={effectivePlayerAvgMode}
             updating={showPlayerUpdating}
             onChange={handlePlayerAvgModeChange}
@@ -3183,7 +3272,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
           />,
           playerAvgModeSlot
         )}
-      {(activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
+      {!localLayout && (activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
         <div style={{ fontSize: 12, color: "#ffb347" }}>
           {activeCompareError}
         </div>
@@ -3211,7 +3300,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
         </div>
       )}
 
-      {hasServers && effectivePlayerError && (
+      {hasServers && effectivePlayerError && !localLayout && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
           <div style={{ wordBreak: "break-all" }}>{effectivePlayerError}</div>
@@ -3236,16 +3325,16 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
             ref={tableRef}
             className="toplists-table-viewport"
             data-toplists-export-root="true"
-            style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
+            style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined, ...(localColumns ? (isPresetRender ? { width: Number(tableStyle.width) } : { overflowX: "auto" }) : {}) }}
           >
-            <div className="toplists-table-header" style={{ paddingRight: isPresetRender ? 0 : tableScrollbarWidth }}>
+            <div className="toplists-table-header" style={{ paddingRight: isPresetRender ? 0 : tableScrollbarWidth, ...(localColumns ? { minWidth: Number(tableStyle.width) + (isPresetRender ? 0 : tableScrollbarWidth) } : {}) }}>
               {renderToplistHeader()}
             </div>
             <div
               ref={tableScrollRef}
               className="toplists-table-scroll"
               data-toplists-export-scroll="true"
-              style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+              style={{ ...(isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : rowWindow ? { minHeight: 160, maxHeight: "65vh", overflowY: "auto" as const } : localLayout ? { minHeight: 160 } : {}), ...(localColumns ? { minWidth: Number(tableStyle.width) + (isPresetRender ? 0 : tableScrollbarWidth) } : {}) }}
             >
               {renderToplistTableBody({ imgLoading: isPresetRender ? "eager" : "lazy" })}
               {hasReadOnlyData && readOnlyHasMoreRows && <div ref={readOnlyLoadMoreSentinelRef} aria-hidden style={{ height: 1 }} />}
