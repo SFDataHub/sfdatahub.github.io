@@ -1,7 +1,11 @@
+import type { LocalDataWriteLease } from "../local-data/localDataCoordination";
+import { commitLocalDataMutation } from "../local-data/localDataTransaction";
+import { createLocalChangesStore, localChangesDb, readLocalDataChanges, type LocalChangesSchema, type LocalDataChangeInput, type LocalIdentityChangeGroup } from "../local-data/localDataChanges";
+import type { IDBPTransaction, StoreNames } from "idb";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 const GUILD_IDENTITY_DB_NAME = "sfdatahub-local-guild-identities";
-const GUILD_IDENTITY_DB_VERSION = 1;
+const GUILD_IDENTITY_DB_VERSION = 2;
 const GUILD_ENTITIES_STORE = "guildEntities";
 const GUILD_ALIASES_STORE = "guildAliases";
 const GUILD_EXCLUSIONS_STORE = "guildExclusions";
@@ -35,6 +39,7 @@ export type GuildExclusion = {
 };
 
 export type LinkGuildAliasesMetadata = {
+  lease?: LocalDataWriteLease;
   source: GuildAliasSource;
   confirmedAt?: string;
 };
@@ -52,7 +57,7 @@ export type GuildIdentityStoreOptions = {
   dbName?: string;
 };
 
-interface GuildIdentityDb extends DBSchema {
+interface GuildIdentityDb extends DBSchema, LocalChangesSchema {
   guildEntities: {
     key: string;
     value: GuildEntity;
@@ -155,6 +160,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
     if (!dbPromise) {
       dbPromise = openDB<GuildIdentityDb>(dbName, GUILD_IDENTITY_DB_VERSION, {
         upgrade(db) {
+          createLocalChangesStore(db);
           if (!db.objectStoreNames.contains(GUILD_ENTITIES_STORE)) {
             const entities = db.createObjectStore(GUILD_ENTITIES_STORE, { keyPath: "entityId" });
             entities.createIndex("by_createdAt", "createdAt");
@@ -174,7 +180,9 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
             exclusions.createIndex("by_source", "source");
           }
         },
-      });
+        blocking() { const opened = dbPromise; dbPromise = null; void opened?.then(db => db.close(), () => {}); },
+        terminated() { dbPromise = null; },
+      }).catch(error => { dbPromise = null; throw error; });
     }
     return dbPromise;
   };
@@ -198,14 +206,56 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
     return null;
   };
 
-  const abortTransaction = async (tx: { abort: () => void; done: Promise<unknown> }) => {
-    try {
-      tx.abort();
-    } catch {
-      // The transaction may already be inactive after an IndexedDB request error.
-    }
-    await tx.done.catch(() => undefined);
-  };
+  const readChanges = async (after = 0, latestOnly = false) => readLocalDataChanges(localChangesDb(await getDb()), after, latestOnly);
+
+  async function commitIdentityMutation<T>(
+    db: IDBPDatabase<GuildIdentityDb>, stores: StoreNames<GuildIdentityDb>[], hints: string[],
+    mutate: (tx: IDBPTransaction<GuildIdentityDb, StoreNames<GuildIdentityDb>[], "readwrite">) => Promise<T>,
+    lease?: LocalDataWriteLease,
+  ): Promise<T> {
+    let change: LocalDataChangeInput | null = null;
+    return commitLocalDataMutation(db, [...new Set<StoreNames<GuildIdentityDb>>([...stores, GUILD_ALIASES_STORE, GUILD_EXCLUSIONS_STORE])], () => change, async tx => {
+      const aliases = tx.objectStore(GUILD_ALIASES_STORE);
+      const exclusions = tx.objectStore(GUILD_EXCLUSIONS_STORE);
+      // Every mutation below can touch only the hinted identifiers and their
+      // complete identity groups. Keep both sides inside this same transaction;
+      // absorbed groups and singleton removal must still reach the journal.
+      const hintKeys = hints.map(identifier => normalizeIdentifierInput(identifier).identifierKey);
+      const readGroups = async (previousIds: string[] = []) => {
+        const hinted = await Promise.all(hintKeys.map(key => aliases.get(key)));
+        const ids = [...new Set([...previousIds, ...hinted.flatMap(alias => alias ? [alias.entityId] : [])])];
+        const groups = await Promise.all(ids.map(id => aliases.index("by_entityId").getAll(id)));
+        return groups.flat().sort((a, b) => a.identifierKey < b.identifierKey ? -1 : a.identifierKey > b.identifierKey ? 1 : 0);
+      };
+      // Link/unlink do not mutate exclusions; reject/remove touch this pair only.
+      const pairKey = hintKeys.length === 2 ? createPairKey(hintKeys[0], hintKeys[1]) : null;
+      const readExclusion = async () => pairKey ? await exclusions.get(pairKey) : undefined;
+      const before = await readGroups();
+      const beforeExclusions = await readExclusion();
+      const result = await mutate(tx);
+      const after = await readGroups(before.map(alias => alias.entityId));
+      const afterExclusions = await readExclusion();
+      const aliasesChanged = JSON.stringify(before) !== JSON.stringify(after);
+      const exclusionsChanged = JSON.stringify(beforeExclusions) !== JSON.stringify(afterExclusions);
+      if (!aliasesChanged && !exclusionsChanged) return result;
+      const beforeByKey = new Map(before.map(alias => [alias.identifierKey, alias]));
+      const afterByKey = new Map(after.map(alias => [alias.identifierKey, alias]));
+      const changedKeys = new Set([...beforeByKey.keys(), ...afterByKey.keys()].filter(key => JSON.stringify(beforeByKey.get(key)) !== JSON.stringify(afterByKey.get(key))));
+      hints.forEach(identifier => changedKeys.add(normalizeIdentifierInput(identifier).identifierKey));
+      const ids = new Set([...before, ...after].filter(alias => changedKeys.has(alias.identifierKey)).map(alias => alias.entityId));
+      const groups = (records: GuildAlias[]): LocalIdentityChangeGroup[] => [...ids].flatMap(identityId => {
+        const members = records.filter(alias => alias.entityId === identityId);
+        return members.length ? [{ identityId, aliases: members.map(alias => alias.identifier) }] : [];
+      });
+      change = {
+        owner: "guild-identities", kinds: [...(aliasesChanged ? ["identity" as const] : []), ...(exclusionsChanged ? ["exclusion" as const] : [])],
+        sourceIds: [], removedSourceIds: [], servers: [], unknownImpact: false,
+        identityBefore: groups(before), identityAfter: groups(after),
+        originalAliases: [...new Set([...hints, ...before, ...after].flatMap(value => typeof value === "string" ? [value] : changedKeys.has(value.identifierKey) ? [value.identifier] : []))],
+      };
+      return result;
+    }, lease);
+  }
 
   const getGuildEntityForAlias = async (identifier: string): Promise<GuildEntity | null> => {
     const { identifierKey } = normalizeIdentifierInput(identifier);
@@ -223,14 +273,17 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
 
   const listGuildEntities = async (): Promise<Array<{ entity: GuildEntity; aliases: GuildAlias[] }>> => {
     const db = await getDb();
-    const entities = await db.getAll(GUILD_ENTITIES_STORE);
-    const entries = await Promise.all(
-      entities.map(async (entity) => ({
-        entity,
-        aliases: sortAliases(await readAliasesForEntity(db, entity.entityId)),
-      })),
-    );
-    return entries.sort((left, right) => left.entity.createdAt.localeCompare(right.entity.createdAt));
+    const tx = db.transaction([GUILD_ENTITIES_STORE, GUILD_ALIASES_STORE]);
+    const [entities, aliases] = await Promise.all([tx.objectStore(GUILD_ENTITIES_STORE).getAll(), tx.objectStore(GUILD_ALIASES_STORE).getAll()]);
+    await tx.done;
+    const byEntity = new Map<string, GuildAlias[]>();
+    for (const alias of aliases) {
+      const group = byEntity.get(alias.entityId);
+      if (group) group.push(alias);
+      else byEntity.set(alias.entityId, [alias]);
+    }
+    return entities.map(entity => ({ entity, aliases: sortAliases(byEntity.get(entity.entityId) ?? []) }))
+      .sort((left, right) => left.entity.createdAt.localeCompare(right.entity.createdAt));
   };
 
   const linkGuildAliases = async (
@@ -246,12 +299,11 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
 
     const db = await getDb();
     const timestamp = nowIso();
-    const tx = db.transaction([GUILD_ENTITIES_STORE, GUILD_ALIASES_STORE, GUILD_EXCLUSIONS_STORE], "readwrite");
-    const entitiesStore = tx.objectStore(GUILD_ENTITIES_STORE);
-    const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
-    const exclusionsStore = tx.objectStore(GUILD_EXCLUSIONS_STORE);
+    return commitIdentityMutation(db, [GUILD_ENTITIES_STORE, GUILD_ALIASES_STORE, GUILD_EXCLUSIONS_STORE], [left, right], async tx => {
+      const entitiesStore = tx.objectStore(GUILD_ENTITIES_STORE);
+      const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
+      const exclusionsStore = tx.objectStore(GUILD_EXCLUSIONS_STORE);
 
-    try {
       if (await exclusionsStore.get(createPairKey(leftInput.identifierKey, rightInput.identifierKey))) {
         throw new GuildIdentityConflictError("guild_link_rejected");
       }
@@ -263,7 +315,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
         const entity = await entitiesStore.get(leftAlias.entityId);
         if (!entity) throw new GuildIdentityConflictError("guild_alias_entity_missing");
         const aliases = await aliasesStore.index("by_entityId").getAll(entity.entityId);
-        await tx.done;
+
         return { entity, aliases: sortAliases(aliases) };
       }
 
@@ -294,7 +346,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
         await entitiesStore.add(entity);
         await aliasesStore.add(aliases[0]);
         await aliasesStore.add(aliases[1]);
-        await tx.done;
+
         return { entity, aliases: sortAliases(aliases) };
       }
 
@@ -322,7 +374,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
           await aliasesStore.add(newAlias);
           const updatedEntity = { ...entity, updatedAt: timestamp };
           await entitiesStore.put(updatedEntity);
-          await tx.done;
+
           return { entity: updatedEntity, aliases: sortAliases([...existingAliases, newAlias]) };
         }
 
@@ -343,7 +395,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
         const updatedEntity = { ...keep, updatedAt: timestamp };
         await entitiesStore.put(updatedEntity);
         await entitiesStore.delete(absorb.entityId);
-        await tx.done;
+
         return {
           entity: updatedEntity,
           aliases: sortAliases([...keepAliases, ...absorbAliases.map((alias) => ({ ...alias, entityId: keep.entityId }))]),
@@ -351,24 +403,20 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
       }
 
       throw new GuildIdentityConflictError("guild_link_failed");
-    } catch (error) {
-      await abortTransaction(tx);
-      throw error;
-    }
+    }, metadata.lease);
   };
 
   const unlinkGuildAlias = async (identifier: string): Promise<void> => {
     const input = normalizeIdentifierInput(identifier);
     const db = await getDb();
     const timestamp = nowIso();
-    const tx = db.transaction([GUILD_ENTITIES_STORE, GUILD_ALIASES_STORE], "readwrite");
-    const entitiesStore = tx.objectStore(GUILD_ENTITIES_STORE);
-    const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
+    return commitIdentityMutation(db, [GUILD_ENTITIES_STORE, GUILD_ALIASES_STORE], [identifier], async tx => {
+      const entitiesStore = tx.objectStore(GUILD_ENTITIES_STORE);
+      const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
 
-    try {
       const alias = await aliasesStore.get(input.identifierKey);
       if (!alias) {
-        await tx.done;
+
         return;
       }
 
@@ -385,11 +433,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
         if (entity) await entitiesStore.put({ ...entity, updatedAt: timestamp });
       }
 
-      await tx.done;
-    } catch (error) {
-      await abortTransaction(tx);
-      throw error;
-    }
+    });
   };
 
   const mergeGuildEntities = linkGuildAliases;
@@ -406,11 +450,10 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
     }
 
     const db = await getDb();
-    const tx = db.transaction([GUILD_ALIASES_STORE, GUILD_EXCLUSIONS_STORE], "readwrite");
-    const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
-    const exclusionsStore = tx.objectStore(GUILD_EXCLUSIONS_STORE);
+    return commitIdentityMutation(db, [GUILD_ALIASES_STORE, GUILD_EXCLUSIONS_STORE], [left, right], async tx => {
+      const aliasesStore = tx.objectStore(GUILD_ALIASES_STORE);
+      const exclusionsStore = tx.objectStore(GUILD_EXCLUSIONS_STORE);
 
-    try {
       const leftAlias = await aliasesStore.get(leftInput.identifierKey);
       const rightAlias = await aliasesStore.get(rightInput.identifierKey);
       if (leftAlias?.entityId && rightAlias?.entityId && leftAlias.entityId === rightAlias.entityId) {
@@ -420,7 +463,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
       const pairKey = createPairKey(leftInput.identifierKey, rightInput.identifierKey);
       const existing = await exclusionsStore.get(pairKey);
       if (existing) {
-        await tx.done;
+
         return existing;
       }
 
@@ -436,18 +479,15 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
         source: metadata.source ?? "manual",
       };
       await exclusionsStore.add(rejection);
-      await tx.done;
+
       return rejection;
-    } catch (error) {
-      await abortTransaction(tx);
-      throw error;
-    }
+    });
   };
 
   const removeGuildLinkRejection = async (left: string, right: string): Promise<void> => {
     const pairKey = createGuildExclusionPairKey(left, right);
     const db = await getDb();
-    await db.delete(GUILD_EXCLUSIONS_STORE, pairKey);
+    await commitIdentityMutation(db, [GUILD_EXCLUSIONS_STORE], [left, right], async tx => { await tx.objectStore(GUILD_EXCLUSIONS_STORE).delete(pairKey); });
   };
 
   const isGuildLinkRejected = async (left: string, right: string): Promise<boolean> => {
@@ -479,6 +519,7 @@ export function createGuildIdentityStore(options: GuildIdentityStoreOptions = {}
   };
 
   return {
+    readChanges,
     getGuildEntityForAlias,
     getGuildAliases,
     listGuildEntities,
@@ -507,3 +548,5 @@ export const removeGuildLinkRejection = defaultGuildIdentityStore.removeGuildLin
 export const isGuildLinkRejected = defaultGuildIdentityStore.isGuildLinkRejected;
 export const getGuildLinkRejections = defaultGuildIdentityStore.getGuildLinkRejections;
 export const listGuildExclusions = defaultGuildIdentityStore.listGuildExclusions;
+
+export const readGuildIdentityChanges = defaultGuildIdentityStore.readChanges;

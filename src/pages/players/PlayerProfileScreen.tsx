@@ -1,3 +1,4 @@
+import { useFavoriteMembership } from "../../lib/data-hub/useFavoriteMembership";
 // src/pages/players/PlayerProfileScreen.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -41,7 +42,7 @@ import {
   buildFallbackProgressSeries,
   usePlayerProgressSnapshots,
 } from "../../lib/player-progress/usePlayerProgressSnapshots";
-import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
+import { formatScanDateTimeLabel, toScanDateTimeMs, getScanAgeDays } from "../../lib/ui/formatScanDateTimeLabel";
 import "./player-profile.css";
 
 const TAB_CONFIG = [
@@ -88,7 +89,7 @@ const BASE_STAT_CONFIG: { key: keyof BaseStatValues; label: string; base: string
   { key: "str", label: "Stärke", base: ["Base Strength", "Stärke", "basestrength"], total: ["Strength"] },
   { key: "dex", label: "Geschick", base: ["Base Dexterity", "Geschick", "basedexterity"], total: ["Dexterity"] },
   { key: "int", label: "Intelligenz", base: ["Base Intelligence", "Intelligenz", "baseintelligence"], total: ["Intelligence"] },
-  { key: "con", label: "Konstitution", base: ["Base Constitution", "Konstitution", "baseconstitution"], total: ["Constitution"] },
+  { key: "con", label: "Ausdauer", base: ["Base Constitution", "Konstitution", "baseconstitution"], total: ["Constitution"] },
   { key: "lck", label: "Glück", base: ["Base Luck", "Glück", "baseluck"], total: ["Luck"] },
 ];
 
@@ -126,7 +127,8 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   const routeIdentifier = params.identifier ?? "";
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { user, isFavoritePlayer, toggleFavoritePlayer } = useAuth();
+  const { isFavoritePlayer, toggleFavoritePlayer } = useAuth();
+  const { favorites: sharedFavorites } = useFavoriteMembership();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -257,7 +259,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           values?.AlbumProgress;
         const scrapbookPct = toNum(scrapbookRaw) ?? null;
         const timestampSeconds = toNum(data.timestamp) ?? toNum(values?.timestamp);
-        const lastScanDays = daysSince(timestampSeconds);
+        const lastScanDays = getScanAgeDays(timestampSeconds);
 
         const portraitConfig =
           typeof data.portrait === "object"
@@ -381,14 +383,14 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
   );
   const favoritePlayerIdentifiers = useMemo(
     () =>
-      Object.keys(user?.favorites?.players ?? {})
+      Object.keys(sharedFavorites.players ?? {})
         .map((identifier) => identifier.trim().toLowerCase())
         .filter((identifier) => !!identifier),
-    [user?.favorites?.players],
+    [sharedFavorites.players],
   );
   const favoritePlayerMetaByIdentifier = useMemo(() => {
     const map: Record<string, { name?: string; className?: string }> = {};
-    const favoritesPlayers = user?.favorites?.players ?? {};
+    const favoritesPlayers = sharedFavorites.players ?? {};
     Object.entries(favoritesPlayers).forEach(([identifier, value]) => {
       const normalizedIdentifier = identifier.trim().toLowerCase();
       if (!normalizedIdentifier) return;
@@ -402,7 +404,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
       };
     });
     return map;
-  }, [user?.favorites?.players]);
+  }, [sharedFavorites.players]);
   const progressSnapshotIdentifiers = useMemo(
     () => (currentHistoryIdentifier ? [currentHistoryIdentifier] : []),
     [currentHistoryIdentifier],
@@ -551,6 +553,7 @@ export default function PlayerProfileScreen({ heroOnly = false }: PlayerProfileS
           const result = await toggleFavoritePlayer(identifier, {
             name: snapshot.name ?? identifier,
             className: snapshot.className ?? undefined,
+            level: snapshot.level, guildName: snapshot.guild,
           });
           showFeedback(
             result.isFavorite
@@ -760,13 +763,6 @@ const toNum = (value: any): number | null => {
   if (!normalized) return null;
   const num = Number(normalized) * sign;
   return Number.isFinite(num) ? num : null;
-};
-
-const daysSince = (timestamp?: number | null) => {
-  if (!timestamp) return null;
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - timestamp);
-  return Math.floor(diff / 86400);
 };
 
 const canonicalize = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -980,7 +976,8 @@ const buildProfileView = (
   const scanValueForDisplay = lastScanRaw && lastScanRaw.trim() ? lastScanRaw : (timestampSeconds ?? null);
   const formattedScanDisplay = formatScanDateTimeLabel(scanValueForDisplay);
   const lastScanDisplay = formattedScanDisplay === "—" ? "-" : formattedScanDisplay;
-  const scanAgeDays = snapshot.lastScanDays ?? (timestampSeconds != null ? daysSince(timestampSeconds) : null);
+  const scanAtMs = toScanDateTimeMs(scanValueForDisplay);
+  const scanAgeDays = getScanAgeDays(scanAtMs);
 
   const xpValue = lookup.number(["xp"]) ?? toNum(values?.XP);
   const xpRequiredValue = lookup.number(["xprequired", "xpnext", "xptonextlevel"]) ?? toNum(values?.["XP Required"]);
@@ -1041,6 +1038,7 @@ const buildProfileView = (
     levelLabel: level ? `Level ${formatNumber(level)}` : undefined,
     lastScanLabel: formatDaysAgo(scanAgeDays) ?? undefined,
     lastScanAtLabel: lastScanDisplay !== "-" ? lastScanDisplay : undefined,
+    lastScanAtMs: scanAtMs,
     lastScanDays: scanAgeDays,
     status: (scanAgeDays != null && scanAgeDays <= 2 ? "online" : "offline") as ("online"|"offline"),
     metrics: heroMetrics,

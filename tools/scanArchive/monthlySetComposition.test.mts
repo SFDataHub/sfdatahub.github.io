@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto";
+import { seedLocalSourceValidityFixture } from "../guilds/localSourceValidityFixture.mts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { gzipSync, gunzipSync } from "fflate";
@@ -59,7 +60,7 @@ assert.equal(composeMonthlySet([partial, extra]).playerRows.find(row => row.play
 const wrongGuild = raw(t2, 49);
 wrongGuild.players[48].guildIdentifier = `${server}_g2`;
 assert.equal(derive(wrongGuild).guildRows[0].memberBasisStatus, "incomplete");
-assert.equal(LOCAL_TOPLIST_DERIVATION_VERSION, 4);
+assert.equal(LOCAL_TOPLIST_DERIVATION_VERSION, 5);
 const encoder = new TextEncoder();
 const dependencies = { gzip: (s: string) => gzipSync(encoder.encode(s), { level: 9, mtime: 0 }), sha256: (b: Uint8Array) => createHash("sha256").update(b).digest("hex"), byteLength: (b: Uint8Array) => b.length, utf8ByteLength: (s: string) => encoder.encode(s).length };
 const empty: ScanArchiveManifest = { schemaVersion: 1, archiveYear: 2026, revision: 0, updatedAt: "2026-01-01T00:00:00Z", scanCount: 0, serverCount: 0, scans: [] };
@@ -67,8 +68,10 @@ const batches = (payload: ReturnType<typeof raw>) => buildScanArchiveBatches(JSO
 const baseRaw = raw(t1, 49, 48), newerRaw = raw(t2, 49, 49, 200);
 newerRaw.groups[0].name = "Complete winner";
 const base = await createScanArchiveBuildPlanCore({ year: 2026, manifest: empty, inputBatches: batches(baseRaw), usageMode: "create-monthly" }, dependencies);
+delete base.manifestAfter.rankings;
 const add = await createScanArchiveBuildPlanCore({ year: 2026, manifest: base.manifestAfter, inputBatches: batches(newerRaw), usageMode: "add-monthly", loadMonthlyRawScan: async () => baseRaw }, dependencies);
 assert.deepEqual(add.conflicts, []);
+delete add.manifestAfter.rankings;
 assert.equal(add.batches[0].players.length, 49);
 assert.equal(add.batches[0].groups.length, 1);
 assert.equal(add.monthlyTargets[0].updatedPlayers, 48);
@@ -87,11 +90,17 @@ assert.equal(aliasedAdd.batches[0].players.length, 1);
 assert.equal(aliasedAdd.batches[0].players[0].identifier, `${server}_p1`);
 assert.equal(derive(aliasedAdd.batches[0] as any).guildRows[0].avgLevel, 300);
 const older = await createScanArchiveBuildPlanCore({ year: 2026, manifest: add.manifestAfter, inputBatches: batches(raw(t1 - 60_000, 49)), usageMode: "add-monthly", loadMonthlyRawScan: async scan => scan.timestamp === t1 ? baseRaw : newerRaw }, dependencies);
-assert(older.conflicts.some(c => c.code === "add_no_new_ids"));
-assert.equal(older.files.length, 0);
+assert.deepEqual(older.conflicts, []);
+assert.equal(older.batches.length, 0);
+assert.deepEqual(older.files.map(file => file.kind), ["ranking"]);
+assert.deepEqual(older.manifestAfter.scans, add.manifestAfter.scans);
+assert.deepEqual(older.manifestAfter.toplists, add.manifestAfter.toplists);
 const redundant = await createScanArchiveBuildPlanCore({ year: 2026, manifest: add.manifestAfter, inputBatches: batches(raw(t3, 49, 0)), usageMode: "add-monthly", loadMonthlyRawScan: async scan => scan.timestamp === t1 ? baseRaw : newerRaw }, dependencies);
-assert(redundant.conflicts.some(c => c.code === "add_no_new_ids"));
-assert.equal(redundant.files.length, 0);
+assert.deepEqual(redundant.conflicts, []);
+assert.equal(redundant.batches.length, 0);
+assert.deepEqual(redundant.files.map(file => file.kind), ["ranking"]);
+assert.deepEqual(redundant.manifestAfter.scans, add.manifestAfter.scans);
+assert.deepEqual(redundant.manifestAfter.toplists, add.manifestAfter.toplists);
 // Create keeps every physical batch; loading its explicit reference uses the
 // exact same service path as an existing archive set or a completed Add.
 const combined = { players: [...baseRaw.players, ...newerRaw.players], groups: [...baseRaw.groups, ...newerRaw.groups, ...raw(t3, 49, 0).groups] };
@@ -101,12 +110,18 @@ const selection = resolveScanArchiveMonthlyToplistScan([create.manifestAfter], s
 assert.equal(selection.status, "selected");
 const entries = createScanArchiveEntryFromToplistSelection(selection, { 2026: "https://example.test/manifest.json" });
 const sources = new Map(create.files.filter(f => f.kind === "raw").map(f => [f.scanId, JSON.parse(new TextDecoder().decode(gunzipSync(f.bytes!)))]));
+const localSources = new Map();
+for (const entry of entries) {
+  const value = await seedLocalSourceValidityFixture({ id: entry.id, contentHash: entry.id, filename: "monthly.json", importedAt: new Date(entry.timestamp).toISOString(), scannedAt: null, servers: [entry.server], playerCount: entry.playerCount ?? 0, groupCount: entry.groupCount ?? 0,
+    rawData: sources.get(entry.id), archiveSource: { archiveScanId: entry.id, sha256: entry.sha256, archiveYear: entry.archiveYear, server: entry.server, timestamp: entry.timestamp, path: entry.path, compression: entry.compression, format: entry.format, importedAt: new Date(entry.timestamp).toISOString() } });
+  localSources.set(entry.id, value.scan);
+}
 const service = await loadOrBuildLocalToplistSnapshots(entries, { dependencies: {
   acquireEntries: async es => ({ status: "complete", localScanIds: es.map(e => e.id), selectedArchives: es.map(e => ({ archiveScanId: e.id, archiveSha256: e.sha256, localScanId: e.id, status: "already-local" })), failedArchives: [], networkAccessed: false }),
-  getLocalScan: async id => ({ id, contentHash: id, rawData: sources.get(id), archiveSource: { archiveScanId: id, sha256: entries.find(e => e.id === id)!.sha256 } }) as any,
+  getLocalScan: async id => localSources.get(id),
   deriveInWorker: async scans => {
     const d = deriveLocalToplistsFromConfirmedScans(scans.map(source => ({ ...source, rawScan: sources.get(source.archiveScanId) })));
-    return d.snapshots.map(meta => ({ ...meta, snapshotMeta: meta, playerRows: d.players.filter(p => p.archiveScanId === meta.archiveScanId), guildRows: d.guilds.filter(g => g.archiveScanId === meta.archiveScanId), issues: d.issues, localContentHash: meta.archiveScanId }));
+    return d.snapshots.map(meta => ({ ...scans.find(source => source.archiveScanId === meta.archiveScanId), ...meta, snapshotMeta: meta, playerRows: d.players.filter(p => p.archiveScanId === meta.archiveScanId), guildRows: d.guilds.filter(g => g.archiveScanId === meta.archiveScanId), issues: d.issues, localContentHash: meta.archiveScanId }));
   },
 } });
 assert.equal(service.status, "complete");

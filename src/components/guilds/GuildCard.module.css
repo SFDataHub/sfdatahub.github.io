@@ -38,6 +38,11 @@
     background 160ms ease;
 }
 
+.guildCard {
+  grid-template-rows: 104px minmax(0, 1fr) 14px;
+  row-gap: 2px;
+}
+
 .card::before {
   content: "";
   position: absolute;
@@ -230,6 +235,17 @@
   width: 100%;
 }
 
+.guildCard .identityZone {
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+}
+
+.guildCard .name {
+  height: auto;
+  max-height: 36px;
+}
+
 .name {
   display: -webkit-box;
   max-width: 100%;
@@ -265,6 +281,15 @@
   min-width: 0;
   transform: translateY(-2px);
   width: 100%;
+}
+
+.guildCard .server {
+  transform: none;
+}
+
+.guildCard .footerZone {
+  place-items: center;
+  transform: none;
 }
 
 .memberCount {
@@ -321,6 +346,10 @@
     width: 150px;
     height: 208px;
     padding-inline: 10px;
+  }
+
+  .guildCard {
+    grid-template-rows: 96px minmax(0, 1fr) 14px;
   }
 
   .emblemRing {

@@ -1,15 +1,24 @@
 import React, { useEffect, useRef } from "react";
+import { CLASSES } from "../../data/classes";
 import { useTranslation } from "react-i18next";
 import { useFilters, type DaysFilter } from "./FilterContext";
 import type { LocalToplistSearchResult } from "../../lib/toplists/localToplistViewWorkerTypes";
 
 type Props = {
+  searchModeSlot?: React.ReactNode;
+  searchFieldClassName?: string;
+  searchGlyphSlot?: React.ReactNode;
+  searchLabel?: string;
+  searchPlaceholder?: string;
   open: boolean;
   onClose: () => void;
   localSearchLoading?: boolean;
   localSearchResults?: LocalToplistSearchResult[];
   onLocalSearchResultSelect?: (result: LocalToplistSearchResult) => void;
   localSearchEmptyText?: string;
+  localSearchNotice?: string;
+  onLocalSearchRetry?: () => void;
+  renderLocalSearchArtwork?: (result: LocalToplistSearchResult) => React.ReactNode;
 };
 
 const PALETTE = {
@@ -25,10 +34,18 @@ const PALETTE = {
 export default function BottomFilterSheet({
   open,
   onClose,
+  searchModeSlot,
+  searchFieldClassName,
+  searchGlyphSlot,
+  searchLabel,
+  searchPlaceholder,
   localSearchLoading = false,
   localSearchResults = [],
   onLocalSearchResultSelect,
   localSearchEmptyText,
+  localSearchNotice,
+  onLocalSearchRetry,
+  renderLocalSearchArtwork,
 }: Props) {
   const { t } = useTranslation();
   const {
@@ -81,9 +98,9 @@ export default function BottomFilterSheet({
           const disabled = result.status !== "jumpable";
           const detailParts = [
             result.server,
-            result.kind === "player" ? result.className : null,
+            result.kind === "player" ? t(`toplists.classes.${CLASSES.find(c => c.key === result.className || c.label === result.className)?.key}`, result.className ?? "") : null,
             result.kind === "player" ? result.guildName : null,
-            disabled ? result.statusReason : null,
+            disabled ? t("toplists.search.outsideScope") : null,
           ].filter(Boolean);
           return (
             <button
@@ -96,8 +113,12 @@ export default function BottomFilterSheet({
               }}
               style={{ ...resultButton, ...(disabled ? resultButtonDisabled : null) }}
             >
+              <span style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              {renderLocalSearchArtwork?.(result)}
+              <span style={{ display: "grid", gap: 3, minWidth: 0 }}>
               <span style={resultLabel}>{result.label}</span>
               <span style={resultMeta}>{detailParts.join(" · ")}</span>
+              </span></span>
             </button>
           );
         })}
@@ -127,24 +148,28 @@ export default function BottomFilterSheet({
     >
       <div ref={rootRef} style={panel}>
         <div style={headerRow}>
-          <h2 id="filters-title" style={{ fontSize: 16, margin: 0, color: PALETTE.text }}>Filters</h2>
-          <button type="button" onClick={onClose} style={primaryBtn}>Done</button>
+          <h2 id="filters-title" style={{ fontSize: 16, margin: 0, color: PALETTE.text }}>{t("toplists.filters.windowTitle")}</h2>
+          <button type="button" onClick={onClose} style={primaryBtn}>{t("toplists.serverPicker.done")}</button>
         </div>
 
         {/* Suche */}
         <div style={{ display: "grid", gap: 8 }}>
-          <label htmlFor="sheet-search" className="sr-only">Search</label>
-          <input
-            id="sheet-search"
-            name="sheet-search"
-            type="text"
-            placeholder="Search…"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            aria-label="Search"
-            autoComplete="off"
-            style={input}
-          />
+          <div className={searchFieldClassName} style={searchFieldClassName ? undefined : { display: "grid", gap: 8 }}>
+            {searchGlyphSlot}
+            <label htmlFor="sheet-search" className="sr-only">{searchLabel ?? t("toplists.search.label")}</label>
+            <input
+              id="sheet-search"
+              name="sheet-search"
+              type="text"
+              placeholder={searchPlaceholder ?? t("toplists.search.placeholder")}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              aria-label={searchLabel ?? t("toplists.search.label")}
+              autoComplete="off"
+              style={searchFieldClassName ? undefined : input}
+            />
+            {searchModeSlot}
+          </div>
           {showLocalResults && (
             <div style={resultsPanel} aria-live="polite">
               {localSearchLoading ? (
@@ -154,27 +179,29 @@ export default function BottomFilterSheet({
                   {renderLocalResultGroup("player", t("toplists.search.players", "Players"))}
                   {renderLocalResultGroup("guild", t("toplists.search.guilds", "Guilds"))}
                   {renderLocalResultGroup("server", t("toplists.search.servers", "Servers"))}
+                  {localSearchNotice ? <div style={resultStatus}>{localSearchNotice}</div> : null}
                 </>
               ) : searchText.trim().length ? (
                 <div style={resultStatus}>{localSearchEmptyText ?? t("toplists.search.empty", "No local results.")}</div>
               ) : null}
+              {localSearchNotice && onLocalSearchRetry ? <button type="button" onClick={onLocalSearchRetry}>{t("toplists.actions.retry")}</button> : null}
             </div>
           )}
         </div>
 
         {/* Range (Buttons – keine Radios) */}
         <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-          <span style={{ color: PALETTE.text2, fontSize: 12 }}>Range</span>
-          <div role="group" aria-label="Range" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <span style={{ color: PALETTE.text2, fontSize: 12 }}>{t("toplists.filters.range")}</span>
+          <div role="group" aria-label={t("toplists.filters.range")} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {rangeButtons.map((option) => (
               <button
-                key={option.label}
+                key={option.value === "all" ? t("toplists.filters.classes.all") : t("toplists.filters.days", { count: option.value })}
                 type="button"
                 aria-pressed={range === option.value}
                 onClick={() => setRange(option.value)}
                 style={{ ...chip, ...(range === option.value ? chipActive : null) }}
               >
-                {option.label}
+                {option.value === "all" ? t("toplists.filters.classes.all") : t("toplists.filters.days", { count: option.value })}
               </button>
             ))}
           </div>
@@ -211,7 +238,7 @@ export default function BottomFilterSheet({
             aria-pressed={quickFav}
             style={{ ...chip, ...(quickFav ? chipActive : null) }}
           >
-            ⭐ Favorites
+            ⭐ {t("nav.favorites")}
           </button>
           <button
             type="button"
@@ -219,7 +246,7 @@ export default function BottomFilterSheet({
             aria-pressed={quickActive}
             style={{ ...chip, ...(quickActive ? chipActive : null) }}
           >
-            ⚡ Active
+            ⚡ {t("search.active")}
           </button>
         </div>
       </div>

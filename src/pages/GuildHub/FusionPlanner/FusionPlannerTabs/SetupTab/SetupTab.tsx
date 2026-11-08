@@ -1,3 +1,4 @@
+import { auditBegin, auditEnter, auditValue, auditError, auditLeave, auditFields } from "../../../../../lib/data-hub/runtimeAudit";
 import React from "react";
 import {
   collectionGroup,
@@ -349,10 +350,13 @@ function useGuildSearchResults(term: string, server: string) {
 
     let cancelled = false;
     async function run() {
+    const __audit1 = auditBegin("F15", "run");
+  auditFields(__audit1, { consumerArea: "Fusionsplanung", trigger: "cloud-search-effect" });
+    try {
       const scope: FirestoreTraceScope = beginReadScope("FusionSetup:guildSearch");
       try {
         const cg = collectionGroup(db, "latest");
-        const snapPrefix = await traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
+        const snapPrefix = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
           getDocs(
             fsQuery(
               cg,
@@ -362,10 +366,10 @@ function useGuildSearchResults(term: string, server: string) {
               limit(12),
             ),
           ),
-        );
-        const snapNgram = await traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
+        ))));
+        const snapNgram = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
           getDocs(fsQuery(cg, where("nameNgrams", "array-contains", q), limit(12))),
-        );
+        ))));
 
         const seen = new Set<string>();
         const next: GuildResult[] = [];
@@ -393,13 +397,16 @@ function useGuildSearchResults(term: string, server: string) {
           next.sort((a, b) => a.name.localeCompare(b.name));
           setResults(next);
         }
-      } catch (err) {
+      } catch (err) { auditError(__audit1, err);
         console.error("[FusionPlanner] guild search failed", err);
         if (!cancelled) setResults([]);
       } finally {
         endReadScope(scope);
       }
-    }
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+}
 
     run();
     return () => {

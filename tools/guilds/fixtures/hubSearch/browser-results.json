@@ -1,0 +1,1105 @@
+{
+  "results": [
+    "Production Dashboard cold metadata preparation and five warm queries: no repeat Raw/core/profile work",
+    "Player/Profile sender -> actual shared W-12 local detail; free Current and Back query restore",
+    "Explicit historical observation -> actual local detail keeps checked individual source/time",
+    "Guild/Profile sender -> actual addressed local Guild Dashboard",
+    "Valid archive-only player match -> explicit production Raw acquisition -> actual local profile",
+    "Player/Toplist sender -> full two-member Currentset -> actual player row -> visible DOM ACK",
+    "Guild/Toplist sender -> full Currentset -> actual guild row -> visible DOM ACK",
+    "Explicit historical archive scope and monthly full-set handoff resolve actual historical dataset row and DOM ACK",
+    "All four target paths preserve favorites and global selection; public consumers untouched",
+    "Real malformed compressed sidecar rejected; other member remains usable; same-scope retry and certified offline metadata recovery",
+    "Delayed target replies rejected after query/mode/scope/new target/unmount and same-source update; newer handed-off profile remains valid",
+    "Existing class blocker requires explicit correction; consumed command cannot replay; same-ID Actual Rows change rejects stale DOM ACK callback",
+    "Compact 390px: all four actual target paths and DOM ACK; keyboard reachable controls",
+    "Native keyboard Tab and Enter: target control reached and actual guild Toplist DOM ACK",
+    "Actual compact Dashboard search and reload preserve text, kind, mode and scope",
+    "Unmount: zero held local/archive documents, listeners and index flights"
+  ],
+  "measurements": {
+    "queryTransport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/archive/search/current-b.search.json.gz",
+        "bytes": 252
+      },
+      {
+        "path": "/archive/search/current-a.search.json.gz",
+        "bytes": 239
+      }
+    ],
+    "warmQueries": {
+      "rawSearchReads": 0,
+      "projectionCommitRawReads": 0,
+      "cores": 0,
+      "profileBuilds": 0,
+      "queryCpuMs": 1.100000023841858
+    },
+    "indexTransportAndValidation": [
+      {
+        "id": "current-a",
+        "ms": 35.200000047683716
+      },
+      {
+        "id": "current-b",
+        "ms": 35
+      },
+      {
+        "id": "historical",
+        "ms": 14.899999976158142
+      },
+      {
+        "id": "current-a",
+        "ms": 15.400000095367432
+      }
+    ],
+    "projectionCommitRawReads": 14,
+    "localRawReaderCalls": 14,
+    "coldPreparationRawReads": 5,
+    "searchCosts": [
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0.10000002384185791
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 3,
+          "projectionBytes": 5541,
+          "preparationMs": 85.69999992847443,
+          "archivePreparationMs": 92.5,
+          "queries": 13,
+          "queryMs": 1.2000000476837158
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 51,
+          "archivePreparationMs": 58.10000002384186,
+          "queries": 7,
+          "queryMs": 0.6000001430511475
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 39.89999997615814,
+          "archivePreparationMs": 43.700000047683716,
+          "queries": 7,
+          "queryMs": 0.6999998092651367
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 1,
+          "projectionBytes": 1413,
+          "preparationMs": 64.60000014305115,
+          "archivePreparationMs": 45,
+          "queries": 13,
+          "queryMs": 0.49999988079071045
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 40.5,
+          "archivePreparationMs": 58.09999990463257,
+          "queries": 7,
+          "queryMs": 0.39999985694885254
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 42.5,
+          "archivePreparationMs": 46,
+          "queries": 7,
+          "queryMs": 0.5
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0.10000002384185791
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 41.199999928474426,
+          "archivePreparationMs": 73.79999995231628,
+          "queries": 11,
+          "queryMs": 0.6999998092651367
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 67.69999992847443,
+          "archivePreparationMs": 149.70000004768372,
+          "queries": 45,
+          "queryMs": 2.6999995708465576
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 76.70000004768372,
+          "archivePreparationMs": 86.89999997615814,
+          "queries": 7,
+          "queryMs": 0.5999999046325684
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 1,
+          "projectionBytes": 1406,
+          "preparationMs": 59.300000071525574,
+          "archivePreparationMs": 41.300000071525574,
+          "queries": 13,
+          "queryMs": 0.6999999284744263
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 36.299999952316284,
+          "archivePreparationMs": 40.299999952316284,
+          "queries": 7,
+          "queryMs": 0.4999997615814209
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 0,
+          "archivePreparationMs": 0,
+          "queries": 2,
+          "queryMs": 0
+        },
+        "retained": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "costs": {
+          "coldRawReads": 0,
+          "projectionBytes": 0,
+          "preparationMs": 45.5,
+          "archivePreparationMs": 58.89999997615814,
+          "queries": 11,
+          "queryMs": 0.3999999761581421
+        },
+        "retained": {
+          "localDocuments": 16,
+          "archiveDocuments": 2,
+          "listeners": 1,
+          "stopped": false
+        }
+      }
+    ],
+    "heldModels": {
+      "builds": 8,
+      "cores": 59
+    }
+  },
+  "compact": {
+    "query": "Fixture Guild",
+    "scope": "historical",
+    "errors": []
+  },
+  "keyboard": {
+    "status": "visibleAck",
+    "query": "Fixture Guild"
+  },
+  "reload": {
+    "query": "Fixture Guild",
+    "mode": "toplist",
+    "scope": "historical",
+    "errors": []
+  },
+  "cleanup": {
+    "controllers": [
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      }
+    ],
+    "flights": 0,
+    "errors": []
+  },
+  "transport": [
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/search/current-b.search.json.gz",
+      "bytes": 252
+    },
+    {
+      "path": "/archive/search/current-a.search.json.gz",
+      "bytes": 239
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/current-b.gz",
+      "bytes": 242
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/current-a.gz",
+      "bytes": 255
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/search/historical.search.json.gz",
+      "bytes": 240
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 258
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/setup.json",
+      "bytes": 1952
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/search/current-a.search.json.gz",
+      "bytes": 15
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/search/current-a.search.json.gz",
+      "bytes": 239
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/current-a.gz",
+      "bytes": 255
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    }
+  ]
+}

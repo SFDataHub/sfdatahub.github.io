@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { LocalGuildToplistRow, LocalPlayerToplistRow } from "../../src/lib/toplists/localToplistTypes.ts";
 import { buildLocalPlayerToplistView } from "../../src/lib/toplists/localToplistView.ts";
-import { resolveLocalToplistSearchSelection } from "../../src/pages/GuildHub/localToplistSearchFlow.ts";
+import { resolveLocalToplistSearchSelection } from "../../src/pages/DataHub/localToplistSearchFlow.ts";
 
 const responses: any[] = [];
 (globalThis as any).postMessage = (message: any) => {
@@ -129,7 +129,7 @@ const search = send({
 const inside = search.results.find((result: any) => result.identifier === "eu1_inside");
 const outside = search.results.find((result: any) => result.identifier === "eu1_outside");
 assert.equal(inside?.status, "jumpable");
-assert.equal(outside?.status, "outside-toplist");
+assert.equal(outside?.status, "jumpable");
 
 assert.deepEqual(resolveLocalToplistSearchSelection("guilds", inside, "EU1", 11), {
   action: "focus-player",

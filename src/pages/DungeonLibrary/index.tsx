@@ -1,6 +1,10 @@
+import { hubNumber, hubText } from "../../lib/i18n/dataHubPresentation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
+import LocalTitleNavigation from "../../components/ui/shared/LocalTitleNavigation";
+import { safeLocalReturn } from "../../lib/data-hub/routes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ContentShell from "../../components/ContentShell";
 import FlipbookCurlViewer from "../../components/Flipbook/FlipbookCurlViewer";
@@ -16,6 +20,7 @@ import { getDungeonFloorStats, type DungeonFloorStats } from "../../data/dungeon
 import { dungeonWorlds, type DungeonDefinition, type DungeonFloor, type DungeonWorld } from "../../data/dungeonLibrary/worlds";
 import { preloadDungeonMonster, preloadDungeonMonsters } from "../../lib/dungeonMonsterPreloader";
 import { toDriveThumbProxy } from "../../lib/urls";
+import { trackDungeonBookOpen } from "../../lib/analytics/localEvents";
 import "./DungeonLibrary.css";
 
 type PageFlipLike = {
@@ -86,6 +91,8 @@ type SelectedLongformFloor = {
 type ZoomedEnemy = {
   enemyId: number;
   name?: string;
+  dungeonId?: number;
+  floorPosition?: number;
 } | null;
 
 type MonsterLore = {
@@ -568,7 +575,7 @@ function MonsterImageZoomOverlay({
   enemy: NonNullable<ZoomedEnemy>;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const imageUrl = getDungeonMonsterImage(enemy.enemyId, MONSTER_ZOOM_IMAGE_SIZE);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     imageUrl ? "loading" : "error"
@@ -578,7 +585,9 @@ function MonsterImageZoomOverlay({
     setStatus(imageUrl ? "loading" : "error");
   }, [imageUrl]);
 
-  const imageLabel = enemy.name || t("dungeonLibrary.detail.monsterImageAlt", { enemyId: enemy.enemyId });
+  const imageLabel = (enemy.dungeonId != null && enemy.floorPosition != null
+    ? getLocalizedDungeonFloorName(enemy.dungeonId, enemy.floorPosition, i18n.language)
+    : enemy.name) || t("dungeonLibrary.detail.monsterImageAlt", { enemyId: enemy.enemyId });
 
   return (
     <div
@@ -656,6 +665,7 @@ function FloorPreviewStrip({
   onShowNextWindow: () => void;
   onSelectFloor: (item: FloorPreviewItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <nav className="floor-preview-strip" style={style} aria-hidden={items.length === 0}>
       <div className="floor-preview-strip-inner">
@@ -665,7 +675,7 @@ function FloorPreviewStrip({
             data-flip-interactive
             type="button"
             disabled={disabled || !canShowPreviousWindow}
-            aria-label="Previous floor preview window"
+            aria-label={t("dungeonLibrary.navigation.previousPreview")}
             onPointerDown={stopFlipGesture}
             onMouseDown={stopFlipGesture}
             onTouchStart={stopFlipGesture}
@@ -685,6 +695,7 @@ function FloorPreviewStrip({
             type="button"
             disabled={disabled}
             aria-current={item.isActive ? "page" : undefined}
+            aria-label={hubText("dungeonLibrary.book.floorLabel", { floor: item.floor.position })}
             onPointerDown={stopFlipGesture}
             onMouseDown={stopFlipGesture}
             onTouchStart={stopFlipGesture}
@@ -709,7 +720,7 @@ function FloorPreviewStrip({
                 <span className="floor-preview-image-fallback">?</span>
               )}
             </span>
-            <span className="floor-preview-number">{item.floor.position}</span>
+            <span className="floor-preview-number">{hubNumber(item.floor.position)}</span>
           </button>
         ))}
         {showWindowControls && (
@@ -718,7 +729,7 @@ function FloorPreviewStrip({
             data-flip-interactive
             type="button"
             disabled={disabled || !canShowNextWindow}
-            aria-label="Next floor preview window"
+            aria-label={t("dungeonLibrary.navigation.nextPreview")}
             onPointerDown={stopFlipGesture}
             onMouseDown={stopFlipGesture}
             onTouchStart={stopFlipGesture}
@@ -754,8 +765,8 @@ function EnemyStatsPanel({ stats }: { stats?: DungeonFloorStats }) {
         <AttributeStatBar
           key={row.key}
           statKey={row.key}
-          label={row.label}
-          iconAlt={t("dungeonLibrary.detail.statIconAlt", { stat: row.label })}
+          label={t(`dungeonLibrary.detail.attributes.${row.key}`)}
+          iconAlt={t("dungeonLibrary.detail.statIconAlt", { stat: t(`playerProfile.heroPanel.stats.attributeBars.attributes.${row.key}`) })}
           value={stats[row.key]}
           displayValue={formatDungeonNumber(stats[row.key], i18n.language)}
           fillRatio={toStatFillPercent(stats[row.key], maxAttribute) / 100}
@@ -822,7 +833,7 @@ function EnemyDetail({ dungeon, floor, dungeonName, monsterName, onOpenMonsterIm
           <p className="enemy-detail-monster-name">{monsterName}</p>
         </div>
         <span className="enemy-detail-floor">
-          {t("dungeonLibrary.detail.floorCounter", {
+          {hubText("dungeonLibrary.detail.floorCounter", {
             current: floor.position,
             total: dungeon.floors.length,
           })}
@@ -834,7 +845,7 @@ function EnemyDetail({ dungeon, floor, dungeonName, monsterName, onOpenMonsterIm
             enemyId={floor.enemyId}
             monsterName={monsterName}
             stats={stats}
-            onOpenMonsterImage={onOpenMonsterImage}
+            onOpenMonsterImage={(enemy) => onOpenMonsterImage({ ...enemy, dungeonId: dungeon.dungeonId, floorPosition: floor.position })}
           />
           <EnemyHealthBar stats={stats} locale={i18n.language} />
         </div>
@@ -853,6 +864,11 @@ function EnemyDetail({ dungeon, floor, dungeonName, monsterName, onOpenMonsterIm
 
 export default function DungeonLibraryPage() {
   const { t, i18n } = useTranslation();
+  const location = useLocation(), navigate = useNavigate();
+  const returnTo = safeLocalReturn(location.state?.returnTo, location.pathname);
+  const back = () => navigate(returnTo ?? "/guidehub-v2", {
+    replace: true, state: returnTo ? location.state?.profileReturnState : undefined,
+  });
   const pfRef = useRef<PageFlipLike | null>(null);
   const openingTimersRef = useRef<number[]>([]);
   const previewFlipTimerRef = useRef<number | null>(null);
@@ -876,8 +892,8 @@ export default function DungeonLibraryPage() {
     t(world.titleKey, { defaultValue: world.title }), [t]);
   const getLocalizedBookSubtitle = useCallback((world: DungeonWorld) =>
     world.type === "single-longform"
-      ? t("dungeonLibrary.book.floorCount", { count: world.dungeons[0]?.floors.length ?? 0 })
-      : t("dungeonLibrary.book.dungeonCount", { count: world.dungeons.length }), [t]);
+      ? hubText("dungeonLibrary.book.floorCount", { count: world.dungeons[0]?.floors.length ?? 0 })
+      : hubText("dungeonLibrary.book.dungeonCount", { count: world.dungeons.length }), [t]);
   const openMonsterImage = useCallback((enemy: NonNullable<ZoomedEnemy>) => {
     setZoomedEnemy(enemy);
   }, []);
@@ -1222,6 +1238,7 @@ export default function DungeonLibraryPage() {
   const openBook = useCallback((world: DungeonWorld, trigger: HTMLButtonElement) => {
     if (state !== "library") return;
 
+    trackDungeonBookOpen(world.worldId);
     clearOpeningTimers();
     setSelectedWorld(world);
     setSelectedLongformFloor(null);
@@ -1426,8 +1443,8 @@ export default function DungeonLibraryPage() {
                       <h2 className="world-index-title">{dungeonName}</h2>
                       <span className="world-index-section-meta">
                         {showRange
-                          ? t("dungeonLibrary.book.floorRangeTitle", { start: firstFloor, end: lastFloor })
-                          : t("dungeonLibrary.book.floorCount", { count: section.floors.length })}
+                          ? hubText("dungeonLibrary.book.floorRangeTitle", { start: firstFloor, end: lastFloor })
+                          : hubText("dungeonLibrary.book.floorCount", { count: section.floors.length })}
                       </span>
                     </div>
                     <div
@@ -1449,7 +1466,7 @@ export default function DungeonLibraryPage() {
                             data-flip-interactive
                             key={floor.position}
                             type="button"
-                            aria-label={t("dungeonLibrary.book.floorTileAria", {
+                            aria-label={hubText("dungeonLibrary.book.floorTileAria", {
                               dungeon: dungeonName,
                               floor: floor.position,
                               monster: monsterName,
@@ -1496,7 +1513,7 @@ export default function DungeonLibraryPage() {
                                 <span className="world-index-floor-image-fallback">?</span>
                               )}
                             </span>
-                            <span className="world-index-floor-number">{floor.position}</span>
+                            <span className="world-index-floor-number">{hubNumber(floor.position)}</span>
                           </button>
                         );
                       })}
@@ -1506,7 +1523,7 @@ export default function DungeonLibraryPage() {
               })}
             </div>
             <p className="page-note">
-              {t("dungeonLibrary.book.worldIndexPageNote", {
+              {hubText("dungeonLibrary.book.worldIndexPageNote", {
                 current: page.indexPage + 1,
                 total: page.indexPageCount,
                 page: index + 1,
@@ -1550,14 +1567,14 @@ export default function DungeonLibraryPage() {
                       goToPage(pagePlan.dynamicFloorDetailPage);
                     }}
                   >
-                    <span>{range.start}-{range.end}</span>
-                    <strong>{t("dungeonLibrary.book.floorCount", { count: range.floors.length })}</strong>
+                    <span>{hubNumber(range.start)}-{hubNumber(range.end)}</span>
+                    <strong>{hubText("dungeonLibrary.book.floorCount", { count: range.floors.length })}</strong>
                   </button>
                 );
               })}
             </div>
             <p className="page-note">
-              {t("dungeonLibrary.book.rangeOverviewPageNote", {
+              {hubText("dungeonLibrary.book.rangeOverviewPageNote", {
                 current: page.overviewIndex + 1,
                 total: page.overviewCount,
                 page: index + 1,
@@ -1600,7 +1617,7 @@ export default function DungeonLibraryPage() {
               </div>
             )}
             <p className="page-note">
-              {t("dungeonLibrary.book.floorRangeTitle", {
+              {hubText("dungeonLibrary.book.floorRangeTitle", {
                 start: spreadStart,
                 end: spreadEnd,
               })}
@@ -1631,7 +1648,7 @@ export default function DungeonLibraryPage() {
             )}
             onOpenMonsterImage={openMonsterImage}
           />
-          <p className="page-note">{t("dungeonLibrary.book.pageNote", { page: index + 1 })}</p>
+          <p className="page-note">{hubText("dungeonLibrary.book.pageNote", { page: index + 1 })}</p>
         </section>
       );
     });
@@ -1715,10 +1732,10 @@ export default function DungeonLibraryPage() {
       }
     : undefined, [dynamicSpreadContext, navigateDynamicSpread, t]);
   const toolbarPageInfo = useMemo(() => dynamicSpreadContext
-    ? `${t("dungeonLibrary.book.floorRangeTitle", {
+    ? `${hubText("dungeonLibrary.book.floorRangeTitle", {
         start: dynamicSpreadContext.spreadStart,
         end: dynamicSpreadContext.spreadEnd,
-      })} / ${dynamicSpreadContext.floorCount}`
+      })} / ${hubNumber(dynamicSpreadContext.floorCount)}`
     : undefined, [dynamicSpreadContext, t]);
   const floorPreviewContext = useMemo(() => {
     if (!selectedWorld) return null;
@@ -1934,8 +1951,13 @@ export default function DungeonLibraryPage() {
 
   return (
     <ContentShell
-      title={t("dungeonLibrary.title")}
-      subtitle={t("dungeonLibrary.subtitle")}
+      headerTransparent
+      headerContent={<LocalTitleNavigation
+        title={<h1 style={{ margin: 0, font: "inherit" }}>{t("dungeonLibrary.title")}</h1>}
+        onBack={back}
+        rightLabel={t("home.guidehub.title")}
+        rightTo="/guidehub-v2"
+      />}
       centerFramed={false}
       mode="page"
       outerPadding="p-4 md:p-6"

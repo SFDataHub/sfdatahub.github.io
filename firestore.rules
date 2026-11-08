@@ -13,6 +13,16 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.roles != null && request.auth.token.roles.hasAny(['admin', 'owner']);
     }
 
+    // Only these aggregate visitor snapshots are public; config/leases stay private.
+    match /visitor_metrics_public/{snapshotId} {
+      allow get: if true;
+      allow list, write: if false;
+      match /pages/{pathId} {
+        allow get: if true;
+        allow list, write: if false;
+      }
+    }
+
     match /analytics/visitor_analytics {
       allow read: if isAdmin();
       allow write: if false;
@@ -193,11 +203,13 @@ service cloud.firestore {
       allow read: if request.auth != null
         && request.auth.token.userId == userId;
 
-      // Client darf nur favorites im eigenen UserDoc updaten.
-      allow update: if request.auth != null
-        && request.auth.token.userId == userId
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['favorites']);
-      allow create, delete: if false;
+      // Favorites are validated/merged by the session API, never written into account metadata.
+      allow create, update, delete: if false;
+      match /users_favorites/{stateId} {
+        allow read: if stateId == 'state' && request.auth != null
+          && request.auth.token.userId == userId;
+        allow write: if false;
+      }
     }
 
     // ---------- User settings (per-user) ----------

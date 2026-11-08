@@ -1,3 +1,4 @@
+import { outputPath, temporaryPrefix } from '../codex/workspace.mjs';
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -37,15 +38,15 @@ const minimalManifest = (overrides: Partial<ScanArchiveManifest> = {}): ScanArch
 });
 
 const makeArchiveRoot = async () => {
-  const base = await fs.mkdtemp(path.join(os.tmpdir(), "scan archive builder "));
+  const base = await fs.mkdtemp(temporaryPrefix("scan archive builder ", 'test-runs'));
   const root = path.join(base, `scan-archive-${YEAR}`);
-  await fs.mkdir(root, { recursive: true });
-  await fs.writeFile(path.join(root, "manifest.json"), `${JSON.stringify(minimalManifest(), null, 2)}\n`);
+  await fs.mkdir(outputPath(root), { recursive: true });
+  await fs.writeFile(outputPath(path.join(root, "manifest.json")), `${JSON.stringify(minimalManifest(), null, 2)}\n`);
   return { base, root };
 };
 
 const writeManifest = async (root: string, manifest: ScanArchiveManifest) => {
-  await fs.writeFile(path.join(root, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  await fs.writeFile(outputPath(path.join(root, "manifest.json")), `${JSON.stringify(manifest, null, 2)}\n`);
 };
 
 const player = (server: string, timestamp: number, id: string, name = `Player ${id}`) => ({
@@ -120,8 +121,8 @@ const singleCombined = (timestamp = tsA) =>
   const entry = plan.manifestAfter.scans.find((scan) => scan.id === `f8_net:${tsA}`)!;
   const searchPayload = JSON.parse(gunzipSync(searchFile.bytes).toString("utf8"));
   validateScanArchiveSearchIndexPayload(searchPayload, entry);
-  assert.deepEqual(Object.keys(searchPayload.players[0]).sort(), ["classId", "guildIdentifier", "guildName", "identifier", "name"]);
-  assert.deepEqual(searchPayload.guilds, [{ identifier: "f8_net_g1", name: "Guild f8_net" }]);
+  assert.deepEqual(Object.keys(searchPayload.players[0]).sort(), ["appearance", "classId", "guildIdentifier", "guildName", "identifier", "name"]);
+  assert.deepEqual(searchPayload.guilds, [{ identifier: "f8_net_g1", name: "Guild f8_net", appearance: { classId: null, portrait: null, coaString: null } }]);
 
   const planAgain = await createScanArchiveBuildPlan({ archiveRoot: root, year: YEAR, inputContent: combined(), updatedAt: UPDATED_AT });
   assert.equal(hash(rawFile.bytes), hash(planAgain.files.find((file) => file.kind === "raw" && file.scanId === `f8_net:${tsA}`)!.bytes!));
@@ -216,8 +217,8 @@ const singleCombined = (timestamp = tsA) =>
   const scan = { ...prepared.manifestAfter.scans[0] };
   const raw = prepared.files.find((file) => file.kind === "raw")!;
   assert(raw.bytes);
-  await fs.mkdir(path.dirname(path.join(root, scan.path)), { recursive: true });
-  await fs.writeFile(path.join(root, scan.path), raw.bytes);
+  await fs.mkdir(outputPath(path.dirname(path.join(root, scan.path))), { recursive: true });
+  await fs.writeFile(outputPath(path.join(root, scan.path)), raw.bytes);
   delete scan.searchIndex;
   await writeManifest(root, minimalManifest({ revision: 1, updatedAt: UPDATED_AT, scanCount: 1, serverCount: 1, scans: [scan] }));
 
@@ -238,18 +239,18 @@ const singleCombined = (timestamp = tsA) =>
   const { root } = await makeArchiveRoot();
   const planned = await createScanArchiveBuildPlan({ archiveRoot: root, year: YEAR, inputContent: singleCombined() });
   const raw = planned.files.find((file) => file.kind === "raw")!;
-  await fs.mkdir(path.dirname(path.join(root, raw.relativePath)), { recursive: true });
-  await fs.writeFile(path.join(root, raw.relativePath), Buffer.from("different"));
+  await fs.mkdir(outputPath(path.dirname(path.join(root, raw.relativePath))), { recursive: true });
+  await fs.writeFile(outputPath(path.join(root, raw.relativePath)), Buffer.from("different"));
   const conflict = await createScanArchiveBuildPlan({ archiveRoot: root, year: YEAR, inputContent: singleCombined() });
   assert(conflict.conflicts.some((item) => item.code === "target_path_conflict"));
   await assert.rejects(() => applyScanArchiveBuildPlan(conflict), /Konflikt/);
 }
 
 {
-  const base = await fs.mkdtemp(path.join(os.tmpdir(), "scan archive unsafe "));
+  const base = await fs.mkdtemp(temporaryPrefix("scan archive unsafe ", 'test-runs'));
   const unsafeRoot = path.join(base, "scan archiv");
-  await fs.mkdir(unsafeRoot, { recursive: true });
-  await fs.writeFile(path.join(unsafeRoot, "manifest.json"), `${JSON.stringify(minimalManifest(), null, 2)}\n`);
+  await fs.mkdir(outputPath(unsafeRoot), { recursive: true });
+  await fs.writeFile(outputPath(path.join(unsafeRoot, "manifest.json")), `${JSON.stringify(minimalManifest(), null, 2)}\n`);
   await assert.rejects(() => createScanArchiveBuildPlan({ archiveRoot: unsafeRoot, year: YEAR, inputContent: singleCombined() }), /Jahresrepo/);
 }
 

@@ -1,3 +1,6 @@
+import { resolveServer } from "../../lib/servers/serverResolver";
+import { isHiddenPickerServer } from "./serverPickerModel";
+
 export type RegionKey = "EU" | "US" | "INT" | "Fusion";
 
 export type ServerGroupsByRegion = Record<RegionKey, string[]>;
@@ -12,7 +15,10 @@ const EMPTY_GROUPS: ServerGroupsByRegion = {
 const REGION_ORDER: RegionKey[] = ["EU", "US", "INT", "Fusion"];
 
 const regionFromCode = (code: string): RegionKey => {
-  const upper = code.toUpperCase();
+  const server = resolveServer(code);
+  if (server?.type === "fusion") return "Fusion";
+  if (server?.type === "named") return "INT";
+  const upper = (server?.code ?? code).toUpperCase();
   if (upper.startsWith("EU")) return "EU";
   if (upper.startsWith("AM") || upper.startsWith("US") || upper.startsWith("NA")) return "US";
   if (upper.startsWith("F")) return "Fusion";
@@ -28,8 +34,10 @@ export function buildServerGroupsFromCodes(servers: string[]): ServerGroupsByReg
   };
 
   servers.forEach((server) => {
-    if (typeof server !== "string") return;
+    if (typeof server !== "string" || isHiddenPickerServer(server) || resolveServer(server)?.active === false) return;
     const region = regionFromCode(server);
+    const canonical = resolveServer(server)?.code;
+    if (canonical && [...buckets[region]].some(value => resolveServer(value)?.code === canonical)) return;
     buckets[region].add(server);
   });
 

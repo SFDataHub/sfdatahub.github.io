@@ -1,5 +1,5 @@
 import React from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ContentShell from "../../components/ContentShell";
 import { categories } from "../../components/guidehub/config";
@@ -587,8 +587,10 @@ const GuideHubSidebar: React.FC<GuideHubSidebarProps> = ({
   onNavigateSub,
   t,
 }) => {
+  const location = useLocation();
   const [query, setQuery] = React.useState("");
   const queryLower = query.trim().toLowerCase();
+  const dungeonLibraryTitle = t("dungeonLibrary.title");
   const orderedCategories = React.useMemo(() => {
     const featured = categories.find((cat) => cat.key === "gamefeatures");
     if (!featured) return categories;
@@ -764,6 +766,17 @@ const GuideHubSidebar: React.FC<GuideHubSidebarProps> = ({
             </button>
           </div>
           {renderNavEntries()}
+          {matchText(dungeonLibraryTitle) && (
+            <div className={styles.navSection}>
+              <Link
+                to="/dungeons/library"
+                state={{ returnTo: location.pathname + location.search, profileReturnState: location.state }}
+                className={`${styles.navRow} ${styles.categoryRow}`}
+              >
+                <span className={styles.navRowLabel}>{dungeonLibraryTitle}</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

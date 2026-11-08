@@ -1,0 +1,47 @@
+{
+  "purpose": "Minimal, unchanged regression inputs extracted for W125. Historical sources remain immutable in the external repo-specific Codex workspace.",
+  "files": [
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/ces.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/ces.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/ces.traineddata.gz",
+      "sha256": "1ea33a8b6f9a9c18a6aae44a71eda06bbfdc206fe53cf1fc8121fb74def99166",
+      "size": 2225029
+    },
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/deu.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/deu.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/deu.traineddata.gz",
+      "sha256": "306c4280d0cbed46fbff727486bd43b92730181bae80f56941a091f363bdf28b",
+      "size": 1333102
+    },
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/eng.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/eng.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/eng.traineddata.gz",
+      "sha256": "45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91",
+      "size": 2952873
+    },
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/hun.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/hun.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/hun.traineddata.gz",
+      "sha256": "99feb1ac618ddd39942d646f1df792e5bd4504df45e1ef68e47df51db476a2ed",
+      "size": 2854466
+    },
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/pol.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/pol.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/pol.traineddata.gz",
+      "sha256": "a20fdec4ff99d8f8e84c708da3e42a4e935c26863055a0ed88aef5c66a59b91b",
+      "size": 2642356
+    },
+    {
+      "fixture": "tools/guilds/fixtures/ocr-assets/slk.traineddata.gz",
+      "historicalSource": "tmp/w32/ocr-assets/slk.traineddata.gz",
+      "migratedSource": "tmp/w32/ocr-assets/slk.traineddata.gz",
+      "sha256": "839350509c06e498448e35ce9faf13e24b28150b2d5cc39b900a751c5009127f",
+      "size": 2377899
+    }
+  ]
+}

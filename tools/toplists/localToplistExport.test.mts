@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
 
 import type { ToplistGuildRow, ToplistPlayerRow } from "../../src/lib/toplists/toplistContracts.ts";
-import { buildLocalToplistExportModel } from "../../src/pages/GuildHub/localToplistExportModel.ts";
+import { buildLocalToplistExportModel } from "../../src/pages/DataHub/localToplistExportModel.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PUBLIC_EXPORT_AMOUNTS = [50, 100, 150] as const;
@@ -251,8 +251,8 @@ describe("local toplist export model", () => {
   test("keeps the public export controller default amount path unchanged", () => {
     const source = fs.readFileSync(path.join(repoRoot, "src/components/export/ToplistExportController.tsx"), "utf8");
     const dialogSource = fs.readFileSync(path.join(repoRoot, "src/components/export/ToplistPngExportDialog.tsx"), "utf8");
-    const localModelSource = fs.readFileSync(path.join(repoRoot, "src/pages/GuildHub/localToplistExportModel.ts"), "utf8");
-    const localToplistSource = fs.readFileSync(path.join(repoRoot, "src/pages/GuildHub/Toplist.tsx"), "utf8");
+    const localModelSource = fs.readFileSync(path.join(repoRoot, "src/pages/DataHub/localToplistExportModel.ts"), "utf8");
+    const localToplistSource = fs.readFileSync(path.join(repoRoot, "src/pages/DataHub/Toplist.tsx"), "utf8");
 
     assert.match(source, /const \[exportAmount, setExportAmount\] = React\.useState<ToplistExportAmount>\(50\)/);
     assert.match(dialogSource, /export type ToplistExportAmount = 50 \| 100 \| 150/);

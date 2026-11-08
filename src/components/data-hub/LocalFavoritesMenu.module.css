@@ -1,0 +1,14 @@
+.backdrop { position: fixed; inset: 0; z-index: 1200; background: #030a12b3; display: flex; justify-content: flex-end; overflow: hidden; }
+.panel { box-sizing: border-box; width: min(580px, 100%); height: 100%; overflow-y: auto; overscroll-behavior: contain; background: #0e1e31; color: #f5f9ff; padding: 22px; border-left: 1px solid #2b4c73; transform: translateX(100%); transition: transform 200ms ease; }
+.entered { transform: none; }
+@media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.header h2 { font-size: 20px; margin: 0; }
+.header button { background: #14273e; color: #f5f9ff; border: 1px solid #3f6b9a; padding: 8px; font: inherit; cursor: pointer; }
+.panel a { color: #9ec7ff; }
+.panel button:focus-visible, .panel a:focus-visible, .panel input:focus-visible, .panel select:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+@media (max-width: 520px) { .panel { padding: 14px; } .header { flex-wrap: wrap; } }
+
+.panel :global([role="dialog"]) { max-height: calc(100dvh - 40px); overflow-y: auto; }
+
+.panel :global([role="presentation"]) { inset: 0; }

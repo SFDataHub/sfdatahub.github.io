@@ -1,3 +1,4 @@
+import type { LocalDependencyReceipt } from "../local-data/localDataDependencies";
 import type { FusionIdentityManagementReport } from "./fusionIdentityManagement";
 import type { FusionIdentityAnalysisScope } from "./fusionIdentityScopes";
 
@@ -49,6 +50,8 @@ export type FusionIdentityWorkerResponse =
     }
   | {
       type: "complete";
+      resolverVersion: number;
+      dependencies?: LocalDependencyReceipt;
       requestId: string;
       report: FusionIdentityManagementReport;
       timings: FusionIdentityWorkerTiming[];

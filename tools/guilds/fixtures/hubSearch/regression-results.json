@@ -1,0 +1,170 @@
+[
+  {
+    "file": "guilds/hubSearch.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/hubSearchLifecycle.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/hubSearchCosts.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/hubSearchArchive.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/hubSearchIndexFlights.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/searchIndexService.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/localFirstScanAcquisition.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/toplistSelection.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localScanProvenance.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/dataHubScanInventory.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistService.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistStore.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/monthlySetComposition.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/localFirstFeatureAcquisition.test.mts",
+    "passed": true
+  },
+  {
+    "file": "scanArchive/localFirstScanResolver.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/dataHubRoutes.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localProfileEntry.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/pageContextStore.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/hubFavoritesStore.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localPlayerCurrentSeed.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localPlayerAnalyticsCoordinator.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localPlayerAnalyticsExecution.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localSourceValidity.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localDataCoordination.test.mts",
+    "passed": true
+  },
+  {
+    "file": "guilds/localGuildAnalyticsScopedRead.test.mts",
+    "passed": true
+  },
+  {
+    "file": "tests/dashboardPlayerCards.test.mts",
+    "passed": true
+  },
+  {
+    "file": "tests/localPlayerInsightsModel.test.mts",
+    "passed": true
+  },
+  {
+    "file": "tests/localPlayerAnalyticsModel.test.ts",
+    "passed": true
+  },
+  {
+    "file": "tests/playerCardDevelopmentModel.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistCompareModel.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistComparison.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistCrossSearchBinding.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistDerivation.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistExport.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistPageModel.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistSearchFlow.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistStateRace.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistView.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistViewWorkerClient.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/toplistContractsArchitecture.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/playerToplistDecor.test.mts",
+    "passed": true
+  },
+  {
+    "file": "toplists/localToplistRevisionSession.test.mts",
+    "passed": true
+  }
+]

@@ -1,0 +1,477 @@
+{
+  "results": [
+    "Actual targeted router input then visible clear during held favorites restore defeat late legacy input",
+    "Actual Dashboard A / Analytics B and their real ContextBars stay independent; foreign choice retains Analytics range/metric/player and Fusion base/partner/scenario",
+    "Actual router navigation/remount restores each own input; targeted routerstate updates only its declared target feature",
+    "Actual view/FastSelect writes zero IDB state; favorite Save/Remove/Reorder retain own and foreign contexts and read-only compatibility",
+    "Actual Toplist early manual unavailable server wins against controlled delayed manifest restore",
+    "Actual Toplist favorite uses visible DOM ACK, no profile/global write; manual unavailable F28 and filter/query survive foreign selection/remount; initial filters {\"servers\":[\"F8\"],\"classes\":[],\"query\":\"\",\"sort\":\"sum\"}",
+    "Actual FightTracking proposal context changes without tracker assignment, member or fight changes",
+    "Actual dashboard old Current source read held across own context switch cannot publish the previous guild",
+    "Actual identity link/unlink conflict explains retained page reference; no first favorite substitution or foreign selection change",
+    "Actual source deletion renews dependent data without rewriting own/foreign page inputs",
+    "Explicit clear remains empty across favorite refresh/remount; own selection restored for subsequent reload proof",
+    "Real browser reload retains each tab session context, including manually unavailable toplist server",
+    "Actual ContextBar explicit clear survives real reload without reapplying available legacy favorite",
+    "Two real tabs share favorite commits while retaining independent live page selections"
+  ],
+  "beforeReload": {
+    "guild-hub": {
+      "schemaVersion": 1,
+      "feature": "guild-hub",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g3",
+          "serverNamespace": "f8",
+          "entityId": "3"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          },
+          {
+            "identifier": "f8_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:2",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g3",
+          "guildId": "3",
+          "name": "Guild 3",
+          "server": "F8",
+          "logo": "f8_net_g3",
+          "logoIdentifier": "f8_net_g3",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "guild-dashboard": {
+      "schemaVersion": 1,
+      "feature": "guild-dashboard",
+      "generation": 15,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g2",
+          "serverNamespace": "f8",
+          "entityId": "2"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          },
+          {
+            "identifier": "f8_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:1",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g2",
+          "guildId": "2",
+          "name": "Guild 2",
+          "server": "F8",
+          "logo": "f8_net_g2",
+          "logoIdentifier": "f8_net_g2",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [
+        "qb7vm3zz",
+        "439wdbvu"
+      ],
+      "error": null
+    },
+    "guild-analytics": {
+      "schemaVersion": 1,
+      "feature": "guild-analytics",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g2",
+          "serverNamespace": "f8",
+          "entityId": "2"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          },
+          {
+            "identifier": "f8_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:1",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g2",
+          "guildId": "2",
+          "name": "Guild 2",
+          "server": "F8",
+          "logo": "f8_net_g2",
+          "logoIdentifier": "f8_net_g2",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "local-toplist": {
+      "schemaVersion": 1,
+      "feature": "local-toplist",
+      "generation": 3,
+      "initialized": true,
+      "guild": null,
+      "servers": [
+        "F28"
+      ],
+      "targetKeys": [],
+      "error": null
+    },
+    "fight-tracking": {
+      "schemaVersion": 1,
+      "feature": "fight-tracking",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g3",
+          "serverNamespace": "f8",
+          "entityId": "3"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          },
+          {
+            "identifier": "f8_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:2",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g3",
+          "guildId": "3",
+          "name": "Guild 3",
+          "server": "F8",
+          "logo": "f8_net_g3",
+          "logoIdentifier": "f8_net_g3",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    }
+  },
+  "afterReload": {
+    "guild-hub": {
+      "schemaVersion": 1,
+      "feature": "guild-hub",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g3",
+          "serverNamespace": "f8",
+          "entityId": "3"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          },
+          {
+            "identifier": "f8_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:2",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g3",
+          "guildId": "3",
+          "name": "Guild 3",
+          "server": "F8",
+          "logo": "f8_net_g3",
+          "logoIdentifier": "f8_net_g3",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "guild-dashboard": {
+      "schemaVersion": 1,
+      "feature": "guild-dashboard",
+      "generation": 15,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g2",
+          "serverNamespace": "f8",
+          "entityId": "2"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          },
+          {
+            "identifier": "f8_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:1",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g2",
+          "guildId": "2",
+          "name": "Guild 2",
+          "server": "F8",
+          "logo": "f8_net_g2",
+          "logoIdentifier": "f8_net_g2",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [
+        "qb7vm3zz",
+        "439wdbvu"
+      ],
+      "error": null
+    },
+    "guild-analytics": {
+      "schemaVersion": 1,
+      "feature": "guild-analytics",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g2",
+          "serverNamespace": "f8",
+          "entityId": "2"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          },
+          {
+            "identifier": "f8_g2",
+            "serverNamespace": "f8",
+            "entityId": "2"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:1",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g2",
+          "guildId": "2",
+          "name": "Guild 2",
+          "server": "F8",
+          "logo": "f8_net_g2",
+          "logoIdentifier": "f8_net_g2",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "local-toplist": {
+      "schemaVersion": 1,
+      "feature": "local-toplist",
+      "generation": 3,
+      "initialized": true,
+      "guild": null,
+      "servers": [
+        "F28"
+      ],
+      "targetKeys": [],
+      "error": null
+    },
+    "fight-tracking": {
+      "schemaVersion": 1,
+      "feature": "fight-tracking",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g3",
+          "serverNamespace": "f8",
+          "entityId": "3"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          },
+          {
+            "identifier": "f8_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": "legacy-guild:2",
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g3",
+          "guildId": "3",
+          "name": "Guild 3",
+          "server": "F8",
+          "logo": "f8_net_g3",
+          "logoIdentifier": "f8_net_g3",
+          "hofRank": null,
+          "memberCount": 1,
+          "coaString": null,
+          "observedAtMs": null
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    }
+  },
+  "peer": {
+    "guild-hub": {
+      "schemaVersion": 1,
+      "feature": "guild-hub",
+      "generation": 0,
+      "initialized": false,
+      "guild": null,
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "guild-dashboard": {
+      "schemaVersion": 1,
+      "feature": "guild-dashboard",
+      "generation": 2,
+      "initialized": true,
+      "guild": {
+        "reference": {
+          "identifier": "f8_net_g3",
+          "serverNamespace": "f8",
+          "entityId": "3"
+        },
+        "originalReferences": [
+          {
+            "identifier": "f8_net_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          },
+          {
+            "identifier": "f8_g3",
+            "serverNamespace": "f8",
+            "entityId": "3"
+          }
+        ],
+        "identityHint": null,
+        "favoriteId": null,
+        "referenceIssue": null,
+        "guild": {
+          "id": "f8_net_g3",
+          "guildId": "3",
+          "name": "Guild 3",
+          "server": "F8",
+          "logoIdentifier": "f8_net_g3",
+          "memberCount": 1
+        }
+      },
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "guild-analytics": {
+      "schemaVersion": 1,
+      "feature": "guild-analytics",
+      "generation": 0,
+      "initialized": false,
+      "guild": null,
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "local-toplist": {
+      "schemaVersion": 1,
+      "feature": "local-toplist",
+      "generation": 0,
+      "initialized": false,
+      "guild": null,
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    },
+    "fight-tracking": {
+      "schemaVersion": 1,
+      "feature": "fight-tracking",
+      "generation": 0,
+      "initialized": false,
+      "guild": null,
+      "servers": null,
+      "targetKeys": [],
+      "error": null
+    }
+  }
+}

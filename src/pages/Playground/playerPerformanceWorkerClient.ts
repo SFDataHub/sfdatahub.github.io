@@ -1,3 +1,4 @@
+import { revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../../lib/local-data/localDataDependencies";
 import type { GuildHubScanSummary } from "../../lib/guilds/localScanLibrary";
 import type { GuildTrendBuildResult, GuildTrendTarget } from "./playerPerformanceModel";
 
@@ -30,6 +31,7 @@ export type PlayerPerformanceWorkerResponse =
     }
   | {
       type: "complete";
+      dependencies?: LocalDependencyReceipt;
       requestId: string;
       result: GuildTrendBuildResult;
     }
@@ -119,7 +121,11 @@ export const startPlayerPerformanceWorkerRun = (
       worker.terminate();
 
       if (message.type === "complete") {
-        resolve(message.result);
+        if (!message.dependencies && !options.workerFactory) { reject(new Error("Performance worker result has no dependency certificate.")); return; }
+        const validate = message.dependencies ? revalidateLocalDataDependencies(message.dependencies).then(result => {
+          if (!result.current) throw new Error("Performance dependencies changed before delivery.");
+        }) : Promise.resolve();
+        void validate.then(() => resolve(message.result), reject);
         return;
       }
 

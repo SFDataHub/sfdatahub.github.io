@@ -1,7 +1,10 @@
+import { fusionViewEvents, useAnalyticsView } from "../../../lib/analytics/localEvents";
+import { useRuntimeAuditCommit } from "../../../lib/data-hub/useRuntimeAuditCommit";
+import { auditBegin, auditEnter, auditValue, auditError, auditLeave, auditAccept, auditFinish } from "../../../lib/data-hub/runtimeAudit";
+import GuildHubBackLink from "../../../components/guildhub/GuildHubBackLink";
 import React from "react";
 import { doc, getDoc } from "firebase/firestore";
 import ContentShell from "../../../components/ContentShell";
-import GuildContextBar from "../../../components/guilds/GuildContextBar";
 import styles from "./FusionPlanner.module.css";
 import SetupTab from "./FusionPlannerTabs/SetupTab/SetupTab";
 import MembersTab from "./FusionPlannerTabs/MembersTab/MembersTab";
@@ -234,6 +237,7 @@ const STAGES: Stage[] = [
 
 export default function FusionPlanner() {
   const [activeTab, setActiveTab] = React.useState<TabKey>("setup");
+  useAnalyticsView(fusionViewEvents[activeTab]);
   const [members, setMembers] = React.useState<FusionMember[]>(INITIAL_MEMBERS);
   const [membersLoading, setMembersLoading] = React.useState(false);
   const [setupState, setSetupState] = React.useState<FusionSetupState>({
@@ -395,6 +399,8 @@ export default function FusionPlanner() {
     let cancelled = false;
 
     async function loadMembers() {
+    const __audit1 = auditBegin("F32", "loadMembers");
+    try {
       const scope: FirestoreTraceScope = beginReadScope("FusionPlanner:loadMembers");
       setMembersLoading(true);
       try {
@@ -405,7 +411,7 @@ export default function FusionPlanner() {
           if (!targetGuildId) continue;
 
           const latestRef = doc(db, `guilds/${targetGuildId}/latest/latest`);
-          const latestSnap = await traceGetDoc(scope, latestRef, () => getDoc(latestRef));
+          const latestSnap = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDoc"), (traceGetDoc(scope, latestRef, () => getDoc(latestRef)))));
           const latestData = latestSnap.exists() ? (latestSnap.data() as any) : null;
           const guildName =
             guildConfig.name?.trim() ??
@@ -419,7 +425,7 @@ export default function FusionPlanner() {
             null;
 
           const membersRef = doc(db, `guilds/${targetGuildId}/snapshots/members_summary`);
-          const membersSnap = await traceGetDoc(scope, membersRef, () => getDoc(membersRef));
+          const membersSnap = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDoc"), (traceGetDoc(scope, membersRef, () => getDoc(membersRef)))));
           if (!membersSnap.exists()) continue;
           const rawMembers = membersSnap.data() as any;
           const list = Array.isArray(rawMembers.members) ? (rawMembers.members as MemberSummaryLike[]) : [];
@@ -430,12 +436,14 @@ export default function FusionPlanner() {
         }
 
         if (!cancelled) {
-          setMembers(allMembers);
+          auditAccept(__audit1, allMembers);
+          (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setMembers", "sync-elapsed"), (setMembers(allMembers))));
         }
-      } catch (error) {
+        if (cancelled) auditFinish(__audit1, "stale-discarded");
+      } catch (error) { auditError(__audit1, error);
         console.error("[FusionPlanner] Failed to load members", error);
         if (!cancelled) {
-          setMembers([]);
+          (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setMembers", "sync-elapsed"), (setMembers([]))));
         }
       } finally {
         if (!cancelled) {
@@ -443,7 +451,10 @@ export default function FusionPlanner() {
         }
         endReadScope(scope);
       }
-    }
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+}
 
     setMembers([]);
     loadMembers();
@@ -452,6 +463,7 @@ export default function FusionPlanner() {
     };
   }, [setupState.baseGuild, setupState.partnerGuilds, setupState.mode]);
 
+  useRuntimeAuditCommit(members, !membersLoading && members.length > 0, "fusion-members");
   React.useEffect(() => {
     if (membersLoading) return;
     setScenarios((prev) =>
@@ -589,9 +601,10 @@ export default function FusionPlanner() {
   return (
     <ContentShell title="Guild Hub" subtitle="Fusion Planner" centerFramed={false}>
       <div className={styles.page}>
+        <GuildHubBackLink />
         <header className={styles.header}>
           <div className={styles.headerLeading}>
-            <GuildContextBar />
+
             <div className={styles.headerStack}>
               <p className={styles.kicker}>Guild Hub</p>
               <h1 className={styles.title}>Fusion Planner</h1>

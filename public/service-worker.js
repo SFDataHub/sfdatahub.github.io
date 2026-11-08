@@ -54,6 +54,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Stable Vite module URLs can outlive their imported contract. Always fetch
+  // the complete dev graph from the current server; do not fall back to old
+  // executable bytes. Content-hashed production assets keep cache-first below.
+  if (['/src/', '/@vite/', '/@id/', '/@fs/', '/node_modules/.vite/'].some(prefix => url.pathname.startsWith(prefix))) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
   // Andere Assets: cache-first mit Runtime-Fill
   event.respondWith((async () => {
     const cached = await caches.match(req);

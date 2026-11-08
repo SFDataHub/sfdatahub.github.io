@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { profileLocale } from "../../../lib/i18n/profilePresentation";
+import { auditGraphBegin, auditResultId, auditEnter, auditValue, auditLeave } from "../../../lib/data-hub/runtimeAudit";
+import { useRuntimeAuditGraphCommit } from "../../../lib/data-hub/useRuntimeAuditGraphCommit";
+import type { ReactNode } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useProfileTranslation as useTranslation } from "../../../lib/i18n/useProfileTranslation";
 import AttributeStatBar, {
   ATTRIBUTE_STAT_ROWS,
   type AttributeStatKey,
@@ -11,6 +15,8 @@ import { getPlayerStatAccentColor } from "../statAccents";
 type AttributeValues = Partial<BaseStatValues>;
 
 type Props = {
+  auditInput?: object;
+  headerEnd?: ReactNode;
   baseStats: AttributeValues;
   totalStats?: AttributeValues;
   benchmarks?: BaseStatBenchmarks;
@@ -19,7 +25,7 @@ type Props = {
 };
 
 const formatNumber = (value: number | null | undefined) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("de-DE") : "-";
+  typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(profileLocale()) : "-";
 
 const isValidNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
@@ -30,6 +36,8 @@ export default function PlayerAttributeBars({
   benchmarks,
   mode,
   onModeChange,
+  auditInput,
+  headerEnd,
 }: Props) {
   const { t } = useTranslation();
   const [internalMode, setInternalMode] = useState<"base" | "total">("base");
@@ -67,6 +75,9 @@ export default function PlayerAttributeBars({
     }
   };
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const graphAudit = useMemo(() => auditInput ? auditGraphBegin("F18", `profile-attribute-bars:${activeMode}`, auditResultId(auditInput)) : null, [baseStats, totalStats, activeMode, auditInput]);
+  const span = auditEnter(graphAudit, "graph-geometry", "sync-elapsed");
   const activeValues = ATTRIBUTE_STAT_ROWS.map((attr) => {
     const source = activeMode === "total" ? totalStats : baseStats;
     const raw = source?.[attr.key];
@@ -80,35 +91,12 @@ export default function PlayerAttributeBars({
       ? t("playerProfile.heroPanel.stats.attributeBars.baseStats", { defaultValue: "Base Stats" })
       : t("playerProfile.heroPanel.stats.attributeBars.totalStats", { defaultValue: "Total Stats" });
 
-  return (
-    <div className="player-profile__attribute-bars">
+  useRuntimeAuditGraphCommit(baseStats, true, `profile-attribute-bars:${activeMode}`, rootRef, graphAudit?.id);
+  const output = (
+    <div ref={rootRef} className="player-profile__attribute-bars">
       <div className="player-profile__attribute-bars-head">
         <div className="player-profile__card-label">{label}</div>
-        <div
-          className="player-profile__attribute-toggle"
-          role="group"
-          aria-label={t("playerProfile.heroPanel.stats.attributeBars.viewModeAriaLabel", {
-            defaultValue: "Attribute view",
-          })}
-        >
-          <button
-            type="button"
-            className={`player-profile__attribute-toggle-btn${activeMode === "base" ? " player-profile__attribute-toggle-btn--active" : ""}`}
-            aria-pressed={activeMode === "base"}
-            onClick={() => handleModeChange("base")}
-          >
-            {t("playerProfile.heroPanel.stats.attributeBars.modeBase", { defaultValue: "Base" })}
-          </button>
-          <button
-            type="button"
-            className={`player-profile__attribute-toggle-btn${activeMode === "total" ? " player-profile__attribute-toggle-btn--active" : ""}`}
-            aria-pressed={activeMode === "total"}
-            onClick={() => handleModeChange("total")}
-            disabled={!hasTotalStats}
-          >
-            {t("playerProfile.heroPanel.stats.attributeBars.modeTotal", { defaultValue: "Total" })}
-          </button>
-        </div>
+        {headerEnd ?? <PlayerAttributeModeToggle activeMode={activeMode} hasTotalStats={hasTotalStats} onModeChange={handleModeChange} />}
       </div>
       <div className="player-profile__attribute-bars-list">
         {ATTRIBUTE_STAT_ROWS.map((attr) => {
@@ -189,6 +177,44 @@ export default function PlayerAttributeBars({
           );
         })}
       </div>
+    </div>
+  );
+  auditValue(graphAudit, span, undefined); auditLeave(graphAudit);
+  return output;
+}
+
+// The expanded bars and the local compact header share this controlled input.
+export function PlayerAttributeModeToggle({ activeMode, hasTotalStats, onModeChange }: {
+  activeMode: "base" | "total";
+  hasTotalStats: boolean;
+  onModeChange: (mode: "base" | "total") => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="player-profile__attribute-toggle"
+      role="group"
+      aria-label={t("playerProfile.heroPanel.stats.attributeBars.viewModeAriaLabel", {
+        defaultValue: "Attribute view",
+      })}
+    >
+      <button
+        type="button"
+        className={`player-profile__attribute-toggle-btn${activeMode === "base" ? " player-profile__attribute-toggle-btn--active" : ""}`}
+        aria-pressed={activeMode === "base"}
+        onClick={() => onModeChange("base")}
+      >
+        {t("playerProfile.heroPanel.stats.attributeBars.modeBase", { defaultValue: "Base" })}
+      </button>
+      <button
+        type="button"
+        className={`player-profile__attribute-toggle-btn${activeMode === "total" ? " player-profile__attribute-toggle-btn--active" : ""}`}
+        aria-pressed={activeMode === "total"}
+        onClick={() => onModeChange("total")}
+        disabled={!hasTotalStats}
+      >
+        {t("playerProfile.heroPanel.stats.attributeBars.modeTotal", { defaultValue: "Total" })}
+      </button>
     </div>
   );
 }

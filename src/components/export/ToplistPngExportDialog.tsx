@@ -1,3 +1,4 @@
+import { useAnalyticsView } from "../../lib/analytics/localEvents";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
@@ -23,6 +24,7 @@ export default function ToplistPngExportDialog({
   onExport,
 }: Props) {
   const { t } = useTranslation();
+  useAnalyticsView(isOpen ? "datahub/toplist/png-dialog" : null);
 
   React.useEffect(() => {
     if (!isOpen) return;

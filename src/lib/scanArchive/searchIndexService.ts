@@ -1,3 +1,5 @@
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditCall, auditCurrent, auditLink, auditPromiseId, auditAliasPromise, auditEvent, auditFields, auditCount, auditFinish, type AuditRun } from "../data-hub/runtimeAudit";
+import type { HubSearchAppearance } from "../data-hub/hubSearchAppearance";
 import {
   getSfDataHubArchiveSearchIndexCache,
   putSfDataHubArchiveSearchIndexCache,
@@ -63,6 +65,7 @@ export type ScanArchiveSearchIndexLoadResult = {
 export type ScanArchiveSearchKind = "player" | "guild";
 
 export type ScanArchiveSearchHitBase = {
+  appearance?: HubSearchAppearance;
   // A matching physical source, never an authoritative monthly winner.
   // Resolve all explicit set members before deriving a monthly dataset.
   kind: ScanArchiveSearchKind;
@@ -92,6 +95,8 @@ export type ScanArchiveSearchHit = ScanArchivePlayerSearchHit | ScanArchiveGuild
 export type ScanArchiveSearchOptions = {
   servers?: readonly string[];
   limit?: number;
+  /** Preserve physical alternatives for target resolution; legacy consumers keep dedupe. */
+  preserveOccurrences?: boolean;
 };
 
 export type ScanArchiveSearchIndexDependencies = {
@@ -101,6 +106,8 @@ export type ScanArchiveSearchIndexDependencies = {
 };
 
 export type ScanArchiveSearchIndexLoadOptions = {
+  /** Diagnostic context only; does not participate in keys or acquisition. */
+  auditConsumerArea?: string;
   signal?: AbortSignal;
   dependencies?: Partial<ScanArchiveSearchIndexDependencies>;
 };
@@ -126,7 +133,8 @@ type SearchDocument = {
 };
 
 const MAX_SEARCH_INDEX_CONCURRENCY = 2;
-const inFlightSearchIndexes = new Map<string, Promise<InFlightSearchIndexResult>>();
+type SearchIndexFlight = { promise: Promise<InFlightSearchIndexResult>; abort: AbortController; consumers: Set<symbol> };
+const inFlightSearchIndexes = new Map<string, SearchIndexFlight>();
 
 const compareText = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
@@ -138,7 +146,7 @@ const normalizeSearchText = (value: string) =>
     .toLocaleLowerCase();
 
 const searchIndexKey = (entry: ScanArchiveEntry) =>
-  `${entry.id}:${entry.searchIndex?.sha256.toLowerCase() ?? "missing-search-index"}`;
+  JSON.stringify([entry.id, entry.sha256.toLowerCase(), entry.server, entry.timestamp, entry.archiveYear, entry.manifestRevision, entry.manifestUrl, entry.path, entry.searchIndex ?? null]);
 
 const archiveEntryKey = (entry: Pick<ScanArchiveEntry, "id" | "sha256">) =>
   `${entry.id}:${entry.sha256.toLowerCase()}`;
@@ -243,34 +251,72 @@ const loadSearchIndex = async (
   dependencies: ScanArchiveSearchIndexDependencies,
   signal?: AbortSignal,
 ): Promise<InFlightSearchIndexResult> => {
+    const __audit1 = auditBegin("S05", "loadSearchIndex");
+    auditFields(__audit1, { archiveScanId: entry.id, archiveSha256: entry.sha256, searchIndexSha256: entry.searchIndex?.sha256, manifestRevision: entry.manifestRevision, manifestYear: entry.archiveYear, server: entry.server, scanTimestamp: entry.timestamp });
+    try {
   if (!entry.searchIndex) throw new Error(`Archivscan ${entry.id} hat keinen Suchindex.`);
 
-  const cached = await dependencies.getCache(entry);
+  const cached = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.getCache"), (dependencies.getCache(entry))));
+  throwIfAborted(signal);
   if (cached) {
-    return { entry, payload: cached.payload, source: "cache", networkAccessed: false };
+    auditFields(__audit1, { decision: "cache-read", source: "cache", networkAccessed: false });
+    return auditReturn(__audit1, { entry, payload: validateScanArchiveSearchIndexPayload(cached.payload, entry), source: "cache", networkAccessed: false });
   }
 
   throwIfAborted(signal);
-  const payload = validateScanArchiveSearchIndexPayload(await dependencies.downloadSearchIndex(entry, signal), entry);
+  auditFields(__audit1, { decision: "cache-miss", downloadRequested: true });
+  const payload = validateScanArchiveSearchIndexPayload(await (auditValue(__audit1, auditEnter(__audit1, "dependencies.downloadSearchIndex"), (dependencies.downloadSearchIndex(entry, signal)))), entry);
   throwIfAborted(signal);
-  await dependencies.putCache(entry, payload);
-  return { entry, payload, source: "download", networkAccessed: true };
+  await (auditValue(__audit1, auditEnter(__audit1, "dependencies.putCache"), (dependencies.putCache(entry, payload))));
+  return auditReturn(__audit1, { entry, payload, source: "download", networkAccessed: true });
+
+    } catch (__auditError) { auditFields(__audit1, { errorCode: classifySearchIndexError(__auditError) }); auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 };
 
 const acquireSearchIndex = (
   entry: ScanArchiveEntry,
   dependencies: ScanArchiveSearchIndexDependencies,
   signal?: AbortSignal,
-) => {
+  observer: AuditRun | null = auditCurrent(),
+): Promise<InFlightSearchIndexResult> => {
+  throwIfAborted(signal);
   const key = searchIndexKey(entry);
-  const existing = inFlightSearchIndexes.get(key);
-  if (existing) return existing;
-
-  const promise = loadSearchIndex(entry, dependencies, signal).finally(() => {
-    inFlightSearchIndexes.delete(key);
+  let flight = inFlightSearchIndexes.get(key);
+  const joined = !!flight;
+  if (!flight) {
+    const abort = new AbortController();
+    const next: SearchIndexFlight = { abort, consumers: new Set(), promise: undefined! };
+    const physical = observer ? auditCall(observer, "index-source-dispatch", () => loadSearchIndex(entry, dependencies, abort.signal), "async-container") : loadSearchIndex(entry, dependencies, abort.signal);
+    next.promise = physical.finally(() => {
+      if (inFlightSearchIndexes.get(key) === next) inFlightSearchIndexes.delete(key);
+    });
+    auditAliasPromise(next.promise, physical);
+    flight = next; inFlightSearchIndexes.set(key, next);
+  }
+  const sourceId = auditPromiseId(flight.promise);
+  // One forward link per source keeps the existing 64-link budget useful for 58 indices.
+  if (!observer?.record?.links.some(link => link.id === sourceId)) auditLink(observer, sourceId, "source-flight-consumer");
+  auditEvent(observer, "search-index-consumer-acquire", { sourceId, archiveScanId: entry.id, searchIndexSha256: entry.searchIndex?.sha256, decision: joined ? "in-flight-join" : "source-dispatch" });
+  const shared = flight, consumer = Symbol();
+  shared.consumers.add(consumer);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      signal?.removeEventListener("abort", cancel);
+      shared.consumers.delete(consumer);
+      auditEvent(observer, "search-index-consumer-release", { sourceId, archiveScanId: entry.id, consumerAborted: signal?.aborted ?? false, physicalContinues: shared.consumers.size > 0 });
+      if (!shared.consumers.size && inFlightSearchIndexes.get(key) === shared) {
+        inFlightSearchIndexes.delete(key); shared.abort.abort();
+      }
+    };
+    const cancel = () => { if (!settled) { settled = true; cleanup(); reject(new DOMException("aborted", "AbortError")); } };
+    signal?.addEventListener("abort", cancel, { once: true });
+    shared.promise.then(result => { if (!settled) { settled = true; cleanup(); resolve({ ...result, entry }); } }, error => {
+      if (!settled) { settled = true; cleanup(); reject(error); }
+    });
+    if (signal?.aborted) cancel();
   });
-  inFlightSearchIndexes.set(key, promise);
-  return promise;
 };
 
 const runWithConcurrency = async <T, R>(
@@ -309,23 +355,27 @@ export async function loadScanArchiveSearchIndexSet(
   selectedEntries: readonly ScanArchiveEntry[],
   options: ScanArchiveSearchIndexLoadOptions = {},
 ): Promise<ScanArchiveSearchIndexLoadResult> {
+    const __audit2 = auditBegin("S05", "loadScanArchiveSearchIndexSet");
+    auditFields(__audit2, { consumerArea: options.auditConsumerArea, trigger: "archive-basis-request" });
+    try {
   const dependencies = createDependencies(options);
   const entries = uniqueExplicitSearchIndexEntries(selectedEntries);
+  auditCount(__audit2, "indexesRequested", entries.length);
   const failedIndexes: ScanArchiveSearchIndexFailure[] = [];
   let networkAccessed = false;
 
-  const results = await runWithConcurrency(
+  const results = await (auditValue(__audit2, auditEnter(__audit2, "runWithConcurrency"), (runWithConcurrency(
     entries,
     MAX_SEARCH_INDEX_CONCURRENCY,
     options.signal,
     async (entry): Promise<InFlightSearchIndexResult | ScanArchiveSearchIndexFailure> => {
       try {
-        return await acquireSearchIndex(entry, dependencies, options.signal);
+        return await acquireSearchIndex(entry, dependencies, options.signal, __audit2);
       } catch (error) {
         return createFailure(entry, error);
       }
     },
-  );
+  ))));
 
   const loaded: LoadedSearchIndex[] = [];
   const loadedIndexes: ScanArchiveSearchIndexLoadedItem[] = [];
@@ -347,13 +397,20 @@ export async function loadScanArchiveSearchIndexSet(
     if (result.networkAccessed) networkAccessed = true;
   }
 
-  return {
+  auditCount(__audit2, "indexesLoaded", loadedIndexes.length);
+  auditCount(__audit2, "indexesFailed", failedIndexes.length);
+  auditCount(__audit2, "cacheResults", loadedIndexes.filter(item => item.source === "cache").length);
+  for (const failure of failedIndexes) auditEvent(__audit2, "index-failure", { archiveScanId: failure.archiveScanId, searchIndexSha256: failure.searchIndexSha256, errorCode: failure.errorCode, reason: failure.message });
+  return auditReturn(__audit2, {
     status: failedIndexes.length ? (loaded.length ? "partial" : "empty") : "complete",
     searchSet: new ScanArchiveSearchIndexSet(loaded),
     loadedIndexes: loadedIndexes.sort((left, right) => compareText(left.archiveScanId, right.archiveScanId)),
     failedIndexes: failedIndexes.sort((left, right) => compareText(left.archiveScanId, right.archiveScanId)),
     networkAccessed,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditFinish(__audit2, options.signal?.aborted ? "aborted" : undefined); }
 }
 
 const entryMetadata = (entry: ScanArchiveEntry) => ({
@@ -394,6 +451,7 @@ const createDocuments = (indexes: readonly LoadedSearchIndex[]) => {
         ...(Object.prototype.hasOwnProperty.call(player, "guildIdentifier") ? { guildIdentifier: player.guildIdentifier } : {}),
         ...(Object.prototype.hasOwnProperty.call(player, "guildName") ? { guildName: player.guildName } : {}),
         ...(Object.prototype.hasOwnProperty.call(player, "classId") ? { classId: player.classId } : {}),
+        ...(player.appearance ? { appearance: player.appearance } : {}),
         ...entryMetadata(entry),
       };
       documents.push({
@@ -412,6 +470,7 @@ const createDocuments = (indexes: readonly LoadedSearchIndex[]) => {
       seenGuilds.add(key);
       const hit: ScanArchiveGuildSearchHit = {
         kind: "guild",
+        ...(guild.appearance ? { appearance: guild.appearance } : {}),
         name: guild.name,
         identifier: guild.identifier,
         ...entryMetadata(entry),
@@ -488,6 +547,9 @@ export class ScanArchiveSearchIndexSet {
     this.entriesByArchiveKey = new Map(this.entries.map((entry) => [archiveEntryKey(entry), entry] as const));
   }
 
+  /** Slim literal documents, including nonmatching alternative occurrences. */
+  getOccurrences(): readonly ScanArchiveSearchHit[] { return this.documents.map(document => document.hit); }
+
   getUniqueEntityCounts() {
     const players = new Set<string>();
     const guilds = new Set<string>();
@@ -526,7 +588,7 @@ export class ScanArchiveSearchIndexSet {
       const rank = documentMatchRank(document, normalizedQuery);
       return Number.isFinite(rank) ? [{ hit: document.hit, rank }] : [];
     });
-    const sorted = dedupeSearchMatches(matches)
+    const sorted = (options.preserveOccurrences ? matches : dedupeSearchMatches(matches))
       .sort(compareSearchHits)
       .map((match) => match.hit);
     return typeof options.limit === "number" && options.limit >= 0 ? sorted.slice(0, options.limit) : sorted;
@@ -558,6 +620,7 @@ export function collectArchiveEntriesForSearchResults(
 
 export const __scanArchiveSearchIndexServiceTestUtils = {
   clearInFlightSearchIndexes: () => inFlightSearchIndexes.clear(),
+  inFlightCount: () => inFlightSearchIndexes.size,
   classifySearchIndexError,
   normalizeSearchText,
 };

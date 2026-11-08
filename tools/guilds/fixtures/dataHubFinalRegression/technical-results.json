@@ -1,0 +1,66 @@
+[
+  {
+    "command": "node.exe node_modules/typescript/bin/tsc -b --pretty false",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node.exe node_modules/typescript/bin/tsc -p tools/guilds/fixtures/dataHubFinalRegression/tsconfig.json --pretty false",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/metrics.js",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/runRegression.mjs",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/runNeighbors.mjs",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/runBrowserGuards.mjs",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "Vite build({mode:production,cacheDir:<Windows TEMP>/vite-cache,build:{outDir:<Windows TEMP>/dist,emptyOutDir:true}})",
+    "config": "vite.config.ts",
+    "publicDir": "public",
+    "outDir": "C:\\Users\\danny\\AppData\\Local\\Temp\\sfdatahub-w14-production-DRHNEZ\\dist",
+    "exitCode": 0,
+    "elapsedMs": 28539.677999999993,
+    "removed": true,
+    "files": 929,
+    "bytes": 348395054
+  },
+  {
+    "command": "node.exe node_modules/typescript/bin/tsc -p tools/guilds/fixtures/dataHubFinalRegression/tsconfig.json --pretty false",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "",
+    "phase": "final metrics.ts, updated group list, both changed existing fixtures"
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/runRegression.mjs",
+    "exitCode": 0,
+    "phase": "final version"
+  },
+  {
+    "command": "node.exe --check tools/guilds/fixtures/dataHubFinalRegression/runChecks.mjs",
+    "exitCode": 0,
+    "phase": "final version"
+  }
+]

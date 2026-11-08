@@ -1,0 +1,42 @@
+.surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  min-height: min(360px, 58dvh);
+  min-width: 0;
+  gap: clamp(8px, 2vw, 28px);
+  padding: 24px clamp(12px, 3vw, 40px);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(16, 34, 56, 0.38);
+}
+
+.filter { position: absolute; width: 0; height: 0; pointer-events: none; }
+.guildMotif, .serverMotif {
+  grid-row: 1;
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1;
+  justify-self: center;
+  min-width: 0;
+  pointer-events: none;
+}
+.guildMotif { grid-column: 1; }
+.serverMotif { grid-column: 3; }
+.guildMotif > svg, .serverMotif > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.status {
+  grid-column: 2;
+  grid-row: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 0;
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 600px) {
+  .surface { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 20px 16px; }
+  .guildMotif, .serverMotif { max-width: 120px; }
+  .serverMotif { grid-column: 2; }
+  .status { grid-column: 1 / -1; grid-row: 2; }
+}

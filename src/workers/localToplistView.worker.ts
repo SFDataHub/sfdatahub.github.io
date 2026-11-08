@@ -1,5 +1,9 @@
+import { auditAcceptWorker, auditCall, auditError, auditWorkerResult, type AuditRun } from "../lib/data-hub/runtimeAudit";
+import { buildPlayerToplistDecorMap } from "../pages/Toplists/playerToplistDecor";
+import type { ToplistPlayerRow } from "../lib/toplists/toplistContracts";
+import { buildLocalToplistNameFilter, normalizeLocalToplistNameText } from "../lib/toplists/localToplistNameFilter";
+import { localToplistContentRevision } from "../lib/toplists/localToplistDatasetRevision";
 import {
-  buildLocalPlayerToplistBaseCohort,
   buildLocalGuildToplistView,
   buildLocalPlayerToplistView,
   LOCAL_PLAYER_TOPLIST_VIEW_LIMIT,
@@ -35,14 +39,20 @@ const pageBounds = (page: number, pageSize: number, maxPageSize: number) => {
   return { start: (safePage - 1) * safeSize, end: safePage * safeSize, page: safePage, pageSize: safeSize };
 };
 
+let requestAudit: AuditRun | null = null;
 const respond = (message: LocalToplistViewWorkerResponse) => {
-  globalThis.postMessage(message);
+  globalThis.postMessage(requestAudit ? { ...message, auditReport: auditWorkerResult(requestAudit, message.ok ? "completed" : "failed") } : message);
 };
 
 let datasetId: string | null = null;
+let contentRevision: string | null = null;
 let playerRows: LocalPlayerToplistRow[] = [];
 let guildRows: LocalGuildToplistRow[] = [];
 let stableTopPlayerKeys = new Set<string>();
+let nameFilter = buildLocalToplistNameFilter([], []);
+let lastNameMatch: { query: string; match: ReturnType<ReturnType<typeof buildLocalToplistNameFilter>> } | null = null;
+let filteredPlayers: { key: string; rows: ReturnType<typeof buildLocalPlayerToplistView>["rows"]; decor: Record<string, import("../pages/Toplists/playerToplistDecor").PlayerToplistCellDecor> } | null = null;
+let preparedView: { key: string; players: ReturnType<typeof buildLocalPlayerToplistView>["rows"]; guilds: ReturnType<typeof buildLocalGuildToplistView>["rows"] } | null = null;
 
 type SearchEntry = {
   kind: LocalToplistSearchResult["kind"];
@@ -159,7 +169,7 @@ const categoryAllows = (categories: readonly LocalToplistSearchCategory[] | unde
 };
 
 const handleSearch = (request: LocalToplistViewWorkerSearchRequest) => {
-  if (!datasetId || request.datasetId !== datasetId) {
+  if (!datasetId || request.datasetId !== datasetId || (request.contentRevision != null && request.contentRevision !== contentRevision)) {
     throw new Error("local_toplist_view_worker_dataset_not_initialized");
   }
 
@@ -169,8 +179,9 @@ const handleSearch = (request: LocalToplistViewWorkerSearchRequest) => {
     respond({
       requestId: request.requestId,
       ok: true,
-      type: "search",
+      contentRevision: contentRevision!,
       datasetId: request.datasetId,
+      type: "search",
       normalizedQuery,
       results: [],
     });
@@ -196,7 +207,7 @@ const handleSearch = (request: LocalToplistViewWorkerSearchRequest) => {
       server: entry.server,
       identifier: entry.identifier,
       status: isJumpable ? "jumpable" : "outside-toplist",
-      statusReason: isJumpable ? null : "outside current Top 1000/toplist scope",
+      statusReason: isJumpable ? null : "outside current toplist scope",
       className: entry.className,
       guildName: entry.guildName,
       score,
@@ -219,8 +230,9 @@ const handleSearch = (request: LocalToplistViewWorkerSearchRequest) => {
   respond({
     requestId: request.requestId,
     ok: true,
-    type: "search",
+    contentRevision: contentRevision!,
     datasetId: request.datasetId,
+    type: "search",
     normalizedQuery,
     results,
   });
@@ -228,17 +240,23 @@ const handleSearch = (request: LocalToplistViewWorkerSearchRequest) => {
 
 const handleInit = (request: LocalToplistViewWorkerInitRequest) => {
   datasetId = request.datasetId;
+  contentRevision = request.contentRevision ?? localToplistContentRevision([request.playerRows, request.guildRows]);
+  preparedView = null;
+  filteredPlayers = null;
   playerRows = request.playerRows;
   guildRows = request.guildRows;
+  nameFilter = buildLocalToplistNameFilter(playerRows, guildRows);
+  lastNameMatch = null;
   stableTopPlayerKeys = new Set(
-    buildLocalPlayerToplistBaseCohort(playerRows, { playerLimit: LOCAL_PLAYER_TOPLIST_VIEW_LIMIT })
-      .map((row) => normalizeKey(row.server, row.identifier))
+    playerRows.map((row) => normalizeKey(row.server, row.identifier))
       .filter((key): key is string => Boolean(key)),
   );
   buildSearchIndex();
   respond({
     requestId: request.requestId,
     ok: true,
+    contentRevision: contentRevision!,
+    datasetId: request.datasetId,
     type: "init",
     tab: "guilds",
     totalRows: playerRows.length + guildRows.length,
@@ -250,75 +268,112 @@ const handleInit = (request: LocalToplistViewWorkerInitRequest) => {
 };
 
 const handleView = (request: LocalToplistViewWorkerViewRequest) => {
-  if (!datasetId || request.datasetId !== datasetId) {
+  if (!datasetId || request.datasetId !== datasetId || (request.contentRevision != null && request.contentRevision !== contentRevision)) {
     throw new Error("local_toplist_view_worker_dataset_not_initialized");
   }
+  const filterEnabled = request.nameFilter !== undefined;
+  const query = normalizeLocalToplistNameText(request.nameFilter);
+  if (query && lastNameMatch?.query !== query) lastNameMatch = { query, match: nameFilter(query) };
+  const match = query ? lastNameMatch!.match : null;
+  // Keep ranked/sorted rows in this existing worker; typing sends only the
+  // view request and filters, and never retransmits the dataset.
+  const prepareKey = JSON.stringify([request.tab, request.filters, request.sort,
+    request.playerAverageMode, request.guildAverageMode, request.playerLimit, request.playerStatsDayValues,
+    request.allowedPlayerKeys, request.allowedGuildKeys, Boolean(query), filterEnabled]);
   if (request.tab === "players") {
-    const bounds = pageBounds(request.page, request.pageSize, LOCAL_PLAYER_TOPLIST_VIEW_LIMIT);
-    const allowed = request.allowedPlayerKeys?.length ? new Set(request.allowedPlayerKeys) : null;
-    const sourceRows = allowed
+    const bounds = pageBounds(request.page, request.pageSize, request.playerLimit === null ? Math.max(10, playerRows.length) : LOCAL_PLAYER_TOPLIST_VIEW_LIMIT);
+    const allowed = request.allowedPlayerKeys && (filterEnabled || request.allowedPlayerKeys.length) ? new Set(request.allowedPlayerKeys) : null;
+    const sourceRows = allowed && !filterEnabled
       ? playerRows.filter((row) => {
           const key = normalizeKey(row.server, row.identifier);
           return !!key && allowed.has(key);
         })
       : playerRows;
-    const view = buildLocalPlayerToplistView(sourceRows, {
-      filters: request.filters,
-      sort: request.sort,
-      playerAverageMode: request.playerAverageMode,
-      playerLimit: LOCAL_PLAYER_TOPLIST_VIEW_LIMIT,
-    });
+    if (preparedView?.key !== prepareKey) {
+      const options = { filters: request.filters, sort: request.sort, playerAverageMode: request.playerAverageMode, playerStatsDayValues: request.playerStatsDayValues,
+        playerLimit: request.playerLimit === null ? null : LOCAL_PLAYER_TOPLIST_VIEW_LIMIT };
+      const baseline = buildLocalPlayerToplistView(sourceRows, options).rows;
+      const full = match && request.playerLimit !== null ? buildLocalPlayerToplistView(sourceRows, { ...options, playerLimit: null }).rows : baseline;
+      const ranks = new Map(baseline.map(row => [normalizeKey(row.server, row.identifier), row.tableRank]));
+      preparedView = { key: prepareKey, guilds: [], players: full.map(row => ({ ...row,
+        tableRank: ranks.get(normalizeKey(row.server, row.identifier)) ?? row.tableRank })) };
+    }
+    const filteredKey = JSON.stringify([prepareKey, query]);
+    if (filteredPlayers?.key !== filteredKey) {
+      const matched = match ? preparedView.players.filter(match.player) : preparedView.players;
+      const filtered = filterEnabled && allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.identifier) ?? "")) : matched;
+      const rows = request.playerLimit === null ? filtered : filtered.slice(0, LOCAL_PLAYER_TOPLIST_VIEW_LIMIT);
+      filteredPlayers = { key: filteredKey, rows,
+        decor: Object.fromEntries([...buildPlayerToplistDecorMap(rows as unknown as ToplistPlayerRow[], request.playerAverageMode ?? "base")].filter(([, value]) => value.mainRank || value.conRank || value.levelRank)) };
+    }
+    const rows = filteredPlayers.rows;
+    const windowed = request.windowStart !== undefined;
+    const size = windowed ? Math.min(200, Math.max(10, Math.floor(request.pageSize) || 100)) : bounds.pageSize;
+    const targetIndex = request.targetPlayer ? rows.findIndex(row => normalizeKey(row.server, row.identifier) === normalizeKey(request.targetPlayer!.server, request.targetPlayer!.identifier)) : null;
+    const requestedStart = targetIndex != null && targetIndex >= 0 ? Math.max(0, targetIndex - Math.floor(size / 2)) : request.windowStart ?? bounds.start;
+    const start = windowed ? Math.min(Math.max(0, rows.length - 1), Math.max(0, Math.floor(requestedStart) || 0)) : bounds.start;
     respond({
       requestId: request.requestId,
       ok: true,
+      contentRevision: contentRevision!,
+      datasetId: request.datasetId,
       type: "view",
       tab: "players",
-      totalRows: view.rows.length,
+      totalRows: rows.length,
       page: bounds.page,
       pageSize: bounds.pageSize,
-      playerRows: view.rows.slice(bounds.start, bounds.end),
+      windowStart: start,
+      targetIndex: targetIndex === -1 ? null : targetIndex,
+      playerDecor: filteredPlayers.decor,
+      playerRows: rows.slice(start, start + size),
       guildRows: [],
     });
     return;
   }
 
-  const bounds = pageBounds(request.page, request.pageSize, GUILD_VIEW_PAGE_LIMIT);
-  const allowed = request.allowedGuildKeys?.length ? new Set(request.allowedGuildKeys) : null;
-  const sourceRows = allowed
+  const bounds = pageBounds(request.page, request.pageSize, request.guildLimit === null ? Math.max(10, guildRows.length) : GUILD_VIEW_PAGE_LIMIT);
+  const allowed = request.allowedGuildKeys && (filterEnabled || request.allowedGuildKeys.length) ? new Set(request.allowedGuildKeys) : null;
+  const sourceRows = allowed && !filterEnabled
     ? guildRows.filter((row) => {
         const key = normalizeKey(row.server, row.guildIdentifier);
         return !!key && allowed.has(key);
       })
     : guildRows;
-  const view = buildLocalGuildToplistView(sourceRows, {
-    filters: request.filters,
-    sort: request.sort,
-    guildAverageMode: request.guildAverageMode,
-  });
+  if (preparedView?.key !== prepareKey) {
+    preparedView = { key: prepareKey, players: [], guilds: buildLocalGuildToplistView(sourceRows, {
+      filters: request.filters, sort: request.sort, guildAverageMode: request.guildAverageMode,
+    }).rows };
+  }
+  const matched = match ? preparedView.guilds.filter(match.guild) : preparedView.guilds;
+  const rows = filterEnabled && allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.guildIdentifier) ?? "")) : matched;
   respond({
     requestId: request.requestId,
     ok: true,
+    contentRevision: contentRevision!,
+    datasetId: request.datasetId,
     type: "view",
     tab: "guilds",
-    totalRows: view.rows.length,
+    totalRows: rows.length,
     page: bounds.page,
     pageSize: bounds.pageSize,
     playerRows: [],
-    guildRows: view.rows.slice(bounds.start, bounds.end),
+    guildRows: rows.slice(bounds.start, bounds.end),
   });
 };
 
 globalThis.onmessage = (event: MessageEvent<LocalToplistViewWorkerRequest>) => {
   const request = event.data;
+  requestAudit = auditAcceptWorker(request.audit);
   try {
-    if (request.type === "init") handleInit(request);
-    else if (request.type === "search") handleSearch(request);
-    else handleView(request);
+    if (request.type === "init") { if (requestAudit) auditCall(requestAudit, "dataset-initialization", () => handleInit(request)); else handleInit(request); }
+    else if (request.type === "search") { if (requestAudit) auditCall(requestAudit, "search-processing", () => handleSearch(request)); else handleSearch(request); }
+    else { if (requestAudit) auditCall(requestAudit, "view-filter-sort-rank-slice", () => handleView(request)); else handleView(request); }
   } catch (error) {
+    auditError(requestAudit, error);
     respond({
       requestId: request.requestId,
       ok: false,
       error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
     });
-  }
+  } finally { requestAudit = null; }
 };

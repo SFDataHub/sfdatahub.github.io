@@ -1,0 +1,347 @@
+{
+  "slots": [
+    "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+    "fight-tracker:muyhy8jh:86e44758-b1de-4259-85f5-7ebc7344ab45"
+  ],
+  "firstPlan": {
+    "scanId": "guild-hub-scan:muyhx5vj:5897912b-0323-42ea-9b96-8d267d9103e7",
+    "newMembers": 2
+  },
+  "multiEvidence": {
+    "scanId": "guild-hub-scan:muyhy98k:292a9d34-4fa1-464c-ad4d-d51609a65f5c",
+    "scanAt": null,
+    "members": [
+      {
+        "name": "Earlier roster",
+        "ref": "f8_net_p1",
+        "lastSeen": null
+      },
+      {
+        "name": "Latest roster",
+        "ref": "f8_net_p1",
+        "lastSeen": null
+      }
+    ],
+    "hasChanges": true
+  },
+  "sameTime": {
+    "scanId": "guild-hub-scan:muyhy98k:292a9d34-4fa1-464c-ad4d-d51609a65f5c",
+    "scanAt": "2026-10-06T12:01:00.000Z",
+    "level": 222
+  },
+  "filterKeys": [
+    "TL_FILTERS_V2",
+    "SFH_LOCAL_TL_FILTERS_V1"
+  ],
+  "trackerStates": [
+    {
+      "tracker": {
+        "id": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+        "name": "W14 tracker 0",
+        "server": "F8",
+        "source": "guild_scan",
+        "linkedGuildHubGuildId": "1",
+        "linkedGuildHubLogoIdentifier": "f8_net_g1",
+        "coaString": null,
+        "lastSyncedScanId": "guild-hub-scan:muyhy98k:292a9d34-4fa1-464c-ad4d-d51609a65f5c",
+        "lastSyncedScanAt": "2026-10-06T12:01:00.000Z",
+        "lastSyncedNormalizerVersion": 9,
+        "createdAt": "2026-10-07T19:24:41.015Z",
+        "updatedAt": "2026-10-07T19:24:42.587Z"
+      },
+      "members": [
+        {
+          "id": "fight-member:muyhy8wz:18f5f541-885a-4a24-a07a-dff3185b9f87",
+          "trackerId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "name": "Archive Player 3",
+          "active": false,
+          "source": "scan",
+          "scanMemberRef": "f8_net_p3",
+          "className": "1",
+          "level": 101,
+          "baseStats": 1500,
+          "totalStats": null,
+          "statsSeenAt": "2026-10-06T12:00:00.000Z",
+          "guildRole": null,
+          "guildRoleSeenAt": null,
+          "lastSeenScanId": "guild-hub-scan:muyhx5vj:5897912b-0323-42ea-9b96-8d267d9103e7",
+          "lastSeenScanAt": "2026-10-06T12:00:00.000Z",
+          "lastConfirmedActiveAt": "2026-10-06T12:00:00.000Z",
+          "createdAt": "2026-10-07T19:24:41.507Z",
+          "updatedAt": "2026-10-07T19:24:42.584Z"
+        },
+        {
+          "id": "fight-member:muyhy9qu:ec76f04c-b727-4bba-aaf3-0275eb4a8974",
+          "trackerId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "name": "Changed same-time roster",
+          "active": true,
+          "source": "scan",
+          "scanMemberRef": "f8_net_p1",
+          "className": "1",
+          "level": 222,
+          "baseStats": 1400,
+          "totalStats": null,
+          "statsSeenAt": "2026-10-06T12:01:00.000Z",
+          "guildRole": null,
+          "guildRoleSeenAt": null,
+          "lastSeenScanId": "guild-hub-scan:muyhy98k:292a9d34-4fa1-464c-ad4d-d51609a65f5c",
+          "lastSeenScanAt": "2026-10-06T12:01:00.000Z",
+          "lastConfirmedActiveAt": "2026-10-06T12:01:00.000Z",
+          "createdAt": "2026-10-07T19:24:42.582Z",
+          "updatedAt": "2026-10-07T19:24:42.582Z"
+        },
+        {
+          "id": "fight-member:muyhy8wx:9518030a-355b-4010-83e8-c9b4d27ee1f2",
+          "trackerId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "name": "Current Player 2",
+          "active": false,
+          "source": "scan",
+          "scanMemberRef": "f8_net_p2",
+          "className": "1",
+          "level": 101,
+          "baseStats": 1500,
+          "totalStats": null,
+          "statsSeenAt": "2026-10-06T12:00:00.000Z",
+          "guildRole": null,
+          "guildRoleSeenAt": null,
+          "lastSeenScanId": "guild-hub-scan:muyhx5vj:5897912b-0323-42ea-9b96-8d267d9103e7",
+          "lastSeenScanAt": "2026-10-06T12:00:00.000Z",
+          "lastConfirmedActiveAt": "2026-10-06T12:00:00.000Z",
+          "createdAt": "2026-10-07T19:24:41.505Z",
+          "updatedAt": "2026-10-07T19:24:42.585Z"
+        },
+        {
+          "id": "fight-member:muyhy8jb:02f0c594-31f3-4b40-b0d2-269d2c89d336",
+          "trackerId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "name": "Kept manual member",
+          "active": true,
+          "source": "manual",
+          "scanMemberRef": null,
+          "className": null,
+          "level": null,
+          "baseStats": null,
+          "totalStats": null,
+          "statsSeenAt": null,
+          "guildRole": null,
+          "guildRoleSeenAt": null,
+          "lastSeenScanId": null,
+          "lastSeenScanAt": null,
+          "lastConfirmedActiveAt": "2026-10-07T19:24:41.015Z",
+          "createdAt": "2026-10-07T19:24:41.015Z",
+          "updatedAt": "2026-10-07T19:24:41.015Z"
+        }
+      ],
+      "fights": [
+        {
+          "id": "w14-fight-0",
+          "trackerId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "guildId": "fight-tracker:muyhy8jb:1c5f303a-9d98-4181-81e8-324920f7b24c",
+          "type": "attack",
+          "date": "2026-10-06T12:00:00.000Z",
+          "fightNumber": "1",
+          "opponentGuild": "Kept opponent",
+          "source": "manual",
+          "createdAt": "2026-10-06T12:00:00.000Z",
+          "rosterSnapshot": [],
+          "missedMemberIds": []
+        }
+      ]
+    },
+    {
+      "tracker": {
+        "id": "fight-tracker:muyhy8jh:86e44758-b1de-4259-85f5-7ebc7344ab45",
+        "name": "W14 tracker 1",
+        "server": "F8",
+        "source": "guild_scan",
+        "linkedGuildHubGuildId": "1",
+        "linkedGuildHubLogoIdentifier": "f8_net_g1",
+        "coaString": null,
+        "lastSyncedScanId": null,
+        "lastSyncedScanAt": null,
+        "lastSyncedNormalizerVersion": null,
+        "createdAt": "2026-10-07T19:24:41.021Z",
+        "updatedAt": "2026-10-07T19:24:41.021Z"
+      },
+      "members": [
+        {
+          "id": "fight-member:muyhy8jh:5db67550-3e76-488b-80d4-3fa3eac98151",
+          "trackerId": "fight-tracker:muyhy8jh:86e44758-b1de-4259-85f5-7ebc7344ab45",
+          "name": "Kept manual member",
+          "active": true,
+          "source": "manual",
+          "scanMemberRef": null,
+          "className": null,
+          "level": null,
+          "baseStats": null,
+          "totalStats": null,
+          "statsSeenAt": null,
+          "guildRole": null,
+          "guildRoleSeenAt": null,
+          "lastSeenScanId": null,
+          "lastSeenScanAt": null,
+          "lastConfirmedActiveAt": "2026-10-07T19:24:41.021Z",
+          "createdAt": "2026-10-07T19:24:41.021Z",
+          "updatedAt": "2026-10-07T19:24:41.021Z"
+        }
+      ],
+      "fights": [
+        {
+          "id": "w14-fight-1",
+          "trackerId": "fight-tracker:muyhy8jh:86e44758-b1de-4259-85f5-7ebc7344ab45",
+          "guildId": "fight-tracker:muyhy8jh:86e44758-b1de-4259-85f5-7ebc7344ab45",
+          "type": "attack",
+          "date": "2026-10-06T12:00:00.000Z",
+          "fightNumber": "1",
+          "opponentGuild": "Kept opponent",
+          "source": "manual",
+          "createdAt": "2026-10-06T12:00:00.000Z",
+          "rosterSnapshot": [],
+          "missedMemberIds": []
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "controllers": [
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      }
+    ],
+    "readiness": {
+      "flights": 0,
+      "consumers": 0
+    },
+    "indexFlights": 0,
+    "acquisition": 0,
+    "preparation": {
+      "sourceJobs": 9,
+      "sourceJoins": 0,
+      "sourceHits": 0,
+      "indexSourceBuilds": 3,
+      "completenessSourceBuilds": 3,
+      "rawReads": 2,
+      "sourceBuilds": 2,
+      "projectionJobs": 0,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 33.89999997615814,
+      "indexCpuMs": 0,
+      "dispatches": 9,
+      "roundtripMs": 353.39999997615814,
+      "inputJsonBytes": 35291,
+      "resultJsonBytes": 5735,
+      "sourceCpuMs": 8.199999928474426,
+      "cardCpuMs": 0,
+      "trendCpuMs": 0,
+      "rawReadElapsedMs": 3.100000023841858,
+      "writeElapsedMs": 5.800000071525574,
+      "memberBuildElapsedMs": 2.5000001192092896,
+      "processedSources": 3,
+      "processedRows": 3,
+      "resultRows": 3,
+      "inputSourceDescriptors": 9,
+      "inputDerivedRows": 0,
+      "inputIndexEntries": 0,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 8,
+        "startCallMs": 1.2000001668930054,
+        "sendCallMs": 0.40000009536743164,
+        "responseElapsedMs": 352.4999998807907,
+        "releases": 8,
+        "cleanupMs": 0.5,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 30
+      }
+    }
+  }
+}

@@ -5,6 +5,24 @@
   padding-bottom:12px;
 }
 
+.shell{ display:contents; }
+
+.overview :global(main){
+  background:transparent !important;
+  border-color:transparent !important;
+}
+
+.navigation{
+  width:100%;
+  max-width:900px;
+  margin-inline:auto;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.wiki{
+  padding:16px;
+}
+
 .hero{
   display:grid;
   gap:16px;

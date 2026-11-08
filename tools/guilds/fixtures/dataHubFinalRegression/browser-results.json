@@ -1,0 +1,284 @@
+{
+  "groups": [
+    "fresh prepared dashboard current",
+    "combined cold",
+    "combined warm",
+    "persisted reload",
+    "five warm queries",
+    "visible profile target",
+    "full set visible toplist ACK",
+    "W12 surviving binding offline/retry/new-ID/fixed/free/unusable/stale",
+    "large single source",
+    "large multiple sources",
+    "overlay history and scanmanagement",
+    "filters and explicit tracker sync",
+    "filter and tracker reload"
+  ],
+  "transport": [
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 258
+    },
+    {
+      "path": "/archive/current-a.gz",
+      "bytes": 255
+    },
+    {
+      "path": "/archive/current-b.gz",
+      "bytes": 242
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/search/current-a.search.json.gz",
+      "bytes": 239
+    },
+    {
+      "path": "/archive/search/current-b.search.json.gz",
+      "bytes": 252
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 0
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/historical.gz",
+      "bytes": 258
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    },
+    {
+      "path": "/data/scan-archive/catalog.json",
+      "bytes": 120
+    },
+    {
+      "path": "/archive/manifest.json",
+      "bytes": 1808
+    }
+  ],
+  "errors": []
+}

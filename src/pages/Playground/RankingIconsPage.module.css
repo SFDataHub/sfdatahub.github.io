@@ -1,0 +1,136 @@
+.page {
+  display: grid;
+  gap: 20px;
+  color: var(--text, #fff);
+}
+
+.header h2 {
+  margin: 0 0 6px;
+  color: var(--title, #f5f9ff);
+  font-size: 24px;
+}
+
+.header p,
+.cardHeader p,
+.note {
+  margin: 0;
+  color: var(--text-soft, #b0c4d9);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nameOnlyGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+
+.sizePreviews {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.sizePreview {
+  display: grid;
+  gap: 8px;
+}
+
+.sizePreview svg {
+  display: block;
+}
+
+.variantSection {
+  display: grid;
+  gap: 12px;
+}
+
+.variantTitle {
+  margin: 0;
+  color: var(--title, #f5f9ff);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line, #2c4a73);
+  border-radius: 14px;
+  background: var(--tile, #1e2f47);
+}
+
+.cardHeader {
+  padding: 16px 16px 0;
+  min-height: 90px;
+}
+
+.cardHeader h3,
+.cardHeader h4 {
+  margin: 0 0 6px;
+  color: var(--title, #f5f9ff);
+  font-size: 16px;
+}
+
+.largePreview {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 16px 8px 24px;
+}
+
+.largeIcon {
+  display: block;
+  width: min(192px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.largeName {
+  color: var(--title, #f5f9ff);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.badgePreview {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--line, #2c4a73);
+  background: var(--page, #0c1c2e);
+}
+
+.sizeLabel {
+  color: var(--text-soft, #b0c4d9);
+  font-size: 11px;
+  letter-spacing: .06em;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--title, #f5f9ff);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.badge svg {
+  display: block;
+  flex: 0 0 32px;
+}
+
+.badge64 svg {
+  flex-basis: 64px;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  }
+}

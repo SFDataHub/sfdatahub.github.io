@@ -1,0 +1,26 @@
+.sidebar { min-width:0; }
+.sidebar input { width:100%; min-width:0; }
+.sidebar [hidden] { display:none; }
+.sidebar button:focus-visible, .sidebar a:focus-visible,
+.toggle:focus-visible, .answer a:focus-visible {
+  outline:2px solid #82bbff;
+  outline-offset:2px;
+}
+.result { display:block; text-decoration:none; }
+.searchStatus { margin:0 0 12px; color:#b0c4d9; font-size:13px; line-height:1.5; }
+.content { display:flex; flex-direction:column; gap:16px; min-width:0; padding-bottom:12px; }
+.title { margin:0; color:#f5f9ff; font-size:20px; line-height:1.35; }
+.questions { display:flex; flex-direction:column; gap:14px; }
+.question { padding:0; }
+.questionHeading { margin:0; font:inherit; }
+.toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:16px; background:transparent; color:#f5f9ff; border:0; border-radius:14px; text-align:left; font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+.toggle:hover { background:rgba(18,40,66,.7); }
+.toggle svg { width:18px; height:18px; flex-shrink:0; transition:transform .2s ease; }
+.toggle .chevronOpen { transform:rotate(180deg); }
+.answer { padding:0 16px 16px; }
+.answer[hidden] { display:none; }
+.related { color:#b0c4d9; font-size:13px; line-height:1.5; }
+.related p { margin:0 0 6px; }
+.related ul { padding-left:18px; margin:0; }
+.related a, .action { color:#82bbff; }
+.action { display:inline-block; margin-top:10px; font-size:13px; }

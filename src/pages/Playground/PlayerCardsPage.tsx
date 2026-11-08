@@ -1,3 +1,4 @@
+import { startSharedPlayerCardsRun } from "../../lib/local-player-profile/cardTrendExecution";
 import React from "react";
 import PlayerCard from "../../components/player-card/PlayerCard";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
@@ -7,7 +8,6 @@ import {
 } from "../../lib/guilds/localScanLibrary";
 import {
   LocalPlayerIndexWorkerCancelledError,
-  startLocalPlayerIndexWorkerRun,
   type LocalPlayerIndexWorkerRun,
 } from "../../lib/player-search/localPlayerIndexClient";
 import type { LocalPlayerIndexPlayer } from "../../lib/player-search/localPlayerIndex";
@@ -38,7 +38,10 @@ export default function PlayerCardsPage() {
         const summaries = await listGuildHubScanSummaries();
         if (cancelled) return;
         const f28Summaries = summaries.filter((summary) => summaryContainsServer(summary, PLAYER_CARDS_SERVER));
-        workerRun = startLocalPlayerIndexWorkerRun({
+        workerRun = startSharedPlayerCardsRun({
+          onInvalidating: () => { if (!cancelled) setLoading(true); },
+          onError: () => { if (!cancelled) { setLoading(false); setError("Lokale Historie konnte nicht geladen werden."); } },
+          onRefresh: ({ index }) => { if (!cancelled) { setPlayers(index.players); setSelectedKey(key => index.players.some(player => player.key === key) ? key : findInitialPlayer(index.players)?.key ?? null); setLoading(false); setError(null); } },
           summaries: f28Summaries,
           serverFilter: PLAYER_CARDS_SERVER,
         });

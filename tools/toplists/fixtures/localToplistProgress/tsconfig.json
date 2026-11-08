@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {"strict": true, "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"], "jsx": "react-jsx"},
+  "include": ["../../localToplistProgress.browser.test.mts", "../../localToplistService.test.mts", "../../localToplistStart.browser.test.mts", "../../localToplistRevision.browser.test.mts", "./fixture.tsx", "../../../../src/**/*.d.ts"], "exclude": []
+}

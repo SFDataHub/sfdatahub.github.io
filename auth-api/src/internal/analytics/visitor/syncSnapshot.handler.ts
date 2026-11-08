@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
+import { createGoatCounterReader } from "./goatCounter";
+import { publishMetrics } from "./metrics";
 
-import { GOATCOUNTER_API_BASE_URL, GOATCOUNTER_API_TOKEN, UPLOAD_INBOX_TOKEN } from "../../../config";
+import { UPLOAD_INBOX_TOKEN } from "../../../config";
 import { admin, db } from "../../../firebase";
 
 const INTERNAL_HEADER = "x-internal-token";
@@ -9,11 +11,6 @@ const SNAPSHOT_DOC = "visitor_analytics";
 const TIMEZONE = "Europe/Berlin";
 const TOP_LIMIT = 25;
 const GUIDE_PREFIXES = ["/guidehub-v2", "/guidehub"];
-const GOATCOUNTER_API_PREFIX = "/api/v0";
-const GOATCOUNTER_MIN_REQUEST_GAP_MS = 350;
-const GOATCOUNTER_MAX_RETRIES = 2;
-const GOATCOUNTER_RETRY_FALLBACK_MS = 1200;
-const GOATCOUNTER_RETRY_MAX_MS = 10000;
 
 type RangeKey = "today" | "last7d" | "last30d";
 
@@ -52,18 +49,9 @@ type WindowSnapshotPayload = {
   visits: number;
 };
 
-type WindowAggregation = {
-  range: DateRange;
-  hits: AggregatedPathHit[];
-};
-
 type TotalAggregation = {
   range: DateRange;
   visits: number;
-};
-
-type GoatCounterRequestContext = {
-  lastRequestStartedAt: number;
 };
 
 const berlinDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -85,133 +73,6 @@ const berlinDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 const dateKeyPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-const normalizeGoatCounterApiBaseUrl = (value: string): URL => {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error("GOATCOUNTER_API_BASE_URL is not configured");
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    throw new Error("GOATCOUNTER_API_BASE_URL must be an absolute URL");
-  }
-
-  const canonicalPrefix = GOATCOUNTER_API_PREFIX.replace(/\/+$/, "");
-  let normalizedPath = parsed.pathname.replace(/\/+$/, "");
-
-  while (normalizedPath.endsWith(canonicalPrefix)) {
-    normalizedPath = normalizedPath.slice(0, normalizedPath.length - canonicalPrefix.length);
-  }
-  if (!normalizedPath.startsWith("/")) {
-    normalizedPath = `/${normalizedPath}`;
-  }
-  if (normalizedPath === "/") {
-    normalizedPath = "";
-  }
-
-  parsed.pathname = `${normalizedPath}${canonicalPrefix}/`;
-  parsed.search = "";
-  parsed.hash = "";
-
-  return parsed;
-};
-
-const buildGoatCounterEndpointUrl = (
-  apiBaseUrl: URL,
-  endpointPath: "stats/hits" | "stats/total",
-  range: DateRange,
-): URL => {
-  const endpoint = new URL(endpointPath, apiBaseUrl);
-  endpoint.searchParams.set("start", range.startDateTime);
-  endpoint.searchParams.set("end", range.endDateTime);
-  return endpoint;
-};
-
-const toErrorBodyPreview = (body: string): string => {
-  const compact = body.replace(/\s+/g, " ").trim();
-  return compact.slice(0, 220);
-};
-
-const wait = async (ms: number): Promise<void> => {
-  if (ms <= 0) return;
-  await new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-const parseRetryAfterMs = (retryAfterHeader: string | null): number | null => {
-  if (!retryAfterHeader) return null;
-  const trimmed = retryAfterHeader.trim();
-  if (!trimmed) return null;
-
-  const seconds = Number(trimmed);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.min(Math.round(seconds * 1000), GOATCOUNTER_RETRY_MAX_MS);
-  }
-
-  const retryAt = Date.parse(trimmed);
-  if (Number.isNaN(retryAt)) return null;
-
-  const deltaMs = retryAt - Date.now();
-  if (deltaMs <= 0) return 0;
-  return Math.min(deltaMs, GOATCOUNTER_RETRY_MAX_MS);
-};
-
-const waitForGoatCounterGap = async (context: GoatCounterRequestContext): Promise<void> => {
-  const elapsed = Date.now() - context.lastRequestStartedAt;
-  const waitMs = GOATCOUNTER_MIN_REQUEST_GAP_MS - elapsed;
-  if (waitMs > 0) {
-    await wait(waitMs);
-  }
-  context.lastRequestStartedAt = Date.now();
-};
-
-const fetchGoatCounterJson = async (
-  endpoint: URL,
-  token: string,
-  context: GoatCounterRequestContext,
-): Promise<unknown> => {
-  const endpointLabel = `${endpoint.origin}${endpoint.pathname}${endpoint.search}`;
-
-  for (let attempt = 0; attempt <= GOATCOUNTER_MAX_RETRIES; attempt += 1) {
-    await waitForGoatCounterGap(context);
-
-    const response = await fetch(endpoint.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    if (response.ok) {
-      return (await response.json()) as unknown;
-    }
-
-    if (response.status === 429 && attempt < GOATCOUNTER_MAX_RETRIES) {
-      const retryAfterMs =
-        parseRetryAfterMs(response.headers.get("retry-after")) ??
-        Math.min(
-          GOATCOUNTER_RETRY_FALLBACK_MS * (attempt + 1),
-          GOATCOUNTER_RETRY_MAX_MS,
-        );
-
-      console.warn(
-        `[visitor-analytics] GoatCounter rate limited endpoint=${endpointLabel} status=429 attempt=${attempt + 1}/${GOATCOUNTER_MAX_RETRIES + 1} retryInMs=${retryAfterMs}`,
-      );
-      await wait(retryAfterMs);
-      continue;
-    }
-
-    const bodyPreview = toErrorBodyPreview(await response.text());
-    throw new Error(
-      `[visitor-analytics] GoatCounter request failed endpoint=${endpointLabel} status=${response.status} body="${bodyPreview}"`,
-    );
-  }
-
-  throw new Error(`[visitor-analytics] GoatCounter request exhausted retries endpoint=${endpointLabel}`);
-};
 
 const parseDateKey = (value: string): { year: number; month: number; day: number } | null => {
   const match = dateKeyPattern.exec(value);
@@ -307,63 +168,6 @@ const toBerlinStartOfDayIso = (dateKey: string): string => {
   return berlinDateTimeToUtc(parsed.year, parsed.month, parsed.day, 0, 0, 0).toISOString();
 };
 
-const parseNumber = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-};
-
-const parsePathText = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const toRecord = (value: unknown): Record<string, unknown> | null => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-};
-
-const extractRawHitEntries = (payload: unknown): Array<Record<string, unknown>> => {
-  if (Array.isArray(payload)) {
-    return payload.map((entry) => toRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
-  }
-
-  const payloadRecord = toRecord(payload);
-  if (!payloadRecord) return [];
-
-  const listCandidates = [
-    payloadRecord.hits,
-    payloadRecord.items,
-    payloadRecord.results,
-    payloadRecord.data,
-  ];
-
-  for (const candidate of listCandidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.map((entry) => toRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
-    }
-    const maybeMap = toRecord(candidate);
-    if (maybeMap) {
-      const fromMap = Object.entries(maybeMap)
-        .map(([path, count]) => ({ path, count }))
-        .filter((entry) => parseNumber(entry.count) !== null);
-      if (fromMap.length > 0) {
-        return fromMap;
-      }
-    }
-  }
-
-  return [];
-};
-
 const normalizeBasePath = (pathName: string): string => {
   if (!pathName || pathName === "/") return "/";
   const ensured = pathName.startsWith("/") ? pathName : `/${pathName}`;
@@ -427,63 +231,6 @@ const decodeSegment = (value: string): string => {
   } catch {
     return value;
   }
-};
-
-const toGoatHits = (payload: unknown): GoatHit[] => {
-  const entries = extractRawHitEntries(payload);
-  const hits: GoatHit[] = [];
-
-  for (const entry of entries) {
-    const path =
-      parsePathText(entry.path) ??
-      parsePathText(entry.url) ??
-      parsePathText(entry.pathname) ??
-      parsePathText(entry.page);
-    const count =
-      parseNumber(entry.count) ??
-      parseNumber(entry.visits) ??
-      parseNumber(entry.hits) ??
-      parseNumber(entry.total) ??
-      parseNumber(entry.n);
-
-    if (!path || count === null || count <= 0) {
-      continue;
-    }
-
-    hits.push({ path, count });
-  }
-
-  return hits;
-};
-
-const extractTotalVisits = (payload: unknown): number | null => {
-  const direct = parseNumber(payload);
-  if (direct !== null) return direct;
-
-  if (Array.isArray(payload)) {
-    for (const entry of payload) {
-      const nested = extractTotalVisits(entry);
-      if (nested !== null) return nested;
-    }
-    return null;
-  }
-
-  const record = toRecord(payload);
-  if (!record) return null;
-
-  const directCandidates = ["count", "total", "visits", "hits", "n"];
-  for (const key of directCandidates) {
-    const value = parseNumber(record[key]);
-    if (value !== null) return value;
-  }
-
-  const nestedCandidates = ["total", "stats", "result", "data", "items"];
-  for (const key of nestedCandidates) {
-    const nested = extractTotalVisits(record[key]);
-    if (nested !== null) return nested;
-  }
-
-  return null;
 };
 
 const aggregateHits = (hits: GoatHit[]): AggregatedPathHit[] => {
@@ -606,42 +353,6 @@ const buildTopGuides = (hits: AggregatedPathHit[]): SnapshotTopEntry[] => {
   return sortTopEntries(entries);
 };
 
-const fetchHitsForRange = async (
-  apiBaseUrl: URL,
-  token: string,
-  range: DateRange,
-  requestContext: GoatCounterRequestContext,
-): Promise<WindowAggregation> => {
-  const endpoint = buildGoatCounterEndpointUrl(apiBaseUrl, "stats/hits", range);
-  const payload = await fetchGoatCounterJson(endpoint, token, requestContext);
-  const hits = toGoatHits(payload);
-  const aggregated = aggregateHits(hits);
-
-  return {
-    range,
-    hits: aggregated,
-  };
-};
-
-const fetchTotalForRange = async (
-  apiBaseUrl: URL,
-  token: string,
-  range: DateRange,
-  requestContext: GoatCounterRequestContext,
-): Promise<TotalAggregation> => {
-  const endpoint = buildGoatCounterEndpointUrl(apiBaseUrl, "stats/total", range);
-  const payload = await fetchGoatCounterJson(endpoint, token, requestContext);
-  const visits = extractTotalVisits(payload);
-  if (visits === null) {
-    throw new Error("[visitor-analytics] Unable to parse totals from GoatCounter stats/total response");
-  }
-
-  return {
-    range,
-    visits,
-  };
-};
-
 const buildDateRanges = (): Record<RangeKey, DateRange> => {
   const now = new Date();
   const nowDateTimeIso = now.toISOString();
@@ -671,20 +382,6 @@ const buildDateRanges = (): Record<RangeKey, DateRange> => {
   };
 };
 
-const ensureConfig = (): { apiBaseUrl: URL; token: string } => {
-  if (!GOATCOUNTER_API_BASE_URL || GOATCOUNTER_API_BASE_URL.trim().length === 0) {
-    throw new Error("GOATCOUNTER_API_BASE_URL is not configured");
-  }
-  if (!GOATCOUNTER_API_TOKEN || GOATCOUNTER_API_TOKEN.trim().length === 0) {
-    throw new Error("GOATCOUNTER_API_TOKEN is not configured");
-  }
-
-  return {
-    apiBaseUrl: normalizeGoatCounterApiBaseUrl(GOATCOUNTER_API_BASE_URL),
-    token: GOATCOUNTER_API_TOKEN,
-  };
-};
-
 const isAuthorized = (req: Request): boolean => {
   const secret = UPLOAD_INBOX_TOKEN;
   if (!secret) return false;
@@ -698,25 +395,18 @@ const toWindowPayload = (aggregation: TotalAggregation): WindowSnapshotPayload =
   visits: aggregation.visits,
 });
 
-export const syncVisitorAnalyticsSnapshotHandler = async (req: Request, res: Response) => {
-  if (!UPLOAD_INBOX_TOKEN) {
-    return res.status(500).json({ ok: false, error: "UPLOAD_INBOX_TOKEN is not configured." });
-  }
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
-  }
-
-  try {
-    const { apiBaseUrl, token } = ensureConfig();
+export async function refreshVisitorAnalyticsDetails() {
+    const read = createGoatCounterReader();
     const ranges = buildDateRanges();
-    const requestContext: GoatCounterRequestContext = { lastRequestStartedAt: 0 };
-
-    const todayTotals = await fetchTotalForRange(apiBaseUrl, token, ranges.today, requestContext);
-    const last7dTotals = await fetchTotalForRange(apiBaseUrl, token, ranges.last7d, requestContext);
-    const last30dTotals = await fetchTotalForRange(apiBaseUrl, token, ranges.last30d, requestContext);
-    const last7dHits = await fetchHitsForRange(apiBaseUrl, token, ranges.last7d, requestContext);
-    const last30dHits = await fetchHitsForRange(apiBaseUrl, token, ranges.last30d, requestContext);
-
+    const fetchWindow = async (range: DateRange) => {
+      const rows = (await read(range.startDateTime, range.endDateTime)).filter(hit => !hit.event);
+      return { range, hits: aggregateHits(rows.map(hit => ({ path: hit.path, count: hit.count }))) };
+    };
+    const todayHits = await fetchWindow(ranges.today);
+    const last7dHits = await fetchWindow(ranges.last7d);
+    const last30dHits = await fetchWindow(ranges.last30d);
+    const total = (window: typeof todayHits): TotalAggregation => ({ range: window.range, visits: window.hits.reduce((sum, hit) => sum + hit.count, 0) });
+    const todayTotals = total(todayHits), last7dTotals = total(last7dHits), last30dTotals = total(last30dHits);
     const payload = {
       schemaVersion: 1,
       timezone: TIMEZONE,
@@ -747,21 +437,17 @@ export const syncVisitorAnalyticsSnapshotHandler = async (req: Request, res: Res
 
     await db.collection(SNAPSHOT_COLLECTION).doc(SNAPSHOT_DOC).set(payload, { merge: false });
 
-    return res.json({
-      ok: true,
-      docPath: `${SNAPSHOT_COLLECTION}/${SNAPSHOT_DOC}`,
-      timezone: TIMEZONE,
-      totals: {
-        today: todayTotals.visits,
-        last7d: last7dTotals.visits,
-        last30d: last30dTotals.visits,
-      },
-    });
+    return { ok: true, ...payload };
+}
+
+export const syncVisitorAnalyticsSnapshotHandler = async (req: Request, res: Response) => {
+  if (!UPLOAD_INBOX_TOKEN) return res.status(500).json({ ok: false, error: "UPLOAD_INBOX_TOKEN is not configured." });
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
+  try {
+    const result = await publishMetrics(createGoatCounterReader());
+    return res.json({ ok: true, ...result });
   } catch (error) {
-    console.error("[visitor-analytics] Failed to sync snapshot", error);
-    return res.status(500).json({
-      ok: false,
-      error: error instanceof Error ? error.message : "Failed to sync visitor analytics snapshot",
-    });
+    console.error("[visitor-analytics] Failed to sync public snapshot", error);
+    return res.status(500).json({ ok: false, error: "Failed to sync public visitor snapshot" });
   }
 };

@@ -116,3 +116,11 @@ export function iconForClassName(input?: string | null): { url?: string; fallbac
 
   return {};
 }
+
+/** Exact class assignment for filtering; unknown labels never use prefix guesses. */
+export type ClassSelection = GameClassKey | readonly string[] | null;
+export function getExactClassMeta(input?: number | string | null): ClassMeta | null {
+  const byId = getClassMetaById(input); if (byId) return byId;
+  const label = String(input ?? "").trim().toLowerCase();
+  return CLASSES.find(meta => meta.key === label || meta.label.toLowerCase() === label) ?? null;
+}

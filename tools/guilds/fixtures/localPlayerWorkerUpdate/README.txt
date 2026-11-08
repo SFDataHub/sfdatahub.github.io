@@ -1,0 +1,4 @@
+W120 historical worker-update fixtures, copied byte-for-byte from the local W19/W19n02 initial evidence. See provenance.json for original paths and SHA-256.
+W19 transport/worker: v1 (no ready handshake); W19n02 transport: v2 (handshake, no renewal); W19n02 main/SW: historical cache-first app update. These are historical bytes, not current code.
+The current transport contract is intentionally independent. The update proof still poisons real CacheStorage, updates a real root Service Worker, reloads and checks native Workers and durable sources.
+A separate synthetic same-contract case changes only the archived v2 transport version tag to the current contract. Its old no-renewal implementation remains intact, so a stale module cannot pass merely because the protocol number matches. The unadapted real v2 module is checked in an additional reload as well.

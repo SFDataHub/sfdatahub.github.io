@@ -1,0 +1,458 @@
+[
+  {
+    "file": "guilds/hubSearch.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS unnamed identifier remains searchable; rows without searchable evidence remain unknown coverage\nPASS slim projection, individual times, unknown rows, versions and same-hash validity\nPASS cold preparation one named Raw read; warm queries/refresh zero Raw reads; old names retain alternatives\nPASS primitive full-server Current handoff, gate before Raw, exact historical individual anchor\nPASS same names/numeric IDs on different servers stay independent\nPASS full Current members, physical dedupe and explicit monthly scope\nPASS old work rejected after reset, newer same-hash generation, update and delete; update renews only source projection\n{\"projectionBytes\":1890,\"costs\":{\"coldRawReads\":2,\"projectionBytes\":3781,\"preparationMs\":6.147600000000011,\"archivePreparationMs\":0.6357000000000426,\"queries\":18,\"queryMs\":1.0411000000001422}}\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/hubSearchLifecycle.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS confirmed alias groups, entity merge and unlink use literal projections without rebuilding Raw; recent name has observation evidence\nPASS missing summaries keep certified projections usable with unknown coverage; damaged fingerprint rebuilt sourcewise without deleting inventory\nPASS merge/slot copies retain locators without creating entities; normalizer/core and malformed-reference evidence rejected\nPASS older Raw without summary/generation stays warm under identity changes using its own journal certificate, with unknown coverage\nPASS actual import survives failed search commit; real slots preserve identity count and usable locators; inactive merge copies add no entities\nPASS old preparation cannot publish after newer atomic source update; newer projection survives late completion\nPASS scope/query generations reject delayed catch/finally results; dispose releases documents, hits and listeners\nPASS missing Currentset declarations remain unknown rather than fabricated from cached entries\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/hubSearchCosts.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS measured 1k/10k slim projection and warm-query budgets [{\"count\":1000,\"projectionBytes\":329752,\"projectionBuildMs\":31.737299999999948,\"queryMs\":[4.132600000000025,4.619299999999953,2.734299999999962,2.6749999999999545,3.092899999999986]},{\"count\":10000,\"projectionBytes\":3354754,\"projectionBuildMs\":190.25559999999996,\"queryMs\":[20.144999999999982,17.633199999999988,15.494400000000041,15.814700000000016,19.592500000000086]}]\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/hubSearchArchive.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS default active years only, full latest Currentset, inactive year available only in declared monthly scope; metadata-only requests\nPASS independent year failures, validated same-scope offline expectations, unknown uncached scope and retry without permanent veto\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/hubSearchIndexFlights.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS first consumer detaches without aborting second consumer; one download, terminal flight cleanup\nPASS failed flight has no permanent veto; same scope retry succeeds\nPASS last consumer releases worker flight immediately; late rejection is consumed\nPASS legacy dedupe preserved; Dashboard retains nonmatching alternatives through complete slim occurrence contract\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/searchIndexService.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "searchIndexService.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/localFirstScanAcquisition.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localFirstScanAcquisition.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/toplistSelection.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "toplistSelection.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localScanProvenance.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS userfirst/archivefirst, repeated duplicate, overlapping binding, unchanged identity/time/generation and Analytics receipt\nPASS legacy unknown, old archive unknown, own/name/absence are not proof, explicit legacy duplicate positive\nPASS personal update, transfer roundtrip, unknown/incompatible transfer, duplicate transport and content-bound invalidation\nPASS contained/deactivated originals, synthetic slot/merge, recovery/dissolution and deleted original references\nPASS serialized archive/user races and duplicate preflight cannot annotate deleted source\nPASS same server/time with different JSON text remains another original source\nPASS aborted provenance commit has no half-proof/journal and committed Raw survives later Analytics error\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/dataHubScanInventory.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS physical dedupe/uppercase SHA/current-monthly references, conflicting versions/URLs, all active years, offline/invalid partial basis and real empty basis\nPASS multiple physical bindings per Raw, active-basis restriction, strong bind proofs, targeted cold 1 Raw/2 validations/0 normalization and warm 0 payload reads\nPASS concurrent proofs join, captured unbind veto, URL revalidation and failed payload expectation\nPASS generation ABA, changed expectation, unbind/update/delete, transferred annotation without binding, missing Raw and missing Summary completeness\nPASS independent personal state, held manifest, stale answer veto, dispose, last-known offline/retry and irrelevant Identity/own-readiness events\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistService.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistService.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistStore.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/monthlySetComposition.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "monthlySetComposition.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/localFirstFeatureAcquisition.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localFirstFeatureAcquisition.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/localFirstScanResolver.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localFirstScanResolver.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/dataHubRoutes.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS full entity identifiers and registry namespaces\nPASS durable observation query and invalid combinations\nPASS root, test and beta deployment copy links\nPASS known local return targets and exhaustive legacy mapping\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localProfileEntry.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS prepared entry: zero Current Raw reads, exact core reused\nPASS cold exact and free entry: named Raw only, individual time, no full-history barrier\nPASS missing anchors, wrong hashes and cancelled entry never choose Current\nPASS source changes, ambiguous rows and deleted sources produce explained states\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/pageContextStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS independent feature inputs, generations and subscriptions\nPASS reload restores each own context; early choice and explicit clear defeat late legacy initialization\nPASS manual/missing/empty toplist server survives foreign selection, late default, reload; separate tab storage\nPASS explicit target overrides own session once; remount/reload does not replay consumed router target after clear\nPASS save/remove/reorder retain historical compatibility and page reference; obsolete active writers reject\nPASS invalid/failed session is explained, never silently overwritten by legacy; explicit choice recovers metadata only\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/hubFavoritesStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS missing legacy metadata and subscription journal reads remain unknown without Raw migration\nPASS absent legacy is a valid empty migration\nPASS ordered metadata, duplicate IDs, incomplete/conflicting/primitives and stable retry mapping preserved\nPASS migration abort rolls back payload, marker and compatibility; atomic deterministic retry\nPASS corrupt legacy and actual read errors stay distinct from empty; actionable restore retry\nPASS explicit player save dedupe/server separation; guild reorder fixes player slots; global selection refused and compatibility retained after removal; stale fullwrite refused\nPASS concurrent stale operations rebase on committed revision without overwriting other saves/removes\nPASS delayed restore gates early user actions\nPASS save/remove/reorder abort preserves committed memory/disk; retry executes the failed concrete operation\nPASS old restore return cannot overwrite a newer commit; durable revision catches a missed notification\nPASS confirmed originals and optional UUID captured; merge/absorbed UUID resolve; unlink conflict visible without rewriting favorites\nPASS raw deletion changes availability while entity favorite and observation hint survive\nPASS current Summary plus independently indexed Raw hash proves positive and complete negative local availability\nPASS Raw present with missing Summary stays unknown; projection never repairs or reads Raw\nPASS stale schema/guild/core normalizers and damaged validity/structure cannot prove either available or missing\nPASS independent existing Raw index contradicts or cannot confirm Summary hash; no self-certification\nPASS contradicted identifier/server metadata cannot prove positive or negative availability\nPASS absent/incomplete Player inventory gives unknown without valid positive evidence\nPASS valid foreign server with unpersisted Player identifiers does not invalidate complete relevant inventory\nPASS valid hit survives an unchecked source; subsequent metadata updates replace stale availability\nMEASURED N02 pure projection operations {\"rawReads\":0,\"rawPoolReads\":0,\"rawValueCursors\":0,\"summaryWrites\":0,\"favoriteWrites\":0}\nPASS actual read/write guild APIs controlled by one owner, player preservation, unchanged legacy recovery, stale compatibility revision refused\nPASS local profile factory persists entity/light metadata only; public favorites and favoritesOnly stay separate\nAll targeted W-10 regression groups passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localPlayerCurrentSeed.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS valid seed: zero Rawpayload reads; complete core reused; missing core prepared in adapter\nPASS physical source/time/server anchors, multiple observations, ambiguity and missing row time\nPASS changed receipt, exact source fallback, source deletion and no acquisition\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localPlayerAnalyticsCoordinator.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS sharing counts {\"preparation\":1,\"sourceBuilds\":6,\"indexBuilds\":1,\"completenessBuilds\":1,\"performanceBuilds\":1,\"analyticsProjections\":2,\"currentProjections\":2,\"bestsProjections\":1,\"currentRawReads\":0,\"historicalRawReads\":10,\"basisJoins\":2,\"projectionJoins\":1,\"basisHits\":3,\"projectionHits\":3,\"metadataElapsedMs\":9.374599999999987,\"historicalReadElapsedMs\":176.37630000000001,\"indexCpuMs\":0.45269999999993615,\"performanceCpuMs\":1.7860000000000582,\"analyticsCpuMs\":9.066499999999905,\"bestsElapsedMs\":4.127899999999954}\nPASS immutable arrays, maps and shared projection values\nPASS 16 complete Analytics + 4 Insights references, adapters, aliases, ties, historical anchor/later history, missing endpoint, partial roster, zero/negative rules\nPASS original-builder full-core Current reference: real zero, per-attribute missing and valid-member means\nPASS empty + partial basis repeated same-key demand, no completed veto\nPASS absent/unmatched memberRef: existing namefallback and confirmed alias history\nPASS known unrelated same-server source omitted: metadata inventoried, zero Raw/source builds\nPASS first and joiner abort preserve the remaining consumer\nPASS two simultaneous physical anchors share history, separate projections, independent close and final release\nPASS last abort, old finally vs replacement, closed A rebuilt after A → B → A\nPASS same name + same server but different original identifier uses distinct history\nPASS rank failure preserves Current/XP/Analytics and same-key rank retry\nPASS preparation failure and identical-key retry\nPASS new source, peer identity, reset, finished-display refresh, foreign scope exclusion and missed-event durable catch-up\nPASS source/identity/reset changes during build reject old generation and permit replacement\nPASS exact Current observation refresh, targeted one-read fallback, deletion missing, no global retained context\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localPlayerAnalyticsExecution.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS queue join/promotion/demotion, independent leases, queued cancel/retry, two-dispatch starvation bound\nPASS worker start/send/error/messageerror/binding/generation/noresponse/cancel/terminate/business/late/duplicate/retry terminal paths\nPASS invalid metrics terminally settle every affected transport await\nPASS complete Card/Trend starting references, shared six sources/completeness builds, partial overlap profile, active result hit and final cleanup\nPASS relevant generation refresh, unrelated same-server import has no preparation/recompute\nPASS active Card/Trend peer Identity, reset, missed journal, stale finished-hit veto, deletion and cleanup\nPASS physical Source malformed/error/messageerror/send failures: same-key retry, no registry/await leak\nPASS identical Source/hash with changed normalizers vetoes pending worker delivery and finished basis reuse, same-key retry\nPASS exact Development mismatch is terminal unavailable, valid static Card retained\n[{\"size\":2,\"elapsedMs\":294.3821999999999,\"delta\":{\"sourceJobs\":6,\"sourceJoins\":11,\"sourceHits\":0,\"indexSourceBuilds\":6,\"completenessSourceBuilds\":6,\"rawReads\":6,\"sourceBuilds\":6,\"projectionJobs\":8,\"projectionJoins\":0,\"projectionHits\":0,\"scopes\":3,\"sourceElapsedMs\":185.57180000000017,\"indexCpuMs\":0.6038000000002057,\"dispatches\":14,\"roundtripMs\":204.97010000000012,\"inputJsonBytes\":93028,\"resultJsonBytes\":46729,\"sourceCpuMs\":9.705399999999827,\"cardCpuMs\":12.98580000000004,\"trendCpuMs\":1.3195000000000618,\"rawReadElapsedMs\":4.749299999999948,\"writeElapsedMs\":10.702000000000226,\"memberBuildElapsedMs\":12.571399999999812,\"processedSources\":24,\"processedRows\":39,\"resultRows\":35,\"inputSourceDescriptors\":24,\"inputDerivedRows\":26,\"inputIndexEntries\":13,\"sources\":6,\"projections\":2},\"afterRelease\":{\"sourceJobs\":6,\"sourceJoins\":11,\"sourceHits\":6,\"indexSourceBuilds\":6,\"completenessSourceBuilds\":6,\"rawReads\":6,\"sourceBuilds\":6,\"projectionJobs\":8,\"projectionJoins\":0,\"projectionHits\":1,\"scopes\":0,\"sourceElapsedMs\":185.57180000000017,\"indexCpuMs\":0.6038000000002057,\"dispatches\":14,\"roundtripMs\":204.97010000000012,\"inputJsonBytes\":93028,\"resultJsonBytes\":46729,\"sourceCpuMs\":9.705399999999827,\"cardCpuMs\":12.98580000000004,\"trendCpuMs\":1.3195000000000618,\"rawReadElapsedMs\":4.749299999999948,\"writeElapsedMs\":10.702000000000226,\"memberBuildElapsedMs\":12.571399999999812,\"processedSources\":24,\"processedRows\":39,\"resultRows\":35,\"inputSourceDescriptors\":24,\"inputDerivedRows\":26,\"inputIndexEntries\":13,\"sources\":0,\"projections\":0,\"queue\":{\"running\":null,\"waiting\":[],\"jobs\":0},\"transport\":{\"starts\":0,\"startCallMs\":0,\"sendCallMs\":0,\"responseElapsedMs\":0,\"releases\":0,\"cleanupMs\":0.0009999999999763531,\"workers\":0,\"awaits\":0,\"generation\":1}}},{\"size\":50,\"elapsedMs\":828.9721000000002,\"delta\":{\"sourceJobs\":6,\"sourceJoins\":11,\"sourceHits\":0,\"indexSourceBuilds\":6,\"completenessSourceBuilds\":6,\"rawReads\":6,\"sourceBuilds\":6,\"projectionJobs\":8,\"projectionJoins\":0,\"projectionHits\":0,\"scopes\":3,\"sourceElapsedMs\":587.0791000000006,\"indexCpuMs\":0.8129999999998745,\"dispatches\":14,\"roundtripMs\":737.8958000000002,\"inputJsonBytes\":975979,\"resultJsonBytes\":811001,\"sourceCpuMs\":126.82140000000004,\"cardCpuMs\":134.5335,\"trendCpuMs\":0.47139999999990323,\"rawReadElapsedMs\":19.515899999999647,\"writeElapsedMs\":32.414999999999964,\"memberBuildElapsedMs\":195.39120000000003,\"processedSources\":24,\"processedRows\":975,\"resultRows\":779,\"inputSourceDescriptors\":24,\"inputDerivedRows\":650,\"inputIndexEntries\":325,\"sources\":6,\"projections\":2},\"afterRelease\":{\"sourceJobs\":12,\"sourceJoins\":22,\"sourceHits\":12,\"indexSourceBuilds\":12,\"completenessSourceBuilds\":12,\"rawReads\":12,\"sourceBuilds\":12,\"projectionJobs\":16,\"projectionJoins\":0,\"projectionHits\":2,\"scopes\":0,\"sourceElapsedMs\":772.6509000000008,\"indexCpuMs\":1.4168000000000802,\"dispatches\":28,\"roundtripMs\":942.8659000000004,\"inputJsonBytes\":1069007,\"resultJsonBytes\":857730,\"sourceCpuMs\":136.52679999999987,\"cardCpuMs\":147.51930000000004,\"trendCpuMs\":1.790899999999965,\"rawReadElapsedMs\":24.265199999999595,\"writeElapsedMs\":43.11700000000019,\"memberBuildElapsedMs\":207.96259999999984,\"processedSources\":48,\"processedRows\":1014,\"resultRows\":814,\"inputSourceDescriptors\":48,\"inputDerivedRows\":676,\"inputIndexEntries\":338,\"sources\":0,\"projections\":0,\"queue\":{\"running\":null,\"waiting\":[],\"jobs\":0},\"transport\":{\"starts\":0,\"startCallMs\":0,\"sendCallMs\":0,\"responseElapsedMs\":0,\"releases\":0,\"cleanupMs\":0.0019999999997253326,\"workers\":0,\"awaits\":0,\"generation\":2}}}]\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localSourceValidity.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS same-hash Normalizer repair, atomic Raw/Summary generation, warm zero-Raw ensure and foreign-source preservation\nPASS Legacy/Normalizer/Core/Derivation misses; Toplist renews only A without downloading again\nPASS identical Analytics builds join; per-row derivation prevents mixed-version publication\nPASS failed Analytics replacement rolls back marker, deletes and rows together\nPASS delayed old Analytics job preserves new physical four-store state, including same-hash generation change, without recovery Ensure\nPASS missing/deleted Raw, missing/invalid Summary, versions, hash, time, policy and read failure reject before any replacement; foreign source preserved\nPASS regular import/update, transfer (including disabled), slot activation/recovery/dissolution and Raw/Analytics failure boundaries preserve current materialization and foreign source\nPASS stale Toplist generation rejects cache commit\nPASS service rejects source change during worker; real worker preserves validity and rejects old token; same-hash update gets fresh generation\nlocalSourceValidity regression passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localDataCoordination.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS old build vs update, physical four-store preservation, scoped foreign-server validity, one committed Source notification\nPASS mutation waits for coordinated critical section and then commits\nPASS reset invalidates direct build and pre-load Ensure; new demand repairs\nPASS Rawdelete vs delayed Writer: no Raw, rows or marker resurrection; durable deletion\nPASS Raw + receipt persist despite propagated Analytics failure; later demand succeeds\nPASS Toplist reset rejects old payload; Derived commits do not impersonate Raw changes\nPASS canonical server selection detects previously unknown Source without invalidating unchanged source-only need\nPASS a completed Worker result is rejected after an intervening durable mutation before delivery\nPASS both Identity owners: atomic before/after aliases, merge/unlink/exclusions, snapshot refresh, upgrade + reopen, unchanged Raw\nPASS failed Tx has no domain/receipt partial commit; missing Locks fail explicitly; subsequent writes succeed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localGuildAnalyticsScopedRead.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localGuildAnalyticsScopedRead test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "tests/dashboardPlayerCards.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "ok - aktueller Snapshot mit 50 Mitgliedern erzeugt sofort 50 statische Cards\nok - Mitglieder ohne Player-Identity oder Entwicklungshistorie bleiben sichtbar\nok - Dashboard-Snapshot ist der feste Endpunkt und behält statische Card-Daten\nok - Cards ohne fertiges Development bleiben waehrend des Worker-Laufs im Ladezustand\nok - abgeschlossene Berechnung ohne Historie wird separat als unverfuegbar markiert\nok - Card-Reihenfolge entspricht der bestehenden Memberlisten-Sortierung\nok - Initiale Dashboard-Ansicht ist Cards\nok - Dashboard-Card-Grid ist auf fuenf Desktop-Spalten ausgelegt\nok - Worker-Index kann auf Zielspieler begrenzt und Card-Details ueberspringen\nok - angezeigte Daten und Tagesdauer kommen aus dem verwendeten Scanpaar\n",
+    "stderr": ""
+  },
+  {
+    "file": "tests/localPlayerInsightsModel.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "ok - hoechster XP/Tag-Wert verwendet gebrochene tatsaechliche Tagesdauer\nok - negative und unvollstaendige XP-Intervalle werden ignoriert\nok - identische oder rueckwaerts laufende Zeitpunkte erzeugen keinen Wert\n",
+    "stderr": ""
+  },
+  {
+    "file": "tests/localPlayerAnalyticsModel.test.ts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "ok - aktueller Guild-Identifier wird erkannt\nok - historischer Vorfusions-Identifier derselben Guild-Identity wird erkannt\nok - transitive bestätigte Fusion-Lineage wird erkannt\nok - unbeteiligte oder nur gleichnamige Gilde wird ausgeschlossen\nok - Future-Fusion wird nicht vorzeitig einbezogen\nok - vollständiger Vorfusionsscan erscheint als Vergleichsoption\nok - fehlender Spieler entfernt vollständigen Gildenscan nicht aus der Auswahl\nok - persönliche XP-Serie verwendet absolute xpTotal-Snapshotwerte\nok - xpPerDayTrend wird nicht mehr als Graph-Y-Wert verwendet\nok - echte Zwischenpunkte bleiben erhalten\nok - keine künstlichen Start- oder Endpunkte entstehen\nok - XP und Base Stats verwenden dieselbe explizite Zeitdomain\nok - Tickdomain bleibt der gewählte Zeitraum, auch wenn XP-Punkte erst später beginnen\nok - focusedBaseStats bleibt Hauptbasiswert plus Basis-Ausdauer\nok - absolute Gildenlinie verwendet Snapshot-Average statt Tagesrate\nok - Player-XP/Tag nutzt exakt Start- und End-xpTotal\nok - Player-Base-Stats/Tag nutzt exakt Start- und End-focusedBaseStats\nok - Zeitraeume unter einem Tag verwenden eine gebrochene Tagesdauer\nok - xpPerDayTrend beeinflusst die neue Zeitraum-KPI nicht\nok - Zwischenpunkte beeinflussen die endpointbasierte KPI nicht\nok - fehlender Spieler am ausgewaehlten Startscan ergibt null\nok - ein spaeterer Spielerpunkt wird nicht als Ersatzstart verwendet\nok - fehlender Endwert betrifft nur die jeweilige Kennzahl\nok - Guild-XP/Tag verwendet absolute Start-/End-Averages vollstaendiger Snapshots\nok - Guild-Base-Stats/Tag verwendet absolute Start-/End-Averages\nok - Vorfusionsstart wird ueber die bestehende Guild-Identity aufgeloest\nok - fehlender exakter Guild-Endpunkt ergibt keinen Ersatzwert\nok - negative Gildenentwicklung bleibt negativ\nok - identische Timestamps erzeugen keinen ungueltigen oder unendlichen Wert\nok - keine Berechnung erzeugt NaN oder Infinity\n",
+    "stderr": ""
+  },
+  {
+    "file": "tests/playerCardDevelopmentModel.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "ok - XP erscheint nicht mehr als Player-Card-Metrik\nok - Level-Gesamtdelta und Level pro Tag sind korrekt\nok - Basiswerte-Gesamtdelta und Basiswerte pro Tag sind korrekt\nok - alle sieben Trendgrenzen inklusive exakter Grenzwerte sind eindeutig\nok - unbekannter Zustand bei nur einer Tagesrate\nok - positiver Wert kann fallenden Trend haben\nok - unterdurchschnittlicher Wert kann steigenden Trend haben\nok - Spieler- und Gilden-Leveltrends werden unabhaengig berechnet\nok - alle Vergleichsfarbbereiche folgen den sichtbaren Schwellen\nok - kurze Intervalle und kleine Level-Gildendeltas fallen auf Blau/Violett zurueck\nok - Rot erfordert mindestens 30 Tage und ein zweites auffaelliges Intervall\nok - fehlende Gildenreferenz erzeugt keinen Vergleichszustand\nok - Beispielquoten werden nicht mehr neutral zusammengefasst\nok - stabiler und unbekannter Trend bleiben getrennte Anzeigezustaende\nok - Default-Scanpaar entspricht weiterhin dem lokalen Spielerprofil\nok - unvollstaendige Gildensnapshots erzeugen keinen Wert\nok - unvollstaendige Levelabdeckung verwirft den Gilden-Levelwert\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistCompareModel.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistCompareModel.test: ok\nTAP version 13\n# Subtest: local toplist compare model\n    # Subtest: progress resolves UI F28 against f28_net with legacy references\n    ok 1 - progress resolves UI F28 against f28_net with legacy references\n      ---\n      duration_ms: 5.611\n      type: 'test'\n      ...\n    # Subtest: progress resolves UI F28 against f28_net with set references\n    ok 2 - progress resolves UI F28 against f28_net with set references\n      ---\n      duration_ms: 0.7692\n      type: 'test'\n      ...\n    # Subtest: months resolves UI F28 against f28_net with legacy references\n    ok 3 - months resolves UI F28 against f28_net with legacy references\n      ---\n      duration_ms: 0.4228\n      type: 'test'\n      ...\n    # Subtest: months resolves UI F28 against f28_net with set references\n    ok 4 - months resolves UI F28 against f28_net with set references\n      ---\n      duration_ms: 0.4138\n      type: 'test'\n      ...\n    # Subtest: keeps genuine missing September terminal despite unreferenced September scans\n    ok 5 - keeps genuine missing September terminal despite unreferenced September scans\n      ---\n      duration_ms: 0.7044\n      type: 'test'\n      ...\n    # Subtest: retains the common raw-key server while reporting partial missing sources on both sides\n    ok 6 - retains the common raw-key server while reporting partial missing sources on both sides\n      ---\n      duration_ms: 0.7328\n      type: 'test'\n      ...\n    # Subtest: keeps plans and source keys invariant under scan and set-member input reordering\n    ok 7 - keeps plans and source keys invariant under scan and set-member input reordering\n      ---\n      duration_ms: 1.1959\n      type: 'test'\n      ...\n    # Subtest: changes compare keys when sources recover, set membership changes or a source hash changes\n    ok 8 - changes compare keys when sources recover, set membership changes or a source hash changes\n      ---\n      duration_ms: 1.0054\n      type: 'test'\n      ...\n    # Subtest: progress resolves raw archive keys per side and retains every explicit set member\n    ok 9 - progress resolves raw archive keys per side and retains every explicit set member\n      ---\n      duration_ms: 1.1067\n      type: 'test'\n      ...\n    # Subtest: months resolves raw archive keys per side and retains every explicit set member\n    ok 10 - months resolves raw archive keys per side and retains every explicit set member\n      ---\n      duration_ms: 0.8034\n      type: 'test'\n      ...\n    # Subtest: maps regional and named aliases while preserving missing-side notices and never selecting unreferenced scans\n    ok 11 - maps regional and named aliases while preserving missing-side notices and never selecting unreferenced scans\n      ---\n      duration_ms: 0.4068\n      type: 'test'\n      ...\n    # Subtest: keeps the singular baseline notice for one missing baseline server\n    ok 12 - keeps the singular baseline notice for one missing baseline server\n      ---\n      duration_ms: 0.2378\n      type: 'test'\n      ...\n    # Subtest: lists all missing baseline servers in selected order\n    ok 13 - lists all missing baseline servers in selected order\n      ---\n      duration_ms: 0.3337\n      type: 'test'\n      ...\n    # Subtest: lists all missing target servers separately\n    ok 14 - lists all missing target servers separately\n      ---\n      duration_ms: 0.3163\n      type: 'test'\n      ...\n    # Subtest: keeps baseline and target missing groups together without merging them\n    ok 15 - keeps baseline and target missing groups together without merging them\n      ---\n      duration_ms: 0.2888\n      type: 'test'\n      ...\n    # Subtest: keeps partial compare entries for common servers while reporting multiple missing servers\n    ok 16 - keeps partial compare entries for common servers while reporting multiple missing servers\n      ---\n      duration_ms: 0.3325\n      type: 'test'\n      ...\n    # Subtest: stays terminal without a common server and still lists every missing server\n    ok 17 - stays terminal without a common server and still lists every missing server\n      ---\n      duration_ms: 0.497\n      type: 'test'\n      ...\n    # Subtest: deduplicates alias variants before building missing server lists\n    ok 18 - deduplicates alias variants before building missing server lists\n      ---\n      duration_ms: 0.2976\n      type: 'test'\n      ...\n    # Subtest: keeps common server order aligned with the selected server order\n    ok 19 - keeps common server order aligned with the selected server order\n      ---\n      duration_ms: 0.4687\n      type: 'test'\n      ...\n    # Subtest: replaces missing server lists when the selected month changes\n    ok 20 - replaces missing server lists when the selected month changes\n      ---\n      duration_ms: 0.5046\n      type: 'test'\n      ...\n    # Subtest: does not duplicate notices across identical evaluations\n    ok 21 - does not duplicate notices across identical evaluations\n      ---\n      duration_ms: 0.4851\n      type: 'test'\n      ...\n    # Subtest: resolves progress as current target against monthly baseline and keeps only common servers\n    ok 22 - resolves progress as current target against monthly baseline and keeps only common servers\n      ---\n      duration_ms: 0.3684\n      type: 'test'\n      ...\n    # Subtest: resolves month-to-month without silently replacing missing months\n    ok 23 - resolves month-to-month without silently replacing missing months\n      ---\n      duration_ms: 0.346\n      type: 'test'\n      ...\n    # Subtest: returns terminal unavailable when there is no common server\n    ok 24 - returns terminal unavailable when there is no common server\n      ---\n      duration_ms: 0.2855\n      type: 'test'\n      ...\n    # Subtest: maps player compare rows to public readonly fields including base and total stats/day\n    ok 25 - maps player compare rows to public readonly fields including base and total stats/day\n      ---\n      duration_ms: 0.859\n      type: 'test'\n      ...\n    # Subtest: maps guild compare deltas without turning null into zero\n    ok 26 - maps guild compare deltas without turning null into zero\n      ---\n      duration_ms: 0.5935\n      type: 'test'\n      ...\n    1..26\nok 1 - local toplist compare model\n  ---\n  duration_ms: 21.8643\n  type: 'suite'\n  ...\n1..1\n# tests 26\n# suites 1\n# pass 26\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.868\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistComparison.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistComparison.test: ok\nTAP version 13\n# Subtest: local toplist comparison\n    # Subtest: matches exact players, computes deltas, stats/day, and positive rankDelta for improvements\n    ok 1 - matches exact players, computes deltas, stats/day, and positive rankDelta for improvements\n      ---\n      duration_ms: 3.6037\n      type: 'test'\n      ...\n    # Subtest: does not match players by equal names when identifiers differ\n    ok 2 - does not match players by equal names when identifiers differ\n      ---\n      duration_ms: 13.8288\n      type: 'test'\n      ...\n    # Subtest: matches players through explicit active fusion identity links\n    ok 3 - matches players through explicit active fusion identity links\n      ---\n      duration_ms: 0.8594\n      type: 'test'\n      ...\n    # Subtest: ignores fusion links outside their effective time window\n    ok 4 - ignores fusion links outside their effective time window\n      ---\n      duration_ms: 0.5523\n      type: 'test'\n      ...\n    # Subtest: reports ambiguous player fusion links as conflicts\n    ok 5 - reports ambiguous player fusion links as conflicts\n      ---\n      duration_ms: 0.6865\n      type: 'test'\n      ...\n    # Subtest: uses each server's own scan timestamps for stats/day\n    ok 6 - uses each server's own scan timestamps for stats/day\n      ---\n      duration_ms: 0.6579\n      type: 'test'\n      ...\n    # Subtest: does not compute stats/day when a sum is missing or time does not move forward\n    ok 7 - does not compute stats/day when a sum is missing or time does not move forward\n      ---\n      duration_ms: 0.5741\n      type: 'test'\n      ...\n    # Subtest: rejects same or reversed comparison months without substituting data\n    ok 8 - rejects same or reversed comparison months without substituting data\n      ---\n      duration_ms: 0.5557\n      type: 'test'\n      ...\n    # Subtest: reports partial comparison sides per server\n    ok 9 - reports partial comparison sides per server\n      ---\n      duration_ms: 0.5407\n      type: 'test'\n      ...\n    # Subtest: matches guilds exactly and computes direct and average deltas\n    ok 10 - matches guilds exactly and computes direct and average deltas\n      ---\n      duration_ms: 1.9097\n      type: 'test'\n      ...\n    # Subtest: keeps incomplete guild average deltas null while direct deltas remain available\n    ok 11 - keeps incomplete guild average deltas null while direct deltas remain available\n      ---\n      duration_ms: 0.7095\n      type: 'test'\n      ...\n    # Subtest: does not match guilds by equal names when identifiers differ\n    ok 12 - does not match guilds by equal names when identifiers differ\n      ---\n      duration_ms: 0.6925\n      type: 'test'\n      ...\n    # Subtest: supports explicit guild fusion links but reports ambiguous links as conflicts\n    ok 13 - supports explicit guild fusion links but reports ambiguous links as conflicts\n      ---\n      duration_ms: 1.1685\n      type: 'test'\n      ...\n    # Subtest: applies filters and metric choices before ranking both comparison sides\n    ok 14 - applies filters and metric choices before ranking both comparison sides\n      ---\n      duration_ms: 0.539\n      type: 'test'\n      ...\n    # Subtest: preserves historical server, guild, and rank fields on both sides\n    ok 15 - preserves historical server, guild, and rank fields on both sides\n      ---\n      duration_ms: 0.4511\n      type: 'test'\n      ...\n    # Subtest: handles larger synthetic inputs without quadratic name matching\n    ok 16 - handles larger synthetic inputs without quadratic name matching\n      ---\n      duration_ms: 62.3169\n      type: 'test'\n      ...\n    1..16\nok 1 - local toplist comparison\n  ---\n  duration_ms: 91.6423\n  type: 'suite'\n  ...\n1..1\n# tests 16\n# suites 1\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 110.8822\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistCrossSearchBinding.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistCrossSearchBinding.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistDerivation.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "TAP version 13\n# Subtest: local toplist derivation\n    # Subtest: derives player and guild rows from confirmed raw archive scans only\n    ok 1 - derives player and guild rows from confirmed raw archive scans only\n      ---\n      duration_ms: 32.0355\n      type: 'test'\n      ...\n    # Subtest: keeps servers, archive bindings, identifiers, and same names separate\n    ok 2 - keeps servers, archive bindings, identifiers, and same names separate\n      ---\n      duration_ms: 6.1131\n      type: 'test'\n      ...\n    # Subtest: rejects unconfirmed or mismatching raw scans without deriving rows\n    ok 3 - rejects unconfirmed or mismatching raw scans without deriving rows\n      ---\n      duration_ms: 0.4472\n      type: 'test'\n      ...\n    # Subtest: does not use name aliases or cross-guild fusion for guild averages\n    ok 4 - does not use name aliases or cross-guild fusion for guild averages\n      ---\n      duration_ms: 2.3134\n      type: 'test'\n      ...\n    # Subtest: uses raw group as guildIdentifier fallback\n    ok 5 - uses raw group as guildIdentifier fallback\n      ---\n      duration_ms: 1.4421\n      type: 'test'\n      ...\n    # Subtest: keeps existing canonical guildIdentifier before raw group\n    ok 6 - keeps existing canonical guildIdentifier before raw group\n      ---\n      duration_ms: 2.7351\n      type: 'test'\n      ...\n    # Subtest: uses existing groupIdentifier and guildId before raw group\n    ok 7 - uses existing groupIdentifier and guildId before raw group\n      ---\n      duration_ms: 4.0891\n      type: 'test'\n      ...\n    # Subtest: does not treat empty, null, or non-scalar raw group as guildIdentifier\n    ok 8 - does not treat empty, null, or non-scalar raw group as guildIdentifier\n      ---\n      duration_ms: 3.3666\n      type: 'test'\n      ...\n    # Subtest: marks incomplete guild member bases and leaves averages empty\n    ok 9 - marks incomplete guild member bases and leaves averages empty\n      ---\n      duration_ms: 1.2258\n      type: 'test'\n      ...\n    # Subtest: computes complete guild base and total averages from expected members only\n    ok 10 - computes complete guild base and total averages from expected members only\n      ---\n      duration_ms: 2.7802\n      type: 'test'\n      ...\n    # Subtest: does not let extra same-guild players replace missing expected members\n    ok 11 - does not let extra same-guild players replace missing expected members\n      ---\n      duration_ms: 2.0064\n      type: 'test'\n      ...\n    # Subtest: does not let duplicate player rows replace missing guild members\n    ok 12 - does not let duplicate player rows replace missing guild members\n      ---\n      duration_ms: 2.4247\n      type: 'test'\n      ...\n    # Subtest: deduplicates identical rows and reports conflicting duplicates\n    ok 13 - deduplicates identical rows and reports conflicting duplicates\n      ---\n      duration_ms: 3.9239\n      type: 'test'\n      ...\n    # Subtest: preserves missing numeric values as null while keeping explicit zero\n    ok 14 - preserves missing numeric values as null while keeping explicit zero\n      ---\n      duration_ms: 2.2837\n      type: 'test'\n      ...\n    # Subtest: uses public player ratio semantics instead of sum per level\n    ok 15 - uses public player ratio semantics instead of sum per level\n      ---\n      duration_ms: 1.7196\n      type: 'test'\n      ...\n    # Subtest: publishes metric definitions for every existing local toplist sort key\n    ok 16 - publishes metric definitions for every existing local toplist sort key\n      ---\n      duration_ms: 0.2098\n      type: 'test'\n      ...\n    # Subtest: stays pure and does not call browser or network sources\n    ok 17 - stays pure and does not call browser or network sources\n      ---\n      duration_ms: 0.9679\n      type: 'test'\n      ...\n    1..17\nok 1 - local toplist derivation\n  ---\n  duration_ms: 71.7976\n  type: 'suite'\n  ...\n1..1\n# tests 17\n# suites 1\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 92.4085\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistExport.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistExport.test: ok\nTAP version 13\n# Subtest: local toplist export model\n    # Subtest: builds a full player export source pool independent from the visible slice\n    ok 1 - builds a full player export source pool independent from the visible slice\n      ---\n      duration_ms: 4.4111\n      type: 'test'\n      ...\n    # Subtest: uses the public default amount from the full player source pool\n    ok 2 - uses the public default amount from the full player source pool\n      ---\n      duration_ms: 0.5253\n      type: 'test'\n      ...\n    # Subtest: exports all available player rows when fewer rows exist than the public default\n    ok 3 - exports all available player rows when fewer rows exist than the public default\n      ---\n      duration_ms: 0.1837\n      type: 'test'\n      ...\n    # Subtest: uses each public export amount without adding a local amount above the public maximum\n    ok 4 - uses each public export amount without adding a local amount above the public maximum\n      ---\n      duration_ms: 0.3376\n      type: 'test'\n      ...\n    # Subtest: builds a full guild export snapshot from the current guild worker view\n    ok 5 - builds a full guild export snapshot from the current guild worker view\n      ---\n      duration_ms: 0.4791\n      type: 'test'\n      ...\n    # Subtest: guild exports use the same public amount selection from the local source pool\n    ok 6 - guild exports use the same public amount selection from the local source pool\n      ---\n      duration_ms: 0.279\n      type: 'test'\n      ...\n    # Subtest: blocks empty, unavailable, loading, error, non-table, no-server, and exporting states\n    ok 7 - blocks empty, unavailable, loading, error, non-table, no-server, and exporting states\n      ---\n      duration_ms: 0.1965\n      type: 'test'\n      ...\n    # Subtest: allows partially available selections by exporting only the rows already present\n    ok 8 - allows partially available selections by exporting only the rows already present\n      ---\n      duration_ms: 0.2474\n      type: 'test'\n      ...\n    # Subtest: keeps the public export controller default amount path unchanged\n    ok 9 - keeps the public export controller default amount path unchanged\n      ---\n      duration_ms: 1.3314\n      type: 'test'\n      ...\n    1..9\nok 1 - local toplist export model\n  ---\n  duration_ms: 9.7525\n  type: 'suite'\n  ...\n1..1\n# tests 9\n# suites 1\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 23.0205\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistPageModel.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistPageModel.test: ok\nTAP version 13\n# Subtest: local toplist page model\n    # Subtest: Guild-Hub navigation contains Toplist directly after Dashboard and does not require local scans\n    ok 1 - Guild-Hub navigation contains Toplist directly after Dashboard and does not require local scans\n      ---\n      duration_ms: 1.6757\n      type: 'test'\n      ...\n    # Subtest: loads active manifest revision 2 and resolves three current selections\n    ok 2 - loads active manifest revision 2 and resolves three current selections\n      ---\n      duration_ms: 38.0433\n      type: 'test'\n      ...\n    # Subtest: selected server resolves through registry aliases instead of selecting every current server\n    ok 3 - selected server resolves through registry aliases instead of selecting every current server\n      ---\n      duration_ms: 1.3971\n      type: 'test'\n      ...\n    # Subtest: missing selected server is unavailable without replacing it with an available current server\n    ok 4 - missing selected server is unavailable without replacing it with an available current server\n      ---\n      duration_ms: 1.7035\n      type: 'test'\n      ...\n    # Subtest: mixed manual server selection keeps available entries and reports unavailable servers\n    ok 5 - mixed manual server selection keeps available entries and reports unavailable servers\n      ---\n      duration_ms: 1.233\n      type: 'test'\n      ...\n    # Subtest: server selection normalization is canonical and equality is content based\n    ok 6 - server selection normalization is canonical and equality is content based\n      ---\n      duration_ms: 0.2412\n      type: 'test'\n      ...\n    # Subtest: view request keys are canonical and ignore inactive player controls for guild views\n    ok 7 - view request keys are canonical and ignore inactive player controls for guild views\n      ---\n      duration_ms: 0.3143\n      type: 'test'\n      ...\n    # Subtest: player view request keys include class, sort, and base-total controls\n    ok 8 - player view request keys include class, sort, and base-total controls\n      ---\n      duration_ms: 0.4421\n      type: 'test'\n      ...\n    # Subtest: Stumblesteppe selected server resolves through registry typo alias\n    ok 9 - Stumblesteppe selected server resolves through registry typo alias\n      ---\n      duration_ms: 0.3048\n      type: 'test'\n      ...\n    # Subtest: server picker groups active registry servers independently from manifest availability\n    ok 10 - server picker groups active registry servers independently from manifest availability\n      ---\n      duration_ms: 4.8085\n      type: 'test'\n      ...\n    # Subtest: selected server entries are exact and do not include unselected current entries\n    ok 11 - selected server entries are exact and do not include unselected current entries\n      ---\n      duration_ms: 1.0113\n      type: 'test'\n      ...\n    # Subtest: empty server selection resolves terminal empty without selecting current entries\n    ok 12 - empty server selection resolves terminal empty without selecting current entries\n      ---\n      duration_ms: 0.7395\n      type: 'test'\n      ...\n    # Subtest: search hits reduce archive acquisition to matching entries only\n    ok 13 - search hits reduce archive acquisition to matching entries only\n      ---\n      duration_ms: 1.039\n      type: 'test'\n      ...\n    # Subtest: search hit filtering uses exact server and identifier, not visible names\n    ok 14 - search hit filtering uses exact server and identifier, not visible names\n      ---\n      duration_ms: 0.3227\n      type: 'test'\n      ...\n    # Subtest: guild search hit filtering also uses exact identity\n    ok 15 - guild search hit filtering also uses exact identity\n      ---\n      duration_ms: 0.2855\n      type: 'test'\n      ...\n    # Subtest: catalog failures are structured and empty\n    ok 16 - catalog failures are structured and empty\n      ---\n      duration_ms: 0.4485\n      type: 'test'\n      ...\n    1..16\nok 1 - local toplist page model\n  ---\n  duration_ms: 55.662\n  type: 'suite'\n  ...\n1..1\n# tests 16\n# suites 1\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 79.7423\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistSearchFlow.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistSearchFlow.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistStateRace.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistStateRace.test: ok\nTAP version 13\n# Subtest: local toplist state and race guards\n    # Subtest: starts new data runs without keeping stale result rows under a new dataset id\n    ok 1 - starts new data runs without keeping stale result rows under a new dataset id\n      ---\n      duration_ms: 1.6952\n      type: 'test'\n      ...\n    # Subtest: applies async data and worker results only for the latest recorded run key\n    ok 2 - applies async data and worker results only for the latest recorded run key\n      ---\n      duration_ms: 1.0441\n      type: 'test'\n      ...\n    # Subtest: local lazy rendering remains outside the worker view request dependencies\n    ok 3 - local lazy rendering remains outside the worker view request dependencies\n      ---\n      duration_ms: 1.985\n      type: 'test'\n      ...\n    1..3\nok 1 - local toplist state and race guards\n  ---\n  duration_ms: 5.8442\n  type: 'suite'\n  ...\n1..1\n# tests 3\n# suites 1\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14.9784\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistView.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistView.test: ok\nTAP version 13\n# Subtest: local toplist view\n    # Subtest: filters players by multiple normalized servers and leaves empty server filters open\n    ok 1 - filters players by multiple normalized servers and leaves empty server filters open\n      ---\n      duration_ms: 2.8067\n      type: 'test'\n      ...\n    # Subtest: filters player classes only for player views\n    ok 2 - filters player classes only for player views\n      ---\n      duration_ms: 0.6015\n      type: 'test'\n      ...\n    # Subtest: sorts numeric player metrics with missing values last for both directions\n    ok 3 - sorts numeric player metrics with missing values last for both directions\n      ---\n      duration_ms: 0.4525\n      type: 'test'\n      ...\n    # Subtest: sorts player ratio by the same public numeric main-ratio basis used for display\n    ok 4 - sorts player ratio by the same public numeric main-ratio basis used for display\n      ---\n      duration_ms: 0.6624\n      type: 'test'\n      ...\n    # Subtest: uses base player stat fields for local player ranking until total mode is requested\n    ok 5 - uses base player stat fields for local player ranking until total mode is requested\n      ---\n      duration_ms: 0.4598\n      type: 'test'\n      ...\n    # Subtest: maps local player main and constitution sorts to total fields in total mode\n    ok 6 - maps local player main and constitution sorts to total fields in total mode\n      ---\n      duration_ms: 14.2872\n      type: 'test'\n      ...\n    # Subtest: keeps non-stat player sorts independent from player total mode\n    ok 7 - keeps non-stat player sorts independent from player total mode\n      ---\n      duration_ms: 0.314\n      type: 'test'\n      ...\n    # Subtest: keeps tableRank separate from historical hofRank and uses sequential ranks after filtering\n    ok 8 - keeps tableRank separate from historical hofRank and uses sequential ranks after filtering\n      ---\n      duration_ms: 0.3184\n      type: 'test'\n      ...\n    # Subtest: caps local players to a public-style top 1000 base-stat result before active table sorting\n    ok 9 - caps local players to a public-style top 1000 base-stat result before active table sorting\n      ---\n      duration_ms: 3.4482\n      type: 'test'\n      ...\n    # Subtest: applies guild filters inside the stable top 1000 cohort without backfilling outsiders\n    ok 10 - applies guild filters inside the stable top 1000 cohort without backfilling outsiders\n      ---\n      duration_ms: 5.3276\n      type: 'test'\n      ...\n    # Subtest: returns every matching local player when fewer than the top 1000 limit match\n    ok 11 - returns every matching local player when fewer than the top 1000 limit match\n      ---\n      duration_ms: 0.3697\n      type: 'test'\n      ...\n    # Subtest: uses stable server-name-identifier fallback without creating competition ranks\n    ok 12 - uses stable server-name-identifier fallback without creating competition ranks\n      ---\n      duration_ms: 0.4992\n      type: 'test'\n      ...\n    # Subtest: sorts guilds by default average level and keeps missing averages last\n    ok 13 - sorts guilds by default average level and keeps missing averages last\n      ---\n      duration_ms: 0.3164\n      type: 'test'\n      ...\n    # Subtest: uses total guild average fields only when requested\n    ok 14 - uses total guild average fields only when requested\n      ---\n      duration_ms: 0.6408\n      type: 'test'\n      ...\n    # Subtest: falls back from unknown metric keys with a structured issue\n    ok 15 - falls back from unknown metric keys with a structured issue\n      ---\n      duration_ms: 0.168\n      type: 'test'\n      ...\n    # Subtest: treats single-snapshot statsDay as not derived\n    ok 16 - treats single-snapshot statsDay as not derived\n      ---\n      duration_ms: 0.1912\n      type: 'test'\n      ...\n    # Subtest: is fully structured-clone serializable\n    ok 17 - is fully structured-clone serializable\n      ---\n      duration_ms: 0.2815\n      type: 'test'\n      ...\n    1..17\nok 1 - local toplist view\n  ---\n  duration_ms: 32.8616\n  type: 'suite'\n  ...\n1..1\n# tests 17\n# suites 1\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 46.5605\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistViewWorkerClient.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localToplistViewWorkerClient.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/toplistContractsArchitecture.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "toplistContractsArchitecture.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/playerToplistDecor.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "playerToplistDecor.test: ok\nTAP version 13\n# Subtest: player toplist decoration\n    # Subtest: uses the full local top-1000 view for decorations independently from the visible lazy slice\n    ok 1 - uses the full local top-1000 view for decorations independently from the visible lazy slice\n      ---\n      duration_ms: 5.1437\n      type: 'test'\n      ...\n    # Subtest: switches main and constitution decoration ranks between base and total mode while level stays stable\n    ok 2 - switches main and constitution decoration ranks between base and total mode while level stays stable\n      ---\n      duration_ms: 0.9715\n      type: 'test'\n      ...\n    # Subtest: uses the same normalized key for decoration writes and visible row lookup\n    ok 3 - uses the same normalized key for decoration writes and visible row lookup\n      ---\n      duration_ms: 0.3006\n      type: 'test'\n      ...\n    # Subtest: renders the desktop highlight span with the concrete inline frame style\n    ok 4 - renders the desktop highlight span with the concrete inline frame style\n      ---\n      duration_ms: 3.6616\n      type: 'test'\n      ...\n    1..4\nok 1 - player toplist decoration\n  ---\n  duration_ms: 11.2741\n  type: 'suite'\n  ...\n1..1\n# tests 4\n# suites 1\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 21.0602\n",
+    "stderr": ""
+  },
+  {
+    "file": "toplists/localToplistRevisionSession.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS revision-bound init join/replacement, old Ready/View/Search, acknowledged reuse, error/messageerror/send/binding retry and dispose\nPASS actual worker arrays and search/view indices replace same-count content; stale revision veto\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localGuildAnalyticsScope.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS cold A materializes all stores; warm B remains byte-for-byte identical\nPASS warm, empty, missing, scoped-read and scan adapters preserve foreign persistence\nPASS version mismatch repaired per requested source; all reads exclude invalid versions\nPASS incomplete legacy inventory and failed/aborted raw enumeration cause no absence deletion\nPASS authoritative full inventory deletes only true orphan across all four stores; raw-only B preserved\nPASS raw-confirmed usage policy removes derived only; stale summary policy cannot delete\nPASS controlled full/scoped overlap with unchanged raw inventory preserves B\nPASS actual player-index worker completes subset request using real store and index builder; B preserved\nlocalGuildAnalyticsScope regression passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localGuildAnalyticsStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localGuildAnalyticsStore test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/localGuildAnalytics.identity.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "localGuildAnalytics identity test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/guildAnalyticsRangeDefault.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "guildAnalyticsRangeDefault test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/guildAnalyticsFusionMarkers.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "guildAnalyticsFusionMarkers test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "guilds/guildAnalyticsChartMarkers.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "guildAnalyticsChartMarkers test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/guildAnalyticsLocalFirst.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "guildAnalyticsLocalFirst.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/identityResolution.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "identityResolution test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/guildIdentityStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "guildIdentityStore test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/playerIdentityStore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "playerIdentityStore test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/fusionDashboardInventory.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "file": "identities/fusionIdentityMemberSelection.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "fusionIdentityMemberSelection.test.mts passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/fusionIdentityWorkerClient.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "fusionIdentityWorkerClient test passed\n",
+    "stderr": ""
+  },
+  {
+    "file": "identities/fusionAnalysisScopes.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "file": "parsing/normalizedPlayer.coverage.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "normalizedPlayer.coverage test passed\n",
+    "stderr": ""
+  }
+]

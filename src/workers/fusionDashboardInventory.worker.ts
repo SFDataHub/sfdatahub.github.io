@@ -1,3 +1,4 @@
+import { captureLocalDataDependencies, revalidateLocalDataDependencies } from "../lib/local-data/localDataDependencies";
 import {
   loadFusionIdentityDashboardInventory,
   type FusionIdentityDashboardInventoryProgress,
@@ -75,6 +76,7 @@ const runBuildInventory = async (requestId: string) => {
   };
 
   try {
+    const dependencies = await captureLocalDataDependencies({ allSources: true, allIdentities: true });
     const inventory = await loadFusionIdentityDashboardInventory({
       onProgress: emitProgress,
       onTiming: timings.add,
@@ -83,6 +85,7 @@ const runBuildInventory = async (requestId: string) => {
       postWorkerMessage({ type: "cancelled", requestId });
       return;
     }
+    if (!(await revalidateLocalDataDependencies(dependencies)).current) throw new Error("Fusion dependencies changed during build.");
     emitProgress({
       phase: "done",
       message: "Fusion dashboard inventory ready",
@@ -91,6 +94,7 @@ const runBuildInventory = async (requestId: string) => {
       type: "complete",
       requestId,
       inventory,
+      dependencies,
       timings: timings.finish(),
     });
   } catch (error) {

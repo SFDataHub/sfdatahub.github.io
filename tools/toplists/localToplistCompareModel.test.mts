@@ -9,7 +9,7 @@ import {
   enrichLocalGuildCompareRows,
   enrichLocalPlayerCompareRows,
   resolveLocalToplistCompareEntryPlan,
-} from "../../src/pages/GuildHub/localToplistCompareModel.ts";
+} from "../../src/pages/DataHub/localToplistCompareModel.ts";
 
 const scan = (id: string, server: string, timestamp: number): ScanArchiveManifestScan => ({
   id,

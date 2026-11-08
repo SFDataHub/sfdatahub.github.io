@@ -2,10 +2,10 @@
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import styles from "./PlaygroundLayout.module.css";
 
 const sx: Record<string, React.CSSProperties> = {
   wrap: { padding: 16, maxWidth: 1200, margin: "0 auto", color: "#FFFFFF" },
-  grid: { display: "grid", gridTemplateColumns: "250px 1fr", gap: 16 },
   tile: {
     background: "#152A42",
     border: "1px solid #2C4A73",
@@ -31,7 +31,7 @@ export default function PlaygroundIndex() {
 
   return (
     <div style={sx.wrap}>
-      <div style={sx.grid}>
+      <div className={styles.grid}>
         <aside style={sx.tile}>
           <h2 style={{ marginTop: 0, color: "#F5F9FF" }}>Playground</h2>
           <p style={sx.note}>Kleine Spielwiese für UI/Flows. Links wählen, rechts live ansehen.</p>
@@ -120,6 +120,20 @@ export default function PlaygroundIndex() {
               style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
             >
               Gildentrend
+            </NavLink>
+
+            <NavLink
+              to="ranking-icons"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Ranking Icons
+            </NavLink>
+
+            <NavLink
+              to="podiums"
+              style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}
+            >
+              Podeste
             </NavLink>
 
             <NavLink

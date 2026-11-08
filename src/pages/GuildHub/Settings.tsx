@@ -1,13 +1,7 @@
-import GuildContextBar from "../../components/guilds/GuildContextBar";
-import { useGuildHubParams } from "./hooks/useGuildHubParams";
+import { Navigate } from "react-router-dom";
+import { PROFILE_SETTINGS_URL } from "../Settings";
 
+/** The enclosing LocalHubGate continues to protect this compatibility entrance. */
 export default function GuildHubSettings() {
-  useGuildHubParams();
-
-  return (
-    <section style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
-      <GuildContextBar />
-      <h1>Guild Hub - Settings</h1>
-    </section>
-  );
+  return <Navigate replace to={PROFILE_SETTINGS_URL} />;
 }

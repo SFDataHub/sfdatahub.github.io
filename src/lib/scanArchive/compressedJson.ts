@@ -18,7 +18,9 @@ export const gunzipArrayBuffer = async (bytes: ArrayBuffer) => {
 
 export function getScanArchiveSearchIndexUrl(entry: ScanArchiveEntry) {
   if (!entry.searchIndex) throw new Error(`Archivscan ${entry.id} hat keinen Suchindex.`);
-  return new URL(entry.searchIndex.path, entry.manifestUrl).toString();
+  const url = new URL(entry.searchIndex.path, entry.manifestUrl);
+  url.searchParams.set("sha256", entry.searchIndex.sha256.toLowerCase());
+  return url.toString();
 }
 
 export async function validateDownloadedScanArchiveSearchIndex(

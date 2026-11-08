@@ -11,16 +11,8 @@ import {
   GOOGLE_LINK_REDIRECT_URI,
 } from "../config";
 import { admin, db } from "../firebase";
-import {
-  buildFavoriteFieldPath,
-  countFavorites,
-  getFavoriteBucket,
-  getFavoriteLimit,
-  isValidFavoriteIdentifier,
-  sanitizeUserFavorites,
-  type FavoriteKind,
-  type UserFavoritePlayerV2,
-} from "../lib/favorites";
+import { parseFavoriteBatch } from "../lib/favoritesState";
+import { transactFavoritesState } from "../lib/favoritesStateRepository";
 import { createFirebaseCustomToken } from "../lib/firebaseAuth";
 import {
   buildClearRefreshCookie,
@@ -138,36 +130,6 @@ const formatAuthUser = (user: UserDoc) => {
     lastLoginAt: user.lastLoginAt?.toDate().toISOString(),
     uploadCenter: user.uploadCenter,
     linkedPlayers: user.linkedPlayers ?? [],
-    favorites: sanitizeUserFavorites(user.favorites),
-  };
-};
-
-class FavoritesLimitError extends Error {
-  readonly code = "FAVORITES_LIMIT";
-
-  constructor(message = "Favorites limit reached") {
-    super(message);
-    this.name = "FavoritesLimitError";
-  }
-}
-
-const createPlayerFavoriteValue = (
-  identifier: string,
-  input?: { name?: unknown; class?: unknown; className?: unknown } | null,
-): UserFavoritePlayerV2 => {
-  const name =
-    typeof input?.name === "string" && input.name.trim()
-      ? input.name.trim()
-      : identifier;
-  const classKey =
-    typeof input?.class === "string"
-      ? input.class.trim()
-      : typeof input?.className === "string"
-      ? input.className.trim()
-      : "";
-  return {
-    name,
-    class: classKey || "",
   };
 };
 
@@ -295,133 +257,26 @@ authRouter.get("/me", async (req, res) => {
   }
 });
 
-authRouter.patch("/me/favorites", async (req, res) => {
+// Old clients must never recreate the migrated account field.
+authRouter.patch("/me/favorites", (_req, res) => res.status(410).json({ error: "Use the versioned favorites state endpoint", code: "FAVORITES_UPGRADE_REQUIRED" }));
+
+// Session userId is the account key (also carried by the Firebase userId claim).
+// Every write rechecks the expected account; an in-flight request cannot follow a cookie account switch.
+authRouter.all("/me/favorites/state", async (req, res) => {
   const token = req.cookies?.[SESSION_COOKIE_NAME];
   const payload = token ? verifySessionToken(token) : null;
-  if (!payload) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-
-  const rawKind = req.body?.kind;
-  const rawOp = req.body?.op;
-  const rawIdentifier = req.body?.identifier;
-
-  if (rawKind !== "player" && rawKind !== "guild") {
-    return res.status(400).json({ error: "Invalid kind", code: "INVALID_KIND" });
-  }
-  if (rawOp !== "add" && rawOp !== "remove") {
-    return res.status(400).json({ error: "Invalid op", code: "INVALID_OP" });
-  }
-  if (typeof rawIdentifier !== "string") {
-    return res.status(400).json({ error: "identifier must be a string", code: "INVALID_IDENTIFIER" });
-  }
-
-  const kind = rawKind as FavoriteKind;
-  const op = rawOp as "add" | "remove";
-  const identifier = rawIdentifier.trim();
-  if (!isValidFavoriteIdentifier(kind, identifier)) {
-    return res.status(400).json({ error: "Invalid favorite identifier", code: "INVALID_IDENTIFIER" });
-  }
-
-  const userRef = db.collection("users").doc(payload.userId);
-  const fieldPath = buildFavoriteFieldPath(kind, identifier);
-  const playerFavoriteInput =
-    kind === "player"
-      ? {
-          name: req.body?.name ?? req.body?.meta?.name,
-          class: req.body?.class ?? req.body?.meta?.class,
-          className: req.body?.className ?? req.body?.meta?.className,
-        }
-      : null;
-  const playerFavoriteValue =
-    kind === "player" && op === "add" ? createPlayerFavoriteValue(identifier, playerFavoriteInput) : null;
-
+  if (!payload) return res.status(401).json({ error: "Not authenticated" });
+  if (req.header("X-SFDataHub-Account") !== payload.userId) return res.status(409).json({ error: "Account changed", code: "FAVORITES_ACCOUNT_CHANGED" });
+  if (!["GET", "PATCH"].includes(req.method)) return res.sendStatus(405);
   try {
-    if (op === "remove") {
-      const snapshot = await userRef.get();
-      if (!snapshot.exists) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userDoc = snapshot.data() as UserDoc;
-      const favorites = sanitizeUserFavorites(userDoc.favorites);
-      const bucket = getFavoriteBucket(kind);
-      const counts = countFavorites(favorites);
-      const existed = !!favorites[bucket]?.[identifier];
-
-      await userRef.update({
-        [fieldPath]: admin.firestore.FieldValue.delete(),
-      });
-
-      if (existed) {
-        if (bucket === "players") {
-          counts.players = Math.max(0, counts.players - 1);
-        } else {
-          counts.guilds = Math.max(0, counts.guilds - 1);
-        }
-      }
-
-      return res.json({
-        ok: true,
-        kind,
-        identifier,
-        isFavorite: false,
-        counts,
-      });
-    }
-
-    const result = await db.runTransaction(async (tx) => {
-      const snapshot = await tx.get(userRef);
-      if (!snapshot.exists) {
-        throw Object.assign(new Error("User not found"), { code: "USER_NOT_FOUND" as const });
-      }
-
-      const userDoc = snapshot.data() as UserDoc;
-      const favorites = sanitizeUserFavorites(userDoc.favorites);
-      const bucket = getFavoriteBucket(kind);
-      const counts = countFavorites(favorites);
-      const alreadyFavorite = !!favorites[bucket]?.[identifier];
-
-      if (!alreadyFavorite) {
-        const limit = getFavoriteLimit(kind);
-        const bucketCount = bucket === "players" ? counts.players : counts.guilds;
-        if (bucketCount >= limit) {
-          throw new FavoritesLimitError();
-        }
-        if (kind === "player") {
-          tx.update(userRef, {
-            [fieldPath]: playerFavoriteValue ?? createPlayerFavoriteValue(identifier),
-            "favorites.schemaVersion": 2,
-          });
-        } else {
-          tx.update(userRef, { [fieldPath]: true });
-        }
-        if (bucket === "players") {
-          counts.players += 1;
-        } else {
-          counts.guilds += 1;
-        }
-      }
-
-      return { counts };
-    });
-
-    return res.json({
-      ok: true,
-      kind,
-      identifier,
-      isFavorite: true,
-      counts: result.counts,
-    });
+    const batch = req.method === "PATCH" ? parseFavoriteBatch(req.body) : null;
+    const state = await transactFavoritesState(db, payload.userId, batch, admin.firestore.FieldValue.delete());
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ accountId: payload.userId, state });
   } catch (error: any) {
-    if (error?.code === "USER_NOT_FOUND") {
-      return res.status(404).json({ error: "User not found" });
-    }
-    if (error instanceof FavoritesLimitError) {
-      return res.status(409).json({ error: error.message, code: error.code });
-    }
-    console.error("[auth] Failed to patch favorites", error);
-    return res.status(500).json({ error: "Failed to update favorites" });
+    const code = error?.code;
+    const expected = typeof code === "string" && code.startsWith("FAVORITES_");
+    return res.status(expected ? 409 : 500).json({ error: expected ? error.message : "Favorites synchronization failed", code });
   }
 });
 

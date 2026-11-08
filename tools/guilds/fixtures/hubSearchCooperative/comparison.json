@@ -1,0 +1,858 @@
+[
+  {
+    "phase": "before-final",
+    "kind": "single",
+    "cpuMs": 160.20000004768372,
+    "sourceWorkMs": 153.30000007152557,
+    "localPreparationMs": 470.2999999523163,
+    "dashboardMs": 851.6000000238419,
+    "setupMs": 13232.399999976158,
+    "commitElapsedMs": 112,
+    "commitMaxMs": 112,
+    "serializationCpuMs": 15.399999976158142,
+    "slices": 0,
+    "yields": 0,
+    "maxSliceMs": 0,
+    "actions": [
+      {
+        "scheduled": 21605.599999904633,
+        "handled": 21764,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      }
+    ],
+    "coldSummary": {
+      "rawRequests": 2,
+      "rawPayloadRows": 2,
+      "keyReads": 15,
+      "metadataReads": 118,
+      "writes": 4,
+      "longtaskCount": 1,
+      "maxLongtaskMs": 184,
+      "maxFrameGapMs": 166.70000000000073,
+      "maxEventloopDelayMs": 186.20000004768372
+    },
+    "calls": {
+      "searchStart": 2,
+      "searchRawReader": 1,
+      "searchProjection": 1,
+      "projectionCommit": 1
+    },
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      }
+    ],
+    "queriesMs": 54.5,
+    "queriesSummary": {
+      "rawRequests": 0,
+      "rawPayloadRows": 0,
+      "keyReads": 0,
+      "metadataReads": 0,
+      "writes": 0,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17,
+      "maxEventloopDelayMs": 8.400000095367432
+    },
+    "cleanup": {
+      "controllers": [
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      ],
+      "readiness": {
+        "flights": 0,
+        "consumers": 0
+      },
+      "indexFlights": 0,
+      "acquisition": 0,
+      "preparation": {
+        "sourceJobs": 2,
+        "sourceJoins": 0,
+        "sourceHits": 0,
+        "indexSourceBuilds": 2,
+        "completenessSourceBuilds": 2,
+        "rawReads": 2,
+        "sourceBuilds": 2,
+        "projectionJobs": 0,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 0,
+        "sourceElapsedMs": 26.699999928474426,
+        "indexCpuMs": 0,
+        "dispatches": 2,
+        "roundtripMs": 210.80000007152557,
+        "inputJsonBytes": 7851,
+        "resultJsonBytes": 3821,
+        "sourceCpuMs": 6.799999952316284,
+        "cardCpuMs": 0,
+        "trendCpuMs": 0,
+        "rawReadElapsedMs": 2.799999952316284,
+        "writeElapsedMs": 5.799999952316284,
+        "memberBuildElapsedMs": 2.100000023841858,
+        "processedSources": 2,
+        "processedRows": 2,
+        "resultRows": 2,
+        "inputSourceDescriptors": 2,
+        "inputDerivedRows": 0,
+        "inputIndexEntries": 0,
+        "sources": 0,
+        "projections": 0,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.3999999761581421,
+          "sendCallMs": 0.10000002384185791,
+          "responseElapsedMs": 210,
+          "releases": 1,
+          "cleanupMs": 0.10000002384185791,
+          "workers": 0,
+          "awaits": 0,
+          "generation": 7
+        }
+      }
+    }
+  },
+  {
+    "phase": "before-final",
+    "kind": "multi",
+    "cpuMs": 146.89999985694885,
+    "sourceWorkMs": 142.89999997615814,
+    "localPreparationMs": 521,
+    "dashboardMs": 900,
+    "setupMs": 12574,
+    "commitElapsedMs": 159.0000001192093,
+    "commitMaxMs": 60.699999928474426,
+    "serializationCpuMs": 13.000000238418579,
+    "slices": 0,
+    "yields": 0,
+    "maxSliceMs": 0,
+    "actions": [
+      {
+        "scheduled": 39000.59999990463,
+        "handled": 39033.39999997616,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 39114.699999928474,
+        "handled": 39143.89999997616,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 39214.39999997616,
+        "handled": 39241,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 39279.799999952316,
+        "handled": 39308.799999952316,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 39349.299999952316,
+        "handled": 39379.299999952316,
+        "beforeSourceComplete": false,
+        "completedSlices": 0,
+        "completedRows": 0,
+        "value": "Large",
+        "focused": true
+      }
+    ],
+    "coldSummary": {
+      "rawRequests": 10,
+      "rawPayloadRows": 10,
+      "keyReads": 15,
+      "metadataReads": 138,
+      "writes": 12,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 33.599999999998545,
+      "maxEventloopDelayMs": 52.59999990463257
+    },
+    "calls": {
+      "searchStart": 2,
+      "searchRawReader": 5,
+      "searchProjection": 5,
+      "projectionCommit": 5
+    },
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      }
+    ],
+    "queriesMs": 48.60000002384186,
+    "queriesSummary": {
+      "rawRequests": 0,
+      "rawPayloadRows": 0,
+      "keyReads": 0,
+      "metadataReads": 0,
+      "writes": 0,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17.099999999998545,
+      "maxEventloopDelayMs": 14.5
+    },
+    "cleanup": {
+      "controllers": [
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      ],
+      "readiness": {
+        "flights": 0,
+        "consumers": 0
+      },
+      "indexFlights": 0,
+      "acquisition": 0,
+      "preparation": {
+        "sourceJobs": 2,
+        "sourceJoins": 0,
+        "sourceHits": 0,
+        "indexSourceBuilds": 2,
+        "completenessSourceBuilds": 2,
+        "rawReads": 2,
+        "sourceBuilds": 2,
+        "projectionJobs": 0,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 0,
+        "sourceElapsedMs": 26.699999928474426,
+        "indexCpuMs": 0,
+        "dispatches": 2,
+        "roundtripMs": 210.80000007152557,
+        "inputJsonBytes": 7851,
+        "resultJsonBytes": 3821,
+        "sourceCpuMs": 6.799999952316284,
+        "cardCpuMs": 0,
+        "trendCpuMs": 0,
+        "rawReadElapsedMs": 2.799999952316284,
+        "writeElapsedMs": 5.799999952316284,
+        "memberBuildElapsedMs": 2.100000023841858,
+        "processedSources": 2,
+        "processedRows": 2,
+        "resultRows": 2,
+        "inputSourceDescriptors": 2,
+        "inputDerivedRows": 0,
+        "inputIndexEntries": 0,
+        "sources": 0,
+        "projections": 0,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.3999999761581421,
+          "sendCallMs": 0.10000002384185791,
+          "responseElapsedMs": 210,
+          "releases": 1,
+          "cleanupMs": 0.10000002384185791,
+          "workers": 0,
+          "awaits": 0,
+          "generation": 7
+        }
+      }
+    }
+  },
+  {
+    "phase": "after-final",
+    "kind": "single",
+    "cpuMs": 170.99999928474426,
+    "sourceWorkMs": 1165.3999999761581,
+    "localPreparationMs": 1409.7000000476837,
+    "dashboardMs": 1781.7999999523163,
+    "setupMs": 13728.5,
+    "commitElapsedMs": 61.60000002384186,
+    "commitMaxMs": 61.60000002384186,
+    "serializationCpuMs": 15.099999904632568,
+    "slices": 79,
+    "yields": 78,
+    "maxSliceMs": 6.099999904632568,
+    "actions": [
+      {
+        "scheduled": 22514.199999928474,
+        "handled": 22526,
+        "beforeSourceComplete": true,
+        "completedSlices": 40,
+        "completedRows": 239,
+        "value": "Large",
+        "focused": true
+      }
+    ],
+    "coldSummary": {
+      "rawRequests": 2,
+      "rawPayloadRows": 2,
+      "keyReads": 15,
+      "metadataReads": 117,
+      "writes": 4,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 33.599999999998545,
+      "maxEventloopDelayMs": 32.10000002384186
+    },
+    "calls": {
+      "searchStart": 2,
+      "searchRawReader": 1,
+      "searchProjection": 1,
+      "projectionCommit": 1
+    },
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      }
+    ],
+    "queriesMs": 51.09999990463257,
+    "queriesSummary": {
+      "rawRequests": 0,
+      "rawPayloadRows": 0,
+      "keyReads": 0,
+      "metadataReads": 0,
+      "writes": 0,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17,
+      "maxEventloopDelayMs": 13.100000023841858
+    },
+    "cleanup": {
+      "controllers": [
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      ],
+      "readiness": {
+        "flights": 0,
+        "consumers": 0
+      },
+      "indexFlights": 0,
+      "acquisition": 0,
+      "preparation": {
+        "sourceJobs": 2,
+        "sourceJoins": 0,
+        "sourceHits": 0,
+        "indexSourceBuilds": 2,
+        "completenessSourceBuilds": 2,
+        "rawReads": 2,
+        "sourceBuilds": 2,
+        "projectionJobs": 0,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 0,
+        "sourceElapsedMs": 26.700000047683716,
+        "indexCpuMs": 0.19999992847442627,
+        "dispatches": 2,
+        "roundtripMs": 189.80000007152557,
+        "inputJsonBytes": 7851,
+        "resultJsonBytes": 3821,
+        "sourceCpuMs": 7.099999904632568,
+        "cardCpuMs": 0,
+        "trendCpuMs": 0,
+        "rawReadElapsedMs": 2.9000000953674316,
+        "writeElapsedMs": 6,
+        "memberBuildElapsedMs": 1.899999976158142,
+        "processedSources": 2,
+        "processedRows": 2,
+        "resultRows": 2,
+        "inputSourceDescriptors": 2,
+        "inputDerivedRows": 0,
+        "inputIndexEntries": 0,
+        "sources": 0,
+        "projections": 0,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.19999992847442627,
+          "sendCallMs": 0.10000002384185791,
+          "responseElapsedMs": 188.90000009536743,
+          "releases": 1,
+          "cleanupMs": 0,
+          "workers": 0,
+          "awaits": 0,
+          "generation": 7
+        }
+      }
+    }
+  },
+  {
+    "phase": "after-final",
+    "kind": "multi",
+    "cpuMs": 166.40000021457672,
+    "sourceWorkMs": 744.1000001430511,
+    "localPreparationMs": 1027.6000000238419,
+    "dashboardMs": 1401.7000000476837,
+    "setupMs": 13104,
+    "commitElapsedMs": 73.89999997615814,
+    "commitMaxMs": 15.699999928474426,
+    "serializationCpuMs": 13.199999928474426,
+    "slices": 80,
+    "yields": 75,
+    "maxSliceMs": 4.899999976158142,
+    "actions": [
+      {
+        "scheduled": 40932.10000002384,
+        "handled": 40938.5,
+        "beforeSourceComplete": true,
+        "completedSlices": 8,
+        "completedRows": 47,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 41125.5,
+        "handled": 41130.89999997616,
+        "beforeSourceComplete": true,
+        "completedSlices": 8,
+        "completedRows": 47,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 41291,
+        "handled": 41298.199999928474,
+        "beforeSourceComplete": true,
+        "completedSlices": 8,
+        "completedRows": 47,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 41462.89999997616,
+        "handled": 41478.5,
+        "beforeSourceComplete": true,
+        "completedSlices": 8,
+        "completedRows": 47,
+        "value": "Large",
+        "focused": true
+      },
+      {
+        "scheduled": 41643.5,
+        "handled": 41659,
+        "beforeSourceComplete": true,
+        "completedSlices": 8,
+        "completedRows": 47,
+        "value": "Large",
+        "focused": true
+      }
+    ],
+    "coldSummary": {
+      "rawRequests": 10,
+      "rawPayloadRows": 10,
+      "keyReads": 15,
+      "metadataReads": 137,
+      "writes": 12,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17,
+      "maxEventloopDelayMs": 29.699999928474426
+    },
+    "calls": {
+      "searchStart": 2,
+      "searchRawReader": 5,
+      "searchProjection": 5,
+      "projectionCommit": 5
+    },
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      }
+    ],
+    "queriesMs": 54.50000011920929,
+    "queriesSummary": {
+      "rawRequests": 0,
+      "rawPayloadRows": 0,
+      "keyReads": 0,
+      "metadataReads": 0,
+      "writes": 0,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17,
+      "maxEventloopDelayMs": 15.100000023841858
+    },
+    "cleanup": {
+      "controllers": [
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        },
+        {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      ],
+      "readiness": {
+        "flights": 0,
+        "consumers": 0
+      },
+      "indexFlights": 0,
+      "acquisition": 0,
+      "preparation": {
+        "sourceJobs": 2,
+        "sourceJoins": 0,
+        "sourceHits": 0,
+        "indexSourceBuilds": 2,
+        "completenessSourceBuilds": 2,
+        "rawReads": 2,
+        "sourceBuilds": 2,
+        "projectionJobs": 0,
+        "projectionJoins": 0,
+        "projectionHits": 0,
+        "scopes": 0,
+        "sourceElapsedMs": 26.700000047683716,
+        "indexCpuMs": 0.19999992847442627,
+        "dispatches": 2,
+        "roundtripMs": 189.80000007152557,
+        "inputJsonBytes": 7851,
+        "resultJsonBytes": 3821,
+        "sourceCpuMs": 7.099999904632568,
+        "cardCpuMs": 0,
+        "trendCpuMs": 0,
+        "rawReadElapsedMs": 2.9000000953674316,
+        "writeElapsedMs": 6,
+        "memberBuildElapsedMs": 1.899999976158142,
+        "processedSources": 2,
+        "processedRows": 2,
+        "resultRows": 2,
+        "inputSourceDescriptors": 2,
+        "inputDerivedRows": 0,
+        "inputIndexEntries": 0,
+        "sources": 0,
+        "projections": 0,
+        "queue": {
+          "running": null,
+          "waiting": [],
+          "jobs": 0
+        },
+        "transport": {
+          "starts": 1,
+          "startCallMs": 0.19999992847442627,
+          "sendCallMs": 0.10000002384185791,
+          "responseElapsedMs": 188.90000009536743,
+          "releases": 1,
+          "cleanupMs": 0,
+          "workers": 0,
+          "awaits": 0,
+          "generation": 7
+        }
+      }
+    }
+  }
+]

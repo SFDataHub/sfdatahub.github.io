@@ -1,0 +1,80 @@
+{
+  "results": [
+    "Desktop zero-based index 99: mounted matching row, scrollTop=5982, visible active mark and bound ACK",
+    "Desktop zero-based index 100: mounted matching row, scrollTop=6222, visible active mark and bound ACK",
+    "Desktop zero-based index 999: mounted matching row, scrollTop=63581, visible active mark and bound ACK",
+    "Outside BaseTop1000 search result keeps cohort reason; no injected row",
+    "Invisible mounted mark produces no ACK; a new hit/query clear cancels the pending real parent/renderer attempt",
+    "Class blocker retained filter and target wish; manual correction produces a new view-bound visible ACK",
+    "Guild/favorite blockers and query-clear cancellation preserve existing filters",
+    "Guild desktop DOM scroll/highlight/ACK; Guild250 excluded; profile unavailable without public call",
+    "Historical Comparecurrent target absent in normal dataset: actual current maps, focus ACK and W-05 historical profile anchor",
+    "Same entity has different normal/compare class, guild, source and time; compare close cancels an invisible pending row attempt",
+    "Same requested ID partial→complete and same-count raw update replace actual parent/view/search data via real IDB changes",
+    "Same raw hash fresh source generation invalidates active dataset without changing values",
+    "Foreign source leaves ready dataset unchanged; missed Sourcegeneration event is caught through real IDB journal on focus",
+    "Current reuse verifies composition and receipt; same-ID current update replaces comparison, search and target context",
+    "Real moduleworker reinit observes replacement rows; no public provider/profile calls or unhandled rejections",
+    "Compact player viewport scroll, visible mark and ACK; accordion expands; profile button uses existing local path",
+    "Compact historical Comparecurrent player action retains September observation",
+    "Compact guild actual viewport focus ACK; guild-profile button is locally unavailable",
+    "Player-guildcell delegates locally; actual Toplist Unmount cancels a pending compact guild attempt",
+    "Real focus hook: delayed mount succeeds, missing DOM ends unresolved, old attempt cancelled, remount cannot replay completed focus"
+  ],
+  "evidence": [
+    {
+      "kind": "desktop-999",
+      "identifier": "f8_net_p1000",
+      "server": "F8",
+      "classes": "toplists-row toplists-row--focused",
+      "visible": true,
+      "bounds": {
+        "top": 649.5,
+        "bottom": 713.5,
+        "left": 16,
+        "right": 1374
+      },
+      "windowScrollY": 0,
+      "bodyScrollTop": 0,
+      "tableScrollTop": 63581,
+      "ack": {
+        "identifier": "f8_net_p1000",
+        "server": "F8",
+        "nonce": 3,
+        "targetGeneration": 3,
+        "datasetKey": "[\"[\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"content:1:931768:b9c6e989:a3e0f05\\\"]\",\"compare:off\",\"normal\",0,null]",
+        "viewKey": "[\"[\\\"[\\\\\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\\\\\",\\\\\\\"content:1:931768:b9c6e989:a3e0f05\\\\\\\"]\\\",\\\"compare:off\\\",\\\"normal\\\",0,null]\",\"players\",\"{\\\"datasetId\\\":\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"contentRevision\\\":\\\"content:1:931768:b9c6e989:a3e0f05\\\",\\\"tab\\\":\\\"players\\\",\\\"servers\\\":[\\\"F8\\\"],\\\"playerClasses\\\":[],\\\"guilds\\\":[],\\\"sort\\\":{\\\"metricKey\\\":\\\"sum\\\",\\\"direction\\\":\\\"desc\\\"},\\\"playerValueMode\\\":\\\"base\\\"}\",[],false,[],[],\"table\"]",
+        "attempt": "3:[\"[\\\"[\\\\\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\\\\\",\\\\\\\"content:1:931768:b9c6e989:a3e0f05\\\\\\\"]\\\",\\\"compare:off\\\",\\\"normal\\\",0,null]\",\"players\",\"{\\\"datasetId\\\":\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"contentRevision\\\":\\\"content:1:931768:b9c6e989:a3e0f05\\\",\\\"tab\\\":\\\"players\\\",\\\"servers\\\":[\\\"F8\\\"],\\\"playerClasses\\\":[],\\\"guilds\\\":[],\\\"sort\\\":{\\\"metricKey\\\":\\\"sum\\\",\\\"direction\\\":\\\"desc\\\"},\\\"playerValueMode\\\":\\\"base\\\"}\",[],false,[],[],\"table\"]",
+        "status": "visibleAck"
+      },
+      "contentRevision": "content:1:931768:b9c6e989:a3e0f05"
+    },
+    {
+      "kind": "compact-100",
+      "identifier": "f8_net_p101",
+      "server": "F8",
+      "classes": "toplists-mobile-row toplists-mobile-row--focused",
+      "visible": true,
+      "bounds": {
+        "top": 310.5,
+        "bottom": 387.5,
+        "left": 16,
+        "right": 784
+      },
+      "windowScrollY": 0,
+      "bodyScrollTop": 8647,
+      "tableScrollTop": null,
+      "ack": {
+        "identifier": "f8_net_p101",
+        "server": "F8",
+        "nonce": 1,
+        "targetGeneration": 1,
+        "datasetKey": "[\"[\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"content:1:931779:dcb0251b:89781489\\\"]\",\"compare:off\",\"normal\",0,null]",
+        "viewKey": "[\"[\\\"[\\\\\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\\\\\",\\\\\\\"content:1:931779:dcb0251b:89781489\\\\\\\"]\\\",\\\"compare:off\\\",\\\"normal\\\",0,null]\",\"players\",\"{\\\"datasetId\\\":\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"contentRevision\\\":\\\"content:1:931779:dcb0251b:89781489\\\",\\\"tab\\\":\\\"players\\\",\\\"servers\\\":[\\\"F8\\\"],\\\"playerClasses\\\":[],\\\"guilds\\\":[],\\\"sort\\\":{\\\"metricKey\\\":\\\"sum\\\",\\\"direction\\\":\\\"desc\\\"},\\\"playerValueMode\\\":\\\"base\\\"}\",[],false,[],[],\"table\"]",
+        "attempt": "1:[\"[\\\"[\\\\\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\\\\\",\\\\\\\"content:1:931779:dcb0251b:89781489\\\\\\\"]\\\",\\\"compare:off\\\",\\\"normal\\\",0,null]\",\"players\",\"{\\\"datasetId\\\":\\\"derivation:5|ccccurrent:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\\",\\\"contentRevision\\\":\\\"content:1:931779:dcb0251b:89781489\\\",\\\"tab\\\":\\\"players\\\",\\\"servers\\\":[\\\"F8\\\"],\\\"playerClasses\\\":[],\\\"guilds\\\":[],\\\"sort\\\":{\\\"metricKey\\\":\\\"sum\\\",\\\"direction\\\":\\\"desc\\\"},\\\"playerValueMode\\\":\\\"base\\\"}\",[],false,[],[],\"table\"]",
+        "status": "visibleAck"
+      },
+      "contentRevision": "content:1:931779:dcb0251b:89781489"
+    }
+  ]
+}

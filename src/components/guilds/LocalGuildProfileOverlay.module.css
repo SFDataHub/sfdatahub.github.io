@@ -1,0 +1,4 @@
+.backdrop { position:fixed; inset:var(--topbar-h, 90px) 0 0 var(--app-shell-left, 0px); z-index:1200; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(7,14,24,.62); box-sizing:border-box; }
+.panel { width:100%; max-width:1536px; max-height:100%; min-width:0; overflow:hidden; border:1px solid #2b4c73; border-radius:16px; background:#0c1c2e; color:#f5f9ff; }
+.panel:focus { outline:none; }
+.content { max-height:calc(100dvh - var(--topbar-h, 90px) - 34px); overflow:auto; overscroll-behavior:contain; padding:24px; }

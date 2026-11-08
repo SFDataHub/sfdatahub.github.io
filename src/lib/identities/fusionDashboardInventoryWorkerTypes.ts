@@ -1,3 +1,4 @@
+import type { LocalDependencyReceipt } from "../local-data/localDataDependencies";
 import type {
   FusionIdentityDashboardInventory,
   FusionIdentityDashboardInventoryProgress,
@@ -22,6 +23,7 @@ export type FusionDashboardInventoryWorkerResponse =
     }
   | {
       type: "complete";
+      dependencies?: LocalDependencyReceipt;
       requestId: string;
       inventory: FusionIdentityDashboardInventory;
       timings: FusionIdentityDashboardInventoryTiming[];

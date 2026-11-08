@@ -1,0 +1,44 @@
+import "fake-indexeddb/auto";
+import assert from "node:assert/strict";
+import { openDB } from "idb";
+import { seedLocalSourceValidityFixture } from "./localSourceValidityFixture.mts";
+import { createLocalPlayerCurrentSeed } from "../../src/pages/GuildHub/localPlayerCurrentSeed.ts";
+import { captureLocalDataDependencies } from "../../src/lib/local-data/localDataDependencies.ts";
+import { normalizeSfPlayerCharacterCore } from "../../src/lib/parsing/normalizedPlayer.ts";
+import { resolveLocalProfileEntry, LocalProfileEntryError } from "../../src/lib/data-hub/localProfileEntry.ts";
+import { parseLocalEntity } from "../../src/lib/data-hub/routes.ts";
+import { deleteGuildHubLocalScans, updateGuildHubLocalScan } from "../../src/lib/guilds/localScanLibrary.ts";
+const time = Date.UTC(2026, 8, 15), older = time - 60 * 86400000;
+const player = (timestamp: number, name: string) => ({ identifier: "f8_net_p1", prefix: "f8_net", timestamp, name, class: 1, level: 100, guildIdentifier: "f8_net_g1", guildName: "Fixture Guild" });
+const { scan } = await seedLocalSourceValidityFixture({ id: "w12-source", contentHash: "w12-hash", filename: "A.json", importedAt: new Date(time + 86400000).toISOString(), scannedAt: new Date(time).toISOString(), servers: ["f8_net"], playerCount: 2, groupCount: 2,
+  rawData: { players: [player(older, "Historical"), player(time, "Current")], groups: [older, time].map(timestamp => ({ identifier: "f8_net_g1", prefix: "f8_net", timestamp, name: "Fixture Guild" })) } });
+const entity = parseLocalEntity("player", "F8", "f8_net_p1")!;
+const exact = { entity, observation: { kind: "exact" as const, anchor: { source: scan.id, at: older, row: "f8_net_p1", hash: scan.contentHash } } };
+const target = { sourceScanId: scan.id, sourcePlayerKey: "f8_net_p1", sourceMemberRef: "f8_net_p1", scannedAtMs: older, scannedAtIso: new Date(older).toISOString(), guild: { name: "Fixture Guild", server: "F8", identifier: "f8_net_g1" } };
+const seed = createLocalPlayerCurrentSeed({ scan, dependencies: await captureLocalDataDependencies({ sourceIds: [scan.id] }), coreLookup: new Map() }, target)!;
+seed.normalizedCore = normalizeSfPlayerCharacterCore(seed.rawPlayer);
+const get = IDBObjectStore.prototype.get, getAll = IDBObjectStore.prototype.getAll;
+let rawReads = 0, globalScans = 0;
+IDBObjectStore.prototype.get = function(key) { if (this.name === "scans") rawReads++; return get.call(this, key); };
+IDBObjectStore.prototype.getAll = function(...args) { if (this.name === "scans") globalScans++; return getAll.apply(this, args); };
+try {
+  const counts = { currentRawReads: 0, currentBuilds: 0 };
+  const prepared = await resolveLocalProfileEntry(exact, seed, undefined, counts);
+  assert.equal(prepared.hero.playerName, "Historical"); assert.equal(prepared.currentSeed?.normalizedCore, seed.normalizedCore);
+  assert.equal(rawReads, 0); assert.deepEqual(counts, { currentRawReads: 0, currentBuilds: 1 });
+  console.log("PASS prepared entry: zero Current Raw reads, exact core reused");
+  const cold = await resolveLocalProfileEntry(exact); assert.equal(cold.hero.playerName, "Historical"); assert.equal(rawReads, 1);
+  const free = await resolveLocalProfileEntry({ entity, observation: { kind: "free" } });
+  assert.equal(free.hero.playerName, "Current"); assert.equal(free.analytics.scannedAtMs, time); assert.equal(rawReads, 2); assert.equal(globalScans, 0);
+  console.log("PASS cold exact and free entry: named Raw only, individual time, no full-history barrier");
+  await assert.rejects(resolveLocalProfileEntry({ ...exact, observation: { kind: "exact", anchor: { source: scan.id, at: older - 1 } } }), (e: unknown) => e instanceof LocalProfileEntryError && e.code === "missing");
+  await assert.rejects(resolveLocalProfileEntry({ ...exact, observation: { kind: "exact", anchor: { source: scan.id, at: older, hash: "changed" } } }), (e: unknown) => e instanceof LocalProfileEntryError && e.code === "changed");
+  await assert.rejects(resolveLocalProfileEntry(exact, undefined, () => false), /Profile action ended/);
+  console.log("PASS missing anchors, wrong hashes and cancelled entry never choose Current");
+  await updateGuildHubLocalScan(scan.id, "changed.json", JSON.stringify({ players: [player(older, "Duplicate"), player(older, "Duplicate")], groups: [] }));
+  await assert.rejects(resolveLocalProfileEntry(exact, seed), (e: unknown) => e instanceof LocalProfileEntryError && e.code === "changed");
+  await assert.rejects(resolveLocalProfileEntry({ ...exact, observation: { kind: "exact", anchor: { source: scan.id, at: older } } }), (e: unknown) => e instanceof LocalProfileEntryError && e.code === "ambiguous");
+  await deleteGuildHubLocalScans([scan.id]);
+  await assert.rejects(resolveLocalProfileEntry(exact), (e: unknown) => e instanceof LocalProfileEntryError && e.code === "missing");
+  console.log("PASS source changes, ambiguous rows and deleted sources produce explained states");
+} finally { IDBObjectStore.prototype.get = get; IDBObjectStore.prototype.getAll = getAll; (await openDB("sfdatahub-local-data")).close(); }

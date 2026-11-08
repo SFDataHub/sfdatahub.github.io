@@ -1,0 +1,69 @@
+{
+  "filters": {
+    "public": "w14-public",
+    "local": "w14-local"
+  },
+  "slots": 2,
+  "fights": [
+    1,
+    1
+  ],
+  "cleanup": {
+    "controllers": [],
+    "readiness": {
+      "flights": 0,
+      "consumers": 0
+    },
+    "indexFlights": 0,
+    "acquisition": 0,
+    "preparation": {
+      "sourceJobs": 0,
+      "sourceJoins": 0,
+      "sourceHits": 0,
+      "indexSourceBuilds": 0,
+      "completenessSourceBuilds": 0,
+      "rawReads": 0,
+      "sourceBuilds": 0,
+      "projectionJobs": 0,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 0,
+      "indexCpuMs": 0,
+      "dispatches": 0,
+      "roundtripMs": 0,
+      "inputJsonBytes": 0,
+      "resultJsonBytes": 0,
+      "sourceCpuMs": 0,
+      "cardCpuMs": 0,
+      "trendCpuMs": 0,
+      "rawReadElapsedMs": 0,
+      "writeElapsedMs": 0,
+      "memberBuildElapsedMs": 0,
+      "processedSources": 0,
+      "processedRows": 0,
+      "resultRows": 0,
+      "inputSourceDescriptors": 0,
+      "inputDerivedRows": 0,
+      "inputIndexEntries": 0,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 0,
+        "startCallMs": 0,
+        "sendCallMs": 0,
+        "responseElapsedMs": 0,
+        "releases": 0,
+        "cleanupMs": 0,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 0
+      }
+    }
+  }
+}

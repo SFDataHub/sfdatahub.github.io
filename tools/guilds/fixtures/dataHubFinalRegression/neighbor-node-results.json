@@ -1,0 +1,58 @@
+[
+  {
+    "file": "guilds/dataHubNeighbors.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "PASS actual multitime library -> coverage options -> selected actual rows/ranks\nPASS actual library logical snapshots -> guild coverage without cross-time roster union\nPASS existing archive builder parses supported multitime Raw; no archive/export files generated\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/archiveBuilderCore.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/scanArchiveBuilderManifest.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "scanArchiveBuilderManifest.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/scanArchiveBuilderClient.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "scanArchiveBuilderClient.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/scanArchiveBuilderWorker.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "scanArchiveBuilderWorker.test: ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/scanArchiveBuilderUi.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "scanArchiveBuilderUi.test: runtime blocker/build-gate logic and static UI bindings ok\n",
+    "stderr": ""
+  },
+  {
+    "file": "scanArchive/scanArchiveBuilderMonthly.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "stdout": "scanArchiveBuilderMonthly.test: ok\n",
+    "stderr": ""
+  }
+]

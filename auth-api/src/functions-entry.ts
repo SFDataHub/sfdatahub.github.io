@@ -8,6 +8,7 @@ import { publishGuildLatestToplists } from "./triggers/guildToplists";
 export const authApi = onRequest(
   {
     region: "europe-west1",
+    timeoutSeconds: 240,
     secrets: FUNCTION_SECRET_PARAMS,
   },
   app,

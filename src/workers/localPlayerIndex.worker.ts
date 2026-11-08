@@ -1,5 +1,6 @@
+import { captureLocalDataDependencies, revalidateLocalDataDependencies } from "../lib/local-data/localDataDependencies";
 import { getGuildHubLocalScan } from "../lib/guilds/localScanLibrary";
-import { ensureGuildAnalyticsDerivedDataFromSummaries } from "../lib/guilds/localGuildAnalyticsStore";
+import { ensureGuildAnalyticsSourceDataFromSummaries } from "../lib/guilds/localGuildAnalyticsStore";
 import { loadIdentityResolutionSnapshot } from "../lib/identities/identityResolution";
 import { createLocalPlayerIndexBuilder } from "../lib/player-search/localPlayerIndex";
 import type {
@@ -70,8 +71,10 @@ const runBuildIndex = async (request: Extract<LocalPlayerIndexWorkerRequest, { t
   };
 
   try {
+    const dependencies = await captureLocalDataDependencies({ sourceIds: request.summaries.map(summary => summary.sourceScanId),
+      ...(request.serverFilter ? { servers: [request.serverFilter] } : { allSources: true }), allIdentities: true });
     const identityResolutionSnapshot = await loadIdentityResolutionSnapshot();
-    const analyticsData = await ensureGuildAnalyticsDerivedDataFromSummaries(request.summaries, {
+    const analyticsData = await ensureGuildAnalyticsSourceDataFromSummaries(request.summaries, {
       loadSourceById: getGuildHubLocalScan,
     });
     const builder = createLocalPlayerIndexBuilder({
@@ -128,11 +131,13 @@ const runBuildIndex = async (request: Extract<LocalPlayerIndexWorkerRequest, { t
     }
 
     const index = builder.finish();
+    if (!(await revalidateLocalDataDependencies(dependencies)).current) throw new Error("Local player index dependencies changed during build.");
     emitProgress({ phase: "done", message: "Lokaler Spielerindex bereit" });
     postWorkerMessage({
       type: "complete",
       requestId: request.requestId,
       index,
+      dependencies,
       stats: index.stats,
       timings: timings.finish(),
     });

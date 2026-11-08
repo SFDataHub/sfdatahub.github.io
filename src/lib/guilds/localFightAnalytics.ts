@@ -1,3 +1,4 @@
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditExpectGraph, auditFields, type AuditFields } from "../data-hub/runtimeAudit";
 import {
   readLinkedFightTrackerState,
   type FightTrackerGuild,
@@ -32,6 +33,7 @@ export type FightParticipationSeries = {
 };
 
 export type FightParticipationOptions = {
+  auditContext?: AuditFields;
   includeFormerMembers?: boolean;
 };
 
@@ -40,11 +42,15 @@ export async function buildLocalFightParticipationSeries(
   range: GuildAnalyticsRangeInput,
   options: FightParticipationOptions = {},
 ): Promise<FightParticipationSeries> {
+    const __audit1 = auditBegin("F14", "buildLocalFightParticipationSeries");
+    auditExpectGraph(__audit1);
+    auditFields(__audit1, options.auditContext ?? { trigger: "fight-participation-service-call", consumer: "guild-fight-participation" });
+    try {
   const linkedGuild = toFightTrackerGuildHubIdentity(guild);
-  if (!linkedGuild) return { tracker: null, allPoints: [], visiblePoints: [], timeDomain: null };
+  if (!linkedGuild) return auditReturn(__audit1, { tracker: null, allPoints: [], visiblePoints: [], timeDomain: null });
 
-  const state = await readLinkedFightTrackerState(linkedGuild);
-  if (!state.tracker) return { tracker: null, allPoints: [], visiblePoints: [], timeDomain: null };
+  const state = await (auditValue(__audit1, auditEnter(__audit1, "readLinkedFightTrackerState"), (readLinkedFightTrackerState(linkedGuild))));
+  if (!state.tracker) return auditReturn(__audit1, { tracker: null, allPoints: [], visiblePoints: [], timeDomain: null });
 
   const activeMemberIds = new Set(
     state.members
@@ -65,12 +71,15 @@ export async function buildLocalFightParticipationSeries(
     );
 
   const visiblePoints = filterAnalyticsPointsByRange(allPoints, range, (point) => point.timestampMs);
-  return {
+  return auditReturn(__audit1, {
     tracker: state.tracker,
     allPoints,
     visiblePoints,
     timeDomain: resolveGuildAnalyticsTimeDomain(allPoints, visiblePoints, range, (point) => point.timestampMs),
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 }
 
 function buildFightParticipationPoint(

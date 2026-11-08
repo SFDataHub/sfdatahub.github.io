@@ -1,19 +1,23 @@
+import { readProfileAttributeSums } from "../../lib/players/profileAttributeSums";
+import type { LocalPlayerCurrentSeed } from "./localPlayerCurrentSeed";
 import { getClassMetaById } from "../../data/classes";
 import type { LocalBaseStatValues, LocalPlayerProfileModel, LocalPotionSlot } from "../../components/local-player-profile/types";
 import { createAttributeCompositionModelFromNormalizedAttributes } from "../../components/attribute-composition/attributeCompositionModel";
 import { createPortraitOptionsFromSaveArray } from "../../lib/portraitFromSave";
 import { readSfPlayerSaveArray } from "../../lib/parsing/playerSaveLayout";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
+import { refreshScrapbookSummary } from "../../lib/parsing/normalizedProgressionStatus";
 import { normalizeSfPlayerPotions } from "../../lib/parsing/normalizedConsumables";
 import { readSfPlayerStats } from "../../lib/parsing/parseSfJson";
-import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
+import { formatScanDateTimeLabel, getScanAgeDays } from "../../lib/ui/formatScanDateTimeLabel";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
-import type { NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
+import { readGuildScanMemberIdentity, type NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
 
 type JsonRecord = Record<string, unknown>;
 
 export type LocalPlayerProfileAdapterInput = {
   rawPlayer: unknown;
+  currentSeed?: LocalPlayerCurrentSeed;
   sourceScanId: string;
   sourcePlayerKey: string;
   sourceMemberRef?: string | null;
@@ -101,16 +105,6 @@ const formatDaysAgo = (days?: number | null) => {
   return `${days} Tag${days === 1 ? "" : "e"} her`;
 };
 
-const daysSinceMs = (ms: number) => {
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
-};
-
-const sumKnown = (values: Array<number | null | undefined>, minKnown = values.length) => {
-  const known = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  return known.length >= minKnown ? known.reduce((sum, value) => sum + value, 0) : null;
-};
-
 const toNumberArray = (value: unknown[] | null): number[] | null =>
   value && value.length ? value.map((entry) => toNumber(entry) ?? 0) : null;
 
@@ -167,7 +161,18 @@ const resolveClassName = (raw: JsonRecord | null, normalized: NormalizedPlayer |
 
 export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInput): LocalPlayerProfileModel {
   const raw = asRecord(input.rawPlayer);
-  const normalized = safeNormalizePlayer(input.rawPlayer);
+  const candidate = input.currentSeed;
+  const seed = candidate && candidate.rawPlayer === input.rawPlayer && candidate.sourceScanId === input.sourceScanId &&
+    candidate.sourcePlayerKey === input.sourcePlayerKey && candidate.scannedAtMs === input.scannedAtMs ? candidate : undefined;
+  let normalized = seed && "normalizedCore" in seed ? seed.normalizedCore ?? null
+    : seed?.coreLookup?.has(seed.rawPlayer) ? seed.coreLookup.get(seed.rawPlayer) ?? null : safeNormalizePlayer(input.rawPlayer);
+  if (normalized) {
+    const scrapbook = refreshScrapbookSummary(normalized.progressionStatus.scrapbook);
+    if (scrapbook !== normalized.progressionStatus.scrapbook) {
+      normalized = { ...normalized, progressionStatus: { ...normalized.progressionStatus, scrapbook } };
+    }
+  }
+  if (seed) { seed.normalizedCore = normalized; seed.coreLookup?.set(seed.rawPlayer, normalized); }
   const stats = readSfPlayerStats(input.rawPlayer);
   const saveArray = toNumberArray(raw ? readSfPlayerSaveArray(raw) : null);
   const portrait = saveArray
@@ -186,18 +191,19 @@ export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInp
   const server =
     normalizeServerKeyFromInput(normalized?.identity.server ?? readString(raw, ["server", "Server", "prefix", "world", "realm"])) ??
     input.guild.server;
+  const guildObservation = readGuildScanMemberIdentity(raw, server);
   const guildName = normalized?.guild.name ?? readString(raw, ["guildName", "Guild Name", "groupname", "groupName", "guild", "Guild"]) ?? input.guild.name;
   const level = normalized?.progression.level ?? stats.level ?? readNumber(raw, ["level", "Level"]);
   const honor = normalized?.progression.honor ?? readNumber(raw, ["honor", "Honor", "honour", "Honour", "arenaHonor", "Ehre"]);
   const hofRank =
     normalized?.progression.rank ??
     readNumber(raw, ["hallOfFameRank", "Hall of Fame Rank", "hofRank", "HoF", "rank", "Rank"]) ??
-    input.guild.hofRank ??
     null;
   const baseStats = buildBaseStats(normalized);
   const totalStats = buildTotalStats(normalized);
-  const totalBaseStats = baseStats ? sumKnown(Object.values(baseStats)) : stats.baseStats;
-  const totalStatsValue = totalStats ? sumKnown(Object.values(totalStats)) : stats.totalStats;
+  const profileAttributeSums = readProfileAttributeSums(input.rawPlayer, normalized);
+  const totalBaseStats = profileAttributeSums["main-con"].base;
+  const totalStatsValue = profileAttributeSums["main-con"].total;
   const scrapbook = normalized?.progressionStatus.scrapbook ?? null;
   const scrapbookRatio = scrapbook?.percentage ?? null;
   const mountPercent =
@@ -205,14 +211,15 @@ export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInp
     readNumber(raw, ["Mount", "Mount %", "mount", "mountPct", "mountBonus", "MountBonus"]);
   const mountLabel = mountPercent != null ? `${Math.round(mountPercent)}%` : "-";
   const mountRace = normalized?.identity.race != null ? RACE_LABEL_BY_ID[normalized.identity.race] ?? null : null;
-  const scanAgeDays = daysSinceMs(input.scannedAtMs);
-  const scanAtLabel = formatScanDateTimeLabel(input.scannedAtIso ?? input.scannedAtMs);
+  const scanAgeDays = getScanAgeDays(input.scannedAtMs);
+  const scanAtLabel = formatScanDateTimeLabel(input.scannedAtMs > 0 ? input.scannedAtMs : null);
   const xp = normalized?.progression.xp ?? readNumber(raw, ["xp", "XP"]);
   const xpNext = normalized?.progression.xpNext ?? readNumber(raw, ["xpNext", "XP Required", "XP Required"]);
   const levelProgress = xp != null && xpNext != null && xpNext > 0 ? Math.min(1, Math.max(0, xp / xpNext)) : 0;
   const roleLabel = input.guildRole ? ROLE_LABELS[input.guildRole] : readString(raw, ["guildRole", "role", "guildRank", "Gildenrolle"]);
 
   return {
+    currentSeed: seed ? { ...seed, normalizedCore: normalized } : undefined,
     sourceScanId: input.sourceScanId,
     sourcePlayerKey: input.sourcePlayerKey,
     analytics: {
@@ -224,13 +231,19 @@ export function buildLocalPlayerProfileModel(input: LocalPlayerProfileAdapterInp
       scannedAtMs: input.scannedAtMs,
     },
     hero: {
+      metricValues: { level, xp, xpNext, scrapbookRatio, scrapbookCount: scrapbook?.count ?? null, scrapbookMaximum: scrapbook?.maximum ?? null },
+      playerInfo: { level, hofRank, honor, guildRole: roleLabel, roleKey: input.guildRole },
+      fortressBuildings: normalized?.fortress.buildings ?? null,
+      profileAttributeSums,
       playerName,
       className,
       guild: guildName,
+      guildIdentifier: input.guild.identifier ?? guildObservation?.guildSegment ?? guildObservation?.groupSegment ?? null,
       server,
       levelLabel: level != null ? `Level ${formatNumber(level)}` : undefined,
       lastScanLabel: formatDaysAgo(scanAgeDays),
       lastScanAtLabel: scanAtLabel === "-" || scanAtLabel === "—" ? undefined : scanAtLabel,
+      lastScanAtMs: input.scannedAtMs,
       lastScanDays: scanAgeDays,
       metrics: [
         { label: "Mount", value: mountLabel },

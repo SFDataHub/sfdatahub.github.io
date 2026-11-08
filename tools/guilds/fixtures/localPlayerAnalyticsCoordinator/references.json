@@ -1,0 +1,2265 @@
+[
+  {
+    "source": "w06-current",
+    "ref": "f8_net_p1",
+    "time": 1785931200000,
+    "analytics": [
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jul 26 - 05 Aug 26 (35d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1782907200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1782907200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 800,
+                  "rawValue": 800,
+                  "detail": "05 Aug 26: 800 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": -2.857142857142857,
+            "guildAverage": 25.714285714285715
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 220,
+                  "rawValue": 220,
+                  "detail": "05 Aug 26: 220"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 0.5714285714285714,
+            "guildAverage": 4.571428571428571
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jun 26 - 05 Aug 26 (65d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1780315200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1780315200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 0,
+                  "rawValue": 0,
+                  "detail": "01 Jun 26: 0 XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 800,
+                  "rawValue": 800,
+                  "detail": "05 Aug 26: 800 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 300,
+                  "rawValue": 300,
+                  "detail": "01 Jun 26: 300 avg XP"
+                },
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": 12.307692307692308,
+            "guildAverage": 16.923076923076923
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 100,
+                  "rawValue": 100,
+                  "detail": "01 Jun 26: 100"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 220,
+                  "rawValue": 220,
+                  "detail": "05 Aug 26: 220"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 1.8461538461538463,
+            "guildAverage": 1.6923076923076923
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "11 Jun 26 - 05 Aug 26 (55d, player missing at start)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1781179200000,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": {
+            "min": 1781179200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 800,
+                  "rawValue": 800,
+                  "detail": "05 Aug 26: 800 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": 7.2727272727272725
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 220,
+                  "rawValue": 220,
+                  "detail": "05 Aug 26: 220"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": 2.909090909090909
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jul 26 - 05 Aug 26 (35d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1782907200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1782907200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 800,
+                  "rawValue": 800,
+                  "detail": "05 Aug 26: 800 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": -2.857142857142857,
+            "guildAverage": 25.714285714285715
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 220,
+                  "rawValue": 220,
+                  "detail": "05 Aug 26: 220"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 0.5714285714285714,
+            "guildAverage": 4.571428571428571
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      }
+    ],
+    "insights": {
+      "status": "ready",
+      "rankings": {
+        "player": 10,
+        "guild": 5,
+        "server": null
+      },
+      "progression": {
+        "gameCompletion": null,
+        "itemsDiscovered": null
+      },
+      "playerVsAverage": [
+        {
+          "key": "str",
+          "label": "Strength",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "dex",
+          "label": "Dexterity",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "int",
+          "label": "Intelligence",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "con",
+          "label": "Constitution",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "lck",
+          "label": "Luck",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        }
+      ],
+      "personalBests": {
+        "highestXpPerDay": 210,
+        "highestDungeon": null,
+        "bestServerRank": 3,
+        "historyAvailable": true
+      }
+    }
+  },
+  {
+    "source": "w06-current",
+    "ref": "f8_net_p2",
+    "time": 1785931200000,
+    "analytics": [
+      {
+        "status": "ready",
+        "playerName": "Peer",
+        "identityKey": "member-ref:f8_net_p2",
+        "periodLabel": "01 Jul 26 - 05 Aug 26 (35d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1782907200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1782907200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Peer",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 2000,
+                  "rawValue": 2000,
+                  "detail": "05 Aug 26: 2K XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": -28.571428571428573,
+            "guildAverage": 25.714285714285715
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "05 Aug 26: 500"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 8.571428571428571,
+            "guildAverage": 4.571428571428571
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Peer",
+        "identityKey": "member-ref:f8_net_p2",
+        "periodLabel": "01 Jun 26 - 05 Aug 26 (65d, player missing at start)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1780315200000,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": {
+            "min": 1780315200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Peer",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 2000,
+                  "rawValue": 2000,
+                  "detail": "05 Aug 26: 2K XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 300,
+                  "rawValue": 300,
+                  "detail": "01 Jun 26: 300 avg XP"
+                },
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": 16.923076923076923
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "11 Jun 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "05 Aug 26: 500"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": 1.6923076923076923
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Peer",
+        "identityKey": "member-ref:f8_net_p2",
+        "periodLabel": "11 Jun 26 - 05 Aug 26 (55d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1781179200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1781179200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Peer",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 2000,
+                  "rawValue": 2000,
+                  "detail": "05 Aug 26: 2K XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": 18.181818181818183,
+            "guildAverage": 7.2727272727272725
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "11 Jun 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "05 Aug 26: 500"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 5.454545454545454,
+            "guildAverage": 2.909090909090909
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Peer",
+        "identityKey": "member-ref:f8_net_p2",
+        "periodLabel": "01 Jul 26 - 05 Aug 26 (35d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": 1782907200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1782907200000,
+            "max": 1785931200000
+          },
+          "options": [
+            {
+              "timestamp": 1782907200000,
+              "sourceScanId": "w06-tie-a",
+              "snapshotId": "w06-tie-a::1782907200000",
+              "label": "01.07.26",
+              "distanceLabel": "vor 35 Tagen"
+            },
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 55 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 65 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Peer",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 2000,
+                  "rawValue": 2000,
+                  "detail": "05 Aug 26: 2K XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 1400,
+                  "rawValue": 1400,
+                  "detail": "05 Aug 26: 1.4K avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": -28.571428571428573,
+            "guildAverage": 25.714285714285715
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "05 Aug 26: 500"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 8.571428571428571,
+            "guildAverage": 4.571428571428571
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      }
+    ],
+    "insights": {
+      "status": "ready",
+      "rankings": {
+        "player": 20,
+        "guild": 5,
+        "server": null
+      },
+      "progression": {
+        "gameCompletion": null,
+        "itemsDiscovered": null
+      },
+      "playerVsAverage": [
+        {
+          "key": "str",
+          "label": "Strength",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "dex",
+          "label": "Dexterity",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "int",
+          "label": "Intelligence",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "con",
+          "label": "Constitution",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "lck",
+          "label": "Luck",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        }
+      ],
+      "personalBests": {
+        "highestXpPerDay": 100,
+        "highestDungeon": null,
+        "bestServerRank": 12,
+        "historyAvailable": true
+      }
+    }
+  },
+  {
+    "source": "w06-mid",
+    "ref": "f8_net_p1",
+    "time": 1782907200000,
+    "analytics": [
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jun 26 - 01 Jul 26 (30d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1782907200000,
+          "currentLabel": "01 Jul 26",
+          "selectedTimestamp": 1780315200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1780315200000,
+            "max": 1782907200000
+          },
+          "options": [
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 20 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 30 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 0,
+                  "rawValue": 0,
+                  "detail": "01 Jun 26: 0 XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 300,
+                  "rawValue": 300,
+                  "detail": "01 Jun 26: 300 avg XP"
+                },
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": 30,
+            "guildAverage": 6.666666666666667
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 100,
+                  "rawValue": 100,
+                  "detail": "01 Jun 26: 100"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 3.3333333333333335,
+            "guildAverage": -1.6666666666666667
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jun 26 - 01 Jul 26 (30d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1782907200000,
+          "currentLabel": "01 Jul 26",
+          "selectedTimestamp": 1780315200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1780315200000,
+            "max": 1782907200000
+          },
+          "options": [
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 20 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 30 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 0,
+                  "rawValue": 0,
+                  "detail": "01 Jun 26: 0 XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 300,
+                  "rawValue": 300,
+                  "detail": "01 Jun 26: 300 avg XP"
+                },
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": 30,
+            "guildAverage": 6.666666666666667
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 100,
+                  "rawValue": 100,
+                  "detail": "01 Jun 26: 100"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 3.3333333333333335,
+            "guildAverage": -1.6666666666666667
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "11 Jun 26 - 01 Jul 26 (20d, player missing at start)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1782907200000,
+          "currentLabel": "01 Jul 26",
+          "selectedTimestamp": 1781179200000,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": {
+            "min": 1781179200000,
+            "max": 1782907200000
+          },
+          "options": [
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 20 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 30 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": -25
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": 0
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "ready",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f8_net_p1",
+        "periodLabel": "01 Jun 26 - 01 Jul 26 (30d)",
+        "snapshotCount": 5,
+        "comparison": {
+          "currentTimestamp": 1782907200000,
+          "currentLabel": "01 Jul 26",
+          "selectedTimestamp": 1780315200000,
+          "selectedPlayerAtStart": true,
+          "chartTimeDomain": {
+            "min": 1780315200000,
+            "max": 1782907200000
+          },
+          "options": [
+            {
+              "timestamp": 1781179200000,
+              "sourceScanId": "w06-missing-start",
+              "snapshotId": "w06-missing-start::1781179200000",
+              "label": "11.06.26",
+              "distanceLabel": "vor 20 Tagen"
+            },
+            {
+              "timestamp": 1780315200000,
+              "sourceScanId": "w06-old",
+              "snapshotId": "w06-old::1780315200000",
+              "label": "01.06.26",
+              "distanceLabel": "vor 30 Tagen"
+            }
+          ],
+          "emptyReason": null
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 0,
+                  "rawValue": 0,
+                  "detail": "01 Jun 26: 0 XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 300,
+                  "rawValue": 300,
+                  "detail": "01 Jun 26: 300 avg XP"
+                },
+                {
+                  "timestamp": 1781179200000,
+                  "label": "11 Jun 26",
+                  "value": 1000,
+                  "rawValue": 1000,
+                  "detail": "11 Jun 26: 1K avg XP"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 500,
+                  "rawValue": 500,
+                  "detail": "01 Jul 26: 500 avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": 30,
+            "guildAverage": 6.666666666666667
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1780315200000,
+                  "label": "01 Jun 26",
+                  "value": 100,
+                  "rawValue": 100,
+                  "detail": "01 Jun 26: 100"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                },
+                {
+                  "timestamp": 1782907200000,
+                  "label": "01 Jul 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "01 Jul 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": 3.3333333333333335,
+            "guildAverage": -1.6666666666666667
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      }
+    ],
+    "insights": {
+      "status": "ready",
+      "rankings": {
+        "player": 12,
+        "guild": 5,
+        "server": null
+      },
+      "progression": {
+        "gameCompletion": null,
+        "itemsDiscovered": null
+      },
+      "playerVsAverage": [
+        {
+          "key": "str",
+          "label": "Strength",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "dex",
+          "label": "Dexterity",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "int",
+          "label": "Intelligence",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "con",
+          "label": "Constitution",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "lck",
+          "label": "Luck",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        }
+      ],
+      "personalBests": {
+        "highestXpPerDay": 210,
+        "highestDungeon": null,
+        "bestServerRank": 3,
+        "historyAvailable": true
+      }
+    }
+  },
+  {
+    "source": "w06-foreign",
+    "ref": "f9_net_p1",
+    "time": 1785931200000,
+    "analytics": [
+      {
+        "status": "insufficient-history",
+        "message": "Für Hero ist nur ein Scanzeitpunkt verfügbar.",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f9_net_p1",
+        "periodLabel": "05 Aug 26",
+        "snapshotCount": 1,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": null,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": null,
+          "options": [],
+          "emptyReason": "Kein älterer vollständiger Scan verfügbar"
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "05 Aug 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "insufficient-history",
+        "message": "Für Hero ist nur ein Scanzeitpunkt verfügbar.",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f9_net_p1",
+        "periodLabel": "05 Aug 26",
+        "snapshotCount": 1,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": null,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": null,
+          "options": [],
+          "emptyReason": "Kein älterer vollständiger Scan verfügbar"
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "05 Aug 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "insufficient-history",
+        "message": "Für Hero ist nur ein Scanzeitpunkt verfügbar.",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f9_net_p1",
+        "periodLabel": "05 Aug 26",
+        "snapshotCount": 1,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": null,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": null,
+          "options": [],
+          "emptyReason": "Kein älterer vollständiger Scan verfügbar"
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "05 Aug 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      },
+      {
+        "status": "insufficient-history",
+        "message": "Für Hero ist nur ein Scanzeitpunkt verfügbar.",
+        "playerName": "Hero",
+        "identityKey": "member-ref:f9_net_p1",
+        "periodLabel": "05 Aug 26",
+        "snapshotCount": 1,
+        "comparison": {
+          "currentTimestamp": 1785931200000,
+          "currentLabel": "05 Aug 26",
+          "selectedTimestamp": null,
+          "selectedPlayerAtStart": false,
+          "chartTimeDomain": null,
+          "options": [],
+          "emptyReason": "Kein älterer vollständiger Scan verfügbar"
+        },
+        "xp": {
+          "series": [
+            {
+              "id": "player-xp",
+              "label": "Hero",
+              "color": "#3ff1c3",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M XP"
+                }
+              ]
+            },
+            {
+              "id": "guild-average-xp",
+              "label": "Guild Average",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 999999,
+                  "rawValue": 999999,
+                  "detail": "05 Aug 26: 1M avg XP"
+                }
+              ]
+            }
+          ],
+          "hasGuildAverage": true,
+          "guildAverageDefinition": "Absolute average total XP across complete guild snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "stats": {
+          "series": [
+            {
+              "id": "focused-base-stats",
+              "label": "Focused Base Stats",
+              "color": "#5c8bc6",
+              "points": [
+                {
+                  "timestamp": 1785931200000,
+                  "label": "05 Aug 26",
+                  "value": 200,
+                  "rawValue": 200,
+                  "detail": "05 Aug 26: 200"
+                }
+              ]
+            }
+          ],
+          "description": "Existing derived focusedBaseStats series. Historical individual attributes are not available in the current derived snapshots.",
+          "rateSummary": {
+            "player": null,
+            "guildAverage": null
+          }
+        },
+        "career": {
+          "title": "CAREER TIMELINE",
+          "events": [],
+          "emptyReason": "No confirmed fusion events in player history"
+        }
+      }
+    ],
+    "insights": {
+      "status": "ready",
+      "rankings": {
+        "player": 12,
+        "guild": 5,
+        "server": null
+      },
+      "progression": {
+        "gameCompletion": null,
+        "itemsDiscovered": null
+      },
+      "playerVsAverage": [
+        {
+          "key": "str",
+          "label": "Strength",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "dex",
+          "label": "Dexterity",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "int",
+          "label": "Intelligence",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "con",
+          "label": "Constitution",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        },
+        {
+          "key": "lck",
+          "label": "Luck",
+          "playerValue": null,
+          "guildAverage": null,
+          "validGuildMembers": 0
+        }
+      ],
+      "personalBests": {
+        "highestXpPerDay": null,
+        "highestDungeon": null,
+        "bestServerRank": 12,
+        "historyAvailable": true
+      }
+    }
+  }
+]

@@ -1,3 +1,4 @@
+import { seedLocalSourceValidityFixture } from "./localSourceValidityFixture.mts";
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -104,7 +105,7 @@ const summary: GuildHubScanSummary = {
   summaryVersion: 5,
 };
 
-const scan: GuildHubLocalScan = {
+let scan: GuildHubLocalScan = {
   id: sourceScanId,
   contentHash: sourceContentHash,
   filename: "scan.json",
@@ -135,7 +136,7 @@ const scan: GuildHubLocalScan = {
 };
 
 const openAnalyticsDb = () =>
-  openDB<TestGuildAnalyticsDb>(DB_NAME, 1, {
+  openDB<TestGuildAnalyticsDb>(DB_NAME, undefined, {
     upgrade(db) {
       if (!db.objectStoreNames.contains(SOURCE_STORE)) {
         const sources = db.createObjectStore(SOURCE_STORE, { keyPath: "sourceScanId" });
@@ -177,15 +178,20 @@ const seedDerivedData = async (derivedVersion: number) => {
   await Promise.all([
     tx.objectStore(SOURCE_STORE).put({
       sourceScanId,
+      sourceGeneration: scan.sourceGeneration,
+      derivedVersion,
       sourceUpdatedAt,
       sourceContentHash,
-      derivedVersion,
+      normalizerVersion: scan.normalizerVersion,
+      coreNormalizerVersion: scan.coreNormalizerVersion,
       materializedAt: "2026-09-27T08:01:00.000Z",
       snapshotCount: 1,
     }),
     tx.objectStore(SNAPSHOT_STORE).put({
       id: "stale-snapshot",
       sourceScanId,
+      sourceGeneration: scan.sourceGeneration,
+      derivedVersion,
       sourceScanFilename: "scan.json",
       sourceImportedAt: sourceUpdatedAt,
       timestamp: snapshotIso,
@@ -195,6 +201,8 @@ const seedDerivedData = async (derivedVersion: number) => {
       id: "stale-member",
       snapshotId: "stale-snapshot",
       sourceScanId,
+      sourceGeneration: scan.sourceGeneration,
+      derivedVersion,
       sourceScanFilename: "scan.json",
       snapshotTimestamp,
       memberRef: "s3_p101",
@@ -213,6 +221,8 @@ const seedDerivedData = async (derivedVersion: number) => {
       id: "stale-guild",
       snapshotId: "stale-snapshot",
       sourceScanId,
+      sourceGeneration: scan.sourceGeneration,
+      derivedVersion,
       sourceScanFilename: "scan.json",
       snapshotTimestamp,
       server: "s3",
@@ -238,6 +248,8 @@ const readStoredSource = async () => {
 
 await deleteDB(DB_NAME);
 
+({ scan } = await seedLocalSourceValidityFixture(scan));
+Object.assign(summary, (await seedLocalSourceValidityFixture(scan)).summary);
 await seedDerivedData(1);
 let loadSourceCount = 0;
 const rebuildDiagnostics: GuildAnalyticsDiagnosticEntry[] = [];
@@ -254,7 +266,7 @@ const rebuilt = await ensureGuildAnalyticsDerivedDataFromSummaries([summary], {
   onPhase: (phase) => rebuildPhases.push(phase),
 });
 
-assert.equal(DERIVED_ANALYTICS_VERSION, 3);
+assert.equal(DERIVED_ANALYTICS_VERSION, 4);
 assert.equal(loadSourceCount, 1);
 assert.equal(rebuilt.members.length, 1);
 assert.equal(rebuilt.members[0].baseStats, 600);
@@ -263,7 +275,7 @@ assert.equal(rebuilt.guilds[0].averageBaseStats, 600);
 assert.equal(rebuilt.guilds[0].averageTotalStats, 660);
 assert.equal((await readStoredSource())?.derivedVersion, DERIVED_ANALYTICS_VERSION);
 assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "derived-version-check"), true);
-assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "derived-reset"), true);
+assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "derived-reset"), false);
 assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "raw-source-load"), true);
 assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "normalization-total"), true);
 assert.equal(rebuildDiagnostics.some((entry) => entry.phase === "member-observation-build"), true);

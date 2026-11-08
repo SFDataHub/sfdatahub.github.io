@@ -4,6 +4,7 @@ import express from "express";
 
 import adminRouter from "./routes/admin";
 import adminStatsRouter from "./routes/adminStats";
+import visitorAnalyticsRouter from "./routes/visitorAnalytics";
 import authRouter from "./routes/auth";
 import adminAccessControlRouter from "./routes/adminAccessControl";
 import internalAdminRouter from "./routes/internalAdmin";
@@ -26,11 +27,13 @@ app.use(
     credentials: true,
   }),
 );
+app.use("/auth/me/favorites/state", express.json({ limit: "900kb" }));
 app.use(express.json());
 app.use(cookieParser());
 
 app.use("/auth", authRouter);
 app.use("/admin", adminRouter);
+app.use("/api/admin/stats/visitor", visitorAnalyticsRouter);
 app.use("/api/admin/stats", adminStatsRouter);
 app.use("/admin/access-control", adminAccessControlRouter);
 app.use("/internal", internalAdminRouter);

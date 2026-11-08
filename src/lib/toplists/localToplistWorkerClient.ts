@@ -1,3 +1,4 @@
+import { auditCurrent, auditSpan, auditSpanEnd, auditEvent, auditFields, auditError, auditWorkerEnvelope, auditMergeWorker } from "../data-hub/runtimeAudit";
 import type {
   LocalToplistDerivationProgress,
   LocalToplistDerivationWorkerRequest,
@@ -43,8 +44,13 @@ export function startLocalToplistDerivationWorkerRun(options: {
   workerFactory?: () => LocalToplistDerivationWorkerLike;
   onProgress?: (progress: LocalToplistDerivationProgress) => void;
 }): LocalToplistDerivationWorkerRun {
+  const ownerAudit = auditCurrent();
   const requestId = options.requestId ?? createRequestId();
+  const constructorAudit = auditSpan(ownerAudit, "worker-constructor-call", "sync-elapsed");
   const worker = (options.workerFactory ?? createLocalToplistDerivationWorker)();
+  auditSpanEnd(ownerAudit, constructorAudit);
+  if (ownerAudit) auditFields(ownerAudit, { workerReady: "unknown; no readiness event", workerInstanceId: requestId, workerKind: "derive-toplists" });
+  const roundtripAudit = auditSpan(ownerAudit, "worker-request-roundtrip");
   let settled = false;
   let rejectRun: (reason?: unknown) => void = () => undefined;
   let handleMessage: (event: MessageEvent<LocalToplistDerivationWorkerResponse>) => void = () => undefined;
@@ -67,6 +73,9 @@ export function startLocalToplistDerivationWorkerRun(options: {
         return;
       }
 
+      auditMergeWorker(ownerAudit, message.auditReport);
+      auditSpanEnd(ownerAudit, roundtripAudit);
+      auditEvent(ownerAudit, "worker-response-receipt");
       settled = true;
       cleanup();
       worker.terminate();
@@ -83,6 +92,8 @@ export function startLocalToplistDerivationWorkerRun(options: {
     };
 
     handleError = (event) => {
+      auditError(ownerAudit, new Error(event.message));
+      auditSpanEnd(ownerAudit, roundtripAudit);
       if (settled) return;
       settled = true;
       cleanup();
@@ -92,7 +103,8 @@ export function startLocalToplistDerivationWorkerRun(options: {
 
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "derive-toplists", requestId, sources: options.sources });
+    const sendAudit = auditSpan(ownerAudit, "postMessage-call", "sync-elapsed");
+    try { worker.postMessage({ type: "derive-toplists", requestId, sources: options.sources, ...(ownerAudit ? { audit: auditWorkerEnvelope(ownerAudit, requestId, requestId) } : undefined) }); } finally { auditSpanEnd(ownerAudit, sendAudit); }
   });
 
   return {
@@ -100,6 +112,8 @@ export function startLocalToplistDerivationWorkerRun(options: {
     promise,
     cancel() {
       if (settled) return;
+      auditEvent(ownerAudit, "worker-cancel-and-terminate");
+      auditSpanEnd(ownerAudit, roundtripAudit);
       settled = true;
       cleanup();
       try {

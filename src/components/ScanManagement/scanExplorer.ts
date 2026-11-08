@@ -1,3 +1,4 @@
+import {auditBegin,auditEnter,auditValue,auditReturn,auditError,auditLeave} from "../../lib/data-hub/runtimeAudit";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../../lib/parsing/normalizedPlayer";
 import {
   createNormalizedGuildIndexes,
@@ -257,6 +258,9 @@ function parseServerFromPlayerIdentifier(identifier: string | null): string | nu
 }
 
 export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData {
+ const __w32Run0=auditBegin("F35","buildScanExplorerData");
+ const __w32Sync=auditEnter(__w32Run0,"buildScanExplorerData","sync-elapsed");
+ try {
   const snapshots = deriveGuildHubLogicalScanSnapshots(scan);
   const coverageRows = deriveGuildCoverageForLogicalSnapshots(snapshots);
   const guildGroups = groupGuildCoverageRows(coverageRows);
@@ -295,7 +299,7 @@ export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData
   const playerLookup = new Map(players.map((player) => [player.key, player]));
   const guildLookup = new Map(guilds.map((guild) => [guild.key, guild]));
 
-  return {
+  return auditReturn(__w32Run0,{
     scan,
     snapshots,
     coverageRows,
@@ -308,25 +312,42 @@ export function buildScanExplorerData(scan: GuildHubLocalScan): ScanExplorerData
     normalizedGuilds,
     normalizedGuildLookup,
     guildIndexes,
-  };
+  });
+
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
 }
 
 export function normalizeScanExplorerPlayer(
   player: ScanExplorerPlayerEntity,
   normalizer: ScanExplorerPlayerNormalizer = normalizeSfPlayerCharacterCore,
 ): NormalizedPlayer {
-  return normalizer(player.raw);
+ const __w32Run1=auditBegin("F35","normalizeScanExplorerPlayer");
+ const __w32Sync=auditEnter(__w32Run1,"normalizeScanExplorerPlayer","sync-elapsed");
+ try {
+  return auditReturn(__w32Run1,normalizer(player.raw));
+
+} catch (__w32Error) { auditError(__w32Run1,__w32Error); throw __w32Error; } finally {auditValue(__w32Run1,__w32Sync,undefined);auditLeave(__w32Run1);}
 }
 
 export function getScanExplorerGuildDetail(data: ScanExplorerData, guild: ScanExplorerGuildEntity): NormalizedGuild | null {
-  return guild.normalizedGuildKey ? data.normalizedGuildLookup.get(guild.normalizedGuildKey) ?? null : null;
+ const __w32Run2=auditBegin("F35","getScanExplorerGuildDetail");
+ const __w32Sync=auditEnter(__w32Run2,"getScanExplorerGuildDetail","sync-elapsed");
+ try {
+  return auditReturn(__w32Run2,guild.normalizedGuildKey ? data.normalizedGuildLookup.get(guild.normalizedGuildKey) ?? null : null);
+
+} catch (__w32Error) { auditError(__w32Run2,__w32Error); throw __w32Error; } finally {auditValue(__w32Run2,__w32Sync,undefined);auditLeave(__w32Run2);}
 }
 
 export function linkScanExplorerPlayerToGuildMember(
   data: ScanExplorerData,
   player: NormalizedPlayer,
 ): NormalizedPlayerGuildMemberLink {
-  return linkNormalizedPlayerToGuildMember(player, data.guildIndexes);
+ const __w32Run3=auditBegin("F35","linkScanExplorerPlayerToGuildMember");
+ const __w32Sync=auditEnter(__w32Run3,"linkScanExplorerPlayerToGuildMember","sync-elapsed");
+ try {
+  return auditReturn(__w32Run3,linkNormalizedPlayerToGuildMember(player, data.guildIndexes));
+
+} catch (__w32Error) { auditError(__w32Run3,__w32Error); throw __w32Error; } finally {auditValue(__w32Run3,__w32Sync,undefined);auditLeave(__w32Run3);}
 }
 
 export function filterScanExplorerEntities(
@@ -358,6 +379,9 @@ export function getLimitedScanExplorerResults(
   guildVisible: number;
   limit: number;
 } {
+ const __w32Run4=auditBegin("F35","getLimitedScanExplorerResults");
+ const __w32Sync=auditEnter(__w32Run4,"getLimitedScanExplorerResults","sync-elapsed");
+ try {
   const normalizedQuery = query.trim().toLowerCase();
   const visiblePlayers: ScanExplorerPlayerEntity[] = [];
   const visibleGuilds: ScanExplorerGuildEntity[] = [];
@@ -376,7 +400,7 @@ export function getLimitedScanExplorerResults(
     if (visibleGuilds.length < limit) visibleGuilds.push(guild);
   }
 
-  return {
+  return auditReturn(__w32Run4,{
     query: normalizedQuery,
     players: visiblePlayers,
     guilds: visibleGuilds,
@@ -385,5 +409,7 @@ export function getLimitedScanExplorerResults(
     playerVisible: visiblePlayers.length,
     guildVisible: visibleGuilds.length,
     limit,
-  };
+  });
+
+} catch (__w32Error) { auditError(__w32Run4,__w32Error); throw __w32Error; } finally {auditValue(__w32Run4,__w32Sync,undefined);auditLeave(__w32Run4);}
 }

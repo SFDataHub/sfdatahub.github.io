@@ -1,3 +1,8 @@
+import { resolvePlayerIdentity, loadIdentityResolutionSnapshot, type IdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
+import { resolveObservedGuildIdentity } from "../../lib/identities/guildObservationIdentity";
+import { observationReferenceKey } from "../../lib/servers/serverResolver";
+import { serverComparisonKey } from "../../lib/servers/serverResolver";
+import { auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave } from "../../lib/data-hub/runtimeAudit";
 import {
   getGuildHubLocalScan,
   listGuildHubScanSummaries,
@@ -192,7 +197,7 @@ const isGroupMatch = (
   const groupServer =
     normalizeServer(readString(group, ["server", "Server", "prefix", "world", "realm"])) ||
     parseServerFromIdentifier(readString(group, ["identifier", "guildIdentifier"]));
-  const serverMatches = !guild.server || !groupServer || guild.server === groupServer;
+  const serverMatches = !guild.server || !groupServer || serverComparisonKey(guild.server) === serverComparisonKey(groupServer);
   if (guild.guildSegment && groupSegment && guild.guildSegment === groupSegment && serverMatches) return true;
 
   const groupName = readGuildName(group);
@@ -201,7 +206,7 @@ const isGroupMatch = (
 
 const isSummaryGuildMatch = (source: GuildHubLocalGuildIdentity, guild: ScanGuildIdentity) => {
   const sourceServer = normalizeServer(source.server);
-  const serverMatches = !guild.server || !sourceServer || guild.server === sourceServer;
+  const serverMatches = !guild.server || !sourceServer || serverComparisonKey(guild.server) === serverComparisonKey(sourceServer);
   const sourceSegment = normalizeGuildSegment(source.guildIdentifier) ?? normalizeGuildSegment(source.guildId);
   if (guild.guildSegment && sourceSegment && guild.guildSegment === sourceSegment && serverMatches) return true;
 
@@ -261,11 +266,31 @@ const toScanMember = (member: NormalizedGuildMember, scan: GuildHubLocalScan): F
 export async function loadLatestScanSnapshotForGuild(
   guild: GuildHubSelectedGuild | FightTrackerGuild | null,
 ): Promise<FightTrackerScanSnapshot | null> {
-  if (!guild) return null;
-  const latestSummary = await findLatestScanSummaryForGuild(guild);
-  const scan = latestSummary ? await getGuildHubLocalScan(latestSummary.sourceScanId) : null;
-  if (!scan) return null;
-  const guildIdentity = getScanGuildIdentity(guild);
+    const __audit1 = auditPhaseBegin("loadLatestScanSnapshotForGuild", undefined, "async-container");
+    try {
+  if (!guild) return auditReturn(__audit1, null);
+  const identities = await loadIdentityResolutionSnapshot();
+  const original = "logoIdentifier" in guild ? guild.logoIdentifier : guild.linkedGuildHubLogoIdentifier || guild.linkedGuildHubGuildId;
+  const resolution = resolveObservedGuildIdentity(identities, original, guild.server);
+  if (resolution.status === "conflict") return auditReturn(__audit1, null);
+  let observedGuild = guild;
+  if (resolution.resolved) {
+    const summaries = await listGuildHubScanSummaries();
+    const observations = summaries.flatMap(summary => summary.guilds.filter(candidate =>
+      resolveObservedGuildIdentity(identities, candidate.guildIdentifier, candidate.server).identityId === resolution.identityId)
+      .map(candidate => ({ summary, candidate, reference: candidate.guildIdentifier ?? "", time: summaryScanTimeMs(summary, candidate) })));
+    observations.sort((a, b) => b.time - a.time);
+    const newest = observations[0];
+    if (newest && observations.some(entry => entry.time === newest.time && observationReferenceKey(entry.reference) !== observationReferenceKey(newest.reference))) return auditReturn(__audit1, null);
+    if (newest) {
+      observedGuild = { ...guild, name: newest.candidate.name, server: newest.candidate.server,
+        ...("logoIdentifier" in guild ? { logoIdentifier: newest.reference, guildId: newest.candidate.guildId } : { linkedGuildHubLogoIdentifier: newest.reference, linkedGuildHubGuildId: newest.candidate.guildId }) };
+    }
+  }
+  const latestSummary = await (auditValue(__audit1, auditEnter(__audit1, "findLatestScanSummaryForGuild"), (findLatestScanSummaryForGuild(observedGuild))));
+  const scan = latestSummary ? await (auditValue(__audit1, auditEnter(__audit1, "getGuildHubLocalScan"), (getGuildHubLocalScan(latestSummary.sourceScanId)))) : null;
+  if (!scan) return auditReturn(__audit1, null);
+  const guildIdentity = getScanGuildIdentity(observedGuild);
 
   const snapshots = [scan]
     .map((entry) => {
@@ -296,15 +321,21 @@ export async function loadLatestScanSnapshotForGuild(
     })
     .filter((snapshot): snapshot is FightTrackerScanSnapshot => Boolean(snapshot));
 
-  return snapshots.sort((a, b) => (timestampMs(b.scanAt) ?? Number.NEGATIVE_INFINITY) - (timestampMs(a.scanAt) ?? Number.NEGATIVE_INFINITY))[0] ?? null;
+  return auditReturn(__audit1, snapshots.sort((a, b) => (timestampMs(b.scanAt) ?? Number.NEGATIVE_INFINITY) - (timestampMs(a.scanAt) ?? Number.NEGATIVE_INFINITY))[0] ?? null);
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 }
 
 export function buildFightTrackerSyncPlan(
   tracker: FightTrackerGuild,
   members: FightTrackerMember[],
   snapshot: FightTrackerScanSnapshot | null,
+  identities?: IdentityResolutionSnapshot | null,
 ): FightTrackerSyncPlan | null {
-  if (!snapshot) return null;
+    const __audit2 = auditPhaseBegin("buildFightTrackerSyncPlan", undefined, "sync-elapsed");
+    try {
+  if (!snapshot) return auditReturn(__audit2, null);
 
   const scanMs = timestampMs(snapshot.scanAt);
   const latestAppliedMs = timestampMs(tracker.lastSyncedScanAt);
@@ -376,15 +407,24 @@ export function buildFightTrackerSyncPlan(
     );
   };
 
+  let ambiguousIdentity = false;
+  const memberIdentityKey = (reference: string | null | undefined) => {
+    const raw = normalizeScanRef(reference);
+    const resolved = identities ? resolvePlayerIdentity(identities, raw) : null;
+    if (resolved?.status === "conflict") { ambiguousIdentity = true; return null; }
+    return resolved?.resolved ? `entity:${resolved.identityId}` : observationReferenceKey(raw);
+  };
   const byScanRef = new Map<string, FightTrackerMember>();
   const byName = new Map<string, FightTrackerMember>();
   members.forEach((member) => {
-    const scanRef = normalizeScanRef(member.scanMemberRef);
+    const scanRef = memberIdentityKey(member.scanMemberRef);
+    if (scanRef && byScanRef.has(scanRef) && byScanRef.get(scanRef)?.id !== member.id) ambiguousIdentity = true;
     if (scanRef && !byScanRef.has(scanRef)) byScanRef.set(scanRef, member);
     const key = normalizeLoose(member.name);
     if (key && !byName.has(key)) byName.set(key, member);
   });
 
+  if (ambiguousIdentity) return auditReturn(__audit2, null);
   const newMembers: FightTrackerScanMember[] = [];
   const existingMembers: Array<{ member: FightTrackerMember; scanMember: FightTrackerScanMember }> = [];
   const confirmedManualMembers: Array<{ member: FightTrackerMember; scanMember: FightTrackerScanMember }> = [];
@@ -395,7 +435,8 @@ export function buildFightTrackerSyncPlan(
   let hasStatsUpdates = false;
 
   snapshot.members.forEach((scanMember) => {
-    const existingByRef = byScanRef.get(normalizeScanRef(scanMember.scanMemberRef));
+    const incomingKey = memberIdentityKey(scanMember.scanMemberRef);
+    const existingByRef = incomingKey ? byScanRef.get(incomingKey) : undefined;
     if (existingByRef) {
       if (!matchedMemberIds.has(existingByRef.id)) {
         existingMemberCount += 1;
@@ -411,7 +452,10 @@ export function buildFightTrackerSyncPlan(
       return;
     }
 
-    const existingByName = byName.get(normalizeLoose(scanMember.name));
+    const named = byName.get(normalizeLoose(scanMember.name));
+    const namedIdentity = identities && named?.scanMemberRef ? resolvePlayerIdentity(identities, named.scanMemberRef) : null;
+    const incomingIdentity = identities ? resolvePlayerIdentity(identities, scanMember.scanMemberRef) : null;
+    const existingByName = named && (!namedIdentity?.resolved && !incomingIdentity?.resolved) ? named : undefined;
     if (existingByName) {
       if (!matchedMemberIds.has(existingByName.id)) {
         existingMemberCount += 1;
@@ -431,9 +475,10 @@ export function buildFightTrackerSyncPlan(
     newMembers.push(isOlderThanApplied ? { ...scanMember, active: false } : scanMember);
   });
 
+  if (ambiguousIdentity) return auditReturn(__audit2, null);
   const missingMembers = members.filter((member) => member.active && !matchedMemberIds.has(member.id) && canInactivateFromScan(member));
 
-  return {
+  return auditReturn(__audit2, {
     snapshot,
     newMembers,
     existingMembers,
@@ -451,5 +496,8 @@ export function buildFightTrackerSyncPlan(
       hasCoaUpdate ||
       hasNewerNormalizerVersion ||
       hasNewerSnapshot,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 }

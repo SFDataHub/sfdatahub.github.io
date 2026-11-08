@@ -1,3 +1,4 @@
+import { serverComparisonKey } from "../servers/serverResolver";
 import type { PlayerCardData, PlayerCardPotion } from "../../components/player-card/types";
 import { resolvePotionAssetKey } from "../../components/potions/potionAssets";
 import { getClassMetaById, iconForClassName } from "../../data/classes";
@@ -46,7 +47,7 @@ export type LocalPlayerIndexPlayer = {
   development?: PlayerCardDevelopmentSummary | null;
 };
 
-type LocalPlayerIndexEntry = LocalPlayerIndexPlayer & {
+export type LocalPlayerIndexEntry = LocalPlayerIndexPlayer & {
   developmentSource: PlayerCardDevelopmentSourceEntry;
 };
 
@@ -86,6 +87,7 @@ export function buildLocalPlayerIndex(
     targetPlayerRefs?: readonly string[] | null;
     targetPlayerNames?: readonly string[] | null;
     includeCards?: boolean;
+    preparedCompleteness?: import("../guilds/guildSnapshotCompleteness").GuildSnapshotCompletenessReport[];
   } = {},
 ): LocalPlayerIndexResult {
   const builder = createLocalPlayerIndexBuilder(options);
@@ -101,6 +103,7 @@ export function createLocalPlayerIndexBuilder(
     targetPlayerRefs?: readonly string[] | null;
     targetPlayerNames?: readonly string[] | null;
     includeCards?: boolean;
+    preparedCompleteness?: import("../guilds/guildSnapshotCompleteness").GuildSnapshotCompletenessReport[];
   } = {},
 ) {
   const serverFilter = normalizeServer(options.serverFilter);
@@ -118,10 +121,13 @@ export function createLocalPlayerIndexBuilder(
       scanCount += 1;
       allPlayers.push(...buildPlayersFromScan(input.scan, input.summary, serverFilter, targetFilter, includeCards));
     },
+    entries(): LocalPlayerIndexEntry[] { return allPlayers; },
+    addPreparedEntries(entries: LocalPlayerIndexEntry[], loaded = true) { if (loaded) scanCount += 1; allPlayers.push(...entries); },
     finish(): LocalPlayerIndexResult {
       const developmentByKey = buildPlayerCardDevelopmentLookup(
         allPlayers.map((player) => player.developmentSource),
         {
+          preparedCompleteness: options.preparedCompleteness,
           analyticsData: options.analyticsData ?? null,
           identityResolutionSnapshot: options.identityResolutionSnapshot ?? null,
         },
@@ -327,7 +333,7 @@ function toIndexPlayer(
   const role = normalized?.guildRole ?? null;
   const scannedAtMs = getEntryTimestampMs(player) ?? fallbackScannedAtMs;
   const serverDisplay = server ?? normalizedPlayer?.identity.server ?? normalized?.server ?? null;
-  if (serverFilter && normalizeServer(serverDisplay)?.toLowerCase() !== serverFilter.toLowerCase()) return null;
+  if (serverFilter && serverComparisonKey(serverDisplay) !== serverComparisonKey(serverFilter)) return null;
   const classAccent = getGuildClassAccent(classMeta?.key ?? className) ?? null;
   const baseStats = readFocusedBaseStats(normalizedPlayer, classMeta?.primaryAttribute ?? null, stats);
   const xpTotal = readTotalXp(player);

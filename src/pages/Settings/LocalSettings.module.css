@@ -1,0 +1,39 @@
+.content { max-width: 880px; margin: 0 auto; color: #f5f9ff; overflow-wrap: anywhere; }
+.content h1 { margin: 0 0 18px; font-size: 1.35rem; font-weight: 650; }
+.panel { padding: clamp(16px, 3vw, 28px); border: 1px solid #2b4c73; border-radius: 16px; background: #1a2f4a; }
+.panel h2 { font-size: 1.1rem; font-weight: 650; margin-bottom: 12px; }
+.panel p { color: #b0c4d9; font-size: .9rem; line-height: 1.6; margin: 12px 0; }
+.panel fieldset { min-width: 0; margin-top: 24px; }
+.panel legend { font-weight: 600; margin-bottom: 12px; }
+.option { display: flex; align-items: flex-start; gap: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #41668b; border-radius: 12px; cursor: pointer; background: #152a42; }
+.option:has(input:checked) { border-color: #79c6ff; background: #1e3e5c; }
+.option input { flex-shrink: 0; margin-top: 5px; accent-color: #79c6ff; }
+.help { display: block; color: #b0c4d9; font-size: .85rem; line-height: 1.5; margin-top: 6px; }
+.notice { border-left: 3px solid #79c6ff; padding-left: 12px; }
+.tabs { display: flex; gap: 12px; }
+.tabs a { color: #f5f9ff; border-bottom: 2px solid transparent; padding: 4px 8px; }
+.tabs a[aria-current="page"] { border-bottom-color: #79c6ff; }
+.subtabs { margin-bottom: 18px; }
+.actionBar { margin-top: 24px; }
+.actionBar p { color: #b0c4d9; font-size: .9rem; line-height: 1.6; margin: 12px 0; }
+.actionBar a { color: #79c6ff; text-decoration: underline; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 12px; }
+.panel button, .actionBar button { color: #f5f9ff; background: #274e73; border: 1px solid #5685ad; padding: 10px 16px; border-radius: 8px; font-size: .9rem; }
+.panel button:disabled, .actionBar button:disabled { opacity: .45; cursor: default; }
+.panel button:not(:disabled), .actionBar button:not(:disabled) { cursor: pointer; }
+.panel button:not(:disabled):hover, .actionBar button:not(:disabled):hover { background: #35638c; }
+.content :focus-visible, .tabs :focus-visible { outline: 3px solid #9cdbff; outline-offset: 4px; }
+
+.content .profileHeading { margin-top: 24px; }
+
+.columnPicker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.columnSettings { margin-block: 20px; }
+.columnSettings select { color: inherit; background: #152b45; padding: 6px; border: 1px solid #2c4a73; border-radius: 6px; }
+.columnPicker details { padding-block: 6px; }
+.columnPicker summary { cursor: pointer; }
+.columnChoice { display: flex; align-items: center; gap: 8px; margin: 8px; }
+.selectedColumns { list-style: none; padding: 0; }
+.selectedColumns li { display: flex; align-items: center; gap: 6px; margin-block: 6px; }
+.selectedColumns li span { flex: 1; }
+.selectedColumns button { padding: 4px 8px; }
+@media (max-width: 600px) { .columnPicker { grid-template-columns: 1fr; } }

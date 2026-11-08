@@ -1,16 +1,10 @@
-import {
-  getGuildHubLocalScan,
-  listGuildHubScanSummaries,
-} from "../../lib/guilds/localScanLibrary";
-import {
-  ensureGuildAnalyticsDerivedDataFromSummaries,
-  type GuildAnalyticsDerivedData,
-  type GuildAnalyticsMemberSnapshot,
-} from "../../lib/guilds/localGuildAnalyticsStore";
+import type { GuildAnalyticsDerivedData, GuildAnalyticsMemberSnapshot } from "../../lib/guilds/localGuildAnalyticsStore";
+import type { GuildSnapshotCompletenessReport } from "../../lib/guilds/guildSnapshotCompleteness";
+import type { LocalPlayerHistoryBasis, LocalProfileStatus, LocalProfileEvidence } from "../../lib/local-player-profile/contract";
+import { acquireLocalPlayerProfile } from "../../lib/local-player-profile/coordinator";
 import { buildGuildSnapshotCompletenessReports } from "../../lib/guilds/guildSnapshotCompleteness";
 import {
   collectGuildIdentityObservations,
-  loadIdentityResolutionSnapshot,
   resolveGuildIdentity,
   type IdentityResolutionSnapshot,
 } from "../../lib/identities/identityResolution";
@@ -21,12 +15,14 @@ import {
   resolveServer,
 } from "../../lib/servers/serverResolver";
 import {
-  buildPlayerPerformanceModel,
+  collectPlayerPerformanceTargetHistory, dedupeSnapshots,
   type PlayerPerformanceBuildResult,
   type PlayerPerformanceSnapshot,
 } from "../../pages/Playground/playerPerformanceModel";
 import { resolveSelectedComparisonTimestamp as resolveSharedSelectedComparisonTimestamp } from "../../lib/player-progress/comparisonScanSelection";
 import type { LocalPlayerProfileModel } from "./types";
+
+import type { PlayerChartRange, PlayerContentView, PlayerChartMetric } from "../../lib/local-player-profile/viewCharts";
 
 const DAY_MS = 86_400_000;
 
@@ -38,19 +34,20 @@ export type LocalComparisonScanOption = {
   distanceLabel: string;
 };
 
-export type LocalAnalyticsPoint = {
+export type LocalAnalyticsPoint<Value extends number | null = number> = {
   timestamp: number;
   label: string;
-  value: number;
+  value: Value;
+  observationKey?: string;
   rawValue?: number | null;
   detail: string;
 };
 
-export type LocalAnalyticsSeries = {
+export type LocalAnalyticsSeries<Value extends number | null = number> = {
   id: string;
   label: string;
   color: string;
-  points: LocalAnalyticsPoint[];
+  points: LocalAnalyticsPoint<Value>[];
 };
 
 export type LocalAnalyticsTimeDomain = {
@@ -71,6 +68,10 @@ export type LocalCareerEvent = {
 };
 
 export type LocalPlayerAnalyticsResult = {
+  view?: PlayerContentView;
+  charts?: { metric: PlayerChartMetric; series: LocalAnalyticsSeries<number | null>[] }[];
+  availability?: LocalProfileStatus;
+  dependency?: LocalProfileEvidence;
   status: PlayerPerformanceBuildResult["status"];
   message?: string;
   playerName: string;
@@ -108,35 +109,31 @@ export async function buildLocalPlayerAnalytics(
   profile: LocalPlayerProfileModel,
   selectedComparisonTimestamp?: number | null,
 ): Promise<LocalPlayerAnalyticsResult> {
-  const [summaries, identityResolutionSnapshot] = await Promise.all([
-    listGuildHubScanSummaries(),
-    loadIdentityResolutionSnapshot(),
-  ]);
-  const analyticsData = await ensureGuildAnalyticsDerivedDataFromSummaries(summaries, {
-    loadSourceById: getGuildHubLocalScan,
-  });
-  const target = {
-    name: profile.analytics.playerName,
-    server: profile.analytics.server,
-    memberRef: profile.analytics.memberRef,
-  };
-  const performance = buildPlayerPerformanceModel([], {
-    analyticsData,
-    identityResolutionSnapshot,
-    target,
-  });
+  const lease = acquireLocalPlayerProfile(profile);
+  try {
+    const part = await lease.request("analytics", selectedComparisonTimestamp);
+    if (!part.value) throw new Error(part.reason ?? "Local analytics unavailable");
+    return { ...part.value, availability: part.status, dependency: part.evidence };
+  } finally { lease.release(); }
+}
 
-  const playerName = performance.player?.name ?? profile.analytics.playerName;
-  const snapshots = performance.snapshots;
-  const currentTimestamp = resolveCurrentTimestamp(profile, snapshots);
+export function projectLocalPlayerAnalytics(
+  profile: LocalPlayerProfileModel, basis: LocalPlayerHistoryBasis, selectedComparisonTimestamp?: number | null, view?: PlayerContentView, range?: PlayerChartRange,
+): LocalPlayerAnalyticsResult {
+  const { analyticsData, identityResolutionSnapshot, performance } = basis;
+  const playerName = range ? profile.analytics.playerName : performance.player?.name ?? profile.analytics.playerName;
+  const snapshots = range ? dedupeSnapshots(collectPlayerPerformanceTargetHistory(analyticsData, identityResolutionSnapshot,
+    { name: profile.analytics.playerName, server: profile.analytics.server, memberRef: profile.analytics.memberRef })) : performance.snapshots;
+  const currentTimestamp = range?.max ?? resolveCurrentTimestamp(profile, snapshots);
   const currentGuildIdentifier = resolveCurrentGuildIdentifier(profile, snapshots, currentTimestamp);
-  const comparisonOptions = buildComparisonOptions({
+  const comparisonOptions = range ? [] : buildComparisonOptions({
     analyticsData,
+    reports: basis.indexes.completenessReports,
     currentTimestamp,
     guildIdentifier: currentGuildIdentifier,
     identityResolutionSnapshot,
   });
-  const selectedTimestamp = resolveSelectedComparisonTimestamp(
+  const selectedTimestamp = range?.min ?? resolveSelectedComparisonTimestamp(
     comparisonOptions,
     currentTimestamp,
     selectedComparisonTimestamp,
@@ -144,13 +141,14 @@ export async function buildLocalPlayerAnalytics(
   const selectedPlayerAtStart =
     selectedTimestamp != null && snapshots.some((snapshot) => snapshot.scannedAtMs === selectedTimestamp);
   const rangedSnapshots = filterSnapshotsForRange(snapshots, selectedTimestamp, currentTimestamp);
-  const guildAverageSnapshots = buildGuildAverageSnapshotsForRange({
+  const guildAverageSnapshots = !range && (!view || view === "progress" || view === "base") ? buildGuildAverageSnapshotsForRange({
     analyticsData,
+    reports: basis.indexes.completenessReports,
     currentTimestamp,
     guildIdentifier: currentGuildIdentifier,
     identityResolutionSnapshot,
     selectedTimestamp,
-  });
+  }) : [];
   const chartTimeDomain = buildChartTimeDomain(selectedTimestamp, currentTimestamp);
   const xpRateSummary = buildPeriodRateSummary({
     playerSnapshots: snapshots,
@@ -186,15 +184,27 @@ export async function buildLocalPlayerAnalytics(
       emptyReason: comparisonOptions.length ? null : "Kein älterer vollständiger Scan verfügbar",
     },
     xp: {
-      ...buildXpSeries(rangedSnapshots, guildAverageSnapshots, playerName),
+      ...buildXpSeries(!view || view === "progress" ? rangedSnapshots : [], view && view !== "progress" ? [] : guildAverageSnapshots, playerName),
       rateSummary: xpRateSummary,
     },
     stats: {
-      ...buildStatsSeries(rangedSnapshots),
+      ...buildStatsSeries(!view || view === "base" ? rangedSnapshots : []),
       rateSummary: baseRateSummary,
     },
-    career: buildCareerTimeline(snapshots),
+    career: range ? { title: "CAREER TIMELINE", events: [], emptyReason: null } : buildCareerTimeline(snapshots),
   };
+}
+
+/** Bind the resolved comparison, preserving each projection's source/tie rule. */
+export function resolveLocalAnalyticsBinding(profile: LocalPlayerProfileModel, basis: LocalPlayerHistoryBasis, requested?: number | null) {
+  const currentTimestamp = resolveCurrentTimestamp(profile, basis.performance.snapshots);
+  const guildIdentifier = resolveCurrentGuildIdentifier(profile, basis.performance.snapshots, currentTimestamp);
+  const options = buildComparisonOptions({ analyticsData: basis.analyticsData, reports: basis.indexes.completenessReports,
+    currentTimestamp, guildIdentifier, identityResolutionSnapshot: basis.identityResolutionSnapshot });
+  const selectedTimestamp = resolveSelectedComparisonTimestamp(options, currentTimestamp, requested);
+  return { currentTimestamp, guildIdentifier, selectedTimestamp, option: options.find(option => option.timestamp === selectedTimestamp) ?? null,
+    start: basis.performance.snapshots.find(snapshot => snapshot.scannedAtMs === selectedTimestamp) ?? null,
+    end: basis.performance.snapshots.find(snapshot => snapshot.scannedAtMs === currentTimestamp) ?? null };
 }
 
 export type LocalGuildAverageSnapshot = {
@@ -325,25 +335,27 @@ export function buildPeriodRateSummary({
 
 export function buildGuildAverageSnapshotsForRange({
   analyticsData,
+  reports,
   currentTimestamp,
   guildIdentifier,
   identityResolutionSnapshot,
   selectedTimestamp,
 }: {
   analyticsData: GuildAnalyticsDerivedData;
+  reports?: GuildSnapshotCompletenessReport[];
   currentTimestamp: number | null;
   guildIdentifier: string | null;
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null;
   selectedTimestamp: number | null;
 }): LocalGuildAverageSnapshot[] {
   if (currentTimestamp == null || !guildIdentifier) return [];
-  const reports = collectCompleteReportsForGuildIdentity(
-    buildGuildSnapshotCompletenessReports(analyticsData),
+  const completeReports = collectCompleteReportsForGuildIdentity(
+    reports ?? buildGuildSnapshotCompletenessReports(analyticsData),
     guildIdentifier,
     identityResolutionSnapshot ?? null,
   ).filter((report) => report.scannedAtMs <= currentTimestamp && (selectedTimestamp == null || report.scannedAtMs >= selectedTimestamp));
 
-  const snapshots = reports
+  const snapshots = completeReports
     .map((report): LocalGuildAverageSnapshot | null => {
       if (!report.guildIdentifier) return null;
       const members = dedupeAnalyticsMembers(
@@ -495,24 +507,26 @@ function resolveCurrentGuildIdentifier(
 
 export function buildComparisonOptions({
   analyticsData,
+  reports,
   currentTimestamp,
   guildIdentifier,
   identityResolutionSnapshot,
 }: {
   analyticsData: GuildAnalyticsDerivedData;
+  reports?: GuildSnapshotCompletenessReport[];
   currentTimestamp: number | null;
   guildIdentifier: string | null;
   identityResolutionSnapshot?: Pick<IdentityResolutionSnapshot, "guilds"> | null;
 }) {
   if (currentTimestamp == null || !guildIdentifier) return [];
   const byTimestamp = new Map<number, LocalComparisonScanOption>();
-  const reports = collectCompleteReportsForGuildIdentity(
-    buildGuildSnapshotCompletenessReports(analyticsData),
+  const completeReports = collectCompleteReportsForGuildIdentity(
+    reports ?? buildGuildSnapshotCompletenessReports(analyticsData),
     guildIdentifier,
     identityResolutionSnapshot ?? null,
   );
 
-  reports
+  completeReports
     .filter((report) => report.scannedAtMs < currentTimestamp)
     .forEach((report) => {
       const elapsedMs = currentTimestamp - report.scannedAtMs;
@@ -537,7 +551,7 @@ function resolveSelectedComparisonTimestamp(
   currentTimestamp: number | null,
   requestedTimestamp?: number | null,
 ) {
-  return resolveSharedSelectedComparisonTimestamp(options, currentTimestamp, requestedTimestamp);
+  return resolveSharedSelectedComparisonTimestamp(options, currentTimestamp, requestedTimestamp, 28);
 }
 
 function filterSnapshotsForRange(

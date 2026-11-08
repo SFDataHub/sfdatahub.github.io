@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const toplistSource = () => fs.readFileSync(path.join(repoRoot, "src/pages/GuildHub/Toplist.tsx"), "utf8").replace(/\r\n/g, "\n");
+const toplistSource = () => fs.readFileSync(path.join(repoRoot, "src/pages/DataHub/Toplist.tsx"), "utf8").replace(/\r\n/g, "\n");
 
 describe("local toplist state and race guards", () => {
   test("starts new data runs without keeping stale result rows under a new dataset id", () => {
@@ -31,7 +31,7 @@ describe("local toplist state and race guards", () => {
     const source = toplistSource();
     const activeViewRequestStart = source.indexOf("const activeViewRequest = React.useMemo");
     const activeViewEffectStart = source.indexOf("React.useEffect(() => {\n    const worker = workerRef.current;", activeViewRequestStart);
-    const activeViewEffectEnd = source.indexOf("const staticToplistsValue = React.useMemo", activeViewEffectStart);
+    const activeViewEffectEnd = source.indexOf("const dependencyNeed = React.useMemo", activeViewEffectStart);
     assert.ok(activeViewRequestStart >= 0);
     assert.ok(activeViewEffectStart > activeViewRequestStart);
     assert.ok(activeViewEffectEnd > activeViewEffectStart);

@@ -1,3 +1,4 @@
+import { PLAYER_ATTRIBUTE_COLUMNS } from "./playerAttributeColumns";
 export type LocalToplistMetricRowKind = "player" | "guild";
 export type LocalToplistMetricValueType = "number" | "string" | "timestamp";
 export type LocalToplistMetricMissingBehavior = "last" | "not-derived";
@@ -12,6 +13,12 @@ export type LocalToplistMetricDefinition = {
 };
 
 export const LOCAL_PLAYER_TOPLIST_METRICS: readonly LocalToplistMetricDefinition[] = [
+  ...PLAYER_ATTRIBUTE_COLUMNS.map(c => ({ metricKey: c.key, rowKind: "player" as const, valueType: "number" as const, defaultDirection: "desc" as const, missingValueBehavior: "last" as const, existingField: c.field ?? `attribute:${c.key}` })),
+  { metricKey: "name", rowKind: "player", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "name" },
+  { metricKey: "server", rowKind: "player", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "server" },
+  { metricKey: "class", rowKind: "player", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "class" },
+  { metricKey: "guild", rowKind: "player", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "guild" },
+
   { metricKey: "level", rowKind: "player", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "level" },
   { metricKey: "main", rowKind: "player", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "main" },
   { metricKey: "constitution", rowKind: "player", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "con" },
@@ -30,6 +37,11 @@ export const LOCAL_PLAYER_TOPLIST_METRICS: readonly LocalToplistMetricDefinition
 ];
 
 export const LOCAL_GUILD_TOPLIST_METRICS: readonly LocalToplistMetricDefinition[] = [
+  { metricKey: "guildName", rowKind: "guild", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "name" },
+  { metricKey: "guildServer", rowKind: "guild", valueType: "string", defaultDirection: "asc", missingValueBehavior: "last", existingField: "server" },
+  { metricKey: "guildLastScan", rowKind: "guild", valueType: "timestamp", defaultDirection: "desc", missingValueBehavior: "last", existingField: "latestScanAtSec" },
+  { metricKey: "guildPetLevel", rowKind: "guild", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "petLevel" },
+
   { metricKey: "guildHofRank", rowKind: "guild", valueType: "number", defaultDirection: "asc", missingValueBehavior: "last", existingField: "hofRank" },
   { metricKey: "guildHonor", rowKind: "guild", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "honor" },
   { metricKey: "guildMembers", rowKind: "guild", valueType: "number", defaultDirection: "desc", missingValueBehavior: "last", existingField: "memberCount" },

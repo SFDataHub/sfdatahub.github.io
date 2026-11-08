@@ -1,192 +1,246 @@
-.card {
-  display: grid;
-  min-width: 0;
-  gap: 14px;
-  border: 1px solid #2b4c73;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(20, 39, 62, 0.92), rgba(9, 21, 41, 0.94));
-  padding: 14px;
-  color: #f5f9ff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
+.card { display: grid; min-width: 0; gap: 8px; padding: 0 8px; color: #f5f9ff; }
+.profileLogoPanel { min-width: 0; }
+.coaStage { display: flex; justify-content: center; min-width: 0; }
+.coaImage { width: min(270px, 100%); height: auto; max-width: min(270px, 100%); object-fit: contain; border: 0; border-radius: 0; background: transparent; filter: none; }
+.coaFallback { display: block; min-width: 0; overflow-wrap: anywhere; color: #b0c4d9; font-size: 13px; font-weight: 700; line-height: 1.35; text-align: center; }
+.metadata { --metadata-value-padding: 8px; min-width: 0; padding: 0 8px; color: #f5f9ff; }
+.kpiGrid { display: grid; grid-template-columns: max-content max-content 32px 32px; justify-content: start; column-gap: 10px; row-gap: 4px; margin: 0; }
+.kpiItem { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; min-width: 0; min-height: 24px; }
+.rankedItem { min-height: 32px; }
+.kpiItem dt, .sectionHud dt { min-width: 0; color: #b0c4d9; font-size: 12px; font-weight: 800; line-height: 1.2; }
+.attributeItem dt { padding-left: 12px; }
+.kpiItem dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #f5f9ff; font-size: 16px; font-weight: 850; line-height: 1.18; font-variant-numeric: tabular-nums; text-align: right; }
+.kpiItem .rankingIcon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
+.rankingIcon svg { display: block; flex: 0 0 32px; }
+.scanHud { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 270px; justify-self: center; }
+.scanStand { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 7px 8px; border-block: 1px solid #2b4c73; background: linear-gradient(90deg, transparent, #152a4280, transparent); }
+.scanStand > div { display: grid; min-width: 0; gap: 2px; }
+.scanLabel { color: #b0c4d9; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.scanStand strong { font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.scanStand small { color: #b0c4d9; font-size: 10px; }
+.freshness { display: inline-flex; flex: 0 0 20px; align-items: center; justify-content: center; width: 20px; height: 20px; }
+.freshness > span { width: 9px; height: 9px; border-radius: 999px; }
+.scanDetailsButton { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 4px 8px; border: 1px solid #2b4c73; border-radius: 6px; background: #1e2f47; color: #b0c4d9; font-size: 10px; cursor: pointer; }
+.scanDetailsButton:hover { background: #2a4c72; color: #f5f9ff; }
+.scanDetailsButton:focus-visible, .freshness:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+@media (max-width: 640px) { .metadata { padding: 0; } .kpiGrid { column-gap: 8px; } }
 
-.profileLogoPanel {
-  display: grid;
-  min-width: 0;
-  gap: 10px;
-  border: 1px solid #2b4c73;
-  border-radius: 8px;
-  background: rgba(2, 17, 40, 0.55);
-  padding: 14px;
-}
+.coaImage, .coaFallback, .scanHud { position: relative; z-index: 2; }
+.scanStand { box-sizing: border-box; }
+.scanDetailsButton > svg { flex-shrink: 0; }
 
-.coaStage {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-  margin-bottom: 10px;
+.compactCrest {
+  position: absolute;
+  z-index: 2;
+  left: var(--compact-crest-left);
+  top: var(--compact-crest-top);
+  width: var(--compact-logo-size);
 }
-
-.coaImage {
-  width: min(270px, 100%);
-  height: auto;
-  max-width: min(270px, 100%);
-  max-height: none;
-  object-fit: contain;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  filter: none;
+.compactCrest .coaImage { width: 100%; height: var(--compact-logo-size); }
+.compactHud {
+  position: absolute;
+  left: var(--compact-hud-left);
+  top: var(--compact-hud-top);
+  width: var(--compact-hud-width);
+  max-width: none;
+  height: 36px;
 }
-
-.coaFallback {
-  display: block;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: #b0c4d9;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: center;
+.compactHud .scanDetailsButton {
+  position: absolute;
+  left: var(--compact-info-left);
+  top: -1px;
 }
-
-.profileMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  min-width: 0;
-  color: #b0c4d9;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.profileMeta > div {
-  min-width: 0;
-}
-
-.metaInline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  width: 100%;
-}
-
-.kpiItem dt {
-  color: #b0c4d9;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.freshness {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 8px;
-  max-width: 100%;
-  min-width: 0;
-  border: 1px solid rgba(43, 76, 115, 0.82);
-  border-radius: 999px;
-  background: rgba(15, 33, 53, 0.78);
-  padding: 5px 9px;
-  color: #b0c4d9;
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.freshness span {
+/* Only the separate compact presentation uses the established small status. */
+:global([data-scan-compact="true"]) .scanStand { height: 14px; }
+:global([data-scan-compact="true"]) .scanLabel,
+:global([data-scan-compact="true"]) .scanStand strong { display: none; }
+:global([data-scan-compact="true"]) .scanStand { padding-block: 0; padding-inline-end: 30px; border-block-width: 0; background: transparent; }
+:global([data-scan-compact="true"]) .freshness { height: 14px; }
+:global([data-scan-compact="true"]) .scanStand small { line-height: 14px; }
+:global([data-scan-compact="true"]) .scanDetailsButton {
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-}
-
-.freshness strong {
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  padding: 0;
   gap: 0;
+  border: 0;
+  background: transparent;
+}
+:global([data-scan-compact="true"]) .scanDetailsButton > span { display: none; }
+:global([data-scan-compact="true"]) .scanDetailsButton:hover { color: #f5f9ff; }
+
+[data-scan-age-compact] { display: none; }
+:global([data-scan-compact="true"]) [data-scan-age-expanded] { display: none; }
+:global([data-scan-compact="true"]) [data-scan-age-compact] { display: inline; }
+
+/* The exact ranking rows own their shape, icons, colours and spacing. */
+.kpiGrid { grid-template-columns: minmax(0, 1fr) max-content 32px 32px; column-gap: 4px; }
+.kpiItem dd.topThreeRows { font-weight: 400; line-height: 1.5; text-align: left; grid-column: 1 / -1; width: 100%; min-width: 0; }
+
+@media (max-width: 980px) {
+  .kpiGrid { grid-template-columns: minmax(0, 1fr) max-content 32px 32px; }
+}
+
+/* Keep every average label, value and ranking icon inside one scan-style HUD. */
+.kpiHeader { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; min-width: 0; }
+.averageHud { position: relative; min-height: 24px; background: linear-gradient(90deg, transparent, #203b5880, transparent); }
+.averageHud::after { content: ""; position: absolute; inset: 0; border-block: 1px solid #2b4c73; pointer-events: none; }
+.averageHud > dt { padding-left: 0; }
+.plainSummary { display: contents; }
+.kpiSummary { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; column-gap: 4px; min-width: 0; padding-inline-end: var(--metadata-value-padding); }
+.kpiSummary > dt { padding-left: 0; }
+
+/* Upper lists only: retain the reference's 36px card, 80px icon artwork,
+   crop, colours and radius. Primary text shares the vertical middle axis;
+   external ranks occupy the existing 28px gutter beside the crest. */
+.topThreeRows > ol { gap: 3px; margin-top: 2px; }
+.topThreeRows li > div { position: relative; display: block; }
+.topThreeRows [data-ranking-rank-area] {
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  gap: 3px;
+  font-size: 12px;
+}
+.topThreeRows [data-ranking-card] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: 32px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--metadata-value-padding) 2px 68px;
+}
+.topThreeRows [data-ranking-card] > span:first-of-type {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
   margin: 0;
-  overflow: hidden;
-  border: 1px solid rgba(43, 76, 115, 0.72);
-  border-radius: 8px;
-  background: rgba(2, 17, 40, 0.32);
+}
+.topThreeRows [data-stats-player-name] { grid-row: 1; grid-column: 1; line-height: 14px; }
+.topThreeRows [data-ranking-card] > span:last-child { grid-row: 1; grid-column: 2; height: 32px; display: grid; align-items: center; justify-items: end; line-height: 14px; }
+
+@media (min-width: 981px) and (max-width: 1150px) {
+  .topThreeRows [data-ranking-value] { font-size: 12px; }
+  .topThreeRows [data-ranking-card] > span:last-child { gap: 2px; }
 }
 
-.kpiItem {
-  min-width: 0;
-  border-top: 1px solid rgba(43, 76, 115, 0.62);
-  padding: 8px;
+@media (max-width: 980px) {
+  .topThreeRows li > div { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px; }
+  .topThreeRows [data-ranking-rank-area] { position: static; transform: none; width: auto; gap: 4px; font-size: 13px; }
 }
 
-.kpiItem:nth-child(1),
-.kpiItem:nth-child(2) {
-  border-top: 0;
+/* HUDs and rows share player/scope tracks, with unused desktop space last. */
+.metadata { --metadata-name-inset:68px; --metadata-rank-scope:48px; --metadata-server-rank-width:var(--metadata-rank-scope); --metadata-rank-columns: minmax(0,1fr) var(--metadata-server-rank-width) var(--metadata-rank-scope); }
+.kpiGrid { grid-template-columns:minmax(0,1fr) max-content 48px 48px; row-gap:22px; }
+.kpiItem { row-gap:4px; }
+.rankedItem { grid-template-columns:var(--metadata-rank-columns); column-gap:4px; }
+.kpiGrid:has(.sectionHud) { row-gap:18px; }
+.sectionHud { min-height:32px; }
+.sectionHud dt { grid-column:1 / -1; }
+.kpiItem .rankingIcon { justify-self:center; }
+.topThreeRows li { display:grid; grid-template-columns:var(--metadata-rank-columns); column-gap:4px; align-items:center; }
+.topThreeRows li > div { min-width:0; }
+.archiveRank { justify-self:center; box-sizing:border-box; max-width:100%; padding:3px 5px; font-size:10px; line-height:16px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+@media (min-width:981px) {
+  .metadata { --metadata-rank-columns:var(--metadata-player-width) var(--metadata-server-rank-width) var(--metadata-rank-scope) minmax(0,1fr); }
+}
+@media (min-width:981px) and (max-width:1150px) {
+  .metadata { --metadata-server-rank-width:32px; }
+}
+@media (max-width:640px) {
+  .metadata { --metadata-rank-scope:38px; }
+  .kpiGrid { grid-template-columns:minmax(0,1fr) max-content 38px 38px; }
+  .archiveRank { padding-inline:3px; font-size:9px; }
 }
 
-.kpiItem:nth-child(odd) {
-  border-right: 1px solid rgba(43, 76, 115, 0.62);
+/* The title and the existing card name use the same local icon/name inset. */
+.topThreeRows [data-ranking-card] { padding-left:var(--metadata-name-inset); }
+.kpiSummary > dt { padding-left:var(--metadata-name-inset); overflow-wrap:anywhere; }
+.sectionHud dt { text-align:center; }
+.kpiItem dd.topThreeRows { display:grid; grid-template-columns:subgrid; }
+.topThreeRows > ol { grid-column:1 / -1; grid-row:1; }
+.kpiItem .hudSummary { grid-column:4; grid-row:1; display:flex; flex-direction:column; justify-content:center; gap:3px; min-width:0; margin-top:2px; padding:4px; box-sizing:border-box; border:1px solid #2b4c73; border-radius:6px; background:linear-gradient(135deg,#152a4280,#14273e); text-align:center; overflow-wrap:anywhere; font-size:11px; font-weight:600; }
+.hudSummary > div { display:grid; gap:2px; }
+.hudSummary span { color:#b0c4d9; font-size:10px; line-height:1.2; }
+.hudSummary strong { font-size:15px; line-height:1.2; font-variant-numeric:tabular-nums; }
+.hudSummary [data-summary-hits="unavailable"] strong, .hudSummary[data-summary-hits="unavailable"] strong { font-size:9px; line-height:1.1; }
+.hudSummary small { color:#b0c4d9; font-size:9px; line-height:1.2; }
+.hudSummary:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.kpiItem .rankingControls { grid-column:4; min-width:0; justify-self:end; text-align:left; }
+.rankingControlRoot { position:relative; display:flex; align-items:center; gap:3px; }
+.rankingControls select { box-sizing:border-box; width:66px; min-height:24px; padding:2px; border:1px solid #2b4c73; border-radius:5px; background:#1e2f47; color:#f5f9ff; font:inherit; font-size:10px; cursor:pointer; }
+.rankingControls button { display:flex; align-items:center; justify-content:center; width:20px; height:24px; padding:0; border:0; border-radius:4px; background:transparent; color:#b0c4d9; cursor:pointer; }
+.rankingControls button:hover { background:#2a4c72; color:#f5f9ff; }
+.rankingControls select:focus-visible, .rankingControls button:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.rankingInfo { position:absolute; z-index:6; overflow:auto; overscroll-behavior:contain; box-sizing:border-box; padding:12px; border:1px solid #2b4c73; border-radius:8px; background:#0d1b2d; color:#b0c4d9; box-shadow:0 8px 24px #0008; font-size:12px; font-weight:400; line-height:1.45; overflow-wrap:anywhere; }
+.rankingInfo strong { color:#f5f9ff; }
+.rankingInfo p { margin:8px 0 0; }
+.fortressItem { --metadata-rank-columns:var(--metadata-player-width) minmax(0,1fr); }
+.fortressItem .averageHud { min-height:32px; }
+.fortressItem .hudSummary { grid-column:2; }
+
+/* Constrained metadata keeps the existing player and badge tracks intact. */
+@media (min-width:1400px) and (max-width:1760px) {
+  .kpiItem .rankingControls { width:100%; }
+  .rankingControlRoot { gap:2px; }
+  .rankingControls select { appearance:none; width:calc(100% - 13px); max-width:66px; padding:0; font-size:9px; text-align:center; }
+  .rankingControls button { flex:0 0 11px; width:11px; }
+  .rankingControls button svg { width:11px; }
+  .kpiItem .hudSummary { padding-inline:2px; }
+}
+@media (max-width:1399px) {
+  .kpiItem .rankingControls { grid-column:2 / -1; grid-row:2; padding-block:2px; }
+  .kpiItem .hudSummary { grid-column:1 / -1; grid-row:2; margin-top:6px; flex-direction:row; flex-wrap:wrap; align-items:center; gap:6px 18px; padding:8px; }
+  .hudSummary > div { grid-template-columns:auto auto; align-items:baseline; gap:8px; }
+  .hudSummary small { flex-basis:100%; }
+  .fortressItem { --metadata-rank-columns:var(--metadata-player-width) minmax(0,1fr); }
+}
+@media (min-width:981px) and (max-width:1399px) {
+  .metadata:has(.rankingControls) { position:relative; }
+  .rankedItem:not(.fortressItem) .kpiSummary { display:contents; }
+  .rankedItem:not(.fortressItem) .kpiSummary > dt { grid-column:1 / -1; grid-row:1; padding-right:calc(var(--metadata-server-rank-width) + var(--metadata-rank-scope) + 8px); }
+  .rankedItem:not(.fortressItem) .kpiSummary > dd { grid-column:1; grid-row:2; padding-right:var(--metadata-value-padding); }
+  .rankedItem:not(.fortressItem) .rankingIcon { grid-row:2; }
+  .kpiItem .rankingControls { grid-row:1; }
+  /* Retain the class panel's original four-track envelope when only the
+     metadata needs extra height; use the existing header/grid contracts. */
+  :global([data-dashboard-selected-mode]):has(.rankingControls) > :global(section):has(> :global([data-class-distribution])) {
+    block-size:calc((var(--normal-title-height, 41px) + var(--guild-trend-body-height) + 4 * 51.5px + var(--dashboard-grid-gap)) / 3 + 20px);
+    bottom:auto;
+  }
+}
+@media (max-width:980px) {
+  .metadata { --metadata-name-inset:104px; }
+  .topThreeRows [data-ranking-card] { padding-left:68px; }
+  .fortressItem { --metadata-rank-columns:minmax(0,1fr) calc(var(--metadata-server-rank-width) + var(--metadata-rank-scope) + 4px); }
+}
+.kpiItem.fortressItem .hudSummary { grid-column:2; grid-row:1; flex-direction:column; flex-wrap:nowrap; gap:6px; padding:5px; }
+@media (max-width:640px) {
+  .fortressItem .hudSummary strong { font-size:12px; }
+  .fortressItem .hudSummary[data-summary-hits="unavailable"] strong { font-size:10px; }
 }
 
-.kpiItem dd {
-  min-width: 0;
-  margin: 3px 0 0;
-  overflow: hidden;
-  color: #f5f9ff;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1.18;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* Filtering keeps the existing three-row space beside the whole-guild HUD. */
+.topThreeRows .emptyRankingSlot { height: 36px; min-width: 0; font-size: 11px; line-height: 14px; color: #b0c4d9; }
+.emptyRankingSlot > span { grid-column: 1 / -1; }
 
-.kpiItem small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  margin-top: 2px;
-  color: #b0c4d9;
-  font-size: 10px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .card {
-    padding: 12px;
-  }
-
-  .profileLogoPanel {
-    padding: 12px;
-  }
-
-  .coaStage {
-    margin-bottom: 6px;
-  }
-
-  .kpiGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .kpiItem,
-  .kpiItem:nth-child(2) {
-    border-top: 1px solid rgba(43, 76, 115, 0.62);
-  }
-
-  .kpiItem:first-child {
-    border-top: 0;
-  }
-
-  .kpiItem:nth-child(odd) {
-    border-right: 0;
-  }
+/* Reuse the existing 32px right-hand clearance before the chart. The player
+   tracks and the measured metadata envelope keep their established geometry. */
+.rankingScope { display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; height:32px; padding:0; border:0; border-radius:5px; background:transparent; color:inherit; cursor:pointer; }
+.rankingScope[aria-pressed="true"] { background:#67d7ff18; box-shadow:inset 0 -2px #67d7ff; }
+.rankingScope:hover { background:#67d7ff25; }
+.rankingScope:focus-visible, .hudSummary > div:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+@media (min-width:1400px) {
+  .rankedItem:not(.fortressItem) .averageHud::after { right:-32px; }
+  .kpiItem .rankingControls { width:calc(100% + 32px); justify-self:start; }
+  .rankingControlRoot { gap:4px; }
+  .rankingControls select { flex:1 1 0; width:0; min-width:0; max-width:none; padding:2px; appearance:auto; font-size:10px; text-align:start; }
+  .rankingControls button { flex:0 0 14px; width:14px; }
+  .rankingControls button svg { width:14px; }
+  .kpiItem:not(.fortressItem) .hudSummary { width:calc(100% + 32px); padding-inline:4px; }
 }

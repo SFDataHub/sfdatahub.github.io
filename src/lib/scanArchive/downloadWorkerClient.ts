@@ -1,7 +1,10 @@
+import { auditCurrent, auditSpan, auditSpanEnd, auditEvent, auditFields, auditError, auditWorkerEnvelope, auditMergeWorker } from "../data-hub/runtimeAudit";
+import i18n from "i18next";
 import type {
   ScanArchiveDownloadProgress,
   ScanArchiveDownloadRequest,
   ScanArchiveDownloadResponse,
+  PreparedLocalScanImport,
 } from "./downloadWorkerTypes";
 import type { ScanArchiveEntry } from "./types";
 
@@ -42,8 +45,13 @@ export function startScanArchiveDownloadWorkerRun(options: {
   workerFactory?: () => ScanArchiveDownloadWorkerLike;
   onProgress?: (progress: ScanArchiveDownloadProgress) => void;
 }): ScanArchiveDownloadRun {
+  const ownerAudit = auditCurrent();
   const requestId = options.requestId ?? createRequestId();
+  const constructorAudit = auditSpan(ownerAudit, "worker-constructor-call", "sync-elapsed");
   const worker = (options.workerFactory ?? createScanArchiveDownloadWorker)();
+  auditSpanEnd(ownerAudit, constructorAudit);
+  if (ownerAudit) auditFields(ownerAudit, { workerReady: "unknown; no readiness event", workerInstanceId: requestId, workerKind: "download" });
+  const roundtripAudit = auditSpan(ownerAudit, "worker-request-roundtrip");
   let settled = false;
   let rejectRun: (reason?: unknown) => void = () => undefined;
   let handleMessage: (event: MessageEvent<ScanArchiveDownloadResponse>) => void = () => undefined;
@@ -65,7 +73,11 @@ export function startScanArchiveDownloadWorkerRun(options: {
         options.onProgress?.(message.progress);
         return;
       }
+      if (message.type === "preview-complete") return;
 
+      auditMergeWorker(ownerAudit, message.auditReport);
+      auditSpanEnd(ownerAudit, roundtripAudit);
+      auditEvent(ownerAudit, "worker-response-receipt");
       settled = true;
       cleanup();
       worker.terminate();
@@ -82,6 +94,8 @@ export function startScanArchiveDownloadWorkerRun(options: {
     };
 
     handleError = (event) => {
+      auditError(ownerAudit, new Error(event.message));
+      auditSpanEnd(ownerAudit, roundtripAudit);
       if (settled) return;
       settled = true;
       cleanup();
@@ -91,7 +105,8 @@ export function startScanArchiveDownloadWorkerRun(options: {
 
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "download", requestId, entry: options.entry });
+    const sendAudit = auditSpan(ownerAudit, "postMessage-call", "sync-elapsed");
+    try { worker.postMessage({ type: "download", requestId, entry: options.entry, ...(ownerAudit ? { audit: auditWorkerEnvelope(ownerAudit, requestId, requestId) } : undefined) }); } finally { auditSpanEnd(ownerAudit, sendAudit); }
   });
 
   return {
@@ -99,6 +114,8 @@ export function startScanArchiveDownloadWorkerRun(options: {
     promise,
     cancel() {
       if (settled) return;
+      auditEvent(ownerAudit, "worker-cancel-and-terminate");
+      auditSpanEnd(ownerAudit, roundtripAudit);
       settled = true;
       cleanup();
       try {
@@ -110,4 +127,58 @@ export function startScanArchiveDownloadWorkerRun(options: {
       rejectRun(new ScanArchiveDownloadCancelledError());
     },
   };
+}
+
+/** Local file preview uses the existing decode/validation worker. It performs
+ * no writes; the confirmed DataJob retains ownership of the normal commit. */
+export function prepareLocalScanImportInWorker(options: {
+  filename: string;
+  content: string;
+  signal?: AbortSignal;
+  workerFactory?: () => ScanArchiveDownloadWorkerLike;
+}): Promise<PreparedLocalScanImport> {
+  if (options.signal?.aborted) return Promise.reject(new DOMException("Local scan preview cancelled.", "AbortError"));
+  const owner = auditCurrent();
+  const requestId = createRequestId();
+  const construct = auditSpan(owner, "local-preview:worker-constructor", "sync-elapsed");
+  const worker = (options.workerFactory ?? createScanArchiveDownloadWorker)();
+  auditSpanEnd(owner, construct);
+  const roundtrip = auditSpan(owner, "local-preview:worker-roundtrip");
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+      worker.terminate();
+      options.signal?.removeEventListener("abort", onAbort);
+      auditSpanEnd(owner, roundtrip);
+    };
+    const onError = (event: ErrorEvent) => {
+      cleanup();
+      reject(new Error(event.message || i18n.t("localScanImport.previewFailed", { defaultValue: "Could not prepare the local scan." })));
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("Local scan preview cancelled.", "AbortError"));
+    };
+    const onMessage = (event: MessageEvent<ScanArchiveDownloadResponse>) => {
+      const message = event.data;
+      if (message.requestId !== requestId || message.type === "progress") return;
+      auditMergeWorker(owner, message.auditReport);
+      cleanup();
+      if (message.type === "preview-complete") resolve({ scan: message.scan, statistics: message.statistics });
+      else reject(new Error(message.type === "error" ? message.message : i18n.t("localScanImport.previewInterrupted", { defaultValue: "Local scan preparation was interrupted." })));
+    };
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options.signal?.aborted) { onAbort(); return; }
+    const send = auditSpan(owner, "local-preview:postMessage", "sync-elapsed");
+    try {
+      worker.postMessage({ type: "preview-local-scan", requestId, filename: options.filename, content: options.content,
+        ...(owner ? { audit: auditWorkerEnvelope(owner, requestId, requestId) } : {}) });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    } finally { auditSpanEnd(owner, send); }
+  });
 }

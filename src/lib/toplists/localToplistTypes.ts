@@ -1,3 +1,4 @@
+import type { PlayerAttributeValues } from "./playerAttributeColumns";
 export type LocalToplistConfirmation =
   | {
       kind: "archiveSource";
@@ -84,6 +85,9 @@ export type LocalPlayerToplistRow = {
   con: number | null;
   sum: number | null;
   ratio: number | null;
+  attributeValues?: PlayerAttributeValues;
+  ratioBase?: number | null;
+  ratioTotal?: number | null;
   mainTotal: number | null;
   conTotal: number | null;
   sumTotal: number | null;

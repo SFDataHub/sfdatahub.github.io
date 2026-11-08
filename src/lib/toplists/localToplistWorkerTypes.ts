@@ -1,3 +1,6 @@
+import type { AuditEnvelope, AuditReport } from "../data-hub/runtimeAudit";
+import type { LocalDependencyReceipt } from "../local-data/localDataDependencies";
+import type { LocalSourceValidity } from "../guilds/localSourceValidity";
 import type {
   LocalGuildToplistRow,
   LocalPlayerToplistRow,
@@ -6,7 +9,9 @@ import type {
   LocalToplistSnapshotMeta,
 } from "./localToplistTypes";
 
-export type LocalToplistDerivationWorkerSource = {
+export type LocalToplistDerivationWorkerSource = Partial<LocalSourceValidity> & {
+  resetGeneration?: string;
+  dependencies?: LocalDependencyReceipt;
   manifestYear: number;
   archiveScanId: string;
   archiveSha256: string;
@@ -17,7 +22,9 @@ export type LocalToplistDerivationWorkerSource = {
   confirmation: LocalToplistConfirmation;
 };
 
-export type LocalToplistDerivedSnapshotPayload = {
+export type LocalToplistDerivedSnapshotPayload = Partial<LocalSourceValidity> & {
+  resetGeneration?: string;
+  dependencies?: LocalDependencyReceipt;
   manifestYear: number;
   archiveScanId: string;
   archiveSha256: string;
@@ -44,31 +51,43 @@ export type LocalToplistDerivationWorkerRequest =
   | {
       type: "derive-toplists";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
       sources: LocalToplistDerivationWorkerSource[];
     }
   | {
       type: "cancel";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
     };
 
 export type LocalToplistDerivationWorkerResponse =
   | {
       type: "progress";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
       progress: LocalToplistDerivationProgress;
     }
   | {
       type: "complete";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
       snapshots: LocalToplistDerivedSnapshotPayload[];
     }
   | {
       type: "error";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
       phase?: LocalToplistDerivationProgressPhase;
       message: string;
     }
   | {
       type: "cancelled";
       requestId: string;
+  audit?: AuditEnvelope;
+  auditReport?: AuditReport;
     };

@@ -14,7 +14,7 @@ type LanguageSettingsOverlayProps = {
 };
 
 type UnavailableLanguageOption = {
-  id: "nl" | "pl" | "fr";
+  id: "nl" | "fr";
   label: string;
   flagAsset: string;
 };
@@ -24,11 +24,6 @@ const UNAVAILABLE_LANGUAGE_OPTIONS: ReadonlyArray<UnavailableLanguageOption> = [
     id: "nl",
     label: "Dutch (unavailable)",
     flagAsset: "/assets/flags/Flag_of_the_Netherlands.svg",
-  },
-  {
-    id: "pl",
-    label: "Polish (unavailable)",
-    flagAsset: "/assets/flags/Flag_of_Poland.svg.png",
   },
   {
     id: "fr",
@@ -168,7 +163,7 @@ const LanguageSettingsOverlay: React.FC<LanguageSettingsOverlayProps> = ({ isOpe
                   style={{ backgroundImage: `url("${option.flagAsset}")` }}
                   aria-hidden="true"
                 />
-                <span className={styles.settingsOverlayOptionLabel}>{option.label}</span>
+                <span className={styles.settingsOverlayOptionLabel}>{t(`topbar.unavailableLanguages.${option.id}`, option.label)}</span>
               </button>
             ))}
           </div>

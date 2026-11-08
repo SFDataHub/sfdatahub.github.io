@@ -1,0 +1,1644 @@
+{
+  "cold": {
+    "name": "cold",
+    "started": 8338.5,
+    "calls": {
+      "searchStart": 2,
+      "readiness": 3,
+      "normalizationRepairCheck": 6,
+      "guildMember": 12,
+      "playerCore": 12,
+      "searchRawReader": 5,
+      "searchProjection": 5,
+      "projectionCommit": 5
+    },
+    "timings": {
+      "searchParserCpu": [
+        0.10000002384185791,
+        0.10000002384185791,
+        0.10000002384185791,
+        0,
+        0.10000002384185791
+      ],
+      "searchProjectionCpu": [
+        0.10000002384185791,
+        0.10000002384185791,
+        0,
+        0.10000002384185791,
+        0
+      ]
+    },
+    "longtasks": [],
+    "frames": [
+      15.199999976157414,
+      16.600000000000364,
+      16.700000000000728,
+      16.69999999999891,
+      16.700000000000728,
+      16.600000000000364,
+      16.69999999999891,
+      16.600000000000364,
+      16.600000000000364,
+      16.700000000000728,
+      16.799999999999272,
+      16.600000000000364,
+      16.69999999999891,
+      16.600000000000364,
+      16.700000000000728,
+      16.69999999999891,
+      16.600000000000364,
+      16.80000000000109,
+      17,
+      16.299999999999272,
+      16.700000000000728,
+      16.599999999998545,
+      16.600000000000364,
+      16.80000000000109,
+      16.599999999998545,
+      16.600000000000364,
+      17,
+      16.5,
+      16.600000000000364,
+      16.600000000000364,
+      16.69999999999891,
+      16.600000000000364,
+      16.700000000000728
+    ],
+    "eventloop": [
+      10.600000023841858,
+      3.700000047683716,
+      -13.200000047683716,
+      0.7000000476837158,
+      2.5999999046325684,
+      -4.299999952316284,
+      2.700000047683716,
+      -1.4000000953674316,
+      -1.0999999046325684,
+      -0.30000007152557373,
+      0.30000007152557373,
+      0.5,
+      0,
+      0.09999990463256836,
+      -0.09999990463256836,
+      -0.6000000238418579,
+      0.7999999523162842,
+      0,
+      1,
+      -1.5,
+      -0.10000002384185791,
+      0.9000000953674316,
+      -0.8000000715255737,
+      0.8000000715255737,
+      -0.5,
+      0.3999999761581421,
+      -1.100000023841858,
+      1.2999999523162842,
+      -0.7999999523162842,
+      0.5,
+      -1,
+      1,
+      -0.8999999761581421,
+      1.100000023841858,
+      -0.9000000953674316
+    ],
+    "readiness": {
+      "entry": 29.90000009536743,
+      "favorites": 30,
+      "search": 205.90000009536743,
+      "kpis": 206
+    },
+    "workersAtStart": 4,
+    "transportIndex": 6,
+    "kpis": [
+      "Archive scans available3Fully checkedDistinct file versions in valid manifests for active archive years.",
+      "Archive scans ready locally3Fully checkedOf those, locally present and verified against the archive metadata.",
+      "Own SFTools sources (proven)0Fully checkedExisting original sources with explicit evidence of a personal file import."
+    ],
+    "search": {
+      "revision": 16,
+      "queryGeneration": 0,
+      "hits": [],
+      "limited": false,
+      "local": {
+        "total": 3,
+        "ready": 3,
+        "failed": 0,
+        "unknown": 0,
+        "preparing": false,
+        "error": false
+      },
+      "archive": {
+        "total": 2,
+        "ready": 2,
+        "failed": 0,
+        "unknown": 0,
+        "preparing": false,
+        "error": false
+      },
+      "scope": {
+        "kind": "current"
+      }
+    },
+    "finished": 8899.100000023842,
+    "elapsedMs": 560.6000000238419,
+    "summary": {
+      "rawRequests": 19,
+      "rawPayloadRows": 19,
+      "keyReads": 35,
+      "metadataReads": 268,
+      "writes": 29,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 17,
+      "maxEventloopDelayMs": 10.600000023841858
+    },
+    "idbGroups": [
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readSfDataHubLocalChanges (/src/lib/guilds/localScanLibrary.ts:317:10)",
+        "requests": 45,
+        "rows": 307,
+        "rawRows": 0,
+        "requestElapsedSumMs": 140.80000030994415,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/playerIdentityStore.ts:116:44)",
+        "requests": 24,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 65.7999997138977,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/guildIdentityStore.ts:112:44)",
+        "requests": 24,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 68.69999969005585,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at readHubSearchArchiveMetadata (/src/lib/guilds/localScanLibrary.ts:1919:58) <- at async Object.loadHubSearchArchiveBasis [as loadArchive] (/src/lib/data-hub/hubSearchService.ts:44:19) <- at async HubSearchController.refreshArchive (/src/lib/data-hub/hubSearchService.ts:349:21)",
+        "requests": 2,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 13.100000023841858,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 7,
+        "rows": 21,
+        "rawRows": 0,
+        "requestElapsedSumMs": 24.700000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 7,
+        "rows": 8,
+        "rawRows": 0,
+        "requestElapsedSumMs": 24.700000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 7,
+        "rows": 21,
+        "rawRows": 0,
+        "requestElapsedSumMs": 25.299999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 7,
+        "rows": 7,
+        "rawRows": 0,
+        "requestElapsedSumMs": 25.199999928474426,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": "by_contentHash",
+        "method": "openKeyCursor",
+        "caller": "at readScanContentHashKeys (/src/lib/guilds/localScanLibrary.ts:1427:52) <- at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1447:36) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 7,
+        "rows": 21,
+        "rawRows": 0,
+        "requestElapsedSumMs": 73.00000011920929,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "playerEntities",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listPlayerEntities2 [as listPlayerEntities] (/src/lib/identities/playerIdentityStore.ts:174:90) <- at async loadPlayerIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:107:45) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 18.199999809265137,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "playerAliases",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listPlayerEntities2 [as listPlayerEntities] (/src/lib/identities/playerIdentityStore.ts:174:137) <- at async loadPlayerIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:107:45) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 18.299999833106995,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "guildEntities",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listGuildEntities2 [as listGuildEntities] (/src/lib/identities/guildIdentityStore.ts:164:89) <- at async loadGuildIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:110:44) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 18.299999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "guildAliases",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listGuildEntities2 [as listGuildEntities] (/src/lib/identities/guildIdentityStore.ts:164:135) <- at async loadGuildIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:110:44) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 18.59999978542328,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 15,
+        "rawRows": 0,
+        "requestElapsedSumMs": 20,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 19.800000071525574,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 15,
+        "rawRows": 0,
+        "requestElapsedSumMs": 19.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 5,
+        "rawRows": 0,
+        "requestElapsedSumMs": 19.59999990463257,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": "by_contentHash",
+        "method": "openKeyCursor",
+        "caller": "at readScanContentHashKeys (/src/lib/guilds/localScanLibrary.ts:1427:52) <- at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1447:36) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 15,
+        "rawRows": 0,
+        "requestElapsedSumMs": 61.200000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readHubSearchProjectionInventory [as readProjections] (/src/lib/guilds/localScanLibrary.ts:1930:80) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 9,
+        "rawRows": 0,
+        "requestElapsedSumMs": 31.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readHubSearchProjectionInventory [as readProjections] (/src/lib/guilds/localScanLibrary.ts:1930:121) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 5,
+        "rows": 64,
+        "rawRows": 0,
+        "requestElapsedSumMs": 33.09999990463257,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 6,
+        "rows": 18,
+        "rawRows": 0,
+        "requestElapsedSumMs": 32,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 6,
+        "rows": 8,
+        "rawRows": 0,
+        "requestElapsedSumMs": 31.90000009536743,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 6,
+        "rows": 18,
+        "rawRows": 0,
+        "requestElapsedSumMs": 32.09999990463257,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 6,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 32.200000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/playerIdentityStore.ts:116:44) <- at async read (/src/lib/identities/identityResolution.ts:119:43) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 4.200000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/guildIdentityStore.ts:112:44) <- at async read (/src/lib/identities/identityResolution.ts:119:43) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 12,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 4.300000190734863,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.6999999284744263,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.600000023841858,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1541:25 <- at performGuildHubArchiveReadiness (/src/lib/guilds/localScanLibrary.ts:1534:27)",
+        "requests": 5,
+        "rows": 5,
+        "rawRows": 5,
+        "requestElapsedSumMs": 22,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "get",
+        "caller": "at persistScanNormalizationIfNeeded (/src/lib/guilds/localScanLibrary.ts:666:36) <- at /src/lib/guilds/localScanLibrary.ts:1549:32 <- at async performGuildHubArchiveReadiness (/src/lib/guilds/localScanLibrary.ts:1534:3)",
+        "requests": 6,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 12.299999833106995,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:104:39 <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.099999904632568,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:107:71 <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.3999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:107:100 <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readGuildHubLocalScanForSearch [as readRaw] (/src/lib/guilds/localScanLibrary.ts:1916:57) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:309:24)",
+        "requests": 5,
+        "rows": 5,
+        "rawRows": 5,
+        "requestElapsedSumMs": 6.499999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "put",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1924:42 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.899999976158142,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "add",
+        "caller": "at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:15:42) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 13,
+        "rows": 13,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveSearchIndexes",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.getGuildHubArchiveSearchIndexCache [as getCache] (/src/lib/guilds/localScanLibrary.ts:1600:27) <- at async loadSearchIndex (/src/lib/scanArchive/searchIndexService.ts:94:18)",
+        "requests": 2,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 2.299999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:302:57 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 3,
+        "requestElapsedSumMs": 7,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "put",
+        "caller": "at commitScanMutation.kinds (/src/lib/guilds/localScanLibrary.ts:671:53) <- at /src/lib/guilds/localScanLibrary.ts:308:26 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.5000001192092896,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "put",
+        "caller": "at commitScanMutation.kinds (/src/lib/guilds/localScanLibrary.ts:671:105) <- at /src/lib/guilds/localScanLibrary.ts:308:26 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveSearchIndexes",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.putGuildHubArchiveSearchIndexCache [as putCache] (/src/lib/guilds/localScanLibrary.ts:1623:29) <- at async loadSearchIndex (/src/lib/scanArchive/searchIndexService.ts:102:3)",
+        "requests": 2,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.100000023841858,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1943:53 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 5,
+        "rows": 5,
+        "rawRows": 5,
+        "requestElapsedSumMs": 2.8999998569488525,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": "by_kind",
+        "method": "getAll",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1944:74 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 5,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.8000001907348633,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getKey",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1573:40 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 4.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1574:48 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 4.599999904632568,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1579:75 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.10000002384185791,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "put",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1585:60 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 3,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.20000004768371582,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1541:25 <- at async performGuildHubArchiveReadiness (/src/lib/guilds/localScanLibrary.ts:1534:3)",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 1,
+        "requestElapsedSumMs": 0.3999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveSearchIndexes",
+        "index": null,
+        "method": "put",
+        "caller": "at commitScanMutation.owner (/src/lib/guilds/localScanLibrary.ts:1626:54) <- at /src/lib/guilds/localScanLibrary.ts:308:26 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.10000002384185791,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1947:65 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 4,
+        "rows": 79,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.0999999046325684,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "put",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1949:42 <- at async withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:22) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 4,
+        "rows": 4,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.2999999523162842,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:200:30)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.7999999523162842,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:200:30)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.7999999523162842,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:200:30)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.899999976158142,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:200:30)",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.899999976158142,
+        "errors": 0
+      }
+    ],
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/archive/search/current-a.search.json.gz",
+        "bytes": 239
+      },
+      {
+        "path": "/archive/search/current-b.search.json.gz",
+        "bytes": 252
+      }
+    ],
+    "searchCosts": [
+      {
+        "coldRawReads": 0,
+        "projectionBytes": 0,
+        "preparationMs": 0,
+        "archivePreparationMs": 0,
+        "queries": 2,
+        "queryMs": 0.10000002384185791,
+        "inspect": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "coldRawReads": 5,
+        "projectionBytes": 4287,
+        "preparationMs": 26.899999976158142,
+        "archivePreparationMs": 135.19999992847443,
+        "queries": 17,
+        "queryMs": 0.10000002384185791,
+        "inspect": {
+          "localDocuments": 6,
+          "archiveDocuments": 4,
+          "listeners": 1,
+          "stopped": false
+        }
+      }
+    ],
+    "workers": [
+      {
+        "url": "http://127.0.0.1:5173/src/workers/scanArchiveSearchIndex.worker.ts?worker_file&type=module",
+        "started": 8445,
+        "messages": 1,
+        "replies": 6,
+        "terminated": true
+      },
+      {
+        "url": "http://127.0.0.1:5173/src/workers/scanArchiveSearchIndex.worker.ts?worker_file&type=module",
+        "started": 8445.200000047684,
+        "messages": 1,
+        "replies": 6,
+        "terminated": true
+      }
+    ],
+    "notCaptured": [
+      "worker internal CPU and IDB",
+      "pure structured-clone time",
+      "RAM/heap",
+      "complete per-owner CPU timings"
+    ]
+  },
+  "warm": {
+    "name": "warm",
+    "started": 9281,
+    "calls": {
+      "searchStart": 2
+    },
+    "timings": {},
+    "longtasks": [],
+    "frames": [
+      -10.600000000000364,
+      16.700000000000728,
+      16.69999999999891,
+      16.600000000000364,
+      16.700000000000728,
+      16.600000000000364,
+      16.69999999999891,
+      16.600000000000364,
+      16.700000000000728,
+      16.69999999999891,
+      16.600000000000364,
+      16.799999999999272,
+      16.600000000000364,
+      16.700000000000728,
+      16.600000000000364,
+      16.69999999999891,
+      16.600000000000364,
+      16.700000000000728,
+      16.69999999999891,
+      16.700000000000728,
+      16.600000000000364,
+      16.799999999999272,
+      16.5,
+      16.799999999999272,
+      16.600000000000364,
+      16.80000000000109
+    ],
+    "eventloop": [
+      4,
+      -2.5,
+      -0.5999999046325684,
+      2.0999999046325684,
+      -2.299999952316284,
+      0.20000004768371582,
+      -0.7000000476837158,
+      1.2000000476837158,
+      -0.20000004768371582,
+      -0.7000000476837158,
+      0.20000004768371582,
+      -0.2999999523162842,
+      1.1999999284744263,
+      -0.7999999523162842,
+      -0.30000007152557373,
+      -0.09999990463256836,
+      0.6999999284744263,
+      -0.6999999284744263,
+      0.6999999284744263,
+      0.7000000476837158,
+      -1.3000000715255737,
+      1.2000000476837158,
+      -0.6000000238418579,
+      -0.19999992847442627,
+      0,
+      0.19999992847442627
+    ],
+    "readiness": {
+      "entry": 22.5,
+      "favorites": 22.5,
+      "search": 66.60000002384186,
+      "kpis": 66.60000002384186
+    },
+    "workersAtStart": 6,
+    "transportIndex": 13,
+    "kpis": [
+      "Archive scans available3Fully checkedDistinct file versions in valid manifests for active archive years.",
+      "Archive scans ready locally3Fully checkedOf those, locally present and verified against the archive metadata.",
+      "Own SFTools sources (proven)0Fully checkedExisting original sources with explicit evidence of a personal file import."
+    ],
+    "search": {
+      "revision": 5,
+      "queryGeneration": 0,
+      "hits": [],
+      "limited": false,
+      "local": {
+        "total": 3,
+        "ready": 3,
+        "failed": 0,
+        "unknown": 0,
+        "preparing": false,
+        "error": false
+      },
+      "archive": {
+        "total": 2,
+        "ready": 2,
+        "failed": 0,
+        "unknown": 0,
+        "preparing": false,
+        "error": false
+      },
+      "scope": {
+        "kind": "current"
+      }
+    },
+    "finished": 9698.100000023842,
+    "elapsedMs": 417.10000002384186,
+    "summary": {
+      "rawRequests": 0,
+      "rawPayloadRows": 0,
+      "keyReads": 15,
+      "metadataReads": 113,
+      "writes": 2,
+      "longtaskCount": 0,
+      "maxLongtaskMs": 0,
+      "maxFrameGapMs": 16.80000000000109,
+      "maxEventloopDelayMs": 4
+    },
+    "idbGroups": [
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readSfDataHubLocalChanges (/src/lib/guilds/localScanLibrary.ts:317:10)",
+        "requests": 18,
+        "rows": 346,
+        "rawRows": 0,
+        "requestElapsedSumMs": 50.700000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/playerIdentityStore.ts:116:44)",
+        "requests": 9,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 30.49999988079071,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/guildIdentityStore.ts:112:44)",
+        "requests": 9,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 29.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at readHubSearchArchiveMetadata (/src/lib/guilds/localScanLibrary.ts:1919:58) <- at async Object.loadHubSearchArchiveBasis [as loadArchive] (/src/lib/data-hub/hubSearchService.ts:44:19) <- at async HubSearchController.refreshArchive (/src/lib/data-hub/hubSearchService.ts:349:21)",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.100000023841858,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 4,
+        "rows": 12,
+        "rawRows": 0,
+        "requestElapsedSumMs": 10.099999904632568,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 4,
+        "rows": 12,
+        "rawRows": 0,
+        "requestElapsedSumMs": 9.99999988079071,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 4,
+        "rows": 12,
+        "rawRows": 0,
+        "requestElapsedSumMs": 10.49999988079071,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 4,
+        "rows": 4,
+        "rawRows": 0,
+        "requestElapsedSumMs": 10.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": "by_contentHash",
+        "method": "openKeyCursor",
+        "caller": "at readScanContentHashKeys (/src/lib/guilds/localScanLibrary.ts:1427:52) <- at readDataHubLocalScanMetadata (/src/lib/guilds/localScanLibrary.ts:1447:36) <- at async projectHubFavorites (/src/lib/data-hub/hubFavoritesProjection.ts:17:34)",
+        "requests": 4,
+        "rows": 12,
+        "rawRows": 0,
+        "requestElapsedSumMs": 25.199999809265137,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "playerEntities",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listPlayerEntities2 [as listPlayerEntities] (/src/lib/identities/playerIdentityStore.ts:174:90) <- at async loadPlayerIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:107:45) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8.700000047683716,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "playerAliases",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listPlayerEntities2 [as listPlayerEntities] (/src/lib/identities/playerIdentityStore.ts:174:137) <- at async loadPlayerIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:107:45) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8.400000095367432,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "guildEntities",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listGuildEntities2 [as listGuildEntities] (/src/lib/identities/guildIdentityStore.ts:164:89) <- at async loadGuildIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:110:44) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8.00000011920929,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "guildAliases",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.listGuildEntities2 [as listGuildEntities] (/src/lib/identities/guildIdentityStore.ts:164:135) <- at async loadGuildIdentityResolutionIndex (/src/lib/identities/identityResolution.ts:110:44) <- at async read (/src/lib/identities/identityResolution.ts:114:31) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8.100000143051147,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.199999928474426,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.299999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.399999976158142,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.399999976158142,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": "by_contentHash",
+        "method": "openKeyCursor",
+        "caller": "at readScanContentHashKeys (/src/lib/guilds/localScanLibrary.ts:1427:52) <- at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1447:36) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 17.5,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readHubSearchProjectionInventory [as readProjections] (/src/lib/guilds/localScanLibrary.ts:1930:80) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 10,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.400000095367432,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readHubSearchProjectionInventory [as readProjections] (/src/lib/guilds/localScanLibrary.ts:1930:121) <- at async HubSearchController.refreshLocal (/src/lib/data-hub/hubSearchService.ts:251:49)",
+        "requests": 2,
+        "rows": 46,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.899999976158142,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.699999928474426,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 7.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 2,
+        "rows": 6,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21)",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 8,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/playerIdentityStore.ts:116:44) <- at async read (/src/lib/identities/identityResolution.ts:119:43) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 3.600000023841858,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-guild-identities",
+        "store": "localChanges",
+        "index": null,
+        "method": "getAll",
+        "caller": "at readLocalDataChanges (/src/lib/local-data/localDataChanges.ts:10:13) <- at readChanges (/src/lib/identities/guildIdentityStore.ts:112:44) <- at async read (/src/lib/identities/identityResolution.ts:119:43) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 6,
+        "rows": 0,
+        "rawRows": 0,
+        "requestElapsedSumMs": 4.799999952316284,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scans",
+        "index": null,
+        "method": "getAllKeys",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1443:32) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.8999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "scanSummaries",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1444:40) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.8999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveScanBindings",
+        "index": null,
+        "method": "getAll",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1445:48) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 3,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.8999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.readDataHubLocalScanMetadata [as readLocal] (/src/lib/guilds/localScanLibrary.ts:1446:36) <- at async DataHubScanInventoryController.refreshLocal (/src/lib/data-hub/dataHubScanInventory.ts:173:21) <- at async DataHubScanInventoryController.refreshArchive (/src/lib/data-hub/dataHubScanInventory.ts:153:7)",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.4000000953674316,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:104:39 <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.3999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:107:71 <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.30000007152557373,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-guild-hub",
+        "store": "state",
+        "index": null,
+        "method": "get",
+        "caller": "at /src/lib/data-hub/hubFavoritesStore.ts:107:100 <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.49999988079071045,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "metadata",
+        "index": null,
+        "method": "put",
+        "caller": "at /src/lib/guilds/localScanLibrary.ts:1924:42 <- at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:9:28) <- at /src/lib/local-data/localDataCoordination.ts:17:20",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.8999999761581421,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "localChanges",
+        "index": null,
+        "method": "add",
+        "caller": "at withLocalDataWrite.lease.lease (/src/lib/local-data/localDataTransaction.ts:15:42) <- at async /src/lib/local-data/localDataCoordination.ts:17:14",
+        "requests": 1,
+        "rows": 1,
+        "rawRows": 0,
+        "requestElapsedSumMs": 0.20000004768371582,
+        "errors": 0
+      },
+      {
+        "db": "sfdatahub-local-data",
+        "store": "archiveSearchIndexes",
+        "index": null,
+        "method": "get",
+        "caller": "at Object.getGuildHubArchiveSearchIndexCache [as getCache] (/src/lib/guilds/localScanLibrary.ts:1600:27) <- at async loadSearchIndex (/src/lib/scanArchive/searchIndexService.ts:94:18)",
+        "requests": 2,
+        "rows": 2,
+        "rawRows": 0,
+        "requestElapsedSumMs": 1.9000000953674316,
+        "errors": 0
+      }
+    ],
+    "transport": [
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      },
+      {
+        "path": "/data/scan-archive/catalog.json",
+        "bytes": 120
+      },
+      {
+        "path": "/archive/manifest.json",
+        "bytes": 1808
+      }
+    ],
+    "searchCosts": [
+      {
+        "coldRawReads": 0,
+        "projectionBytes": 0,
+        "preparationMs": 0,
+        "archivePreparationMs": 0,
+        "queries": 2,
+        "queryMs": 0.10000002384185791,
+        "inspect": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "coldRawReads": 5,
+        "projectionBytes": 4287,
+        "preparationMs": 26.899999976158142,
+        "archivePreparationMs": 135.19999992847443,
+        "queries": 17,
+        "queryMs": 0.10000002384185791,
+        "inspect": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "coldRawReads": 0,
+        "projectionBytes": 0,
+        "preparationMs": 0,
+        "archivePreparationMs": 0,
+        "queries": 2,
+        "queryMs": 0,
+        "inspect": {
+          "localDocuments": 0,
+          "archiveDocuments": 0,
+          "listeners": 0,
+          "stopped": true
+        }
+      },
+      {
+        "coldRawReads": 0,
+        "projectionBytes": 0,
+        "preparationMs": 36,
+        "archivePreparationMs": 39.10000002384186,
+        "queries": 6,
+        "queryMs": 0,
+        "inspect": {
+          "localDocuments": 6,
+          "archiveDocuments": 4,
+          "listeners": 1,
+          "stopped": false
+        }
+      }
+    ],
+    "workers": [],
+    "notCaptured": [
+      "worker internal CPU and IDB",
+      "pure structured-clone time",
+      "RAM/heap",
+      "complete per-owner CPU timings"
+    ]
+  },
+  "cleanup": {
+    "controllers": [
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      },
+      {
+        "localDocuments": 0,
+        "archiveDocuments": 0,
+        "listeners": 0,
+        "stopped": true
+      }
+    ],
+    "readiness": {
+      "flights": 0,
+      "consumers": 0
+    },
+    "indexFlights": 0,
+    "acquisition": 0,
+    "preparation": {
+      "sourceJobs": 3,
+      "sourceJoins": 4,
+      "sourceHits": 1,
+      "indexSourceBuilds": 3,
+      "completenessSourceBuilds": 3,
+      "rawReads": 0,
+      "sourceBuilds": 0,
+      "projectionJobs": 5,
+      "projectionJoins": 0,
+      "projectionHits": 0,
+      "scopes": 0,
+      "sourceElapsedMs": 15.300000071525574,
+      "indexCpuMs": 0.6000000238418579,
+      "dispatches": 8,
+      "roundtripMs": 287.799999833107,
+      "inputJsonBytes": 57044,
+      "resultJsonBytes": 12659,
+      "sourceCpuMs": 0,
+      "cardCpuMs": 12.699999928474426,
+      "trendCpuMs": 1,
+      "rawReadElapsedMs": 5.399999976158142,
+      "writeElapsedMs": 0,
+      "memberBuildElapsedMs": 0,
+      "processedSources": 12,
+      "processedRows": 12,
+      "resultRows": 7,
+      "inputSourceDescriptors": 12,
+      "inputDerivedRows": 8,
+      "inputIndexEntries": 2,
+      "sources": 0,
+      "projections": 0,
+      "queue": {
+        "running": null,
+        "waiting": [],
+        "jobs": 0
+      },
+      "transport": {
+        "starts": 1,
+        "startCallMs": 0.09999990463256836,
+        "sendCallMs": 0.5999999046325684,
+        "responseElapsedMs": 285.69999980926514,
+        "releases": 1,
+        "cleanupMs": 0.10000002384185791,
+        "workers": 0,
+        "awaits": 0,
+        "generation": 1
+      }
+    }
+  }
+}

@@ -13,7 +13,7 @@ import type { LocalServerFusionEvent } from "../../src/data/serverFusions.ts";
 import type { LocalServerDefinition } from "../../src/data/serverRegistry.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const compareSource = fs.readFileSync(path.join(repoRoot, "src/pages/GuildHub/compareGuilds.tsx"), "utf8");
+const compareSource = fs.readFileSync(path.join(repoRoot, "src/pages/DataHub/compareGuilds.tsx"), "utf8");
 const chartSource = fs.readFileSync(path.join(repoRoot, "src/components/ui/charts/AnchoredLineChart.tsx"), "utf8");
 const markerSource = fs.readFileSync(path.join(repoRoot, "src/lib/guilds/guildAnalyticsFusionMarkers.ts"), "utf8");
 

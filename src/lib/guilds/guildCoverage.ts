@@ -176,7 +176,7 @@ function readDeclaredMemberCountFromSave(group: JsonRecord): number | undefined 
   return readPositiveInteger(save[3]);
 }
 
-function readDeclaredMemberCount(group: JsonRecord): number | undefined {
+export function readDeclaredMemberCount(group: JsonRecord): number | undefined {
   return readPositiveInteger(readFirst(group, DECLARED_MEMBER_COUNT_KEYS)) ?? readDeclaredMemberCountFromSave(group);
 }
 

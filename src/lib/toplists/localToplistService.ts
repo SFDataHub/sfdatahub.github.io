@@ -1,3 +1,7 @@
+import { auditBegin, auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields, auditCaught, auditCall, auditEvent } from "../data-hub/runtimeAudit";
+import { localToplistContentRevision, localToplistSelectionRevision } from "./localToplistDatasetRevision";
+import { captureLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
+import { hasCurrentLocalSourceValidity, matchesLocalSourceValidity, localSourceValidityKey } from "../guilds/localSourceValidity";
 import {
   acquireExplicitLocalFirstArchiveScans,
   type ExplicitLocalFirstArchiveScanResult,
@@ -6,6 +10,8 @@ import {
 import type { ScanArchiveEntry } from "../scanArchive/types";
 import {
   getSfDataHubLocalScan,
+  readGuildHubLocalScanSourceValidity,
+  readLocalToplistResetGeneration,
   type GuildHubLocalToplistSnapshotRecord,
   type GuildHubLocalScan,
 } from "../guilds/localScanLibrary";
@@ -59,6 +65,9 @@ export type LocalToplistFailedSelection = {
 };
 
 export type LocalToplistLoadResult = {
+  requestRevision?: string;
+  contentRevision?: string;
+  dependencies?: LocalDependencyReceipt;
   status: LocalToplistServiceStatus;
   snapshots: LocalToplistSnapshotMeta[];
   playerRows: LocalPlayerToplistRow[];
@@ -79,7 +88,17 @@ export type LocalToplistServiceDependencies = {
   deriveInWorker: (sources: LocalToplistDerivationWorkerSource[], signal?: AbortSignal) => Promise<LocalToplistDerivedSnapshotPayload[]>;
 };
 
+/** Phase-local physical-source counts, never an overall completion percentage. */
+export type LocalToplistLoadProgress = {
+  phase: "acquiring" | "preparing" | "composing";
+  total: number;
+  succeeded: number;
+  failed: number;
+};
+
 export type LocalToplistLoadOptions = {
+  auditContext?: import("../data-hub/runtimeAudit").AuditFields;
+  onProgress?: (progress: LocalToplistLoadProgress) => void;
   signal?: AbortSignal;
   derivationVersion?: number;
   dependencies?: Partial<LocalToplistServiceDependencies>;
@@ -90,6 +109,7 @@ export type LocalToplistLoadOptions = {
 };
 
 type LoadedSnapshot = {
+  resetGeneration: string;
   entry: ScanArchiveEntry;
   cacheKey: string;
   payload: LocalToplistDerivedSnapshotPayload;
@@ -130,20 +150,22 @@ const mergeLogicalToplistPayload = (
   loaded: readonly LoadedSnapshot[],
   groupEntries: readonly ScanArchiveEntry[],
 ): LocalToplistDerivedSnapshotPayload => {
-  if (loaded.length === 1) return loaded[0].payload;
+    const __audit1 = auditPhaseBegin("mergeLogicalToplistPayload", undefined, "sync-elapsed");
+    try {
+  if (loaded.length === 1) return auditReturn(__audit1, loaded[0].payload);
 
   const payloads = loaded
     .map((item) => item.payload)
     .sort((left, right) => left.scanTimestamp - right.scanTimestamp || compareText(left.archiveScanId, right.archiveScanId));
   const latest = payloads[payloads.length - 1];
-  const { playerRows, guildRows } = composeMonthlySet(payloads);
+  const { playerRows, guildRows } = (auditValue(__audit1, auditEnter(__audit1, "composeMonthlySet", "sync-elapsed"), (composeMonthlySet(payloads))));
   const issues = payloads.flatMap((payload) => payload.issues);
   const scanTimestamp = Math.max(...payloads.map((payload) => payload.scanTimestamp));
   const archiveScanId = groupEntries.map((entry) => entry.id).join("+");
   const archiveSha256 = groupEntries.map((entry) => normalizeSha(entry.sha256)).join("+");
   const localScanId = payloads.map((payload) => payload.localScanId).join("+");
 
-  return {
+  return auditReturn(__audit1, {
     manifestYear: latest.manifestYear,
     archiveScanId,
     archiveSha256,
@@ -165,7 +187,10 @@ const mergeLogicalToplistPayload = (
       issues,
     },
     issues,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 };
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error ?? "unknown_error"));
@@ -179,17 +204,22 @@ const throwIfAborted = (signal?: AbortSignal) => {
 };
 
 const defaultDeriveInWorker: LocalToplistServiceDependencies["deriveInWorker"] = async (sources, signal) => {
+    const __audit2 = auditPhaseBegin("defaultDeriveInWorker", undefined, "async-container");
+    try {
   throwIfAborted(signal);
   const run = startLocalToplistDerivationWorkerRun({ sources });
   const abortListener = () => run.cancel();
   signal?.addEventListener("abort", abortListener, { once: true });
   try {
-    const snapshots = await run.promise;
+    const snapshots = await (auditValue(__audit2, auditEnter(__audit2, "run.promise"), (run.promise)));
     throwIfAborted(signal);
-    return snapshots;
+    return auditReturn(__audit2, snapshots);
   } finally {
     signal?.removeEventListener("abort", abortListener);
   }
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 };
 
 const defaultDependencies: LocalToplistServiceDependencies = {
@@ -265,6 +295,9 @@ const payloadFromRecord = (record: GuildHubLocalToplistSnapshotRecord): LocalTop
   scanTimestamp: record.scanTimestamp,
   localScanId: record.localScanId,
   localContentHash: record.localContentHash,
+  sourceGeneration: record.sourceGeneration,
+  normalizerVersion: record.normalizerVersion,
+  coreNormalizerVersion: record.coreNormalizerVersion,
   playerRows: record.playerRows,
   guildRows: record.guildRows,
   snapshotMeta: record.snapshotMeta,
@@ -305,21 +338,32 @@ async function loadOrDeriveSnapshot(input: {
   issues: LocalToplistIssue[];
   workerRanFlag: { value: boolean };
 }): Promise<LoadedSnapshot> {
+    const __audit3 = auditPhaseBegin("loadOrDeriveSnapshot", undefined, "async-container");
+    try {
   const { entry, acquired, derivationVersion, dependencies, signal } = input;
   const cacheKey = localToplistSnapshotCacheKey({
     archiveScanId: entry.id,
     archiveSha256: entry.sha256,
     derivationVersion,
   });
-  const existing = inFlightDerivedSnapshots.get(cacheKey);
-  if (existing) return existing;
+  throwIfAborted(signal);
+  const sourceDependencies = await (auditValue(__audit3, auditEnter(__audit3, "captureLocalDataDependencies"), (captureLocalDataDependencies({ sourceIds: [acquired.localScanId] }))));
+  const resetGeneration = await (auditValue(__audit3, auditEnter(__audit3, "readLocalToplistResetGeneration"), (readLocalToplistResetGeneration(acquired.localScanId))));
+  const scan = await (auditValue(__audit3, auditEnter(__audit3, "dependencies.getLocalScan"), (dependencies.getLocalScan(acquired.localScanId))));
+  if (!scan) throw new Error(`Lokaler Scan wurde nicht gefunden: ${acquired.localScanId}`);
+  if (!hasCurrentLocalSourceValidity(scan)) throw new Error(`Lokaler Scan hat keinen aktuellen Versionsbeleg: ${scan.id}`);
+  const confirmation = confirmationFor(entry, scan, acquired);
+  if (!confirmation) throw new Error(`Lokaler Scan ist nicht als Archivquelle bestaetigt: ${entry.id}`);
+  const flightKey = (auditValue(__audit3, auditEnter(__audit3, "JSON.stringify", "sync-elapsed"), (JSON.stringify([cacheKey, scan.id, scan.contentHash, localSourceValidityKey(scan),
+    entry.archiveYear, entry.server, entry.timestamp, resetGeneration]))));
+  const existing = inFlightDerivedSnapshots.get(flightKey);
+  if (existing) return auditReturn(__audit3, existing);
 
   const promise = (async (): Promise<LoadedSnapshot> => {
+    const __audit4 = auditBegin("S08", "derived-source", __audit3);
+    if (__audit4) auditFields(__audit4, { sourceScanId: scan.id, sourceGeneration: scan.sourceGeneration, archiveEntryId: entry.id, resetGeneration });
+    try {
     throwIfAborted(signal);
-    const scan = await dependencies.getLocalScan(acquired.localScanId);
-    if (!scan) throw new Error(`Lokaler Scan wurde nicht gefunden: ${acquired.localScanId}`);
-    const confirmation = confirmationFor(entry, scan, acquired);
-    if (!confirmation) throw new Error(`Lokaler Scan ist nicht als Archivquelle bestaetigt: ${entry.id}`);
     const canonicalServer = normalizeServerKeyFromInput(entry.server) ?? entry.server;
     const expectation: LocalToplistSnapshotCacheExpectation = {
       derivationVersion,
@@ -330,16 +374,22 @@ async function loadOrDeriveSnapshot(input: {
       scanTimestamp: entry.timestamp,
       localScanId: acquired.localScanId,
       localContentHash: scan.contentHash,
+      sourceGeneration: scan.sourceGeneration,
+      normalizerVersion: scan.normalizerVersion,
+      coreNormalizerVersion: scan.coreNormalizerVersion,
     };
-    const cached = await getLocalToplistSnapshot(expectation);
+    const cached = await (auditValue(__audit4, auditEnter(__audit4, "getLocalToplistSnapshot"), (getLocalToplistSnapshot(expectation))));
     if (cached.status === "hit") {
+      auditEvent(__audit4, "persisted-cache-hit");
       input.cacheHits.push(cacheKey);
-      return { entry, cacheKey, payload: payloadFromRecord(cached.record), source: "cache" };
+      return auditReturn(__audit4, { entry, cacheKey, resetGeneration, payload: payloadFromRecord(cached.record), source: "cache" });
     }
     input.cacheMisses.push(cacheKey);
     input.issues.push(cacheIssueToToplistIssue(expectation, cached.reason));
 
     const source: LocalToplistDerivationWorkerSource = {
+      resetGeneration,
+      dependencies: sourceDependencies,
       manifestYear: entry.archiveYear,
       archiveScanId: entry.id,
       archiveSha256: entry.sha256,
@@ -347,30 +397,84 @@ async function loadOrDeriveSnapshot(input: {
       scanTimestamp: entry.timestamp,
       localScanId: acquired.localScanId,
       localContentHash: scan.contentHash,
+      sourceGeneration: scan.sourceGeneration,
+      normalizerVersion: scan.normalizerVersion,
+      coreNormalizerVersion: scan.coreNormalizerVersion,
       confirmation,
     };
+    auditEvent(__audit4, "new-derived-build");
     input.workerRanFlag.value = true;
-    const snapshots = await dependencies.deriveInWorker([source], signal);
+    const snapshots = await (auditValue(__audit4, auditEnter(__audit4, "dependencies.deriveInWorker"), (dependencies.deriveInWorker([source], signal))));
     const payload = snapshots[0];
     if (!payload) throw new Error(`Worker lieferte keinen Derived Snapshot fuer ${entry.id}.`);
-    const saved = await putLocalToplistSnapshot(payload, { derivationVersion });
+    if (payload.localScanId !== scan.id || payload.localContentHash !== scan.contentHash ||
+        !matchesLocalSourceValidity(payload, scan)) throw new Error(`Worker lieferte veraltete Sourcegeneration fuer ${entry.id}.`);
+    const latest = await (auditValue(__audit4, auditEnter(__audit4, "dependencies.getLocalScan"), (dependencies.getLocalScan(scan.id))));
+    if (!latest || latest.contentHash !== scan.contentHash || !matchesLocalSourceValidity(scan, latest)) {
+      throw new Error(`Sourcegeneration hat sich waehrend der Ableitung geaendert: ${entry.id}`);
+    }
+    const saved = await (auditValue(__audit4, auditEnter(__audit4, "putLocalToplistSnapshot"), (putLocalToplistSnapshot(payload, { derivationVersion, resetGeneration, dependencies: sourceDependencies }))));
     input.derivedSelections.push(cacheKey);
-    return { entry, cacheKey, payload: payloadFromRecord(saved), source: "derived" };
-  })().finally(() => {
-    inFlightDerivedSnapshots.delete(cacheKey);
+    return auditReturn(__audit4, { entry, cacheKey, resetGeneration, payload: payloadFromRecord(saved), source: "derived" });
+
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
+})().finally(() => {
+    inFlightDerivedSnapshots.delete(flightKey);
   });
 
-  inFlightDerivedSnapshots.set(cacheKey, promise);
-  return promise;
+  inFlightDerivedSnapshots.set(flightKey, promise);
+  return auditReturn(__audit3, promise);
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 }
 
 export async function loadOrBuildLocalToplistSnapshots(
   selectedEntries: readonly ScanArchiveEntry[],
   options: LocalToplistLoadOptions = {},
 ): Promise<LocalToplistLoadResult> {
+    const __audit5 = auditBegin("F20", "loadOrBuildLocalToplistSnapshots");
+    auditFields(__audit5, options.auditContext ?? { trigger: "toplist-service-call", consumer: "toplist-service-unspecified" });
+    try {
   const dependencies = createDependencies(options);
   const derivationVersion = options.derivationVersion ?? LOCAL_TOPLIST_DERIVATION_VERSION;
   const entries = uniqueEntries(selectedEntries, derivationVersion);
+  const report = (progress: LocalToplistLoadProgress) => {
+    if (options.signal?.aborted) return;
+    try { options.onProgress?.(progress); }
+    catch { /* Progress observation cannot change the data result. */ }
+  };
+  report({ phase: "acquiring", total: entries.length, succeeded: 0, failed: 0 });
+  const requestRevision = localToplistSelectionRevision(entries, derivationVersion);
+  const provide = async (result: LocalToplistLoadResult, physical: LoadedSnapshot[] = []) => {
+    const __audit6 = auditPhaseBegin("provide", __audit5, "async-container");
+    try {
+    const dependencies = await (auditValue(__audit6, auditEnter(__audit6, "captureLocalDataDependencies"), (captureLocalDataDependencies({ servers: result.failedSelections.map(selection => selection.server), sourceIds: physical.map(item => item.payload.localScanId), toplistResets: true }))));
+    const live = await (auditValue(__audit6, auditEnter(__audit6, "readGuildHubLocalScanSourceValidity"), (readGuildHubLocalScanSourceValidity(physical.map(item => item.payload.localScanId)))));
+    for (const { payload, resetGeneration } of physical) {
+      const source = live.get(payload.localScanId);
+      if (!source || source.contentHash !== payload.localContentHash || !matchesLocalSourceValidity(payload, source) ||
+          resetGeneration !== await (auditValue(__audit6, auditEnter(__audit6, "readLocalToplistResetGeneration"), (readLocalToplistResetGeneration(payload.localScanId))))) throw new Error("local_toplist_dependencies_changed_during_load");
+    }
+    return auditReturn(__audit6, {
+      ...result, dependencies, requestRevision,
+      contentRevision: localToplistContentRevision({
+        contract: "monthly-set:1;view:1;compare:1", derivationVersion,
+        requestRevision,
+        status: result.status, snapshots: result.snapshots, playerRows: result.playerRows, guildRows: result.guildRows,
+        physical: physical.map(({ payload, resetGeneration }) => ({
+          id: payload.archiveScanId, sha: payload.archiveSha256, source: payload.localScanId, hash: payload.localContentHash,
+          generation: payload.sourceGeneration, normalizer: payload.normalizerVersion, core: payload.coreNormalizerVersion, resetGeneration,
+        })).sort((a,b) => a.id.localeCompare(b.id)),
+        ready: result.readySelections.map(({ source: _source, ...selection }) => selection),
+        failed: result.failedSelections.map(({ message: _message, ...selection }) => selection),
+      }),
+    });
+
+    } catch (__auditError) { auditError(__audit6, __auditError); throw __auditError; }
+    finally { auditLeave(__audit6); }
+};
   const snapshots: LocalToplistSnapshotMeta[] = [];
   const playerRows: LocalPlayerToplistRow[] = [];
   const guildRows: LocalGuildToplistRow[] = [];
@@ -383,7 +487,7 @@ export async function loadOrBuildLocalToplistSnapshots(
   const workerRanFlag = { value: false };
 
   if (!entries.length) {
-    return {
+    return auditReturn(__audit5, provide({
       status: "empty",
       snapshots,
       playerRows,
@@ -396,17 +500,21 @@ export async function loadOrBuildLocalToplistSnapshots(
       networkAccessed: false,
       workerRan: false,
       issues,
-    };
+    }));
   }
 
   let acquisition: ExplicitLocalFirstArchiveScansResult;
   try {
-    acquisition = await dependencies.acquireEntries(entries, {
+    acquisition = await (auditValue(__audit5, auditEnter(__audit5, "dependencies.acquireEntries"), (dependencies.acquireEntries(entries, {
       ...options.acquisitionOptions,
       signal: options.signal,
-    });
-  } catch (error) {
-    return {
+      onProgress: (progress) => {
+        report({ phase: "acquiring", ...progress });
+        try { options.acquisitionOptions?.onProgress?.(progress); } catch { /* Observer only. */ }
+      },
+    }))));
+  } catch (error) { auditCaught(__audit5, error);
+    return auditReturn(__audit5, provide({
       status: "empty",
       snapshots,
       playerRows,
@@ -419,7 +527,7 @@ export async function loadOrBuildLocalToplistSnapshots(
       networkAccessed: false,
       workerRan: false,
       issues,
-    };
+    }));
   }
 
   acquisition.failedArchives.forEach((failure) => {
@@ -440,9 +548,12 @@ export async function loadOrBuildLocalToplistSnapshots(
     return [{ entry, acquired }];
   });
 
-  const loaded = await runWithConcurrency(work, MAX_TOPLIST_DERIVATION_CONCURRENCY, options.signal, async ({ entry, acquired }) => {
+  let prepared = 0;
+  const preparationProgress = () => report({ phase: "preparing", total: entries.length, succeeded: prepared, failed: failedSelections.length });
+  preparationProgress();
+  const loaded = await (auditValue(__audit5, auditEnter(__audit5, "runWithConcurrency"), (runWithConcurrency(work, MAX_TOPLIST_DERIVATION_CONCURRENCY, options.signal, async ({ entry, acquired }) => {
     try {
-      return await loadOrDeriveSnapshot({
+      const snapshot = await (__audit5 ? auditCall(__audit5, "derived-source-consumer", () => loadOrDeriveSnapshot({
         entry,
         acquired,
         derivationVersion,
@@ -453,13 +564,29 @@ export async function loadOrBuildLocalToplistSnapshots(
         derivedSelections,
         issues,
         workerRanFlag,
-      });
+      }), "async-container") : loadOrDeriveSnapshot({
+        entry,
+        acquired,
+        derivationVersion,
+        dependencies,
+        signal: options.signal,
+        cacheMisses,
+        cacheHits,
+        derivedSelections,
+        issues,
+        workerRanFlag,
+      }));
+      prepared += 1;
+      preparationProgress();
+      return snapshot;
     } catch (error) {
       failedSelections.push(failureForEntry(entry, errorMessage(error), isAbortError(error) ? "aborted" : "worker-error"));
+      preparationProgress();
       return null;
     }
-  });
+  }))));
 
+  report({ phase: "composing", total: entries.length, succeeded: prepared, failed: failedSelections.length });
   const loadedSnapshots = loaded.filter((item): item is LoadedSnapshot => Boolean(item));
   const loadedByArchiveKey = new Map(loadedSnapshots.map((item) => [archiveEntryKey(item.entry), item] as const));
   const failedArchiveKeys = new Set(failedSelections.map((failure) => `${failure.archiveScanId}:${normalizeSha(failure.archiveSha256)}`));
@@ -499,7 +626,7 @@ export async function loadOrBuildLocalToplistSnapshots(
     });
   }
 
-  return {
+  return auditReturn(__audit5, provide({
     status: failedSelections.length ? (readySelections.length ? "partial" : "empty") : readySelections.length ? "complete" : "empty",
     snapshots: snapshots.sort((left, right) => left.scanTimestamp - right.scanTimestamp || compareText(left.server, right.server)),
     playerRows: playerRows.sort((left, right) => compareText(left.server, right.server) || compareText(left.identifier, right.identifier)),
@@ -512,7 +639,10 @@ export async function loadOrBuildLocalToplistSnapshots(
     networkAccessed: acquisition.networkAccessed,
     workerRan: workerRanFlag.value,
     issues,
-  };
+  }, loadedSnapshots));
+
+    } catch (__auditError) { auditError(__audit5, __auditError); throw __auditError; }
+    finally { auditLeave(__audit5); }
 }
 
 export const __localToplistServiceTestUtils = {

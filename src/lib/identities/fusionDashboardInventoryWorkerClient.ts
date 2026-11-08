@@ -1,3 +1,4 @@
+import { revalidateLocalDataDependencies } from "../local-data/localDataDependencies";
 import type {
   FusionIdentityDashboardInventory,
   FusionIdentityDashboardInventoryProgress,
@@ -94,7 +95,11 @@ export const startFusionDashboardInventoryWorkerRun = (
         cleanup();
 
         if (message.type === "complete") {
-          resolve({ inventory: message.inventory, timings: message.timings });
+        if (!message.dependencies && !options.workerFactory) { worker.terminate(); reject(new Error("Fusion worker result has no dependency certificate.")); return; }
+          const validate = message.dependencies ? revalidateLocalDataDependencies(message.dependencies).then(result => {
+            if (!result.current) throw new Error("Fusion dependencies changed before delivery.");
+          }) : Promise.resolve();
+          void validate.then(() => resolve({ inventory: message.inventory, timings: message.timings }), reject);
           worker.terminate();
           return;
         }

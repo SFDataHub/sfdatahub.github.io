@@ -6,7 +6,9 @@ import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/logo-sfdatahub.png";
 import styles from "../../pages/auth/LoginPage.module.css";
 
-const LoginCard: React.FC = () => {
+type LoginCardProps = { cardRef?: React.Ref<HTMLDivElement> };
+
+const LoginCard: React.FC<LoginCardProps> = ({ cardRef }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { status, user, loginWithDiscord, logout } = useAuth();
@@ -113,7 +115,7 @@ const LoginCard: React.FC = () => {
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.card}>
+      <div ref={cardRef} className={styles.card}>
         <img className={styles.logo} src={logo} alt={t("account.loginOverlay.logoAlt")} />
         <h1 className={styles.heading}>{t("account.loginOverlay.title")}</h1>
         <p className={styles.subcopy}>{t("account.loginOverlay.subtitle")}</p>

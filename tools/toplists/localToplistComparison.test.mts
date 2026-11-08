@@ -402,3 +402,15 @@ describe("local toplist comparison", () => {
 });
 
 console.log("localToplistComparison.test: ok");
+
+test("new text sorts retain comparison identities and numeric rank changes without text deltas", () => {
+ const previous={month:"2026-01",snapshots:[snapshot("EU1","previous",prevTs)],players:[player({identifier:"a",name:"Zeta"}),player({identifier:"b",name:"Alpha"})],guilds:[]};
+ const current={month:"2026-02",snapshots:[snapshot("EU1","current",currTs)],players:[player({identifier:"a",name:"Alpha"}),player({identifier:"b",name:"Zeta"})],guilds:[]};
+ for(const metricKey of ["name","server","class","guild"]){
+  const result=compareLocalToplists(previous,current,{playerSort:{metricKey,direction:"asc"}});
+  assert.equal(result.players.length,2);assert.ok(result.players.every(r=>r.status==="matched"&&r.metricDelta===null));
+ }
+ const ascending=compareLocalToplists(previous,current,{playerSort:{metricKey:"name",direction:"asc"}});
+ const descending=compareLocalToplists(previous,current,{playerSort:{metricKey:"name",direction:"desc"}});
+ assert.equal(ascending.currentPlayerView.rows[0].identifier,"a");assert.equal(descending.currentPlayerView.rows[0].identifier,"b");assert.equal(ascending.players.find(r=>r.current?.identifier==="a")?.rankDelta,1);
+});

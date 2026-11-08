@@ -1097,20 +1097,70 @@ const conflictResult = await mergeReadyFusionIdentityItems(mixedStatusReport, {
     currentIdentifiers: ["mixed-ready", "f28_net_p902"],
   },
   playerStore: {
-    async linkPlayerIdentifiers(currentIdentifier: string) {
+    ...createPlayerIdentityStore({ dbName: `w119-conflict-${dbSuffix}` }),
+    async linkPlayerIdentifiers(currentIdentifier: string, historicalIdentifier: string, metadata: any) {
       conflictCalls.push(currentIdentifier);
-      if (currentIdentifier === "f28_net_p902") {
-        throw new Error("candidate_reserved");
-      }
+      if (currentIdentifier === "f28_net_p902") throw new Error("candidate_reserved");
+      return createPlayerIdentityStore({ dbName: `w119-conflict-${dbSuffix}` }).linkPlayerIdentifiers(currentIdentifier, historicalIdentifier, metadata);
     },
-  } as never,
+  },
 });
 assert.deepEqual(conflictCalls, ["mixed-ready", "f28_net_p902"]);
 assert.equal(conflictResult.players, 1);
 assert.equal(conflictResult.guilds, 0);
-assert.deepEqual(conflictResult.errors, [
+assert.deepEqual(conflictResult.errors.map(({ itemId, message }) => ({ itemId, message })), [
   { itemId: "mixed-conflict", message: "candidate_reserved" },
 ]);
+assert.equal(conflictResult.processed, 2);
+assert.equal(conflictResult.failedPlayers, 0);
+assert.equal(conflictResult.unresolved, 1);
+assert.equal(conflictResult.errors[0].currentIdentifier, "f28_net_p902");
+
+// Capture identifiers before the first await; progress counts settled writes,
+// including failures, and never includes newly discovered Ready candidates.
+const frozenReport = {
+  ...mixedStatusReport,
+  items: [0, 1, 2, 3].map(index => ({
+    ...mixedStatusReport.items[0], id: `frozen-${index}`,
+    entityType: index === 2 ? "guild" as const : "player" as const,
+    status: index === 3 ? "review" as const : "ready" as const,
+    currentIdentifier: `current-${index}`, readyCandidateIdentifier: `old-${index}`,
+  })),
+};
+const frozenCalls: string[] = [];
+const progressCounts: number[] = [];
+const frozenResult = await mergeReadyFusionIdentityItems(frozenReport, {
+  playerStore: { ...createPlayerIdentityStore({ dbName: `w119-frozen-player-${dbSuffix}` }), async linkPlayerIdentifiers(current: string, old: string, metadata: any) {
+    frozenCalls.push(`${current}:${old}`);
+    frozenReport.items[1].readyCandidateIdentifier = "changed-during-job";
+    frozenReport.items.push({ ...frozenReport.items[0], id: "new-ready", currentIdentifier: "new-ready" });
+    await new Promise(resolve => setTimeout(resolve, 55));
+    if (current === "current-1") throw Error("test-write-conflict");
+    return createPlayerIdentityStore({ dbName: `w119-frozen-player-${dbSuffix}` }).linkPlayerIdentifiers(current, old, metadata);
+  } },
+  guildStore: { ...createGuildIdentityStore({ dbName: `w119-frozen-guild-${dbSuffix}` }), async linkGuildAliases(current: string, old: string, metadata: any) {
+    frozenCalls.push(`${current}:${old}`);
+    return createGuildIdentityStore({ dbName: `w119-frozen-guild-${dbSuffix}` }).linkGuildAliases(current, old, metadata);
+  } },
+  onProgress(p) {
+    assert.equal(p.total, 3);
+    assert.equal(p.processed, p.players + p.guilds + p.failedPlayers + p.failedGuilds);
+    progressCounts.push(p.processed);
+  },
+});
+assert.deepEqual(frozenCalls, ["current-0:old-0", "current-1:old-1", "current-2:old-2"]);
+assert.equal(progressCounts[0], 0);
+assert.equal(progressCounts.at(-1), 3);
+assert(progressCounts.some(value => value > 0 && value < 3));
+assert.equal(frozenResult.players, 1);
+assert.equal(frozenResult.guilds, 1);
+assert.equal(frozenResult.failedPlayers, 1);
+let prematureWrites = 0;
+await assert.rejects(() => mergeReadyFusionIdentityItems(frozenReport, {
+  playerStore: { async linkPlayerIdentifiers() { prematureWrites++; } } as never,
+  onProgress() { throw Error("before-loop-failure"); },
+}), /before-loop-failure/);
+assert.equal(prematureWrites, 0);
 
 const mergeResult = await mergeReadyFusionIdentityItems(report, {
   playerStore,

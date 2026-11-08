@@ -1,15 +1,32 @@
+import { profileLocale, profilePercent, profileText, profileDateTime } from "../../lib/i18n/profilePresentation";
+import { guildChartAvailableTimes } from "./dashboardChartWindow";
+import DashboardChartRange, { guildChartRangeStart, type GuildChartRangeSelection, type GuildChartRangeControl } from "./DashboardChartRange";
+import { CompareDisplay } from "./DashboardCompareChart";
+import { sharedAnalyticsPreparation, type AnalyticsPreparationLease } from "../../lib/local-player-profile/sharedPreparation";
+import { guildViewEvents, useAnalyticsView } from "../../lib/analytics/localEvents";
+import { preferencesStore } from "../../lib/settings/preferences";
+import { useProfileAttributeSumMode } from "../../lib/settings/usePreferences";
+import { projectLocalGuildMembers } from "./localGuildPlayerStats";
+import { serverComparisonKey } from "../../lib/servers/serverResolver";
+import { auditBegin, auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditDiscard, auditCaught, auditAccept, auditResultId, auditRecordedEvent, associateAuditResultId, auditObserveInputs, auditFields } from "../../lib/data-hub/runtimeAudit";
+import { buildGuildAnalyticsFusionMarkers, type GuildAnalyticsFusionMarker } from "../../lib/guilds/guildAnalyticsFusionMarkers";
+import { buildDashboardCompareEmblems } from "./dashboardCompareEmblems";
+import { startSharedGuildTrendRun, analyticsSummaryKey } from "../../lib/local-player-profile/cardTrendExecution";
 import React from "react";
-import { TrendingDown, TrendingUp, UserMinus, UserPlus, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useRuntimeAuditCommit } from "../../lib/data-hub/useRuntimeAuditCommit";
+import { useProfileTranslation as useTranslation } from "../../lib/i18n/useProfileTranslation";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { DATA_HUB, parseObservation, safeLocalReturn } from "../../lib/data-hub/routes";
 import ContentShell from "../../components/ContentShell";
-import GuildTrendChart, { type GuildTrendChartMetric } from "../../components/guild-trend/GuildTrendChart";
-import GuildContextBar from "../../components/guilds/GuildContextBar";
-import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
-import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
-import { getClassMetaById, iconForClassName, type ClassMeta } from "../../data/classes";
+import type { ClassSelection } from "../../data/classes";
+import GuildTrendChart, { getGuildTrendMetric, type GuildTrendChartMetric } from "../../components/guild-trend/GuildTrendChart";
+import GuildDashboardLoadingState from "./GuildDashboardLoadingState";
+import LocalTitleNavigation from "../../components/ui/shared/LocalTitleNavigation";
+import { getClassMetaById, type ClassMeta } from "../../data/classes";
 import { SERVER_BY_ID } from "../../data/servers";
 import {
   getGuildHubLocalScan,
+  selectGuildHubRawSnapshot,
   isGuildHubScanAnalyticsEnabled,
   listGuildHubScanSummaries,
   subscribeToSfDataHubLocalScanChanges,
@@ -17,85 +34,77 @@ import {
   type GuildHubLocalScan,
   type GuildHubScanSummary,
 } from "../../lib/guilds/localScanLibrary";
-import { normalizeGuildScanMembers, type NormalizedGuildMember, type NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
+import { normalizeGuildScanMembersCooperatively, type NormalizedGuildMember } from "../../lib/guilds/guildScanNormalizer";
 import { calculateGuildActivityPct } from "../../lib/guilds/guildActivity";
+import { readDeclaredMemberCount } from "../../lib/guilds/guildCoverage";
 import type { GuildAnalyticsMemberSnapshot } from "../../lib/guilds/localGuildAnalyticsStore";
+import { guildObservationIdentifierCandidates, confirmedGuildObservationsMatch, resolveObservedGuildIdentity } from "../../lib/identities/guildObservationIdentity";
+import { classifyDashboardTransfers } from "./dashboardTransfersModel";
 import {
   loadIdentityResolutionSnapshot,
-  resolveGuildIdentity,
+  revalidateIdentityResolutionSnapshot,
   type IdentityResolutionSnapshot,
 } from "../../lib/identities/identityResolution";
 import {
-  LocalPlayerIndexWorkerCancelledError,
-  startLocalPlayerIndexWorkerRun,
   type LocalPlayerIndexProgress,
-  type LocalPlayerIndexWorkerRun,
 } from "../../lib/player-search/localPlayerIndexClient";
 import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
-import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
-import { toDriveThumbProxy } from "../../lib/urls";
+import { useScanAgeDays } from "../../lib/ui/useScanAgeDays";
+import { getScanAgeDays } from "../../lib/ui/formatScanDateTimeLabel";
 import type { GuildTrendBuildResult } from "../Playground/playerPerformanceModel";
 import {
-  PlayerPerformanceWorkerCancelledError,
-  startPlayerPerformanceWorkerRun,
   type PlayerPerformanceProgress,
   type PlayerPerformanceWorkerRun,
 } from "../Playground/playerPerformanceWorkerClient";
-import LocalPlayerProfileOverlay from "../../components/local-player-profile/LocalPlayerProfileOverlay";
-import type { LocalPlayerProfileModel } from "../../components/local-player-profile/types";
+import { useLocalProfileNavigation } from "../../lib/data-hub/profileNavigation";
+import { captureLocalDataDependencies, revalidateLocalDataDependencies, subscribeToLocalDataDependencies } from "../../lib/local-data/localDataDependencies";
+import { matchesLocalSourceValidity } from "../../lib/guilds/localSourceValidity";
+import { readGuildScanMemberIdentity } from "../../lib/guilds/guildScanNormalizer";
+import { isLocalPlayerSourceContextValid, type LocalPlayerSourceContext } from "./localPlayerCurrentSeed";
+
 import { acquireDashboardLocalFirstFeatureScans } from "./dashboardLocalFirst";
 import {
-  buildDashboardPlayerCardItems,
   buildDashboardStaticPlayerCardItems,
-  DEFAULT_DASHBOARD_MEMBER_VIEW,
   sortDashboardMembers,
-  type DashboardMemberView,
-  type DashboardPlayerCardItem,
 } from "./dashboardPlayerCards";
-import DashboardMemberCard from "./DashboardMemberCard";
+import { rankingMemberSelection, toggleMemberSelection } from "./dashboardMemberChartModel";
+import GuildScanDetailsOverlay from "./GuildScanDetailsOverlay";
+import { summarizeScanIdentities, type ScanIdentityContext, type ScanIdentitySummary } from "./dashboardScanIdentity";
+import type { ScanArchiveEntry } from "../../lib/scanArchive/types";
 import DashboardGuildCard, { type DashboardGuildCardKpi } from "./DashboardGuildCard";
-import { buildLocalPlayerProfileModel } from "./localPlayerProfileAdapter";
-import { useGuildHubSelection, type GuildHubSelectedGuild } from "./hooks/useGuildHubSelection";
-import styles from "./Dashboard.module.css";
+import LocalGuildPlayerStats from "../../components/guilds/LocalGuildPlayerStats";
+import GuildClassDistributionPie from "../../components/guilds/GuildClassOverview/GuildClassDistributionPie";
+import { averageLocalGuildMemberField, readLocalGuildMemberValues, type LocalGuildPlayerStats as LocalGuildPlayerStatsValues, type LocalGuildStatsMember } from "./localGuildPlayerStats";
 
-const DAY_MS = 86_400_000;
-const MIN_COMPARISON_DAYS = 30;
-const DASHBOARD_GRID_GAP_PX = 16;
-const DASHBOARD_GRID_ROW_HEIGHT_PX = 121;
-const DASHBOARD_MEMBER_MIN_ROW_SPAN = 9;
-const DASHBOARD_MEMBER_PANEL_CHROME_HEIGHT_PX = 76;
-const DASHBOARD_MEMBER_CARD_HEIGHT_PX = 190;
-const DASHBOARD_MEMBER_CARD_GAP_PX = 12;
-const DASHBOARD_MEMBER_LIST_ROW_HEIGHT_PX = 56;
-const DASHBOARD_MEMBER_LIST_GAP_PX = 8;
-const DASHBOARD_MEMBER_CARDS_ERROR_HEIGHT_PX = 30;
+import { useGuildHubSelection, type GuildHubSelectedGuild } from "./hooks/useGuildHubSelection";
+import { useDashboardMemberComparison } from "./useDashboardMemberComparison";
+import { type DashboardMemberMode, type LocalGuildRankingComparison } from "./localGuildRanking";
+import { useHubFavorites } from "../../lib/data-hub/useHubFavorites";
+import { localPlayerObservationFavorite } from "../../lib/data-hub/hubFavoritesProjection";
+import { favoriteReference, referenceKey } from "../../lib/data-hub/hubFavoritesContract";
+import { createHubToplistTarget } from "../../lib/data-hub/hubTargetResolver";
+import DashboardTransfers, { type DashboardTransfersHandle } from "./DashboardTransfers";
+import { buildCurrentTransferGuildLookupCooperatively, buildTransferGuildLookup, resolveTransferGuildStatus, selectTransferGuildStands, readTransferGuildStands, type TransferGuildStand, type TransferGuildLookup } from "./dashboardTransferGuilds";
+import DashboardChartDetails, { DashboardCompareChart, ChartDetailButton } from "./DashboardChartDetails";
+import { buildDashboardGuildTrendIntervals, buildDashboardGuildComparison, type DashboardGuildComparison } from "./dashboardGuildComparison";
+import { dashboardModeMetrics, buildDashboardHistory, type DashboardHistory, type DashboardHistoryMetric } from "./dashboardHistory";
+import styles from "./Dashboard.module.css";
+import cardStyles from "./DashboardGuildCard.module.css";
+import LocalGuildProfileActions from "../../components/guilds/LocalGuildProfileActions";
+// Preserve the hero/HUD-to-page stylesheet order when loading the extracted member views.
+import DashboardMembersPanel, { DashboardClassIcon as ClassIcon, type LocalMember, type DashboardPlayerCardsState, type DashboardCompareMembers } from "./DashboardMembersPanel";
+
+import { collectDashboardComparisonDiagnostic, type DashboardComparisonEvidence } from "./dashboardComparisonDiagnostic";
+
+const EMPTY_ARCHIVE_ENTRIES: readonly ScanArchiveEntry[] = [];
+const EMPTY_SELECTED_CLASSES: readonly string[] = [];
 
 type JsonRecord = Record<string, unknown>;
 
-type LocalMember = {
-  key: string;
-  name: string;
-  classLabel: string | null;
-  classMeta: ClassMeta | null;
-  level: number | null;
-  honor: number | null;
-  hofRank: number | null;
-  baseMain: number | null;
-  totalStats: number | null;
-  lastScanMs?: number | null;
-  lastActivityMs?: number | null;
-  guildRole?: NormalizedGuildRole;
-  localRef?: {
-    sourceScanId: string;
-    sourcePlayerKey: string;
-    identifier: string | null;
-    playerId: string | null;
-    server: string | null;
-    matchedByNameFallback: boolean;
-  };
-};
 
 type LocalGuildScanView = {
+  guildContextId: string;
+  context: LocalPlayerSourceContext;
   source: DashboardGuildSource;
   scannedAtMs: number;
   scannedAtIso: string | null;
@@ -103,6 +112,7 @@ type LocalGuildScanView = {
     name: string | null;
     server: string | null;
     memberCount: number | null;
+    declaredMemberCount: number | null;
     hofRank: number | null;
   };
   members: LocalMember[];
@@ -110,6 +120,7 @@ type LocalGuildScanView = {
 };
 
 type DashboardGuildSource = {
+  guildIdentifier?: string | null;
   sourceScanId: string;
   sourceFilename: string;
   scannedAtMs: number;
@@ -123,246 +134,565 @@ type DashboardGuildSource = {
   };
 };
 
+type ComparisonStatus = "not-requested" | "loading" | "ready" | "empty" | "error";
+
 type ScanState = {
+  generation?: number;
+  transferDependencies?: import("../../lib/local-data/localDataDependencies").LocalDependencyReceipt;
+  requestKey: string;
+  loadingCoaString?: string | null;
+  comparisonStatus: ComparisonStatus;
   summaries: GuildHubScanSummary[];
   sources: DashboardGuildSource[];
   latest: LocalGuildScanView | null;
   comparisonMembers: LocalMember[] | null;
+  comparisonGuilds: TransferGuildLookup | null;
+  transferGuildStands?: TransferGuildStand[];
+  currentGuilds: TransferGuildLookup | null;
+  identities: IdentityResolutionSnapshot | null;
+  scanIdentityContexts?: ScanIdentityContext[];
+  identityContextStatus?: ScanIdentityContext["status"];
   loading: boolean;
   detailLoading: boolean;
   error: string | null;
 };
 
 type GuildTrendState = {
+  guildId?: string;
   result: GuildTrendBuildResult | null;
+  history?: import("../../lib/local-player-profile/cardTrendExecution").GuildTrendHistory;
   progress: PlayerPerformanceProgress | null;
   loading: boolean;
   error: string | null;
+  requestKey?: string;
 };
 
-type DashboardPlayerCardsState = {
-  items: DashboardPlayerCardItem<LocalMember>[];
-  progress: LocalPlayerIndexProgress | null;
-  loading: boolean;
-  error: string | null;
-};
 
 type DashboardArchiveInventoryState = {
+  guildContextId?: string;
+  archiveEntries?: readonly ScanArchiveEntry[];
   archiveScanCount: number | null;
   loading: boolean;
   error: string | null;
 };
-
-type DashboardMembersPanelStyle = React.CSSProperties & {
-  "--dashboard-members-row-span"?: number;
-};
-
-const dashboardPlayerCardsDevelopmentCache = new Map<string, DashboardPlayerCardItem<LocalMember>[]>();
 
 type TransferSummary = {
   joined: LocalMember[];
   left: LocalMember[];
 };
 
-export default function GuildHubDashboard() {
-  const { activeGuild } = useGuildHubSelection();
-  const scanState = useDashboardScans(activeGuild);
-  const archiveInventoryState = useDashboardLocalFirstAcquisition(activeGuild, scanState.summaries, scanState.loading);
-  const [selectedLocalProfile, setSelectedLocalProfile] = React.useState<LocalPlayerProfileModel | null>(null);
+export default function GuildHubDashboard({ overlay = false, onClose, onGoToProfile }: {
+  overlay?: boolean; onClose?: () => void; onGoToProfile?: () => void;
+} = {}) {
+  const { t } = useTranslation();
+  const selection = useGuildHubSelection("guild-dashboard");
+  const { activeGuild } = selection;
+  const overviewLocation = useLocation();
+  const currentScans = useDashboardScans(activeGuild);
+  const [comparisonSelection, setComparisonSelection] = React.useState<{ guildId: string; stand: NonNullable<import("./dashboardMemberComparison").DashboardMemberComparisonRequest["selectedComparison"]> } | null>(null);
+  const requestedComparison = comparisonSelection && comparisonSelection.guildId === activeGuild?.id ? comparisonSelection.stand : null;
+  const archiveInventoryState = useDashboardLocalFirstAcquisition(activeGuild, currentScans.summaries, currentScans.loading);
 
-  const latest = scanState.latest;
+  const attributeSumMode = useProfileAttributeSumMode();
+  const latest = currentScans.latest?.guildContextId === activeGuild?.id ? currentScans.latest : null;
+  const currentStatsMembers = React.useMemo(
+    () => latest?.members.map((member) => ({ ...member, playerStats: member.playerStats ?? readLocalGuildMemberValues(null) })) ?? [],
+    [latest],
+  );
+  const displayLatest = React.useMemo(() => latest ? { ...latest, members: projectLocalGuildMembers(latest.members, attributeSumMode) } : null, [latest, attributeSumMode]);
+  const displayStatsMembers = React.useMemo(() => projectLocalGuildMembers(currentStatsMembers, attributeSumMode), [currentStatsMembers, attributeSumMode]);
+  const [chartRangeSelection, setChartRangeSelection] = React.useState<{ guildId: string; value: GuildChartRangeSelection } | null>(null);
+  const chartRangeValue = chartRangeSelection && chartRangeSelection.guildId === activeGuild?.id ? chartRangeSelection.value : "12months";
+  const chartWindow = React.useMemo(() => latest ? { startMs: guildChartRangeStart(chartRangeValue, latest.scannedAtMs), endMs: latest.scannedAtMs } : undefined, [chartRangeValue, latest?.scannedAtMs]);
+  const chartRange: GuildChartRangeControl = {
+    value: chartRangeValue, times: guildChartAvailableTimes(currentScans.sources, currentScans.summaries, latest?.scannedAtMs ?? 0),
+    onChange: value => { if (activeGuild) setChartRangeSelection({ guildId: activeGuild.id, value }); },
+  };
+  const historyMemberRefs = React.useMemo(() => latest?.members.map(member => member.localRef?.identifier ?? member.key).sort() ?? [], [latest]);
+  const guildTrendState = useDashboardGuildTrend(latest ? activeGuild : null, currentScans.summaries, historyMemberRefs, chartWindow);
+  const history = React.useMemo(() => buildDashboardHistory(guildTrendState.history, latest?.members ?? [], guildTrendState.result?.guild?.identifier ?? activeGuild?.logoIdentifier ?? "", latest?.scannedAtMs ?? 0, attributeSumMode), [attributeSumMode, guildTrendState.history, guildTrendState.result?.guild?.identifier, latest?.members, latest?.scannedAtMs, activeGuild?.logoIdentifier]);
+  const comparisonHistory = React.useMemo(() => buildDashboardGuildComparison(guildTrendState.history, activeGuild?.server ?? "", guildTrendState.result?.guild?.identifier ?? activeGuild?.logoIdentifier ?? "", latest?.scannedAtMs ?? 0, latest?.source.sourceScanId, attributeSumMode), [attributeSumMode, guildTrendState.history, guildTrendState.result?.guild?.identifier, activeGuild?.server, activeGuild?.logoIdentifier, latest?.scannedAtMs, latest?.source.sourceScanId]);
+  const classDistribution = React.useMemo(() => buildClassDistribution(latest?.members ?? []), [latest?.members]);
+  // Resolve the saved default only on a new guild opening. Data/preference updates
+  // within this opening leave the existing shared mode and all profile state intact.
+  const guildOpening = activeGuild?.id ?? null;
+  const [modeSelection, setModeSelection] = React.useState(() => ({ guildOpening, mode: preferencesStore.refresh().guildProfileMode }));
+  let memberMode = modeSelection.mode;
+  if (modeSelection.guildOpening !== guildOpening) {
+    memberMode = preferencesStore.refresh().guildProfileMode;
+    setModeSelection({ guildOpening, mode: memberMode });
+  }
+  const setMemberMode = (mode: DashboardMemberMode) => setModeSelection({ guildOpening, mode });
+  // The overlay entry includes its initial mode, even before guild data is ready.
+  useAnalyticsView(overlay || activeGuild ? guildViewEvents[memberMode] : null, !overlay);
+  // Keep the local width choice through the existing current-scan loading gap.
+  // The panel owns its renders; width clicks never rerender the data consumers.
+  const memberWidthPreference = React.useRef<{ guildId: string; narrow: boolean } | null>(null);
+  React.useEffect(() => { memberWidthPreference.current = null; }, [activeGuild?.id]);
+  const transfersRef = React.useRef<DashboardTransfersHandle>(null);
+  const closeTransfersOnCompactActivation = React.useCallback(() => transfersRef.current?.close(), []);
+  const [memberSelection, setMemberSelection] = React.useState<{ guildId: string; keys: string[] } | null>(null);
+  const selectedMemberKeys = React.useMemo(() => memberSelection?.guildId === activeGuild?.id
+    ? memberSelection?.keys.filter(key => latest?.members.some(member => member.key === key)) ?? [] : [], [memberSelection, activeGuild?.id, latest?.members]);
+  const selectedMemberKey = rankingMemberSelection(selectedMemberKeys);
+  React.useEffect(() => setMemberSelection(null), [activeGuild?.id]);
+  React.useEffect(() => {
+    if (!latest) return;
+    setMemberSelection(current => {
+      if (!current || current.guildId !== activeGuild?.id) return current;
+      const keys = current.keys.filter(key => latest.members.some(member => member.key === key));
+      return keys.length === current.keys.length ? current : { ...current, keys };
+    });
+  }, [latest, activeGuild?.id]);
+  const toggleMember = (key: string) => {
+    if (activeGuild && latest?.members.some(member => member.key === key)) setMemberSelection(current => ({ guildId: activeGuild.id,
+      keys: toggleMemberSelection(current?.guildId === activeGuild.id ? current.keys : [], key) }));
+  };
+  const selectMember = (member: LocalMember) => toggleMember(member.key);
+  const [classFilter, setClassFilter] = React.useState<{ guildId: string; labels: string[] } | null>(null);
+  const selectedClasses = classFilter?.guildId === activeGuild?.id ? classFilter?.labels ?? EMPTY_SELECTED_CLASSES : EMPTY_SELECTED_CLASSES;
+  const rankingClass = selectedClasses;
+  React.useEffect(() => setClassFilter(null), [activeGuild?.id]);
+  React.useEffect(() => {
+    if (!latest) return;
+    setClassFilter(current => {
+      if (!current || current.guildId !== activeGuild?.id) return current;
+      const labels = current.labels.filter(label => latest.members.some(member => member.classLabel?.trim() === label));
+      return labels.length === current.labels.length ? current : labels.length ? { ...current, labels } : null;
+    });
+  }, [latest, activeGuild?.id]);
+  const toggleClass = (label: string) => {
+    if (!activeGuild) return;
+    setClassFilter(current => {
+      const previous = current?.guildId === activeGuild.id ? current.labels : EMPTY_SELECTED_CLASSES;
+      const labels = previous.includes(label) ? previous.filter(value => value !== label) : [...previous, label];
+      return labels.length ? { guildId: activeGuild.id, labels } : null;
+    });
+  };
+  const comparisonInput = React.useMemo(() => latest && activeGuild ? {
+    selectedComparison: requestedComparison, diagnostic: import.meta.env.DEV, summaries: currentScans.summaries, currentSourceId: latest.source.sourceScanId, currentTimestamp: latest.scannedAtMs,
+    currentGuildIdentifier: latest.source.guildIdentifier, currentDeclaredMemberCount: latest.guild.declaredMemberCount,
+    guild: { name: activeGuild.name, server: activeGuild.server, logoIdentifier: activeGuild.logoIdentifier }, members: currentStatsMembers,
+  } : null, [latest, activeGuild, currentScans.summaries, currentStatsMembers, requestedComparison]);
+  const memberComparison = useDashboardMemberComparison(comparisonInput, latest?.context ?? null, attributeSumMode);
+  const comparisonOptions = React.useRef<{ guildId?: string; values: NonNullable<LocalGuildRankingComparison["options"]> }>({ values: [] });
+  if (comparisonOptions.current.guildId !== activeGuild?.id) comparisonOptions.current = { guildId: activeGuild?.id, values: [] };
+  if (memberComparison.options) comparisonOptions.current.values = memberComparison.options;
+  const scanState = useDashboardTransferComparison(currentScans, activeGuild, memberComparison);
+  const navigate = useNavigate(), favorites = useHubFavorites();
+  const memberFavorite = React.useCallback((member: LocalMember) => latest ? localPlayerObservationFavorite({
+    identifier: member.localRef?.identifier ?? null, name: member.name, server: member.localRef?.server ?? null,
+    className: member.classLabel, levelLabel: member.level == null ? null : String(member.level), guildName: latest.guild.name,
+    rawPlayer: latest.playerLookup.get(member.localRef?.sourcePlayerKey ?? ""), sourceScanId: latest.source.sourceScanId,
+    sourcePlayerKey: member.localRef?.sourcePlayerKey ?? member.key, observedAtMs: latest.scannedAtMs,
+  }) : null, [latest]);
+  const savedMember = React.useCallback((member: LocalMember) => {
+    const ref = favoriteReference("player", member.localRef?.identifier);
+    return ref ? favorites.snapshot?.record.favorites.find(f => f.kind === "player" && f.originalReferences.some(r => referenceKey(r) === referenceKey(ref))) : undefined;
+  }, [favorites.snapshot]);
+  const memberActions = (member: LocalMember) => ({
+    saved: !!savedMember(member), disabled: favorites.disabled || !member.localRef?.identifier,
+    onFavorite: () => { const candidate = memberFavorite(member), saved = savedMember(member); if (candidate) void favorites.mutate(saved ? { type: "remove", id: saved.id } : { type: "save", favorite: candidate }); },
+    onToplist: () => { const ref = favoriteReference("player", member.localRef?.identifier); if (!ref) return;
+      const target = createHubToplistTarget("player", member.name, ref.serverNamespace, [ref.identifier]);
+      navigate(target.path, { state: { ...target.state, returnTo: overviewLocation.pathname + overviewLocation.search } }); },
+  });
+  const profileNavigation = useLocalProfileNavigation("guild");
   const userScanCount = React.useMemo(
     () => countDashboardUserScans(scanState.sources, scanState.summaries),
     [scanState.sources, scanState.summaries],
   );
-  const playerCardsState = useDashboardPlayerCards(activeGuild, scanState.summaries, scanState.sources, latest);
-  const comparison = React.useMemo(() => {
-    if (!latest) return null;
-    return (
-      scanState.sources.find((source) => latest.scannedAtMs - source.scannedAtMs >= MIN_COMPARISON_DAYS * DAY_MS) ?? null
-    );
-  }, [latest, scanState.sources]);
+  const playerCardsState = useDashboardPlayerCards(latest);
+  const comparison = React.useMemo(() => resolveDashboardComparisonSource(scanState, memberComparison), [memberComparison, scanState.sources, scanState.summaries]);
   const transfers = React.useMemo(() => {
     if (!latest || !comparison || !scanState.comparisonMembers) return null;
-    return buildTransferSummary(latest.members, scanState.comparisonMembers);
-  }, [comparison, latest, scanState.comparisonMembers]);
+    return buildTransferSummary(latest.members, scanState.comparisonMembers, scanState.identities);
+  }, [comparison, latest, scanState.comparisonMembers, scanState.identities]);
+  const transferDisplay = React.useMemo(() => {
+    if (!transfers || !latest) return transfers;
+    const currentGuilds = scanState.currentGuilds;
+    return {
+      ...transfers,
+      joined: transfers.joined.map(member => ({ ...member, transferGuild: resolveTransferGuildStatus(scanState.comparisonGuilds, member.key, scanState.identities) })),
+      left: transfers.left.map(member => ({ ...member, transferGuild: resolveTransferGuildStatus(currentGuilds, member.key, scanState.identities) })),
+    };
+  }, [transfers, latest, scanState.comparisonGuilds, scanState.currentGuilds, scanState.identities]);
   const handleMemberClick = React.useCallback(
     (member: LocalMember) => {
       if (!latest || !activeGuild || !member.localRef) return;
       const rawPlayer = latest.playerLookup.get(member.localRef.sourcePlayerKey);
       if (!rawPlayer) return;
-
-      const profile = buildLocalPlayerProfileModel({
-        rawPlayer,
+      const target = {
         sourceScanId: latest.source.sourceScanId,
         sourcePlayerKey: member.localRef.sourcePlayerKey,
         sourceMemberRef: member.localRef.identifier ?? (member.localRef.matchedByNameFallback ? null : member.localRef.sourcePlayerKey),
         scannedAtMs: latest.scannedAtMs,
         scannedAtIso: latest.scannedAtIso,
-        guild: {
-          ...latest.guild,
-          identifier: activeGuild.logoIdentifier ?? activeGuild.guildId,
-        },
         guildRole: member.guildRole ?? null,
-      });
-      setSelectedLocalProfile(profile);
+        guild: { ...latest.guild, identifier: activeGuild.logoIdentifier ?? activeGuild.guildId },
+      };
+      // Open the existing exact-observation route immediately. Its profile
+      // worker reads the named source; the click never walks the full Raw scan.
+      const identifier = readGuildScanMemberIdentity(rawPlayer, target.guild.server)?.memberRef ?? target.sourceMemberRef;
+      if (identifier && target.guild.server) profileNavigation.openExact(identifier, target.guild.server,
+        target.sourceScanId, target.scannedAtMs, target.sourcePlayerKey, undefined, latest.context.scan.contentHash);
     },
-    [activeGuild, latest],
+    [activeGuild, latest, profileNavigation.open, profileNavigation.openExact],
   );
 
-  React.useEffect(() => {
-    setSelectedLocalProfile(null);
-  }, [activeGuild?.id, latest?.source.sourceScanId, latest?.scannedAtMs]);
+  const diagnosticBasis = React.useRef<object | null>(null);
+  const basis = React.useMemo(() => ({}), [scanState, memberComparison, activeGuild, overviewLocation.pathname, overviewLocation.search, transferDisplay, memberMode, selectedClasses]);
+  diagnosticBasis.current = basis;
+  React.useEffect(() => () => { diagnosticBasis.current = null; }, []);
+  const collectComparisonDiagnostic = React.useCallback(async () => {
+    if (!latest || !activeGuild) throw Error("comparison-unavailable");
+    const evidence: DashboardComparisonEvidence = {
+      generation: scanState.generation ?? 0, requestKey: scanState.requestKey, status: scanState.comparisonStatus,
+      current: { sourceScanId: latest.source.sourceScanId, scannedAtMs: latest.scannedAtMs, guildIdentifier: latest.source.guildIdentifier },
+      historical: comparison, currentMembers: latest.members, historicalMembers: scanState.comparisonMembers,
+      identities: scanState.identities, dependencies: scanState.transferDependencies, currentDependencies: latest.context.dependencies,
+      contexts: scanState.scanIdentityContexts ?? [], guildStands: scanState.transferGuildStands, currentGuilds: scanState.currentGuilds, historicalGuilds: scanState.comparisonGuilds,
+      output: transferDisplay, worker: memberComparison, summaries: scanState.summaries,
+      guild: { name: activeGuild.name, server: activeGuild.server, logoIdentifier: activeGuild.logoIdentifier },
+      presentation: { mode: memberMode, selectedClasses },
+    };
+    const isCurrent = () => diagnosticBasis.current === basis;
+    // Route parameters are whitelisted; no auth/query/session storage is read.
+    const routeQuery = new URLSearchParams();
+    const query = new URLSearchParams(overviewLocation.search);
+    for (const key of ["source", "snapshot", "row", "at", "hash"]) if (query.has(key)) routeQuery.set(key, query.get(key)!);
+    const result = await collectDashboardComparisonDiagnostic(evidence, isCurrent, {
+      origin: window.location.origin, route: overviewLocation.pathname + (routeQuery.size ? `?${routeQuery}` : ""),
+      modules: [import.meta.url, ...Array.from(document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]')).map(script => script.src)],
+    });
+    if (!isCurrent()) throw Error("comparison-context-changed");
+    const rendered = {
+      transferStatus: document.querySelector("[data-guild-transfers]")?.getAttribute("data-comparison-status") ?? null,
+      transferCounts: Array.from(document.querySelectorAll("[data-transfer-summary-count]")).map(node => ({
+        category: node.getAttribute("data-transfer-summary-count"), text: node.textContent })),
+      // Only mounted guild cards are evidence of visible output; unmounted rows
+      // remain covered by the worker matrix, never reported as DOM-verified.
+      cards: Array.from(document.querySelectorAll("[data-member-card]")).map(card => ({
+        key: card.getAttribute("data-member-card"), mode: card.getAttribute("data-member-mode"),
+        metrics: Array.from(card.querySelectorAll("[data-member-metric]")).map(metric => ({
+          category: metric.getAttribute("data-member-metric"), value: metric.querySelector("[data-member-value]")?.textContent ?? null,
+          delta: metric.querySelector("[data-member-delta]")?.textContent ?? null,
+          direction: metric.querySelector("[data-member-delta]")?.getAttribute("data-direction") ?? null,
+        })),
+      })),
+    };
+    return { text: JSON.stringify({ ...result, rendered }, null, 2), coherent: result.consistency.coherent, isCurrent };
+  }, [basis, latest, activeGuild, scanState, comparison, transferDisplay, memberComparison, overviewLocation.pathname, overviewLocation.search, memberMode, selectedClasses]);
+  const handleTransferMemberClick = React.useCallback((direction: "joined" | "left", key: string) => {
+    const member = transfers?.[direction].find(entry => entry.key === key);
+    if (!member || !latest) return;
+    if (direction === "joined") {
+      handleMemberClick(member);
+      return;
+    }
+    if (!comparison) return;
+    const summary = scanState.summaries.find(entry => entry.sourceScanId === comparison.sourceScanId);
+    const server = member.server ?? comparison.guild.server;
+    if (!server) return;
+    // A departure is proven in the historical roster. Open that exact observed
+    // player, even when the current scan no longer contains them.
+    profileNavigation.openExact(member.key, server, comparison.sourceScanId, comparison.scannedAtMs, member.key, undefined, summary?.contentHash);
+  }, [transfers, latest, comparison, scanState.summaries, handleMemberClick, profileNavigation.openExact]);
 
-  return (
-    <ContentShell centerFramed={false}>
+  const content = (
       <div className={styles.page}>
-        <div className={styles.topbar}>
-          <GuildContextBar useImageFallback={false} />
-          <SectionDividerHeader title="Dashboard" className={styles.divider} />
-        </div>
+        {(!activeGuild || !latest || scanState.error || selection.targetError || selection.contextIssue) && <GuildOverviewTitle onClose={onClose} />}
 
-        {!activeGuild ? (
-          <EmptyPanel
-            title="Keine aktive Gilde"
-            text="Waehle zuerst im Guild-Hub-Startmenue eine Gilde aus. Das Dashboard trifft hier keine automatische Auswahl."
-            action={<Link to="/guild-hub">Zur Gildenauswahl</Link>}
+        {selection.targetError ? (
+          <EmptyPanel title={t("guildDashboardState.failed")} text={t(selection.targetError)} />
+        ) : selection.contextIssue ? (
+          <EmptyPanel title={t("guildDashboardState.unavailable")} text={t(`pageContext.${selection.contextIssue}`)} />
+        ) : selection.targetLoading || activeGuild && (scanState.loading || scanState.detailLoading) && !latest ? (
+          <GuildDashboardLoadingState
+            key={selection.loadingGuild ? `${selection.loadingGuild.server}:${selection.loadingGuild.logoIdentifier}:${selection.loadingGuild.id}` : "resolving"}
+            guild={selection.loadingGuild}
+            coaString={selection.loadingGuild?.coaString || scanState.loadingCoaString}
           />
-        ) : scanState.loading || scanState.detailLoading ? (
-          <DataHubLoadingState
-            variant="page"
-            title="Lokale Scans werden geladen"
-            message="Die IndexedDB-Bibliothek wird gelesen."
+        ) : !activeGuild ? (
+          <EmptyPanel
+            title={t("guildDashboardState.noTarget")}
+            text={t("guildDashboardState.choose")}
+            action={<Link to="/data-hub/guild-hub/dashboard">{t("guildProfile.heroPanel.sections.guildOverview")}</Link>}
           />
         ) : scanState.error ? (
-          <EmptyPanel title="Lokale Scans nicht verfuegbar" text={scanState.error} />
+          <EmptyPanel title={t("guildDashboardState.failed")} text={t(scanState.error)} />
         ) : !latest ? (
           <EmptyPanel
-            title="Keine lokalen Scans fuer diese Gilde"
-            text="Importiere zuerst SF-Tools JSONs oder pruefe, ob die aktive Gilde in den lokalen Scans enthalten ist."
-            action={<Link to="/guild-hub/import">Scans importieren</Link>}
+            title={t("guildDashboardState.noScans")}
+            text={t("guildDashboardState.importHint")}
+            action={<Link to="/data-hub/guild-hub/import">{t("guildDashboardState.import")}</Link>}
           />
         ) : (
-          <div className={styles.dashboardGrid}>
+          <div className={`${styles.dashboardGrid}${overlay ? ` ${styles.overlayGrid}` : ""}`} data-dashboard-selected-mode={memberMode}>
             <GuildOverviewCard
+              onClose={onClose}
               guild={activeGuild}
-              latest={latest}
+              latest={displayLatest!}
               userScanCount={userScanCount}
               archiveInventoryState={archiveInventoryState}
               summaries={scanState.summaries}
+              identities={scanState.identities}
+              scanIdentityContexts={scanState.scanIdentityContexts ?? []}
+              identityContextStatus={scanState.identityContextStatus ?? "not-checked"}
+              transferComparison={scanState.comparisonStatus === "ready" ? comparison : null}
+              transferStatus={scanState.comparisonStatus}
+              memberComparison={memberComparison}
+              collectComparisonDiagnostic={import.meta.env.DEV ? collectComparisonDiagnostic : undefined}
+              rankingMembers={displayStatsMembers} rankingClass={rankingClass}
+              compareMembers={{ members: displayLatest!.members, playerCardsState, comparison: memberComparison, actions: memberActions, onMemberClick: handleMemberClick }}
+              chartRange={chartRange} trendState={guildTrendState} history={history} comparisonHistory={comparisonHistory}
+              memberMode={memberMode} onMemberModeChange={setMemberMode}
+              classDistribution={classDistribution} selectedClasses={selectedClasses} onToggleClass={toggleClass}
+              onCompactActivate={closeTransfersOnCompactActivation}
             />
-            <KpiPanel className={styles.classDistributionSlot} latest={latest} />
-            <DashboardMembersPanel
-              className={styles.membersSlot}
-              members={latest.members}
-              playerCardsState={playerCardsState}
-              onMemberClick={handleMemberClick}
-            />
-            <HistoryPanel className={styles.historySlot} latest={latest} comparison={comparison} transfers={transfers} />
+            <div className={styles.controlsSlot}>
+              <LocalGuildProfileActions key={`${latest.guildContextId}:${latest.source.sourceScanId}:${latest.scannedAtMs}`}
+                className={styles.profileActions} onGoToProfile={onGoToProfile}
+                guild={{ ...activeGuild, ...latest.guild, guildId: latest.source.guildIdentifier ?? activeGuild.guildId,
+                  name: latest.guild.name ?? activeGuild.name, server: latest.guild.server ?? activeGuild.server,
+                  logoIdentifier: latest.source.guildIdentifier ?? activeGuild.logoIdentifier, coaString: latest.source.guild.coaString }}
+                anchor={{ source: latest.source.sourceScanId, at: latest.scannedAtMs, hash: latest.context.scan.contentHash }} />
+              <DashboardTransfers
+                ref={transfersRef}
+                key={`${latest.guildContextId}:${latest.source.sourceScanId}:${latest.context.scan.contentHash}:${latest.scannedAtMs}:${comparison?.sourceScanId}:${comparison?.scannedAtMs}:${scanState.summaries.find(summary => summary.sourceScanId === comparison?.sourceScanId)?.contentHash}`}
+                transfers={transferDisplay}
+                onMemberClick={handleTransferMemberClick}
+                status={scanState.comparisonStatus}
+                fromLabel={comparison ? profileDateTime(comparison.scannedAtIso) : null}
+                toLabel={profileDateTime(latest.scannedAtIso)}
+              />
+              <label className={styles.comparisonScanSelect} data-guild-comparison-select>
+                <span>{t("guildProfileRange.comparisonScan")}</span>
+                <select value={requestedComparison ? JSON.stringify(requestedComparison) : "default"} onChange={event => setComparisonSelection(event.target.value === "default" ? null : { guildId: activeGuild.id, stand: JSON.parse(event.target.value) })}>
+                  <option value="default">{t("guildProfileRange.comparisonDefault")}</option>
+                  {comparisonOptions.current.values.map(stand => <option key={JSON.stringify(stand)} value={JSON.stringify(stand)}>{profileDateTime(new Date(stand.scannedAtMs).toISOString())} · {formatServerLabel(stand.guildIdentifier.replace(/_g[^_]+$/i, ""))}{comparisonOptions.current.values.some(other => other !== stand && other.scannedAtMs === stand.scannedAtMs && other.sourceScanId !== stand.sourceScanId) ? " · " + currentScans.summaries.find(summary => summary.sourceScanId === stand.sourceScanId)?.filename : ""}</option>)}
+                </select>
+              </label>
+            </div>
+            {!overlay && <div className={styles.detailsSlot} data-dashboard-details>
+              <DashboardMembersPanel
+                className={styles.membersSlot}
+                guildId={activeGuild.id}
+                widthPreference={memberWidthPreference}
+                members={displayLatest!.members}
+                playerCardsState={playerCardsState}
+                selectedClasses={selectedClasses}
+                mode={memberMode} comparison={memberComparison} actions={memberActions}
+                selectedMemberKeys={selectedMemberKeys} onMemberSelect={selectMember}
+                onMemberClick={handleMemberClick}
+              />
+              <div className={styles.historySlot}>
+                <LocalGuildPlayerStats rankingClass={rankingClass} animateChanges members={displayStatsMembers} scope={latest.context} currentTimestamp={latest.scannedAtMs} comparison={memberComparison} mode={memberMode} selectedMemberKey={selectedMemberKey} onRequestRanking={() => {}} />
+              </div>
+            </div>}
+            <KpiPanel history={history} members={latest.members} className={styles.classDistributionSlot} entries={classDistribution} selectedClasses={selectedClasses} onToggleClass={toggleClass} />
           </div>
         )}
-        <LocalPlayerProfileOverlay
-          isOpen={Boolean(selectedLocalProfile)}
-          profile={selectedLocalProfile}
-          onClose={() => setSelectedLocalProfile(null)}
-        />
+
       </div>
-    </ContentShell>
   );
+  return overlay ? content : <ContentShell centerFramed={false}>{content}</ContentShell>;
 }
 
 function useDashboardScans(activeGuild: GuildHubSelectedGuild | null): ScanState {
+  const location = useLocation();
+  const observation = React.useMemo(() => parseObservation(location.search), [location.search]);
+  // Only a target/observation change owns a new request. Metadata refreshes of
+  // the same guild retain an already committed dashboard.
+  const requestKey = JSON.stringify([activeGuild && [activeGuild.id, activeGuild.server, activeGuild.logoIdentifier, activeGuild.guildId], observation]);
   const [state, setState] = React.useState<ScanState>({
-    summaries: [],
-    sources: [],
-    latest: null,
-    comparisonMembers: null,
-    loading: true,
-    detailLoading: false,
-    error: null,
+    requestKey, summaries: [], sources: [], latest: null, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, identities: null, comparisonStatus: "not-requested",
+    loading: true, detailLoading: false, error: null,
   });
-
   React.useEffect(() => {
     let cancelled = false;
     let runId = 0;
-
-    if (!activeGuild) {
-      setState({ summaries: [], sources: [], latest: null, comparisonMembers: null, loading: false, detailLoading: false, error: null });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const load = async () => {
+    let committed: LocalGuildScanView | null = null;
+    const empty: ScanState = {
+      requestKey, summaries: [], sources: [], latest: null, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, identities: null, comparisonStatus: "not-requested",
+      loading: false, detailLoading: false, error: null,
+    };
+    setState({ ...empty, loading: Boolean(activeGuild) });
+    if (!activeGuild) return;
+    const load = async (trigger = "dashboard-load-effect") => {
+    const __audit2 = auditBegin("F08", "load");
+    auditFields(__audit2, { trigger, consumer: "dashboard-current-and-comparison" });
+    try {
       const currentRunId = ++runId;
-      setState((current) => ({ ...current, loading: true, detailLoading: false, error: null }));
-
+      const allowed = () => !cancelled && currentRunId === runId;
+      // Historical refreshes retain the current component tree and its toggles.
+      (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState(current => ({ ...current, generation: currentRunId, transferDependencies: undefined, transferGuildStands: undefined, scanIdentityContexts: [], identityContextStatus: "checking", loading: !committed, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, comparisonStatus: "not-requested", error: null })))));
       try {
-        const [summaries, identityResolutionSnapshot] = await Promise.all([
-          listGuildHubScanSummaries(),
-          loadIdentityResolutionSnapshot().catch((error) => {
+        const [summaries, identityResolutionSnapshot] = await (auditValue(__audit2, auditEnter(__audit2, "Promise.all"), (Promise.all([
+          listGuildHubScanSummaries({ auditContext: { trigger, consumer: "dashboard-current-and-comparison" } }),
+          loadIdentityResolutionSnapshot().catch(error => {
             console.warn("[GuildHubDashboard] identity resolution unavailable for dashboard scan scope", error);
             return null;
           }),
-        ]);
-        const sources = buildDashboardGuildSources(summaries, activeGuild, identityResolutionSnapshot);
-        const latestSource = sources[0] ?? null;
-        const comparisonSource = latestSource
-          ? sources.find((source) => latestSource.scannedAtMs - source.scannedAtMs >= MIN_COMPARISON_DAYS * DAY_MS) ?? null
-          : null;
-
-        if (cancelled || currentRunId !== runId) return;
-
+        ]))));
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        const sources = (auditValue(__audit2, auditEnter(__audit2, "buildDashboardGuildSources", "sync-elapsed"), (buildDashboardGuildSources(summaries, activeGuild, identityResolutionSnapshot))));
+        if (observation.kind === "invalid") throw Error("Invalid guild observation anchor");
+        const exact = observation.kind === "exact" ? observation.anchor : null;
+        const anchoredSource = exact ? sources.find(source => source.sourceScanId === exact.source) : null;
+        const anchoredSummary = exact ? summaries.find(summary => summary.sourceScanId === exact.source) : null;
+        const currentSources = sources.filter(source => normalizeServerForCompare(source.guild.server) === normalizeServerForCompare(activeGuild.server));
+        const latestSource = exact ? anchoredSource && anchoredSummary?.snapshotTimestamps.includes(exact.at) && (!exact.hash || anchoredSummary.contentHash === exact.hash)
+          ? { ...anchoredSource, scannedAtMs: exact.at, scannedAtIso: new Date(exact.at).toISOString() } : null : currentSources[0] ?? null;
+        if (exact && !latestSource) throw Error("Selected guild observation is missing or changed");
         if (!latestSource) {
-          setState({ summaries, sources, latest: null, comparisonMembers: null, loading: false, detailLoading: false, error: null });
-          return;
+          committed = null;
+          (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, summaries, sources }))));
+          return auditReturn(__audit2, undefined);
         }
-
-        setState((current) => ({ ...current, summaries, sources, loading: false, detailLoading: true, error: null }));
-
-        const [latestScan, comparisonMembers] = await Promise.all([
-          getGuildHubLocalScan(latestSource.sourceScanId),
-          readComparisonMembers(comparisonSource, activeGuild),
-        ]);
-
-        if (cancelled || currentRunId !== runId) return;
-
-        const latest = latestScan ? buildGuildScanView(latestScan, activeGuild, latestSource) : null;
-        setState({
-          summaries,
-          sources,
-          latest,
-          comparisonMembers,
-          loading: false,
-          detailLoading: false,
-          error: latest ? null : "Lokale Scans konnten nicht geladen werden.",
-        });
-      } catch (error) {
-        console.error("[GuildHubDashboard] failed to load local scan summaries", error);
-        if (!cancelled && currentRunId === runId) {
-          setState({
-            summaries: [],
-            sources: [],
-            latest: null,
-            comparisonMembers: null,
-            loading: false,
-            detailLoading: false,
-            error: "Lokale Scans konnten nicht geladen werden.",
-          });
+        const summary = summaries.find(entry => entry.sourceScanId === latestSource.sourceScanId);
+        let latest = committed;
+        const reusable = latest && latest.source.sourceScanId === latestSource.sourceScanId &&
+          latest.scannedAtMs === latestSource.scannedAtMs && matchesLocalSourceValidity(latest.context.scan, summary) &&
+          await (auditValue(__audit2, auditEnter(__audit2, "isLocalPlayerSourceContextValid"), (isLocalPlayerSourceContextValid(latest.context))));
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        if (!reusable) {
+          committed = null;
+          (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, summaries, sources, loadingCoaString: latestSource.guild.coaString, detailLoading: true }))));
+          const dependencies = await (auditValue(__audit2, auditEnter(__audit2, "captureLocalDataDependencies"), (captureLocalDataDependencies({ sourceIds: [latestSource.sourceScanId] }))));
+          if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+          const scan = await (auditValue(__audit2, auditEnter(__audit2, "getGuildHubLocalScan"), (getGuildHubLocalScan(latestSource.sourceScanId))));
+          if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+          if (exact?.hash && scan?.contentHash !== exact.hash) throw Error("Selected guild source changed");
+          const context = scan ? { scan, dependencies, coreLookup: new Map() } : null;
+          if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+          latest = context && await (auditValue(__audit2, auditEnter(__audit2, "isLocalPlayerSourceContextValid"), (isLocalPlayerSourceContextValid(context))))
+            ? await (auditValue(__audit2, auditEnter(__audit2, "buildGuildScanView", "async-container"), (buildGuildScanView(context.scan, activeGuild, latestSource, context, allowed)))) : null;
         }
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        if (!latest) {
+          (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, summaries, sources, error: "guildDashboardState.loadFailed" }))));
+          return auditReturn(__audit2, undefined);
+        }
+        const currentValid = await (auditValue(__audit2, auditEnter(__audit2, "isLocalPlayerSourceContextValid"), (isLocalPlayerSourceContextValid(latest.context))));
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        const identitiesValid = !identityResolutionSnapshot || await revalidateIdentityResolutionSnapshot(identityResolutionSnapshot) === identityResolutionSnapshot;
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        if (!currentValid || !identitiesValid) {
+          committed = null;
+          (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, summaries, sources, error: "guildDashboardState.changed" }))));
+          return auditReturn(__audit2, undefined);
+        }
+        committed = latest;
+        auditAccept(__audit2, latest);
+        (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, generation: currentRunId, summaries, sources, latest, identities: identityResolutionSnapshot,
+          identityContextStatus: identityResolutionSnapshot ? "ready" : "not-checked",
+          scanIdentityContexts: identityResolutionSnapshot ? [{ stand: { ...latest.source, scannedAtMs: latest.scannedAtMs }, role: "current", status: "ready",
+            summary: summarizeScanIdentities(latest.members, identityResolutionSnapshot, latest.source.guildIdentifier, latest.guild.declaredMemberCount),
+            revisions: identityResolutionSnapshot.revisions, contentHash: latest.context.scan.contentHash }] : [],
+          comparisonStatus: "not-requested" }))));
+        // The member worker selects one eligible basis for every comparison consumer.
+      } catch (error) { auditCaught(__audit2, error);
+        if (!allowed()) return (__audit2 && auditDiscard(__audit2), auditReturn(__audit2, undefined));
+        console.error("[GuildHubDashboard] failed to load current scan", error);
+        committed = null;
+        (auditValue(__audit2, auditEnter(__audit2, "state-enqueue:setState", "sync-elapsed"), (setState({ ...empty, error: "guildDashboardState.loadFailed" }))));
       }
-    };
 
-    load();
-    const unsubscribe = subscribeToSfDataHubLocalScanChanges(load);
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
+};
+    void load();
+    const unsubscribe = subscribeToSfDataHubLocalScanChanges(cause => { void load(cause?.trigger ?? "source-dependency-change"); }, { consumer: "guild-dashboard-sources" });
+    const unsubscribeIdentity = subscribeToLocalDataDependencies({ allIdentities: true, guildAliases: [activeGuild.logoIdentifier] }, cause => { void load(cause?.trigger ?? "identity-dependency-change"); }, undefined, { consumer: "guild-dashboard-identities" });
+    return () => { cancelled = true; runId++; unsubscribe(); unsubscribeIdentity(); };
+  }, [requestKey]);
+  useRuntimeAuditCommit(state.latest, !!state.latest && !state.loading, "guild-current");
+  useRuntimeAuditCommit(state.comparisonMembers, state.comparisonStatus === "ready", "guild-history-comparison");
+  return state.requestKey === requestKey ? state : {
+    requestKey, summaries: [], sources: [], latest: null, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null,
+    identities: null, comparisonStatus: "not-requested", loading: Boolean(activeGuild), detailLoading: false, error: null,
+  };
+}
 
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [activeGuild]);
 
-  return state;
+function resolveDashboardComparisonSource(base: Pick<ScanState, "sources" | "summaries">, comparison: LocalGuildRankingComparison): DashboardGuildSource | null {
+  if (comparison.status !== "ready" || comparison.timestamp == null) return null;
+  const source = base.sources.find(source => source.sourceScanId === comparison.sourceScanId);
+  if (!source || !base.summaries.find(summary => summary.sourceScanId === source.sourceScanId)?.snapshotTimestamps.includes(comparison.timestamp)) return null;
+  return { ...source, guildIdentifier: comparison.guildIdentifier, scannedAtMs: comparison.timestamp, scannedAtIso: new Date(comparison.timestamp).toISOString() };
+}
+
+function useDashboardTransferComparison(base: ScanState, activeGuild: GuildHubSelectedGuild | null, comparison: LocalGuildRankingComparison): ScanState {
+  const [state, setState] = React.useState<ScanState>(base);
+  const source = React.useMemo(() => resolveDashboardComparisonSource(base, comparison), [base.sources, base.summaries, comparison.status, comparison.sourceScanId, comparison.timestamp, comparison.guildIdentifier]);
+  React.useEffect(() => {
+    let cancelled = false;
+    const allowed = () => !cancelled;
+    const latest = base.latest;
+    setState({ ...base, comparisonStatus: source ? "loading" : comparison.status === "loading" ? "loading" : comparison.status === "error" ? "error" : "empty" });
+    if (!latest || !source || !activeGuild) return () => { cancelled = true; };
+    const runComparison = async (
+      latest: LocalGuildScanView, source: DashboardGuildSource, summaries: GuildHubScanSummary[],
+      allowed: () => boolean, identities: IdentityResolutionSnapshot | null,
+    ) => {
+    const __audit1 = auditBegin("F09", "runComparison");
+    try {
+      const context = latest.context;
+      let dependencies: Awaited<ReturnType<typeof captureLocalDataDependencies>> | undefined;
+      try {
+        dependencies = await (auditValue(__audit1, auditEnter(__audit1, "captureLocalDataDependencies"), (captureLocalDataDependencies({ sourceIds: [source.sourceScanId], allIdentities: true }))));
+        if (!allowed()) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        const members = await (auditValue(__audit1, auditEnter(__audit1, "readComparisonMembers"), (readComparisonMembers(source, activeGuild, summaries, identities))));
+        if (!allowed()) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        const guildStands = selectTransferGuildStands(summaries,
+          members.members ? classifyDashboardTransfers(latest.members, members.members, identities).joined.map(member => member.key) : [],
+          identities, latest.scannedAtMs, { sourceScanId: source.sourceScanId, scannedAtMs: source.scannedAtMs, server: source.guild.server ?? "" });
+        // Enlarge the receipt before acquiring additional sources, retaining the
+        // original receipt until the already-read roster has been revalidated.
+        const guildDependencies = await captureLocalDataDependencies({ sourceIds: [...new Set(guildStands.map(stand => stand.sourceScanId))], allIdentities: true });
+        if (!allowed() || !(await revalidateLocalDataDependencies(dependencies)).current) return;
+        dependencies = guildDependencies;
+        const comparisonGuilds = await readTransferGuildStands(guildStands.slice(1), summaries, members.guilds, allowed);
+        if (!allowed()) return;
+        const snapshot = selectGuildHubRawSnapshot(context.scan, latest.scannedAtMs);
+        const currentGuilds = snapshot ? await buildCurrentTransferGuildLookupCooperatively(snapshot, latest.guild.server, allowed) : null;
+        if (!allowed()) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        const [currentValid, historicalValid] = await (auditValue(__audit1, auditEnter(__audit1, "Promise.all"), (Promise.all([
+          isLocalPlayerSourceContextValid(context), revalidateLocalDataDependencies(dependencies),
+        ]))));
+        if (!allowed() || !currentValid || !historicalValid.current || (identities && await revalidateIdentityResolutionSnapshot(identities) !== identities) || !allowed()) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        auditAccept(__audit1, members.members);
+        (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setState", "sync-elapsed"), (setState(current => current.latest?.context === context
+          ? { ...current, comparisonMembers: members.members, comparisonGuilds, transferGuildStands: guildStands, currentGuilds, comparisonStatus: members.members ? "ready" : "empty", transferDependencies: dependencies,
+            scanIdentityContexts: [...(current.scanIdentityContexts ?? []).filter(item => item.role !== "transfer"),
+              { stand: source, role: "transfer", status: identities && members.identitySummary ? "ready" : "not-checked", summary: members.identitySummary,
+                contentHash: summaries.find(summary => summary.sourceScanId === source.sourceScanId)?.contentHash, revisions: identities?.revisions, dependencies }] } : current))));
+      } catch (error) { auditCaught(__audit1, error);
+        if (!allowed()) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        const [currentValid, historicalValid] = await (auditValue(__audit1, auditEnter(__audit1, "Promise.all"), (Promise.all([
+          isLocalPlayerSourceContextValid(context).catch(() => false),
+          dependencies ? revalidateLocalDataDependencies(dependencies).catch(() => ({ current: false })) : Promise.resolve({ current: true }),
+        ]))));
+        if (!allowed() || !currentValid || !historicalValid.current) return (__audit1 && auditDiscard(__audit1), auditReturn(__audit1, undefined));
+        console.error("[GuildHubDashboard] failed to load comparison", error);
+        (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setState", "sync-elapsed"), (setState(current => current.latest?.context === context
+          ? { ...current, comparisonMembers: null, comparisonGuilds: null, currentGuilds: null, comparisonStatus: "error" } : current))));
+      } finally {
+        // A discarded dependency result also settles its own spinner. It does
+        // not publish stale members or errors and cannot touch a newer job.
+        if (allowed()) (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setState", "sync-elapsed"), (setState(current => current.latest?.context === context && current.comparisonStatus === "loading"
+          ? { ...current, comparisonStatus: "not-requested" } : current))));
+      }
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
+};
+
+    void runComparison(latest, source, base.summaries, allowed, base.identities);
+    return () => { cancelled = true; };
+  }, [base, activeGuild, source, comparison.status]);
+  return state.latest === base.latest && state.summaries === base.summaries && (source ? state.comparisonStatus === "loading" || state.scanIdentityContexts?.some(context => context.role === "transfer" && context.stand.sourceScanId === source.sourceScanId && context.stand.scannedAtMs === source.scannedAtMs) : state.comparisonStatus !== "ready") ? state : { ...base, comparisonStatus: "loading" };
 }
 
 function useDashboardLocalFirstAcquisition(
@@ -403,6 +733,8 @@ function useDashboardLocalFirstAcquisition(
 
         const archiveScanCount = countUniqueArchiveEntries(outcome.result.preparedRequest.archiveEntries);
         setState({
+          guildContextId: activeGuild.id,
+          archiveEntries: outcome.result.preparedRequest.archiveEntries,
           archiveScanCount: outcome.result.manifestStatus === "offline" ? null : archiveScanCount,
           loading: false,
           error: outcome.result.manifestStatus === "offline" ? "Archiv nicht verfuegbar" : null,
@@ -419,143 +751,25 @@ function useDashboardLocalFirstAcquisition(
     };
   }, [activeGuild, inventoryKey, localLoading, summaries]);
 
-  return state;
+  return state.guildContextId === activeGuild?.id ? state : { archiveScanCount: null, archiveEntries: EMPTY_ARCHIVE_ENTRIES, loading: state.loading, error: state.error };
 }
 
-function useDashboardPlayerCards(
-  activeGuild: GuildHubSelectedGuild | null,
-  summaries: GuildHubScanSummary[],
-  sources: DashboardGuildSource[],
-  latest: LocalGuildScanView | null,
-): DashboardPlayerCardsState {
-  const [state, setState] = React.useState<DashboardPlayerCardsState>({
-    items: [],
-    progress: null,
-    loading: false,
-    error: null,
-  });
-  const activeRequestKeyRef = React.useRef<string | null>(null);
-  const inventoryKey = React.useMemo(() => buildGuildTrendInventoryKey(summaries), [summaries]);
-  const requestKey = React.useMemo(
-    () =>
-      [
-        activeGuild?.id ?? "",
-        activeGuild?.logoIdentifier ?? "",
-        latest?.source.sourceScanId ?? "",
-        latest?.scannedAtMs ?? "",
-        latest ? sortDashboardMembers(latest.members).map((member) => member.key).join(",") : "",
-        inventoryKey,
-      ].join(":"),
-    [activeGuild?.id, activeGuild?.logoIdentifier, inventoryKey, latest],
-  );
-
-  React.useEffect(() => {
-    if (!activeGuild || !latest) {
-      activeRequestKeyRef.current = null;
-      setState({ items: [], progress: null, loading: false, error: null });
-      return undefined;
-    }
-
-    const sortedMembers = sortDashboardMembers(latest.members);
-    const staticItems = buildDashboardStaticPlayerCardItems({
-      members: sortedMembers,
-      playerLookup: latest.playerLookup,
-      developmentStatus: "loading",
-    });
-    const cachedItems = dashboardPlayerCardsDevelopmentCache.get(requestKey);
-    if (cachedItems) {
-      setState({ items: cachedItems, progress: null, loading: false, error: null });
-      return undefined;
-    }
-
-    const summaryById = new Map(summaries.map((summary) => [summary.sourceScanId, summary]));
-    const dashboardSummaries = [
-      ...new Map(
-        sources
-          .filter((source) => source.scannedAtMs <= latest.scannedAtMs)
-          .map((source) => summaryById.get(source.sourceScanId) ?? null)
-          .filter((summary): summary is GuildHubScanSummary => Boolean(summary))
-          .map((summary) => [summary.sourceScanId, summary]),
-      ).values(),
-    ];
-
-    if (!dashboardSummaries.length) {
-      setState({
-        items: staticItems.map((item) => ({ ...item, developmentStatus: "unavailable" })),
-        progress: null,
-        loading: false,
-        error: null,
-      });
-      return undefined;
-    }
-
-    let cancelled = false;
-    let workerRun: LocalPlayerIndexWorkerRun | null = null;
-    activeRequestKeyRef.current = requestKey;
-    setState({ items: staticItems, progress: null, loading: true, error: null });
-
-    workerRun = startLocalPlayerIndexWorkerRun({
-      summaries: dashboardSummaries,
-      serverFilter: normalizeServerForCompare(activeGuild.server),
-      targetPlayerRefs: sortedMembers.map((member) => member.localRef?.identifier ?? member.localRef?.sourcePlayerKey ?? member.key),
-      targetPlayerNames: sortedMembers.map((member) => member.name),
-      includeCards: false,
-      onProgress: (progress) => {
-        if (!cancelled && activeRequestKeyRef.current === requestKey) {
-          setState((current) => ({ ...current, progress }));
-        }
-      },
-    });
-
-    workerRun.promise
-      .then(({ index }) => {
-        if (cancelled || activeRequestKeyRef.current !== requestKey) return;
-        const items = buildDashboardPlayerCardItems({
-          members: sortedMembers,
-          players: index.players,
-          currentSourceScanId: latest.source.sourceScanId,
-          currentTimestampMs: latest.scannedAtMs,
-          baseItems: staticItems,
-          developmentStatus: "unavailable",
-        });
-        dashboardPlayerCardsDevelopmentCache.set(requestKey, items);
-        setState({
-          items,
-          progress: null,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (cancelled || error instanceof LocalPlayerIndexWorkerCancelledError) return;
-        console.error("[GuildHubDashboard] failed to build player cards", error);
-        if (activeRequestKeyRef.current === requestKey) {
-          setState({
-            items: staticItems.map((item) => ({
-              ...item,
-              developmentStatus: "error",
-              developmentError: "Entwicklung konnte nicht geladen werden",
-            })),
-            progress: null,
-            loading: false,
-            error: "Player Cards konnten nicht berechnet werden.",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (activeRequestKeyRef.current === requestKey) activeRequestKeyRef.current = null;
-      workerRun?.cancel();
-    };
-  }, [activeGuild, inventoryKey, latest, requestKey, sources, summaries]);
-
-  return state;
+function useDashboardPlayerCards(latest: LocalGuildScanView | null): DashboardPlayerCardsState {
+  // The current source and its normalized cores already belong to the current
+  // dashboard observation. There is no player-index/history consumer here.
+  const items = React.useMemo(() => latest ? buildDashboardStaticPlayerCardItems({
+    members: sortDashboardMembers(latest.members), playerLookup: latest.playerLookup,
+    coreLookup: latest.context.coreLookup, developmentStatus: "unavailable",
+  }) : [], [latest]);
+  useRuntimeAuditCommit(items, items.length > 0, "guild-member-current-values");
+  return { items, loading: false, progress: null, error: null };
 }
 
 function useDashboardGuildTrend(
-  activeGuild: GuildHubSelectedGuild,
+  activeGuild: GuildHubSelectedGuild | null,
   summaries: GuildHubScanSummary[],
+  memberRefs: readonly string[],
+  chartWindow?: { startMs: number; endMs: number },
 ): GuildTrendState {
   const [state, setState] = React.useState<GuildTrendState>({
     result: null,
@@ -563,23 +777,28 @@ function useDashboardGuildTrend(
     loading: false,
     error: null,
   });
+  const preparationRef = React.useRef<AnalyticsPreparationLease>();
+  React.useEffect(() => {
+    preparationRef.current = sharedAnalyticsPreparation.acquire("visible");
+    return () => { preparationRef.current?.release(); preparationRef.current = undefined; };
+  }, [activeGuild?.id]);
   const activeRequestKeyRef = React.useRef<string | null>(null);
-  const inventoryKey = React.useMemo(() => buildGuildTrendInventoryKey(summaries), [summaries]);
+  const inventoryKey = React.useMemo(() => analyticsSummaryKey(summaries), [summaries]);
   const guildTarget = React.useMemo(
     () => ({
-      guildId: activeGuild.guildId,
-      logoIdentifier: activeGuild.logoIdentifier,
-      server: activeGuild.server,
+      guildId: activeGuild?.guildId,
+      logoIdentifier: activeGuild?.logoIdentifier,
+      server: activeGuild?.server,
     }),
-    [activeGuild.guildId, activeGuild.logoIdentifier, activeGuild.server],
+    [activeGuild?.guildId, activeGuild?.logoIdentifier, activeGuild?.server],
   );
   const requestKey = React.useMemo(
-    () => buildDashboardGuildTrendRequestKey(guildTarget, inventoryKey),
-    [guildTarget, inventoryKey],
+    () => buildDashboardGuildTrendRequestKey(guildTarget, inventoryKey) + ":" + memberRefs.join(",") + ":" + JSON.stringify(chartWindow),
+    [guildTarget, inventoryKey, memberRefs, chartWindow],
   );
 
   React.useEffect(() => {
-    if (!summaries.length) {
+    if (!activeGuild || !summaries.length) {
       activeRequestKeyRef.current = null;
       setState({ result: null, progress: null, loading: false, error: null });
       return undefined;
@@ -588,11 +807,19 @@ function useDashboardGuildTrend(
     let cancelled = false;
     let workerRun: PlayerPerformanceWorkerRun | null = null;
     activeRequestKeyRef.current = requestKey;
-    setState({ result: null, progress: null, loading: true, error: null });
+    setState(current => ({ ...(current.guildId === activeGuild.id ? current : { result: null }), guildId: activeGuild.id, requestKey, progress: null, loading: true, error: null }));
 
-    workerRun = startPlayerPerformanceWorkerRun({
+    const deliver = (result: GuildTrendBuildResult) => { if (!cancelled && activeRequestKeyRef.current === requestKey) setState(current => ({ ...current, requestKey, result, progress: null, loading: false, error: null })); };
+    const fail = (error: unknown) => { if (!cancelled && activeRequestKeyRef.current === requestKey) { console.error("[GuildHubDashboard] failed to build guild trend", error); setState(current => ({ ...current, requestKey, progress: null, loading: false, error: "Gildentrend konnte nicht berechnet werden." })); } };
+    workerRun = startSharedGuildTrendRun({
+      onRefresh: deliver, onError: fail, onInvalidating: () => { if (!cancelled) setState(current => ({ ...(current.guildId === activeGuild.id ? current : { result: null }), guildId: activeGuild.id, requestKey, progress: null, loading: true, error: null })); },
       summaries,
       guildTarget,
+      sourceScope: "dashboard-guild",
+      includeServerHistory: true,
+      chartWindow, preparation: preparationRef.current,
+      memberRefs,
+      onHistory: history => { if (!cancelled && activeRequestKeyRef.current === requestKey) setState(current => ({ ...current, history })); },
       onProgress: (progress) => {
         if (!cancelled && activeRequestKeyRef.current === requestKey) {
           setState((current) => ({ ...current, progress }));
@@ -601,26 +828,17 @@ function useDashboardGuildTrend(
     });
 
     workerRun.promise
-      .then((result) => {
-        if (cancelled || activeRequestKeyRef.current !== requestKey) return;
-        setState({ result, progress: null, loading: false, error: null });
-      })
-      .catch((error) => {
-        if (cancelled || error instanceof PlayerPerformanceWorkerCancelledError) return;
-        console.error("[GuildHubDashboard] failed to build guild trend", error);
-        if (activeRequestKeyRef.current === requestKey) {
-          setState({ result: null, progress: null, loading: false, error: "Gildentrend konnte nicht berechnet werden." });
-        }
-      });
+      .then(deliver).catch(fail);
 
     return () => {
       cancelled = true;
       if (activeRequestKeyRef.current === requestKey) activeRequestKeyRef.current = null;
       workerRun?.cancel();
     };
-  }, [guildTarget, requestKey, summaries.length]);
+  }, [guildTarget, requestKey]);
 
-  return state;
+  useRuntimeAuditCommit(state.result, !!state.result && !state.loading && !state.error, "guild-trend");
+  return state.guildId === activeGuild?.id ? state : { result: null, progress: null, loading: Boolean(activeGuild), error: null };
 }
 
 function buildDashboardGuildTrendRequestKey(
@@ -652,6 +870,8 @@ function buildDashboardGuildSources(
   activeGuild: GuildHubSelectedGuild,
   identityResolutionSnapshot: Pick<IdentityResolutionSnapshot, "guilds"> | null = null,
 ): DashboardGuildSource[] {
+    const __audit3 = auditPhaseBegin("buildDashboardGuildSources", undefined, "sync-elapsed");
+    try {
   const sources = summaries.flatMap((summary) => {
     if (!isGuildHubScanAnalyticsEnabled(summary)) return [];
     const guild = summary.guilds.find((entry) => isSummaryGuildMatch(entry, activeGuild, identityResolutionSnapshot));
@@ -662,6 +882,7 @@ function buildDashboardGuildSources(
 
     return [
       {
+        guildIdentifier: guild.guildIdentifier,
         sourceScanId: summary.sourceScanId,
         sourceFilename: guild.sourceScanFilename ?? summary.filename,
         scannedAtMs: scannedAt.ms,
@@ -677,12 +898,15 @@ function buildDashboardGuildSources(
     ];
   });
 
-  return sources.sort(
+  return auditReturn(__audit3, sources.sort(
     (a, b) =>
       b.scannedAtMs - a.scannedAtMs ||
       a.sourceFilename.localeCompare(b.sourceFilename, undefined, { sensitivity: "base" }) ||
       a.sourceScanId.localeCompare(b.sourceScanId),
-  );
+  ));
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 }
 
 function countDashboardUserScans(sources: DashboardGuildSource[], summaries: GuildHubScanSummary[]) {
@@ -695,25 +919,39 @@ function countUniqueArchiveEntries(entries: readonly { id: string }[]) {
 }
 
 async function readComparisonMembers(
-  source: DashboardGuildSource | null,
+  source: DashboardGuildSource,
   activeGuild: GuildHubSelectedGuild,
-): Promise<LocalMember[] | null> {
-  if (!source) return null;
+  summaries: GuildHubScanSummary[],
+  identities: IdentityResolutionSnapshot | null = null,
+): Promise<{ members: LocalMember[] | null; guilds: TransferGuildLookup; identitySummary?: ScanIdentitySummary }> {
+    const __audit4 = auditPhaseBegin("readComparisonMembers", undefined, "async-container");
+    try {
+  const historicalGuild = { name: source.guild.name ?? "", server: source.guild.server ?? parseServerFromIdentifier(source.guildIdentifier) ?? "", logoIdentifier: source.guildIdentifier };
+  const sameServer = normalizeServerForCompare(historicalGuild.server) === normalizeServerForCompare(activeGuild.server);
+  const confirmed = identities && confirmedGuildObservationsMatch(identities, source.guildIdentifier, activeGuild.logoIdentifier ?? activeGuild.guildId, historicalGuild.server, activeGuild.server);
+  if (!confirmed && !(sameServer && isSummaryGuildMatch({ ...historicalGuild, guildId: source.guildIdentifier ?? "", guildIdentifier: source.guildIdentifier ?? null }, activeGuild, identities))) throw Error("Historical guild identity changed");
+  const { isDerivedMemberInGuild, ensureGuildAnalyticsSourceDataFromSummaries } = await (auditValue(__audit4, auditEnter(__audit4, "import"), (import("../../lib/guilds/localGuildAnalyticsStore"))));
+  const result = await (auditValue(__audit4, auditEnter(__audit4, "ensureGuildAnalyticsSourceDataFromSummaries"), (ensureGuildAnalyticsSourceDataFromSummaries(
+    summaries.filter(summary => summary.sourceScanId === source.sourceScanId),
+    { loadSourceById: getGuildHubLocalScan, readSourceIds: [source.sourceScanId] },
+  ))));
+  const snapshotMembers = result.members.filter(member => member.sourceScanId === source.sourceScanId && member.snapshotTimestamp === source.scannedAtMs).sort((a, b) => a.id.localeCompare(b.id));
+  const members = snapshotMembers
+    .filter(member => member.sourceScanId === source.sourceScanId && member.snapshotTimestamp === source.scannedAtMs && isDerivedMemberInGuild(source.guildIdentifier ? { ...member, guildName: null } : member, historicalGuild))
+    .map(toLocalMemberFromDerived);
+  const guilds = buildTransferGuildLookup(snapshotMembers, result.guilds.filter(guild => guild.sourceScanId === source.sourceScanId && guild.snapshotTimestamp === source.scannedAtMs));
+  const sourceReference = favoriteReference("guild", source.guildIdentifier, historicalGuild.server);
+  const declarations = result.guilds.filter(guild => {
+    const ref = favoriteReference("guild", guild.guildIdentifier ?? guild.guildSegment, guild.server);
+    return guild.sourceScanId === source.sourceScanId && guild.snapshotTimestamp === source.scannedAtMs &&
+      ref && sourceReference && referenceKey(ref) === referenceKey(sourceReference);
+  }).map(guild => guild.declaredMemberCount);
+  const declared = declarations.length && declarations.every(count => count === declarations[0]) ? declarations[0] : null;
+  return auditReturn(__audit4, { members: members.length ? members : null, guilds,
+    identitySummary: identities ? summarizeScanIdentities(members, identities, source.guildIdentifier, declared) : undefined });
 
-  try {
-    const { isDerivedMemberInGuild, readGuildAnalyticsDerivedSource } = await import(
-      "../../lib/guilds/localGuildAnalyticsStore"
-    );
-    const data = await readGuildAnalyticsDerivedSource(source.sourceScanId);
-    const members = data.members
-      .filter((member) => member.snapshotTimestamp === source.scannedAtMs && isDerivedMemberInGuild(member, activeGuild))
-      .map(toLocalMemberFromDerived);
-
-    return members.length ? members : null;
-  } catch (error) {
-    console.error("[GuildHubDashboard] failed to load derived comparison members", error);
-    return null;
-  }
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
 }
 
 function toLocalMemberFromDerived(member: GuildAnalyticsMemberSnapshot): LocalMember {
@@ -721,6 +959,7 @@ function toLocalMemberFromDerived(member: GuildAnalyticsMemberSnapshot): LocalMe
   return {
     key: member.memberRef.toLowerCase(),
     name: member.name,
+    server: member.server,
     classLabel: classMeta?.label ?? normalizeMemberClassLabel(member.classId),
     classMeta,
     level: member.level,
@@ -734,12 +973,22 @@ function toLocalMemberFromDerived(member: GuildAnalyticsMemberSnapshot): LocalMe
 }
 
 function isSummaryGuildMatch(
-  guild: GuildHubLocalGuildIdentity,
+  guild: Pick<GuildHubLocalGuildIdentity, "guildIdentifier" | "guildId" | "name" | "server">,
   activeGuild: GuildHubSelectedGuild,
   identityResolutionSnapshot: Pick<IdentityResolutionSnapshot, "guilds"> | null = null,
 ) {
-  const activeServer = normalizeServerForCompare(activeGuild.server);
-  const guildServer = normalizeServerForCompare(guild.server);
+  const sourceRef = guild.guildIdentifier ?? guild.guildId;
+  const targetRef = activeGuild.logoIdentifier ?? activeGuild.guildId;
+  // A complete reference cannot be rescued by a contradictory server label.
+  if ((/_g[^_]+$/i.test(sourceRef ?? "") && !collectDashboardGuildIdentifierCandidates(sourceRef, guild.server).length) ||
+    (/_g[^_]+$/i.test(targetRef ?? "") && !collectDashboardGuildIdentifierCandidates(targetRef, activeGuild.server).length)) return false;
+  if (identityResolutionSnapshot) {
+    const source = resolveObservedGuildIdentity(identityResolutionSnapshot, guild.guildIdentifier ?? guild.guildId, guild.server);
+    const target = resolveObservedGuildIdentity(identityResolutionSnapshot, activeGuild.logoIdentifier ?? activeGuild.guildId, activeGuild.server);
+    if (source.resolved && target.resolved) return source.identityId === target.identityId;
+  }
+  const activeServer = normalizeServerForCompare(activeGuild.server) ?? normalizeServerForCompare(parseServerFromIdentifier(targetRef));
+  const guildServer = normalizeServerForCompare(guild.server) ?? normalizeServerForCompare(parseServerFromIdentifier(sourceRef));
   const serverMatches = !activeServer || !guildServer || activeServer === guildServer;
   const activeGuildSegment = normalizeGuildSegment(activeGuild.guildId) ?? normalizeGuildSegment(activeGuild.logoIdentifier);
   const sourceGuildSegment = normalizeGuildSegment(guild.guildIdentifier) ?? normalizeGuildSegment(guild.guildId);
@@ -748,7 +997,7 @@ function isSummaryGuildMatch(
     return true;
   }
 
-  if (identityResolutionSnapshot && summaryGuildIdentityMatches(guild, activeGuild, identityResolutionSnapshot) && serverMatches) {
+  if (identityResolutionSnapshot && summaryGuildIdentityMatches(guild, activeGuild, identityResolutionSnapshot)) {
     return true;
   }
 
@@ -756,35 +1005,17 @@ function isSummaryGuildMatch(
 }
 
 function summaryGuildIdentityMatches(
-  guild: GuildHubLocalGuildIdentity,
+  guild: Pick<GuildHubLocalGuildIdentity, "guildIdentifier" | "guildId" | "name" | "server">,
   activeGuild: GuildHubSelectedGuild,
   identityResolutionSnapshot: Pick<IdentityResolutionSnapshot, "guilds">,
 ) {
-  const sourceIdentifiers = collectDashboardGuildIdentifierCandidates(guild.guildIdentifier ?? guild.guildId, guild.server);
-  if (!sourceIdentifiers.length) return false;
-  const activeIdentifiers = collectDashboardGuildIdentifierCandidates(activeGuild.logoIdentifier ?? activeGuild.guildId, activeGuild.server);
-  for (const identifier of activeIdentifiers) {
-    const resolution = resolveGuildIdentity(identityResolutionSnapshot, identifier);
-    if (!resolution.resolved) continue;
-    const aliases = new Set(
-      resolution.aliasIdentifiers.flatMap((alias) => collectDashboardGuildIdentifierCandidates(alias, activeGuild.server)),
-    );
-    if (sourceIdentifiers.some((sourceIdentifier) => aliases.has(sourceIdentifier))) return true;
-  }
-  return false;
+  return confirmedGuildObservationsMatch(identityResolutionSnapshot,
+    guild.guildIdentifier ?? guild.guildId, activeGuild.logoIdentifier ?? activeGuild.guildId,
+    guild.server, activeGuild.server);
 }
 
 function collectDashboardGuildIdentifierCandidates(identifier: string | null | undefined, server: string | null | undefined) {
-  const candidates = new Set<string>();
-  const raw = String(identifier ?? "").trim().toLowerCase();
-  const segment = normalizeGuildSegment(raw);
-  const normalizedServer = normalizeServerForCompare(server) ?? normalizeServerForCompare(parseServerFromIdentifier(raw));
-  if (raw) candidates.add(raw);
-  if (segment) {
-    candidates.add(segment);
-    if (normalizedServer) candidates.add(`${normalizedServer}_${segment}`);
-  }
-  return [...candidates];
+  return guildObservationIdentifierCandidates(identifier, server);
 }
 
 function resolveSummaryGuildScanTime(summary: GuildHubScanSummary, guild: GuildHubLocalGuildIdentity) {
@@ -799,27 +1030,261 @@ function resolveSummaryGuildScanTime(summary: GuildHubScanSummary, guild: GuildH
   return summaryTime != null ? { ms: summaryTime, iso: new Date(summaryTime).toISOString() } : null;
 }
 
+function GuildOverviewTitle({ onClose }: { onClose?: () => void } = {}) {
+  const { t } = useTranslation();
+  const location = useLocation(), navigate = useNavigate();
+  const target = safeLocalReturn(location.state?.returnTo);
+  return <LocalTitleNavigation title={<h1 style={{ margin: 0, font: "inherit" }}>{t("guildProfile.heroPanel.sections.guildOverview")}</h1>}
+    className={styles.divider} onBack={onClose ?? (() => navigate(target === location.pathname + location.search ? DATA_HUB : target ?? DATA_HUB,
+      { state: location.state?.guildReturnState }))} />;
+}
+
+/** Keep the W-79 activation clearances and crest/status anchors; normal content stays in flow. */
+function useCompactGuildHeader(
+  ref: React.RefObject<HTMLDivElement>,
+  target: HTMLDivElement | null,
+  source: LocalPlayerSourceContext,
+  onActivate: () => void,
+) {
+  React.useLayoutEffect(() => {
+    const header = ref.current;
+    const grid = header?.parentElement;
+    const scroller = header?.closest<HTMLElement>("main");
+    const normal = grid?.querySelector<HTMLElement>("[data-guild-expanded]");
+    if (!header || !grid || !scroller || !normal || !target) return;
+    const title = header.querySelector<HTMLElement>("[data-guild-title]")!;
+    const body = normal.querySelector<HTMLElement>("[data-guild-header-body]")!;
+    const hero = body.querySelector<HTMLElement>("[data-guild-hero]")!;
+    const crest = body.querySelector<HTMLElement>("[data-guild-crest]")!;
+    const hud = body.querySelector<HTMLElement>("[data-guild-scan-hud]")!;
+    const toggle = body.querySelector<HTMLElement>("[data-member-mode-toggle]")!;
+    const compactCrest = target.querySelector<HTMLElement>("[data-compact-crest]");
+    const compactHud = target.querySelector<HTMLElement>("[data-compact-hud]");
+    if (!compactCrest || !compactHud) return;
+    const stand = compactHud.querySelector<HTMLElement>("[data-guild-scan-stand]")!;
+    const details = compactHud.querySelector<HTMLElement>("[data-guild-scan-details-trigger]")!;
+    const compactModes = target.querySelector<HTMLElement>("[data-compact-modes]")!;
+    const compactChart = target.querySelector<HTMLElement>("[data-compact-chart]")!;
+    const compactClasses = target.querySelector<HTMLElement>("[data-compact-classes]")!;
+    const chartPanel = body.querySelector<HTMLElement>("[data-guild-trend]")!;
+    const sharedControls = body.querySelector<HTMLElement>("[data-guild-shared-controls]")!;
+    const groups = [compactCrest, compactHud, compactModes, compactChart, compactClasses];
+    const surface = scroller.closest("section")!;
+    const glow = surface.querySelector<SVGElement>(":scope > svg");
+    let origin = 0, logoClearance = 0, statusClearance = 0, ready = false;
+    const box = (element: Element) => element.getBoundingClientRect();
+    const set = (name: string, value: number) => header.style.setProperty(name, `${value}px`);
+    const paint = () => {
+      const travel = scroller.scrollTop - origin;
+      const next = travel >= logoClearance && travel > statusClearance;
+      if (next === ready) return;
+      ready = next;
+      header.dataset.compactReady = String(ready);
+      if (ready) onActivate();
+      for (const group of groups) {
+        // The CSS lead-in also uses visibility:hidden, so no hidden group can
+        // acquire focus or intercept a pointer during its independent delay.
+        if (!ready && group.contains(document.activeElement)) {
+          (document.activeElement as HTMLElement).blur();
+        }
+        group.inert = !ready;
+        group.setAttribute("aria-hidden", String(!ready));
+      }
+    };
+    const measure = () => {
+      const h = box(body), headerBox = box(header);
+      const titleBox = box(title);
+      const line = box(title.querySelector("[data-title-stripe]")!);
+      const mobile = window.matchMedia("(max-width: 980px)").matches;
+      const style = getComputedStyle(header);
+      const padding = parseFloat(style.getPropertyValue("--head-compact-padding"));
+      const metadata = box(body.querySelector<HTMLElement>("[data-guild-metadata]")!);
+      sharedControls.style.setProperty("--metadata-mode-center", `${metadata.left + metadata.width / 2 - box(sharedControls).left}px`);
+      const normalImage = crest.querySelector("img") ?? crest;
+      const logo = box(normalImage), status = box(hud), modes = box(toggle);
+      const smallLogo = Math.min(logo.width, parseFloat(style.getPropertyValue("--head-compact-logo-size")));
+      const statusHeight = box(stand).height, actionHeight = box(details).height;
+      const modeHeight = modes.height;
+      const gap = mobile ? 0 : 4;
+      const titleHeight = titleBox.height + parseFloat(getComputedStyle(normal).getPropertyValue("--overview-title-gap"));
+      const rowTop = line.top - headerBox.top;
+      const extraIcon = Math.max(0, (actionHeight - statusHeight) / 2);
+      // Preserve the original band envelope before centring the whole group.
+      const compactBody = Math.max(
+        padding + (mobile ? modeHeight : 0) + smallLogo + gap + statusHeight + padding + extraIcon,
+        padding + modeHeight + padding,
+      );
+      const height = titleHeight + compactBody;
+      const groupHeight = smallLogo + gap + statusHeight + extraIcon;
+      const crestTop = (rowTop + line.height + height - 2 - groupHeight) / 2;
+      const statusTop = crestTop + smallLogo + gap;
+      const modeLift = mobile ? Math.max(0, rowTop + padding + modeHeight - crestTop) : 0;
+      // Keep the pre-W109 compact envelope and category-tab anchors.
+      const rowCenter = (line.height + height - 2 - rowTop) / 2;
+      const modeTop = padding - modeLift;
+      const scrollEdge = box(scroller).top + scroller.clientTop;
+      origin = box(grid).top + scroller.scrollTop - scrollEdge;
+      // W-79 activated at these measured envelope clearances. Only scroll
+      // position is compared now; no group is scaled, moved, or folded.
+      logoClearance = Math.max(1, h.height - compactBody) / 2;
+      statusClearance = h.height - (statusTop - titleHeight + status.height + padding);
+      set("--head-sticky-top", origin);
+      set("--head-title-height", titleHeight);
+      set("--head-title-cover-height", titleBox.height);
+      set("--head-row-overlap", titleHeight - rowTop);
+      set("--compact-crest-left", logo.left - h.left + (logo.width - smallLogo) / 2);
+      set("--compact-crest-top", crestTop - rowTop);
+      set("--compact-logo-size", smallLogo);
+      set("--compact-hud-left", status.left - h.left);
+      set("--compact-hud-top", statusTop - rowTop);
+      set("--compact-hud-width", status.width);
+      // Anchor both presentations to the outer chart box, including loading
+      // and neutral states. The existing mobile row keeps its free right slot.
+      const chart = box(chartPanel);
+      const chartCenter = chart.left + chart.width / 2;
+      sharedControls.style.setProperty("--chart-toggle-center", `${chartCenter - box(sharedControls).left}px`);
+      // Restore the original compact height and category-tab position.
+      // Only Trend/Compare use the former left return-link anchor.
+      const classHeight = compactClasses.offsetHeight;
+      const classTop = mobile
+        ? height - rowTop - classHeight - 2
+        : rowCenter - classHeight / 2;
+      set("--compact-modes-left", modes.left - h.left);
+      set("--compact-modes-top", modeTop);
+      set("--compact-chart-left", 0);
+      // Mobile keeps the fixed category row clear; centre the full button
+      // group in the remaining band. Desktop uses the existing row centre.
+      const chartCenterY = mobile
+        ? (modeTop + modeHeight + height - rowTop - 2) / 2
+        : rowCenter;
+      set("--compact-chart-top", chartCenterY - compactChart.offsetHeight / 2);
+      set("--compact-classes-top", classTop);
+      // Preserve the class distribution anchor formerly beside the 74px return link.
+      set("--compact-back-width", 74);
+      set("--head-cover-height", height);
+      set("--head-compact-height", height);
+      // The compact status uses the same DOM/rules and centred age text as
+      // W-79. Anchor its info action directly after that text, without motion.
+      const age = box(stand.querySelector("small")!);
+      set("--compact-info-left", age.right - box(compactHud).left + 6);
+      const surfaceBox = box(glow ?? surface);
+      set("--head-surface-width", surfaceBox.width);
+      set("--head-surface-height", surfaceBox.height);
+      set("--head-surface-x", surfaceBox.left);
+      set("--head-surface-y", surfaceBox.top);
+      set("--head-viewport-x", h.left);
+      set("--head-dock-y", scrollEdge + origin);
+      header.style.setProperty("--head-surface-color", getComputedStyle(document.body).backgroundColor);
+      if (glow) header.style.setProperty("--head-surface-image", `url("data:image/svg+xml,${encodeURIComponent(new XMLSerializer().serializeToString(glow))}")`);
+      normal.style.setProperty("--normal-title-height", `${titleHeight}px`);
+      const fullHeight = titleHeight + h.height;
+      grid.style.setProperty("--dashboard-grid-row-height", `${(fullHeight - 2 * parseFloat(getComputedStyle(grid).rowGap)) / 3}px`);
+      grid.style.setProperty("--dashboard-head-expanded-height", `${fullHeight}px`);
+      paint();
+    };
+    // Initial hidden state is explicit even when restored scroll starts low.
+    header.dataset.compactReady = "false";
+    for (const group of groups) { group.inert = true; group.setAttribute("aria-hidden", "true"); }
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller); observer.observe(body); observer.observe(title); observer.observe(compactClasses);
+    hero.addEventListener("load", measure, true);
+    measure();
+    scroller.addEventListener("scroll", paint, { passive: true });
+    return () => {
+      observer.disconnect(); hero.removeEventListener("load", measure, true);
+      scroller.removeEventListener("scroll", paint);
+      grid.style.removeProperty("--dashboard-grid-row-height");
+      grid.style.removeProperty("--dashboard-head-expanded-height");
+    };
+  }, [ref, target, source, onActivate]);
+}
+
 function GuildOverviewCard({
+  onClose,
   guild,
   latest,
   userScanCount,
   archiveInventoryState,
   summaries,
+  identities,
+  scanIdentityContexts, identityContextStatus,
+  transferComparison,
+  transferStatus,
+  memberComparison, collectComparisonDiagnostic,
+  trendState, history, comparisonHistory, compareMembers, chartRange,
+  memberMode, onMemberModeChange,
+  rankingMembers, rankingClass,
+  classDistribution, selectedClasses, onToggleClass, onCompactActivate,
 }: {
+  onClose?: () => void;
   guild: GuildHubSelectedGuild;
   latest: LocalGuildScanView;
   userScanCount: number;
   archiveInventoryState: DashboardArchiveInventoryState;
   summaries: GuildHubScanSummary[];
+  identities: IdentityResolutionSnapshot | null;
+  scanIdentityContexts: ScanIdentityContext[];
+  identityContextStatus: ScanIdentityContext["status"];
+  transferComparison: DashboardGuildSource | null;
+  transferStatus: ComparisonStatus;
+  memberComparison: LocalGuildRankingComparison;
+  collectComparisonDiagnostic?: () => Promise<{ text: string; coherent: boolean; isCurrent: () => boolean }>;
+  chartRange: GuildChartRangeControl;
+  trendState: GuildTrendState;
+  history: DashboardHistory;
+  comparisonHistory: DashboardGuildComparison;
+  compareMembers: DashboardCompareMembers;
+  rankingMembers: readonly LocalGuildStatsMember[];
+  rankingClass: ClassSelection;
+  memberMode: DashboardMemberMode;
+  onMemberModeChange: (mode: DashboardMemberMode) => void;
+  onCompactActivate: () => void;
+  classDistribution: ReturnType<typeof buildClassDistribution>;
+  selectedClasses: readonly string[];
+  onToggleClass: (label: string) => void;
 }) {
-  const [metric, setMetric] = React.useState<GuildTrendChartMetric>("base");
-  const trendState = useDashboardGuildTrend(guild, summaries);
+  const fusionMarkers = React.useMemo(() => buildGuildAnalyticsFusionMarkers(
+    comparisonHistory.fusionServersByGuild.get(comparisonHistory.currentGuildKey), history.timeDomain,
+  ), [comparisonHistory, history.timeDomain]);
+  const [chartInformationTarget, setChartInformationTarget] = React.useState<HTMLDivElement | null>(null);
+  const [compareGuilds, setCompareGuilds] = React.useState<readonly string[]>([]);
+  const toggleCompareGuild = (key: string) => setCompareGuilds(current => current.includes(key) ? current.filter(value => value !== key) : [...current, key]);
+  const [displayDismissal, setDisplayDismissal] = React.useState(0);
+  const handleCompactActivate = React.useCallback(() => { setDisplayDismissal(value => value + 1); onCompactActivate(); }, [onCompactActivate]);
+  const comparePresentation = React.useMemo(() => ({
+    currentAt: latest.scannedAtMs,
+    comparisonValues: memberComparison.comparisonValues,
+    comparisonStand: transferComparison ? { at: transferComparison.scannedAtMs, sourceScanId: transferComparison.sourceScanId } : null,
+    emblems: buildDashboardCompareEmblems({ comparison: comparisonHistory, summaries, identities, currentAt: latest.scannedAtMs,
+      primary: { coaString: latest.source.guild.coaString ?? null, identifier: latest.source.guildIdentifier ?? null, sourceScanId: latest.source.sourceScanId },
+    }).emblems,
+  }), [latest.scannedAtMs, latest.source.guild.coaString, latest.source.guildIdentifier, latest.source.sourceScanId, transferComparison, comparisonHistory, summaries, identities, memberComparison]);
+  const [compareMetrics, setCompareMetrics] = React.useState<DashboardHistoryMetric[]>(["base", "total"]);
+  const toggleCompareMetric = (metric: DashboardHistoryMetric) => setCompareMetrics(current => current.includes(metric) ? current.filter(value => value !== metric) : [...current, metric]);
+  const [chartMode, setChartMode] = React.useState<"trend" | "compare">("trend");
+  useAnalyticsView(chartMode === "trend" ? "datahub/guild/trend" : "datahub/guild/compare");
+  const [chartDetails, setChartDetails] = React.useState<{ kind: "trend" | "compare"; trigger: HTMLElement } | null>(null);
+  const closeChartDetails = React.useCallback(() => setChartDetails(null), []);
+  React.useEffect(() => { setChartDetails(null); setChartMode("trend"); }, [guild.id]);
+  const trendArchive = React.useMemo(() => ({ entries: archiveInventoryState.archiveEntries ?? EMPTY_ARCHIVE_ENTRIES, summaries }), [archiveInventoryState.archiveEntries, summaries]);
+  const chartIntervals = React.useMemo(() => buildDashboardGuildTrendIntervals(comparisonHistory, trendArchive), [comparisonHistory, trendArchive]);
+  const [trendMetrics, setTrendMetrics] = React.useState<Partial<Record<DashboardMemberMode, GuildTrendChartMetric>>>({});
+  const metric: GuildTrendChartMetric = trendMetrics[memberMode]
+    ?? ((memberMode === "progress" || memberMode === "general") ? "xp" : memberMode === "base" ? "base" : memberMode === "total" ? "total" : "mine");
+  const metricOptions = dashboardModeMetrics(memberMode).filter((value): value is GuildTrendChartMetric => value !== "hof");
+  const headerRef = React.useRef<HTMLDivElement>(null);
+  const [compactTarget, setCompactTarget] = React.useState<HTMLDivElement | null>(null);
+  useCompactGuildHeader(headerRef, compactTarget, latest.context, handleCompactActivate);
+  const { t } = useTranslation();
+  const [detailsContext, setDetailsContext] = React.useState<LocalPlayerSourceContext | null>(null);
+  const detailsTrigger = React.useRef<HTMLButtonElement | null>(null);
+  const closeDetails = React.useCallback(() => setDetailsContext(null), []);
+  const detailsOpen = detailsContext === latest.context;
   const guildName = latest.guild.name ?? guild.name;
   const serverLabel = formatServerLabel(latest.guild.server ?? guild.server);
-  const kpis = buildGuildOverviewKpis(latest, userScanCount, archiveInventoryState);
-  const memberCount = latest.guild.memberCount ?? latest.members.length;
-  const lastScanAtLabel = formatScanDateTimeLabel(latest.scannedAtIso);
-  const lastScanDays = getScanAgeDays(latest.scannedAtMs);
+  const kpis = buildGuildOverviewKpis(latest, userScanCount, archiveInventoryState, selectedClasses);
+  const lastScanAtLabel = profileDateTime(latest.scannedAtMs);
+  const lastScanDays = useScanAgeDays(latest.scannedAtMs);
   const activityPct = calculateGuildActivityPct(
     latest.members.map((member) => ({
       lastScanMs: member.lastScanMs ?? latest.scannedAtMs,
@@ -827,396 +1292,161 @@ function GuildOverviewCard({
     })),
   );
   const guildCardKpis = buildDashboardGuildCardKpis(kpis, activityPct);
+  const renderModes = (compact = false) => (
+    <div className={`${styles.memberModeSlot} ${compact ? styles.compactModes : ""}`} role="group" aria-label={t("profileI18n.guildViews")} data-member-mode-toggle data-compact-modes={compact ? "" : undefined}>
+      {(["general", "progress", "base", "total", "fortress"] as const).map(mode => <button type="button" key={mode} aria-pressed={memberMode === mode} onClick={() => onMemberModeChange(mode)}>{t("dashboardCompare.modes." + mode)}</button>)}
+    </div>
+  );
+
+  const renderChartToggle = (compact = false) => (
+    <div className={`${styles.guildTrendToggle} ${compact ? styles.compactChart : ""}`} role="group" aria-label={t("dashboardCompare.display")} data-compact-chart={compact ? "" : undefined}>
+      {(["trend", "compare"] as const).map(kind => <button key={kind} type="button" className={styles.guildTrendButton} aria-pressed={chartMode === kind} data-active={chartMode === kind} onClick={() => setChartMode(kind)}>{t("guildChartDetails." + kind)}</button>)}
+    </div>
+  );
 
   return (
     <>
+    <div className={styles.guildStickyHead} ref={headerRef} data-guild-header data-compact-ready="false">
+      <div className={styles.guildTitleRow} data-guild-title><GuildOverviewTitle onClose={onClose} /></div>
+      <div className={styles.compactBody} ref={setCompactTarget} data-guild-compact-body data-scan-compact="true">
+        {renderModes(true)}
+        {renderChartToggle(true)}
+        <div className={styles.compactClasses} data-compact-classes>
+          <DashboardClassDistribution entries={classDistribution} selectedClasses={selectedClasses} onToggleClass={onToggleClass} compact />
+        </div>
+      </div>
+    </div>
+    <div className={styles.guildOverviewTop} data-guild-expanded>
+      <div className={styles.guildOverviewBody} data-guild-header-body>
       <DashboardGuildCard
         className={styles.guildOverviewHero}
+        metadataClassName={styles.guildOverviewMetadata}
+        mode={memberMode}
+        rankingMembers={rankingMembers} rankingClass={rankingClass} rankingComparison={memberComparison} identities={identities} memberCount={latest.guild.declaredMemberCount}
+        modeToggle={<div className={styles.sharedControls} data-guild-shared-controls>
+          {renderModes()}
+          {renderChartToggle()}
+        </div>}
+        compactTarget={compactTarget}
         coaString={latest.source.guild.coaString}
         guildName={guildName}
         serverLabel={serverLabel}
-        memberCount={memberCount}
+        server={latest.guild.server ?? guild.server}
         hofRank={latest.guild.hofRank}
         lastScanAtLabel={lastScanAtLabel !== "—" ? lastScanAtLabel : null}
         lastScanDays={lastScanDays}
         kpis={guildCardKpis}
+        scanDetailsOpen={detailsOpen}
+        onScanDetails={trigger => { detailsTrigger.current = trigger; setDetailsContext(latest.context); }}
       />
 
-      <div className={styles.guildOverviewTrend}>
-        <div className={styles.guildTrendHeader}>
-          <div>
-            <p className={styles.kicker}>Gildentrend</p>
-            <h2>Gildentrend</h2>
-          </div>
-          <div className={styles.guildTrendToggle} aria-label="Kennzahl auswählen">
-            <button type="button" data-active={metric === "xp"} onClick={() => setMetric("xp")}>XP</button>
-            <button type="button" data-active={metric === "base"} onClick={() => setMetric("base")}>Basiswerte</button>
-          </div>
-        </div>
-        <DashboardGuildTrendBody metric={metric} state={trendState} />
+      {detailsOpen && <GuildScanDetailsOverlay
+        key={`${guild.id}:${latest.source.sourceScanId}:${latest.context.scan.contentHash}`}
+        guild={guild} summaries={summaries} identities={identities}
+        collectComparisonDiagnostic={collectComparisonDiagnostic}
+        identityContexts={[
+          ...(scanIdentityContexts.length ? scanIdentityContexts : [{ stand: { ...latest.source, scannedAtMs: latest.scannedAtMs }, role: "current" as const, status: identityContextStatus }]),
+          ...(memberComparison.identityContexts ?? []).map(context => identityContextStatus === "checking" ? { ...context, status: "stale" as const, summary: undefined } : context),
+        ]}
+        consumerStatus={{ transfer: transferStatus === "ready" ? "ready" : transferStatus === "loading" || identityContextStatus === "checking" ? "checking" : "not-checked",
+          ranking: memberComparison.status === "loading" ? "checking" : memberComparison.status === "ready" ? "ready" : "not-checked" }}
+        archiveEntries={archiveInventoryState.archiveEntries ?? EMPTY_ARCHIVE_ENTRIES}
+        current={{ sourceScanId: latest.source.sourceScanId, scannedAtMs: latest.scannedAtMs, guildIdentifier: latest.source.guildIdentifier }}
+        currentGuild={{ ...latest.guild, name: guildName, server: latest.guild.server ?? guild.server }}
+        comparisons={[
+          ...[...new Map((memberComparison.valueSources ?? []).filter(source => source.sourceScanId !== memberComparison.sourceScanId || source.scannedAtMs !== memberComparison.timestamp).map(source => [JSON.stringify([source.sourceScanId, source.scannedAtMs]), source])).values()].map(source => ({ ...source, label: t("guildProfileRange.playerValues") })),
+          ...(transferComparison ? [{ ...transferComparison, label: t("guildScanDetails.transferComparison") }] : []),
+          ...(memberComparison.status === "ready" && memberComparison.sourceScanId && memberComparison.timestamp != null ? [{ sourceScanId: memberComparison.sourceScanId, scannedAtMs: memberComparison.timestamp, guildIdentifier: memberComparison.guildIdentifier, label: t("guildScanDetails.rankingComparison") }] : []),
+        ]}
+        kpis={guildCardKpis} onClose={closeDetails} trigger={detailsTrigger.current}
+      />}
+
+      <div className={styles.guildOverviewTrend} data-guild-trend>
+        {chartMode === "compare" ? <DashboardCompareChart chartRange={chartRange} profileHud informationTarget={chartInformationTarget} {...comparePresentation} closeDisplaySignal={chartDetails ?? displayDismissal} selectedGuilds={compareGuilds} onToggleGuild={toggleCompareGuild} onSelectGuilds={setCompareGuilds} comparison={comparisonHistory} mode={memberMode} selectedMetrics={compareMetrics} onToggleMetric={toggleCompareMetric} loading={trendState.loading} error={trendState.error} headingAction={<ChartDetailButton title={t("guildChartDetails.compare")} onClick={trigger => setChartDetails({ kind: "compare", trigger })} />} /> : <>
+        {memberMode === "general" ? <DashboardCompareChart chartRange={chartRange} profileHud singleGuild informationTarget={chartInformationTarget} {...comparePresentation} selectedGuilds={compareGuilds} onToggleGuild={toggleCompareGuild} onSelectGuilds={setCompareGuilds} comparison={comparisonHistory} mode="general" selectedMetrics={compareMetrics} onToggleMetric={toggleCompareMetric} loading={trendState.loading} error={trendState.error} headingAction={<ChartDetailButton title={t("guildChartDetails.trend")} onClick={trigger => setChartDetails({ kind: "trend", trigger })} />} /> : <DashboardGuildTrendBody chartRange={chartRange} closeDisplaySignal={chartDetails ?? displayDismissal} fusionMarkers={fusionMarkers} informationTarget={chartInformationTarget} metric={metric} metricOptions={metricOptions} onMetricChange={value => setTrendMetrics(current => ({ ...current, [memberMode]: value }))} intervals={chartIntervals} state={trendState} headingAction={<ChartDetailButton title={t("guildChartDetails.trend")} onClick={trigger => setChartDetails({ kind: "trend", trigger })} />} />}</>}
       </div>
+      {chartDetails && <DashboardChartDetails chartRange={chartRange} key={`${guild.id}:${chartDetails.kind}`} kind={chartDetails.kind} fusionMarkers={fusionMarkers} compareMembers={compareMembers} compare={{ ...comparePresentation, selectedGuilds: compareGuilds, comparison: comparisonHistory, selectedMetrics: compareMetrics }} history={history} members={latest.members} mode={memberMode} metric={metric} intervals={chartIntervals} loading={trendState.loading} error={trendState.error} onClose={closeChartDetails} trigger={chartDetails.trigger} />}
+      </div>
+    </div>
+    <div ref={setChartInformationTarget} className={styles.chartInformationSlot} data-dashboard-chart-info />
     </>
   );
 }
 
+const noopChartClose = () => {};
 function DashboardGuildTrendBody({
   metric,
-  state,
+  state, intervals, headingAction, informationTarget, fusionMarkers, metricOptions, onMetricChange, chartRange, closeDisplaySignal,
 }: {
   metric: GuildTrendChartMetric;
+  chartRange: GuildChartRangeControl; closeDisplaySignal?: unknown;
+  metricOptions: readonly GuildTrendChartMetric[]; onMetricChange: (value: GuildTrendChartMetric) => void;
   state: GuildTrendState;
+  intervals: import("../../components/guild-trend/GuildTrendChart").GuildTrendChartInterval[];
+  fusionMarkers?: readonly GuildAnalyticsFusionMarker[];
+  informationTarget?: HTMLElement | null;
+  headingAction?: React.ReactNode;
 }) {
-  if (state.loading) {
-    return (
-      <div className={styles.guildTrendState}>
-        <DataHubLoadingState
-          variant="inline"
-          title="Gildentrend wird geladen"
-          message={state.progress?.message ?? "Lokale Analytics-Daten werden vorbereitet."}
-        />
-      </div>
-    );
-  }
-
-  if (state.error) {
-    return <div className={styles.guildTrendState}>{state.error}</div>;
-  }
-
-  if (!state.result || state.result.status === "empty" || state.result.status === "missing-guild") {
-    return <div className={styles.guildTrendState}>{state.result?.message ?? "Keine verwertbaren Gildendaten gefunden."}</div>;
-  }
-
-  if (state.result.intervals.length < 1) {
-    return (
-      <div className={styles.guildTrendState}>
-        {state.result.message ?? "Für diese Gilde wurden weniger als zwei vollständige historische Snapshots gefunden."}
-      </div>
-    );
-  }
-
-  const hasMetricData = state.result.intervals.some((interval) => {
-    const values = metric === "xp" ? interval.xp : interval.base;
-    return Number.isFinite(values.startAverage) && Number.isFinite(values.endAverage) && Number.isFinite(values.perDay);
+  const { t } = useTranslation();
+  const [infoTarget, setInfoTarget] = React.useState<HTMLSpanElement | null>(null);
+  useRuntimeAuditCommit(state.result, !!state.result && !state.loading && !state.error, `guild-trend-chart:${metric}`);
+  const message = !state.result ? state.loading ? t("guildChartDetails.loading") : t("guildDashboardState.loadFailed")
+    : state.result.status === "empty" || state.result.status === "missing-guild" || !intervals.length ? t("guildChartDetails.empty") : null;
+  const hasMetricData = intervals.some((interval) => {
+    const values = getGuildTrendMetric(interval, metric);
+    return values != null && Number.isFinite(values.startAverage) && Number.isFinite(values.endAverage) && Number.isFinite(values.perDay);
   });
-  if (!hasMetricData) {
-    return (
-      <div className={styles.guildTrendState}>
-        {metric === "xp" ? "Keine verwertbaren XP-Daten verfügbar." : "Keine verwertbaren Basiswertdaten verfügbar."}
-      </div>
-    );
-  }
 
   return (
-    <GuildTrendChart
+    <div className={styles.trendDetailFrame}>
+    <div className={styles.trendDetailHeading} data-profile-chart-hud><h2 data-profile-title-group>{headingAction}{t("guildChartDetails.trend")}<span ref={setInfoTarget} /></h2>
+      <CompareDisplay mode="progress" metrics={[]} selectedMetrics={[]} onToggleMetric={() => {}} closeSignal={closeDisplaySignal} onClose={noopChartClose}>
+        <label className={styles.trendMetricSelect}><span>{t("dashboardTrend.metricSelection")}</span><select value={metric} onChange={event => onMetricChange(event.target.value as GuildTrendChartMetric)} data-trend-metric>
+          {metricOptions.map(value => <option key={value} value={value}>{t("dashboardTrend.metrics." + value)}</option>)}
+        </select></label>
+        <DashboardChartRange {...chartRange} />
+      </CompareDisplay></div>
+    {message && <p role="status">{message}</p>}
+    {!message && !hasMetricData && <p className={styles.trendMetricEmpty} role="status">{t("dashboardTrend.noMetricData", { metric: t("dashboardTrend.metrics." + metric) })}</p>}
+    {!message && <GuildTrendChart trendInfoTarget={infoTarget} averageLabels fusionMarkers={fusionMarkers}
+      informationTarget={informationTarget}
       className={styles.guildTrendChart}
-      title={metric === "xp" ? "Gilden-XP-Trend" : "Gilden-Basiswerte-Trend"}
+      title={t("dashboardTrend.metrics." + metric)}
       metric={metric}
-      intervals={state.result.intervals}
+      intervals={intervals}
       showTrendInfo
-    />
-  );
-}
-
-function DashboardMembersPanel({
-  className,
-  members,
-  playerCardsState,
-  onMemberClick,
-}: {
-  className?: string;
-  members: LocalMember[];
-  playerCardsState: DashboardPlayerCardsState;
-  onMemberClick: (member: LocalMember) => void;
-}) {
-  const [view, setView] = React.useState<DashboardMemberView>(DEFAULT_DASHBOARD_MEMBER_VIEW);
-  const sorted = React.useMemo(() => sortDashboardMembers(members), [members]);
-  const visibleItemCount = view === "cards" ? Math.max(sorted.length, playerCardsState.items.length) : sorted.length;
-  const rowSpan = calculateDashboardMembersGridRowSpan({
-    view,
-    itemCount: visibleItemCount,
-    hasCardsError: view === "cards" && Boolean(playerCardsState.error),
-  });
-  const style = React.useMemo<DashboardMembersPanelStyle>(
-    () => ({ "--dashboard-members-row-span": rowSpan }),
-    [rowSpan],
-  );
-
-  return (
-    <section className={[styles.panel, styles.memberPanel, className].filter(Boolean).join(" ")} style={style}>
-      <div className={styles.panelHeader}>
-        <div>
-          <p className={styles.kicker}>Aktuelle Memberliste</p>
-          <h2>Mitglieder</h2>
-        </div>
-        <div className={styles.memberPanelActions}>
-          <div className={styles.memberViewToggle} role="tablist" aria-label="Mitgliederansicht">
-            <button type="button" role="tab" aria-selected={view === "cards"} data-active={view === "cards"} onClick={() => setView("cards")}>
-              Cards
-            </button>
-            <button type="button" role="tab" aria-selected={view === "list"} data-active={view === "list"} onClick={() => setView("list")}>
-              Liste
-            </button>
-          </div>
-          <span className={styles.countBadge}>{formatInteger(sorted.length)}</span>
-        </div>
-      </div>
-
-      <div className={styles.memberEntriesScroll}>
-        {view === "cards" ? (
-          <DashboardPlayerCardGrid state={playerCardsState} fallbackMembers={sorted} onMemberClick={onMemberClick} />
-        ) : sorted.length ? (
-          <div className={styles.memberList}>
-            {sorted.map((member) => (
-              <MemberRow key={member.key} member={member} onClick={onMemberClick} />
-            ))}
-          </div>
-        ) : (
-          <p className={styles.emptyText}>Im neuesten Scan sind keine eindeutig zugeordneten Mitglieder enthalten.</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function calculateDashboardMembersGridRowSpan({
-  view,
-  itemCount,
-  hasCardsError,
-}: {
-  view: DashboardMemberView;
-  itemCount: number;
-  hasCardsError: boolean;
-}) {
-  const entryHeight = view === "cards" ? DASHBOARD_MEMBER_CARD_HEIGHT_PX : DASHBOARD_MEMBER_LIST_ROW_HEIGHT_PX;
-  const entryGap = view === "cards" ? DASHBOARD_MEMBER_CARD_GAP_PX : DASHBOARD_MEMBER_LIST_GAP_PX;
-  const entriesHeight = itemCount > 0
-    ? itemCount * entryHeight + Math.max(0, itemCount - 1) * entryGap
-    : 18;
-  const errorHeight = hasCardsError ? DASHBOARD_MEMBER_CARDS_ERROR_HEIGHT_PX : 0;
-  const totalHeight = DASHBOARD_MEMBER_PANEL_CHROME_HEIGHT_PX + entriesHeight + errorHeight;
-
-  return Math.max(
-    DASHBOARD_MEMBER_MIN_ROW_SPAN,
-    Math.ceil((totalHeight + DASHBOARD_GRID_GAP_PX) / (DASHBOARD_GRID_ROW_HEIGHT_PX + DASHBOARD_GRID_GAP_PX)),
-  );
-}
-
-function DashboardPlayerCardGrid({
-  state,
-  fallbackMembers,
-  onMemberClick,
-}: {
-  state: DashboardPlayerCardsState;
-  fallbackMembers: LocalMember[];
-  onMemberClick: (member: LocalMember) => void;
-}) {
-  const items = state.items.length
-    ? state.items
-    : buildDashboardPlayerCardItems({
-        members: fallbackMembers,
-        players: [],
-        currentSourceScanId: "",
-        currentTimestampMs: 0,
-        developmentStatus: state.error ? "error" : state.loading ? "loading" : "unavailable",
-        developmentError: state.error ? "Entwicklung konnte nicht geladen werden" : null,
-      });
-
-  return (
-    <div className={styles.memberCardsArea}>
-      {state.error ? <p className={styles.memberCardsError}>{state.error}</p> : null}
-      {items.length ? (
-        <div className={styles.memberCardGrid}>
-          {items.map((item) => (
-            <DashboardMemberCard key={item.member.key} item={item} onClick={() => onMemberClick(item.member)} />
-          ))}
-        </div>
-      ) : (
-        <p className={styles.emptyText}>Im neuesten Scan sind keine eindeutig zugeordneten Mitglieder enthalten.</p>
-      )}
+      legendInChart
+      animateBuild
+      fitContainer
+    />}
     </div>
   );
 }
 
-function MemberRow({ member, onClick }: { member: LocalMember; onClick: (member: LocalMember) => void }) {
-  const secondary = [
-    member.classLabel ?? "Klasse unbekannt",
-    typeof member.level === "number" ? `Lv. ${formatInteger(member.level)}` : null,
-  ].filter(Boolean);
-  const score =
-    typeof member.honor === "number"
-      ? formatInteger(member.honor)
-      : typeof member.hofRank === "number"
-        ? `#${formatInteger(member.hofRank)}`
-        : null;
 
-  return (
-    <button type="button" className={styles.memberRow} onClick={() => onClick(member)}>
-      <ClassIcon classLabel={member.classLabel} classMeta={member.classMeta} fallbackText={member.name} />
-      <div className={styles.memberIdentity}>
-        <span className={styles.memberName}>{member.name}</span>
-        <span className={styles.memberSubline}>{secondary.join(" · ") || "Keine Detaildaten"}</span>
-      </div>
-      <div className={styles.memberScore}>
-        <span>{score ?? "-"}</span>
-        <small>Ehre/HoF</small>
-      </div>
-    </button>
-  );
-}
-
-function KpiPanel({ className, latest }: { className?: string; latest: LocalGuildScanView }) {
-  const classDistribution = buildClassDistribution(latest.members);
-
-  return (
-    <section className={[styles.panel, className].filter(Boolean).join(" ")}>
-      {classDistribution.length ? (
-        <div className={styles.classDistribution}>
-          <p className={styles.subhead}>Klassenverteilung</p>
-          {classDistribution.map((entry) => (
-            <div key={entry.classLabel} className={styles.classLine}>
-              <span className={styles.classLineLabel}>
-                <ClassIcon classLabel={entry.classLabel} classMeta={entry.classMeta} fallbackText={entry.classLabel} compact />
-                <span>{entry.classLabel}</span>
-              </span>
-              <strong>{formatInteger(entry.count)}</strong>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={styles.emptyText}>Keine Klassendaten im neuesten Scan gefunden.</p>
-      )}
-    </section>
-  );
-}
-
-function HistoryPanel({
-  className,
-  latest,
-  comparison,
-  transfers,
-}: {
-  className?: string;
-  latest: LocalGuildScanView;
-  comparison: DashboardGuildSource | null;
-  transfers: TransferSummary | null;
+function DashboardClassDistribution({ entries, selectedClasses, onToggleClass, compact = false }: {
+  entries: ReturnType<typeof buildClassDistribution>; selectedClasses: readonly string[]; onToggleClass: (label: string) => void; compact?: boolean;
 }) {
-  const comparisonLabel = comparison
-    ? `Vergleich: ${formatScanDateTimeLabel(comparison.scannedAtIso)} -> ${formatScanDateTimeLabel(latest.scannedAtIso)}`
-    : null;
-  const daySpan = comparison ? Math.floor((latest.scannedAtMs - comparison.scannedAtMs) / DAY_MS) : null;
-
-  return (
-    <section className={[styles.panel, className].filter(Boolean).join(" ")}>
-      <div className={styles.panelHeader}>
-        <div>
-          <p className={styles.kicker}>Historische Teaser</p>
-          <h2>{daySpan != null ? `${formatInteger(daySpan)} Tage` : "Vergleich"}</h2>
-        </div>
-      </div>
-
-      {comparisonLabel ? <p className={styles.compareLabel}>{comparisonLabel}</p> : null}
-
-      <div className={styles.teaserStack}>
-        <TeaserCard icon={<TrendingUp size={16} aria-hidden />} title="Top 3">
-          <p className={styles.emptyText}>{comparison ? "Noch keine eindeutige lokale Delta-Kennzahl vorhanden." : comparisonNeededText()}</p>
-        </TeaserCard>
-        <TeaserCard icon={<TrendingDown size={16} aria-hidden />} title="Flop 3">
-          <p className={styles.emptyText}>{comparison ? "Noch keine eindeutige lokale Delta-Kennzahl vorhanden." : comparisonNeededText()}</p>
-        </TeaserCard>
-        <TeaserCard icon={<Users size={16} aria-hidden />} title="Zu- & Abgaenge">
-          {comparison && transfers ? (
-            <TransfersView transfers={transfers} />
-          ) : (
-            <p className={styles.emptyText}>{comparisonNeededText()}</p>
-          )}
-        </TeaserCard>
-      </div>
-    </section>
-  );
+  return <GuildClassDistributionPie
+    fitWidth iconCounts playerRowChips compact={compact}
+    entries={entries} selectedClasses={selectedClasses} onToggleClass={onToggleClass}
+    renderIcon={entry => <ClassIcon classLabel={entry.classLabel} classMeta={entry.classMeta} fallbackText={entry.classLabel} compact />}
+  />;
 }
 
-function TransfersView({ transfers }: { transfers: TransferSummary }) {
-  return (
-    <div className={styles.transferGrid}>
-      <TransferList icon={<UserPlus size={14} aria-hidden />} label="Zugaenge" members={transfers.joined} />
-      <TransferList icon={<UserMinus size={14} aria-hidden />} label="Abgaenge" members={transfers.left} />
-    </div>
-  );
-}
-
-function TransferList({
-  icon,
-  label,
-  members,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  members: LocalMember[];
+function KpiPanel({ className, history, members, ...distribution }: {
+  className?: string; history: DashboardHistory; members: LocalMember[];
+  entries: ReturnType<typeof buildClassDistribution>; selectedClasses: readonly string[]; onToggleClass: (label: string) => void;
 }) {
-  const visible = members.slice(0, 3);
-  const remaining = members.length - visible.length;
-
-  return (
-    <div className={styles.transferList}>
-      <div className={styles.transferTitle}>
-        {icon}
-        <span>{label}</span>
-        <strong>{formatInteger(members.length)}</strong>
-      </div>
-      {visible.length ? (
-        <ul>
-          {visible.map((member) => (
-            <li key={member.key}>{member.name}</li>
-          ))}
-          {remaining > 0 ? <li>+{formatInteger(remaining)} weitere</li> : null}
-        </ul>
-      ) : (
-        <p className={styles.emptyText}>Keine.</p>
-      )}
-    </div>
-  );
-}
-
-function TeaserCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={styles.teaserCard}>
-      <div className={styles.teaserTitle}>
-        {icon}
-        <span>{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function ClassIcon({
-  classLabel,
-  classMeta,
-  fallbackText,
-  compact = false,
-}: {
-  classLabel: string | null;
-  classMeta?: ClassMeta | null;
-  fallbackText: string;
-  compact?: boolean;
-}) {
-  const icon = iconForClassName(classLabel);
-  const iconUrl = toDriveThumbProxy(classMeta?.iconUrl ?? icon.url, compact ? 28 : 36);
-  const fallback = classMeta?.fallback ?? getInitials(fallbackText);
-
-  return (
-    <span className={`${styles.classIcon} ${compact ? styles.classIconCompact : ""}`} aria-hidden="true">
-      {iconUrl ? <img src={iconUrl} alt="" loading="lazy" /> : <span>{fallback}</span>}
-    </span>
-  );
+  const { t } = useTranslation();
+  const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
+  const close = React.useCallback(() => setTrigger(null), []);
+  React.useEffect(() => setTrigger(null), [members]);
+  return <section className={[styles.panel, className].filter(Boolean).join(" ")}>
+    <div data-profile-chart-hud><h2 data-profile-title-group><ChartDetailButton title={t("guildChartDetails.classes")} onClick={setTrigger} />{t("guildChartDetails.classes")}</h2></div>
+    <GuildClassDistributionPie fitWidth iconCounts playerRowChips {...distribution} heading={false} renderIcon={entry => <ClassIcon classLabel={entry.classLabel} classMeta={entry.classMeta} fallbackText={entry.classLabel} compact />} />
+    {trigger && <DashboardChartDetails kind="classes" history={history} members={members} metric="xp" intervals={[]} onClose={close} trigger={trigger} />}
+  </section>;
 }
 
 function EmptyPanel({
@@ -1237,20 +1467,49 @@ function EmptyPanel({
   );
 }
 
-function buildGuildScanView(
+async function buildGuildScanView(
   scan: GuildHubLocalScan,
   activeGuild: GuildHubSelectedGuild,
   source: DashboardGuildSource,
-): LocalGuildScanView | null {
-  const raw = asRawScan(scan.rawData, source.scannedAtMs);
-  if (!raw) return null;
+  context: LocalPlayerSourceContext,
+  allowed: () => boolean = () => true,
+): Promise<LocalGuildScanView | null> {
+    const __audit5 = auditPhaseBegin("buildGuildScanView", undefined, "async-container");
+    try {
+  const snapshot = selectGuildHubRawSnapshot(scan, source.scannedAtMs);
+  const raw = snapshot ? {
+    players: snapshot.players.map(asRecord).filter((row): row is JsonRecord => Boolean(row)),
+    groups: snapshot.groups.map(asRecord).filter((row): row is JsonRecord => Boolean(row)),
+  } : null;
+  if (!raw) return auditReturn(__audit5, null);
 
   const activeServer = normalizeServerForCompare(activeGuild.server);
   const activeGuildSegment = normalizeGuildSegment(activeGuild.guildId) ?? normalizeGuildSegment(activeGuild.logoIdentifier);
   const group = raw.groups.find((entry) => isGroupMatch(entry, activeGuild, activeServer, activeGuildSegment)) ?? null;
-  const normalizedMembers = normalizeGuildScanMembers(raw);
+  // Membership uses the exact identity fields returned by the full normalizer.
+  // Preserve all groups (role lookup) and the full Raw lookup below, but build
+  // expensive character cores only for members of the selected guild.
+  const guildPlayers: JsonRecord[] = [];
+  let sliceStarted = performance.now();
+  for (const row of raw.players) {
+    if (!allowed()) throw Error("dashboard_context_changed");
+    const identity = readGuildScanMemberIdentity(row);
+    if (identity && isNormalizedMemberInActiveGuild(identity, activeGuild, activeServer, activeGuildSegment)) guildPlayers.push(row);
+    if (performance.now() - sliceStarted >= 6) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      sliceStarted = performance.now();
+    }
+  }
+  const normalizedMembers = await normalizeGuildScanMembersCooperatively({ ...raw, players: guildPlayers }, (row, core) => {
+    if (!allowed()) throw Error("dashboard_context_changed");
+    const identity = readGuildScanMemberIdentity(row, activeServer);
+    if (identity && isNormalizedMemberInActiveGuild(identity, activeGuild, activeServer, activeGuildSegment)) {
+      context.coreLookup.set(row as JsonRecord, core);
+    }
+  });
+  if (!group && !normalizedMembers.some(member => isNormalizedMemberInActiveGuild(member, activeGuild, activeServer, activeGuildSegment))) return auditReturn(__audit5, null);
   const snapshotMembers = normalizedMembers.filter((member) => isNormalizedMemberInActiveGuild(member, activeGuild, activeServer, activeGuildSegment));
-  const rawPlayersByKey = buildRawPlayerLookup(raw.players, activeServer, source.sourceScanId);
+  const rawPlayersByKey = await (auditValue(__audit5, auditEnter(__audit5, "buildRawPlayerLookup", "async-container"), (buildRawPlayerLookup(raw.players, activeServer, source.sourceScanId, allowed))));
   const playerLookup = new Map<string, JsonRecord>();
   const members = snapshotMembers
     .map((member) =>
@@ -1259,6 +1518,7 @@ function buildGuildScanView(
         source.sourceScanId,
         source.scannedAtMs,
         rawPlayersByKey.get(member.memberRef.toLowerCase()) ?? null,
+        context.coreLookup.get(rawPlayersByKey.get(member.memberRef.toLowerCase())!) ?? null,
       ),
     )
     .filter((member): member is LocalMember => Boolean(member));
@@ -1267,11 +1527,14 @@ function buildGuildScanView(
     if (rawPlayer && member.localRef) playerLookup.set(member.localRef.sourcePlayerKey, rawPlayer);
   });
 
-  return {
+  return auditReturn(__audit5, {
+    guildContextId: activeGuild.id,
+    context,
     source,
     scannedAtMs: source.scannedAtMs,
     scannedAtIso: source.scannedAtIso,
     guild: {
+      declaredMemberCount: group ? readDeclaredMemberCount(group) ?? null : null,
       name: source.guild.name ?? (group ? readString(group, ["name", "Name", "groupname", "groupName", "guildName", "Guild Name"]) : activeGuild.name),
       server:
         source.guild.server ??
@@ -1286,11 +1549,14 @@ function buildGuildScanView(
     },
     members,
     playerLookup,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit5, __auditError); throw __auditError; }
+    finally { auditLeave(__audit5); }
 }
 
 function isNormalizedMemberInActiveGuild(
-  member: NormalizedGuildMember,
+  member: Pick<NormalizedGuildMember, "server" | "guildSegment" | "groupSegment" | "guildName">,
   activeGuild: GuildHubSelectedGuild,
   activeServer: string | null,
   activeGuildSegment: string | null,
@@ -1308,13 +1574,19 @@ function isNormalizedMemberInActiveGuild(
   return Boolean(member.guildName && normalizeLoose(member.guildName) === normalizeLoose(activeGuild.name) && serverMatches);
 }
 
-function buildRawPlayerLookup(players: JsonRecord[], fallbackServer: string | null, sourceScanId: string) {
-  const nameCounts = buildPlayerNameCounts(players);
+async function buildRawPlayerLookup(players: JsonRecord[], fallbackServer: string | null, sourceScanId: string, allowed: () => boolean) {
+  const nameCounts = await buildPlayerNameCounts(players, allowed);
   const lookup = new Map<string, JsonRecord>();
-  players.forEach((player) => {
+  let sliceStarted = performance.now();
+  for (const player of players) {
+    if (!allowed()) throw Error("dashboard_context_changed");
     const key = resolveLocalPlayerKey(player, fallbackServer, sourceScanId, nameCounts);
     if (key && !lookup.has(key.toLowerCase())) lookup.set(key.toLowerCase(), player);
-  });
+    if (performance.now() - sliceStarted >= 6) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      sliceStarted = performance.now();
+    }
+  }
   return lookup;
 }
 
@@ -1323,6 +1595,7 @@ function toLocalMemberFromSnapshotMember(
   sourceScanId: string,
   sourceScannedAtMs: number,
   rawPlayer: JsonRecord | null,
+  core: import("../../lib/parsing/normalizedPlayer").NormalizedPlayer | null,
 ): LocalMember | null {
   const key = member.memberRef.toLowerCase();
   if (!key) return null;
@@ -1340,10 +1613,11 @@ function toLocalMemberFromSnapshotMember(
     classMeta,
     level: member.level,
     honor: null,
-    hofRank: null,
+    hofRank: core?.progression.rank ?? null,
     baseMain: member.baseStats,
     totalStats: member.totalStats,
     lastScanMs: rawLastScanMs ?? sourceScannedAtMs,
+    playerStats: readLocalGuildMemberValues(rawPlayer, core),
     lastActivityMs: rawLastActivityMs,
     guildRole: member.guildRole ?? null,
     localRef: {
@@ -1360,26 +1634,6 @@ function toLocalMemberFromSnapshotMember(
 function parsePlayerIdFromMemberRef(memberRef: string) {
   const match = memberRef.match(/_p([^_]+)$/i);
   return match?.[1] ?? null;
-}
-
-function asRawScan(value: unknown, snapshotTimestampMs: number): { players: JsonRecord[]; groups: JsonRecord[] } | null {
-  const record = asRecord(value);
-  if (!record) return null;
-  const rawPlayers = Array.isArray(record.players) ? record.players : [];
-  const rawGroups = Array.isArray(record.groups) ? record.groups : Array.isArray(record.guilds) ? record.guilds : [];
-  const players = filterEntriesForSnapshot(rawPlayers, snapshotTimestampMs);
-  const groups = filterEntriesForSnapshot(rawGroups, snapshotTimestampMs);
-  if (!players.length && !groups.length) return null;
-  return {
-    players: players.map(asRecord).filter((entry): entry is JsonRecord => Boolean(entry)),
-    groups: groups.map(asRecord).filter((entry): entry is JsonRecord => Boolean(entry)),
-  };
-}
-
-function filterEntriesForSnapshot(entries: unknown[], snapshotTimestampMs: number) {
-  const timestampedEntries = entries.filter((entry) => getEntryTimestampMs(entry) != null);
-  if (!timestampedEntries.length) return entries;
-  return timestampedEntries.filter((entry) => getEntryTimestampMs(entry) === snapshotTimestampMs);
 }
 
 function isGroupMatch(
@@ -1404,14 +1658,19 @@ function isGroupMatch(
 
 
 
-function buildPlayerNameCounts(players: JsonRecord[]) {
+async function buildPlayerNameCounts(players: JsonRecord[], allowed: () => boolean) {
   const counts = new Map<string, number>();
-  players.forEach((player) => {
+  let sliceStarted = performance.now();
+  for (const player of players) {
+    if (!allowed()) throw Error("dashboard_context_changed");
     const name = readString(player, ["name", "Name", "playerName", "Player Name"]);
     const key = name ? normalizeLoose(name) : "";
-    if (!key) return;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  });
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (performance.now() - sliceStarted >= 6) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      sliceStarted = performance.now();
+    }
+  }
   return counts;
 }
 
@@ -1437,73 +1696,99 @@ function resolveLocalPlayerKey(
   return null;
 }
 
-function buildTransferSummary(latest: LocalMember[], previous: LocalMember[]): TransferSummary {
-  const latestKeys = new Set(latest.map((member) => member.key));
-  const previousKeys = new Set(previous.map((member) => member.key));
-  return {
-    joined: latest.filter((member) => !previousKeys.has(member.key)),
-    left: previous.filter((member) => !latestKeys.has(member.key)),
-  };
+function buildTransferSummary(latest: LocalMember[], previous: LocalMember[], identities: IdentityResolutionSnapshot | null = null): TransferSummary {
+    const __audit6 = auditPhaseBegin("buildTransferSummary", undefined, "sync-elapsed");
+    try {
+  return auditReturn(__audit6, classifyDashboardTransfers(latest, previous, identities));
+
+    } catch (__auditError) { auditError(__audit6, __auditError); throw __auditError; }
+    finally { auditLeave(__audit6); }
 }
 
 function buildGuildOverviewKpis(
   latest: LocalGuildScanView,
   userScanCount: number,
   archiveInventoryState: DashboardArchiveInventoryState,
+  selectedClasses: readonly string[] = EMPTY_SELECTED_CLASSES,
 ): DashboardGuildCardKpi[] {
-  const members = latest.members;
-  const memberCount = latest.guild.memberCount ?? members.length;
+    const __audit7 = auditBegin("F08", "main:buildGuildOverviewKpis");
+    auditObserveInputs(__audit7, [latest]);
+    try {
+  const members = latest.members.filter(member => selectedClasses.length === 0 || selectedClasses.includes(member.classLabel?.trim() ?? ""));
+  const memberCount = latest.guild.memberCount ?? latest.members.length;
   const avgLevel = average(members.map((member) => member.level).filter(isNumber));
-  const avgBaseMain = average(members.map((member) => member.baseMain).filter(isNumber));
-  const avgTotalStats = average(members.map((member) => member.totalStats).filter(isNumber));
+  const avgBaseMain = average(members.map((member) => member.playerStats?.sumBaseTotal ?? null).filter(isNumber));
+  const avgTotalStats = average(members.map((member) => member.playerStats?.totalStats ?? null).filter(isNumber));
+  const memberAverage = (field: keyof LocalGuildPlayerStatsValues) => {
+    const value = averageLocalGuildMemberField(members, field);
+    return value != null ? formatInteger(Math.round(value)) : "-";
+  };
   const archiveScanValue = archiveInventoryState.archiveScanCount == null
     ? archiveInventoryState.loading
       ? "..."
       : "-"
     : formatInteger(archiveInventoryState.archiveScanCount);
 
-  return [
-    { key: "scanstand", label: "Scanstand", value: formatScanDateTimeLabel(latest.scannedAtIso), hint: formatAge(latest.scannedAtMs) },
-    { key: "members", label: "Mitglieder", value: formatInteger(memberCount), hint: `${formatInteger(latest.members.length)} im Scan` },
-    { key: "avg-level", label: "Ø Level", value: avgLevel != null ? formatDecimal(avgLevel) : "-", hint: "Memberliste" },
-    { key: "avg-base", label: "Ø Base", value: avgBaseMain != null ? formatInteger(Math.round(avgBaseMain)) : "-", hint: "direktes Scan-Feld" },
+  return auditReturn(__audit7, [
+    { key: "scanstand", label: profileText("profileI18n.scanStand"), value: profileDateTime(latest.scannedAtIso), hint: formatAge(latest.scannedAtMs) },
+    { key: "members", label: profileText("guildHub.membersPanel.title"), value: formatInteger(memberCount), hint: profileText("profileI18n.membersInScan", { value: formatInteger(latest.members.length) }) },
+    { key: "avg-level", label: profileText("dashboardAverageHud.avg-level"), value: avgLevel != null ? formatDecimal(avgLevel) : "-", hint: profileText("profileI18n.currentMembers") },
+    { key: "avg-base", label: profileText("dashboardAverageHud.avg-base"), value: avgBaseMain != null ? formatInteger(Math.round(avgBaseMain)) : "-", hint: profileText("profileI18n.mainCon") },
     {
       key: "avg-total",
-      label: "Ø Gesamtstats",
+      label: profileText("dashboardAverageHud.avg-total"),
       value: avgTotalStats != null ? formatInteger(Math.round(avgTotalStats)) : "-",
-      hint: "direktes Scan-Feld",
+      hint: profileText("profileI18n.mainCon"),
     },
-    { key: "user-scans", label: "User-Scans", value: formatInteger(userScanCount), hint: "aktive Gilde" },
+    { key: "avg-base-main", label: profileText("dashboardAverageHud.avg-base-main"), value: memberAverage("baseMain"), hint: profileText("dashboardTrend.metrics.baseMain") },
+    { key: "avg-base-con", label: profileText("dashboardAverageHud.avg-base-con"), value: memberAverage("conBase"), hint: profileText("dashboardTrend.metrics.conBase") },
+    { key: "avg-total-main", label: profileText("dashboardAverageHud.avg-base-main"), value: memberAverage("attrTotal"), hint: profileText("dashboardTrend.metrics.attrTotal") },
+    { key: "avg-total-con", label: profileText("dashboardAverageHud.avg-base-con"), value: memberAverage("conTotal"), hint: profileText("dashboardTrend.metrics.conTotal") },
+    { key: "avg-treasury", label: profileText("dashboardAverageHud.avg-treasury"), value: memberAverage("treasury"), hint: profileText("dashboardCompare.averages.treasury") },
+    { key: "avg-mine", label: profileText("dashboardAverageHud.avg-mine"), value: memberAverage("mine"), hint: profileText("dashboardCompare.averages.mine") },
+    { key: "user-scans", label: profileText("guildScanDetails.userScan"), value: formatInteger(userScanCount), hint: profileText("guildHistory.current") },
     {
       key: "archive-scans",
-      label: "Scan-Archiv",
+      label: profileText("guildScanDetails.archive"),
       value: archiveScanValue,
-      hint: archiveInventoryState.error ?? "verfuegbare Historie",
+      hint: profileText(archiveInventoryState.error ? "profileI18n.archiveUnavailable" : "profileI18n.availableHistory"),
     },
-  ];
+  ]);
+
+    } catch (__auditError) { auditError(__audit7, __auditError); throw __auditError; }
+    finally { auditLeave(__audit7); }
 }
 
 function buildDashboardGuildCardKpis(
   dashboardKpis: DashboardGuildCardKpi[],
   activityPct: number | null,
 ): DashboardGuildCardKpi[] {
-  return [
+    const __audit8 = auditBegin("F08", "main:buildDashboardGuildCardKpis");
+    auditObserveInputs(__audit8, [dashboardKpis]);
+    try {
+  return auditReturn(__audit8, [
     ...dashboardKpis,
     {
       key: "activity",
-      label: "Aktivität",
+      label: profileText("guildProfile.heroPanel.metrics.activity"),
       value: formatActivityPercent(activityPct),
-      hint: "Activity",
+      hint: profileText("guildProfile.heroPanel.metrics.activity"),
     },
-  ];
+  ]);
+
+    } catch (__auditError) { auditError(__audit8, __auditError); throw __auditError; }
+    finally { auditLeave(__audit8); }
 }
 
 function formatActivityPercent(value: number | null) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "--";
-  return `${Math.max(0, Math.min(100, Math.round(value)))} %`;
+  return profilePercent(Math.max(0, Math.min(100, Math.round(value))));
 }
 
 function buildClassDistribution(members: LocalMember[]) {
+    const __audit9 = auditBegin("F08", "main:buildClassDistribution");
+    auditObserveInputs(__audit9, [members]);
+    try {
   const counts = new Map<string, { classLabel: string; classMeta: ClassMeta | null; count: number }>();
   for (const member of members) {
     const classLabel = member.classLabel?.trim();
@@ -1516,9 +1801,11 @@ function buildClassDistribution(members: LocalMember[]) {
     });
   }
 
-  return [...counts.values()]
-    .sort((a, b) => b.count - a.count || a.classLabel.localeCompare(b.classLabel))
-    .slice(0, 8);
+  return auditReturn(__audit9, [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.classLabel.localeCompare(b.classLabel)));
+
+    } catch (__auditError) { auditError(__audit9, __auditError); throw __auditError; }
+    finally { auditLeave(__audit9); }
 }
 
 function parseTimestampMs(value: string | null | undefined) {
@@ -1527,11 +1814,6 @@ function parseTimestampMs(value: string | null | undefined) {
   return null;
 }
 
-function getEntryTimestampMs(entry: unknown) {
-  const record = asRecord(entry);
-  if (!record) return null;
-  return readTimestampMs(record, ["scannedAt", "scanAt", "timestamp", "timestampSec", "timestampRaw"]);
-}
 
 function readTimestampMs(record: JsonRecord, keys: string[]) {
   for (const key of keys) {
@@ -1563,35 +1845,27 @@ function toTimestampMillis(value: unknown): number | null {
   return null;
 }
 
-function comparisonNeededText() {
-  return "Fuer diese Uebersicht wird ein weiterer Scan mit mindestens 30 Tagen Abstand benoetigt.";
-}
-
 function formatServerLabel(server: string | null) {
-  if (!server) return "Server unbekannt";
+  if (!server) return profileText("profileI18n.serverUnknown");
   const normalized = normalizeServerKeyFromInput(server);
   return SERVER_BY_ID[String(normalized ?? server).trim().toLowerCase()]?.label ?? server;
 }
 
 function formatAge(ms: number) {
-  if (!Number.isFinite(ms) || ms <= 0) return "Alter unbekannt";
-  const days = Math.max(0, Math.floor((Date.now() - ms) / DAY_MS));
-  if (days === 0) return "heute";
-  if (days === 1) return "1 Tag alt";
-  return `${formatInteger(days)} Tage alt`;
-}
-
-function getScanAgeDays(ms: number) {
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.max(0, Math.floor((Date.now() - ms) / DAY_MS));
+  if (!Number.isFinite(ms) || ms <= 0) return profileText("profileI18n.ageUnknown");
+  const days = getScanAgeDays(ms);
+  if (days == null) return profileText("profileI18n.ageUnknown");
+  if (days === 0) return profileText("guildProfile.heroPanel.tooltips.age.today");
+  if (days === 1) return profileText("guildProfile.heroPanel.tooltips.age.oneDayAgo");
+  return profileText("guildProfile.heroPanel.tooltips.age.daysAgo", { days: formatInteger(days) });
 }
 
 function formatInteger(value: number) {
-  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat(profileLocale(), { maximumFractionDigits: 0 }).format(value);
 }
 
 function formatDecimal(value: number) {
-  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value);
+  return new Intl.NumberFormat(profileLocale(), { maximumFractionDigits: 1 }).format(value);
 }
 
 function average(values: number[]) {
@@ -1652,7 +1926,7 @@ function normalizeLoose(value: unknown) {
 }
 
 function normalizeServerForCompare(value: unknown) {
-  return normalizeServerKeyFromInput(value)?.toLowerCase() ?? null;
+  return serverComparisonKey(value)?.toLowerCase() ?? null;
 }
 
 function normalizeGuildSegment(value: unknown) {
@@ -1673,14 +1947,4 @@ function normalizeMemberClassLabel(value: string | null) {
   if (!value) return null;
   const raw = value.trim();
   return raw || null;
-}
-
-function getInitials(value: string) {
-  const initials = value
-    .split(/[\s_-]+/g)
-    .map((part) => part.trim().charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  return initials || "-";
 }

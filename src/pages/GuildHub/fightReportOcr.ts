@@ -1,3 +1,4 @@
+import { auditBegin, auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields, auditCount } from "../../lib/data-hub/runtimeAudit";
 export type FightReportRosterMember = {
   id: string;
   name: string;
@@ -317,13 +318,15 @@ const findNearestAttackHeader = (lines: OcrLine[], startLine: OcrLine, page: Ocr
 };
 
 const buildFightReportTextFromTsv = (tsv: string | null | undefined) => {
+    const __audit1 = auditPhaseBegin("buildFightReportTextFromTsv", undefined, "sync-elapsed");
+    try {
   const parsed = parseTsvOcrLines(tsv);
-  if (!parsed) return null;
+  if (!parsed) return auditReturn(__audit1, null);
 
   const { page, lines } = parsed;
   const startLines = lines.filter((line) => isMissedStartAnchor(simplifyForAnchors(line.text)));
   const endLines = lines.filter((line) => isSignedUpEndAnchor(simplifyForAnchors(line.text)));
-  if (!startLines.length || !endLines.length) return null;
+  if (!startLines.length || !endLines.length) return auditReturn(__audit1, null);
 
   const candidates = startLines
     .flatMap((startLine) =>
@@ -340,7 +343,7 @@ const buildFightReportTextFromTsv = (tsv: string | null | undefined) => {
     )
     .sort((a, b) => a.score - b.score);
   const selected = candidates[0];
-  if (!selected) return null;
+  if (!selected) return auditReturn(__audit1, null);
 
   const { startLine, endLine } = selected;
   const attackHeader = findNearestAttackHeader(lines, startLine, page);
@@ -366,7 +369,10 @@ const buildFightReportTextFromTsv = (tsv: string | null | undefined) => {
     });
 
   outputLines.push(endLine.text);
-  return outputLines.join("\n");
+  return auditReturn(__audit1, outputLines.join("\n"));
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 };
 
 const buildRosterIndex = (roster: FightReportRosterMember[]) => {
@@ -445,6 +451,8 @@ const findRosterMatch = (name: string, rosterIndex: Map<string, FightReportRoste
 };
 
 export const parseFightReportText = (text: string, roster: FightReportRosterMember[]): FightReportScanResult => {
+    const __audit2 = auditPhaseBegin("parseFightReportText", undefined, "sync-elapsed");
+    try {
   const lines = text
     .split(/\r?\n/g)
     .map((line) => line.trim())
@@ -478,7 +486,7 @@ export const parseFightReportText = (text: string, roster: FightReportRosterMemb
   }
 
   if (hasDefense || missingStartIndex < 0 || missingEndIndex < 0) {
-    return {
+    return auditReturn(__audit2, {
       reportKind,
       opponentGuild,
       missingSectionFound: missingStartIndex >= 0,
@@ -488,10 +496,10 @@ export const parseFightReportText = (text: string, roster: FightReportRosterMemb
       unknownNames: [],
       uncertainNames: [],
       notices,
-    };
+    });
   }
 
-  const rosterIndex = buildRosterIndex(roster);
+  const rosterIndex = (auditValue(__audit2, auditEnter(__audit2, "buildRosterIndex", "sync-elapsed"), (buildRosterIndex(roster))));
   const names = unique(lines.slice(missingStartIndex + 1, missingEndIndex).map(cleanMissingNameLine).filter(Boolean));
   const confirmedMemberIds: string[] = [];
   const confirmedNames: string[] = [];
@@ -514,7 +522,7 @@ export const parseFightReportText = (text: string, roster: FightReportRosterMemb
     notices.push("Keine verwertbaren fehlenden Mitglieder erkannt.");
   }
 
-  return {
+  return auditReturn(__audit2, {
     reportKind,
     opponentGuild,
     missingSectionFound: true,
@@ -524,7 +532,10 @@ export const parseFightReportText = (text: string, roster: FightReportRosterMemb
     unknownNames,
     uncertainNames,
     notices,
-  };
+  });
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 };
 
 export const scanFightReportScreenshot = async (
@@ -532,25 +543,38 @@ export const scanFightReportScreenshot = async (
   roster: FightReportRosterMember[],
   onProgress?: (progress: FightReportScanProgress) => void,
 ) => {
-  const { PSM, createWorker } = await import("tesseract.js");
-  const worker = await createWorker(["deu", "eng", "ces", "pol", "slk", "hun"], 1, {
+    const __audit3 = auditBegin("F30", "scanFightReportScreenshot");
+    auditFields(__audit3, { imageBytes: file.size, rosterMembers: roster.length });
+    try {
+  const { PSM, createWorker } = await (auditValue(__audit3, auditEnter(__audit3, "import"), (import("tesseract.js"))));
+  const worker = await (auditValue(__audit3, auditEnter(__audit3, "createWorker"), (createWorker(["deu", "eng", "ces", "pol", "slk", "hun"], 1, {
     logger: (message) => {
       onProgress?.({
         status: message.status,
         progress: Number.isFinite(message.progress) ? message.progress : 0,
       });
     },
-  });
+  }))));
 
+  auditFields(__audit3, { externalWorker: "tesseract-worker-wasm", workerInstanceId: (worker as typeof worker & { id?: string }).id, internalWorkerCpuMeasured: false });
   try {
-    await worker.setParameters({
+    await (auditValue(__audit3, auditEnter(__audit3, "worker.setParameters"), (worker.setParameters({
       preserve_interword_spaces: "1",
       tessedit_pageseg_mode: PSM.SPARSE_TEXT,
-    });
-    const result = await worker.recognize(file, {}, { text: true, tsv: true });
-    const reportText = buildFightReportTextFromTsv(result.data.tsv) ?? result.data.text;
-    return parseFightReportText(reportText, roster);
+    }))));
+    const result = await (auditValue(__audit3, auditEnter(__audit3, "worker.recognize"), (worker.recognize(file, {}, { text: true, tsv: true }))));
+    auditFields(__audit3, { workerJobId: result.jobId });
+    const reportText = (auditValue(__audit3, auditEnter(__audit3, "buildFightReportTextFromTsv", "sync-elapsed"), (buildFightReportTextFromTsv(result.data.tsv)))) ?? result.data.text;
+    const report = (auditValue(__audit3, auditEnter(__audit3, "parseFightReportText", "sync-elapsed"), parseFightReportText(reportText, roster)));
+    auditFields(__audit3, { reportKind: report.reportKind, missingSectionFound: report.missingSectionFound, endAnchorFound: report.endAnchorFound });
+    auditCount(__audit3, "confirmedMembers", report.confirmedMemberIds.length);
+    auditCount(__audit3, "unknownNames", report.unknownNames.length);
+    auditCount(__audit3, "uncertainNames", report.uncertainNames.length);
+    return auditReturn(__audit3, report);
   } finally {
-    await worker.terminate();
+    await (auditValue(__audit3, auditEnter(__audit3, "worker.terminate"), (worker.terminate())));
   }
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 };

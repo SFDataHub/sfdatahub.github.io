@@ -1,0 +1,20 @@
+.grid {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.grid > * {
+  min-width: 0;
+}
+
+.grid nav a:focus-visible {
+  outline: 2px solid var(--text-soft, #b0c4d9) !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

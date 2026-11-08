@@ -1,0 +1,51 @@
+.root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  color: #b0c4d9;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  pointer-events: auto;
+}
+.root > strong { min-width: 0; font-weight: inherit; }
+.side { display: flex; align-items: center; gap: 14px; min-width: 0; position: relative; }
+.side > span { flex: 1; min-width: 0; height: 2px; background: linear-gradient(90deg, transparent, #5c8bc6, transparent); }
+/* Buttons occupy the existing title band without changing its flow height. */
+.side:first-child { padding-inline-start: calc(8ch + 24px + 14px); }
+.side:last-child { padding-inline-end: calc(8ch + 24px + 14px); }
+.side > .button {
+  position: absolute;
+  box-sizing: border-box;
+  inline-size: calc(8ch + 24px);
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: #b0c4d9;
+  text-transform: none;
+  cursor: pointer;
+}
+.side:first-child > .button { left: 0; }
+.side:last-child > .button { right: 0; }
+.side > .button::after { border-color: transparent; }
+.side > .button:hover { color: #f5f9ff; }
+.side > .button:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+@media (max-width: 560px) {
+  .root { gap: 6px; }
+  .side { gap: 6px; }
+  .side:first-child { padding-inline-start: 0; }
+  .side:last-child { padding-inline-end: 0; }
+  .side > span { margin-inline: 0; }
+  .side:first-child > span { margin-left: min(100%, 95px); }
+  .side:last-child > span { margin-right: min(100%, 95px); }
+  .root > strong { max-width: 100%; overflow-wrap: normal; letter-spacing: 0; }
+}

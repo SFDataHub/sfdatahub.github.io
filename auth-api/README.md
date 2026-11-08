@@ -82,7 +82,68 @@ Required environment values:
 - `GOATCOUNTER_API_BASE_URL` (recommended: `https://<your-site>.goatcounter.com`; `/api/v0` is also accepted)
 - `GOATCOUNTER_API_TOKEN` (Bearer token)
 
-The endpoint writes an idempotent snapshot to Firestore at `analytics/visitor_analytics`.
+The existing hourly job now publishes the v2 public footer snapshot at
+`visitor_metrics_public/current`. It no longer generates the private admin details.
+Repeated runs within an hour reuse the current snapshot unless configuration changed.
+The job uses the existing token, API rate gap and bounded retries. It reads complete
+`stats/hits` pages using `exclude_paths`, never `stats/total` as a website visitor count.
+It aborts without replacing the current snapshot on missing/malformed data or bounds:
+240 upstream attempts / 180 seconds, 200 pages per range, 20,000 public paths.
+
+The deployed v2 tracker sends the fixed `sfdatahub/website-visit-v2` event with
+session detection and sends versioned `sfdatahub/page-view-v2:<tracking-path>` events with per-hit
+`no_session: true`. It also preserves the existing normal session-counted path hit
+for the admin lists; the public snapshot ignores that stream, including old open clients.
+Other events are excluded. Website totals mean temporary-session visits, not
+permanently unique people. No new user identifier or account linkage is introduced.
+
+`/api/admin/stats/visitor/config` (GET/PUT) uses the existing admin session guard.
+In Visitor Analytics, set the common start date (00:00 Europe/Berlin). After deploying
+the tracker, explicitly verify GoatCounter → Settings → Data collection → Sessions
+and confirm the checkbox. This service does not read/change active account settings.
+First confirmation records the next Berlin calendar day as collection start; reconfirming
+after disabling verification begins a new reliable interval. Earlier start dates are
+clamped to that collection start and labelled honestly. Historical GoatCounter data stays.
+
+The public manifest and immutable per-path documents share one generation. Each path
+has its own SHA-256 document ID and at most 30 daily values, avoiding the 1 MiB document
+limit. No private titles, referrers, API keys or admin top lists are published. A successful
+missing-path read from a complete generation means zero; failed reads do not. Frontend
+reads share a single manifest and per-path promises, with no focus/toggle refresh. Cached
+manifests expire after two hours; generations are retained for 48 hours and at most two
+expired generations are removed per job. A failed unpublished generation is also eligible
+for this cleanup. One additional range supplies the full-period total after day 30;
+up to 30 exact Berlin-day ranges supply the average, including current and zero days.
+DST uses calendar days. Provider chart timezone is not used.
+
+Private legacy admin details at `analytics/visitor_analytics` are generated/loaded only
+by explicit POST `/api/admin/stats/visitor/refresh`. Their existing shape/top-25 taxonomy
+is retained; totals are per-page counts and exclude events. They must not be interpreted
+as the v2 website visitor totals, especially across the tracking transition.
+
+Local checks (run in the existing independent external test copy):
+
+```text
+npm --prefix auth-api run build
+npm --prefix auth-api test -- src/internal/analytics/visitor/metrics.test.ts --cache=false
+```
+
+Manual deployment, using the existing Firebase authapi workflow, after local review:
+
+1. Deploy authApi only with the existing project selection (`firebase deploy --only
+   functions:authapi:authApi`); predeploy runs the auth-api TypeScript build. The local
+   function definition raises the request timeout to 240 seconds for bounded pagination.
+2. Add **only** the `visitor_metrics_public` match from `firestore.rules` to the active
+   rules: public single-document `get` for the manifest/generations and their `pages`
+   subcollection; deny list/write. Keep all other active rules. Do not deploy the whole
+   local rules file without comparing it to the active rules.
+3. Deploy the frontend through its existing workflow. Then configure Visitor Analytics
+   and confirm the deployed v2 tracker plus enabled Sessions as described above.
+4. Preserve the existing hourly scheduler URL/method/internal header. Ensure its request
+   deadline accommodates the 240-second function timeout. No new schedule, secrets,
+   GoatCounter account changes or TTL policy are required.
+
+No deployment or production configuration change is performed by these local edits.
 
 ### User Upload Inbox Endpoints
 

@@ -4,6 +4,7 @@ type PostedMessage = {
   requestId: number;
   type: string;
   datasetId?: string;
+  contentRevision?: string;
 };
 
 class MockWorker {
@@ -22,6 +23,7 @@ class MockWorker {
             ok: true,
             type: "search",
             datasetId: message.datasetId,
+            contentRevision: message.contentRevision,
             normalizedQuery: "ather",
             results: [],
           },
@@ -33,6 +35,8 @@ class MockWorker {
           requestId: message.requestId,
           ok: true,
           type: message.type,
+          datasetId: message.datasetId,
+          contentRevision: message.contentRevision,
           tab: "guilds",
           totalRows: 0,
           page: 1,

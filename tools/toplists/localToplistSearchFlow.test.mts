@@ -3,7 +3,7 @@ import {
   nextLocalToplistVisibleBatchSize,
   resolveLocalToplistSearchSelection,
   sameLocalToplistPendingTarget,
-} from "../../src/pages/GuildHub/localToplistSearchFlow.ts";
+} from "../../src/pages/DataHub/localToplistSearchFlow.ts";
 import type { LocalToplistSearchResult } from "../../src/lib/toplists/localToplistViewWorkerTypes.ts";
 
 const result = (kind: LocalToplistSearchResult["kind"], overrides: Partial<LocalToplistSearchResult> = {}): LocalToplistSearchResult => ({
@@ -57,3 +57,20 @@ assert.equal(sameLocalToplistPendingTarget(target, { ...target, nonce: 2 }), fal
 assert.equal(sameLocalToplistPendingTarget(target, null), false);
 
 console.log("localToplistSearchFlow.test: ok");
+
+// An original archive guild occurrence enters the existing canonical table
+// focus path without losing its provenance or switching away from Guilds.
+const archiveGuild = {
+  kind: "guild" as const, name: "Archive Guild", identifier: "s1_eu_g10", server: "s1_eu",
+  archiveScanId: "source", archiveSha256: "a".repeat(64), searchIndexSha256: "b".repeat(64), scanTimestamp: 1, manifestYear: 2026,
+};
+const archiveAction = resolveLocalToplistSearchSelection("guilds", {
+  kind: "guild", id: "archive", label: archiveGuild.name, identifier: archiveGuild.identifier, server: archiveGuild.server,
+  status: "jumpable", score: 0, archive: archiveGuild,
+}, "EU1", 99);
+assert.equal(archiveAction.action, "focus-guild");
+if (archiveAction.action === "focus-guild") {
+  assert.equal(archiveAction.target.identifier, "eu1__10");
+  assert.equal(archiveAction.target.archive, archiveGuild);
+  assert.equal(archiveAction.nextTab, null);
+}

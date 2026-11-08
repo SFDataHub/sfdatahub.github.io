@@ -1,3 +1,5 @@
+import { CURRENT_FUSION_RESOLVER_VERSION } from "../lib/identities/fusionAnalysisCache";
+import { captureLocalDataDependencies, revalidateLocalDataDependencies } from "../lib/local-data/localDataDependencies";
 import { loadFusionIdentityManagementReport } from "../lib/identities/fusionIdentityManagement";
 import type { FusionIdentityAnalysisScope } from "../lib/identities/fusionIdentityScopes";
 import type {
@@ -70,6 +72,7 @@ const runBuildReport = async (
   };
 
   try {
+    const dependencies = await captureLocalDataDependencies({ ...(scope ? { servers: [...scope.lineageServerCodes, ...scope.originServerCodes, scope.targetServerCode] } : { allSources: true }), allIdentities: true });
     const report = await loadFusionIdentityManagementReport(
       {},
       {
@@ -82,6 +85,7 @@ const runBuildReport = async (
       postWorkerMessage({ type: "cancelled", requestId });
       return;
     }
+    if (!(await revalidateLocalDataDependencies(dependencies)).current) throw new Error("Fusion dependencies changed during build.");
     emitProgress({ phase: "done", message: "Fusion identity report ready" });
     const workerComputeFinishedAt = performance.now();
     const finalTimings = timings.finish();
@@ -90,7 +94,8 @@ const runBuildReport = async (
       durationMs: workerComputeFinishedAt - workerRequestStartedAt,
       count: 1,
     });
-    postWorkerMessage({ type: "complete", requestId, report, timings: finalTimings });
+    report.dependencies = dependencies;
+    postWorkerMessage({ type: "complete", resolverVersion: CURRENT_FUSION_RESOLVER_VERSION, requestId, report, dependencies, timings: finalTimings });
   } catch (error) {
     if (cancelledRequests.has(requestId) || activeRequestId !== requestId) {
       postWorkerMessage({ type: "cancelled", requestId });

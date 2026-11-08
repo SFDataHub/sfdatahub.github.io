@@ -1,0 +1,53 @@
+.list { list-style: none; padding: 0; margin: 16px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+.item { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.status { color: #b0c4d9; font-size: 12px; margin: 0; text-align: center; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.item button:not([class]) { border: 1px solid #3f6b9a; background: #14273e; color: #f5f9ff; padding: 6px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+.item button:disabled { opacity: .45; cursor: default; }
+.item button:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+
+.toolbar { margin-top: 16px; }
+.overviewDescription { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.overviewDescription > button { flex-shrink: 0; margin-block: -8px; }
+.controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.before { border-left: 2px solid #82bbff; }
+.after { border-right: 2px solid #82bbff; }
+
+.editButton.editButton { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; max-width: 100%; width: auto; height: auto; padding: 8px 10px; gap: 6px; font: inherit; font-size: 13px; cursor: pointer; }
+
+.editButton > svg { flex-shrink: 0; }
+
+/* The wrapper contains only the actual card, not status or management rows. */
+.cardRegion { position: relative; display: grid; width: fit-content; }
+.loadingOverlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #f5f9ff; z-index: 3; }
+.spinner { width: 24px; height: 24px; filter: drop-shadow(0 1px 3px #091529); animation: favoriteLoadingSpin 900ms linear infinite; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@keyframes favoriteLoadingSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+/* Only the metadata line below cards; card/grid styles remain unchanged. */
+.statusLine { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
+.identity { display: inline-flex; align-items: center; gap: 4px; }
+.identity svg { flex-shrink: 0; }
+.freshness { display: inline-flex; align-items: center; gap: 6px; cursor: help; white-space: nowrap; }
+.freshness:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+.freshnessDot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.freshnessInfo { opacity: .8; }
+.freshnessTooltip.freshnessTooltip { min-width: 220px; max-width: 320px; white-space: normal; line-height: 1.35; overflow-wrap: anywhere; padding: 10px 12px; }
+.freshnessTooltip > div { display: flex; flex-direction: column; gap: 4px; }
+.freshnessDot[data-level="0"] { background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.6); }
+.freshnessDot[data-level="1"] { background: #4ade80;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.6); }
+.freshnessDot[data-level="2"] { background: #a3e635;
+  box-shadow: 0 0 10px rgba(163, 230, 53, 0.55); }
+.freshnessDot[data-level="3"] { background: #facc15;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.55); }
+.freshnessDot[data-level="4"] { background: #f97316;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.55); }
+.freshnessDot[data-level="5"] { background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.55); }
+.freshnessDot[data-level="6"] { background: #b91c1c;
+  box-shadow: 0 0 10px rgba(185, 28, 28, 0.55); }
+.freshnessDot[data-level="unknown"] { background: #7c8aa5;
+  box-shadow: 0 0 10px rgba(124, 138, 165, 0.35); }

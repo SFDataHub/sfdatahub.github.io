@@ -1,3 +1,4 @@
+import { captureLocalDataDependencies } from "../../src/lib/local-data/localDataDependencies.ts";
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -11,6 +12,7 @@ import {
   listSfDataHubArchiveScanBindings,
   listSfDataHubArchiveSearchIndexCacheRecords,
   putSfDataHubLocalToplistSnapshotRecord,
+  readLocalToplistResetGeneration,
 } from "../../src/lib/guilds/localScanLibrary.ts";
 import {
   LOCAL_TOPLIST_DERIVATION_VERSION,
@@ -97,7 +99,15 @@ assert.equal((await getSfDataHubLocalScan("legacy-scan"))?.id, "legacy-scan");
 assert.equal((await listSfDataHubArchiveScanBindings()).some((binding) => binding.archiveScanId === "legacy"), true);
 assert.equal((await listSfDataHubArchiveSearchIndexCacheRecords()).some((record) => record.archiveScanId === "legacy"), true);
 
+const sourceValidity = await getSfDataHubLocalScan("legacy-scan");
+assert.ok(sourceValidity);
+const validity = {
+  sourceGeneration: sourceValidity.sourceGeneration,
+  normalizerVersion: sourceValidity.normalizerVersion,
+  coreNormalizerVersion: sourceValidity.coreNormalizerVersion,
+};
 const payload: LocalToplistDerivedSnapshotPayload = {
+  ...validity,
   manifestYear: 2026,
   archiveScanId: "legacy",
   archiveSha256: sha,
@@ -122,12 +132,13 @@ const payload: LocalToplistDerivedSnapshotPayload = {
   issues: [],
 };
 
-const stored = await putLocalToplistSnapshot(payload);
+const stored = await putLocalToplistSnapshot(payload, { resetGeneration: await readLocalToplistResetGeneration(payload.localScanId), dependencies: await captureLocalDataDependencies({ sourceIds: [payload.localScanId] }) });
 assert.equal(stored.key, localToplistSnapshotCacheKey({ archiveScanId: "legacy", archiveSha256: sha }));
 assert.equal(stored.derivationVersion, LOCAL_TOPLIST_DERIVATION_VERSION);
 assert.equal(stored.derivationVersion >= 2, true);
 
 const expectation = {
+  ...validity,
   manifestYear: 2026,
   archiveScanId: "legacy",
   archiveSha256: sha,
@@ -150,7 +161,7 @@ await putSfDataHubLocalToplistSnapshotRecord({
   ...stored,
   key: oldVersionKey,
   derivationVersion: LOCAL_TOPLIST_DERIVATION_VERSION - 1,
-});
+}, { resetGeneration: await readLocalToplistResetGeneration(stored.localScanId), dependencies: await captureLocalDataDependencies({ sourceIds: [stored.localScanId] }) });
 assert.equal((await getLocalToplistSnapshot(expectation)).status, "hit");
 assert.equal((await getLocalToplistSnapshot({ ...expectation, derivationVersion: LOCAL_TOPLIST_DERIVATION_VERSION - 1 })).status, "hit");
 
@@ -160,7 +171,7 @@ await putSfDataHubLocalToplistSnapshotRecord({
   archiveScanId: "missing-version",
   // Legacy records without an explicit derivationVersion must be rejected.
   derivationVersion: undefined,
-} as Parameters<typeof putSfDataHubLocalToplistSnapshotRecord>[0]);
+} as Parameters<typeof putSfDataHubLocalToplistSnapshotRecord>[0], { resetGeneration: await readLocalToplistResetGeneration(stored.localScanId), dependencies: await captureLocalDataDependencies({ sourceIds: [stored.localScanId] }) });
 const missingVersion = await getLocalToplistSnapshot({ ...expectation, archiveScanId: "missing-version" });
 assert.equal(missingVersion.status, "miss");
 assert.equal(missingVersion.status === "miss" ? missingVersion.reason : "", "invalid-structure");
@@ -184,7 +195,7 @@ await deleteLocalToplistSnapshot({ archiveScanId: "missing-version", archiveSha2
 assert.equal((await listLocalToplistSnapshots()).length, 0);
 assert.equal((await getSfDataHubLocalScan("legacy-scan"))?.id, "legacy-scan");
 
-await putLocalToplistSnapshot(payload);
+await putLocalToplistSnapshot(payload, { resetGeneration: await readLocalToplistResetGeneration(payload.localScanId), dependencies: await captureLocalDataDependencies({ sourceIds: [payload.localScanId] }) });
 assert.equal((await listLocalToplistSnapshots()).length, 1);
 await deleteSfDataHubLocalScans(["legacy-scan"]);
 assert.equal(await getSfDataHubLocalScan("legacy-scan"), null);
@@ -196,7 +207,7 @@ const userContent = JSON.stringify({
 });
 const preview = await createSfDataHubLocalScanImportPreview("user.json", userContent);
 const committed = await commitSfDataHubLocalScanPreview(preview);
-await putLocalToplistSnapshot({ ...payload, archiveScanId: "user-bound", localScanId: committed.scan.id, localContentHash: committed.scan.contentHash });
+await putLocalToplistSnapshot({ ...payload, archiveScanId: "user-bound", localScanId: committed.scan.id, localContentHash: committed.scan.contentHash, sourceGeneration: committed.scan.sourceGeneration, normalizerVersion: committed.scan.normalizerVersion, coreNormalizerVersion: committed.scan.coreNormalizerVersion }, { resetGeneration: await readLocalToplistResetGeneration(committed.scan.id), dependencies: await captureLocalDataDependencies({ sourceIds: [committed.scan.id] }) });
 await deleteLocalToplistSnapshot({ archiveScanId: "user-bound", archiveSha256: sha });
 assert.equal((await getSfDataHubLocalScan(committed.scan.id))?.archiveSource, undefined);
 

@@ -1,0 +1,30 @@
+import { artifactPath } from '../../../codex/workspace.mjs';
+import "fake-indexeddb/auto";
+import { writeFile } from "node:fs/promises";
+import { seedLocalSourceValidityFixture } from "../../localSourceValidityFixture.mts";
+import { inputs, anchor } from "../localPlayerAnalyticsCoordinator/inputs.ts";
+import { getGuildHubLocalScan, listGuildHubScanSummaries } from "../../../../src/lib/guilds/localScanLibrary.ts";
+import { ensureGuildAnalyticsSourceDataFromSummaries, ensureGuildAnalyticsDerivedDataFromSummaries } from "../../../../src/lib/guilds/localGuildAnalyticsStore.ts";
+import { loadIdentityResolutionSnapshot } from "../../../../src/lib/identities/identityResolution.ts";
+import { buildLocalPlayerIndex } from "../../../../src/lib/player-search/localPlayerIndex.ts";
+import { buildGuildTrendModel, buildAnalyticsIndexes } from "../../../../src/pages/Playground/playerPerformanceModel.ts";
+import { prepareLocalPlayerHistory, emptyProfileBuildCounters } from "../../../../src/lib/local-player-profile/historyBasis.ts";
+const samples=[];
+for (const size of [2, 50]) {
+ const rows=inputs.slice(0,6).map(input=>({...input,id:`baseline-${size}-${input.id}`,rawData:{players:input.rawData.players.flatMap(row=>Array.from({length:size/2},(_,i)=>({...row,identifier:row.identifier.replace(/_p(\d+)$/,(_,n)=>`_p${Number(n)+i*10}`),name:i?`Peer ${i}`:row.name}))),groups:input.rawData.groups.map(row=>({...row,memberCount:size}))}}));
+ const stamp=()=>performance.now();let at=stamp();
+ for(const input of rows)await seedLocalSourceValidityFixture({...input,filename:input.id+'.json',contentHash:input.id,importedAt:new Date(anchor).toISOString(),scannedAt:new Date(anchor).toISOString(),servers:[],playerCount:input.rawData.players.length,groupCount:input.rawData.groups.length});
+ const seedMs=stamp()-at;at=stamp();
+ const all=await listGuildHubScanSummaries();const summaries=all.filter(s=>s.sourceScanId.startsWith(`baseline-${size}-`));const identity=await loadIdentityResolutionSnapshot();const metadataMs=stamp()-at;
+ let reads=0;at=stamp();
+ const source=await ensureGuildAnalyticsSourceDataFromSummaries(summaries,{loadSourceById:async id=>{reads++;return getGuildHubLocalScan(id)}});const sourceMs=stamp()-at;
+ at=stamp();const scans=await Promise.all(summaries.map(async summary=>{reads++;return {summary,scan:(await getGuildHubLocalScan(summary.sourceScanId))!}}));const rawMs=stamp()-at;
+ at=stamp();const index=buildLocalPlayerIndex(scans,{analyticsData:source,identityResolutionSnapshot:identity});const cardMs=stamp()-at;
+ at=stamp();const derived=await ensureGuildAnalyticsDerivedDataFromSummaries(summaries,{readSourceIds:summaries.map(s=>s.sourceScanId)});const derivedMs=stamp()-at;
+ at=stamp();buildAnalyticsIndexes(derived);const indexesMs=stamp()-at;
+ at=stamp();const trend=buildGuildTrendModel({analyticsData:derived,identityResolutionSnapshot:identity,guildTarget:{logoIdentifier:'f8_net_g1',server:'f8_net'}});const trendMs=stamp()-at;
+ at=stamp();const counters=emptyProfileBuildCounters();await prepareLocalPlayerHistory({sourceScanId:`baseline-${size}-w06-current`,sourcePlayerKey:'f8_net_p1',analytics:{memberRef:'f8_net_p1',playerName:'Hero',server:'f8_net',guildIdentifier:'f8_net_g1',guildName:'Fixture Guild',scannedAtMs:anchor}},new AbortController().signal,counters,()=>{});const profileMs=stamp()-at;
+ samples.push({size,sourceCount:summaries.length,rows:scans.reduce((n,s)=>n+s.scan.playerCount,0),seedMs,metadataMs,sourceMs,rawMs,cardMs,derivedMs,indexesMs,trendMs,profileMs,reads,profileCounters:counters,inputJsonBytes:Buffer.byteLength(JSON.stringify(scans)),resultJsonBytes:Buffer.byteLength(JSON.stringify({index,trend}))});
+ if(size===2)await writeFile(artifactPath('tools/guilds/fixtures/localPlayerAnalyticsExecution/references.json'),JSON.stringify({index,trend},null,2)+'\n');
+}
+await writeFile(artifactPath('tools/guilds/fixtures/localPlayerAnalyticsExecution/before.json'),JSON.stringify(samples,null,2)+'\n');console.log(JSON.stringify(samples));

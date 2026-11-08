@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
-import { deleteDB } from "idb";
+import { deleteDB, openDB } from "idb";
 
 import {
   __localFirstScanAcquisitionTestUtils,
@@ -17,6 +17,7 @@ import {
   __localToplistServiceTestUtils,
   loadOrBuildLocalToplistSnapshots,
   type LocalToplistServiceDependencies,
+  type LocalToplistLoadProgress,
 } from "../../src/lib/toplists/localToplistService.ts";
 import { LOCAL_TOPLIST_DERIVATION_VERSION, listLocalToplistSnapshots } from "../../src/lib/toplists/localToplistStore.ts";
 import type { ScanArchiveEntry } from "../../src/lib/scanArchive/types.ts";
@@ -166,6 +167,9 @@ const createHarness = (harnessOptions: { rawSuffixById?: Record<string, string> 
           scanTimestamp: source.scanTimestamp,
           localScanId: source.localScanId,
           localContentHash: source.localContentHash,
+          sourceGeneration: scan.sourceGeneration,
+          normalizerVersion: scan.normalizerVersion,
+          coreNormalizerVersion: scan.coreNormalizerVersion,
           playerRows: derived.players,
           guildRows: derived.guilds,
           snapshotMeta,
@@ -183,6 +187,7 @@ const a = entry("a", "f8_net", baseTimestamp, "a");
 const b = entry("b", "s30_eu", baseTimestamp + 1_000, "b");
 const c = entry("c", "stumblesteppe_net", baseTimestamp + 2_000, "c");
 
+let initialRevision: string | undefined;
 const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   const toplistSetKey = entries.map((item) => `${item.id}:${item.sha256.toLowerCase()}`).join("|");
   const toplistSetScanIds = entries.map((item) => item.id);
@@ -212,6 +217,8 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   const h = createHarness();
   const result = await loadOrBuildLocalToplistSnapshots([a], { dependencies: h.dependencies });
   assert.equal(result.status, "complete");
+  initialRevision = result.contentRevision;
+  assert.ok(initialRevision);
   assert.equal(result.networkAccessed, true);
   assert.equal(result.workerRan, true);
   assert.deepEqual(h.calls.downloads, [a.id]);
@@ -244,6 +251,7 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   assert.equal(h.calls.workerRuns, 0);
   assert.equal(second.cacheHits.length, 1);
   assert.equal(second.readySelections[0].source, "cache");
+  assert.equal(second.contentRevision, initialRevision, "cache/derived delivery must keep semantic evidence");
 }
 
 {
@@ -351,7 +359,13 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
     entry("set-new", "f8_net", baseTimestamp + 13_000, "7"),
   ]);
   const h = createHarness({ rawSuffixById: { [oldMember.id]: "shared-set", [newMember.id]: "shared-set" } });
-  const result = await loadOrBuildLocalToplistSnapshots([oldMember, newMember], { dependencies: h.dependencies });
+  const phases: LocalToplistLoadProgress[] = [];
+  const result = await loadOrBuildLocalToplistSnapshots([oldMember, newMember], { dependencies: h.dependencies, onProgress: p => phases.push(p) });
+  assert.ok(phases.every(p => p.total === 2)); // Two physical sources, one logical set.
+  assert.ok(phases.some(p => p.phase === "acquiring" && p.succeeded === 1));
+  assert.ok(phases.some(p => p.phase === "preparing" && p.succeeded === 1));
+  assert.equal(phases.at(-1)?.phase, "composing");
+  assert.equal(phases.at(-1)?.succeeded, 2);
   assert.equal(result.status, "complete");
   assert.equal(result.readySelections.length, 1);
   assert.equal(result.readySelections[0].archiveScanId, `${oldMember.id}+${newMember.id}`);
@@ -434,15 +448,74 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   __localToplistServiceTestUtils.clearInFlightDerivedSnapshots();
   const parallel = entry("parallel", "f8_net", baseTimestamp + 40_000, "2");
   const h = createHarness();
+  const leftProgress: LocalToplistLoadProgress[] = [], rightProgress: LocalToplistLoadProgress[] = [];
+  const leftOptions = { dependencies: h.dependencies, onProgress: (p: LocalToplistLoadProgress) => { leftProgress.push(p); } };
+  const leftPromise = loadOrBuildLocalToplistSnapshots([parallel], leftOptions);
+  // Unsubscribe an observer without taking ownership of or cancelling shared work.
+  const atUnsubscribe = leftProgress.length;
+  leftOptions.onProgress = () => {};
   const [left, right] = await Promise.all([
-    loadOrBuildLocalToplistSnapshots([parallel], { dependencies: h.dependencies }),
-    loadOrBuildLocalToplistSnapshots([parallel], { dependencies: h.dependencies }),
+    leftPromise,
+    loadOrBuildLocalToplistSnapshots([parallel], { dependencies: h.dependencies, onProgress: p => rightProgress.push(p) }),
   ]);
+  assert.equal(leftProgress.length, atUnsubscribe);
+  assert.ok(rightProgress.some(p => p.phase === "preparing" && p.succeeded === 1));
+  const warmProgress: LocalToplistLoadProgress[] = [];
+  await loadOrBuildLocalToplistSnapshots([parallel], {dependencies:h.dependencies,onProgress:p=>warmProgress.push(p)});
+  assert.ok(warmProgress.some(p=>p.phase==="preparing"&&p.succeeded===1));
   assert.equal(left.status, "complete");
   assert.equal(right.status, "complete");
   assert.deepEqual(h.calls.downloads, [parallel.id]);
   assert.deepEqual(h.calls.workerSources, [parallel.id]);
 }
 
+{
+  const h = createHarness();
+  const before = await loadOrBuildLocalToplistSnapshots([a], { dependencies: h.dependencies });
+  const db = await openDB("sfdatahub-local-data");
+  const key = before.readySelections[0].cacheKey;
+  const record = await db.get("localToplistSnapshots", key);
+  await db.put("localToplistSnapshots", { ...record, playerRows: record.playerRows.map((row: any, i: number) => i ? row : { ...row, sum: row.sum + 1, archiveScanId: "another-physical-winner" }) });
+  const changed = await loadOrBuildLocalToplistSnapshots([a], { dependencies: h.dependencies });
+  assert.equal(changed.playerRows.length, before.playerRows.length);
+  assert.notEqual(changed.contentRevision, before.contentRevision);
+  assert.equal(changed.workerRan, false, "revision compares actual delivered cache content without raw rederivation");
+  const again = await loadOrBuildLocalToplistSnapshots([a], { dependencies: h.dependencies });
+  assert.equal(again.contentRevision, changed.contentRevision);
+  db.close();
+}
+{
+  const future = entry("revision-retry", "eu31", baseTimestamp + 50_000, "3");
+  const h = createHarness();
+  let failed = true;
+  const acquire = h.dependencies.acquireEntries!;
+  const dependencies = { ...h.dependencies, acquireEntries: (entries: readonly ScanArchiveEntry[], options: any) => acquire(entries.filter(item => !failed || item.id !== future.id), options) };
+  const partial = await loadOrBuildLocalToplistSnapshots([a, future], { dependencies });
+  assert.equal(partial.status, "partial");
+  failed = false;
+  const complete = await loadOrBuildLocalToplistSnapshots([a, future], { dependencies });
+  assert.equal(complete.status, "complete");
+  assert.notEqual(partial.contentRevision, complete.contentRevision);
+}
 assert.equal((await listLocalToplistSnapshots()).length >= 1, true);
 console.log("localToplistService.test: ok");
+
+// Progress observers cannot fail physical work; abort suppresses late observation.
+{
+  const h = createHarness();
+  const source = entry("progress-observer", "f8_net", baseTimestamp + 90_000, "3");
+  const observed: LocalToplistLoadProgress[] = [];
+  const controller = new AbortController();
+  const original = h.dependencies.deriveInWorker;
+  assert.ok(original);
+  let release!: () => void, started!: () => void;
+  const began = new Promise<void>(resolve=>started=resolve);
+  const gate = new Promise<void>(resolve=>release=resolve);
+  h.dependencies.deriveInWorker = async (...args) => { started();await gate;return original(...args); };
+  const run = loadOrBuildLocalToplistSnapshots([source], {dependencies:h.dependencies,signal:controller.signal,onProgress:p=>observed.push(p)});
+  await began;controller.abort();const atAbort=observed.length;release();await run;
+  assert.equal(observed.length,atAbort);
+  const ok = await loadOrBuildLocalToplistSnapshots([source], {dependencies:h.dependencies,onProgress:()=>{throw Error("observer only");}});
+  assert.equal(ok.status,"complete");
+}
+console.log("PASS W18 phase events: physical vs logical units, shared unsubscribe, warm cache, abort suppression and observer isolation");

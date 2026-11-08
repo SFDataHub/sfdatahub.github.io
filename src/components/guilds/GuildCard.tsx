@@ -90,7 +90,7 @@ export default function GuildCard(props: GuildCardComponentProps) {
 
       <button
         type="button"
-        className={cx(styles.card, props.active && styles.active)}
+        className={cx(styles.card, !isAddCard && styles.guildCard, props.active && styles.active)}
         style={style}
         aria-pressed={props.active}
         aria-label={ariaLabel}
@@ -110,14 +110,14 @@ export default function GuildCard(props: GuildCardComponentProps) {
         </span>
 
         <span className={styles.identityZone}>
-          <span className={styles.name}>{label}</span>
-          {!isAddCard ? <span className={styles.server}>{props.server}</span> : null}
-        </span>
-
-        <span className={styles.footerZone}>
+          <span className={styles.name} data-favorite-name>{label}</span>
           {!isAddCard ? (
             <span className={styles.memberCount}>{formatMemberCount(props.memberCount, props.memberLimit)}</span>
           ) : null}
+        </span>
+
+        <span className={styles.footerZone}>
+          {!isAddCard ? <span className={styles.server}>{props.server}</span> : null}
         </span>
       </button>
     </span>

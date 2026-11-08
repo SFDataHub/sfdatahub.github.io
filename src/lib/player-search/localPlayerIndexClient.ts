@@ -1,3 +1,4 @@
+import { revalidateLocalDataDependencies, type LocalDependencyReceipt } from "../local-data/localDataDependencies";
 import type { GuildHubScanSummary } from "../guilds/localScanLibrary";
 import type { LocalPlayerIndexBuildStats, LocalPlayerIndexResult } from "./localPlayerIndex";
 
@@ -39,6 +40,7 @@ export type LocalPlayerIndexWorkerResponse =
     }
   | {
       type: "complete";
+      dependencies?: LocalDependencyReceipt;
       requestId: string;
       index: LocalPlayerIndexResult;
       stats: LocalPlayerIndexBuildStats;
@@ -134,7 +136,11 @@ export const startLocalPlayerIndexWorkerRun = (
       cleanup();
 
       if (message.type === "complete") {
-        resolve({ index: message.index, stats: message.stats, timings: message.timings });
+        if (!message.dependencies && !options.workerFactory) { worker.terminate(); reject(new Error("Local player index worker result has no dependency certificate.")); return; }
+        const validate = message.dependencies ? revalidateLocalDataDependencies(message.dependencies).then(result => {
+          if (!result.current) throw new Error("Local player index dependencies changed before delivery.");
+        }) : Promise.resolve();
+        void validate.then(() => resolve({ index: message.index, stats: message.stats, timings: message.timings }), reject);
         worker.terminate();
         return;
       }

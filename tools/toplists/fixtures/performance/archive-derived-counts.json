@@ -1,0 +1,1002 @@
+{
+  "readOnly": true,
+  "manifestRevision": 8,
+  "physicalSources": 115,
+  "current": {
+    "servers": 45,
+    "players": 30492,
+    "counts": {
+      "am1_net": {
+        "validPlayers": 492,
+        "guilds": 10,
+        "sourceIds": [
+          "am1_net:1788598437385"
+        ]
+      },
+      "blackforest_net": {
+        "validPlayers": 1121,
+        "guilds": 105,
+        "sourceIds": [
+          "blackforest_net:1788602046680",
+          "blackforest_net:1788603073670"
+        ]
+      },
+      "f11_net": {
+        "validPlayers": 1086,
+        "guilds": 113,
+        "sourceIds": [
+          "f11_net:1788600564288",
+          "f11_net:1788603073670"
+        ]
+      },
+      "f14_net": {
+        "validPlayers": 1064,
+        "guilds": 78,
+        "sourceIds": [
+          "f14_net:1788600624810",
+          "f14_net:1788603073670"
+        ]
+      },
+      "f17_net": {
+        "validPlayers": 1209,
+        "guilds": 125,
+        "sourceIds": [
+          "f17_net:1788602812978",
+          "f17_net:1788603073670"
+        ]
+      },
+      "f19_net": {
+        "validPlayers": 1045,
+        "guilds": 89,
+        "sourceIds": [
+          "f19_net:1788601170185",
+          "f19_net:1788603073670"
+        ]
+      },
+      "f21_net": {
+        "validPlayers": 1059,
+        "guilds": 89,
+        "sourceIds": [
+          "f21_net:1788601198783",
+          "f21_net:1788603073670"
+        ]
+      },
+      "f22_net": {
+        "validPlayers": 1047,
+        "guilds": 78,
+        "sourceIds": [
+          "f22_net:1788601226242",
+          "f22_net:1788603073670"
+        ]
+      },
+      "f23_net": {
+        "validPlayers": 501,
+        "guilds": 10,
+        "sourceIds": [
+          "f23_net:1788602041393"
+        ]
+      },
+      "f24_net": {
+        "validPlayers": 505,
+        "guilds": 11,
+        "sourceIds": [
+          "f24_net:1788601433079"
+        ]
+      },
+      "f25_net": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "f25_net:1788600697920"
+        ]
+      },
+      "f26_net": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "f26_net:1788600224671"
+        ]
+      },
+      "f27_net": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "f27_net:1788599802125"
+        ]
+      },
+      "f28_net": {
+        "validPlayers": 996,
+        "guilds": 20,
+        "sourceIds": [
+          "f28_net:1788599455210"
+        ]
+      },
+      "f8_net": {
+        "validPlayers": 1170,
+        "guilds": 112,
+        "sourceIds": [
+          "f8_net:1788600621047",
+          "f8_net:1788603073670"
+        ]
+      },
+      "f9_net": {
+        "validPlayers": 1107,
+        "guilds": 88,
+        "sourceIds": [
+          "f9_net:1788600566512",
+          "f9_net:1788603073670"
+        ]
+      },
+      "gnarogrim_net": {
+        "validPlayers": 1196,
+        "guilds": 118,
+        "sourceIds": [
+          "gnarogrim_net:1788602057447",
+          "gnarogrim_net:1788603073670"
+        ]
+      },
+      "maerwynn_net": {
+        "validPlayers": 1318,
+        "guilds": 116,
+        "sourceIds": [
+          "maerwynn_net:1788599922274",
+          "maerwynn_net:1788600687337",
+          "maerwynn_net:1788603073670"
+        ]
+      },
+      "s10_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s10_eu:1788598751254"
+        ]
+      },
+      "s11_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s11_eu:1788598543596"
+        ]
+      },
+      "s12_eu": {
+        "validPlayers": 495,
+        "guilds": 10,
+        "sourceIds": [
+          "s12_eu:1788598314692"
+        ]
+      },
+      "s13_eu": {
+        "validPlayers": 495,
+        "guilds": 10,
+        "sourceIds": [
+          "s13_eu:1788598090965"
+        ]
+      },
+      "s14_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s14_eu:1788597862517"
+        ]
+      },
+      "s15_eu": {
+        "validPlayers": 501,
+        "guilds": 10,
+        "sourceIds": [
+          "s15_eu:1788597610803"
+        ]
+      },
+      "s16_eu": {
+        "validPlayers": 498,
+        "guilds": 10,
+        "sourceIds": [
+          "s16_eu:1788597410169"
+        ]
+      },
+      "s17_eu": {
+        "validPlayers": 498,
+        "guilds": 10,
+        "sourceIds": [
+          "s17_eu:1788597198376"
+        ]
+      },
+      "s18_eu": {
+        "validPlayers": 497,
+        "guilds": 10,
+        "sourceIds": [
+          "s18_eu:1788597003209"
+        ]
+      },
+      "s19_eu": {
+        "validPlayers": 480,
+        "guilds": 10,
+        "sourceIds": [
+          "s19_eu:1788596732933"
+        ]
+      },
+      "s20_eu": {
+        "validPlayers": 501,
+        "guilds": 10,
+        "sourceIds": [
+          "s20_eu:1788596527034"
+        ]
+      },
+      "s21_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s21_eu:1788596317453"
+        ]
+      },
+      "s22_eu": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "s22_eu:1788596123580"
+        ]
+      },
+      "s23_eu": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "s23_eu:1788595921920"
+        ]
+      },
+      "s24_eu": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "s24_eu:1788595649566"
+        ]
+      },
+      "s25_eu": {
+        "validPlayers": 498,
+        "guilds": 10,
+        "sourceIds": [
+          "s25_eu:1788595454894"
+        ]
+      },
+      "s26_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s26_eu:1788595259607"
+        ]
+      },
+      "s27_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s27_eu:1788595046333"
+        ]
+      },
+      "s28_eu": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "s28_eu:1788594763752"
+        ]
+      },
+      "s29_eu": {
+        "validPlayers": 481,
+        "guilds": 10,
+        "sourceIds": [
+          "s29_eu:1788594558519"
+        ]
+      },
+      "s30_eu": {
+        "validPlayers": 451,
+        "guilds": 10,
+        "sourceIds": [
+          "s30_eu:1788594348833"
+        ]
+      },
+      "s5_eu": {
+        "validPlayers": 500,
+        "guilds": 10,
+        "sourceIds": [
+          "s5_eu:1788599757969"
+        ]
+      },
+      "s6_eu": {
+        "validPlayers": 498,
+        "guilds": 10,
+        "sourceIds": [
+          "s6_eu:1788599550748"
+        ]
+      },
+      "s7_eu": {
+        "validPlayers": 498,
+        "guilds": 10,
+        "sourceIds": [
+          "s7_eu:1788599354154"
+        ]
+      },
+      "s8_eu": {
+        "validPlayers": 499,
+        "guilds": 10,
+        "sourceIds": [
+          "s8_eu:1788599136467"
+        ]
+      },
+      "s9_eu": {
+        "validPlayers": 491,
+        "guilds": 10,
+        "sourceIds": [
+          "s9_eu:1788598936887"
+        ]
+      },
+      "stumblesteppe_net": {
+        "validPlayers": 1201,
+        "guilds": 108,
+        "sourceIds": [
+          "stumblesteppe_net:1788600650311",
+          "stumblesteppe_net:1788603073670"
+        ]
+      }
+    }
+  },
+  "monthly": {
+    "2026-08": {
+      "servers": 44,
+      "players": 23597,
+      "counts": {
+        "am1_net": {
+          "validPlayers": 494,
+          "guilds": 10,
+          "sourceIds": [
+            "am1_net:1785672839328"
+          ]
+        },
+        "blackforest_net": {
+          "validPlayers": 752,
+          "guilds": 15,
+          "sourceIds": [
+            "blackforest_net:1785668916697",
+            "blackforest_net:1785671513042",
+            "blackforest_net:1785673758828"
+          ]
+        },
+        "f11_net": {
+          "validPlayers": 509,
+          "guilds": 10,
+          "sourceIds": [
+            "f11_net:1785669605220",
+            "f11_net:1785673487879"
+          ]
+        },
+        "f14_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f14_net:1785669810129",
+            "f14_net:1785673487879"
+          ]
+        },
+        "f17_net": {
+          "validPlayers": 516,
+          "guilds": 10,
+          "sourceIds": [
+            "f17_net:1785672298329",
+            "f17_net:1785673487879",
+            "f17_net:1785673758828"
+          ]
+        },
+        "f19_net": {
+          "validPlayers": 502,
+          "guilds": 10,
+          "sourceIds": [
+            "f19_net:1785671943970",
+            "f19_net:1785673487879"
+          ]
+        },
+        "f21_net": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "f21_net:1785671607843"
+          ]
+        },
+        "f22_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f22_net:1785671269362"
+          ]
+        },
+        "f23_net": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "f23_net:1785670738936"
+          ]
+        },
+        "f24_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f24_net:1785670345462"
+          ]
+        },
+        "f25_net": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "f25_net:1785669850643"
+          ]
+        },
+        "f26_net": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "f26_net:1785669420408"
+          ]
+        },
+        "f27_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f27_net:1785668756895"
+          ]
+        },
+        "f28_net": {
+          "validPlayers": 997,
+          "guilds": 20,
+          "sourceIds": [
+            "f28_net:1785668127783"
+          ]
+        },
+        "f8_net": {
+          "validPlayers": 601,
+          "guilds": 13,
+          "sourceIds": [
+            "f8_net:1785669187277",
+            "f8_net:1785673487879"
+          ]
+        },
+        "f9_net": {
+          "validPlayers": 503,
+          "guilds": 11,
+          "sourceIds": [
+            "f9_net:1785669386370",
+            "f9_net:1785673487879"
+          ]
+        },
+        "gnarogrim_net": {
+          "validPlayers": 757,
+          "guilds": 15,
+          "sourceIds": [
+            "gnarogrim_net:1785667782930",
+            "gnarogrim_net:1785671513042",
+            "gnarogrim_net:1785673758828"
+          ]
+        },
+        "maerwynn_net": {
+          "validPlayers": 752,
+          "guilds": 16,
+          "sourceIds": [
+            "maerwynn_net:1785667470302",
+            "maerwynn_net:1785671513042"
+          ]
+        },
+        "s10_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s10_eu:1785669783798"
+          ]
+        },
+        "s11_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s11_eu:1785669572911"
+          ]
+        },
+        "s12_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s12_eu:1785669365850"
+          ]
+        },
+        "s13_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s13_eu:1785669165376"
+          ]
+        },
+        "s14_eu": {
+          "validPlayers": 497,
+          "guilds": 10,
+          "sourceIds": [
+            "s14_eu:1785668968969"
+          ]
+        },
+        "s15_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s15_eu:1785668732294"
+          ]
+        },
+        "s16_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s16_eu:1785668508499"
+          ]
+        },
+        "s17_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s17_eu:1785668266690"
+          ]
+        },
+        "s18_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s18_eu:1785668052976"
+          ]
+        },
+        "s19_eu": {
+          "validPlayers": 481,
+          "guilds": 10,
+          "sourceIds": [
+            "s19_eu:1785667768913"
+          ]
+        },
+        "s20_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s20_eu:1785667515904"
+          ]
+        },
+        "s21_eu": {
+          "validPlayers": 496,
+          "guilds": 10,
+          "sourceIds": [
+            "s21_eu:1785667267241"
+          ]
+        },
+        "s22_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s22_eu:1785666989498"
+          ]
+        },
+        "s23_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s23_eu:1785666771797"
+          ]
+        },
+        "s24_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s24_eu:1785666560936"
+          ]
+        },
+        "s25_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s25_eu:1785666342462"
+          ]
+        },
+        "s26_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s26_eu:1785666144588"
+          ]
+        },
+        "s27_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s27_eu:1785665832003"
+          ]
+        },
+        "s28_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s28_eu:1785665429016"
+          ]
+        },
+        "s29_eu": {
+          "validPlayers": 499,
+          "guilds": 6,
+          "sourceIds": [
+            "s29_eu:1785665619463"
+          ]
+        },
+        "s5_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s5_eu:1785670895732"
+          ]
+        },
+        "s6_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s6_eu:1785670687511"
+          ]
+        },
+        "s7_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s7_eu:1785670477676"
+          ]
+        },
+        "s8_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s8_eu:1785670258015"
+          ]
+        },
+        "s9_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s9_eu:1785670039541"
+          ]
+        },
+        "stumblesteppe_net": {
+          "validPlayers": 751,
+          "guilds": 15,
+          "sourceIds": [
+            "stumblesteppe_net:1785668361525",
+            "stumblesteppe_net:1785671513042"
+          ]
+        }
+      }
+    },
+    "2026-09": {
+      "servers": 45,
+      "players": 30492,
+      "counts": {
+        "am1_net": {
+          "validPlayers": 492,
+          "guilds": 10,
+          "sourceIds": [
+            "am1_net:1788598437385"
+          ]
+        },
+        "blackforest_net": {
+          "validPlayers": 1121,
+          "guilds": 105,
+          "sourceIds": [
+            "blackforest_net:1788602046680",
+            "blackforest_net:1788603073670"
+          ]
+        },
+        "f11_net": {
+          "validPlayers": 1086,
+          "guilds": 113,
+          "sourceIds": [
+            "f11_net:1788600564288",
+            "f11_net:1788603073670"
+          ]
+        },
+        "f14_net": {
+          "validPlayers": 1064,
+          "guilds": 78,
+          "sourceIds": [
+            "f14_net:1788600624810",
+            "f14_net:1788603073670"
+          ]
+        },
+        "f17_net": {
+          "validPlayers": 1209,
+          "guilds": 125,
+          "sourceIds": [
+            "f17_net:1788602812978",
+            "f17_net:1788603073670"
+          ]
+        },
+        "f19_net": {
+          "validPlayers": 1045,
+          "guilds": 89,
+          "sourceIds": [
+            "f19_net:1788601170185",
+            "f19_net:1788603073670"
+          ]
+        },
+        "f21_net": {
+          "validPlayers": 1059,
+          "guilds": 89,
+          "sourceIds": [
+            "f21_net:1788601198783",
+            "f21_net:1788603073670"
+          ]
+        },
+        "f22_net": {
+          "validPlayers": 1047,
+          "guilds": 78,
+          "sourceIds": [
+            "f22_net:1788601226242",
+            "f22_net:1788603073670"
+          ]
+        },
+        "f23_net": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "f23_net:1788602041393"
+          ]
+        },
+        "f24_net": {
+          "validPlayers": 505,
+          "guilds": 11,
+          "sourceIds": [
+            "f24_net:1788601433079"
+          ]
+        },
+        "f25_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f25_net:1788600697920"
+          ]
+        },
+        "f26_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f26_net:1788600224671"
+          ]
+        },
+        "f27_net": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "f27_net:1788599802125"
+          ]
+        },
+        "f28_net": {
+          "validPlayers": 996,
+          "guilds": 20,
+          "sourceIds": [
+            "f28_net:1788599455210"
+          ]
+        },
+        "f8_net": {
+          "validPlayers": 1170,
+          "guilds": 112,
+          "sourceIds": [
+            "f8_net:1788600621047",
+            "f8_net:1788603073670"
+          ]
+        },
+        "f9_net": {
+          "validPlayers": 1107,
+          "guilds": 88,
+          "sourceIds": [
+            "f9_net:1788600566512",
+            "f9_net:1788603073670"
+          ]
+        },
+        "gnarogrim_net": {
+          "validPlayers": 1196,
+          "guilds": 118,
+          "sourceIds": [
+            "gnarogrim_net:1788602057447",
+            "gnarogrim_net:1788603073670"
+          ]
+        },
+        "maerwynn_net": {
+          "validPlayers": 1318,
+          "guilds": 116,
+          "sourceIds": [
+            "maerwynn_net:1788599922274",
+            "maerwynn_net:1788600687337",
+            "maerwynn_net:1788603073670"
+          ]
+        },
+        "s10_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s10_eu:1788598751254"
+          ]
+        },
+        "s11_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s11_eu:1788598543596"
+          ]
+        },
+        "s12_eu": {
+          "validPlayers": 495,
+          "guilds": 10,
+          "sourceIds": [
+            "s12_eu:1788598314692"
+          ]
+        },
+        "s13_eu": {
+          "validPlayers": 495,
+          "guilds": 10,
+          "sourceIds": [
+            "s13_eu:1788598090965"
+          ]
+        },
+        "s14_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s14_eu:1788597862517"
+          ]
+        },
+        "s15_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s15_eu:1788597610803"
+          ]
+        },
+        "s16_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s16_eu:1788597410169"
+          ]
+        },
+        "s17_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s17_eu:1788597198376"
+          ]
+        },
+        "s18_eu": {
+          "validPlayers": 497,
+          "guilds": 10,
+          "sourceIds": [
+            "s18_eu:1788597003209"
+          ]
+        },
+        "s19_eu": {
+          "validPlayers": 480,
+          "guilds": 10,
+          "sourceIds": [
+            "s19_eu:1788596732933"
+          ]
+        },
+        "s20_eu": {
+          "validPlayers": 501,
+          "guilds": 10,
+          "sourceIds": [
+            "s20_eu:1788596527034"
+          ]
+        },
+        "s21_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s21_eu:1788596317453"
+          ]
+        },
+        "s22_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s22_eu:1788596123580"
+          ]
+        },
+        "s23_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s23_eu:1788595921920"
+          ]
+        },
+        "s24_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s24_eu:1788595649566"
+          ]
+        },
+        "s25_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s25_eu:1788595454894"
+          ]
+        },
+        "s26_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s26_eu:1788595259607"
+          ]
+        },
+        "s27_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s27_eu:1788595046333"
+          ]
+        },
+        "s28_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s28_eu:1788594763752"
+          ]
+        },
+        "s29_eu": {
+          "validPlayers": 481,
+          "guilds": 10,
+          "sourceIds": [
+            "s29_eu:1788594558519"
+          ]
+        },
+        "s30_eu": {
+          "validPlayers": 451,
+          "guilds": 10,
+          "sourceIds": [
+            "s30_eu:1788594348833"
+          ]
+        },
+        "s5_eu": {
+          "validPlayers": 500,
+          "guilds": 10,
+          "sourceIds": [
+            "s5_eu:1788599757969"
+          ]
+        },
+        "s6_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s6_eu:1788599550748"
+          ]
+        },
+        "s7_eu": {
+          "validPlayers": 498,
+          "guilds": 10,
+          "sourceIds": [
+            "s7_eu:1788599354154"
+          ]
+        },
+        "s8_eu": {
+          "validPlayers": 499,
+          "guilds": 10,
+          "sourceIds": [
+            "s8_eu:1788599136467"
+          ]
+        },
+        "s9_eu": {
+          "validPlayers": 491,
+          "guilds": 10,
+          "sourceIds": [
+            "s9_eu:1788598936887"
+          ]
+        },
+        "stumblesteppe_net": {
+          "validPlayers": 1201,
+          "guilds": 108,
+          "sourceIds": [
+            "stumblesteppe_net:1788600650311",
+            "stumblesteppe_net:1788603073670"
+          ]
+        }
+      }
+    }
+  }
+}

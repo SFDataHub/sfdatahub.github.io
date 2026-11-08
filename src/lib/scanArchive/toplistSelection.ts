@@ -151,3 +151,9 @@ function compareCandidatePreference(
     right.scans.map((scan) => scan.id).join("|").localeCompare(left.scans.map((scan) => scan.id).join("|"))
   );
 }
+
+/** Explicit monthly sets only; catalogue years and calendar gaps prove nothing. */
+export function scanArchiveMonthlyOptions(manifests: readonly ScanArchiveManifest[]): string[] {
+  return [...new Set(manifests.flatMap(manifest => Object.keys(manifest.toplists?.monthly ?? {})))]
+    .filter(month => /^\d{4}-(0[1-9]|1[0-2])$/.test(month)).sort().reverse();
+}

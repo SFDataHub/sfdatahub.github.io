@@ -1,3 +1,5 @@
+import { trackLocalEvent } from "../../lib/analytics/localEvents";
+import { auditBegin, auditPhaseBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave, auditFields } from "../../lib/data-hub/runtimeAudit";
 import React from "react";
 import html2canvas from "html2canvas";
 
@@ -96,6 +98,8 @@ const waitForStableNode = async (
   resolveNode: () => HTMLElement | null,
   opts?: { timeoutMs?: number; requiredStableFrames?: number },
 ): Promise<HTMLElement | null> => {
+    const __audit1 = auditPhaseBegin("waitForStableNode", undefined, "async-container");
+    try {
   const timeoutMs = opts?.timeoutMs ?? 3000;
   const requiredStableFrames = opts?.requiredStableFrames ?? 2;
   const deadline = Date.now() + timeoutMs;
@@ -108,20 +112,25 @@ const waitForStableNode = async (
       if (node === lastNode) stableFrames += 1;
       else stableFrames = 1;
       lastNode = node;
-      if (stableFrames >= requiredStableFrames) return node;
+      if (stableFrames >= requiredStableFrames) return auditReturn(__audit1, node);
     } else {
       lastNode = null;
       stableFrames = 0;
     }
-    await waitForAnimationFrame();
+    await (auditValue(__audit1, auditEnter(__audit1, "waitForAnimationFrame"), (waitForAnimationFrame())));
   }
 
-  return resolveNode();
+  return auditReturn(__audit1, resolveNode());
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 };
 
 const waitForImagesInNode = async (node: HTMLElement) => {
+    const __audit2 = auditPhaseBegin("waitForImagesInNode", undefined, "async-container");
+    try {
   const images = Array.from(node.querySelectorAll<HTMLImageElement>("img"));
-  await Promise.all(
+  await (auditValue(__audit2, auditEnter(__audit2, "Promise.all"), (Promise.all(
     images.map(async (img) => {
       if (!img.complete) {
         await new Promise<void>((resolve) => {
@@ -138,17 +147,25 @@ const waitForImagesInNode = async (node: HTMLElement) => {
         }
       }
     }),
-  );
+  ))));
+
+    } catch (__auditError) { auditError(__audit2, __auditError); throw __auditError; }
+    finally { auditLeave(__audit2); }
 };
 
 const waitForFontsReady = async () => {
+    const __audit3 = auditPhaseBegin("waitForFontsReady", undefined, "async-container");
+    try {
   const fonts = typeof document !== "undefined" ? (document as Document & { fonts?: FontFaceSet }).fonts : null;
-  if (!fonts?.ready) return;
+  if (!fonts?.ready) return auditReturn(__audit3, undefined);
   try {
-    await fonts.ready;
+    await (auditValue(__audit3, auditEnter(__audit3, "fonts.ready"), (fonts.ready)));
   } catch {
     // Ignore font loading failures and continue with the capture.
   }
+
+    } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
+    finally { auditLeave(__audit3); }
 };
 
 const TOPLIST_CAPTURE_TARGET_ATTR = "data-toplists-capture-target";
@@ -168,14 +185,19 @@ type CaptureScrollState = Record<string, {
 }>;
 
 const waitForStableLayout = async (node: HTMLElement) => {
+    const __audit4 = auditPhaseBegin("waitForStableLayout", undefined, "async-container");
+    try {
   let previous = "";
   for (let i = 0; i < 6; i += 1) {
-    await waitForAnimationFrame();
+    await (auditValue(__audit4, auditEnter(__audit4, "waitForAnimationFrame"), (waitForAnimationFrame())));
     const rect = node.getBoundingClientRect();
     const current = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
-    if (current === previous) return;
+    if (current === previous) return auditReturn(__audit4, undefined);
     previous = current;
   }
+
+    } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
+    finally { auditLeave(__audit4); }
 };
 
 const isScrollableNode = (node: HTMLElement) => {
@@ -515,9 +537,12 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
       amount: ToplistExportAmount;
       scale: number;
     }): Promise<HTMLCanvasElement | null> => {
-      if (typeof document === "undefined") return null;
+ const __w32Run0=auditPhaseBegin("captureToplistCanvas");
+ const __w32Sync=null;
+ try {
+      if (typeof document === "undefined") return auditReturn(__w32Run0,null);
       const tableRoot = liveTableRef.current;
-      if (!tableRoot) return null;
+      if (!tableRoot) return auditReturn(__w32Run0,null);
 
       const width = Math.max(1, Math.round(tableRoot.getBoundingClientRect().width || tableRoot.offsetWidth || 1));
       const backgroundColor = resolveExportBackground(tableRoot);
@@ -536,21 +561,21 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
           backgroundColor,
           context,
         });
-        await waitForAnimationFrame();
-        await waitForAnimationFrame();
-        captureTarget = await waitForCaptureReady({
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForAnimationFrame"),waitForAnimationFrame());
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForAnimationFrame"),waitForAnimationFrame());
+        captureTarget = await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForCaptureReady"),waitForCaptureReady({
           resolveNode: () => presetTableRef.current,
           resolveStatus: () => presetCaptureStatusRef.current,
           timeoutMs: 12000,
           requiredStableFrames: 4,
-        });
-        if (!captureTarget) return null;
+        }));
+        if (!captureTarget) return auditReturn(__w32Run0,null);
         const resolvedCaptureTarget = captureTarget;
 
-        await waitForFontsReady();
-        await waitForImagesInNode(resolvedCaptureTarget);
-        await waitForAnimationFrame();
-        await waitForStableLayout(resolvedCaptureTarget);
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForFontsReady"),waitForFontsReady());
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForImagesInNode"),waitForImagesInNode(resolvedCaptureTarget));
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForAnimationFrame"),waitForAnimationFrame());
+        await auditValue(__w32Run0,auditEnter(__w32Run0,"waitForStableLayout"),waitForStableLayout(resolvedCaptureTarget));
 
         const rect = resolvedCaptureTarget.getBoundingClientRect();
         const targetWidth = Math.max(1, Math.ceil(rect.width || resolvedCaptureTarget.offsetWidth || 1));
@@ -564,10 +589,10 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
         const viewportHeight = Math.max(1, Math.ceil(document.documentElement.clientHeight || window.innerHeight || captureHeight));
         const captureWindowWidth = Math.max(viewportWidth, captureWidth);
         const captureWindowHeight = Math.max(viewportHeight, captureHeight);
-        const iconDataUrlBySource = await buildToplistIconDataUrlMap(
+        const iconDataUrlBySource = await auditValue(__w32Run0,auditEnter(__w32Run0,"buildToplistIconDataUrlMap"),buildToplistIconDataUrlMap(
           resolvedCaptureTarget,
           iconDataUrlPromiseCacheRef.current,
-        );
+        ));
 
         const restoreCaptureTarget = markCaptureTarget(resolvedCaptureTarget);
         const { scrollState, cleanup: cleanupScrollState } = collectCaptureScrollState(resolvedCaptureTarget);
@@ -610,17 +635,17 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
             },
           });
           try {
-            const primaryCanvas = await runCapture(true);
+            const primaryCanvas = await auditValue(__w32Run0,auditEnter(__w32Run0,"runCapture"),runCapture(true));
             if (!isValidCaptureCanvas(primaryCanvas)) {
               throw new Error("Invalid canvas from foreignObject renderer");
             }
-            return primaryCanvas;
+            return auditReturn(__w32Run0,primaryCanvas);
           } catch {
-            const fallbackCanvas = await runCapture(false);
+            const fallbackCanvas = await auditValue(__w32Run0,auditEnter(__w32Run0,"runCapture"),runCapture(false));
             if (!isValidCaptureCanvas(fallbackCanvas)) {
               throw new Error("Invalid canvas from fallback renderer");
             }
-            return fallbackCanvas;
+            return auditReturn(__w32Run0,fallbackCanvas);
           }
         } finally {
           cleanupScrollState();
@@ -629,22 +654,27 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
       } finally {
         setPresetRenderState(null);
       }
-    }, [liveTableRef, waitForCaptureReady]);
+
+} catch (__w32Error) { auditError(__w32Run0,__w32Error); throw __w32Error; } finally {auditValue(__w32Run0,__w32Sync,undefined);auditLeave(__w32Run0);}
+}, [liveTableRef, waitForCaptureReady]);
 
     const handleConfirmExportPng = React.useCallback(async () => {
-      if (typeof document === "undefined") return;
-      if (!liveTableRef.current || isExportingPng) return;
+    const __audit5 = auditBegin("F25", "handleConfirmExportPng");
+  auditFields(__audit5, { consumerArea: "Topliste", trigger: "export-confirm-handler" });
+    try {
+      if (typeof document === "undefined") return auditReturn(__audit5, undefined);
+      if (!liveTableRef.current || isExportingPng) return auditReturn(__audit5, undefined);
 
       setIsExportingPng(true);
       setIsExportDialogOpen(false);
       try {
-        const canvas = await captureToplistCanvas({
+        const canvas = await (auditValue(__audit5, auditEnter(__audit5, "captureToplistCanvas"), (captureToplistCanvas({
           kind: activeKind,
           amount: exportAmount,
           scale: Math.max(1, Math.min(2, window.devicePixelRatio || 1)),
-        });
-        if (!canvas) return;
-        await new Promise<void>((resolve, reject) => {
+        }))));
+        if (!canvas) return auditReturn(__audit5, undefined);
+        await (auditValue(__audit5, auditEnter(__audit5, "new Promise<void>((resolve, reject) => {\r\n          canvas.toBlob(\r\n            (blob) => {\r\n              if (!blob) {\r\n         "), (new Promise<void>((resolve, reject) => {
           canvas.toBlob(
             (blob) => {
               if (!blob) {
@@ -656,17 +686,21 @@ const ToplistExportController = React.forwardRef<ToplistExportControllerHandle, 
               link.download = "sfdatahub_toplist.png";
               link.href = url;
               link.click();
+              trackLocalEvent("datahub/toplist/png-export-success");
               URL.revokeObjectURL(url);
               resolve();
             },
             "image/png",
             1,
           );
-        });
+        }))));
       } finally {
         setIsExportingPng(false);
       }
-    }, [activeKind, captureToplistCanvas, exportAmount, isExportingPng, liveTableRef]);
+
+    } catch (__auditError) { auditError(__audit5, __auditError); throw __auditError; }
+    finally { auditLeave(__audit5); }
+}, [activeKind, captureToplistCanvas, exportAmount, isExportingPng, liveTableRef]);
 
     return (
       <>

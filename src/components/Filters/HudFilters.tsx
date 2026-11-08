@@ -1,3 +1,5 @@
+import { toplistColumns } from "../../lib/toplists/toplistColumns";
+import { LOCAL_TOPLIST_METRICS } from "../../lib/toplists/localToplistMetrics";
 // src/components/Filters/HudFilters.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -5,13 +7,17 @@ import { useFilters } from "./FilterContext";
 import { CLASSES } from "../../data/classes";
 import styles from "./filters.module.css";
 import { ClassIconButton } from "./atoms";
-import { useAuth } from "../../context/AuthContext";
+import CompareControls from "./CompareControls";
+import { getGuildClassAccent } from "../guilds/classColors";
 
 type CompareMode = "off" | "progress" | "months";
 
 type Props = {
   mode: "players" | "guilds";
+  sortDirection?: "asc" | "desc";
+  onToggleSortDirection?: () => void;
   sortValue: string;
+  sortOptions?: readonly { metricKey: string; label: string }[];
   onSortValueChange: (value: string) => void;
   compareMode: CompareMode;
   onCompareModeChange: (mode: CompareMode) => void;
@@ -24,13 +30,16 @@ type Props = {
   monthOptions: string[];
   guildOptions: { value: string; label: string }[];
   searchSlot?: React.ReactNode;
+  hideServerButton?: boolean;
+  localWindow?: boolean;
   onExportPng?: () => void;
   exportDisabled?: boolean;
+  onResetAll?: () => void;
 };
 
 export default function HudFilters({
   mode,
-  sortValue,
+  sortValue, sortOptions, sortDirection, onToggleSortDirection,
   onSortValueChange,
   compareMode,
   onCompareModeChange,
@@ -43,8 +52,11 @@ export default function HudFilters({
   monthOptions,
   guildOptions,
   searchSlot,
+  hideServerButton = false,
+  localWindow = false,
   onExportPng,
   exportDisabled,
+  onResetAll,
 }: Props) {
   const { t } = useTranslation();
   const {
@@ -62,7 +74,6 @@ export default function HudFilters({
     setServerSheetOpen,
     resetAll,
   } = useFilters();
-  const { user } = useAuth();
 
   const isGuildMode = mode === "guilds";
   const guildLabel = t("toplists.filters.guilds.label", "Guilds");
@@ -78,33 +89,45 @@ export default function HudFilters({
     : guildPlaceholder;
 
   return (
-    <div className={styles.hudWrap}>
-      <button
-        type="button"
-        className={styles.hudBtn}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setServerSheetOpen(true);
-        }}
-        aria-haspopup="dialog"
-        aria-expanded={serverSheetOpen || false}
-        aria-label={`Select servers${servers.length ? ` (${servers.length} selected)` : ""}`}
-        title="Open Server Picker"
-      >
-        🌐 Servers {servers.length ? `(${servers.length})` : ""}
-      </button>
+    <div className={`${styles.hudWrap} ${localWindow ? styles.localWindow : ""}`}>
+      {!hideServerButton && (
+        <button
+          type="button"
+          className={styles.hudBtn}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setServerSheetOpen(true);
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={serverSheetOpen || false}
+          aria-label={t("guildHub.toplist.servers.selectedCount", { count: servers.length })}
+          title={t("toplists.serverPicker.title")}
+        >
+          🌐 {t("toplists.columns.server")} {servers.length ? `(${servers.length})` : ""}
+        </button>
+      )}
 
       {!isGuildMode && (
+        <>
+        {localWindow && <div className={styles.classHeader}>
+          <span>{t("toplists.filters.classes.selected", "Classes – selected ({{selection}})", { selection: CLASSES.every(c => classes.includes(c.key)) ? t("toplists.filters.classes.all", "All") : CLASSES.filter(c => classes.includes(c.key)).length })}</span>
+          <div className={styles.classActions}>
+            <button type="button" className={styles.hudSubBtn} onClick={() => setClasses(CLASSES.map(c => c.key))}>{t("toplists.filters.classes.all", "All")}</button>
+            <button type="button" className={styles.hudSubBtn} onClick={() => setClasses([])}>{t("toplists.filters.classes.clear", "Clear")}</button>
+          </div>
+        </div>}
         <div className={styles.iconRow}>
           {CLASSES.map((c) => (
             <ClassIconButton
               key={c.key}
               active={classes.includes(c.key)}
-              title={c.label}
+              title={t(`toplists.classes.${c.key}`, c.label)}
               iconUrl={c.iconUrl}
               fallback={c.fallback}
               size={40}
+              localDropdown={localWindow}
+              classAccent={localWindow ? getGuildClassAccent(c.key) : undefined}
               onClick={() =>
                 setClasses((prev) =>
                   prev.includes(c.key) ? prev.filter((k) => k !== c.key) : [...prev, c.key]
@@ -112,15 +135,19 @@ export default function HudFilters({
               }
             />
           ))}
+          {!localWindow && <div className={styles.inlineGroup}>
           <button type="button" className={styles.hudSubBtn} onClick={() => setClasses(CLASSES.map((c) => c.key))}>
-            All
+            {t("toplists.filters.classes.all")}
           </button>
           <button type="button" className={styles.hudSubBtn} onClick={() => setClasses([])}>
-            None
+            {t("toplists.filters.classes.clear")}
           </button>
+          </div>}
         </div>
+        </>
       )}
 
+      <div className={localWindow ? styles.windowFields : styles.inlineGroup}>
       {!isGuildMode && (
         <div className={styles.guildField}>
           <span className={styles.guildLabel}>{guildLabel}</span>
@@ -157,7 +184,7 @@ export default function HudFilters({
         <label className={styles.sortLabel} htmlFor="toplists-sort">
           {sortLabel}
         </label>
-        <select
+        <div className={onToggleSortDirection ? styles.sortControls : styles.sortControlPassthrough}><select
           id="toplists-sort"
           name="toplists-sort"
           value={sortValue}
@@ -165,6 +192,11 @@ export default function HudFilters({
           className={styles.sortSelect}
           aria-label={sortAriaLabel}
         >
+          {sortOptions ? sortOptions.map(option => <option key={option.metricKey} value={option.metricKey}>{option.label}</option>) : <>
+          {localWindow && LOCAL_TOPLIST_METRICS.filter(metric => toplistColumns(isGuildMode ? "guilds" : "players").some(column => column.metric === metric.metricKey) && metric.rowKind === (isGuildMode ? "guild" : "player") && !(isGuildMode ? ["guildMembers", "guildAvgLevel", "guildAvgMain", "guildAvgCon", "guildAvgSum", "guildRaids", "guildHydra"] : ["main", "mainTotal", "constitution", "conTotal", "sum", "statsDay", "sumTotal", "statsDayTotal", "level", "mine"]).includes(metric.metricKey)).map(metric => {
+            const column = toplistColumns(isGuildMode ? "guilds" : "players").find(c => c.metric === metric.metricKey);
+            return <option key={metric.metricKey} value={metric.metricKey}>{column ? t(`toplists.columns.${column.key === "name" && !isGuildMode ? "player" : column.key}`, column.label) : t(`toplists.columns.${metric.metricKey}`, metric.metricKey)}</option>;
+          })}
           {isGuildMode ? (
             <>
               <option value="guildMembers">{t("toplists.filters.sort.guildOptions.guildMembers", "Members")}</option>
@@ -189,7 +221,11 @@ export default function HudFilters({
               <option value="mine">{t("toplists.filters.sort.playerOptions.mine", "Mine")}</option>
             </>
           )}
+          </>}
         </select>
+        {onToggleSortDirection && <button type="button" className={styles.sortDirection} onClick={onToggleSortDirection}
+          aria-label={t(`localSettings.toplists.${sortDirection === "asc" ? "ascending" : "descending"}`)} title={t(`localSettings.toplists.${sortDirection === "asc" ? "ascending" : "descending"}`)}>{sortDirection === "asc" ? "↑" : "↓"}</button>}
+        </div>
       </div>
 
       {isGuildMode ? (
@@ -198,101 +234,24 @@ export default function HudFilters({
         <div id="player-avg-mode-slot" className={styles.sortField} />
       )}
 
-      <div className={styles.compareBlock}>
-        <span className={styles.compareBlockTitle}>{t("toplists.compareMode", "Compare Mode")}</span>
-        <div className={styles.segmented} role="group" aria-label={t("toplists.compareMode", "Compare Mode")}>
-          <button type="button" aria-pressed={compareMode === "off"} onClick={() => onCompareModeChange("off")}>
-            {t("toplists.compareOff", "Off")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={compareMode === "progress"}
-            onClick={() => onCompareModeChange("progress")}
-          >
-            {t("toplists.compareMonth", "Progress since")}
-          </button>
-          <button type="button" aria-pressed={compareMode === "months"} onClick={() => onCompareModeChange("months")}>
-            {t("toplists.compareMonths", "Compare months")}
-          </button>
-        </div>
-
-        {compareMode === "progress" && (
-          <div className={styles.compareInputsRow}>
-            <label className={styles.compareField} htmlFor="toplists-compare-progress">
-              <span className={styles.guildLabel}>{t("toplists.compareMonth", "Progress since")}</span>
-              <select
-                id="toplists-compare-progress"
-                name="toplists-compare-progress"
-                value={progressSinceMonth}
-                onChange={(e) => onProgressSinceMonthChange(e.target.value)}
-                className={styles.sortSelect}
-                aria-label={t("toplists.compareMonth", "Progress since")}
-              >
-                <option value="">{t("toplists.compareOff", "Off")}</option>
-                {monthOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-
-        {compareMode === "months" && (
-          <div className={styles.compareInputsRow}>
-            <label className={styles.compareField} htmlFor="toplists-compare-from">
-              <span className={styles.guildLabel}>{t("toplists.compareFrom", "From")}</span>
-              <select
-                id="toplists-compare-from"
-                name="toplists-compare-from"
-                value={compareFromMonth}
-                onChange={(e) => onCompareFromMonthChange(e.target.value)}
-                className={styles.sortSelect}
-                aria-label={t("toplists.compareFrom", "From")}
-              >
-                {monthOptions.map((opt) => (
-                  <option key={`from-${opt}`} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={styles.compareField} htmlFor="toplists-compare-to">
-              <span className={styles.guildLabel}>{t("toplists.compareTo", "To")}</span>
-              <select
-                id="toplists-compare-to"
-                name="toplists-compare-to"
-                value={compareToMonth}
-                onChange={(e) => onCompareToMonthChange(e.target.value)}
-                className={styles.sortSelect}
-                aria-label={t("toplists.compareTo", "To")}
-              >
-                {monthOptions.map((opt) => (
-                  <option key={`to-${opt}`} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
       </div>
+
+      {!localWindow && <CompareControls
+        compareMode={compareMode} onCompareModeChange={onCompareModeChange}
+        progressSinceMonth={progressSinceMonth} onProgressSinceMonthChange={onProgressSinceMonthChange}
+        compareFromMonth={compareFromMonth} onCompareFromMonthChange={onCompareFromMonthChange}
+        compareToMonth={compareToMonth} onCompareToMonthChange={onCompareToMonthChange}
+        monthOptions={monthOptions} />}
+
 
       {searchSlot ? <div className={styles.searchSlot}>{searchSlot}</div> : null}
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className={localWindow ? styles.windowActions : "ml-auto flex items-center gap-2"}>
         <button
           type="button"
           className={`${styles.chip} ${favoritesOnly ? styles.isActive : ""}`.trim()}
           aria-pressed={favoritesOnly}
           onClick={() => {
-            if (!user) {
-              const message = t("profile.favorite.authRequired", { defaultValue: "Sign in to use favorites." });
-              if (typeof window !== "undefined") window.alert(message);
-              return;
-            }
             setFavoritesOnly(!favoritesOnly);
           }}
           title={favoritesChipLabel}
@@ -309,8 +268,8 @@ export default function HudFilters({
         >
           {exportPngLabel}
         </button>
-        <button type="button" className={styles.hudSubBtn} onClick={resetAll}>
-          Reset
+        <button type="button" className={styles.hudSubBtn} onClick={onResetAll ?? resetAll}>
+          {t("toplists.filters.reset")}
         </button>
 
         {filterMode === "sheet" && (
@@ -322,9 +281,9 @@ export default function HudFilters({
               e.stopPropagation();
               setBottomFilterOpen(true);
             }}
-            title="Open Filters"
+            title={t("toplists.filters.showHud")}
           >
-            Open Filters
+            {t("toplists.filters.showHud")}
           </button>
         )}
       </div>

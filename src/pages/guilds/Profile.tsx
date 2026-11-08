@@ -41,7 +41,7 @@ import { CLASSES } from "../../data/classes";
 import { readTtlCache, writeTtlCache } from "../../lib/cache/localStorageTtl";
 import { calculateGuildActivityPct } from "../../lib/guilds/guildActivity";
 import { isValidGuildCoaString } from "../../lib/guilds/guildCoa";
-import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
+import { formatScanDateTimeLabel, toScanDateTimeMs, getScanAgeDays } from "../../lib/ui/formatScanDateTimeLabel";
 
 const C = {
   tile: "#152A42",
@@ -264,12 +264,6 @@ const toEpochMs = (value: unknown): number | null => {
   }
   return null;
 };
-const daysSince = (tsSec?: number | null) => {
-  if (!tsSec) return null;
-  const diff = Math.max(0, Date.now() / 1000 - tsSec);
-  return Math.floor(diff / 86400);
-};
-
 const normalizeToplistServerCode = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
   if (!raw) return "";
@@ -605,7 +599,7 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
                 d.values?.Rank ??
                 d.values?.["Guild Rank"]
             ) ?? null;
-          const lastScanDays = daysSince(toNum(d.timestamp));
+          const lastScanDays = getScanAgeDays(d.timestampRaw ?? d.values?.Timestamp ?? d.timestamp);
           const g: Guild = { id, name, server, memberCount, hofRank, lastScanDays };
           let nextSnapshot: MembersSnapshot | null = null;
           let nextTransfers: GuildHeroTransfersData = EMPTY_TRANSFERS;
@@ -806,7 +800,9 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
     );
   }
 
-  const updatedScanLabel = formatScanDateTimeLabel(snapshot?.updatedAtMs ?? snapshot?.updatedAt ?? null);
+  const latestScan = monthlySeed.latestLatest;
+  const scanAtMs = toScanDateTimeMs(latestScan?.timestampRaw ?? latestScan?.values?.Timestamp ?? latestScan?.timestamp);
+  const updatedScanLabel = formatScanDateTimeLabel(scanAtMs);
   const hasUpdatedScanLabel = updatedScanLabel !== "—";
   const gdriveEmblemUrl = guildIconUrlByIdentifier(guild.id, 512) || undefined;
   const hasCoaEmblem = Boolean(coaEmblemUrl);
@@ -842,7 +838,8 @@ export default function GuildProfile({ heroOnly = false }: GuildProfileProps) {
         emblemUrl: emblemUrl ?? null,
         emblemAlt: hasCoaEmblem ? "Guild COA" : undefined,
         lastScanAtLabel: hasUpdatedScanLabel ? updatedScanLabel : null,
-        lastScanDays: guild.lastScanDays ?? null,
+        lastScanAtMs: scanAtMs,
+        lastScanDays: getScanAgeDays(scanAtMs),
         averageStats: {
           base: {
             main: snapshot?.avgBaseMain ?? null,

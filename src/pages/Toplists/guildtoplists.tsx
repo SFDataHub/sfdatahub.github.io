@@ -1,5 +1,10 @@
+import { useToplistAutoSize } from "./useToplistAutoSize";
+import ToplistViewPicker from "./ToplistViewControls";
+import LocalSortHeader from "./LocalSortHeader";
+import { toplistColumnLabel, type LocalTableColumnsProps } from "../../lib/toplists/toplistColumns";
 // src/components/toplists/GuildToplists.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -9,7 +14,7 @@ import {
 import type { ToplistGuildRow, ToplistGuildSnapshot } from "../../lib/toplists/toplistContracts";
 import { SERVERS } from "../../data/servers";
 import { useFilters } from "../../components/Filters/FilterContext";
-import { useAuth } from "../../context/AuthContext";
+import { useFavoriteMembership } from "../../lib/data-hub/useFavoriteMembership";
 import { useToplistsData } from "../../context/ToplistsDataContextCore";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import type { ToplistCaptureStatus } from "../../components/export/ToplistExportController";
@@ -20,9 +25,15 @@ import {
   formatToplistDelta,
   getToplistRankDeltaDisplay,
 } from "./toplistCompareDisplay";
-import { useToplistRowFocus } from "./useToplistRowFocus";
+import { useToplistRowFocus, type ToplistFocusRequest, type ToplistFocusResult } from "./useToplistRowFocus";
 
-type GuildToplistsProps = {
+type GuildToplistsProps = LocalTableColumnsProps & {
+  /** Optional local body state. Public consumers keep their existing defaults. */
+  localLayout?: boolean;
+  /** Share local cell alignment with the DataHub PNG capture. */
+  centerCellContents?: boolean;
+  localLoadingContent?: React.ReactNode;
+  localNoticeContent?: React.ReactNode;
   serverCodes?: string[];
   sortKey?: string;
   showAvgModeControl?: boolean;
@@ -36,6 +47,9 @@ type GuildToplistsProps = {
   renderFirestoreGuildOverlay?: boolean;
   focusIdentifier?: string | null;
   focusNonce?: number | string | null;
+  focusRequest?: ToplistFocusRequest | null;
+  onFocusResult?: (result: ToplistFocusResult) => void;
+  onOpenGuildProfile?: (row: ToplistGuildRow) => void;
 };
 
 export type GuildToplistsPresetData = {
@@ -94,7 +108,8 @@ const GUILD_COLUMNS: ReadonlyArray<GuildColumnDef> = [
   { key: "lastScan", label: "Last Scan", width: "7%", align: "right" },
 ];
 
-const GUILD_TABLE_COL_SPAN = GUILD_COLUMNS.length;
+
+const customColumnWidth = (key: string) => key === "name" ? 250 : key === "guild" ? 160 : key === "lastScan" ? 150 : 105;
 
 const TOPLIST_TABLE_STYLE: React.CSSProperties = {
   width: "100%",
@@ -193,29 +208,34 @@ const TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
   return acc;
 }, {} as Record<GuildColumnKey, React.CSSProperties>);
 
-const GuildToplistColGroup = React.memo(function GuildToplistColGroup() {
+const CENTERED_TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
+  acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: "center" };
+  return acc;
+}, {} as Record<GuildColumnKey, React.CSSProperties>);
+
+const GuildToplistColGroup = React.memo(function GuildToplistColGroup({ columns, custom, localColumnWidths }: { localColumnWidths?: Record<string, number>; columns: readonly GuildColumnDef[]; custom: boolean }) {
   return (
     <colgroup>
-      {GUILD_COLUMNS.map((column) => (
-        <col key={column.key} style={{ width: column.width }} />
+      {columns.map((column) => (
+        <col key={column.key} style={{ width: custom ? (localColumnWidths?.[column.key] ?? customColumnWidth(column.key)) : column.width }} />
       ))}
     </colgroup>
   );
 });
 
-const GuildToplistHeader = React.memo(function GuildToplistHeader() {
+const GuildToplistHeader = React.memo(function GuildToplistHeader({ columns, custom, localColumnWidths, localSort, onLocalSort }: LocalTableColumnsProps & { columns: readonly GuildColumnDef[]; custom: boolean }) {
   const { t } = useTranslation();
   return (
-    <table className="toplists-table toplists-table--header" style={TOPLIST_TABLE_STYLE}>
-      <GuildToplistColGroup />
+    <table className="toplists-table toplists-table--header" style={custom ? { ...TOPLIST_TABLE_STYLE, width: columns.reduce((sum, c) => sum + (localColumnWidths?.[c.key] ?? customColumnWidth(c.key)), 0) } : TOPLIST_TABLE_STYLE}>
+      <GuildToplistColGroup columns={columns} custom={custom} localColumnWidths={localColumnWidths} />
       <thead>
         <tr style={TOPLIST_HEADER_ROW_STYLE}>
-          {GUILD_COLUMNS.map((column) => (
-            <th key={column.key} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
+          {columns.map((column) => (
+            <LocalSortHeader key={column.key} kind="guilds" columnKey={column.key} localSort={localSort} onLocalSort={onLocalSort} style={TOPLIST_CELL_STYLE_BY_KEY[column.key]}>
               <span style={{ ...TOPLIST_HEADER_LABEL_STYLE, ...TOPLIST_HEADER_LABEL_ALIGN_STYLE[column.align] }}>
-                {t(`toplists.columns.${column.key}`, column.label)}
+                {toplistColumnLabel("guilds", column.key, t)}
               </span>
-            </th>
+            </LocalSortHeader>
           ))}
         </tr>
       </thead>
@@ -446,6 +466,7 @@ function GuildAvgModeControls({
 const formatLastScanDisplay = (value: unknown): string => formatScanDateTimeLabel(value);
 
 export default function GuildToplists({
+  localLayout = false, centerCellContents = localLayout, localLoadingContent, localNoticeContent, localColumns, localColumnWidths, localSort, onLocalSort,
   serverCodes,
   sortKey,
   showAvgModeControl = true,
@@ -458,10 +479,19 @@ export default function GuildToplists({
   renderFirestoreGuildOverlay = true,
   focusIdentifier = null,
   focusNonce = null,
+  focusRequest, onFocusResult, onOpenGuildProfile,
 }: GuildToplistsProps) {
+  const activeColumns = localColumns ? localColumns.flatMap(key => { const column = GUILD_COLUMNS.find(c => c.key === key); return column ? [column] : []; }) : GUILD_COLUMNS;
+  const columnCount = activeColumns.length;
+  const cellStyles = centerCellContents ? CENTERED_TOPLIST_CELL_STYLE_BY_KEY : TOPLIST_CELL_STYLE_BY_KEY;
+  const numberColumnStyle: React.CSSProperties = centerCellContents ? TOPLIST_FLEX_COLUMN_CENTER_STYLE : TOPLIST_FLEX_COLUMN_RIGHT_STYLE;
+  const lastScanStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_LAST_SCAN_CONTENT_STYLE, justifyContent: "center" } : TOPLIST_LAST_SCAN_CONTENT_STYLE;
+  const lastScanLabelStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_LAST_SCAN_LABEL_STYLE, flex: "0 1 auto", textAlign: "center" as const } : TOPLIST_LAST_SCAN_LABEL_STYLE;
+
+  const tableStyle = localColumns ? { ...TOPLIST_TABLE_STYLE, width: activeColumns.reduce((sum, c) => sum + (localColumnWidths?.[c.key] ?? customColumnWidth(c.key)), 0) } : TOPLIST_TABLE_STYLE;
   const { t, i18n } = useTranslation();
   const { favoritesOnly } = useFilters();
-  const { user } = useAuth();
+  const { filterFavorites: sharedFavorites } = useFavoriteMembership();
   const { getGuildToplistSnapshotCached } = useToplistsData();
   const isPresetRender = renderMode === "preset";
   const hasReadOnlyData = Boolean(presetReadOnlyData);
@@ -473,6 +503,19 @@ export default function GuildToplists({
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [guildAvgMode, setGuildAvgMode] = useState<"base" | "total">("base");
+  const [guildAvgModeSlot, setGuildAvgModeSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!localLayout || isPresetRender || !showAvgModeControl) return;
+    const resolveSlot = () => {
+      const slot = document.getElementById("guild-avg-mode-slot");
+      setGuildAvgModeSlot(previous => previous === slot ? previous : slot);
+    };
+    resolveSlot();
+    const observer = new MutationObserver(resolveSlot);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [localLayout, isPresetRender, showAvgModeControl]);
+
   const [expandedMobileGuildKey, setExpandedMobileGuildKey] = useState<string | null>(null);
   const [selectedGuildProfile, setSelectedGuildProfile] = useState<{
     identifier: string;
@@ -670,9 +713,9 @@ export default function GuildToplists({
   };
 
   const favoriteGuildSet = useMemo(() => {
-    const keys = Object.keys(user?.favorites?.guilds ?? {});
+    const keys = Object.keys(sharedFavorites.guilds ?? {});
     return new Set(keys.map((key) => normalizeFavoriteIdentifier(key)).filter((v): v is string => !!v));
-  }, [user?.favorites?.guilds]);
+  }, [sharedFavorites.guilds]);
 
   const activeSortKey = resolveGuildSort(sortKey);
   const activeGuildAvgMode = guildAvgMode === "total" ? "total" : "base";
@@ -699,7 +742,7 @@ export default function GuildToplists({
     if (!list.length) return list;
     if (hasReadOnlyData) return list;
 
-    if (favoritesOnly && user) {
+    if (favoritesOnly) {
       list = list.filter((row) => {
         const identifier = buildGuildFavoriteIdentifierFromRow(row);
         return !!(identifier && favoriteGuildSet.has(identifier));
@@ -740,7 +783,7 @@ export default function GuildToplists({
     });
 
     return list;
-  }, [activeSortKey, avgSumSortMode, effectiveGuildAvgMode, favoriteGuildSet, favoritesOnly, hasReadOnlyData, presetReadOnlyData?.rows, rows, user]);
+  }, [activeSortKey, avgSumSortMode, effectiveGuildAvgMode, favoriteGuildSet, favoritesOnly, hasReadOnlyData, presetReadOnlyData?.rows, rows]);
   const displayRows = useMemo(
     () => (hasReadOnlyData && isPresetRender ? (presetReadOnlyData?.rows ?? []) : computedDisplayRows),
     [computedDisplayRows, hasReadOnlyData, isPresetRender, presetReadOnlyData]
@@ -752,6 +795,7 @@ export default function GuildToplists({
   const highlightedIdentifier = useToplistRowFocus({
     focusIdentifier,
     focusNonce,
+    focusRequest, onFocusResult,
     disabled: isPresetRender || effectiveLoading,
     scrollContainerRef: (tableRef ?? tableScrollRef) as React.RefObject<HTMLElement | null>,
   });
@@ -825,6 +869,7 @@ export default function GuildToplists({
 
   const openGuildProfile = (row: ToplistGuildRow) => {
     if (isPresetRender) return;
+    if (onOpenGuildProfile) { onOpenGuildProfile(row); return; }
     const guildId = String(row.guildId ?? "").trim();
     if (!guildId) return;
     const rowIdentifier = resolveGuildIdentifier(row);
@@ -876,13 +921,19 @@ export default function GuildToplists({
     </div>
   );
 
+  const compactMetricColumn = ({"guildMembers": "members", "guildAvgMain": "avgMain", "guildAvgCon": "avgCon", "guildAvgSum": "avgSum", "guildRaids": "raids", "guildHydra": "hydra", "guildAvgLevel": "avgLevel"} as Record<string, string>)[activeSortKey] ?? "avgLevel";
+
   const renderGuildMobileAccordion = () => (
     <div
       ref={tableRef}
       className="toplists-mobile-list"
       data-toplists-export-root="true"
     >
-      {renderedRows.map((row, idx) => {
+      {localLayout && <div data-local-toplist-header="true" className="toplists-mobile-summary" style={{ borderBottom: "1px solid #2C4A73", cursor: "default", fontSize: 12, fontWeight: 600 }}>
+        <span>#</span><span>{t("toplists.columns.name")} / {t("toplists.columns.server")}</span><span>{t(`toplists.columns.${compactMetricColumn}`)}</span><span aria-hidden />
+      </div>}
+      {localLayout && <div data-local-toplist-body="true">{localNoticeContent}{localLoadingContent}</div>}
+      {(localLoadingContent ? [] : renderedRows).map((row, idx) => {
         const rowIdentifier = resolveGuildIdentifier(row);
         const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
         const isFocusedRow = Boolean(rowIdentifier && highlightedIdentifier === rowIdentifier);
@@ -900,6 +951,7 @@ export default function GuildToplists({
             key={rowKey}
             className={`toplists-mobile-row${isExpanded ? " toplists-mobile-row--open" : ""}${isFocusedRow ? " toplists-mobile-row--focused" : ""}`}
             data-sfh-identifier={rowIdentifier ?? undefined}
+            data-sfh-server={row.server ?? undefined}
           >
             <button
               type="button"
@@ -909,7 +961,7 @@ export default function GuildToplists({
               onClick={() => setExpandedMobileGuildKey((prev) => (prev === rowKey ? null : rowKey))}
             >
               <span className="toplists-mobile-rank">
-                #{idx + 1}
+                #{hasReadOnlyData ? ((row as any)._rank ?? (row as any).tableRank ?? idx + 1) : idx + 1}
                 {compare.rankDeltaDisplay ? (
                   <span className={`rank-delta-chip rank-delta-chip--${compare.rankDeltaDisplay.variant}`}>
                     {compare.rankDeltaDisplay.text}
@@ -933,8 +985,8 @@ export default function GuildToplists({
                   onClick={(event) => event.stopPropagation()}
                 >
                   <NeonCoreButton
-                    label={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
-                    title={t("toplists.mobileActions.guildProfile", "Gildenprofil")}
+                    label={t("toplists.mobileActions.guildProfile", "Guild profile")}
+                    title={t("toplists.mobileActions.guildProfile", "Guild profile")}
                     icon={null}
                     disabled={!guildId}
                     className="toplists-mobile-action-button"
@@ -964,7 +1016,7 @@ export default function GuildToplists({
           </div>
         );
       })}
-      {effectiveLoading && renderedRows.length === 0 && (
+      {effectiveLoading && !localLoadingContent && renderedRows.length === 0 && (
         <div className="toplists-mobile-empty">{t("toplists.table.loading", "Loading...")}</div>
       )}
       {!effectiveLoading && !effectiveError && renderedRows.length === 0 && (
@@ -974,12 +1026,13 @@ export default function GuildToplists({
   );
 
   const renderGuildBody = () => {
-    const rows = renderedRows;
+    const rows = localLoadingContent ? [] : renderedRows;
 
     return (
-      <table className="toplists-table toplists-table--body" style={TOPLIST_TABLE_STYLE}>
-        <GuildToplistColGroup />
+      <table className="toplists-table toplists-table--body" style={tableStyle}>
+        <GuildToplistColGroup columns={activeColumns} custom={!!localColumns} localColumnWidths={localColumnWidths} />
         <tbody>
+          {(localNoticeContent || localLoadingContent) && <tr><td colSpan={columnCount} style={{ padding: 0 }}>{localNoticeContent}{localLoadingContent}</td></tr>}
           {rows.map((row, idx) => {
             const rowIdentifier = resolveGuildIdentifier(row);
             const rowKey = rowIdentifier ?? `${row.guildId}-${row.server}-${idx}`;
@@ -989,6 +1042,10 @@ export default function GuildToplists({
             const rowOnClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
               event.preventDefault();
               event.stopPropagation();
+              if (onOpenGuildProfile) {
+                event.currentTarget.tabIndex = -1;
+                event.currentTarget.focus({ preventScroll: true });
+              }
               openGuildProfile(row);
             };
 
@@ -997,6 +1054,7 @@ export default function GuildToplists({
                 key={rowKey}
                 className={`toplists-row${isFocusedRow ? " toplists-row--focused" : ""}`}
                 data-sfh-identifier={rowIdentifier ?? undefined}
+            data-sfh-server={row.server ?? undefined}
                 style={{
                   borderBottom: "1px solid #2C4A73",
                   cursor: "pointer",
@@ -1005,86 +1063,89 @@ export default function GuildToplists({
                 }}
                 onClick={rowOnClick}
               >
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.rank}>
+                {activeColumns.map(column => { switch (column.key) {
+case "rank": return (<td key={column.key} style={cellStyles.rank}>
                   <div style={TOPLIST_FLEX_COLUMN_CENTER_STYLE}>
-                    <span>{idx + 1}</span>
+                    <span>{hasReadOnlyData ? ((row as any)._rank ?? (row as any).tableRank ?? idx + 1) : idx + 1}</span>
                     {compare.rankDeltaDisplay ? (
                       <span className={`rank-delta-chip rank-delta-chip--${compare.rankDeltaDisplay.variant}`}>
                         {compare.rankDeltaDisplay.text}
                       </span>
                     ) : null}
                   </div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.server}>
+                </td>);
+case "server": return (<td key={column.key} style={cellStyles.server}>
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{row.server}</span>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.name}>
+                </td>);
+case "name": return (<td key={column.key} style={cellStyles.name}>
                   <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>{row.name}</span>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.hofRank}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.hofRank)}</span>{renderGuildDelta(compare.deltas.hofRank, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.honor}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtGroupedInt(row.honor)}</span>{renderGuildDelta(compare.deltas.honor, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.raids}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.raids)}</span>{renderGuildDelta(compare.deltas.raids, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.portal}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.portalFloor)}</span>{renderGuildDelta(compare.deltas.portalFloor, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.hydra}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.hydra)}</span>{renderGuildDelta(compare.deltas.hydra, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.petLevel}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.petLevel)}</span>{renderGuildDelta(compare.deltas.petLevel, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.members}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.memberCount)}</span>{renderGuildDelta(compare.deltas.memberCount, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgLevel}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}><span>{fmtNum(row.avgLevel)}</span>{renderGuildDelta(compare.deltas.avgLevel, compare.compareMissing)}</div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgMain}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                </td>);
+case "hofRank": return (<td key={column.key} style={cellStyles.hofRank}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.hofRank)}</span>{renderGuildDelta(compare.deltas.hofRank, compare.compareMissing)}</div>
+                </td>);
+case "honor": return (<td key={column.key} style={cellStyles.honor}>
+                  <div style={numberColumnStyle}><span>{fmtGroupedInt(row.honor)}</span>{renderGuildDelta(compare.deltas.honor, compare.compareMissing)}</div>
+                </td>);
+case "raids": return (<td key={column.key} style={cellStyles.raids}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.raids)}</span>{renderGuildDelta(compare.deltas.raids, compare.compareMissing)}</div>
+                </td>);
+case "portal": return (<td key={column.key} style={cellStyles.portal}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.portalFloor)}</span>{renderGuildDelta(compare.deltas.portalFloor, compare.compareMissing)}</div>
+                </td>);
+case "hydra": return (<td key={column.key} style={cellStyles.hydra}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.hydra)}</span>{renderGuildDelta(compare.deltas.hydra, compare.compareMissing)}</div>
+                </td>);
+case "petLevel": return (<td key={column.key} style={cellStyles.petLevel}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.petLevel)}</span>{renderGuildDelta(compare.deltas.petLevel, compare.compareMissing)}</div>
+                </td>);
+case "members": return (<td key={column.key} style={cellStyles.members}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.memberCount)}</span>{renderGuildDelta(compare.deltas.memberCount, compare.compareMissing)}</div>
+                </td>);
+case "avgLevel": return (<td key={column.key} style={cellStyles.avgLevel}>
+                  <div style={numberColumnStyle}><span>{fmtNum(row.avgLevel)}</span>{renderGuildDelta(compare.deltas.avgLevel, compare.compareMissing)}</div>
+                </td>);
+case "avgMain": return (<td key={column.key} style={cellStyles.avgMain}>
+                  <div style={numberColumnStyle}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: centerCellContents ? "center" : "right", fontVariantNumeric: "tabular-nums" }}>
                       {fmtGroupedInt(getGuildAvgMain(row, effectiveGuildAvgMode))}
                     </span>
                     {renderGuildDelta(guildAvgMainDelta(compare.deltas), compare.compareMissing)}
                   </div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgCon}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                </td>);
+case "avgCon": return (<td key={column.key} style={cellStyles.avgCon}>
+                  <div style={numberColumnStyle}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: centerCellContents ? "center" : "right", fontVariantNumeric: "tabular-nums" }}>
                       {fmtGroupedInt(getGuildAvgCon(row, effectiveGuildAvgMode))}
                     </span>
                     {renderGuildDelta(guildAvgConDelta(compare.deltas), compare.compareMissing)}
                   </div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.avgSum}>
-                  <div style={TOPLIST_FLEX_COLUMN_RIGHT_STYLE}>
-                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                </td>);
+case "avgSum": return (<td key={column.key} style={cellStyles.avgSum}>
+                  <div style={numberColumnStyle}>
+                    <span style={{ display: "inline-block", minWidth: "9ch", textAlign: centerCellContents ? "center" : "right", fontVariantNumeric: "tabular-nums" }}>
                       {fmtGroupedInt(getGuildAvgSum(row, effectiveGuildAvgMode))}
                     </span>
                     {renderGuildDelta(guildAvgSumDelta(compare.deltas), compare.compareMissing)}
                   </div>
-                </td>
-                <td style={TOPLIST_CELL_STYLE_BY_KEY.lastScan}>
-                  <span style={TOPLIST_LAST_SCAN_CONTENT_STYLE}>
-                    <span style={TOPLIST_LAST_SCAN_LABEL_STYLE}>{formatLastScanDisplay(lastScanSec)}</span>
+                </td>);
+case "lastScan": return (<td key={column.key} style={cellStyles.lastScan}>
+                  <span style={lastScanStyle}>
+                    <span style={lastScanLabelStyle}>{formatLastScanDisplay(lastScanSec)}</span>
                   </span>
-                </td>
-              </tr>
+                </td>);
+default: return null;
+} })}
+</tr>
             );
           })}
-          {effectiveLoading && rows.length === 0 && (
+          {effectiveLoading && !localLoadingContent && rows.length === 0 && (
             <tr>
-              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td>
+              <td colSpan={columnCount} style={{ padding: 12 }}>{t("toplists.table.loading", "Loading...")}</td>
             </tr>
           )}
           {!effectiveLoading && !effectiveError && rows.length === 0 && (
             <tr>
-              <td colSpan={GUILD_TABLE_COL_SPAN} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td>
+              <td colSpan={columnCount} style={{ padding: 12 }}>{t("toplists.table.noResults", "No results")}</td>
             </tr>
           )}
         </tbody>
@@ -1092,36 +1153,43 @@ export default function GuildToplists({
     );
   };
 
+  const autoSizePortal = useToplistAutoSize("guilds", localLayout && !isPresetRender, activeColumns.map(c => c.key), () => <><GuildToplistHeader columns={activeColumns} custom={!!localColumns} localColumnWidths={localColumnWidths} localSort={localSort} onLocalSort={onLocalSort} />{renderGuildBody()}</>);
+  const avgModeControl = showAvgModeControl ? (
+    <GuildAvgModeControls
+      mode={effectiveGuildAvgMode}
+      updating={false}
+      onChange={handleGuildAvgModeChange}
+      label={t("toplists.guilds.avgMode.label", "Values")}
+      ariaLabel={t("toplists.guilds.avgMode.aria", "Guild average mode")}
+      baseLabel={t("toplists.guilds.avgMode.base", "Base")}
+      totalLabel={t("toplists.guilds.avgMode.total", "Total")}
+      updatingLabel={t("toplists.guilds.avgMode.updating", "Updating...")}
+    />
+  ) : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: isPresetRender ? 0 : 12, minHeight: 0, height: isPresetRender ? "auto" : "100%" }}>
-      <div style={{ opacity: 0.8, fontSize: 12 }}>
+      {autoSizePortal}
+      {/* Custom capture starts at the table; these live captions are outside its image. */}
+      {!(isPresetRender && localColumns) && <>
+      {!localLayout && <div style={{ opacity: 0.8, fontSize: 12 }}>
         {t("toplists.guilds.snapshotStatus", "Guilds - snapshots (latest)")}
         {resolvedServers.length ? ` - ${resolvedServers.join(", ")}` : ""}
-      </div>
-      <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-        <div>
+      </div>}
+      <div style={{ opacity: 0.8, fontSize: 12, display: "flex", justifyContent: "space-between", ...(localLayout ? { height: 18, minHeight: 18, whiteSpace: "nowrap", position: "relative" as const, zIndex: 5 } : {}) }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {localLayout && <ToplistViewPicker kind="guilds" />}
           {effectiveLoading ? t("toplists.status.loading", "Loading...") : effectiveError ? t("toplists.status.error", "Error") : t("toplists.status.ready", "Ready")}
           {" - "}
-          {renderedRows.length} {t("toplists.status.rows", "rows")}
+          {renderedRows.length} {t("toplists.status.rows", { count: renderedRows.length })}
         </div>
         <div>{effectiveUpdatedAt ? t("toplists.status.updated", "Updated: {{value}}", { value: fmtDate(effectiveUpdatedAt) }) : null}</div>
       </div>
-      {showAvgModeControl && (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>
-          <GuildAvgModeControls
-            mode={effectiveGuildAvgMode}
-            updating={false}
-            onChange={handleGuildAvgModeChange}
-            label={t("toplists.guilds.avgMode.label", "Values")}
-            ariaLabel={t("toplists.guilds.avgMode.aria", "Guild average mode")}
-            baseLabel={t("toplists.guilds.avgMode.base", "Base")}
-            totalLabel={t("toplists.guilds.avgMode.total", "Total")}
-            updatingLabel={t("toplists.guilds.avgMode.updating", "Updating...")}
-          />
-        </div>
-      )}
+      </>}
+      {avgModeControl && (localLayout
+        ? guildAvgModeSlot && createPortal(avgModeControl, guildAvgModeSlot)
+        : <div style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}>{avgModeControl}</div>)}
 
-      {effectiveError && (
+      {effectiveError && !localLayout && (
         <div style={{ border: "1px solid #2C4A73", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("toplists.status.error", "Error")}</div>
           <div style={{ wordBreak: "break-all" }}>{effectiveError}</div>
@@ -1138,16 +1206,16 @@ export default function GuildToplists({
           ref={tableRef}
           className="toplists-table-viewport"
           data-toplists-export-root="true"
-          style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined }}
+          style={{ flex: isPresetRender ? "0 0 auto" : "1 1 auto", minHeight: 0, overflow: isPresetRender ? "visible" : undefined, ...(localColumns ? (isPresetRender ? { width: Number(tableStyle.width) } : { overflowX: "auto" }) : {}) }}
         >
-          <div className="toplists-table-header" style={{ paddingRight: 0 }}>
-            <GuildToplistHeader />
+          <div className="toplists-table-header" style={{ paddingRight: 0, ...(localColumns ? { minWidth: Number(tableStyle.width) + (isPresetRender ? 0 : 17) } : {}) }}>
+            <GuildToplistHeader columns={activeColumns} custom={!!localColumns} localColumnWidths={localColumnWidths} localSort={localSort} onLocalSort={onLocalSort} />
           </div>
           <div
             ref={tableScrollRef}
             className="toplists-table-scroll"
             data-toplists-export-scroll="true"
-            style={isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : undefined}
+            style={{ ...(isPresetRender ? { overflow: "visible", maxHeight: "none", flex: "0 0 auto" } : localLayout ? { minHeight: 160 } : {}), ...(localColumns ? { minWidth: Number(tableStyle.width) + (isPresetRender ? 0 : 17) } : {}) }}
           >
             {renderGuildBody()}
           </div>

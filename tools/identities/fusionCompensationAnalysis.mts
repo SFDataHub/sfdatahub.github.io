@@ -1,3 +1,4 @@
+import { artifactPath } from '../codex/workspace.mjs';
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -73,7 +74,7 @@ type GaCompensationSource = {
 
 const DEFAULT_SCAN_ROOT = "D:/SFDataHub/Guild Analytics/public/scans";
 const GUILD_ANALYTICS_ROOT = "D:/SFDataHub/Guild Analytics";
-const REPORT_PATH = path.resolve("tools/identities/fusion-compensation-analysis.latest.txt");
+const REPORT_PATH = artifactPath('tools/identities/fusion-compensation-analysis.latest.txt');
 const GA_SOURCE_FILES = [
   "src/routes/Ranking.tsx",
   "src/routes/Dashboard.tsx",

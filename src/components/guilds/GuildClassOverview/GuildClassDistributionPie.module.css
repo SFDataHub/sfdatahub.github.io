@@ -1,0 +1,225 @@
+.root {
+  /* Keep chips above the empty area of the shared mode bar. */
+  position: relative;
+  z-index: 2;
+  container-type: inline-size;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: var(--radar-text, #f5f9ff);
+}
+
+.heading {
+  justify-self: start;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.chart {
+  display: block;
+  width: min(100%, 232px);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.18));
+}
+
+.segment {
+  outline: none;
+  stroke: var(--radar-bg, #0d1b2d);
+  stroke-width: 0.8px;
+  transform-origin: 120px 120px;
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.segment[data-active="true"] {
+  transform: scale(1.07);
+  filter: brightness(1.18);
+}
+
+.segment[role="button"] { cursor: pointer; }
+.segment[data-selected="true"] { stroke: var(--radar-text, #f5f9ff); stroke-width: 2px; }
+.segment:focus-visible { outline: none; stroke: var(--radar-accent, #67d7ff); stroke-width: 3px; }
+
+.empty {
+  margin: 0;
+  color: var(--radar-muted, #b0c4d9);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 6px;
+  list-style: none;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chip {
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--class-accent) 60%, #2b4c73);
+  border-radius: 8px;
+  padding: 4px 7px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--class-accent) 16%, #152a42), #0d1b2d);
+  font-size: 11px;
+  line-height: 18px;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.legend > li { max-width: 100%; min-width: 0; }
+.chip[data-selected="true"] {
+  border-color: var(--class-accent);
+  background: color-mix(in srgb, var(--class-accent) 32%, #152a42);
+  box-shadow: inset 0 0 0 1px var(--class-accent);
+}
+
+.chip > span:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chip strong { flex-shrink: 0; }
+
+.chip[data-active="true"] {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--class-accent) 22%, transparent);
+}
+
+.chip[data-selected="true"][data-active="true"] {
+  box-shadow: inset 0 0 0 1px var(--class-accent), 0 0 10px color-mix(in srgb, var(--class-accent) 22%, transparent);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--radar-accent, #67d7ff);
+  outline-offset: 3px;
+}
+
+@container (max-width: 220px) {
+  .chart { width: min(100%, 112px); }
+  .legend { gap: 6px; padding-block: 6px; }
+  .chip { padding-block: 3px; line-height: 16px; }
+}
+
+.icon, .icon > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.icon img { width: 18px; height: 18px; object-fit: contain; }
+
+@media (prefers-reduced-motion: reduce) {
+  .segment, .chip { transition: none; }
+}
+
+/* Dashboard opt-in: full two-column width, with room for 1.07x segments
+   and the scaled focus stroke in the matching 228-unit viewBox. */
+.fitWidth .chart { width: 100%; }
+/* Six bottom pixels retain the 5px keyboard outline clearance. Only the
+   unused outer bottom reserve changes; chip padding, icons and gaps stay. */
+.iconCounts .legend { gap: 10px; padding: 10px 6px 6px; }
+.iconCounts .legend > li { display: flex; }
+.iconCounts .chip { padding: 4px 7px; line-height: 18px; }
+
+/* A second presentation of the shared inventory, confined to the compact band. */
+.compact {
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.compact .chart { width: 80px; }
+.compact .legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+}
+.compact .chip { width: 100%; justify-content: center; }
+@media (max-width: 980px) {
+  .compact { grid-template-columns: 32px minmax(0, 1fr); gap: 6px; }
+  .compact .chart { width: 32px; }
+  .compact .legend { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 5px; }
+  .compact .chip { padding: 1px 2px; gap: 2px; font-size: 9px; line-height: 12px; border-radius: 4px; }
+  .compact .icon, .compact .icon > span, .compact .icon img { width: 10px; height: 10px; }
+  .compact .chip:focus-visible { outline-offset: 2px; }
+}
+
+/* Dashboard chips reuse the player row's entry, bar and icon styles. Scale the
+   36px row's 80px image / 24px slot / 12px inset into a compact 26px chip. */
+.playerRowChips .playerChip {
+  --class-chip-height: 26px;
+  height: var(--class-chip-height);
+  padding: 0 7px 0 49px;
+  gap: 0;
+  border: 0;
+  border-radius: calc(var(--class-chip-height) * 4 / 9);
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: 0 0 0 1px rgba(43, 76, 115, 0.88) inset;
+  font-size: 11px;
+  line-height: 18px;
+}
+.playerRowChips .playerChipIcon {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--class-chip-height) / 3);
+  width: calc(var(--class-chip-height) * 2 / 3);
+  height: calc(var(--class-chip-height) * 2 / 3);
+  margin: 0;
+  transform: translateY(-50%);
+}
+.playerRowChips .playerChipIcon img {
+  width: calc(var(--class-chip-height) * 20 / 9);
+  height: calc(var(--class-chip-height) * 20 / 9);
+}
+.playerRowChips .playerChip strong { position: relative; font-weight: 600; }
+.playerRowChips .playerChip[data-selected="true"] {
+  box-shadow: 0 0 0 2px var(--class-accent) inset;
+}
+.playerRowChips .playerChip[data-active="true"] {
+  box-shadow: 0 0 0 1px rgba(43, 76, 115, 0.88) inset, 0 0 10px color-mix(in srgb, var(--class-accent) 22%, transparent);
+}
+.playerRowChips .playerChip[data-selected="true"][data-active="true"] {
+  box-shadow: 0 0 0 2px var(--class-accent) inset, 0 0 10px color-mix(in srgb, var(--class-accent) 22%, transparent);
+}
+@media (max-width: 980px) {
+  /* Preserve the row's oversized, clipped icon at the small mobile scale;
+     confine its right edge so the complete count remains unobstructed. */
+  .compact.playerRowChips .playerChip {
+    --class-chip-height: 16px;
+    padding: 0 2px 0 18px;
+    font-size: 9px;
+    line-height: 12px;
+  }
+  .compact.playerRowChips .playerChipIcon {
+    top: 0;
+    left: 0;
+    width: 17px;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.headingWithAction { display:flex; align-items:center; gap:2px; max-width:100%; font-size:clamp(12px, 9cqw, 15px); white-space:nowrap; }
+.headingWithAction > button { margin-left:0; flex-shrink:0; }

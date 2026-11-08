@@ -1,3 +1,7 @@
+import { loadIdentityResolutionSnapshot, type IdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
+import { guildObservationIdentifierCandidates, resolveObservedGuildIdentity } from "../../lib/identities/guildObservationIdentity";
+import { observationReferenceKey } from "../../lib/servers/serverResolver";
+import { auditBegin, auditEnter, auditValue, auditReturn, auditError, auditLeave } from "../../lib/data-hub/runtimeAudit";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { NormalizedGuildRole } from "../../lib/guilds/guildScanNormalizer";
 
@@ -370,7 +374,18 @@ async function readActiveManualTrackerState(): Promise<FightTrackerState> {
   return readFightTrackerStateByTracker(tracker);
 }
 
-export const isFightTrackerLinkedToGuild = (tracker: FightTrackerGuild, guild: FightTrackerGuildHubIdentity) => {
+export const isFightTrackerLinkedToGuild = (tracker: FightTrackerGuild, guild: FightTrackerGuildHubIdentity, identities?: IdentityResolutionSnapshot | null) => {
+  const trackerReference = tracker.linkedGuildHubLogoIdentifier || tracker.linkedGuildHubGuildId;
+  const guildReference = guild.logoIdentifier || guild.id || guild.guildId;
+  if (identities) {
+    const left = resolveObservedGuildIdentity(identities, trackerReference, tracker.server);
+    const right = resolveObservedGuildIdentity(identities, guildReference, guild.server);
+    if (left.status === "conflict" || right.status === "conflict") return false;
+    if (left.resolved && right.resolved) return left.identityId === right.identityId;
+  }
+  const leftKey = guildObservationIdentifierCandidates(trackerReference, tracker.server)[0];
+  const rightKey = guildObservationIdentifierCandidates(guildReference, guild.server)[0];
+  if (leftKey && rightKey && observationReferenceKey(leftKey) === observationReferenceKey(rightKey)) return true;
   const trackerLogo = normalizeIdentityText(tracker.linkedGuildHubLogoIdentifier);
   const guildLogo = normalizeIdentityText(guild.logoIdentifier || guild.id);
   if (trackerLogo && guildLogo && trackerLogo === guildLogo) return true;
@@ -386,8 +401,8 @@ export async function readFightTrackerState(guild: FightTrackerGuildHubIdentity 
   const db = await getFightTrackingDb();
   if (!guild) return readActiveManualTrackerState();
 
-  const trackers = await db.getAll("trackers");
-  const matches = trackers.filter((tracker) => isFightTrackerLinkedToGuild(tracker, guild));
+  const [trackers, identities] = await Promise.all([db.getAll("trackers"), loadIdentityResolutionSnapshot()]);
+  const matches = trackers.filter((tracker) => isFightTrackerLinkedToGuild(tracker, guild, identities));
   if (matches.length > 1) {
     throw new Error("Mehrere Fight Tracker passen zur aktiven Guild-Hub-Gilde. Bitte keine automatische Zuordnung vornehmen.");
   }
@@ -401,8 +416,8 @@ export async function readLinkedFightTrackerState(guild: FightTrackerGuildHubIde
   const db = await getFightTrackingDb();
   if (!guild) return { tracker: null, members: [], fights: [] };
 
-  const trackers = await db.getAll("trackers");
-  const matches = trackers.filter((tracker) => isFightTrackerLinkedToGuild(tracker, guild));
+  const [trackers, identities] = await Promise.all([db.getAll("trackers"), loadIdentityResolutionSnapshot()]);
+  const matches = trackers.filter((tracker) => isFightTrackerLinkedToGuild(tracker, guild, identities));
   if (matches.length > 1) {
     throw new Error("Mehrere Fight Tracker passen zur aktiven Guild-Hub-Gilde. Bitte keine automatische Zuordnung vornehmen.");
   }
@@ -455,14 +470,16 @@ export async function readFightTrackers(): Promise<FightTrackerGuild[]> {
 }
 
 export async function readFightTrackerSummaries(): Promise<FightTrackerSummary[]> {
-  const db = await getFightTrackingDb();
-  const trackers = await readFightTrackers();
+    const __audit1 = auditBegin("F26", "readFightTrackerSummaries");
+    try {
+  const db = await (auditValue(__audit1, auditEnter(__audit1, "getFightTrackingDb"), (getFightTrackingDb())));
+  const trackers = await (auditValue(__audit1, auditEnter(__audit1, "readFightTrackers"), (readFightTrackers())));
   const trackerIds = new Set(trackers.map((tracker) => tracker.id));
-  const summaryByTrackerId = new Map((await db.getAll("summaries")).map((summary) => [summary.trackerId, summary]));
+  const summaryByTrackerId = new Map((await (auditValue(__audit1, auditEnter(__audit1, "db.getAll"), (db.getAll("summaries"))))).map((summary) => [summary.trackerId, summary]));
   const summaries: FightTrackerSummaryRecord[] = [];
 
   for (const summary of summaryByTrackerId.values()) {
-    if (!trackerIds.has(summary.trackerId)) await db.delete("summaries", summary.trackerId);
+    if (!trackerIds.has(summary.trackerId)) await (auditValue(__audit1, auditEnter(__audit1, "db.delete"), (db.delete("summaries", summary.trackerId))));
   }
 
   for (const tracker of trackers) {
@@ -472,12 +489,15 @@ export async function readFightTrackerSummaries(): Promise<FightTrackerSummary[]
       continue;
     }
 
-    const rebuilt = await rebuildFightTrackerSummary(db, tracker.id);
+    const rebuilt = await (auditValue(__audit1, auditEnter(__audit1, "rebuildFightTrackerSummary"), (rebuildFightTrackerSummary(db, tracker.id))));
     if (rebuilt) summaries.push(rebuilt);
-    await yieldToBrowser();
+    await (auditValue(__audit1, auditEnter(__audit1, "yieldToBrowser"), (yieldToBrowser())));
   }
 
-  return summaries.sort((a, b) => a.tracker.name.localeCompare(b.tracker.name, "de-DE", { sensitivity: "base" }));
+  return auditReturn(__audit1, summaries.sort((a, b) => a.tracker.name.localeCompare(b.tracker.name, "de-DE", { sensitivity: "base" })));
+
+    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
+    finally { auditLeave(__audit1); }
 }
 
 export async function readFightTrackerTransferState(trackerId: string): Promise<FightTrackerTransferState | null> {

@@ -4,7 +4,7 @@ import {
   loadGuildAnalyticsLocalFirstData,
   type GuildAnalyticsLocalFirstAcquisitionOutcome,
   type GuildAnalyticsLocalFirstLoadDependencies,
-} from "../../src/pages/GuildHub/guildAnalyticsLocalFirst.ts";
+} from "../../src/pages/DataHub/guildAnalyticsLocalFirst.ts";
 import {
   acquireLocalFirstScans,
   type LocalFirstScanAcquisitionDependencies,

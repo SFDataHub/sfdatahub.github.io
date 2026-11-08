@@ -1,9 +1,12 @@
+import { parseHubSearchAppearance } from "../data-hub/hubSearchAppearance";
+import { SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION } from "./types";
 import type {
   ScanArchiveCatalog,
   ScanArchiveCatalogEntry,
   ScanArchiveEntry,
   ScanArchiveManifest,
   ScanArchiveManifestScan,
+  ScanArchiveRankingMetadata,
   ScanArchiveSearchIndexGuildEntry,
   ScanArchiveSearchIndexMetadata,
   ScanArchiveSearchIndexPayload,
@@ -13,7 +16,7 @@ import type {
 } from "./types";
 
 const SUPPORTED_SCHEMA_VERSION = 1;
-const SUPPORTED_SEARCH_INDEX_SCHEMA_VERSION = 1;
+const supportedSearchSchema = (value: unknown) => value === 1 || value === SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION;
 const SUPPORTED_FORMAT = "sftools.raw.v1";
 const SERVER_PREFIX_PATTERN = /^[a-z0-9_]+$/i;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
@@ -26,6 +29,7 @@ export type ScanArchiveValidationErrorCode =
   | "catalog_entry"
   | "catalog_duplicate_year"
   | "catalog_manifest_url"
+  | "ranking_metadata"
   | "manifest_not_object"
   | "manifest_version"
   | "manifest_year"
@@ -199,7 +203,7 @@ function validateSearchIndexMetadata(
   scanGroupCount: unknown,
 ): ScanArchiveSearchIndexMetadata {
   if (!isRecord(value)) throw validationError("search_index_not_object", `Suchindex fuer ${scanId} ist kein Objekt.`);
-  if (value.schemaVersion !== SUPPORTED_SEARCH_INDEX_SCHEMA_VERSION) {
+  if (!supportedSearchSchema(value.schemaVersion)) {
     throw validationError("search_index_version", `Suchindex-Version fuer ${scanId} wird nicht unterstuetzt.`);
   }
   const path = typeof value.path === "string" ? value.path.trim() : "";
@@ -218,7 +222,7 @@ function validateSearchIndexMetadata(
     throw validationError("search_index_count_mismatch", `Suchindex-Zaehler fuer ${scanId} stimmen nicht mit dem Scan ueberein.`);
   }
   return {
-    schemaVersion: SUPPORTED_SEARCH_INDEX_SCHEMA_VERSION,
+    schemaVersion: value.schemaVersion as ScanArchiveSearchIndexMetadata["schemaVersion"],
     path,
     sha256,
     compressedBytes,
@@ -260,6 +264,7 @@ export function validateScanArchiveManifest(
     ? validateToplistsManifest(value.toplists, archiveYear, scans)
     : undefined;
 
+  const rankings = value.rankings === undefined ? undefined : validateRankingReferences(value.rankings, archiveYear, toplists);
   scans.sort((left, right) => left.timestamp - right.timestamp || left.server.localeCompare(right.server));
 
   return {
@@ -271,6 +276,7 @@ export function validateScanArchiveManifest(
     serverCount: new Set(scans.map((scan) => scan.server)).size,
     scans,
     ...(toplists ? { toplists } : {}),
+    ...(rankings ? { rankings } : {}),
   };
 }
 
@@ -464,8 +470,23 @@ function isTimestampInUtcMonth(timestamp: number, year: number, month: number) {
 }
 
 export function toScanArchiveEntries(manifest: ScanArchiveManifest, manifestUrl: string): ScanArchiveEntry[] {
+  // Preserve explicit logical set membership alongside each physical file.
+  // It does not change the selection/grouping fields used by toplists.
+  const monthlySets = new Map<string, NonNullable<ScanArchiveEntry["monthlySets"]>[number][]>();
+  const scans = new Map(manifest.scans.map(scan => [scan.id, scan]));
+  for (const [month, servers] of Object.entries(manifest.toplists?.monthly ?? {})) {
+    for (const [server, reference] of Object.entries(servers)) {
+      const scanIds = normalizeScanArchiveToplistReference(reference, scans).scanIds;
+      if (scanIds.length < 2) continue;
+      const membership = { key: JSON.stringify([manifestUrl, manifest.archiveYear, month, server,
+        ...scanIds.map(id => [id, scans.get(id)!.sha256.toLowerCase()])]), scanIds,
+        members: scanIds.map(id => { const scan = scans.get(id)!; return { id, server: scan.server, timestamp: scan.timestamp, sha256: scan.sha256, playerCount: scan.playerCount, groupCount: scan.groupCount }; }) };
+      for (const id of scanIds) monthlySets.set(id, [...(monthlySets.get(id) ?? []), membership]);
+    }
+  }
   return manifest.scans.map((scan) => ({
     ...scan,
+    ...(monthlySets.has(scan.id) ? { monthlySets: monthlySets.get(scan.id) } : {}),
     archiveYear: manifest.archiveYear,
     manifestRevision: manifest.revision,
     manifestUrl,
@@ -498,11 +519,14 @@ export function validateScanArchivePayload(payload: unknown, entry: Pick<ScanArc
 
 export function validateScanArchiveSearchIndexPayload(
   payload: unknown,
-  entry: Pick<ScanArchiveEntry, "id" | "sha256" | "server" | "timestamp" | "playerCount" | "groupCount">,
+  entry: Pick<ScanArchiveEntry, "id" | "sha256" | "server" | "timestamp" | "playerCount" | "groupCount"> & { searchIndex?: ScanArchiveSearchIndexMetadata },
 ): ScanArchiveSearchIndexPayload {
   if (!isRecord(payload)) throw validationError("search_payload_not_object", "Suchindex-Payload ist kein Objekt.");
-  if (payload.schemaVersion !== SUPPORTED_SEARCH_INDEX_SCHEMA_VERSION) {
+  if (!supportedSearchSchema(payload.schemaVersion)) {
     throw validationError("search_payload_version", "Suchindex-Payload-Version wird nicht unterstuetzt.");
+  }
+  if (entry.searchIndex && payload.schemaVersion !== entry.searchIndex.schemaVersion) {
+    throw validationError("search_payload_version", "Suchindex-Payload-Version passt nicht zum Manifest.");
   }
   if (
     payload.archiveScanId !== entry.id ||
@@ -523,7 +547,7 @@ export function validateScanArchiveSearchIndexPayload(
   }
 
   return {
-    schemaVersion: SUPPORTED_SEARCH_INDEX_SCHEMA_VERSION,
+    schemaVersion: payload.schemaVersion as ScanArchiveSearchIndexPayload["schemaVersion"],
     archiveScanId: payload.archiveScanId,
     sourceSha256: payload.sourceSha256,
     server: payload.server,
@@ -548,12 +572,16 @@ function validateSearchIndexPlayerEntry(value: unknown, index: number): ScanArch
   if (Object.prototype.hasOwnProperty.call(value, "classId")) {
     entry.classId = validateSearchIndexClassId(value.classId, index);
   }
+  const appearance = parseHubSearchAppearance(value.appearance);
+  if (appearance && appearance.coaString === null) entry.appearance = appearance;
   return entry;
 }
 
 function validateSearchIndexGuildEntry(value: unknown, index: number): ScanArchiveSearchIndexGuildEntry {
   if (!isRecord(value)) throw validationError("search_payload_entry", `guilds[${index}] ist kein Objekt.`);
+  const appearance = parseHubSearchAppearance(value.appearance);
   return {
+    ...(appearance?.portrait === null && appearance.classId === null ? { appearance } : {}),
     identifier: assertCleanString(value.identifier, `guilds[${index}].identifier`),
     name: assertCleanString(value.name, `guilds[${index}].name`),
   };
@@ -571,4 +599,37 @@ function validateSearchIndexClassId(value: unknown, index: number) {
   if (typeof value === "string") return assertCleanString(value, `players[${index}].classId`);
   if (typeof value === "number" && Number.isFinite(value)) return value;
   throw validationError("search_payload_entry", `players[${index}].classId ist ungueltig.`);
+}
+
+/** Old manifests omit this optional section. New months reference one complete common pool. */
+function validateRankingReferences(value: unknown, year: number, toplists: ScanArchiveToplistsManifest | undefined): Record<string, Record<string, ScanArchiveRankingMetadata>> {
+  const invalid = (detail: string): never => { throw validationError("ranking_metadata", `Rankingreferenz ungueltig: ${detail}`); };
+  if (!isRecord(value)) return invalid("kein Objekt");
+  const result: Record<string, Record<string, ScanArchiveRankingMetadata>> = {};
+  for (const [month, servers] of Object.entries(value)) {
+    if (!new RegExp(`^${year}-(0[1-9]|1[0-2])$`).test(month) || !isRecord(servers)) invalid(month);
+    const entries = Object.entries(servers as Record<string, unknown>);
+    const selected = Object.keys(toplists?.monthly?.[month] ?? {}).sort();
+    if (!entries.length || JSON.stringify(entries.map(([s]) => s).sort()) !== JSON.stringify(selected)) invalid(`${month}: unvollstaendiger Serverbestand`);
+    let cohort: string | undefined;
+    let rankingVersion: number | undefined;
+    result[month] = {};
+    for (const [server, raw] of entries) {
+      if (!isRecord(raw)) invalid(`${month}/${server}`);
+      const ref = raw as Record<string, unknown>;
+      if ((ref.schemaVersion !== 1 && ref.schemaVersion !== 2) || ref.path !== `${month}/${server}/monthly.ranking.json.gz` || typeof ref.sha256 !== "string" || !SHA256_PATTERN.test(ref.sha256) || typeof ref.cohortId !== "string" || !SHA256_PATTERN.test(ref.cohortId)) invalid(`${month}/${server}: Format/Pfad/Hash`);
+      for (const key of ["compressedBytes", "uncompressedBytes", "playerCount", "guildCount"]) {
+        if (typeof ref[key] !== "number" || !Number.isSafeInteger(ref[key]) || (ref[key] as number) < 0) invalid(`${month}/${server}: ${key}`);
+      }
+      if (!(ref.compressedBytes as number) || !(ref.uncompressedBytes as number)) invalid(`${month}/${server}: leere Datei`);
+      if (cohort && cohort !== ref.cohortId) invalid(`${month}: gemischte Gesamtstaende`);
+      if (rankingVersion !== undefined && rankingVersion !== ref.schemaVersion) invalid(`${month}: gemischte Gesamtstaende`);
+      rankingVersion = ref.schemaVersion as number;
+      cohort = ref.cohortId as string;
+      result[month][server] = { schemaVersion: ref.schemaVersion as 1 | 2, path: ref.path as string, sha256: (ref.sha256 as string).toLowerCase(),
+        compressedBytes: ref.compressedBytes as number, uncompressedBytes: ref.uncompressedBytes as number,
+        cohortId: (ref.cohortId as string).toLowerCase(), playerCount: ref.playerCount as number, guildCount: ref.guildCount as number };
+    }
+  }
+  return result;
 }

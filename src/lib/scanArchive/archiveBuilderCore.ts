@@ -1,3 +1,7 @@
+import { createMonthlyRankingPreparation } from "./scanArchiveBuilderRanking";
+import { readHubSearchAppearance } from "../data-hub/hubSearchAppearance";
+import { extractGuildCoaString, extractDerivedGuildCoaMetadata } from "../guilds/guildCoa";
+import { SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION } from "./types";
 import { resolveServer } from "../servers/serverResolver";
 import { ScanArchiveBuilderValidationError } from "./scanArchiveBuilderErrors";
 import {
@@ -15,6 +19,7 @@ import {
 import type {
   ScanArchiveManifest,
   ScanArchiveManifestScan,
+  ScanArchiveRankingMetadata,
   ScanArchiveSearchIndexMetadata,
   ScanArchiveSearchIndexPayload,
   ScanArchiveToplistReference,
@@ -47,10 +52,12 @@ export type ScanArchiveBuilderCoreOptions<TBytes = unknown> = {
   existingFiles?: ReadonlyMap<string, ScanArchiveExistingFileMetadata<TBytes>>;
   onProgress?: (progress: ScanArchiveBuilderCoreProgress) => void;
   loadMonthlyRawScan?: (scan: ScanArchiveManifestScan) => Promise<ScanArchiveBuilderRawPayload>;
+  loadMonthlyRankingBytes?: (reference: ScanArchiveRankingMetadata) => Promise<TBytes>;
 };
 
 export type ScanArchiveBuilderCoreDependencies<TBytes> = {
   gzip: (content: string) => TBytes | Promise<TBytes>;
+  gunzip?: (bytes: TBytes) => string | Promise<string>;
   sha256: (bytes: TBytes) => string | Promise<string>;
   byteLength: (bytes: TBytes) => number;
   utf8ByteLength: (content: string) => number;
@@ -103,6 +110,7 @@ export type ScanArchiveBatch = {
   searchIndexPath: string;
   players: ScanArchiveJsonRecord[];
   groups: ScanArchiveJsonRecord[];
+  guildCoaByIdentifier?: Record<string, string>;
 };
 
 export type ScanArchiveExistingFileMetadata<TBytes = unknown> = {
@@ -112,7 +120,7 @@ export type ScanArchiveExistingFileMetadata<TBytes = unknown> = {
 };
 
 export type ScanArchivePlannedFile<TBytes> = {
-  kind: "raw" | "searchIndex";
+  kind: "raw" | "searchIndex" | "ranking";
   scanId: string;
   relativePath: string;
   action: "write" | "skip-identical";
@@ -241,6 +249,7 @@ const parseCombinedInput = (content: string) => {
   return {
     players: parsed.players as unknown[],
     groups: parsed.groups as unknown[],
+    guildCoaByIdentifier: extractDerivedGuildCoaMetadata(parsed, content)?.guildCoaByIdentifier,
   };
 };
 
@@ -262,7 +271,7 @@ const detectInputYears = (input: { players: unknown[]; groups: unknown[] }) => {
 };
 
 const buildScanArchiveBatchesFromParsedInput = (
-  input: { players: unknown[]; groups: unknown[] },
+  input: { players: unknown[]; groups: unknown[]; guildCoaByIdentifier?: Record<string, string> },
   year: number,
 ): ScanArchiveBatch[] => {
   const batches = new Map<string, ScanArchiveBatch>();
@@ -285,6 +294,7 @@ const buildScanArchiveBatchesFromParsedInput = (
         searchIndexPath: searchIndexPathForScanArchivePath(rawPath),
         players: [],
         groups: [],
+        guildCoaByIdentifier: input.guildCoaByIdentifier,
       };
       batches.set(id, batch);
     }
@@ -311,6 +321,7 @@ export const inspectScanArchiveInputContent = (content: string): { years: number
 export const searchIndexPayloadForScanArchiveEntry = (
   entry: ScanArchiveManifestScan,
   payload: { players: ScanArchiveJsonRecord[]; groups: ScanArchiveJsonRecord[] },
+  guildCoaByIdentifier?: Readonly<Record<string, string>>,
 ): ScanArchiveSearchIndexPayload => {
   const players = payload.players.map((player, index) => {
     const rowLabel = `players[${index}]`;
@@ -324,14 +335,16 @@ export const searchIndexPayloadForScanArchiveEntry = (
     if (guildName != null) result.guildName = guildName || null;
     if (Object.prototype.hasOwnProperty.call(player, "class")) result.classId = player.class as string | number | null;
     if (Object.prototype.hasOwnProperty.call(player, "classId")) result.classId = player.classId as string | number | null;
+    result.appearance = readHubSearchAppearance("player", player);
     return result;
   });
   const guilds = payload.groups.map((guild, index) => ({
+    appearance: readHubSearchAppearance("guild", guild, guildCoaByIdentifier?.[String(guild.identifier)] ?? extractGuildCoaString(guild)),
     identifier: readRequiredString(guild, ["identifier"], "identifier", `groups[${index}]`),
     name: readRequiredString(guild, ["name"], "name", `groups[${index}]`),
   }));
   return {
-    schemaVersion: 1,
+    schemaVersion: SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION,
     archiveScanId: entry.id,
     sourceSha256: entry.sha256,
     server: entry.server,
@@ -365,12 +378,12 @@ export async function createPreparedScan<TBytes>(
   };
   validateScanArchivePayload(rawPayload, entry);
 
-  const searchPayload = searchIndexPayloadForScanArchiveEntry(entry, rawPayload);
+  const searchPayload = searchIndexPayloadForScanArchiveEntry(entry, rawPayload, batch.guildCoaByIdentifier);
   validateScanArchiveSearchIndexPayload(searchPayload, entry);
   const searchJson = JSON.stringify(searchPayload);
   const searchCompressed = await dependencies.gzip(searchJson);
   const searchIndex: ScanArchiveSearchIndexMetadata = {
-    schemaVersion: 1,
+    schemaVersion: SCAN_ARCHIVE_SEARCH_SCHEMA_VERSION,
     path: batch.searchIndexPath,
     sha256: await dependencies.sha256(searchCompressed),
     compressedBytes: dependencies.byteLength(searchCompressed),
@@ -675,9 +688,24 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
   }
 
   const monthlyTargets = scanArchiveBuilderTargets(batches);
-  if (options.usageMode === "add-monthly") {
+  const ranking = options.usageMode === "create-monthly" || options.usageMode === "add-monthly"
+    ? createMonthlyRankingPreparation(options, dependencies) : undefined;
+  if (ranking) {
+    try { await ranking.prepare(manifest, monthlyTargets); }
+    catch (error) { conflicts.push({ code: "ranking_basis_unavailable", message: error instanceof Error ? error.message : String(error) }); }
+  }
+  if (conflicts.length) batches = [];
+  if (options.usageMode === "add-monthly" && !conflicts.length) {
     batches = await prepareScanArchiveMonthlyAdd(manifest, batches, monthlyTargets, conflicts, options.loadMonthlyRawScan,
-      (scan, current, total) => options.onProgress?.({ phase: "loading-monthly", current, total, message: `Monatsset-Mitglied ${scan.id} wird geladen und validiert.` }));
+      (scan, current, total) => options.onProgress?.({ phase: "loading-monthly", current, total, message: `Monatsset-Mitglied ${scan.id} wird geladen und validiert.` }),
+      ranking?.snapshot, ranking?.baseSnapshot);
+    // A validated legacy month still needs its first complete ranking output,
+    // even when the identical upload contributes no monthly rows.
+    const needsRankingInitialization = monthlyTargets.some((target) =>
+      !manifest.rankings?.[target.month] || Object.values(manifest.rankings[target.month]).some(ref => ref.schemaVersion !== 2));
+    if (!conflicts.length && !batches.length && !needsRankingInitialization) {
+      conflicts.push({ code: "add_no_new_ids", message: "Keine neuen IDs und kein uebernehmbarer vollstaendiger Gildenstand. Kein Add-ZIP." });
+    }
   } else {
     for (const target of monthlyTargets) {
       const relevant = batches.filter((batch) => batch.server === target.server && monthKeyForScanArchiveTimestamp(batch.timestamp) === target.month);
@@ -786,7 +814,16 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
     updatedAt: hasManifestChanges ? options.updatedAt ?? new Date().toISOString() : manifest.updatedAt,
     ...(toplists ? { toplists } : {}),
   };
-  validateScanArchiveManifest(manifestAfterInput, options.year);
+  if (ranking && !conflicts.length) {
+    try {
+      files.push(...await ranking.emit(manifestAfterInput, monthlyTargets, batches));
+      if (!hasManifestChanges && JSON.stringify(manifestAfterInput.rankings) !== JSON.stringify(manifestBefore.rankings)) {
+        manifestAfterInput.revision++;
+        manifestAfterInput.updatedAt = options.updatedAt ?? new Date().toISOString();
+      }
+    } catch (error) { conflicts.push({ code: "ranking_build_failed", message: error instanceof Error ? error.message : String(error) }); }
+  }
+  validateScanArchiveManifest(conflicts.length ? manifestBefore : manifestAfterInput, options.year);
 
   options.onProgress?.({ phase: "ready", message: "Archivpaket ist vorbereitet." });
   return {
@@ -795,7 +832,7 @@ export async function createScanArchiveBuildPlanCore<TBytes>(
     monthlyTargets,
     batches,
     manifestBefore,
-    manifestAfter: manifestAfterInput,
+    manifestAfter: conflicts.length ? manifestBefore : manifestAfterInput,
     files,
     conflicts,
     warnings,

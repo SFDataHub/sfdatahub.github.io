@@ -1,16 +1,10 @@
 .page {
+  --overview-title-gap: 18px;
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--overview-title-gap);
   color: #f5f9ff;
-}
-
-.topbar {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 14px;
 }
 
 .divider {
@@ -26,32 +20,102 @@
   --guild-trend-internal-gap: 12px;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: repeat(12, minmax(var(--dashboard-grid-row-height), var(--dashboard-grid-row-height)));
-  grid-auto-rows: minmax(var(--dashboard-grid-row-height), var(--dashboard-grid-row-height));
+  grid-template-rows: repeat(4, minmax(var(--dashboard-grid-row-height), auto)) auto;
+  grid-auto-rows: auto;
+  gap: var(--dashboard-grid-gap);
+  align-items: start;
+  min-width: 0;
+  overflow-anchor: none;
+}
+
+.controlsSlot,
+.detailsSlot {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--dashboard-grid-gap);
   align-items: start;
   min-width: 0;
 }
 
-.membersSlot {
-  grid-column: 4 / 9;
-  grid-row: 4 / span var(--dashboard-members-row-span, 9);
-  align-self: start;
-  min-width: 0;
+.controlsSlot { grid-row: 4; }
+
+.detailsSlot {
+  grid-row: 5;
+  /* Reserve the existing member eyebrow above the shared title line. */
+  padding-top: 19px;
 }
 
-.classDistributionSlot {
-  grid-column: 1 / 4;
-  grid-row: 7 / 13;
-  align-self: start;
-  min-width: 0;
+.detailsSlot > .panel { border-width: 0; }
+
+.membersSlot { grid-column: 1 / 7; min-width: 0; }
+.membersWidthToggle {
+  border: 1px solid #2b4c73;
+  border-radius: 0;
+  background: linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95));
+  color: #f5f9ff;
+  padding: 3px 8px;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
+.membersWidthToggle:hover { border-color: #3f6b9a; box-shadow: 0 8px 22px rgba(3, 10, 18, 0.22); }
+.membersWidthToggle:focus-visible { outline: 2px solid #82bbff; outline-offset: 3px; }
+.membersMobileHeading { display: none; }
+.membersWidthDescription { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (min-width: 981px) {
+  .membersSlot[data-members-narrow="true"] {
+    grid-column: 1 / 4;
+    /* Keep the original grid reservation. Its outer width is 3 tracks + 2 gaps;
+       adding one sixth of (that width + a gap) gives exactly 3.5 tracks + 2.5 gaps. */
+    width: calc((100% * 7 + var(--dashboard-grid-gap)) / 6);
+    box-sizing: border-box;
+    justify-self: start;
+    padding-inline: 0;
+    container: dashboard-members-narrow / inline-size;
+  }
+  .membersSlot[data-members-narrow="true"] .memberRow { grid-template-columns: 38px minmax(0, 1fr); }
+  .membersSlot[data-members-narrow="true"] .memberScore { grid-column: 1 / -1; text-align: left; }
+  .membersSlot[data-members-narrow="true"] :is(.memberName, .memberSubline) { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 980px) {
+  .membersWidthToggle { display: none; }
+  .membersMobileHeading { display: inline; }
+}
+.classDistributionSlot { grid-column: 11 / 13; grid-row: 1 / 4; min-width: 0; }
+.panel.classDistributionSlot { border-width: 0; padding: var(--normal-title-height, 41px) 0 0; }
 
 .historySlot {
-  grid-column: 9 / 13;
-  grid-row: 4 / 13;
-  align-self: start;
+  display: grid;
+  gap: 16px;
+  grid-column: 7 / 10;
   min-width: 0;
+}
+
+.memberPanel .panelHeader { align-items: flex-start; }
+.memberPanel .panelHeader > div:first-child { position: relative; }
+.memberPanel .kicker { position: absolute; bottom: 100%; white-space: nowrap; }
+
+@media (min-width: 981px) {
+  .memberPanel .panelHeader {
+    position: relative;
+    display: grid;
+    grid-template-columns: max-content max-content;
+    align-items: center;
+    gap: 0 12px;
+  }
+  .memberPanel .panelHeader > div:first-child { display: contents; }
+  .memberPanel .panelHeader h2 { grid-area: 1 / 1; white-space: nowrap; }
+  .memberPanel .memberPanelActions { grid-area: 1 / 2; flex-wrap: nowrap; white-space: nowrap; }
+  .memberPanel .memberViewToggle { flex-wrap: nowrap; flex-shrink: 0; }
+  .memberPanel .memberViewToggle button,
+  .memberPanel .countBadge { flex-shrink: 0; white-space: nowrap; }
+  .memberPanel .kicker { inset-inline-start: 0; }
+  .memberPanel .compareLabel {
+    grid-area: 2 / 1 / auto / -1;
+    /* Identical natural wrapping in both widths, even for long class selections. */
+    max-inline-size: 32ch;
+  }
 }
 
 .panel {
@@ -62,11 +126,162 @@
   padding: 16px;
 }
 
+/* Half-column proportions are confined to the upper three rows. */
+.guildOverviewTop {
+  grid-column: 1 / -1;
+  grid-row: 1 / 4;
+  min-width: 0;
+  padding-block-start: var(--normal-title-height, 41px);
+}
+
+.guildStickyHead {
+  --head-compact-padding: 16px;
+  --head-compact-logo-size: 74.5px;
+  /* Each group owns both entry and exit times; surface timing stays separate. */
+  --head-back-in-delay: 50ms;
+  --head-back-in-duration: 150ms;
+  --head-back-out-delay: 0ms;
+  --head-back-out-duration: 0ms;
+  --head-logo-in-delay: 50ms;
+  --head-logo-in-duration: 150ms;
+  --head-logo-out-delay: 0ms;
+  --head-logo-out-duration: 0ms;
+  --head-status-in-delay: 50ms;
+  --head-status-in-duration: 150ms;
+  --head-status-out-delay: 0ms;
+  --head-status-out-duration: 0ms;
+  --head-modes-in-delay: 50ms;
+  --head-modes-in-duration: 150ms;
+  --head-modes-out-delay: 0ms;
+  --head-modes-out-duration: 0ms;
+  --head-chart-in-delay: 50ms;
+  --head-chart-in-duration: 150ms;
+  --head-chart-out-delay: 0ms;
+  --head-chart-out-duration: 0ms;
+  --head-classes-in-delay: 50ms;
+  --head-classes-in-duration: 150ms;
+  --head-classes-out-delay: 0ms;
+  --head-classes-out-duration: 0ms;
+  grid-column: 1 / -1;
+  grid-row: 1 / 4;
+  min-width: 0;
+  width: 100%;
+  position: sticky;
+  top: var(--head-sticky-top, 0px);
+  z-index: 15;
+  block-size: var(--head-cover-height, 166.5px);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.compactBody {
+  position: absolute;
+  top: calc(var(--head-title-height) - var(--head-row-overlap));
+  inset-inline: 0;
+  height: calc(var(--head-cover-height) - var(--head-title-height) + var(--head-row-overlap));
+}
+.compactBack {
+  position: absolute;
+  right: 0;
+  top: var(--compact-back-top);
+  display: flex;
+  z-index: 2;
+}
+
+.guildTitleRow {
+  display: flow-root;
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Cover from the scrollport edge through the title's own spacing, including
+   the shell's top inset, independently of the second row's surface fade. */
+.guildTitleRow::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: calc(-1 * var(--head-sticky-top, 0px));
+  height: calc(var(--head-title-cover-height, var(--head-title-height, 41px)) + var(--head-sticky-top, 0px));
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Keep all original grid coordinates inside the second header row. */
+.guildOverviewBody {
+  display: grid;
+  position: relative;
+  grid-template-columns: 6fr 9fr 9fr;
+  gap: var(--dashboard-grid-gap);
+  align-items: start;
+  min-width: 0;
+  width: 100%;
+  flex-shrink: 0;
+  min-block-size: 0;
+}
+
+.guildStickyHead :is(button, a, [data-freshness-level]) {
+  pointer-events: auto;
+}
+
+/* Fade the complete matching surface and its edge independently of the
+   crest/HUD. Keep both layers mounted so reversals resume at current opacity. */
+.guildStickyHead::before,
+.guildStickyHead::after {
+  content: "";
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+  position: absolute;
+  inset-inline: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.guildStickyHead[data-compact-ready="true"]::before,
+.guildStickyHead[data-compact-ready="true"]::after { opacity: 1; }
+
+.guildTitleRow::before,
+.guildStickyHead::before {
+  background-color: var(--head-surface-color, var(--page));
+  background-image: var(--head-surface-image, none);
+  background-size: var(--head-surface-width) var(--head-surface-height);
+  background-repeat: no-repeat;
+  background-position: calc(var(--head-surface-x) - var(--head-viewport-x)) calc(var(--head-surface-y) - var(--head-dock-y));
+}
+
+.guildTitleRow::before {
+  background-position: calc(var(--head-surface-x) - var(--head-viewport-x)) calc(var(--head-surface-y) - var(--head-dock-y) + var(--head-sticky-top, 0px));
+}
+
+.guildStickyHead::before {
+  top: calc(var(--head-title-height) - var(--head-row-overlap, 0px));
+  height: calc(var(--head-cover-height) - var(--head-title-height) + var(--head-row-overlap, 0px));
+  background-position: calc(var(--head-surface-x) - var(--head-viewport-x)) calc(var(--head-surface-y) - var(--head-dock-y) - var(--head-title-height) + var(--head-row-overlap, 0px));
+}
+
+.guildStickyHead::after {
+  top: calc(var(--head-cover-height) - 2px);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #5C8BC6, transparent);
+}
+
 .guildOverviewHero {
-  grid-column: 1 / 4;
-  grid-row: 1 / 7;
+  grid-column: 1;
+  grid-row: 1;
   align-self: start;
   min-width: 0;
+}
+
+.guildOverviewMetadata {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  min-width: 0;
+}
+
+/* The page owns this inset, independent of the generic metadata card padding. */
+.guildOverviewBody .guildOverviewMetadata {
+  padding-block-start: calc(var(--head-mode-height, 36px) + 16px);
 }
 
 .guildOverviewTrend {
@@ -79,70 +294,54 @@
   --radar-trend: #6ee7a8;
   --radar-warn: #d98f72;
   display: grid;
-  grid-column: 4 / 13;
-  grid-row: 1 / 4;
+  grid-column: 3;
+  grid-row: 1;
   gap: var(--guild-trend-internal-gap);
   align-self: start;
   min-width: 0;
   background: transparent;
 }
 
-.guildTrendHeader {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-  min-block-size: var(--guild-trend-header-height);
-  min-width: 0;
-}
-
-.guildTrendHeader h2 {
-  margin: 0;
-  color: #f5f9ff;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
 .guildTrendToggle {
   display: inline-flex;
   flex: 0 0 auto;
-  overflow: hidden;
-  border: 1px solid #2b4c73;
-  border-radius: 8px;
-  background: #0f2135;
+  gap: 8px;
+  block-size: 36px;
 }
 
-.guildTrendToggle button {
-  border: 0;
-  background: transparent;
-  color: #b0c4d9;
+/* Use the Data Hub navigation surface and title with compact dimensions
+   and 12px labels for the existing control row. */
+.guildTrendButton {
+  composes: tile tileTitle from "../DataHub/Index.module.css";
+  font-size: 12px;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 7px 9px;
+  white-space: nowrap;
+  padding: 0 6px;
 }
 
-.guildTrendToggle button[data-active="true"] {
-  background: #1b4168;
-  color: #f5f9ff;
+/* The navigation hover presentation also marks the selected chart type. */
+.guildTrendButton:enabled:is(:hover, [data-active="true"]) {
+  border-color: #3f6b9a;
+  box-shadow: 0 8px 22px rgba(3, 10, 18, 0.22);
 }
 
-.guildTrendToggle button:focus-visible {
-  outline: 2px solid rgba(103, 215, 255, 0.65);
-  outline-offset: -2px;
+.guildTrendButton:focus-visible {
+  outline: 2px solid #82bbff;
+  outline-offset: 3px;
 }
 
 .guildTrendChart {
   gap: 10px;
   block-size: var(--guild-trend-body-height);
   min-block-size: var(--guild-trend-body-height);
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .guildTrendChart svg {
-  block-size: var(--guild-trend-chart-height);
+  block-size: 100%;
   min-height: 0;
 }
 
@@ -434,54 +633,6 @@
   font-size: 10px;
 }
 
-.classDistribution {
-  display: grid;
-  gap: 7px;
-  margin-top: 16px;
-  border-top: 1px solid #2b4c73;
-  padding-top: 14px;
-}
-
-.classDistributionSlot .classDistribution {
-  margin-top: 0;
-  border-top: 0;
-  padding-top: 0;
-}
-
-.subhead {
-  margin: 0 0 2px;
-  color: #f5f9ff;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.classLine {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  color: #b0c4d9;
-  font-size: 12px;
-}
-
-.classLineLabel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.classLineLabel > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.classLine strong {
-  color: #f5f9ff;
-}
-
 .compareLabel {
   margin: 12px 0 0;
   font-size: 12px;
@@ -504,8 +655,7 @@
   padding: 12px;
 }
 
-.teaserTitle,
-.transferTitle {
+.teaserTitle {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -521,51 +671,31 @@
   line-height: 1.45;
 }
 
-.transferGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.transferList {
-  min-width: 0;
-}
-
-.transferTitle strong {
-  margin-left: auto;
-  color: #b7d4ff;
-}
-
-.transferList ul {
-  display: grid;
-  gap: 5px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.transferList li {
-  min-width: 0;
-  overflow: hidden;
-  color: #b0c4d9;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 980px) {
   .dashboardGrid {
     --guild-trend-chart-height: 310px;
     --guild-trend-body-height: 354px;
     grid-template-columns: 1fr;
-    grid-template-rows: none;
+    grid-template-rows: var(--dashboard-head-expanded-height, auto) auto auto;
+    grid-auto-rows: auto;
+  }
+
+  .guildOverviewTop, .guildStickyHead { grid-row: 1; }
+  .guildStickyHead { --head-compact-logo-size: 46.5px; }
+
+  .guildOverviewBody {
+    grid-template-rows: auto auto auto auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-column: 1 / -1;
+    grid-row: auto;
+    min-block-size: 0;
   }
 
   .guildOverviewHero,
   .guildOverviewTrend,
-  .classDistributionSlot,
-  .membersSlot,
-  .historySlot {
+  .guildOverviewMetadata,
+  .controlsSlot,
+  .detailsSlot {
     grid-column: 1 / -1;
     grid-row: auto;
   }
@@ -582,13 +712,8 @@
     padding: 14px;
   }
 
-  .memberRow,
-  .transferGrid {
+  .memberRow {
     grid-template-columns: 1fr;
-  }
-
-  .guildTrendHeader {
-    flex-direction: column;
   }
 
   .guildTrendToggle {
@@ -623,3 +748,504 @@
     margin-left: 6px;
   }
 }
+
+.memberModeSlot { grid-column: 1 / 7; display: flex; flex-wrap: wrap; gap: 4px; padding-inline: 16px; }
+.memberModeSlot button { background: #0f2135; border: 1px solid #2b4c73; border-radius: 6px; color: #b0c4d9; padding: 8px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+.memberModeSlot button[aria-pressed="true"] { color: #67d7ff; background: #193654; border-color: #67d7ff; }
+.memberModeSlot button:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot {
+  grid-column: 2;
+  grid-row: 1;
+  margin-inline-start: 8px;
+  width: max-content;
+  max-width: 100%;
+  padding: 0;
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.controlsSlot > section { grid-column: 1 / 4; }
+
+@media (max-width: 980px) {
+  .controlsSlot, .detailsSlot { grid-template-columns: minmax(0, 1fr); }
+  .controlsSlot > section, .memberModeSlot, .membersSlot, .historySlot, .classDistributionSlot { grid-column: 1 / -1; }
+  .detailsSlot { padding-top: 0; }
+  .memberPanel .kicker { position: static; }
+  .panel.classDistributionSlot { grid-row: auto; padding: 16px; }
+}
+
+/* Mode selection only: adopt the existing scan HUD's surface and horizontal
+   rules without changing the group's box or the original button hit areas. */
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot {
+  background: linear-gradient(90deg, transparent, #152a4280, transparent);
+}
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-block: 1px solid #2b4c73;
+  pointer-events: none;
+}
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot button {
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #b0c4d9;
+  box-shadow: none;
+}
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot button:not([aria-pressed="true"]):hover {
+  background: rgba(43, 76, 115, 0.35);
+  color: #f5f9ff;
+}
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot button[aria-pressed="true"] {
+  background: linear-gradient(180deg, #1b4168, #193654);
+  color: #f5f9ff;
+  box-shadow: inset 0 0 12px rgba(103, 215, 255, 0.15), inset 0 -2px 0 #67d7ff;
+}
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot button:focus-visible {
+  outline: 2px solid #67d7ff;
+  outline-offset: -3px;
+}
+
+/* Return links stay out of flow so the existing header tracks are unchanged. */
+:is(.guildOverviewBody, .compactBack) > [data-data-hub-back] {
+  grid-column: 1;
+  grid-row: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 74px;
+  padding: 2px 4px;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: normal;
+}
+
+.guildOverviewBody > [data-data-hub-back] {
+  grid-column: 1 / -1;
+  left: var(--expanded-back-left);
+  top: var(--expanded-back-top);
+}
+.compactBack > [data-data-hub-back] { position: static; }
+:is(.guildOverviewTop, .guildStickyHead) .memberModeSlot.compactModes {
+  position: absolute;
+  left: var(--compact-modes-left);
+  top: var(--compact-modes-top);
+  margin: 0;
+}
+
+@media (min-width: 981px) {
+  /* Move only this page's existing Frame top inset inside the scroller.
+     Expanded grid coordinates stay unchanged; the docked head can reach
+     the area immediately below the global topbar instead of leaving 24px. */
+  :global(section) > :global(div):has(.page) { padding-top: 0; }
+  .page { padding-top: 24px; }
+}
+
+/* Use the same mode band above the hero in the single-column layout, so its
+   natural scroll path never crosses the crest or full scan HUD. */
+@media (max-width: 980px) {
+  :is(.guildOverviewTop, .guildStickyHead) .memberModeSlot { grid-column: 1; grid-row: 1; margin-inline-start: 0; }
+  .guildOverviewHero { grid-row: 2; }
+  .guildOverviewMetadata { grid-row: 3; }
+  .guildOverviewBody .guildOverviewMetadata { padding-block-start: 0; }
+  .guildOverviewTrend { grid-row: 4; }
+}
+
+/* Independent opacity-only presentations. Visibility also guards the lead-in
+   from hit testing and tab focus; inactive groups are additionally inert. */
+.compactBack {
+  --entry-delay: var(--head-back-in-delay);
+  --entry-duration: var(--head-back-in-duration);
+  --exit-delay: var(--head-back-out-delay);
+  --exit-duration: var(--head-back-out-duration);
+}
+.guildStickyHead [data-compact-crest] {
+  --entry-delay: var(--head-logo-in-delay);
+  --entry-duration: var(--head-logo-in-duration);
+  --exit-delay: var(--head-logo-out-delay);
+  --exit-duration: var(--head-logo-out-duration);
+}
+.guildStickyHead [data-compact-hud] {
+  --entry-delay: var(--head-status-in-delay);
+  --entry-duration: var(--head-status-in-duration);
+  --exit-delay: var(--head-status-out-delay);
+  --exit-duration: var(--head-status-out-duration);
+}
+.compactModes {
+  --entry-delay: var(--head-modes-in-delay);
+  --entry-duration: var(--head-modes-in-duration);
+  --exit-delay: var(--head-modes-out-delay);
+  --exit-duration: var(--head-modes-out-duration);
+}
+.guildStickyHead :is([data-compact-back], [data-compact-crest], [data-compact-hud], [data-compact-modes], [data-compact-chart], [data-compact-classes]) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--exit-duration) ease-out var(--exit-delay), visibility 0s linear calc(var(--exit-delay) + var(--exit-duration));
+}
+.guildStickyHead[data-compact-ready="true"] :is([data-compact-back], [data-compact-crest], [data-compact-hud], [data-compact-modes], [data-compact-chart], [data-compact-classes]) {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--entry-duration) ease-out var(--entry-delay), visibility 0s linear var(--entry-delay);
+}
+@media (prefers-reduced-motion: reduce) {
+  .guildStickyHead::before,
+  .guildStickyHead::after,
+  .guildStickyHead[data-compact-ready] :is([data-compact-back], [data-compact-crest], [data-compact-hud], [data-compact-modes], [data-compact-chart], [data-compact-classes]) { transition: none; }
+}
+
+/* Keep the original fractional tracks: translating the complete trend box
+   preserves its exact width instead of rounding a new four-track grid. */
+.sharedControls {
+  position: relative;
+  grid-column: 2 / 4;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding-inline-start: 8px;
+  box-sizing: border-box;
+  z-index: 4;
+}
+.sharedControls .memberModeSlot { margin: 0; flex: 0 0 auto; max-width: none; }
+.guildTrendToggle button:disabled { opacity: .45; cursor: default; }
+.guildOverviewTop .guildOverviewTrend {
+  block-size: calc(var(--guild-trend-body-height) + 51.5px);
+  box-sizing: border-box;
+  padding-block-start: 52px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+.guildOverviewTrend :is(.guildTrendChart, .guildTrendState) {
+  block-size: 100%;
+  min-block-size: 0;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+@media (min-width: 981px) {
+  .guildOverviewBody { container-type: inline-size; --overview-two-columns: calc((100cqw + var(--dashboard-grid-gap)) / 6); }
+  .guildOverviewTrend { transform: translateX(calc(-1 * var(--overview-two-columns))); }
+  .guildOverviewMetadata { width: calc(100% - var(--overview-two-columns)); }
+  .sharedControls { width: calc(100% - var(--overview-two-columns)); }
+  .sharedControls .guildTrendToggle {
+    position: absolute;
+    left: var(--chart-toggle-center);
+    top: 0;
+    transform: translateX(-50%);
+  }
+}
+@media (max-width: 980px) {
+  .sharedControls { grid-column: 1; grid-row: 1; flex-wrap: wrap; padding-inline-start: 0; gap: 8px 16px; }
+  /* The second control row clears the existing left return link. */
+  .sharedControls .guildTrendToggle { margin-inline-start: auto; }
+  .guildOverviewTop .guildOverviewTrend { padding-block-start: 0; }
+}
+
+@media (max-width: 640px) {
+  .sharedControls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px 36px;
+    gap: 8px;
+  }
+  .sharedControls .guildTrendToggle { justify-self: end; margin-inline-start: 0; }
+  /* The extra 44px control row uses space from the removed local heading.
+     Preserve W-80's complete mobile header envelope and activation point. */
+  .guildOverviewTop .guildOverviewTrend { block-size: calc(var(--guild-trend-body-height) + 52px); }
+}
+
+/* Final positions are measured from the normal controls before any entry fade. */
+.compactChart {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 4px;
+  block-size: auto;
+  width: max-content;
+  position: absolute;
+  left: var(--compact-chart-left);
+  top: var(--compact-chart-top);
+  z-index: 2;
+  --entry-delay: var(--head-chart-in-delay);
+  --entry-duration: var(--head-chart-in-duration);
+  --exit-delay: var(--head-chart-out-delay);
+  --exit-duration: var(--head-chart-out-duration);
+}
+.compactChart > button { block-size: 36px; flex: 0 0 36px; }
+.compactClasses {
+  position: absolute;
+  right: calc(var(--compact-back-width) + 8px);
+  top: var(--compact-classes-top);
+  width: 324px;
+  z-index: 2;
+  --entry-delay: var(--head-classes-in-delay);
+  --entry-duration: var(--head-classes-in-duration);
+  --exit-delay: var(--head-classes-out-delay);
+  --exit-duration: var(--head-classes-out-duration);
+}
+@media (max-width: 980px) {
+  .compactClasses { width: 214px; }
+}
+
+@media (min-width: 981px) {
+  /* Metadata may continue through row 4 in its existing columns. Keep the
+     measured header envelope (and all other tracks/compact anchors) intact. */
+  .guildOverviewMetadata { position: absolute; top: 0; grid-column: 2 / 3; grid-row: 1 / 2; }
+}
+
+/* Expanded mode groups retain their measured metadata centre and height. */
+.sharedControls { min-block-size: 36px; }
+.sharedControls .memberModeSlot { position: absolute; top: 0; left: var(--metadata-mode-center, 8px); transform: translateX(-50%); }
+@media (max-width: 640px) { .sharedControls .guildTrendToggle { grid-row: 2; } }
+/* Keep existing chart geometry while placing its detail action by the heading. */
+.trendDetailFrame { display:grid; grid-template-rows:29px minmax(0,1fr); min-width:0; min-height:0; }
+.trendDetailHeading { display:flex; align-items:center; margin:0; font-size:14px; color:#b7d4ff; }
+
+/* Dashboard-only chart envelope; the overlay retains its own geometry. */
+.guildOverviewTrend > [data-guild-compare] { height:100%; min-height:0; }
+.classDistributionSlot { container-type:inline-size; }
+.classDistributionSlot > [data-class-distribution] {
+  height:100%;
+  grid-template-columns:auto minmax(0, 1fr);
+  grid-template-rows:auto minmax(0, 1fr);
+  column-gap:12px;
+  align-items:center;
+}
+.classDistributionSlot :global(h2) { grid-column:2; grid-row:1; justify-self:start; }
+.panel.classDistributionSlot > [data-class-distribution] > :global(svg) { grid-column:1; grid-row:1 / 3; height:100%; width:auto; max-width:100%; }
+.panel.classDistributionSlot :global(ul) { grid-column:2; grid-row:2; align-self:center; gap:4px; padding:4px; }
+
+@media (min-width:981px) {
+  /* Preserve the expanded header's original contribution to rows 1–3. */
+  .guildOverviewBody { min-block-size:calc(var(--guild-trend-body-height) + 51.5px); }
+  .guildOverviewTop .guildOverviewTrend {
+    transform:translateX(calc((100cqw + 4 * var(--dashboard-grid-gap)) / -24));
+    width:calc(100% + (100cqw + 4 * var(--dashboard-grid-gap)) / 24);
+    block-size:calc(var(--guild-trend-body-height) - 24px);
+  }
+  .dashboardGrid { position:relative; }
+  .panel.classDistributionSlot {
+    position:absolute;
+    grid-column:8 / -1;
+    grid-row:1 / 5;
+    top:calc(var(--normal-title-height, 41px) + var(--guild-trend-body-height) - 20px);
+    left:0;
+    bottom:0;
+    width:min(100%, 420px);
+    padding:0;
+  }
+}
+@media (max-width:980px) {
+  .panel.classDistributionSlot { grid-row:2; height:220px; box-sizing:border-box; }
+  .guildOverviewTop .guildOverviewTrend { block-size:640px; }
+}
+
+@container (max-width:400px) {
+  .panel.classDistributionSlot :global(ul) { gap:2px; padding:2px; }
+}
+@container (max-width:360px) {
+  .classDistributionSlot > [data-class-distribution] { grid-template-columns:minmax(0, 1fr) minmax(0, 1.1fr); }
+  .panel.classDistributionSlot > [data-class-distribution] > :global(svg) { width:100%; }
+  .classDistributionSlot :global(h2) { font-size:12px; white-space:normal; overflow-wrap:anywhere; }
+  .classDistributionSlot :global(h2 button) { width:20px; height:20px; }
+  .panel.classDistributionSlot :global([data-class-chip]) { --class-chip-height:20px; padding-inline:29px 4px; font-size:10px; }
+}
+
+/* Lift only the open Compare disclosure above the adjacent class chart. */
+.guildOverviewTrend:has([data-compare-display-popup]) { z-index:5; }
+
+/* The information portal shares the existing lower chart band without
+   contributing to the measured header tracks. Hover cannot resize the plot. */
+.chartInformationSlot {
+  composes: compareInformation from "./DashboardChartDetails.module.css";
+  min-width:0;
+  box-sizing:border-box;
+  color:#b0c4d9;
+  overflow-wrap:anywhere;
+  overflow-anchor:none;
+}
+@media (min-width:1201px) {
+  .chartInformationSlot {
+    position:absolute;
+    grid-column:11 / 13;
+    grid-row:3 / 5;
+    inset:0;
+    top:max(0px, calc(var(--normal-title-height, 41px) + var(--guild-trend-body-height) - 20px - 2 * (var(--dashboard-grid-row-height) + var(--dashboard-grid-gap))));
+    overflow:auto;
+    scrollbar-width:thin;
+    padding-inline-end:4px;
+  }
+  .panel.classDistributionSlot { grid-column:8 / 11; width:100%; }
+  .classDistributionSlot > [data-class-distribution] { grid-template-columns:auto minmax(0,1fr); }
+  .panel.classDistributionSlot > [data-class-distribution] > :global(svg) { width:auto; }
+}
+@media (min-width:981px) and (max-width:1200px) {
+  .chartInformationSlot { grid-column:8 / -1; grid-row:5; min-height:240px; }
+  .detailsSlot { grid-row:6; }
+}
+@media (max-width:980px) {
+  .chartInformationSlot { grid-column:1 / -1; grid-row:2; min-block-size:200px; }
+  .panel.classDistributionSlot { grid-row:3; }
+  .guildOverviewTop .guildOverviewTrend { block-size:clamp(340px, 80vh, 648px); }
+}
+
+@media (max-width:1200px) {
+  .chartInformationSlot [data-trend-values] dl {
+    grid-template-columns:minmax(64px, .65fr) minmax(0, 1fr);
+    column-gap:12px;
+    align-items:baseline;
+  }
+}
+
+
+
+/* W101: the extra metadata space ends before the unchanged chart envelope. */
+@media (min-width:981px) {
+  .guildOverviewMetadata {
+    --metadata-extension:calc(var(--overview-two-columns) - (100cqw + 4 * var(--dashboard-grid-gap)) / 24 - 16px);
+    --metadata-player-width:calc(100% - var(--metadata-extension));
+    width:calc(100% - var(--overview-two-columns) + var(--metadata-extension));
+  }
+}
+
+/* Keep the expanded coverage legend above the adjacent class chart. */
+.guildOverviewTrend:has([data-trend-coverage-help]) { z-index:5; }
+
+.trendDetailHeading { flex-wrap: wrap; gap: 4px 8px; }
+.trendMetricSelect { margin-left: auto; min-width: 0; font-size: 11px; font-weight: 400; }
+.trendMetricSelect > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.trendMetricSelect select { max-width: 100%; min-width: 0; border: 1px solid #2b4c73; border-radius: 6px; padding: 3px; color: #f5f9ff; background: #152a42; }
+.trendMetricSelect select:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+
+.trendDetailFrame { position: relative; }
+.trendMetricEmpty { position: absolute; left: 12px; right: 12px; top: 32px; margin: 0; font-size: 11px; color: #b0c4d9; pointer-events: none; }
+
+
+/* Member views retain the profile ten-card scroll window. */
+.memberEntriesScroll { position:relative; margin-top:14px; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:#39688f #0a1828; }
+.memberEntriesScroll::-webkit-scrollbar { width:10px; }
+.memberEntriesScroll::-webkit-scrollbar-track { background:#0a1828; border-radius:8px; }
+.memberEntriesScroll::-webkit-scrollbar-thumb { background:#39688f; border:2px solid #0a1828; border-radius:8px; }
+.memberEntriesScroll::-webkit-scrollbar-thumb:hover { background:#5996c6; }
+.memberCardsArea, .memberList { margin-top:0; }
+.cardView[data-active="false"] { position:absolute; inset:0 0 auto; height:0; overflow:hidden; visibility:hidden; pointer-events:none; }
+.memberRow { display:flex; align-items:stretch; padding:0; }
+.memberRow[data-selected="true"] { border-color:#67d7ff; background:#193654; }
+.memberRowSelect { flex:0 0 30px; color:#67d7ff; border:0; border-right:1px solid #2b4c73; background:transparent; cursor:pointer; }
+.memberRowProfile { flex:1; min-width:0; display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:10px; align-items:center; padding:8px; border:0; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+.memberRow button:focus-visible { outline:2px solid #67d7ff; outline-offset:-2px; }
+@media (min-width:981px) {
+  .membersSlot[data-members-narrow="true"] .memberRow { display:flex; }
+  .membersSlot[data-members-narrow="true"] .memberRowProfile { grid-template-columns:30px minmax(0,1fr); }
+}
+
+/* Profile titles reproduce averageHud + sectionHud without changing metadata. */
+.guildOverviewTrend [data-profile-chart-hud],
+.classDistributionSlot > [data-profile-chart-hud] {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  min-height:32px;
+  flex:0 0 auto;
+  gap:0;
+  background:linear-gradient(90deg, transparent, #203b5880, transparent);
+}
+.guildOverviewTrend [data-profile-chart-hud]::after,
+.classDistributionSlot > [data-profile-chart-hud]::after {
+  content:""; position:absolute; inset:0; border-block:1px solid #2b4c73; pointer-events:none;
+}
+.guildOverviewTrend [data-profile-title-group],
+.classDistributionSlot [data-profile-title-group] {
+  grid-column:2; grid-row:1; display:flex; align-items:center; justify-content:center;
+  gap:6px; min-width:0; margin:0; padding:0;
+  font-family:inherit; font-size:12px; font-weight:800; line-height:1.2; color:#b0c4d9; text-align:center;
+}
+.guildOverviewTrend [data-profile-title-group] button,
+.classDistributionSlot [data-profile-title-group] button { margin-left:0; }
+.guildOverviewTrend [data-profile-title-group] > span { display:flex; align-items:center; }
+.guildOverviewTrend [data-profile-title-group] > span > button {
+  position:static; width:22px; height:22px;
+}
+.guildOverviewTrend [data-profile-chart-hud] > :last-child:not([data-profile-title-group]) {
+  grid-column:3; grid-row:1; justify-self:end; margin-left:0;
+}
+.trendDetailFrame { grid-template-rows:32px minmax(0,1fr); }
+.panel.classDistributionSlot { display:grid; grid-template-rows:32px minmax(0,1fr); row-gap:8px; }
+.classDistributionSlot > [data-class-distribution] { min-height:0; grid-template-rows:minmax(0,1fr); }
+.panel.classDistributionSlot > [data-class-distribution] > :global(svg) {
+  grid-row:1; height:auto; width:100%; max-height:100%; aspect-ratio:1; justify-self:center;
+}
+.panel.classDistributionSlot :global(ul) { grid-row:1; }
+@media (min-width:981px) {
+  .panel.classDistributionSlot { top:calc(var(--normal-title-height, 41px) + var(--guild-trend-body-height) - 20px + 2 * var(--dashboard-grid-gap)); }
+}
+@media (min-width:1201px) {
+  .chartInformationSlot { top:max(0px, calc(var(--normal-title-height, 41px) + var(--guild-trend-body-height) - 20px + 2 * var(--dashboard-grid-gap) - 2 * (var(--dashboard-grid-row-height) + var(--dashboard-grid-gap)))); }
+}
+@media (max-width:980px) {
+  .chartInformationSlot { margin-top:var(--dashboard-grid-gap); }
+  .panel.classDistributionSlot { height:260px; padding:0; }
+}
+/* Keep selection controls clear of the full-width title on narrow charts. */
+.guildOverviewTrend { container-type:inline-size; }
+.guildOverviewTrend [data-profile-title-group] [role="region"] { font-weight:400; text-align:left; }
+@container (max-width:460px) {
+  .guildOverviewTrend [data-profile-chart-hud] > .trendMetricSelect { position:absolute; top:36px; right:0; margin:0; }
+  .trendDetailFrame { row-gap:33px; }
+  .trendMetricEmpty { top:69px; }
+}
+@container (max-width:280px) {
+  .guildOverviewTrend [data-profile-chart-hud]:has([data-compare-display]) { margin-bottom:32px; }
+  .guildOverviewTrend [data-profile-chart-hud] > :last-child:not([data-profile-title-group]) { position:absolute; top:36px; right:0; }
+}
+@media (min-width:981px) {
+  .panel.classDistributionSlot { bottom:calc(-1 * var(--dashboard-grid-gap)); }
+}
+
+/* Navigation belongs only to the guild loading view; the loaded header stays intact. */
+.guildLoadingTitle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.guildLoadingTitle .divider { margin: 0; }
+.guildLoadingTitle .guildLoadingNav {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: calc(8ch + 24px);
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 0;
+  color: #b0c4d9;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.guildLoadingTitle .guildLoadingNav::after { border-color: transparent; }
+.guildLoadingTitle .guildLoadingNav:hover { color: #f5f9ff; }
+.guildLoadingTitle .guildLoadingNav:focus-visible { outline: 2px solid #67d7ff; outline-offset: 2px; }
+@media (max-width: 560px) { .guildLoadingTitle { gap: 6px; } }
+
+/* The 88px Transfers card leaves 33px in the existing fourth 121px track. */
+.controlsSlot { position:relative; }
+.comparisonScanSelect { position:absolute; grid-column:1 / 4; inset-inline:0; top:calc(100% + 6px); display:flex; align-items:center; gap:6px; min-width:0; height:26px; color:#b0c4d9; font-size:10px; }
+.comparisonScanSelect > span { flex:0 0 auto; }
+.comparisonScanSelect select { min-width:0; width:100%; height:26px; border:1px solid #2b4c73; border-radius:6px; background:#0f2135; color:#f5f9ff; font:inherit; }
+.comparisonScanSelect select:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+
+/* Occupy only the existing gap above Transfers, outside measured header flow. */
+.profileActions { position:absolute; grid-column:1 / 4; inset-inline:0; bottom:calc(100% + 7px); height:34px; display:flex; align-items:center; justify-content:center; gap:8px; z-index:4; }
+.profileActions > button { padding:4px 8px; font:inherit; font-size:11px; line-height:16px; white-space:nowrap; color:#b0c4d9; border:1px solid #2b4c73; border-radius:6px; background:#1e2f47; cursor:pointer; }
+.profileActions > button:hover:not(:disabled) { background:#2a4c72; color:#f5f9ff; }
+.profileActions > button:disabled { opacity:.55; cursor:default; }
+.profileActions > button:focus-visible { outline:2px solid #67d7ff; outline-offset:2px; }
+.profileActions :global(.player-profile__favorite-star-button) > span { font-size:22px !important; }
+.profileActions [data-guild-action-feedback] { position:absolute; top:100%; left:0; right:0; padding:4px; border:1px solid #2b4c73; background:#102238; font-size:10px; }
+.overlayGrid { grid-template-rows:repeat(4, minmax(var(--dashboard-grid-row-height), auto)); }

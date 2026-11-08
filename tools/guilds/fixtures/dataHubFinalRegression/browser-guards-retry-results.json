@@ -1,0 +1,12 @@
+[
+  {
+    "file": "scanArchive/dataHubScanInventory.browser.test.mts",
+    "passed": true,
+    "exitCode": 0,
+    "signal": null,
+    "elapsedMs": 8816.5604,
+    "passLines": 14,
+    "stdout": "PASS loading/unknown archive and true empty personal zero; four unchanged navigation tiles\nPASS actual validated multi-year manifests; current/monthly references do not add files\nPASS actual personal import, two physical bindings on one Raw and overlap without total\nPASS archivefirst personal duplicate, repeated duplicate stable counts and original identity/time/name\nPASS actual personal content update expires readiness; Rawdelete updates displayed counts\nPASS legacy own/name/no annotation stays unknown with explicit partial personal status\nPASS targeted cold readiness: 1 Raw read, 2 validations, 0 normalization/build/download/fullpool\nPASS warm real dashboard remount reuses proof: zero payload read/validation/normalization/derivedbuild\nPASS missed provenance event caught up from durable journal on focus\nPASS offline year leaves valid active subset and independently complete personal count\nPASS offline catalog explicitly last-known, retained date and successful retry\nPASS accessible live status, translated labels and wide layout\nPASS real navigation remains operable during held request; no late publications after unmount\nPASS 390px actual shell/dashboard: stacked KPIs, no horizontal overflow and all four navigation tiles\nMEASURED [{\"name\":\"cold bound candidates\",\"costs\":{\"metadataReads\":53,\"rawReads\":1,\"rawPoolReads\":0,\"payloadValidations\":2,\"normalizations\":0,\"derivedBuilds\":0,\"metadataSnapshots\":0,\"archiveNetwork\":0,\"rawNetwork\":0,\"publications\":4},\"values\":[\"3\",\"2\",\"1\"]},{\"name\":\"warm dashboard remount\",\"costs\":{\"metadataReads\":49,\"rawReads\":0,\"rawPoolReads\":0,\"payloadValidations\":0,\"normalizations\":0,\"derivedBuilds\":0,\"metadataSnapshots\":0,\"archiveNetwork\":6,\"rawNetwork\":0,\"publications\":6},\"values\":[\"3\",\"2\",\"1\"]}]\n",
+    "stderr": "[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`\nBrowserslist: browsers data (caniuse-lite) is 13 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme\n"
+  }
+]

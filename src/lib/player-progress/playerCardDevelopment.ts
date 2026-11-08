@@ -107,12 +107,13 @@ export function buildPlayerCardDevelopmentLookup(
   options: {
     analyticsData?: GuildAnalyticsDerivedData | null;
     identityResolutionSnapshot?: IdentityResolutionSnapshot | null;
+    preparedCompleteness?: GuildSnapshotCompletenessReport[];
   } = {},
 ) {
   const analyticsData = options.analyticsData ?? null;
   const identityResolutionSnapshot = options.identityResolutionSnapshot ?? null;
   const groupedEntries = groupEntriesByPlayerKey(entries);
-  const completeReports = buildGuildSnapshotCompletenessReports(analyticsData);
+  const completeReports = options.preparedCompleteness ?? buildGuildSnapshotCompletenessReports(analyticsData);
   const guildSnapshotCache = new Map<string, GuildAverageSnapshot[]>();
   const summaries = new Map<string, PlayerCardDevelopmentSummary>();
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const sourcePath = path.join(repoRoot, "src/pages/GuildHub/compareGuilds.tsx");
+const sourcePath = path.join(repoRoot, "src/pages/DataHub/compareGuilds.tsx");
 const source = fs.readFileSync(sourcePath, "utf8");
 
 assert.match(

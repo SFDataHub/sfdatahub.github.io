@@ -4,7 +4,7 @@ import {
   acquireDashboardLocalFirstFeatureScans,
   buildDashboardLocalFirstFeatureRequest,
 } from "../../src/pages/GuildHub/dashboardLocalFirst.ts";
-import { loadGuildAnalyticsLocalFirstData } from "../../src/pages/GuildHub/guildAnalyticsLocalFirst.ts";
+import { loadGuildAnalyticsLocalFirstData } from "../../src/pages/DataHub/guildAnalyticsLocalFirst.ts";
 import {
   acquireLocalFirstScans,
   type LocalFirstScanAcquisitionDependencies,

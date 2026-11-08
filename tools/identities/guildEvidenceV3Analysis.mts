@@ -1,3 +1,4 @@
+import { artifactPath } from '../codex/workspace.mjs';
 import "fake-indexeddb/auto";
 
 import assert from "node:assert/strict";
@@ -84,7 +85,7 @@ type GuildCoverage = {
 };
 
 const DEFAULT_SCAN_ROOT = "D:/SFDataHub/Guild Analytics/public/scans";
-const REPORT_PATH = path.resolve("tools/identities/guild-evidence-v3-analysis.latest.txt");
+const REPORT_PATH = artifactPath('tools/identities/guild-evidence-v3-analysis.latest.txt');
 const ORIGIN_CODES = new Set(["EU1", "EU2", "EU3", "EU4"]);
 const TARGET_CODE = "F28";
 const PROGRESSION_FIELDS = [

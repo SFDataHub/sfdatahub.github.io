@@ -740,7 +740,7 @@ const STAT_LABELS: Record<string, string> = {
   Strength: "Staerke",
   Dexterity: "Geschick",
   Intelligence: "Intelligenz",
-  Constitution: "Konstitution",
+  Constitution: "Ausdauer",
 };
 
 function buildPlayerStatSlices(values: Record<string, any> = {}): PlayerStatSlice[] {

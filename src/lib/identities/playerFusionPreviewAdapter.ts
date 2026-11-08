@@ -1,10 +1,11 @@
+import { readCurrentCompactOriginNumericId } from "./playerOrigin";
 import {
   deriveGuildHubLogicalScanSnapshots,
   listSfDataHubLocalScansReadOnly,
   type GuildHubLogicalScanSnapshot,
 } from "../guilds/localScanLibrary";
 import { extractGuildCoaString } from "../guilds/guildCoa";
-import { normalizeGuildScanServer, normalizeGuildSegmentForScan } from "../guilds/guildScanNormalizer";
+import { normalizeGuildScanServer, normalizeGuildSegmentForScan, readGuildScanMemberIdentity } from "../guilds/guildScanNormalizer";
 import {
   normalizeSfPlayerCharacterCore,
   type NormalizedPlayer,
@@ -73,14 +74,6 @@ const normalizeIdentifierKey = (value: unknown) =>
     .trim()
     .toLowerCase();
 
-const readCurrentCompactOriginNumericId = (player: JsonRecord | null) => {
-  if (!player) return null;
-  const saveVersion = toFiniteNumber(player.saveVersion);
-  const save = Array.isArray(player.save) ? player.save : null;
-  if (saveVersion !== 2 || save?.length !== 70) return null;
-  return toFiniteNumber(save[68]);
-};
-
 const ATTRIBUTE_KEYS = ["strength", "dexterity", "intelligence", "constitution", "luck"] as const;
 const FORTRESS_BUILDING_KEYS = [
   "fortress",
@@ -122,9 +115,9 @@ const supportingVector = (values: Array<number | null | undefined>, statuses: Ar
   };
 };
 
-export const createPlayerFusionSemanticSummary = (player: JsonRecord | null) => {
+export const createPlayerFusionSemanticSummary = (player: JsonRecord | null, preparedCore?: NormalizedPlayer) => {
   if (!player) return undefined;
-  const normalized: NormalizedPlayer = normalizeSfPlayerCharacterCore(player);
+  const normalized: NormalizedPlayer = preparedCore ?? normalizeSfPlayerCharacterCore(player);
   const fields = normalized.metadata.fields;
   const baseAttributePaths = ATTRIBUTE_KEYS.map((attribute) => `attributes.${attribute}.base`);
   const baseAttributes = strictVector(
@@ -212,9 +205,15 @@ const buildRawPlayerLookup = (snapshot: GuildHubLogicalScanSnapshot) => {
   return lookup;
 };
 
+// Only a single report run owns this projection; raw objects are the exact
+// objects seen by that run's normalizer, never a persisted or cross-job cache.
+export type PreparedFusionPlayerSemantics = WeakMap<object, ReturnType<typeof createPlayerFusionSemanticSummary>>;
+
 export const createFusionIdentityObservations = (
   snapshot: GuildHubLogicalScanSnapshot,
+  preparedSemanticsOrIndex?: PreparedFusionPlayerSemantics | number,
 ): PlayerFusionObservation[] => {
+  const preparedSemantics = typeof preparedSemanticsOrIndex === "number" ? undefined : preparedSemanticsOrIndex;
   const rawPlayersByIdentifier = buildRawPlayerLookup(snapshot);
 
   return snapshot.normalizedMembers.map((member) => {
@@ -234,7 +233,7 @@ export const createFusionIdentityObservations = (
       guildIdentifier: member.guildSegment ?? member.groupSegment,
       guildName: member.guildName,
       originNumericId: readCurrentCompactOriginNumericId(rawPlayer),
-      semantic: createPlayerFusionSemanticSummary(rawPlayer),
+      semantic: rawPlayer && preparedSemantics?.has(rawPlayer) ? preparedSemantics.get(rawPlayer) : createPlayerFusionSemanticSummary(rawPlayer),
     };
   });
 };
@@ -278,6 +277,22 @@ const readGroupInfo = (group: unknown) => {
     coa: extractGuildCoaString(record),
   };
 };
+
+/** Exact server/eligibility projection of the observation adapters. It uses
+ * the member normalizer's identity fields and the guild adapter's own parser,
+ * before character cores or semantic vectors are needed. A selected bucket
+ * still retains every row, group and historical observation. */
+export function hasFusionIdentityScopeObservation(rawData: unknown, includesServer: (code: string | null) => boolean): boolean {
+  const raw = asRecord(rawData);
+  if (!raw) return false;
+  const groups = Array.isArray(raw.groups) ? raw.groups : [];
+  if (groups.some(group => { const info = readGroupInfo(group); return info != null && includesServer(info.serverCode); })) return true;
+  const fallbackServer = normalizeGuildScanServer(raw.prefix ?? raw.server);
+  return (Array.isArray(raw.players) ? raw.players : []).some(player => {
+    const member = readGuildScanMemberIdentity(player, fallbackServer);
+    return member != null && includesServer(resolveServerCode(member.server));
+  });
+}
 
 export const createFusionIdentityGuildObservations = (
   snapshot: GuildHubLogicalScanSnapshot,

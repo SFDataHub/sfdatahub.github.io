@@ -76,6 +76,7 @@ export default function AdminScanArchiveBuilderPage() {
   const [inspection, setInspection] = React.useState<ScanArchiveBuilderInspection | null>(null);
   const [usageMode, setUsageMode] = React.useState<ScanArchiveBuilderUsageMode | null>(null);
   const [manifestMode, setManifestMode] = React.useState<"catalog" | "override">("catalog");
+  const [overrideInput, setOverrideInput] = React.useState<{ content: string; filename: string } | null>(null);
   const [manifestState, setManifestState] = React.useState<ScanArchiveBuilderManifestState>(emptyManifestState);
   const [progress, setProgress] = React.useState<ScanArchiveBuilderProgress | null>(null);
   const [inspectionError, setInspectionError] = React.useState<ScanArchiveBuilderBlocker | null>(null);
@@ -90,6 +91,7 @@ export default function AdminScanArchiveBuilderPage() {
 
   React.useEffect(
     () => () => {
+      revisionRef.current++;
       inspectRunRef.current?.cancel();
       buildRunRef.current?.cancel();
       sessionRef.current?.terminate();
@@ -131,9 +133,8 @@ export default function AdminScanArchiveBuilderPage() {
       setInspection(null);
       setInspectionError(null);
       setUsageMode(null);
-      setManifestState(emptyManifestState);
+      if (manifestMode !== "override" || !overrideInput) setManifestState(emptyManifestState);
       setProgress(null);
-      setManifestMode("catalog");
       if (!file) return;
 
       const session = new ScanArchiveBuilderSession();
@@ -161,18 +162,22 @@ export default function AdminScanArchiveBuilderPage() {
           setProgress(null);
         });
     },
-    [resetResult],
+    [manifestMode, overrideInput, resetResult],
   );
 
   React.useEffect(() => {
-    if (!inputFile || !inspection || manifestMode !== "catalog") return;
+    if (!inputFile || !inspection) return;
     if (inspection.blockers.length || inspection.years.length !== 1) {
       setManifestState(emptyManifestState);
       return;
     }
+    const year = inspection.years[0];
+    if (manifestMode === "override") {
+      if (overrideInput) setManifestState(parseScanArchiveBuilderManifestOverride({ ...overrideInput, year }));
+      return;
+    }
     let cancelled = false;
     const revision = revisionRef.current;
-    const year = inspection.years[0];
     setManifestState({ status: "loading", message: "Catalog and year manifest are loading." });
     loadScanArchiveBuilderCatalogManifest({ year })
       .then((manifestResult) => {
@@ -182,13 +187,14 @@ export default function AdminScanArchiveBuilderPage() {
     return () => {
       cancelled = true;
     };
-  }, [inputFile, inspection, manifestMode]);
+  }, [inputFile, inspection, manifestMode, overrideInput]);
 
   const handleOverrideChange = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
       resetResult();
       const revision = ++revisionRef.current;
+      setOverrideInput(null);
       if (!file) {
         setManifestMode("catalog");
         setManifestState(emptyManifestState);
@@ -207,7 +213,7 @@ export default function AdminScanArchiveBuilderPage() {
         }
         const content = await file.text();
         if (revisionRef.current !== revision) return;
-        setManifestState(parseScanArchiveBuilderManifestOverride({ content, filename: file.name, year }));
+        setOverrideInput({ content, filename: file.name });
       } catch (caught) {
         if (revisionRef.current !== revision) return;
         const item =
@@ -338,11 +344,11 @@ export default function AdminScanArchiveBuilderPage() {
               <p className={styles.muted}>{manifestDescription}</p>
             </div>
             <label className={styles.checkbox}>
-              <input type="radio" checked={manifestMode === "catalog"} onChange={() => { revisionRef.current++; resetResult(); setManifestState(emptyManifestState); setManifestMode("catalog"); }} />
+              <input type="radio" checked={manifestMode === "catalog"} onChange={() => { revisionRef.current++; resetResult(); setOverrideInput(null); setManifestState(emptyManifestState); setManifestMode("catalog"); }} />
               Auto-load catalog manifest
             </label>
             <label className={styles.checkbox}>
-              <input type="radio" checked={manifestMode === "override"} onChange={() => { revisionRef.current++; resetResult(); setManifestState(emptyManifestState); setManifestMode("override"); }} />
+              <input type="radio" checked={manifestMode === "override"} onChange={() => { revisionRef.current++; resetResult(); setOverrideInput(null); setManifestState(emptyManifestState); setManifestMode("override"); }} />
               Manual override
             </label>
             <input className={styles.fileInput} type="file" accept="application/json,.json" onChange={handleOverrideChange} />
@@ -362,7 +368,7 @@ export default function AdminScanArchiveBuilderPage() {
               <span>
                 <strong>Create monthly scan</strong>
                 <span className={styles.small}>
-                  Create an explicit monthly set from this import and replace the monthly reference. Existing archive files are retained.
+                  Create an explicit monthly set from this import, replace its monthly reference and recalculate rankings across all official servers in that month.
                 </span>
               </span>
             </label>
@@ -370,7 +376,7 @@ export default function AdminScanArchiveBuilderPage() {
               <input type="radio" name="scanArchiveUsageMode" checked={usageMode === "add-monthly"} onChange={() => handleUsageModeChange("add-monthly")} />
               <span>
                 <strong>Add to monthly scan</strong>
-                <span className={styles.small}>Load the complete referenced monthly set and add only missing player and guild IDs. Existing entities are skipped.</span>
+                <span className={styles.small}>Add missing IDs and eligible complete guild observations using the existing monthly selection rules. Recalculate and replace rankings for every official server in the month. An identical import also creates missing monthly rankings without adding Raw/Search files.</span>
               </span>
             </label>
             <label className={`${styles.option} ${usageMode === "archive-only" ? styles.optionActive : ""}`}>
@@ -463,6 +469,7 @@ export default function AdminScanArchiveBuilderPage() {
             <div className={styles.metrics}>
               <Metric label="New scans" value={result.summary.newScans} />
               <Metric label="Files to write" value={result.summary.filesToWrite} />
+              <Metric label="Ranking files" value={result.files.filter(file => file.kind === "ranking").length} />
               <Metric label="ZIP size" value={formatBytes(result.summary.zipBytes)} />
             </div>
             <table className={styles.table}>
@@ -489,7 +496,7 @@ export default function AdminScanArchiveBuilderPage() {
         ) : null}
 
         <div className={styles.small}>
-          ZIP contents are limited to manifest.json plus newly generated .json.gz and .search.json.gz files.
+          ZIP contains manifest.json, new Raw/Search files and, for monthly modes, replacement monthly.ranking.json.gz files for all participating servers.
         </div>
       </div>
     </ContentShell>
