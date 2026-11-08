@@ -12,14 +12,14 @@ export default function VisitorMetricsSettings() {
   const { t, i18n } = useTranslation();
   const [start, setStart] = useState("");
   const [sessionsVerified, setSessionsVerified] = useState(false);
-  const [collectionStart, setCollectionStart] = useState<string | null>(null);
+  const [confirmedStart, setConfirmedStart] = useState<string | null>(null);
   const [status, setStatus] = useState("loading");
   useEffect(() => {
     let active = true;
     void visitorAdminRequest("config").then(config => {
       if (!active) return;
       setStart(config.startDate ?? ""); setSessionsVerified(config.sessionsVerified === true);
-      setCollectionStart(config.collectionStartDate); setStatus("idle");
+      setConfirmedStart(config.sessionsVerified ? config.startDate : null); setStatus("idle");
     }, () => { if (active) setStatus("error"); });
     return () => { active = false; };
   }, []);
@@ -27,7 +27,7 @@ export default function VisitorMetricsSettings() {
     setStatus("saving");
     try {
       const config = await visitorAdminRequest("config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ startDate: start, sessionsVerified }) });
-      setCollectionStart(config.collectionStartDate); setStatus("saved");
+      setConfirmedStart(config.sessionsVerified ? config.startDate : null); setStatus("saved");
     } catch { setStatus("error"); }
   };
   return (
@@ -42,7 +42,7 @@ export default function VisitorMetricsSettings() {
         <input type="checkbox" checked={sessionsVerified} disabled={status === "loading" || status === "saving"} onChange={event => setSessionsVerified(event.target.checked)} className="mt-1" />
         <span>{t("footer.admin.sessions")}</span>
       </label>
-      <p>{collectionStart ? t("footer.admin.collection", { start: new Intl.DateTimeFormat(i18n.resolvedLanguage || "en", { dateStyle: "medium", timeZone: "Europe/Berlin" }).format(new Date(collectionStart + "T12:00:00Z")) }) : t("footer.admin.activation")}</p>
+      <p>{confirmedStart ? t("footer.admin.collection", { start: new Intl.DateTimeFormat(i18n.resolvedLanguage || "en", { dateStyle: "medium", timeZone: "Europe/Berlin" }).format(new Date(confirmedStart + "T12:00:00Z")) }) : t("footer.admin.activation")}</p>
       <button type="button" onClick={() => void save()} disabled={!start || status === "loading" || status === "saving"} className="rounded border border-[#2B4C73] bg-[#1A2F4A] px-4 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#82BBFF] disabled:opacity-50">{t(status === "saving" ? "footer.admin.saving" : "footer.admin.save")}</button>
       <span role="status" className="ml-3">{status === "saved" ? t("footer.admin.saved") : status === "error" ? t("footer.admin.error") : ""}</span>
     </section>
