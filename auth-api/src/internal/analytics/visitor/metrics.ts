@@ -36,7 +36,9 @@ export type MetricsConfig = { startDate: string | null; collectionStartDate: str
 export function parseConfig(data: FirebaseFirestore.DocumentData | undefined): MetricsConfig {
   return {
     startDate: validDay(data?.startDate) ? data!.startDate : null,
-    collectionStartDate: validDay(data?.collectionStartDate) ? data!.collectionStartDate : null,
+    // Keep the existing field as a compatibility alias. Old confirmation dates
+    // must not block v2 data within the explicitly selected period.
+    collectionStartDate: data?.sessionsVerified === true && validDay(data?.startDate) ? data!.startDate : null,
     sessionsVerified: data?.sessionsVerified === true,
     revision: typeof data?.revision === "string" ? data.revision : "",
   };
@@ -64,13 +66,13 @@ function counts(hits: Hit[]): { visitors: number; pages: Map<string, number> } {
 
 export async function buildMetrics(config: MetricsConfig, now: Date, fetchRange: FetchRange) {
   const today = berlinDay(now);
-  const effectiveStartDate = config.startDate && config.collectionStartDate ? [config.startDate, config.collectionStartDate].sort()[1] : null;
+  const effectiveStartDate = config.startDate;
   const base = {
     schemaVersion: METRIC_VERSION, timezone: "Europe/Berlin", startDate: config.startDate,
-    collectionStartDate: config.collectionStartDate, effectiveStartDate,
+    collectionStartDate: config.sessionsVerified ? config.startDate : null, effectiveStartDate,
     configRevision: config.revision, asOf: now.toISOString(), today,
   };
-  const state = !config.startDate || !config.collectionStartDate ? "not_configured" : !config.sessionsVerified ? "unverified" : effectiveStartDate! > today ? "not_started" : "ready";
+  const state = !config.startDate ? "not_configured" : !config.sessionsVerified ? "unverified" : effectiveStartDate! > today ? "not_started" : "ready";
   if (state !== "ready") return { manifest: { ...base, state, website: null }, pages: new Map<string, Metric>() };
   const start = effectiveStartDate!;
   const averageStart = [start, shiftDay(today, -29)].sort()[1];
@@ -107,7 +109,9 @@ export async function publishMetrics(fetchRange: FetchRange, now = new Date()) {
     const config = parseConfig(configDoc.data());
     const previous = current.data();
     if ((lease.data()?.until ?? 0) > now.getTime()) return false;
-    if (previous?.configRevision === config.revision && Date.parse(previous.asOf) > now.getTime() - 3600000) return false;
+    // A recent snapshot made with the old confirmation-date clamp is stale,
+    // even when the stored configuration revision has not changed.
+    if (previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Date.parse(previous.asOf) > now.getTime() - 3600000) return false;
     tx.set(leaseRef, { id: leaseId, until: now.getTime() + 240000 });
     return true;
   });

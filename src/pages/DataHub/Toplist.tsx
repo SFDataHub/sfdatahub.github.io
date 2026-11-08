@@ -1,3 +1,4 @@
+import { useLocalToplistUrlSelection } from "./useLocalToplistUrlSelection";
 import { scanArchiveMonthlyOptions } from "../../lib/scanArchive/toplistSelection";
 import { visibleToplistSortOptions, resolveVisibleToplistSort } from "../../lib/toplists/toplistSortOptions";
 import { trackLocalEvent, useAnalyticsView } from "../../lib/analytics/localEvents";
@@ -48,7 +49,7 @@ import {
   LocalToplistViewWorkerCancelledError,
   LocalToplistViewWorkerSession,
 } from "../../lib/toplists/localToplistViewWorkerClient";
-import type { LocalToplistSearchResult, LocalToplistViewWorkerSuccess, LocalToplistViewTab } from "../../lib/toplists/localToplistViewWorkerTypes";
+import type { LocalToplistSearchResult, LocalToplistViewWorkerSuccess } from "../../lib/toplists/localToplistViewWorkerTypes";
 import {
   LOCAL_TOPLIST_SEARCH_DEBOUNCE_MS,
   LOCAL_TOPLIST_SEARCH_MIN_CHARS,
@@ -186,7 +187,7 @@ function GuildHubToplistInner() {
     serverSheetOpen,
     setServerSheetOpen,
     setServers,
-    servers: filterServers,
+    servers: storedServers,
     classes,
     guilds,
     sortBy,
@@ -200,7 +201,9 @@ function GuildHubToplistInner() {
   const nameFilterText = searchMode === "filter" ? searchText : "";
   const nameFilterFavorites = favoritesOnly
     ? JSON.stringify([Object.keys(sharedFavorites.players ?? {}), Object.keys(sharedFavorites.guilds ?? {})]) : "";
-  const [tab, setTab] = React.useState<LocalToplistViewTab>("players");
+  const { servers: filterServers, tab, setTab } = useLocalToplistUrlSelection(
+    storedServers, setServers, !!hubCommand && hubCommandAccepted.current !== hubCommand.id,
+  );
   useAnalyticsView(tab === "players" ? "datahub/toplist/players" : "datahub/toplist/guilds");
   const [filtersCollapsed, setFiltersCollapsed] = React.useState(false);
   const [context, setContext] = React.useState<LocalToplistArchiveContext | null>(null);

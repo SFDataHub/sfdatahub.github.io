@@ -101,9 +101,13 @@ permanently unique people. No new user identifier or account linkage is introduc
 In Visitor Analytics, set the common start date (00:00 Europe/Berlin). After deploying
 the tracker, explicitly verify GoatCounter → Settings → Data collection → Sessions
 and confirm the checkbox. This service does not read/change active account settings.
-First confirmation records the next Berlin calendar day as collection start; reconfirming
-after disabling verification begins a new reliable interval. Earlier start dates are
-clamped to that collection start and labelled honestly. Historical GoatCounter data stays.
+The selected start date is the sole evaluation boundary, including the current partial
+Berlin day. Confirmation verifies the deployed v2 tracker and enabled Sessions; it does
+not postpone evaluation. Previously stored automatic collection dates are ignored on
+read and aligned with the selected start on save, without toggling the checkbox. Only
+existing v2 events within the selected period count; legacy history is never substituted.
+Saving changes the configuration revision. The next regular hourly job also replaces
+snapshots based on the old later boundary even if the revision has not changed.
 
 The public manifest and immutable per-path documents share one generation. Each path
 has its own SHA-256 document ID and at most 30 daily values, avoiding the 1 MiB document

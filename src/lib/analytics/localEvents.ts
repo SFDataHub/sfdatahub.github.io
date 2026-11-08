@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getQaQuestion } from "../help/qaCatalog";
+import { resolveServer } from "../servers/serverResolver";
 
 export const uploadViewEvents = {
   "scans": "datahub/uploads/user-scans",
@@ -134,7 +135,8 @@ const eventNames = [
 ] as const;
 export type LocalEvent = typeof eventNames[number];
 const allowed = new Set<string>(eventNames);
-type ActionEvent = `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}`;
+type ToplistTab = "players" | "guilds";
+type ActionEvent = `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}` | `datahub/toplist/${ToplistTab}/server-view/${string}`;
 type EventPath = LocalEvent | ActionEvent;
 const dungeonBookIds = new Set(["light-world", "shadow-world", "class-world", "fairy-tower", "continuous-loop", "twister", "sandstorm"]);
 type Payload = { path: EventPath; title: EventPath; event: true; referrer: ""; no_session: true };
@@ -182,6 +184,29 @@ export function trackDungeonBookOpen(worldId: string) {
 /** Only catalog IDs; called by deliberate closed-to-open actions, never restoration. */
 export function trackHelpQuestionOpen(questionId: string) {
   if (getQaQuestion(questionId)) enqueueEvent(`help/qa/question-open/${questionId}`);
+}
+
+/** Fixed action prefix, registry codes only; never enters the page-view stream. */
+export function trackToplistServerView(tab: ToplistTab, value: string) {
+  const server = resolveServer(value);
+  if (server && (tab === "players" || tab === "guilds")) enqueueEvent(`datahub/toplist/${tab}/server-view/${server.code}`);
+}
+
+/** Count resolved selection transitions; data updates and effect replays are inert. */
+export function useToplistServerViews(servers: readonly string[], tab: ToplistTab, ready: boolean) {
+  const previous = useRef<{ tab: ToplistTab; servers: Set<string> } | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    const current = new Set(servers.flatMap(value => {
+      const server = resolveServer(value);
+      return server ? [server.code] : [];
+    }));
+    const before = previous.current;
+    previous.current = { tab, servers: current };
+    for (const server of current) {
+      if (before?.tab !== tab || !before.servers.has(server)) trackToplistServerView(tab, server);
+    }
+  }, [servers, tab, ready]);
 }
 
 /** Count committed visibility/selection transitions, never effect replays or renders.
