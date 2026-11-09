@@ -136,7 +136,7 @@ const eventNames = [
 export type LocalEvent = typeof eventNames[number];
 const allowed = new Set<string>(eventNames);
 type ToplistTab = "players" | "guilds";
-type ActionEvent = `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}` | `datahub/toplist/${ToplistTab}/server-view/${string}`;
+type ActionEvent = `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}` | `datahub/toplist/${ToplistTab}/server-view/${string}` | `datahub/setup/completed/servers/${number}`;
 type EventPath = LocalEvent | ActionEvent;
 const dungeonBookIds = new Set(["light-world", "shadow-world", "class-world", "fairy-tower", "continuous-loop", "twister", "sandstorm"]);
 type Payload = { path: EventPath; title: EventPath; event: true; referrer: ""; no_session: true };
@@ -190,6 +190,11 @@ export function trackHelpQuestionOpen(questionId: string) {
 export function trackToplistServerView(tab: ToplistTab, value: string) {
   const server = resolveServer(value);
   if (server && (tab === "players" || tab === "guilds")) enqueueEvent(`datahub/toplist/${tab}/server-view/${server.code}`);
+}
+
+/** One successful explicit preparation; only the confirmed target count, never server data. */
+export function trackDataHubSetupCompleted(serverCount: number) {
+  if (Number.isSafeInteger(serverCount) && serverCount > 0) enqueueEvent(`datahub/setup/completed/servers/${serverCount}`);
 }
 
 /** Count resolved selection transitions; data updates and effect replays are inert. */
