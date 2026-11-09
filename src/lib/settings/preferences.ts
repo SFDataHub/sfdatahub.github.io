@@ -16,7 +16,25 @@ export const PLAYER_RADAR_MODES = ["main", "class", "guild", "server"] as const;
 export type PlayerRadarMode = typeof PLAYER_RADAR_MODES[number];
 const isPlayerRadarMode = (value: unknown): value is PlayerRadarMode => PLAYER_RADAR_MODES.some(mode => mode === value);
 export type PreferencesStatus = "missing" | "ready" | "invalid" | "incompatible" | "read-error";
+export type DataHubSetupPreference = {
+  servers: string[];
+  scope: "comparison" | "year";
+  year: number | null;
+  hidden: boolean;
+  completed: boolean;
+};
+const setupPreference = (value: unknown): DataHubSetupPreference => {
+  const data = record(value);
+  return {
+    servers: Array.isArray(data.servers) ? [...new Set(data.servers.filter((v): v is string => typeof v === "string"))] : [],
+    scope: data.scope === "year" ? "year" : "comparison",
+    year: Number.isInteger(data.year) ? data.year as number : null,
+    hidden: data.hidden === true,
+    completed: data.completed === true,
+  };
+};
 export type PreferencesSnapshot = Readonly<{
+  dataHubSetup: DataHubSetupPreference;
   attributeSumMode: AttributeSumMode;
   navigationMode: NavigationMode;
   guildProfileMode: GuildProfileMode;
@@ -71,7 +89,7 @@ function record(value: unknown): RecordValue {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 }
 function decode(raw: string | null, playerMode: "base" | "total" = "base"): PreferencesSnapshot {
-  const base = { toplistViews: normalizeToplistViews(undefined, playerMode), attributeSumMode: DEFAULT_ATTRIBUTE_SUM_MODE, navigationMode: DEFAULT_NAVIGATION_MODE, guildProfileMode: DEFAULT_GUILD_PROFILE_MODE, playerRadarMode: "main" as const, raw };
+  const base = { dataHubSetup: setupPreference(undefined), toplistViews: normalizeToplistViews(undefined, playerMode), attributeSumMode: DEFAULT_ATTRIBUTE_SUM_MODE, navigationMode: DEFAULT_NAVIGATION_MODE, guildProfileMode: DEFAULT_GUILD_PROFILE_MODE, playerRadarMode: "main" as const, raw };
   if (raw === null) return Object.freeze({ ...base, status: "missing" });
   try {
     const data = record(parsePreferences(raw));
@@ -88,6 +106,7 @@ function decode(raw: string | null, playerMode: "base" | "total" = "base"): Pref
     const validSum = mode === "main-con" || mode === "all-five";
     const validNavigation = navigation === "burger" || navigation === "sidebar";
     return Object.freeze({ ...base,
+      dataHubSetup: setupPreference(record(data.dataHub).setup),
       toplistViews: normalizeToplistViews(record(data.dataHub).toplists, playerMode),
       attributeSumMode: validSum ? mode : DEFAULT_ATTRIBUTE_SUM_MODE,
       navigationMode: validNavigation ? navigation : DEFAULT_NAVIGATION_MODE,
@@ -140,7 +159,7 @@ export function createPreferencesStore(
       }
       return decoded;
     }
-    catch { if (upgradeBasis) return Object.freeze({ ...upgradeBasis, status: "read-error" }); return Object.freeze({ toplistViews: snapshot?.toplistViews ?? normalizeToplistViews(undefined), attributeSumMode: snapshot?.attributeSumMode ?? DEFAULT_ATTRIBUTE_SUM_MODE, navigationMode: snapshot?.navigationMode ?? DEFAULT_NAVIGATION_MODE, guildProfileMode: snapshot?.guildProfileMode ?? DEFAULT_GUILD_PROFILE_MODE, playerRadarMode: snapshot?.playerRadarMode ?? "main", raw: snapshot?.raw ?? null, status: "read-error" }); }
+    catch { if (upgradeBasis) return Object.freeze({ ...upgradeBasis, status: "read-error" }); return Object.freeze({ dataHubSetup: snapshot?.dataHubSetup ?? setupPreference(undefined), toplistViews: snapshot?.toplistViews ?? normalizeToplistViews(undefined), attributeSumMode: snapshot?.attributeSumMode ?? DEFAULT_ATTRIBUTE_SUM_MODE, navigationMode: snapshot?.navigationMode ?? DEFAULT_NAVIGATION_MODE, guildProfileMode: snapshot?.guildProfileMode ?? DEFAULT_GUILD_PROFILE_MODE, playerRadarMode: snapshot?.playerRadarMode ?? "main", raw: snapshot?.raw ?? null, status: "read-error" }); }
   }
   function publish(next: PreferencesSnapshot) {
     if (snapshot && snapshot.raw === next.raw && snapshot.status === next.status && snapshot.attributeSumMode === next.attributeSumMode && snapshot.navigationMode === next.navigationMode && snapshot.playerRadarMode === next.playerRadarMode && snapshot.guildProfileMode === next.guildProfileMode && snapshot.toplistViews.players.playerValueMode === next.toplistViews.players.playerValueMode) return snapshot;
@@ -166,7 +185,7 @@ export function createPreferencesStore(
       if (!listeners.size) events?.removeEventListener("storage", onStorage);
     };
   }
-  function savePreferences(changes: Partial<Pick<PreferencesSnapshot, "attributeSumMode" | "navigationMode" | "guildProfileMode" | "playerRadarMode" | "toplistViews">>, basis: PreferencesSnapshot): SaveResult {
+  function savePreferences(changes: Partial<Pick<PreferencesSnapshot, "attributeSumMode" | "navigationMode" | "guildProfileMode" | "playerRadarMode" | "toplistViews" | "dataHubSetup">>, basis: PreferencesSnapshot): SaveResult {
     if (changes.attributeSumMode !== undefined && changes.attributeSumMode !== "main-con" && changes.attributeSumMode !== "all-five") throw new TypeError("Invalid attribute sum mode");
     if (changes.navigationMode !== undefined && changes.navigationMode !== "burger" && changes.navigationMode !== "sidebar") throw new TypeError("Invalid navigation mode");
     if (changes.playerRadarMode !== undefined && !isPlayerRadarMode(changes.playerRadarMode)) throw new TypeError("Invalid player radar mode");
@@ -185,6 +204,7 @@ export function createPreferencesStore(
       ...(changes.playerRadarMode !== undefined ? { playerRadarMode: changes.playerRadarMode } : {}),
       ...(changes.guildProfileMode !== undefined ? { guildProfileMode: changes.guildProfileMode } : {}),
     } };
+    if (changes.dataHubSetup !== undefined) next.dataHub = { ...record(next.dataHub ?? dataHub), setup: setupPreference(changes.dataHubSetup) };
     if (changes.toplistViews !== undefined) {
       const oldViews = record(dataHub.toplists);
       const views = normalizeToplistViews(changes.toplistViews, current.toplistViews.players.playerValueMode === "total" ? "total" : "base");
