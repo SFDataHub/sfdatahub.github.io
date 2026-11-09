@@ -10,6 +10,7 @@ import ContentShell from "../../components/ContentShell";
 import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
 import BetaCornerBanner from "../../components/ui/shared/BetaCornerBanner";
 import styles from "./Index.module.css";
+import DataHubSetup from "./DataHubSetup";
 
 export default function DataHubIndex() {
   const { t } = useTranslation();
@@ -61,6 +62,7 @@ export default function DataHubIndex() {
           </button>
         </div>
         {inventoryOpen && <ScanInventoryInfo id={inventoryId} />}
+        <DataHubSetup />
 
         <section className={styles.tileGrid} aria-label={t("hubNavigation.areas")}>
           <Link className={styles.tile} to="/data-hub/toplist">
