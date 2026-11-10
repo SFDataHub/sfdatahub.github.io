@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "re
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { trackDataHubSetupCompleted } from "../../lib/analytics/localEvents";
 import { lockBodyScroll } from "../../lib/bodyScrollLock";
 import { preferencesStore, type DataHubSetupPreference } from "../../lib/settings/preferences";
 import { listSfDataHubScanSummaries, type GuildHubScanSummary } from "../../lib/guilds/localScanLibrary";
@@ -35,7 +36,7 @@ export default function DataHubSetup() {
   const [stopped, setStopped] = useState(false);
   const [runError, setRunError] = useState(false);
   const [progress, setProgress] = useState<SetupProgress>({ phase: "acquiring", complete: [], failed: [], total: 0 });
-  const [confirmedPlan, setConfirmedPlan] = useState<SetupPlan | null>(null);
+  const [confirmedPlan, setConfirmedPlan] = useState<(SetupPlan & { selectedServerCount: number }) | null>(null);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -103,7 +104,7 @@ export default function DataHubSetup() {
 
   const start = async (retry = false) => {
     if (controller.current || !plan?.scans.length) return;
-    const frozen = retry && confirmedPlan ? confirmedPlan : plan;
+    const frozen = retry && confirmedPlan ? confirmedPlan : { ...plan, selectedServerCount: normalizeSetupServers(draft.servers).length };
     const successful = retry ? progress.complete : [];
     const remaining = { ...frozen, scans: frozen.scans.filter(scan => !successful.includes(scan.id)) };
     const pending = new AbortController(); controller.current = pending;
@@ -114,8 +115,9 @@ export default function DataHubSetup() {
       const result = await prepareSetupPlan(remaining, pending.signal, value => {
         if (mounted.current && !pending.signal.aborted) setProgress({ ...value, complete: [...successful, ...value.complete], total: frozen.scans.length });
       });
-      if (!mounted.current || pending.signal.aborted) return;
+      if (!mounted.current || pending.signal.aborted || controller.current !== pending) return;
       if (!result.failed.length && !frozen.missing.length && !frozen.failedYears.length) {
+        trackDataHubSetupCompleted(frozen.selectedServerCount);
         const completed = { ...draft, completed: true };
         setDraft(completed); persist(completed); setStep(5);
       }
