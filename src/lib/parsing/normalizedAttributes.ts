@@ -46,7 +46,7 @@ const markCalculated = (
 
 const getPrimaryAttribute = (characterClass: number | null): NormalizedAttributeKey | null => {
   if (characterClass == null) return null;
-  if ([1, 5, 6, 11].includes(characterClass)) return "strength";
+  if ([1, 5, 6, 11, 13].includes(characterClass)) return "strength";
   if ([3, 4, 7, 12].includes(characterClass)) return "dexterity";
   if ([2, 8, 9, 10].includes(characterClass)) return "intelligence";
   return null;
@@ -176,7 +176,10 @@ export const calculateSfPlayerAttributes = (
           ? Math.ceil((equipment * 11) / 100)
           : options.characterClass === BERSERKER_CLASS
             ? Math.ceil((items * 11) / 100)
-            : 0;
+            : options.characterClass === 13
+              // SF-Tools PlayerModel.getClassBonus: item bonus, excluding gems.
+              ? Math.ceil((items * 11.11) / 100)
+              : 0;
     const potion =
       base == null || classBonus == null || equipment == null
         ? null

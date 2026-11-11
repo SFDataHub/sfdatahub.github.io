@@ -753,6 +753,9 @@
     "columns": {
       "rank": "#",
       "rankDelta": "Δ Hely",
+      "overallRank": "Összesített helyezés",
+      "serverRank": "Szerveren elért helyezés",
+      "classRank": "Kaszt szerinti helyezés",
       "server": "Szerver",
       "player": "Játékos",
       "name": "Név",
@@ -1037,7 +1040,8 @@
       "bard": "Bárd",
       "necromancer": "Nekromanta",
       "paladin": "Paladin",
-      "plague-doctor": "Pestisdoktor"
+      "plague-doctor": "Pestisdoktor",
+      "bloodweaver": "Bloodweaver"
     },
     "errors": {
       "archive": "Az archív metaadatok nem tölthetők be. Próbáld újra.",
@@ -1992,7 +1996,8 @@
       "bard": "Bard",
       "necromancer": "Nekromanta",
       "paladin": "Paladin",
-      "plague-doctor": "Pestisdoktor"
+      "plague-doctor": "Pestisdoktor",
+      "bloodweaver": "Bloodweaver"
     }
   },
   "fusionIdentity": {
@@ -2648,6 +2653,7 @@
       "ascending": "Növekvő — kattints a csökkenőhöz",
       "descending": "Csökkenő — kattints a növekvőhöz",
       "categories": {
+        "rankings": "Rangsorok",
         "identity": "Általános / Azonosítás",
         "attributes": "Tulajdonságok",
         "progress": "Fejlődés / Haladás",
@@ -4549,7 +4555,7 @@
     "retry": "Befejezetlen részek újrapróbálása",
     "changePlan": "Előkészítés módosítása",
     "success": "A(z) {{servers}} szerverek elérhető adatai sikeresen előkészítve.",
-    "moreData": "Később más szerverekhez vagy hosszabb időszakokhoz is betölthetsz további adatokat.",
+    "moreData": "A DataHub irányítópultján, a kereső alatt bármikor újra megnyithatod a beállítási varázslót, hogy további szervereket vagy hosszabb időszakokat tölts be.",
     "fusionDone": "Egyesítések utáni történeti hozzárendelésekhez használd az Identity Matching funkciót. Az előkészítés nem indított azonosságelemzést, és nem erősített meg azonosságokat.",
     "help": "További információ a kérdések és válaszok között",
     "toplist": "Toplista megnyitása",

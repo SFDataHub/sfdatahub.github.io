@@ -95,6 +95,7 @@
       "ascending": "Aufsteigend — klicken für absteigend",
       "descending": "Absteigend — klicken für aufsteigend",
       "categories": {
+        "rankings": "Rankings",
         "identity": "Allgemein / Identität",
         "attributes": "Attribute",
         "progress": "Entwicklung / Fortschritt",
@@ -1377,6 +1378,9 @@
       "bonus_bonus_lck": "Gesamtbonus Glü",
       "rank": "#",
       "rankDelta": "Δ Rang",
+      "overallRank": "Gesamtrang",
+      "serverRank": "Serverrang",
+      "classRank": "Klassenrang",
       "server": "Server",
       "player": "Spieler",
       "name": "Name",
@@ -1551,7 +1555,8 @@
       "bard": "Barde",
       "necromancer": "Nekromant",
       "paladin": "Paladin",
-      "plague-doctor": "Pestdoktor"
+      "plague-doctor": "Pestdoktor",
+      "bloodweaver": "Bloodweaver"
     },
     "errors": {
       "archive": "Archiv-Metadaten konnten nicht geladen werden. Versuche es erneut.",
@@ -2637,7 +2642,8 @@
       "bard": "Barde",
       "necromancer": "Nekromant",
       "paladin": "Paladin",
-      "plague-doctor": "Pestdoktor"
+      "plague-doctor": "Pestdoktor",
+      "bloodweaver": "Bloodweaver"
     }
   },
   "localScanImport": {
@@ -4931,7 +4937,7 @@
     "retry": "Offene Teile erneut versuchen",
     "changePlan": "Vorbereitung ändern",
     "success": "Verfügbare Daten für {{servers}} wurden erfolgreich vorbereitet.",
-    "moreData": "Später können zusätzliche Daten für andere Server oder weitergehende Zeiträume nachgeladen werden.",
+    "moreData": "Du kannst den Einrichtungsassistenten jederzeit im DataHub-Dashboard unter der Suche erneut öffnen, um weitere Server oder längere Zeiträume zu laden.",
     "fusionDone": "Nutze Identity Matching für historische Zuordnungen nach Fusionen. Die Vorbereitung hat keine Identitätsanalyse gestartet und keine Identitäten bestätigt.",
     "help": "Mehr in den Q&A",
     "toplist": "Topliste öffnen",

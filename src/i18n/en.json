@@ -95,6 +95,7 @@
       "ascending": "Ascending — click to sort descending",
       "descending": "Descending — click to sort ascending",
       "categories": {
+        "rankings": "Rankings",
         "identity": "General / Identity",
         "attributes": "Attributes",
         "progress": "Development / Progress",
@@ -1383,6 +1384,9 @@
       "bonus_bonus_lck": "Total Bonus Lck",
       "rank": "#",
       "rankDelta": "Δ Rank",
+      "overallRank": "Overall rank",
+      "serverRank": "Server rank",
+      "classRank": "Class rank",
       "server": "Server",
       "player": "Player",
       "name": "Name",
@@ -1557,7 +1561,8 @@
       "bard": "Bard",
       "necromancer": "Necromancer",
       "paladin": "Paladin",
-      "plague-doctor": "Plague Doctor"
+      "plague-doctor": "Plague Doctor",
+      "bloodweaver": "Bloodweaver"
     },
     "errors": {
       "archive": "Could not load archive metadata. Try again.",
@@ -2648,7 +2653,8 @@
       "bard": "Bard",
       "necromancer": "Necromancer",
       "paladin": "Paladin",
-      "plague-doctor": "Plague Doctor"
+      "plague-doctor": "Plague Doctor",
+      "bloodweaver": "Bloodweaver"
     }
   },
   "localScanImport": {
@@ -4942,7 +4948,7 @@
     "retry": "Retry unfinished parts",
     "changePlan": "Change preparation",
     "success": "Available data for {{servers}} has been prepared successfully.",
-    "moreData": "You can load additional data for other servers or longer periods later.",
+    "moreData": "You can reopen the setup assistant at any time below the search in the DataHub dashboard to load more servers or longer time periods.",
     "fusionDone": "For historical links after mergers, use Identity Matching. Preparation has not started an identity analysis or confirmed any identities.",
     "help": "More in Q&A",
     "toplist": "Open toplist",

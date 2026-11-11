@@ -116,7 +116,7 @@ const asNumberArray = (value: unknown): number[] | null => {
   return value.map((entry) => toFiniteNumberWithFallback(entry, 0));
 };
 
-const STRENGTH_CLASS_IDS = new Set([1, 5, 6, 11]);
+const STRENGTH_CLASS_IDS = new Set([1, 5, 6, 11, 13]);
 const DEXTERITY_CLASS_IDS = new Set([3, 4, 7, 12]);
 const INTELLIGENCE_CLASS_IDS = new Set([2, 8, 9, 10]);
 
@@ -209,7 +209,7 @@ const getMainSaveBaseIndex = (classId: string | null): number | null => {
   }
 
   const key = canonicalizeFieldKey(classId ?? "");
-  if (["warrior", "berserker", "battlemage", "paladin"].includes(key)) return 30;
+  if (["warrior", "berserker", "battlemage", "paladin", "bloodweaver"].includes(key)) return 30;
   if (["scout", "assassin", "demonhunter", "plaguedoctor", "pestdoktor"].includes(key)) return 31;
   if (["mage", "druid", "bard", "necromancer"].includes(key)) return 32;
   return null;

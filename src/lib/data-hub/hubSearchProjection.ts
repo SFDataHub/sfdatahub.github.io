@@ -8,7 +8,7 @@ import { readHubSearchReferenceEvidence, resolveHubSearchReference } from "./hub
 export { readHubSearchReferenceEvidence } from "./hubSearchReference";
 
 export const HUB_SEARCH_PROJECTION_VERSION = 2;
-export const HUB_SEARCH_PARSER_VERSION = "memberIdentity:2/logicalSnapshots:2/guildIdentity:2/serverEvidence:2";
+export const HUB_SEARCH_PARSER_VERSION = "memberIdentity:2/logicalSnapshots:2/guildIdentity:2/serverEvidence:2/classes:13";
 export const HUB_SEARCH_KEY_PREFIX = "hub-search:source:";
 export type HubSearchDocument = {
   kind: FavoriteKind; name: string; identifier: string | null; reference: FavoriteReference | null;

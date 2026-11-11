@@ -4,7 +4,7 @@ export type GameClassKey =
   | "warrior" | "mage" | "scout" | "assassin"
   | "demon-hunter" | "berserker" | "battle-mage"
   | "druid" | "bard" | "necromancer" | "paladin"
-  | "plague-doctor";
+  | "plague-doctor" | "bloodweaver";
 
 export type ClassMeta = {
   id: number;
@@ -27,6 +27,7 @@ const DRIVE: Record<GameClassKey, string> = {
   necromancer:    "1mZKuTZKPEJTuwWhbhVsmFfs6vfnv2Wi9",
   paladin:        "1dx7zcadr6xFLNudjojKVerP19Vt6_lbB",
   "plague-doctor": "1sRziBjLKnZ-iE7OC44c_mJ_0j62ra9fg",
+  bloodweaver:    "1vPA3SQrln3hpWW7tu3wD7k-LifaDAG5v",
   scout:          "12eL2NkyvJg2CL8GUbA8whKOA7TLBoa6x",
   warrior:        "13Q4lC2CqjYjWjIhbGU8kunApX1I3_TDt",
 };
@@ -58,6 +59,7 @@ export const CLASSES: ClassMeta[] = [
   { id: 10, key: "necromancer",  label: "Necromancer",  primaryAttribute: "intelligence", iconUrl: driveViewUrl(DRIVE["necromancer"]),  fallback: "💀"  },
   { id: 11, key: "paladin",      label: "Paladin",      primaryAttribute: "strength",     iconUrl: driveViewUrl(DRIVE["paladin"]),      fallback: "🛡️"  },
   { id: 12, key: "plague-doctor", label: "Plague Doctor", primaryAttribute: "dexterity", iconUrl: driveViewUrl(DRIVE["plague-doctor"]), fallback: "?" },
+  { id: 13, key: "bloodweaver", label: "Bloodweaver", primaryAttribute: "strength", iconUrl: driveViewUrl(DRIVE["bloodweaver"]), fallback: "🩸" },
 ];
 
 export const CLASS_BY_KEY = Object.fromEntries(CLASSES.map(c => [c.key, c] as const));
@@ -92,6 +94,7 @@ add("druide", "druid");
 add("barde", "bard");
 add("necro", "necromancer"); add("nekromant", "necromancer");
 add("pala", "paladin");
+add("13", "bloodweaver");
 add("plaguedoctor", "plague-doctor"); add("plague doctor", "plague-doctor"); add("plague-doctor", "plague-doctor"); add("pestdoktor", "plague-doctor"); add("12", "plague-doctor");
 
 /** Öffentliche Helper: aus beliebigem Namen verlässlich das Icon bestimmen. */
@@ -122,5 +125,5 @@ export type ClassSelection = GameClassKey | readonly string[] | null;
 export function getExactClassMeta(input?: number | string | null): ClassMeta | null {
   const byId = getClassMetaById(input); if (byId) return byId;
   const label = String(input ?? "").trim().toLowerCase();
-  return CLASSES.find(meta => meta.key === label || meta.label.toLowerCase() === label) ?? null;
+  return CLASSES.find(meta => meta.key === label || meta.label.toLowerCase() === label || (meta.key === "bloodweaver" && canon(label) === meta.key)) ?? null;
 }

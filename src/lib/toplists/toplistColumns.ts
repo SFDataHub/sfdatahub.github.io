@@ -1,10 +1,10 @@
 import { PLAYER_ATTRIBUTE_COLUMNS, playerAttributeColumn, attributeColumnLabel } from "./playerAttributeColumns";
 /** Stable local table identities; labels and positions are not persisted. */
 export type ToplistKind = "players" | "guilds";
-export type ToplistColumn = { key: string; label: string; category: "identity" | "attributes" | "progress" | "fortress"; metric?: string; path?: string[] };
+export type ToplistColumn = { key: string; label: string; category: "rankings" | "identity" | "attributes" | "progress" | "fortress"; metric?: string; path?: string[] };
 const column = (key: string, label: string, category: ToplistColumn["category"], metric?: string): ToplistColumn => ({ key, label, category, metric });
 export const PLAYER_COLUMNS = [
-  column("rank", "#", "identity"), column("rankDelta", "Δ Rank", "identity"),
+  column("rank", "#", "rankings"), column("rankDelta", "Δ Rank", "rankings"),
   column("server", "Server", "identity", "server"), column("name", "Player", "identity", "name"),
   column("class", "Class", "identity", "class"), column("guild", "Guild", "identity", "guild"),
   column("level", "Level", "progress", "level"), column("main", "Main", "attributes", "main"),
@@ -14,7 +14,7 @@ export const PLAYER_COLUMNS = [
   column("lastScan", "Last Scan", "identity", "lastScan"),
 ];
 export const GUILD_COLUMNS = [
-  column("rank", "#", "identity"), column("server", "Server", "identity", "guildServer"), column("name", "Name", "identity", "guildName"),
+  column("rank", "#", "rankings"), column("server", "Server", "identity", "guildServer"), column("name", "Name", "identity", "guildName"),
   column("hofRank", "HoF Rank", "progress", "guildHofRank"), column("honor", "Honor", "progress", "guildHonor"),
   column("raids", "Raids", "progress", "guildRaids"), column("portal", "Portal", "progress", "guildPortal"),
   column("hydra", "Hydra", "progress", "guildHydra"), column("petLevel", "Pet Level", "progress", "guildPetLevel"),
@@ -24,8 +24,10 @@ export const GUILD_COLUMNS = [
 ];
 const DYNAMIC_ATTRIBUTES = ["main", "con", "sum", "ratio"];
 const OPTIONAL_PLAYER_COLUMNS: ToplistColumn[] = PLAYER_ATTRIBUTE_COLUMNS.map(c => ({ key: c.key, label: c.label, category: "attributes", metric: c.key, path: c.path }));
-export const toplistColumns = (kind: ToplistKind) => kind === "players" ? [...PLAYER_COLUMNS.filter(c => !DYNAMIC_ATTRIBUTES.includes(c.key)), ...OPTIONAL_PLAYER_COLUMNS] : GUILD_COLUMNS;
-const allowedColumns = (kind: ToplistKind) => kind === "players" ? [...PLAYER_COLUMNS, ...OPTIONAL_PLAYER_COLUMNS] : GUILD_COLUMNS;
+export const toplistColumns = (kind: ToplistKind) => kind === "players" ? [...PLAYER_COLUMNS.filter(c => !DYNAMIC_ATTRIBUTES.includes(c.key)), ...OPTIONAL_PLAYER_COLUMNS, ...rankingColumns(kind)] : [...GUILD_COLUMNS, ...rankingColumns(kind)];
+const RANKING_COLUMNS = [column("overallRank", "Overall rank", "rankings"), column("serverRank", "Server rank", "rankings")];
+const rankingColumns = (kind: ToplistKind) => [...RANKING_COLUMNS, ...(kind === "players" ? [column("classRank", "Class rank", "rankings")] : [])];
+const allowedColumns = (kind: ToplistKind) => kind === "players" ? [...PLAYER_COLUMNS, ...OPTIONAL_PLAYER_COLUMNS, ...rankingColumns(kind)] : [...GUILD_COLUMNS, ...rankingColumns(kind)];
 export const toplistColumnDefinition = (kind: ToplistKind, key: string) => allowedColumns(kind).find(c => c.key === key);
 /** The same translated title is used by local headers and the visible sort choices. */
 export function toplistColumnLabel(kind: ToplistKind, key: string, translate: (key: string, fallback: string) => string) {
@@ -168,7 +170,7 @@ export function toplistColumnTree(kind: ToplistKind): ToplistCatalogNode[] {
     }
     nodes.push({ key: column.key, label: column.label, column, children: [] });
   }
-  return roots.sort((a, b) => ["identity", "attributes", "progress", "fortress"].indexOf(a.key) - ["identity", "attributes", "progress", "fortress"].indexOf(b.key));
+  return roots.sort((a, b) => ["rankings", "identity", "attributes", "progress", "fortress"].indexOf(a.key) - ["rankings", "identity", "attributes", "progress", "fortress"].indexOf(b.key));
 }
 
 /** Old dynamic sort choices follow their frozen Custom counterpart, without rewriting Default filters. */

@@ -1,5 +1,5 @@
 import type { NormalizedPlayer } from "../parsing/normalizedPlayer";
-import { getClassMetaById } from "../../data/classes";
+import { getExactClassMeta } from "../../data/classes";
 
 export const ATTRIBUTE_NAMES = ["Main", "Con", "Dex", "Int", "Str", "Lck"] as const;
 export const STAT_NAMES = [...ATTRIBUTE_NAMES, "Sum", "Ratio"] as const;
@@ -27,7 +27,7 @@ export type PlayerAttributeValues = Record<string, number | null>;
 const finite = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
 /** Project only scalar components, reusing the single normalization done by derivation. */
 export function projectPlayerAttributeValues(core: NormalizedPlayer | null, classId: unknown): PlayerAttributeValues {
-  const keys = { Main: getClassMetaById(Number(classId))?.primaryAttribute, Con: "constitution", Dex: "dexterity", Int: "intelligence", Str: "strength", Lck: "luck" };
+  const keys = { Main: getExactClassMeta(typeof classId === "number" || typeof classId === "string" ? classId : null)?.primaryAttribute, Con: "constitution", Dex: "dexterity", Int: "intelligence", Str: "strength", Lck: "luck" };
   return Object.fromEntries(PLAYER_ATTRIBUTE_COLUMNS.filter(c => !c.field).map(c => {
     const attribute = keys[c.stat as keyof typeof keys];
     const status = core?.metadata.fields[`attributes.${attribute}.${c.component}`]?.status;

@@ -144,7 +144,7 @@ function HeaderCascade({ menu, value, index, panel, close, edit, autoSize, error
       const attribute = playerAttributeColumn(node.key);
       return attribute ? attributeColumnLabel(attribute, t, true) : t(`toplists.columns.${node.key === "name" && menu.kind === "players" ? "player" : node.key}`, node.label ?? node.key);
     }
-    return ["identity", "attributes", "progress", "fortress"].includes(node.key)
+    return ["rankings", "identity", "attributes", "progress", "fortress"].includes(node.key)
       ? t(`localSettings.toplists.categories.${node.key}`)
       : t(`toplists.attributeCatalog.groups.${node.key}`, ATTRIBUTE_BONUSES.find(b => b[0] === node.key)?.[1] ?? node.key);
   };

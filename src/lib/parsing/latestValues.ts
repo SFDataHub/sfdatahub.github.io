@@ -142,6 +142,8 @@ const MAIN_ATTRIBUTE_BY_CLASS_NAME: Record<string, AttributeCode> = {
   bard: "int",
   necromancer: "int",
   paladin: "str",
+  bloodweaver: "str",
+  "13": "str",
   plaguedoctor: "dex",
   pestdoktor: "dex",
   "12": "dex",

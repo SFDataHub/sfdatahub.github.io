@@ -1,3 +1,4 @@
+import ToplistRankingValue from "./ToplistRankingValue";
 import { PLAYER_ATTRIBUTE_COLUMNS, playerAttributeColumn, playerAttributeValue, playerRatioLabel } from "../../lib/toplists/playerAttributeColumns";
 import { useToplistAutoSize } from "./useToplistAutoSize";
 import ToplistViewPicker from "./ToplistViewControls";
@@ -284,6 +285,7 @@ const DEFAULT_TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [
 ];
 
 const TOPLIST_COLUMNS: ReadonlyArray<ToplistColumnDef> = [...DEFAULT_TOPLIST_COLUMNS,
+  ...["overallRank", "serverRank", "classRank"].map(key => ({ key, label: key, width: "6%", align: "center" as const })),
   ...PLAYER_ATTRIBUTE_COLUMNS.map(c => ({ key: c.key, label: c.label, width: "6%", align: "right" as const })),
 ];
 const TOPLIST_VISIBLE_COLUMNS = DEFAULT_TOPLIST_COLUMNS.filter((column) => !column.hidden);
@@ -3103,6 +3105,9 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
               }
               switch (column.key) {
 case "rank": return (<td key={column.key} style={cellStyles.rank}>{hasReadOnlyData ? ((r as any)._rank ?? (r as any).tableRank ?? i + 1) : i + 1}</td>);
+case "overallRank":
+case "serverRank":
+case "classRank": return <td key={column.key} style={cellStyles[column.key]}><ToplistRankingValue rankings={r.rankings} rankKey={column.key} showCompare={showCompare} /></td>;
 case "rankDelta": return (<td key={column.key} style={cellStyles.rankDelta}>
                 <span style={TOPLIST_TEXT_CELL_CONTENT_STYLE}>
                   {rankDeltaDisplay ? (

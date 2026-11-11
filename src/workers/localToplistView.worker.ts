@@ -4,6 +4,7 @@ import type { ToplistPlayerRow } from "../lib/toplists/toplistContracts";
 import { buildLocalToplistNameFilter, normalizeLocalToplistNameText } from "../lib/toplists/localToplistNameFilter";
 import { localToplistContentRevision } from "../lib/toplists/localToplistDatasetRevision";
 import {
+  withLocalToplistRankings,
   buildLocalGuildToplistView,
   buildLocalPlayerToplistView,
   LOCAL_PLAYER_TOPLIST_VIEW_LIMIT,
@@ -283,26 +284,24 @@ const handleView = (request: LocalToplistViewWorkerViewRequest) => {
   if (request.tab === "players") {
     const bounds = pageBounds(request.page, request.pageSize, request.playerLimit === null ? Math.max(10, playerRows.length) : LOCAL_PLAYER_TOPLIST_VIEW_LIMIT);
     const allowed = request.allowedPlayerKeys && (filterEnabled || request.allowedPlayerKeys.length) ? new Set(request.allowedPlayerKeys) : null;
-    const sourceRows = allowed && !filterEnabled
-      ? playerRows.filter((row) => {
-          const key = normalizeKey(row.server, row.identifier);
-          return !!key && allowed.has(key);
-        })
-      : playerRows;
     if (preparedView?.key !== prepareKey) {
+      const scope = buildLocalPlayerToplistView(playerRows, {
+        filters: { servers: request.filters.servers }, sort: request.sort,
+        playerAverageMode: request.playerAverageMode, playerStatsDayValues: request.playerStatsDayValues, playerLimit: null,
+      }).rows;
+      const sourceRows = withLocalToplistRankings(scope, "players", row =>
+        !["statsDay", "statsDayTotal"].includes(request.sort.metricKey) || Number.isFinite(request.playerStatsDayValues?.[row.rowKey]));
       const options = { filters: request.filters, sort: request.sort, playerAverageMode: request.playerAverageMode, playerStatsDayValues: request.playerStatsDayValues,
         playerLimit: request.playerLimit === null ? null : LOCAL_PLAYER_TOPLIST_VIEW_LIMIT };
-      const baseline = buildLocalPlayerToplistView(sourceRows, options).rows;
-      const full = match && request.playerLimit !== null ? buildLocalPlayerToplistView(sourceRows, { ...options, playerLimit: null }).rows : baseline;
-      const ranks = new Map(baseline.map(row => [normalizeKey(row.server, row.identifier), row.tableRank]));
-      preparedView = { key: prepareKey, guilds: [], players: full.map(row => ({ ...row,
-        tableRank: ranks.get(normalizeKey(row.server, row.identifier)) ?? row.tableRank })) };
+      preparedView = { key: prepareKey, guilds: [], players: buildLocalPlayerToplistView(sourceRows,
+        match && request.playerLimit !== null ? { ...options, playerLimit: null } : options).rows };
     }
     const filteredKey = JSON.stringify([prepareKey, query]);
     if (filteredPlayers?.key !== filteredKey) {
       const matched = match ? preparedView.players.filter(match.player) : preparedView.players;
-      const filtered = filterEnabled && allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.identifier) ?? "")) : matched;
-      const rows = request.playerLimit === null ? filtered : filtered.slice(0, LOCAL_PLAYER_TOPLIST_VIEW_LIMIT);
+      const filtered = allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.identifier) ?? "")) : matched;
+      const rows = (request.playerLimit === null ? filtered : filtered.slice(0, LOCAL_PLAYER_TOPLIST_VIEW_LIMIT))
+        .map((row, index) => ({ ...row, tableRank: index + 1 }));
       filteredPlayers = { key: filteredKey, rows,
         decor: Object.fromEntries([...buildPlayerToplistDecorMap(rows as unknown as ToplistPlayerRow[], request.playerAverageMode ?? "base")].filter(([, value]) => value.mainRank || value.conRank || value.levelRank)) };
     }
@@ -333,19 +332,13 @@ const handleView = (request: LocalToplistViewWorkerViewRequest) => {
 
   const bounds = pageBounds(request.page, request.pageSize, request.guildLimit === null ? Math.max(10, guildRows.length) : GUILD_VIEW_PAGE_LIMIT);
   const allowed = request.allowedGuildKeys && (filterEnabled || request.allowedGuildKeys.length) ? new Set(request.allowedGuildKeys) : null;
-  const sourceRows = allowed && !filterEnabled
-    ? guildRows.filter((row) => {
-        const key = normalizeKey(row.server, row.guildIdentifier);
-        return !!key && allowed.has(key);
-      })
-    : guildRows;
   if (preparedView?.key !== prepareKey) {
-    preparedView = { key: prepareKey, players: [], guilds: buildLocalGuildToplistView(sourceRows, {
+    preparedView = { key: prepareKey, players: [], guilds: withLocalToplistRankings(buildLocalGuildToplistView(guildRows, {
       filters: request.filters, sort: request.sort, guildAverageMode: request.guildAverageMode,
-    }).rows };
+    }).rows, "guilds") };
   }
   const matched = match ? preparedView.guilds.filter(match.guild) : preparedView.guilds;
-  const rows = filterEnabled && allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.guildIdentifier) ?? "")) : matched;
+  const rows = allowed ? matched.filter(row => allowed.has(normalizeKey(row.server, row.guildIdentifier) ?? "")) : matched;
   respond({
     requestId: request.requestId,
     ok: true,
@@ -357,7 +350,7 @@ const handleView = (request: LocalToplistViewWorkerViewRequest) => {
     page: bounds.page,
     pageSize: bounds.pageSize,
     playerRows: [],
-    guildRows: rows.slice(bounds.start, bounds.end),
+    guildRows: rows.map((row, index) => ({ ...row, tableRank: index + 1 })).slice(bounds.start, bounds.end),
   });
 };
 

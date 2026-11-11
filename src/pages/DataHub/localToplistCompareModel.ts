@@ -359,7 +359,7 @@ const statsPerDay = (
 };
 
 export function summarizeLocalPlayerCompareRows(rows: readonly LocalPlayerToplistComparisonRow[], mode: "base" | "total", includes: (row: LocalPlayerToplistRow) => boolean) {
-  const target = rows.filter(row => row.current && includes(row.current)).sort((a, b) => (a.currentTableRank ?? Infinity) - (b.currentTableRank ?? Infinity));
+  const target = rows.filter(row => row.current && row.currentTableRank != null && includes(row.current)).sort((a, b) => (a.currentTableRank ?? Infinity) - (b.currentTableRank ?? Infinity));
   let sum = 0, count = 0, max: number | null = null;
   target.forEach((row, index) => {
     const value = statsPerDay(row.current, row.previous, mode === "total" ? "sumTotal" : "sum").perDay;
@@ -400,7 +400,8 @@ export function enrichLocalPlayerCompareRows(input: {
     const totalStats = comparison ? statsPerDay(comparison.current, comparison.previous, "sumTotal") : { days: null, perDay: null };
     return {
       ...row,
-      _rank: comparison?.currentTableRank ?? row.tableRank,
+      _rank: row.tableRank ?? comparison?.currentTableRank,
+      rankings: comparison?.rankings ?? row.rankings,
       _rankDelta: comparison?.rankDelta ?? null,
       _compareMissing: compareMissing,
       _statsPerDay: input.playerAvgMode === "total" ? totalStats.perDay : baseStats.perDay,
@@ -447,7 +448,8 @@ export function enrichLocalGuildCompareRows(input: {
     const comparison = key ? byIdentifier.get(key) : null;
     return {
       ...row,
-      _rank: comparison?.currentTableRank ?? row.tableRank,
+      _rank: row.tableRank ?? comparison?.currentTableRank,
+      rankings: comparison?.rankings ?? row.rankings,
       _rankDelta: comparison?.rankDelta ?? null,
       _compareMissing: !comparison || comparison.status !== "matched",
       _delta: comparison?.deltas ?? {},

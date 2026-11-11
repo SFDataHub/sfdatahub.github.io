@@ -1,3 +1,4 @@
+import { buildLocalToplistNameFilter } from "./localToplistNameFilter";
 import { resolvePlayerIdentity, type IdentityResolutionSnapshot } from "../identities/identityResolution";
 import { observationReferenceKey, serverComparisonKey } from "../servers/serverResolver";
 import {
@@ -12,6 +13,8 @@ import type {
   LocalToplistSnapshotMeta,
 } from "./localToplistTypes";
 import {
+  withLocalToplistRankings,
+  type LocalToplistRankings,
   buildLocalGuildToplistView,
   buildLocalPlayerToplistView,
   getLocalToplistMetricValue,
@@ -45,6 +48,11 @@ export type LocalToplistIdentityLink = {
 
 export type LocalToplistComparisonOptions = {
   filters?: LocalToplistFilters;
+  nameFilter?: string;
+  allowedPlayerKeys?: readonly string[];
+  allowedGuildKeys?: readonly string[];
+  /** An independently derived historical daily basis; never substitute current values. */
+  previousPlayerStatsDayValues?: Readonly<Record<string, number | null>>;
   playerSort?: {
     metricKey?: string;
     direction?: LocalToplistSortDirection;
@@ -68,6 +76,7 @@ export type LocalToplistComparisonMatchType = "exact" | "fusion" | "none" | "con
 export type LocalToplistMetricDeltaMap = Record<string, number | null>;
 
 export type LocalPlayerToplistComparisonRow = {
+  rankings?: LocalToplistRankings;
   status: LocalToplistComparisonStatus;
   matchType: LocalToplistComparisonMatchType;
   identityKey: string | null;
@@ -84,6 +93,7 @@ export type LocalPlayerToplistComparisonRow = {
 };
 
 export type LocalGuildToplistComparisonRow = {
+  rankings?: LocalToplistRankings;
   status: LocalToplistComparisonStatus;
   matchType: LocalToplistComparisonMatchType;
   identityKey: string | null;
@@ -108,6 +118,7 @@ export type LocalToplistComparisonResult = {
   currentPlayerView: LocalPlayerToplistViewResult;
   previousGuildView: LocalGuildToplistViewResult;
   currentGuildView: LocalGuildToplistViewResult;
+  playerStatsDayValues: { base: Record<string, number | null>; total: Record<string, number | null> };
   players: LocalPlayerToplistComparisonRow[];
   guilds: LocalGuildToplistComparisonRow[];
   counts: {
@@ -273,12 +284,12 @@ const guildDeltas = (
   }));
 };
 
-const computePlayerStatsPerDay = (current: LocalPlayerToplistRow | null, previous: LocalPlayerToplistRow | null) => {
+const computePlayerStatsPerDay = (current: LocalPlayerToplistRow | null, previous: LocalPlayerToplistRow | null, field: "sum" | "sumTotal" = "sum") => {
   if (!current || !previous) return { statsDays: null, statsPerDay: null };
   const currentSec = rowScanSec(current);
   const previousSec = rowScanSec(previous);
-  const currentSum = toNumber(current.sum);
-  const previousSum = toNumber(previous.sum);
+  const currentSum = toNumber(current[field]);
+  const previousSum = toNumber(previous[field]);
   if (!(currentSec > previousSec) || currentSum == null || previousSum == null) {
     return { statsDays: null, statsPerDay: null };
   }
@@ -433,24 +444,24 @@ export const compareLocalToplists = (
     ));
   }
 
-  const previousPlayerView = buildLocalPlayerToplistView(previous.players, {
-    filters: options.playerSources ? { ...options.filters, servers: options.playerSources.previousServers } : options.filters,
+  let previousPlayerView = buildLocalPlayerToplistView(previous.players, {
+    filters: { servers: options.playerSources?.previousServers ?? options.filters?.servers },
     sort: { metricKey: options.playerSort?.metricKey ?? "sum", direction: options.playerSort?.direction },
     playerAverageMode: options.playerAverageMode,
     playerLimit: null,
   });
-  const currentPlayerView = buildLocalPlayerToplistView(current.players, {
-    filters: options.playerSources ? { ...options.filters, servers: options.playerSources.currentServers } : options.filters,
+  let currentPlayerView = buildLocalPlayerToplistView(current.players, {
+    filters: { servers: options.playerSources?.currentServers ?? options.filters?.servers },
     sort: { metricKey: options.playerSort?.metricKey ?? "sum", direction: options.playerSort?.direction },
     playerAverageMode: options.playerAverageMode,
     playerLimit: null,
   });
-  const previousGuildView = buildLocalGuildToplistView(previous.guilds, {
+  let previousGuildView = buildLocalGuildToplistView(previous.guilds, {
     filters: options.filters,
     sort: { metricKey: options.guildSort?.metricKey ?? "guildAvgLevel", direction: options.guildSort?.direction },
     guildAverageMode: options.guildAverageMode,
   });
-  const currentGuildView = buildLocalGuildToplistView(current.guilds, {
+  let currentGuildView = buildLocalGuildToplistView(current.guilds, {
     filters: options.filters,
     sort: { metricKey: options.guildSort?.metricKey ?? "guildAvgLevel", direction: options.guildSort?.direction },
     guildAverageMode: options.guildAverageMode,
@@ -478,8 +489,79 @@ export const compareLocalToplists = (
   );
   issues.push(...playerCompare.issues, ...guildCompare.issues);
 
-  const players = validMonthOrder ? sortComparisonRows(playerCompare.rows) : [];
-  const guilds = validMonthOrder ? sortComparisonRows(guildCompare.rows) : [];
+  // Match identities before display filters: a changed class, guild or name may
+  // remove one side from a list without destroying its confirmed value baseline.
+  const playerStatsDayValues = { base: {} as Record<string, number | null>, total: {} as Record<string, number | null> };
+  for (const row of playerCompare.rows) if (row.current) {
+    playerStatsDayValues.base[row.current.rowKey] = computePlayerStatsPerDay(row.current, row.previous).statsPerDay;
+    playerStatsDayValues.total[row.current.rowKey] = computePlayerStatsPerDay(row.current, row.previous, "sumTotal").statsPerDay;
+  }
+  const daily = ["statsDay", "statsDayTotal"].includes(currentPlayerView.sort.metricKey);
+  const currentDaily = playerStatsDayValues[currentPlayerView.sort.metricKey === "statsDayTotal" || options.playerAverageMode === "total" ? "total" : "base"];
+  const playerOptions = { sort: currentPlayerView.sort, playerAverageMode: options.playerAverageMode, playerLimit: null };
+  const previousScope = withLocalToplistRankings(buildLocalPlayerToplistView(previousPlayerView.rows, {
+    ...playerOptions, playerStatsDayValues: options.previousPlayerStatsDayValues,
+  }).rows, "players", row => !daily || Number.isFinite(options.previousPlayerStatsDayValues?.[row.rowKey]));
+  const currentScope = withLocalToplistRankings(buildLocalPlayerToplistView(currentPlayerView.rows, {
+    ...playerOptions, playerStatsDayValues: currentDaily,
+  }).rows, "players", row => !daily || Number.isFinite(currentDaily[row.rowKey]));
+  previousPlayerView = buildLocalPlayerToplistView(previousScope, { ...playerOptions,
+    filters: { ...options.filters, servers: options.playerSources?.previousServers ?? options.filters?.servers },
+    playerStatsDayValues: options.previousPlayerStatsDayValues });
+  currentPlayerView = buildLocalPlayerToplistView(currentScope, { ...playerOptions,
+    filters: { ...options.filters, servers: options.playerSources?.currentServers ?? options.filters?.servers },
+    playerStatsDayValues: currentDaily });
+  previousGuildView = { ...previousGuildView, rows: withLocalToplistRankings(previousGuildView.rows, "guilds") };
+  currentGuildView = { ...currentGuildView, rows: withLocalToplistRankings(currentGuildView.rows, "guilds") };
+  const previousGuildScope = previousGuildView.rows;
+  const currentGuildScope = currentGuildView.rows;
+  const previousNames = options.nameFilter ? buildLocalToplistNameFilter(previous.players, previous.guilds)(options.nameFilter) : null;
+  const currentNames = options.nameFilter ? buildLocalToplistNameFilter(current.players, current.guilds)(options.nameFilter) : null;
+  const playerKey = (row: LocalPlayerToplistRow) => identityKey(row.server, row.identifier)!;
+  const guildKey = (row: LocalGuildToplistRow) => identityKey(row.server, row.guildIdentifier)!;
+  // Favorites refer to current identities; carry only confirmed matches back.
+  const historicalAllowed = <T extends LocalPlayerToplistRow | LocalGuildToplistRow>(
+    keys: readonly string[] | undefined, rows: readonly { current: T | null; previous: T | null; status: LocalToplistComparisonStatus }[], key: (row: T) => string,
+  ) => {
+    if (!keys) return null;
+    const allowed = new Set(keys);
+    for (const row of rows) if (row.status === "matched" && row.current && row.previous && allowed.has(key(row.current))) allowed.add(key(row.previous));
+    return allowed;
+  };
+  const previousPlayersAllowed = historicalAllowed(options.allowedPlayerKeys, playerCompare.rows, playerKey);
+  const previousGuildsAllowed = historicalAllowed(options.allowedGuildKeys, guildCompare.rows, guildKey);
+  const currentPlayersAllowed = options.allowedPlayerKeys ? new Set(options.allowedPlayerKeys) : null;
+  const currentGuildsAllowed = options.allowedGuildKeys ? new Set(options.allowedGuildKeys) : null;
+  const numbered = <T,>(rows: readonly T[]) => rows.map((row, index) => ({ ...row, tableRank: index + 1 }));
+  previousPlayerView.rows = numbered(previousPlayerView.rows.filter(row => (!previousNames || previousNames.player(row)) && (!previousPlayersAllowed || previousPlayersAllowed.has(playerKey(row)))));
+  currentPlayerView.rows = numbered(currentPlayerView.rows.filter(row => (!currentNames || currentNames.player(row)) && (!currentPlayersAllowed || currentPlayersAllowed.has(playerKey(row)))));
+  previousGuildView.rows = numbered(previousGuildView.rows.filter(row => (!previousNames || previousNames.guild(row)) && (!previousGuildsAllowed || previousGuildsAllowed.has(guildKey(row)))));
+  currentGuildView.rows = numbered(currentGuildView.rows.filter(row => (!currentNames || currentNames.guild(row)) && (!currentGuildsAllowed || currentGuildsAllowed.has(guildKey(row)))));
+  const previousRanks = new Map(previousPlayerView.rows.map(row => [row.rowKey, row.tableRank]));
+  const currentRanks = new Map(currentPlayerView.rows.map(row => [row.rowKey, row.tableRank]));
+  const previousGuildRanks = new Map(previousGuildView.rows.map(row => [row.rowKey, row.tableRank]));
+  const currentGuildRanks = new Map(currentGuildView.rows.map(row => [row.rowKey, row.tableRank]));
+  const previousScopes = new Map([...previousScope, ...previousGuildScope].map(row => [row.rowKey, row.rankings]));
+  const currentScopes = new Map([...currentScope, ...currentGuildScope].map(row => [row.rowKey, row.rankings]));
+  const assignRanks = <T extends LocalPlayerToplistRow | LocalGuildToplistRow>(row: {
+    current: T | null; previous: T | null; currentTableRank: number | null; previousTableRank: number | null; rankDelta: number | null; rankings?: LocalToplistRankings;
+  }, previousList: Map<string, number>, currentList: Map<string, number>, isDaily: boolean) => {
+    row.currentTableRank = row.current ? currentList.get(row.current.rowKey) ?? null : null;
+    row.previousTableRank = row.previous && (!isDaily || Number.isFinite(options.previousPlayerStatsDayValues?.[row.previous.rowKey])) ? previousList.get(row.previous.rowKey) ?? null : null;
+    row.rankDelta = row.previousTableRank != null && row.currentTableRank != null ? row.previousTableRank - row.currentTableRank : null;
+    const current = row.current && currentScopes.get(row.current.rowKey);
+    const prior = row.previous && previousScopes.get(row.previous.rowKey);
+    row.rankings = Object.fromEntries(Object.entries(current || {}).map(([key, value]) => {
+      const before = prior && prior[key as keyof LocalToplistRankings]?.rank;
+      return [key, { rank: value.rank, delta: value.rank != null && before != null ? before - value.rank : null }];
+    }));
+  };
+  playerCompare.rows.forEach(row => assignRanks(row, previousRanks, currentRanks, daily));
+  guildCompare.rows.forEach(row => assignRanks(row, previousGuildRanks, currentGuildRanks, false));
+
+
+  const players = validMonthOrder ? sortComparisonRows(playerCompare.rows.filter(row => (row.current && currentRanks.has(row.current.rowKey)) || (row.previous && previousRanks.has(row.previous.rowKey)))) : [];
+  const guilds = validMonthOrder ? sortComparisonRows(guildCompare.rows.filter(row => (row.current && currentGuildRanks.has(row.current.rowKey)) || (row.previous && previousGuildRanks.has(row.previous.rowKey)))) : [];
   const status = issues.some((entry) => entry.severity === "error")
     ? "empty"
     : issues.some((entry) => entry.code === "partial-comparison-side")
@@ -497,6 +579,7 @@ export const compareLocalToplists = (
     currentPlayerView,
     previousGuildView,
     currentGuildView,
+    playerStatsDayValues,
     players,
     guilds,
     counts: {

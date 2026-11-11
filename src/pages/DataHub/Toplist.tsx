@@ -205,7 +205,7 @@ function GuildHubToplistInner() {
     storedServers, setServers, !!hubCommand && hubCommandAccepted.current !== hubCommand.id,
   );
   useAnalyticsView(tab === "players" ? "datahub/toplist/players" : "datahub/toplist/guilds");
-  const [filtersCollapsed, setFiltersCollapsed] = React.useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = React.useState(true);
   const [context, setContext] = React.useState<LocalToplistArchiveContext | null>(null);
   const [contextLoading, setContextLoading] = React.useState(true);
   const [contextError, setContextError] = React.useState<string | null>(null);
@@ -632,7 +632,16 @@ function GuildHubToplistInner() {
       (auditValue(__audit1, auditEnter(__audit1, "buildLocalToplistComparisonSnapshotSet", "sync-elapsed"), (buildLocalToplistComparisonSnapshotSet(comparePlan.previousMonth, compareLoadState.previous)))),
       (auditValue(__audit1, auditEnter(__audit1, "buildLocalToplistComparisonSnapshotSet", "sync-elapsed"), (buildLocalToplistComparisonSnapshotSet(comparePlan.currentMonth, compareLoadState.current)))),
       {
-        filters: { servers: comparePlan.commonServers, playerClasses: selectedClasses, playerClassMode },
+        filters: { servers: comparePlan.commonServers, playerClasses: selectedClasses, playerClassMode, guilds },
+        nameFilter: nameFilterText,
+        ...(nameFilterFavorites ? (() => {
+          const [players, guilds] = JSON.parse(nameFilterFavorites) as [string[], string[]];
+          const keys = (kind: "player" | "guild", ids: string[]) => ids.flatMap(id => {
+            const ref = favoriteReference(kind, id);
+            return ref ? [playerTargetKey(ref.serverNamespace, ref.identifier)] : [];
+          });
+          return { allowedPlayerKeys: keys("player", players), allowedGuildKeys: keys("guild", guilds) };
+        })() : {}),
         ...(tab === "players" ? {
           playerSources: comparePlan,
           playerIdentities: compareLoadState.identities!,
@@ -647,6 +656,7 @@ function GuildHubToplistInner() {
     } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
     finally { auditLeave(__audit1); }
 }, [
+    nameFilterText, nameFilterFavorites, guilds,
     tab, dataRefresh, compareLoadState.refresh, compareLoadState.identities,
     compareLoadState.current,
     compareLoadState.error,
@@ -690,10 +700,7 @@ function GuildHubToplistInner() {
     if (!result || !selectedServers.length || (!useCompareFilterView && (dataState.datasetId !== dataRunKey || dataState.refresh !== dataRefresh))) return null;
     const favoriteIds = nameFilterFavorites ? JSON.parse(nameFilterFavorites) as [string[], string[]] : null;
     const playerStatsDayValues = tab === "players" && showLocalCompare && comparisonResult && ["statsDay", "statsDayTotal"].includes(activeViewPlayerSort.metricKey)
-      ? Object.fromEntries(enrichLocalPlayerCompareRows({
-          rows: result.playerRows.map(toPublicPlayerRow), comparisonRows: comparisonResult.players,
-          playerAvgMode: activeViewPlayerSort.metricKey === "statsDayTotal" ? "total" : activeViewPlayerValueMode,
-        }).map((row, index) => [result.playerRows[index].rowKey, row._statsPerDay]))
+      ? comparisonResult.playerStatsDayValues[activeViewPlayerSort.metricKey === "statsDayTotal" || activeViewPlayerValueMode === "total" ? "total" : "base"]
       : undefined;
     const request = {
       playerStatsDayValues,
@@ -923,7 +930,7 @@ function GuildHubToplistInner() {
   const compareGuildRows = React.useMemo(
     () => {
       if (!showLocalCompare || !comparisonResult) return [];
-      const rows = ((searchMode === "filter" || favoritesOnly) ? currentViewResult?.tab === "guilds" ? currentViewResult.guildRows : [] : comparisonResult.currentGuildView.rows).map(toPublicGuildRow);
+      const rows = (currentViewResult?.tab === "guilds" ? currentViewResult.guildRows : []).map(toPublicGuildRow);
       return enrichLocalGuildCompareRows({ rows, comparisonRows: comparisonResult.guilds });
     },
     [comparisonResult, showLocalCompare, searchMode, favoritesOnly, currentViewResult],
@@ -2053,6 +2060,7 @@ function toPublicPlayerRow(row: LocalPlayerToplistRow & { tableRank?: number }):
   const { label: ratioLabel, mainRatio } = derivePublicPlayerRatio(row.main, row.con);
   const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
   return {
+    rankings: (row as { rankings?: ToplistPlayerRow["rankings"] }).rankings,
     __localRow: row,
     identifier: row.identifier,
     playerId: row.playerId,
@@ -2094,6 +2102,7 @@ function toPublicGuildRow(row: LocalGuildToplistRow & { tableRank?: number }): T
   _rank?: number;
 } {
   return {
+    rankings: (row as { rankings?: ToplistPlayerRow["rankings"] }).rankings,
     __localRow: row,
     guildId: row.guildId,
     guildIdentifier: row.guildIdentifier,
