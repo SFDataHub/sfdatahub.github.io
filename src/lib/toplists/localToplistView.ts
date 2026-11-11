@@ -39,10 +39,12 @@ export type LocalToplistViewOptions = {
 
 export type LocalToplistRankedPlayerRow = LocalPlayerToplistRow & {
   tableRank: number;
+  rankings?: LocalToplistRankings;
 };
 
 export type LocalToplistRankedGuildRow = LocalGuildToplistRow & {
   tableRank: number;
+  rankings?: LocalToplistRankings;
 };
 
 export type LocalPlayerToplistViewResult = {
@@ -365,3 +367,22 @@ export const getLocalToplistMetricValue = (
   metric: LocalToplistMetricDefinition,
   guildAverageMode: LocalGuildAverageMode = "base",
 ) => getFieldValue(row as unknown as Record<string, unknown>, metric, guildAverageMode);
+
+/** Scope ranks use the sorted, server-only cohort, before any display filters. */
+export type LocalToplistRankKey = "overallRank" | "serverRank" | "classRank";
+export type LocalToplistRankings = Partial<Record<LocalToplistRankKey, { rank: number | null; delta: number | null }>>;
+export function withLocalToplistRankings<T extends LocalPlayerToplistRow | LocalGuildToplistRow>(
+  rows: readonly T[], kind: "players" | "guilds", available: (row: T) => boolean = () => true,
+): (T & { rankings: LocalToplistRankings })[] {
+  const servers = new Map<string, number>(), classes = new Map<string, number>();
+  return rows.map((row, index) => {
+    const server = normalizeLocalToplistServer(row.server) ?? "";
+    const playerClass = kind === "players" ? normalizeLocalToplistPlayerClass((row as LocalPlayerToplistRow).class) ?? "" : "";
+    const serverRank = (servers.get(server) ?? 0) + 1;
+    const classRank = (classes.get(playerClass) ?? 0) + 1;
+    servers.set(server, serverRank); classes.set(playerClass, classRank);
+    const rank = (value: number) => ({ rank: available(row) ? value : null, delta: null });
+    return { ...row, rankings: { overallRank: rank(index + 1), serverRank: rank(serverRank),
+      ...(kind === "players" ? { classRank: rank(classRank) } : {}) } };
+  });
+}

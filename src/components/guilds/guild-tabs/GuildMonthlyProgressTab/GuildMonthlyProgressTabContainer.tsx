@@ -247,6 +247,7 @@ const CLASS_TO_BUCKET: Record<string, MainBucketKey> = {
   berserker: "str",
   "battle-mage": "str",
   paladin: "str",
+  bloodweaver: "str",
   scout: "dex",
   assassin: "dex",
   "demon-hunter": "dex",

@@ -272,6 +272,9 @@
       "bonus_bonus_lck": "Łączna premia Szcz",
       "rank": "#",
       "rankDelta": "Δ Pozycja",
+      "overallRank": "Pozycja ogólna",
+      "serverRank": "Pozycja na serwerze",
+      "classRank": "Pozycja w klasie",
       "server": "Serwer",
       "player": "Gracz",
       "name": "Nazwa",
@@ -417,7 +420,8 @@
       "bard": "Bard",
       "necromancer": "Nekromanta",
       "paladin": "Paladyn",
-      "plague-doctor": "Medyk zarazy"
+      "plague-doctor": "Medyk zarazy",
+      "bloodweaver": "Bloodweaver"
     },
     "status": {
       "noServerSelected": "Nie wybrano serwera",
@@ -894,6 +898,7 @@
       "ascending": "Rosnąco — kliknij, aby sortować malejąco",
       "descending": "Malejąco — kliknij, aby sortować rosnąco",
       "categories": {
+        "rankings": "Rankingi",
         "identity": "Ogólne / Tożsamość",
         "attributes": "Atrybuty",
         "progress": "Rozwój / Postęp",
@@ -3880,7 +3885,8 @@
       "bard": "Bard",
       "necromancer": "Nekromanta",
       "paladin": "Paladyn",
-      "plague-doctor": "Medyk zarazy"
+      "plague-doctor": "Medyk zarazy",
+      "bloodweaver": "Bloodweaver"
     }
   },
   "flipbook": {
@@ -4193,7 +4199,7 @@
     "retry": "Ponów niedokończone części",
     "changePlan": "Zmień przygotowanie",
     "success": "Dostępne dane dla {{servers}} zostały pomyślnie przygotowane.",
-    "moreData": "Później możesz pobrać dodatkowe dane dla innych serwerów lub dłuższych okresów.",
+    "moreData": "Kreator konfiguracji możesz w każdej chwili ponownie otworzyć w panelu DataHub pod wyszukiwarką, aby wczytać kolejne serwery lub dłuższe okresy.",
     "fusionDone": "Do historycznych przypisań po fuzjach użyj Identity Matching. Przygotowanie nie uruchomiło analizy tożsamości ani nie potwierdziło żadnych tożsamości.",
     "help": "Więcej w pytaniach i odpowiedziach",
     "toplist": "Otwórz ranking",

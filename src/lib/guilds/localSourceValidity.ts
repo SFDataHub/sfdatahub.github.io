@@ -2,7 +2,7 @@ import { GUILD_SCAN_NORMALIZER_VERSION } from "./guildScanNormalizer";
 
 // Bump when normalizedPlayer/normalizedGuild, parseSfJson or the shared stat
 // readers change their output contract. Independent of each consumer's derivation.
-export const LOCAL_SCAN_CORE_NORMALIZER_VERSION = 1;
+export const LOCAL_SCAN_CORE_NORMALIZER_VERSION = 2;
 
 export type LocalSourceValidity = {
   sourceGeneration: string;

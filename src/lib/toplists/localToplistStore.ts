@@ -17,7 +17,7 @@ import type { LocalToplistDerivedSnapshotPayload } from "./localToplistWorkerTyp
 
 import { hasCurrentLocalSourceValidity, matchesLocalSourceValidity, type LocalSourceValidity } from "../guilds/localSourceValidity";
 
-export const LOCAL_TOPLIST_DERIVATION_VERSION = 6;
+export const LOCAL_TOPLIST_DERIVATION_VERSION = 7;
 
 export type LocalToplistSnapshotCacheIdentity = {
   derivationVersion?: number;

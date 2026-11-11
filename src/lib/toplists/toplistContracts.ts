@@ -1,5 +1,7 @@
+import type { LocalToplistRankings } from "./localToplistView";
 import type { PlayerAttributeValues } from "./playerAttributeColumns";
 export type ToplistPlayerRow = {
+  rankings?: LocalToplistRankings;
   identifier?: string | null;
   playerId?: string | null;
   flag: string | null;
@@ -28,6 +30,7 @@ export type ToplistPlayerRow = {
 };
 
 export type ToplistGuildRow = {
+  rankings?: LocalToplistRankings;
   guildId: string;
   server: string;
   name: string;

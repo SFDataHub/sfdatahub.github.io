@@ -48,6 +48,7 @@ const CLASS_CONFIG: Record<number, ClassCombatConfig> = {
   10: { primaryAttribute: "intelligence", healthMultiplier: 4, weaponMultiplier: 4.5 },
   11: { primaryAttribute: "strength", healthMultiplier: 6, weaponMultiplier: 2 },
   12: { primaryAttribute: "dexterity", healthMultiplier: 4, weaponMultiplier: 2 },
+  13: { primaryAttribute: "strength", healthMultiplier: 5, weaponMultiplier: 2 },
 };
 
 const mark = (

@@ -26,7 +26,7 @@ export default function ToplistColumnSettings({ kind, value, onChange }: { kind:
     return nodes.map(node => node.column ? <label key={node.key} className={styles.columnChoice}>
       <input type="checkbox" checked={value.columns.includes(node.key)} disabled={node.key === "name"} onChange={e => updateColumns(e.target.checked ? [...value.columns, node.key] : value.columns.filter(k => k !== node.key))} />{playerAttributeColumn(node.key) ? attributeColumnLabel(playerAttributeColumn(node.key)!, t, true) : label(node.key)}
     </label> : <details key={node.key}>
-      <summary>{["identity", "attributes", "progress", "fortress"].includes(node.key) ? t(`localSettings.toplists.categories.${node.key}`) : t(`toplists.attributeCatalog.groups.${node.key}`, ATTRIBUTE_BONUSES.find(b => b[0] === node.key)?.[1] ?? node.key)}</summary>
+      <summary>{["rankings", "identity", "attributes", "progress", "fortress"].includes(node.key) ? t(`localSettings.toplists.categories.${node.key}`) : t(`toplists.attributeCatalog.groups.${node.key}`, ATTRIBUTE_BONUSES.find(b => b[0] === node.key)?.[1] ?? node.key)}</summary>
       {renderNodes(node.children)}
     </details>);
   }

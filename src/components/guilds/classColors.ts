@@ -10,6 +10,7 @@ export const GUILD_CLASS_ACCENTS: Record<string, string> = {
   bard: "#4C8FD9",         // Royal Cyan-Blue
   necromancer: "#5E7FD6",  // Spectral Blue
   paladin: "#D4AF37",      // Holy Gold
+  bloodweaver: "#B83B52",  // Blood Red
   plaguedoctor: "#6E9F3A", // Toxic Green
 };
 

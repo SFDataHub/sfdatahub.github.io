@@ -64,6 +64,9 @@ export function canonClassKey(raw: any): GameClassKey | null {
     "paladin": "paladin",
     "plague-doctor": "plague-doctor",
     "12": "plague-doctor",
+    "bloodweaver": "bloodweaver",
+    "blood-weaver": "bloodweaver",
+    "13": "bloodweaver",
 
     // populäre Varianten/Aliasse
     "demonhunter": "demon-hunter",

@@ -1,3 +1,4 @@
+import ToplistRankingValue from "./ToplistRankingValue";
 import { useToplistAutoSize } from "./useToplistAutoSize";
 import ToplistViewPicker from "./ToplistViewControls";
 import LocalSortHeader from "./LocalSortHeader";
@@ -65,6 +66,8 @@ export type GuildToplistsPresetData = {
 };
 
 type GuildColumnKey =
+  | "overallRank"
+  | "serverRank"
   | "rank"
   | "server"
   | "name"
@@ -108,6 +111,11 @@ const GUILD_COLUMNS: ReadonlyArray<GuildColumnDef> = [
   { key: "lastScan", label: "Last Scan", width: "7%", align: "right" },
 ];
 
+
+const GUILD_CUSTOM_COLUMNS: ReadonlyArray<GuildColumnDef> = [...GUILD_COLUMNS,
+  { key: "overallRank", label: "Overall rank", width: "6%", align: "center" },
+  { key: "serverRank", label: "Server rank", width: "6%", align: "center" },
+];
 
 const customColumnWidth = (key: string) => key === "name" ? 250 : key === "guild" ? 160 : key === "lastScan" ? 150 : 105;
 
@@ -203,12 +211,12 @@ const TOPLIST_DELTA_SUBTEXT_STYLE: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
+const TOPLIST_CELL_STYLE_BY_KEY = GUILD_CUSTOM_COLUMNS.reduce((acc, column) => {
   acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: column.align };
   return acc;
 }, {} as Record<GuildColumnKey, React.CSSProperties>);
 
-const CENTERED_TOPLIST_CELL_STYLE_BY_KEY = GUILD_COLUMNS.reduce((acc, column) => {
+const CENTERED_TOPLIST_CELL_STYLE_BY_KEY = GUILD_CUSTOM_COLUMNS.reduce((acc, column) => {
   acc[column.key] = { ...TOPLIST_CELL_BASE_STYLE, textAlign: "center" };
   return acc;
 }, {} as Record<GuildColumnKey, React.CSSProperties>);
@@ -481,7 +489,7 @@ export default function GuildToplists({
   focusNonce = null,
   focusRequest, onFocusResult, onOpenGuildProfile,
 }: GuildToplistsProps) {
-  const activeColumns = localColumns ? localColumns.flatMap(key => { const column = GUILD_COLUMNS.find(c => c.key === key); return column ? [column] : []; }) : GUILD_COLUMNS;
+  const activeColumns = localColumns ? localColumns.flatMap(key => { const column = GUILD_CUSTOM_COLUMNS.find(c => c.key === key); return column ? [column] : []; }) : GUILD_COLUMNS;
   const columnCount = activeColumns.length;
   const cellStyles = centerCellContents ? CENTERED_TOPLIST_CELL_STYLE_BY_KEY : TOPLIST_CELL_STYLE_BY_KEY;
   const numberColumnStyle: React.CSSProperties = centerCellContents ? TOPLIST_FLEX_COLUMN_CENTER_STYLE : TOPLIST_FLEX_COLUMN_RIGHT_STYLE;
@@ -1064,6 +1072,8 @@ export default function GuildToplists({
                 onClick={rowOnClick}
               >
                 {activeColumns.map(column => { switch (column.key) {
+case "overallRank":
+case "serverRank": return <td key={column.key} style={cellStyles[column.key]}><ToplistRankingValue rankings={row.rankings} rankKey={column.key} showCompare={showCompare} /></td>;
 case "rank": return (<td key={column.key} style={cellStyles.rank}>
                   <div style={TOPLIST_FLEX_COLUMN_CENTER_STYLE}>
                     <span>{hasReadOnlyData ? ((row as any)._rank ?? (row as any).tableRank ?? idx + 1) : idx + 1}</span>

@@ -771,6 +771,9 @@
     "columns": {
       "rank": "#",
       "rankDelta": "Δ Pořadí",
+      "overallRank": "Celkové pořadí",
+      "serverRank": "Pořadí na serveru",
+      "classRank": "Pořadí ve třídě",
       "server": "Server",
       "player": "Hráč",
       "name": "Jméno",
@@ -1057,7 +1060,8 @@
       "bard": "Bard",
       "necromancer": "Nekromant",
       "paladin": "Paladin",
-      "plague-doctor": "Morový lékař"
+      "plague-doctor": "Morový lékař",
+      "bloodweaver": "Bloodweaver"
     },
     "errors": {
       "archive": "Metadata archivu se nepodařilo načíst. Zkus to znovu.",
@@ -2012,7 +2016,8 @@
       "bard": "Bard",
       "necromancer": "Nekromant",
       "paladin": "Paladin",
-      "plague-doctor": "Morový doktor"
+      "plague-doctor": "Morový doktor",
+      "bloodweaver": "Bloodweaver"
     }
   },
   "fusionIdentity": {
@@ -2680,6 +2685,7 @@
       "ascending": "Vzestupně — kliknutím řadit sestupně",
       "descending": "Sestupně — kliknutím řadit vzestupně",
       "categories": {
+        "rankings": "Žebříčky",
         "identity": "Obecné / Identita",
         "attributes": "Atributy",
         "progress": "Vývoj / Pokrok",
@@ -4601,7 +4607,7 @@
     "retry": "Zkusit znovu nedokončené části",
     "changePlan": "Změnit přípravu",
     "success": "Dostupná data pro {{servers}} byla úspěšně připravena.",
-    "moreData": "Později můžeš načíst další data pro jiné servery nebo delší období.",
+    "moreData": "Průvodce nastavením můžeš kdykoli znovu otevřít na nástěnce DataHub pod vyhledáváním a načíst další servery nebo delší časová období.",
     "fusionDone": "Pro historické přiřazení po sloučení použij Identity Matching. Příprava nespustila analýzu identit ani žádné identity nepotvrdila.",
     "help": "Více v otázkách a odpovědích",
     "toplist": "Otevřít žebříček",

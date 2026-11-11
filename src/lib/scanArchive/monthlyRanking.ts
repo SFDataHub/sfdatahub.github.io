@@ -1,6 +1,6 @@
 import { LOCAL_SCAN_CORE_NORMALIZER_VERSION } from "../guilds/localSourceValidity";
 import { GUILD_SCAN_NORMALIZER_VERSION } from "../guilds/guildScanNormalizer";
-import { getClassMetaById } from "../../data/classes";
+import { getExactClassMeta } from "../../data/classes";
 import { deriveLocalToplistsFromConfirmedScans } from "../toplists/localToplistDerivation";
 import { readProgressRadarAnalyticsValuesForPlayer } from "../../pages/Playground/progressRadarModel";
 import { earliestMonthlyRow, composeMonthlySet } from "./monthlySetComposition";
@@ -68,7 +68,7 @@ export function deriveRankingSnapshot(scan: Pick<ScanArchiveManifestScan, "id" |
     confirmation: { kind: "archiveSource", archiveScanId: scan.id, archiveSha256: hash },
   }], (row, player, core, stats) => {
     const xp = readProgressRadarAnalyticsValuesForPlayer(player, core, stats).xpTotal;
-    const primary = getClassMetaById(row.classId)?.primaryAttribute;
+    const primary = getExactClassMeta(row.classId)?.primaryAttribute;
     const baseMain = clean((primary ? core?.attributes[primary].base : null) ?? row.main);
     const baseCon = clean(core?.attributes.constitution.base ?? row.con);
     const totalMain = clean((primary ? core?.attributes[primary].total : null) ?? row.mainTotal);
@@ -126,7 +126,7 @@ export function deriveRankingSnapshot(scan: Pick<ScanArchiveManifestScan, "id" |
   const players: RankingPlayer[] = result.players.map(row => ({
     server: row.server, scanTimestamp: row.scanTimestamp, archiveScanId: row.archiveScanId,
     identifier: row.identifier, playerId: row.playerId, guildIdentifier: row.guildIdentifier,
-    classKey: getClassMetaById(projected.get(row.identifier)!.classId)?.id ?? null,
+    classKey: getExactClassMeta(projected.get(row.identifier)!.classId)?.id ?? null,
     ...projected.get(row.identifier)!, observations: [], ranks: keysObject(PLAYER_RANKING_KEYS, emptyRanks),
   }));
   for (const player of players) player.observations = [{ scanTimestamp: player.scanTimestamp, archiveScanId: player.archiveScanId,
@@ -155,7 +155,7 @@ export function composeRankingSnapshots(snapshots: readonly RankingSnapshot[]): 
   const expanded = snapshots.flatMap(snapshot => snapshot.playerRows.flatMap(player => player.observations.map(observation => {
     const classId = Object.prototype.hasOwnProperty.call(observation, "classId") ? observation.classId! : player.classId;
     return { ...player, ...observation, identifier: observation.identifier ?? player.identifier,
-      classId, classKey: getClassMetaById(classId)?.id ?? null };
+      classId, classKey: getExactClassMeta(classId)?.id ?? null };
   })));
   const composed = composeMonthlySet([{ playerRows: expanded, guildRows: snapshots.flatMap(s => s.guildRows) }]);
   const earliest = new Map<string, RankingPlayer>();
@@ -283,7 +283,7 @@ const integer = (v: unknown): v is number => valid(v) && Number.isSafeInteger(v)
 const rankValid = (v: unknown, max: number) => v === null || (integer(v) && v > 0 && v <= max);
 export function validateMonthlyRanking(value: unknown, expected: { month: string; server: string; pool: RankingPool; metadata: ScanArchiveRankingMetadata }): MonthlyRankingPayload {
   const { month, server, pool, metadata } = expected;
-  if (!record(value) || (value.schemaVersion !== 1 && value.schemaVersion !== 2) || value.schemaVersion !== metadata.schemaVersion || value.projection !== `monthly-ranking.v${value.schemaVersion}` || value.coreNormalizerVersion !== LOCAL_SCAN_CORE_NORMALIZER_VERSION || value.guildNormalizerVersion !== GUILD_SCAN_NORMALIZER_VERSION || value.month !== month || value.server !== server || value.cohortId !== metadata.cohortId) fail(`${month}/${server}: Format/Monat/Server/Gesamtstand passt nicht.`);
+  if (!record(value) || (value.schemaVersion !== 1 && value.schemaVersion !== 2) || value.schemaVersion !== metadata.schemaVersion || value.projection !== `monthly-ranking.v${value.schemaVersion}` || (value.coreNormalizerVersion !== LOCAL_SCAN_CORE_NORMALIZER_VERSION && !(LOCAL_SCAN_CORE_NORMALIZER_VERSION === 2 && value.coreNormalizerVersion === 1)) || value.guildNormalizerVersion !== GUILD_SCAN_NORMALIZER_VERSION || value.month !== month || value.server !== server || value.cohortId !== metadata.cohortId) fail(`${month}/${server}: Format/Monat/Server/Gesamtstand passt nicht.`);
   const payload = value as unknown as MonthlyRankingPayload;
   const playerKeys = payload.schemaVersion === 1 ? V1_PLAYER_RANKING_KEYS : PLAYER_RANKING_KEYS;
   const guildKeys = payload.schemaVersion === 1 ? V1_GUILD_RANKING_KEYS : GUILD_RANKING_KEYS;
@@ -306,7 +306,9 @@ export function validateMonthlyRanking(value: unknown, expected: { month: string
     }
     if (kind === "players") {
       const player = row as RankingPlayer;
-      if ((typeof player.classId !== "number" && typeof player.classId !== "string" && player.classId !== null) || player.classKey !== (getClassMetaById(player.classId)?.id ?? null) || (player.playerId !== null && typeof player.playerId !== "string") || (player.guildIdentifier !== null && typeof player.guildIdentifier !== "string") || !record(player.statuses)) fail(`Klasse/Identitaet/Status fehlt: ${id}.`);
+      // Version 1 rankings remain valid for unchanged classes, but never certify Bloodweaver stats.
+      if (payload.coreNormalizerVersion === 1 && (getExactClassMeta(player.classId)?.id === 13 || player.observations?.some(observation => getExactClassMeta(observation.classId)?.id === 13))) fail(`Veraltete Bloodweaver-Ableitung ${id}.`);
+      if ((typeof player.classId !== "number" && typeof player.classId !== "string" && player.classId !== null) || player.classKey !== (getExactClassMeta(player.classId)?.id ?? null) || (player.playerId !== null && typeof player.playerId !== "string") || (player.guildIdentifier !== null && typeof player.guildIdentifier !== "string") || !record(player.statuses)) fail(`Klasse/Identitaet/Status fehlt: ${id}.`);
       if (!Array.isArray(player.observations) || !player.observations.length) fail(`Beobachtungsgrundlage ${id}.`);
       const observed = new Set<string>();
       let winnerFound = false;

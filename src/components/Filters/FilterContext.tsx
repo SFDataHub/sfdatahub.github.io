@@ -45,6 +45,7 @@ type FiltersState = {
   classes: string[];
   localClassSelectionVersion?: 1;
   localClassSelectionMask?: number;
+  localClassSelectionAll?: boolean;
   guilds: string[];
   days: DaysFilter;        // interne Quelle
   sortBy: string;          // "level" | "main" | "constitution" | "sum" | "lastScan" | "name" ...
@@ -147,6 +148,8 @@ const DEFAULT_STATE: FiltersState = {
 /** Keep local filters writable when an origin's shared localStorage is nearly full. */
 export function persistLocalFilters(storage: Pick<Storage, "setItem">, storageKey: string, raw: string | null, state: FiltersState): string {
   const { serverSheetOpen: _picker, bottomFilterOpen: _menu, localClassSelectionMask: _mask, ...persistent } = state;
+  // Only new writes provide explicit All evidence; old twelve-key lists remain partial.
+  if (state.localClassSelectionVersion === 1) persistent.localClassSelectionAll = CLASSES.every(c => state.classes.includes(c.key));
   const next = JSON.stringify(persistent);
   if (raw === next) return next;
   try {
@@ -179,7 +182,7 @@ export function persistLocalFilters(storage: Pick<Storage, "setItem">, storageKe
 }
 
 export function loadFromStorage(storageKey = LS_KEY, migrateFrom?: string, localClassSelection = false): { state: FiltersState; writable: boolean } {
-  const defaults = localClassSelection ? { ...DEFAULT_STATE, classes: CLASSES.map(c => c.key), localClassSelectionVersion: 1 as const } : DEFAULT_STATE;
+  const defaults = localClassSelection ? { ...DEFAULT_STATE, classes: CLASSES.map(c => c.key), localClassSelectionAll: true, localClassSelectionVersion: 1 as const } : DEFAULT_STATE;
   try {
     const raw = localStorage.getItem(storageKey) ?? (migrateFrom ? localStorage.getItem(migrateFrom) : null);
     if (!raw) return { state: defaults, writable: true };
@@ -215,7 +218,7 @@ export function loadFromStorage(storageKey = LS_KEY, migrateFrom?: string, local
       localTable: localClassSelection ? normalizeLocalTable(parsed.localTable ?? {}) : undefined,
       servers: Array.isArray(parsed.servers) ? excludeHiddenPickerServers(parsed.servers) : [],
       classes: localClassSelection
-        ? (parsed.classes === undefined && parsed.localClassSelectionVersion === 1 && Number.isInteger(parsed.localClassSelectionMask) && parsed.localClassSelectionMask >= 0 && parsed.localClassSelectionMask < (1 << CLASSES.length)
+        ? (parsed.localClassSelectionAll === true ? CLASSES.map(c => c.key) : parsed.classes === undefined && parsed.localClassSelectionVersion === 1 && Number.isInteger(parsed.localClassSelectionMask) && parsed.localClassSelectionMask >= 0 && parsed.localClassSelectionMask < (1 << CLASSES.length)
           ? CLASSES.filter((_, index) => (parsed.localClassSelectionMask & (1 << index)) !== 0).map(c => c.key)
           : Array.isArray(parsed.classes) && (parsed.classes.length === 0 ? parsed.localClassSelectionVersion === 1 : parsed.classes.some((key: string) => CLASSES.some(c => c.key === key))) ? CLASSES.filter(c => parsed.classes.includes(c.key)).map(c => c.key) : defaults.classes)
         : Array.isArray(parsed.classes) ? parsed.classes : [],

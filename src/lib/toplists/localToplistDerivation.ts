@@ -1,5 +1,5 @@
 import { projectPlayerAttributeValues, playerAttributeRatio } from "./playerAttributeColumns";
-import { getClassMetaById } from "../../data/classes";
+import { getClassMetaById, getExactClassMeta } from "../../data/classes";
 import { normalizeSfGuildsFromScan } from "../parsing/normalizedGuild";
 import { normalizeSfPlayerCharacterCore, type NormalizedPlayer } from "../parsing/normalizedPlayer";
 import { validateScanArchivePayload } from "../scanArchive/validation";
@@ -118,7 +118,7 @@ const timestampSec = (timestampMs: number) => Math.floor(timestampMs / 1000);
 
 const classNameFromId = (classId: string | number | null) => {
   const parsed = classId == null ? null : Number(classId);
-  return Number.isFinite(parsed) ? getClassMetaById(parsed)?.label ?? String(classId) : String(classId ?? "");
+  return getExactClassMeta(classId)?.label ?? (Number.isFinite(parsed) ? getClassMetaById(parsed)?.label ?? String(classId) : String(classId ?? ""));
 };
 
 const playerIdFromIdentifier = (identifier: string | null) => {
@@ -160,7 +160,7 @@ const derivePlayerRow = (
   if (stats.baseMain != null) {
     values.Base = stats.baseMain;
     values["Base Attribute"] = stats.baseMain;
-    const metaMain = classMainKey ? getClassMetaById(Number(classId)) : null;
+    const metaMain = classMainKey ? getExactClassMeta(classId) : null;
     const label = metaMain?.primaryAttribute === "strength"
       ? "Base Strength"
       : metaMain?.primaryAttribute === "dexterity"
