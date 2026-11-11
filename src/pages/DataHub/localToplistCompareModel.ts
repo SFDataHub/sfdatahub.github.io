@@ -1,3 +1,5 @@
+import { compareLocalToplists, type LocalToplistComparisonResult } from "../../lib/toplists/localToplistComparison";
+import type { IdentityResolutionSnapshot } from "../../lib/identities/identityResolution";
 import { getFusionEventForTarget } from "../../lib/servers/serverResolver";
 import { LOCAL_SERVER_FUSION_EVENTS } from "../../data/serverFusions";
 import { localToplistResultRevision } from "../../lib/toplists/localToplistDatasetRevision";
@@ -318,6 +320,35 @@ export function resolveLocalToplistCompareEntryPlan(input: ResolveCompareEntries
     issues,
     noticeMessages,
   };
+}
+
+/** Continue the selected calendar-month interval: C -> B has the same span as B -> A. */
+export function resolveHistoricalStatsDayEntryPlan(
+  comparison: LocalToplistCompareEntryPlan,
+  input: Pick<ResolveCompareEntriesInput, "selectedServers" | "manifests" | "manifestUrlsByYear">,
+): LocalToplistCompareEntryPlan {
+  const index = (month: string) => {
+    const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+    return match ? Number(match[1]) * 12 + Number(match[2]) - 1 : NaN;
+  };
+  const from = index(comparison.previousMonth), span = index(comparison.currentMonth) - from;
+  if (!comparison.active || !Number.isInteger(span) || span < 1 || from - span < 12) return inactivePlan();
+  const earlier = from - span;
+  const month = `${String(Math.floor(earlier / 12)).padStart(4, "0")}-${String(earlier % 12 + 1).padStart(2, "0")}`;
+  return resolveLocalToplistCompareEntryPlan({ ...input, mode: "months", resolveFusionSources: true,
+    progressSinceMonth: "", compareFromMonth: month, compareToMonth: comparison.previousMonth });
+}
+
+/** Use the same observed times, rounding and confirmed identities as the current daily values. */
+export function buildHistoricalPlayerStatsDayValues(
+  plan: LocalToplistCompareEntryPlan, earlier: LocalToplistLoadResult, baseline: LocalToplistLoadResult,
+  identities: IdentityResolutionSnapshot,
+): LocalToplistComparisonResult["playerStatsDayValues"] {
+  return compareLocalToplists(
+    buildLocalToplistComparisonSnapshotSet(plan.previousMonth, earlier),
+    buildLocalToplistComparisonSnapshotSet(plan.currentMonth, baseline),
+    { playerSources: plan, playerIdentities: identities },
+  ).playerStatsDayValues;
 }
 
 export const buildLocalToplistComparisonSnapshotSet = (

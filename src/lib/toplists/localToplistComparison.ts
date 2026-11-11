@@ -546,7 +546,7 @@ export const compareLocalToplists = (
   const assignRanks = <T extends LocalPlayerToplistRow | LocalGuildToplistRow>(row: {
     current: T | null; previous: T | null; currentTableRank: number | null; previousTableRank: number | null; rankDelta: number | null; rankings?: LocalToplistRankings;
   }, previousList: Map<string, number>, currentList: Map<string, number>, isDaily: boolean) => {
-    row.currentTableRank = row.current ? currentList.get(row.current.rowKey) ?? null : null;
+    row.currentTableRank = row.current && (!isDaily || Number.isFinite(currentDaily[row.current.rowKey])) ? currentList.get(row.current.rowKey) ?? null : null;
     row.previousTableRank = row.previous && (!isDaily || Number.isFinite(options.previousPlayerStatsDayValues?.[row.previous.rowKey])) ? previousList.get(row.previous.rowKey) ?? null : null;
     row.rankDelta = row.previousTableRank != null && row.currentTableRank != null ? row.previousTableRank - row.currentTableRank : null;
     const current = row.current && currentScopes.get(row.current.rowKey);

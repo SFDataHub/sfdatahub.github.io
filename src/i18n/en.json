@@ -1571,6 +1571,11 @@
       "search": "Could not load the search index. Try again.",
       "compare": "Could not prepare the comparison. Try again."
     },
+    "historicalStatsDay": {
+      "loading": "Preparing historical Stats/Day ranks. Current values remain available.",
+      "error": "Historical Stats/Day ranks could not be prepared. Current values remain available.",
+      "unavailable": "Historical Stats/Day ranks are unavailable where a suitable earlier comparison is missing."
+    },
     "compareIssues": {
       "compare-off": "Compare is disabled.",
       "missing-baseline-month": "No comparison baseline month selected.",
