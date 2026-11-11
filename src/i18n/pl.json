@@ -495,6 +495,11 @@
       "search": "Nie udało się załadować indeksu wyszukiwania. Spróbuj ponownie.",
       "compare": "Nie udało się przygotować porównania. Spróbuj ponownie."
     },
+    "historicalStatsDay": {
+      "loading": "Trwa przygotowywanie historycznych pozycji Stats/Day. Bieżące wartości pozostają dostępne.",
+      "error": "Nie udało się przygotować historycznych pozycji Stats/Day. Bieżące wartości pozostają dostępne.",
+      "unavailable": "Historyczne pozycje Stats/Day są niedostępne bez odpowiedniej wcześniejszej podstawy porównania."
+    },
     "compareIssues": {
       "compare-off": "Porównanie jest wyłączone.",
       "missing-baseline-month": "Nie wybrano miesiąca bazowego porównania.",

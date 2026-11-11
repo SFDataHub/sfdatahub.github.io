@@ -1,3 +1,4 @@
+import { useHistoricalStatsDayRanks } from "./useHistoricalStatsDayRanks";
 import { useLocalToplistUrlSelection } from "./useLocalToplistUrlSelection";
 import { scanArchiveMonthlyOptions } from "../../lib/scanArchive/toplistSelection";
 import { visibleToplistSortOptions, resolveVisibleToplistSort } from "../../lib/toplists/toplistSortOptions";
@@ -589,6 +590,16 @@ function GuildHubToplistInner() {
     return () => { controller.abort(); auditFinish(compareAudit, "superseded", { consumerReleased: true, physicalContinues: true }); };
   }, [tab, comparePlan, comparePlan.currentDatasetId === dataState.datasetId ? dataState.result : null, dataRefresh]);
 
+  const historicalStatsDay = useHistoricalStatsDayRanks({
+    enabled: tab === "players" && ["statsDay", "statsDayTotal"].includes(playerSort.metricKey) &&
+      comparePlan.active && comparePlan.status !== "unavailable" && compareLoadState.key === comparePlan.loadKey &&
+      compareLoadState.refresh === dataRefresh && !compareLoadState.loading && !compareLoadState.error &&
+      !!compareLoadState.previous && !!compareLoadState.current && !!compareLoadState.identities,
+    metric: playerSort.metricKey, comparison: comparePlan, selectedServers,
+    manifests: context?.manifests ?? [], manifestUrlsByYear: context?.manifestUrlsByYear ?? {},
+    baseline: compareLoadState.previous, identities: compareLoadState.identities ?? null, dataRefresh,
+  });
+
   const activeViewPlayerClasses = tab === "players" ? selectedClasses : EMPTY_VIEW_PLAYER_CLASSES;
   const activeViewGuilds = tab === "players" ? guilds : EMPTY_VIEW_GUILDS;
   const activeViewPlayerSort = tab === "players" ? playerSort : INACTIVE_VIEW_SORT;
@@ -646,6 +657,7 @@ function GuildHubToplistInner() {
           playerSources: comparePlan,
           playerIdentities: compareLoadState.identities!,
         } : {}),
+        previousPlayerStatsDayValues: historicalStatsDay.values?.[playerSort.metricKey === "statsDayTotal" || playerValueMode === "total" ? "total" : "base"],
         playerSort,
         guildSort,
         playerAverageMode: playerValueMode,
@@ -656,7 +668,7 @@ function GuildHubToplistInner() {
     } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
     finally { auditLeave(__audit1); }
 }, [
-    nameFilterText, nameFilterFavorites, guilds,
+    historicalStatsDay.values, nameFilterText, nameFilterFavorites, guilds,
     tab, dataRefresh, compareLoadState.refresh, compareLoadState.identities,
     compareLoadState.current,
     compareLoadState.error,
@@ -1752,10 +1764,13 @@ function GuildHubToplistInner() {
       return comparePlan.issues.map(issue => t(`toplists.compareIssues.${issue.code === "missing-current-server" && !issue.month ? "missing-current-server-current" : issue.code}`, { server: issue.server ?? "", month: issue.month ?? "" })).join(" ");
     }
     if (showLocalCompare) {
+      if (historicalStatsDay.loading) return t("toplists.historicalStatsDay.loading");
+      if (historicalStatsDay.error) return t("toplists.historicalStatsDay.error");
+      if (historicalStatsDay.unavailable) return t("toplists.historicalStatsDay.unavailable");
       return null;
     }
     return t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: comparePlan.previousMonth || comparePlan.currentMonth || "" });
-  }, [compareError, compareExpected, compareLoadState.loading, comparePlan.currentMonth, comparePlan.issues, comparePlan.previousMonth, showLocalCompare, tableBusy, t]);
+  }, [historicalStatsDay.loading, historicalStatsDay.error, historicalStatsDay.unavailable, compareError, compareExpected, compareLoadState.loading, comparePlan.currentMonth, comparePlan.issues, comparePlan.previousMonth, showLocalCompare, tableBusy, t]);
 
   const tableNotices = <>
           {contextError ? <Notice tone="error" text={t("toplists.errors.archive")} /> : null}

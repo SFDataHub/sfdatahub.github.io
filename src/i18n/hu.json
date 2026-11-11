@@ -1050,6 +1050,11 @@
       "search": "A keresési index nem tölthető be. Próbáld újra.",
       "compare": "Az összehasonlítás nem készíthető elő. Próbáld újra."
     },
+    "historicalStatsDay": {
+      "loading": "A korábbi Stats/Day-helyezések előkészítése folyamatban. Az aktuális értékek elérhetők maradnak.",
+      "error": "A korábbi Stats/Day-helyezések előkészítése sikertelen. Az aktuális értékek elérhetők maradnak.",
+      "unavailable": "Megfelelő korábbi összehasonlítás nélkül a korábbi Stats/Day-helyezések nem érhetők el."
+    },
     "compareIssues": {
       "compare-off": "Az összehasonlítás ki van kapcsolva.",
       "missing-baseline-month": "Nincs kiválasztva az összehasonlítás alapul szolgáló hónap.",

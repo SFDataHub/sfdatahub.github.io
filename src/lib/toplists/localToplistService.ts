@@ -117,7 +117,34 @@ type LoadedSnapshot = {
 };
 
 const MAX_TOPLIST_DERIVATION_CONCURRENCY = 2;
-const inFlightDerivedSnapshots = new Map<string, Promise<LoadedSnapshot>>();
+type SharedSnapshotFlight = {
+  promise: Promise<LoadedSnapshot>;
+  controller: AbortController;
+  users: number;
+  settled: boolean;
+};
+const inFlightDerivedSnapshots = new Map<string, SharedSnapshotFlight>();
+
+// A departed historical consumer releases only its own preparation lease.
+function joinSnapshotFlight(key: string, flight: SharedSnapshotFlight, signal?: AbortSignal): Promise<LoadedSnapshot> {
+  throwIfAborted(signal);
+  flight.users++;
+  return new Promise((resolve, reject) => {
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      signal?.removeEventListener("abort", abort);
+      if (--flight.users === 0 && !flight.settled) {
+        flight.controller.abort();
+        if (inFlightDerivedSnapshots.get(key) === flight) inFlightDerivedSnapshots.delete(key);
+      }
+    };
+    const abort = () => { release(); reject(new LocalToplistDerivationCancelledError()); };
+    signal?.addEventListener("abort", abort, { once: true });
+    flight.promise.then(value => { release(); resolve(value); }, error => { release(); reject(error); });
+  });
+}
 
 const normalizeSha = (value: string) => value.trim().toLowerCase();
 
@@ -356,13 +383,17 @@ async function loadOrDeriveSnapshot(input: {
   if (!confirmation) throw new Error(`Lokaler Scan ist nicht als Archivquelle bestaetigt: ${entry.id}`);
   const flightKey = (auditValue(__audit3, auditEnter(__audit3, "JSON.stringify", "sync-elapsed"), (JSON.stringify([cacheKey, scan.id, scan.contentHash, localSourceValidityKey(scan),
     entry.archiveYear, entry.server, entry.timestamp, resetGeneration]))));
+  throwIfAborted(signal);
   const existing = inFlightDerivedSnapshots.get(flightKey);
-  if (existing) return auditReturn(__audit3, existing);
+  if (existing && !existing.controller.signal.aborted) return auditReturn(__audit3, joinSnapshotFlight(flightKey, existing, signal));
 
+  const consumerSignal = signal;
+  const flight: SharedSnapshotFlight = { controller: new AbortController(), users: 0, settled: false, promise: null! };
   const promise = (async (): Promise<LoadedSnapshot> => {
     const __audit4 = auditBegin("S08", "derived-source", __audit3);
     if (__audit4) auditFields(__audit4, { sourceScanId: scan.id, sourceGeneration: scan.sourceGeneration, archiveEntryId: entry.id, resetGeneration });
     try {
+    const signal = flight.controller.signal;
     throwIfAborted(signal);
     const canonicalServer = normalizeServerKeyFromInput(entry.server) ?? entry.server;
     const expectation: LocalToplistSnapshotCacheExpectation = {
@@ -405,6 +436,7 @@ async function loadOrDeriveSnapshot(input: {
     auditEvent(__audit4, "new-derived-build");
     input.workerRanFlag.value = true;
     const snapshots = await (auditValue(__audit4, auditEnter(__audit4, "dependencies.deriveInWorker"), (dependencies.deriveInWorker([source], signal))));
+    throwIfAborted(signal);
     const payload = snapshots[0];
     if (!payload) throw new Error(`Worker lieferte keinen Derived Snapshot fuer ${entry.id}.`);
     if (payload.localScanId !== scan.id || payload.localContentHash !== scan.contentHash ||
@@ -413,6 +445,7 @@ async function loadOrDeriveSnapshot(input: {
     if (!latest || latest.contentHash !== scan.contentHash || !matchesLocalSourceValidity(scan, latest)) {
       throw new Error(`Sourcegeneration hat sich waehrend der Ableitung geaendert: ${entry.id}`);
     }
+    throwIfAborted(signal);
     const saved = await (auditValue(__audit4, auditEnter(__audit4, "putLocalToplistSnapshot"), (putLocalToplistSnapshot(payload, { derivationVersion, resetGeneration, dependencies: sourceDependencies }))));
     input.derivedSelections.push(cacheKey);
     return auditReturn(__audit4, { entry, cacheKey, resetGeneration, payload: payloadFromRecord(saved), source: "derived" });
@@ -420,11 +453,13 @@ async function loadOrDeriveSnapshot(input: {
     } catch (__auditError) { auditError(__audit4, __auditError); throw __auditError; }
     finally { auditLeave(__audit4); }
 })().finally(() => {
-    inFlightDerivedSnapshots.delete(flightKey);
+    flight.settled = true;
+    if (inFlightDerivedSnapshots.get(flightKey) === flight) inFlightDerivedSnapshots.delete(flightKey);
   });
 
-  inFlightDerivedSnapshots.set(flightKey, promise);
-  return auditReturn(__audit3, promise);
+  flight.promise = promise;
+  inFlightDerivedSnapshots.set(flightKey, flight);
+  return auditReturn(__audit3, joinSnapshotFlight(flightKey, flight, consumerSignal));
 
     } catch (__auditError) { auditError(__audit3, __auditError); throw __auditError; }
     finally { auditLeave(__audit3); }

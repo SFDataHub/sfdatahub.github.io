@@ -1070,6 +1070,11 @@
       "search": "Vyhledávací index se nepodařilo načíst. Zkus to znovu.",
       "compare": "Porovnání se nepodařilo připravit. Zkus to znovu."
     },
+    "historicalStatsDay": {
+      "loading": "Připravují se historická pořadí Stats/Day. Aktuální hodnoty zůstávají dostupné.",
+      "error": "Historická pořadí Stats/Day se nepodařilo připravit. Aktuální hodnoty zůstávají dostupné.",
+      "unavailable": "Bez vhodného dřívějšího srovnání nejsou historická pořadí Stats/Day dostupná."
+    },
     "compareIssues": {
       "compare-off": "Porovnání je vypnuté.",
       "missing-baseline-month": "Není vybrán základní měsíc porovnání.",
