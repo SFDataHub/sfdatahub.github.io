@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from "crypto";
 import { db } from "../../../firebase";
+import { fragmentEntries } from "../../../storage/fragments";
+import { assertAtomicSize, bundleId, digest, packBundles } from "../../../storage/bundles";
 
 export const METRIC_VERSION = 2;
 export const WEBSITE_VISIT_PATH = "sfdatahub/website-visit-v2";
@@ -98,56 +100,63 @@ export async function buildMetrics(config: MetricsConfig, now: Date, fetchRange:
   return { manifest: { ...base, state, website: metric(total.visitors, daily.map(day => day.visitors)) }, pages };
 }
 
-/** Only the authenticated hourly job publishes; readers never contact GoatCounter.
- * Immutable generations let a cached manifest and later navigation share one basis.
- */
+// Older current/live pointers stay frozen for already-open clients during rollout.
+export const liveRef = () => db.collection(PUBLIC_COLLECTION).doc("bundled");
+const compact = ({ today, total, dailyAverage }: Metric) => ({ today, total, dailyAverage });
+
+/** Stable size-bounded bundles; manifest hashes replace private page indexes. */
 export async function publishMetrics(fetchRange: FetchRange, now = new Date()) {
   const leaseRef = db.collection("analytics").doc("visitor_sync_lease");
   const leaseId = randomUUID();
   const acquired = await db.runTransaction(async tx => {
-    const [lease, configDoc, current] = await Promise.all([tx.get(leaseRef), tx.get(configRef()), tx.get(publicRef())]);
+    const [lease, configDoc, current] = await Promise.all([tx.get(leaseRef), tx.get(configRef()), tx.get(liveRef())]);
     const config = parseConfig(configDoc.data());
     const previous = current.data();
-    if ((lease.data()?.until ?? 0) > now.getTime()) return false;
-    // A recent snapshot made with the old confirmation-date clamp is stale,
-    // even when the stored configuration revision has not changed.
-    // Absolute hour buckets tolerate scheduler jitter and delayed starts. Berlin's
-    // repeated autumn hour has two distinct UTC buckets; elapsed minutes do not
-    // identify which scheduled hour the snapshot actually covers.
-    if (previous?.complete === true && previous?.schemaVersion === METRIC_VERSION && previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Math.floor(Date.parse(previous.asOf) / 3600000) === Math.floor(now.getTime() / 3600000)) return false;
+    if ((lease.data()?.until ?? 0) > now.getTime()) return null;
+    if (previous?.complete === true && previous?.schemaVersion === 4 && previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Math.floor(Date.parse(previous.asOf) / 3600000) === Math.floor(now.getTime() / 3600000)) return null;
     tx.set(leaseRef, { id: leaseId, until: now.getTime() + 240000 });
-    return true;
+    return { config, previous, sequence: (previous?.sequence ?? 0) + 1 };
   });
   if (!acquired) return { skipped: true };
+  let committed = false;
   try {
-    const config = parseConfig((await configRef().get()).data());
+    const { config, previous, sequence } = acquired;
     const { manifest, pages } = await buildMetrics(config, now, fetchRange);
-    const generation = `${now.getTime()}-${leaseId}`;
-    const generationRef = db.collection(PUBLIC_COLLECTION).doc(generation);
-    // Smaller than Firestore's document/batch limits even with 30 daily values.
-    // Fail rather than publish a partial index when operational bounds are hit.
     if (pages.size > 20000) throw new Error("Visitor snapshot exceeds 20000 paths; previous snapshot retained");
-    await generationRef.set({ createdAt: now.getTime(), expiresAt: now.getTime() + 48 * 3600000 });
-    const entries = [...pages];
-    for (let offset = 0; offset < entries.length; offset += 400) {
-      const batch = db.batch();
-      for (const [path, metric] of entries.slice(offset, offset + 400)) {
-        batch.set(generationRef.collection("pages").doc(pathId(path)), { schemaVersion: METRIC_VERSION, generation, path, ...metric });
-      }
-      await batch.commit();
+    const dayCount = manifest.website?.days.length ?? 0;
+    const basis = JSON.stringify([manifest.state, manifest.effectiveStartDate, manifest.today, dayCount]);
+    const entries: Record<string, unknown> = {};
+    for (const [path, metric] of pages) entries[pathId(path)] = { path, ...compact(metric) };
+    const oldBundles = (previous?.bundles ?? []) as Array<{ prefix: string; hash: string }>;
+    const pageCollection = liveRef().collection("pages");
+    const prepared = fragmentEntries(entries, basis, id => pageCollection.doc(id).path);
+    const packed = packBundles(prepared.entries, oldBundles.length ? oldBundles.map(bundle => bundle.prefix) : undefined,
+      id => pageCollection.doc(id).path, bundle => ({ schemaVersion: 4, basis, ...bundle }));
+    const bundles = packed.leaves.map(prefix => ({ prefix, hash: digest(packed.documents.get(bundleId(prefix))) }));
+    const fragments = [...prepared.fragments].map(([id, value]) => ({ id, hash: digest(value) }));
+    const oldFragments = (previous?.fragments ?? []) as Array<{ id: string; hash: string }>;
+    const snapshot = { ...manifest, schemaVersion: 4, generation: "bundled", sequence, basis, bundles, fragments,
+      dayCount, website: manifest.website ? compact(manifest.website) : null, pathCount: pages.size, complete: true };
+    const writes = bundles.filter(bundle => oldBundles.find(old => old.prefix === bundle.prefix)?.hash !== bundle.hash)
+      .map(bundle => ({ ref: pageCollection.doc(bundleId(bundle.prefix)), value: packed.documents.get(bundleId(bundle.prefix))! }));
+    for (const fragment of fragments) if (oldFragments.find(old => old.id === fragment.id)?.hash !== fragment.hash) {
+      writes.push({ ref: pageCollection.doc(fragment.id), value: prepared.fragments.get(fragment.id)! });
     }
-    const snapshot = { ...manifest, generation, pathCount: pages.size, complete: true };
-    await db.runTransaction(async tx => {
+    assertAtomicSize([...writes.map(write => ({ path: write.ref.path, value: write.value })), { path: liveRef().path, value: snapshot }]);
+    const operations = await db.runTransaction(async tx => {
       const [latest, lease] = await Promise.all([tx.get(configRef()), tx.get(leaseRef)]);
-      if (parseConfig(latest.data()).revision !== config.revision || lease.data()?.id !== leaseId || lease.data()?.until < Date.now()) throw new Error("Visitor configuration or sync lease changed; unpublished generation discarded");
-      tx.set(publicRef(), snapshot);
+      if (JSON.stringify(parseConfig(latest.data())) !== JSON.stringify(config) || lease.data()?.id !== leaseId || lease.data()?.until < Date.now()) throw new Error("Visitor configuration or sync lease changed; previous snapshot retained");
+      for (const { ref, value } of writes) tx.set(ref, value);
+      tx.set(liveRef(), snapshot);
+      tx.set(leaseRef, { id: "", until: 0 });
+      return { pageWrites: writes.length, pageDeletes: 0, indexWrites: 0 };
     });
-    // Bounded housekeeping. Cached frontend manifests expire after two hours;
-    // generations remain readable for 48 hours, including failed publications.
-    const expired = await db.collection(PUBLIC_COLLECTION).where("expiresAt", "<", now.getTime()).limit(2).get();
-    for (const old of expired.docs) await db.recursiveDelete(old.ref);
-    return { skipped: false, generation, state: manifest.state, pathCount: pages.size };
+    committed = true;
+    return { skipped: false, generation: "bundled", sequence, state: manifest.state, pathCount: pages.size, ...operations };
   } finally {
-    await db.runTransaction(async tx => { const lease = await tx.get(leaseRef); if (lease.data()?.id === leaseId) tx.delete(leaseRef); });
+    if (!committed) await db.runTransaction(async tx => {
+      const lease = await tx.get(leaseRef);
+      if (lease.data()?.id === leaseId) tx.set(leaseRef, { id: "", until: 0 });
+    });
   }
 }

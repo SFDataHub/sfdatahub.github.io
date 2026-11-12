@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,9 @@ import {
   SheetCreatorRow,
   sheetRowToCreator,
 } from "../../src/lib/creators/shared";
+
+// AuthAPI is CommonJS; load its shared validator through the CLI's ESM boundary.
+const { isYouTubeSnapshot } = createRequire(import.meta.url)("../../auth-api/src/creators/types") as typeof import("../../auth-api/src/creators/types");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../");
 const OUTPUT = path.join(ROOT, "public", "data", "creators-live.json");
@@ -38,18 +42,8 @@ async function loadEnvFile(filePath: string) {
 await loadEnvFile(path.join(ROOT, ".env.local"));
 await loadEnvFile(path.join(ROOT, ".env"));
 
-const YT_KEY = process.env.YOUTUBE_API_KEY;
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
-
-type Optional<T> = T | null | undefined;
-
-interface YouTubeStats {
-  channelId: string;
-  subscribers?: number;
-  totalViews?: number;
-  lastUpload?: string;
-}
 
 interface TwitchStats {
   userId: string;
@@ -69,111 +63,9 @@ function warn(warnings: CreatorWarning[], warning: CreatorWarning) {
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status} for ${url}\n${text}`);
+    throw new Error(`Upstream HTTP ${res.status}`);
   }
   return (await res.json()) as T;
-}
-
-function extractYouTubeLookup(url: string): Optional<{ type: string; value: string }> {
-  if (!url) return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch (err) {
-    return null;
-  }
-  const pathname = parsed.pathname.replace(/\/+$/, "");
-  if (pathname.includes("@")) {
-    const at = pathname.lastIndexOf("@");
-    const rest = pathname.substring(at + 1);
-    const handle = rest.split("/")[0];
-    return { type: "handle", value: handle };
-  }
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts.length >= 2) {
-    const [prefix, value] = parts;
-    if (prefix === "channel") return { type: "channel", value };
-    if (prefix === "user") return { type: "user", value };
-    if (prefix === "c") return { type: "custom", value };
-  }
-  return null;
-}
-
-async function fetchYouTubeStats(url: string): Promise<YouTubeStats | null> {
-  if (!YT_KEY) return null;
-  const lookup = extractYouTubeLookup(url);
-  if (!lookup) return null;
-
-  async function getChannelById(id: string) {
-    const data = await fetchJSON<any>(
-      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=${YT_KEY}`
-    );
-    return data.items?.[0];
-  }
-
-  async function getChannelByUsername(username: string) {
-    const data = await fetchJSON<any>(
-      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forUsername=${encodeURIComponent(
-        username
-      )}&key=${YT_KEY}`
-    );
-    return data.items?.[0];
-  }
-
-  async function searchChannel(query: string) {
-    const search = await fetchJSON<any>(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(
-        query
-      )}&maxResults=1&key=${YT_KEY}`
-    );
-    const channelId = search.items?.[0]?.snippet?.channelId;
-    if (!channelId) return null;
-    return getChannelById(channelId);
-  }
-
-  let channel: any = null;
-  switch (lookup.type) {
-    case "channel":
-      channel = await getChannelById(lookup.value);
-      break;
-    case "user":
-      channel = await getChannelByUsername(lookup.value);
-      break;
-    case "custom":
-      channel = (await searchChannel(lookup.value)) || (await searchChannel(`@${lookup.value}`));
-      break;
-    case "handle":
-      channel = await searchChannel(lookup.value.startsWith("@") ? lookup.value : `@${lookup.value}`);
-      break;
-    default:
-      break;
-  }
-
-  // Last‑chance fallback: try search without @ if still missing
-  if (!channel) {
-    const plain = lookup.value.replace(/^@/, "");
-    channel = await searchChannel(plain);
-  }
-
-  if (!channel) return null;
-
-  const channelId: string = channel.id;
-  const statistics = channel.statistics ?? {};
-  const subscribers = statistics.hiddenSubscriberCount ? undefined : Number(statistics.subscriberCount ?? 0);
-  const totalViews = Number(statistics.viewCount ?? 0);
-
-  const latest = await fetchJSON<any>(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&type=video&maxResults=1&key=${YT_KEY}`
-  );
-  const lastUpload = latest.items?.[0]?.snippet?.publishedAt ?? channel.snippet?.publishedAt;
-
-  return {
-    channelId,
-    subscribers: Number.isNaN(subscribers) ? undefined : subscribers,
-    totalViews: Number.isNaN(totalViews) ? undefined : totalViews,
-    lastUpload,
-  };
 }
 
 let twitchToken: { token: string; expires: number } | null = null;
@@ -257,45 +149,9 @@ async function hydrateCreator(
   warnings: CreatorWarning[],
   counters: { youtubeLookups: number; twitchLookups: number }
 ): Promise<Creator> {
-  const enriched = sheetRowToCreator(row);
+  const fallback = sheetRowToCreator(row);
+  const enriched = { ...fallback, ...previousCreators.find(c => c.id === fallback.id), platforms: fallback.platforms };
   let lastActive = enriched.lastActive;
-
-  if (row.youtube) {
-    if (!YT_KEY) {
-      warn(warnings, {
-        creator: row.name,
-        scope: "youtube",
-        level: "warning",
-        message: "YOUTUBE_API_KEY missing, skipping YouTube stats",
-      });
-    } else {
-      try {
-        const stats = await fetchYouTubeStats(row.youtube);
-        counters.youtubeLookups += 1;
-        if (stats) {
-          if (typeof stats.subscribers === "number") enriched.subscribers = Math.max(enriched.subscribers, stats.subscribers);
-          if (typeof stats.totalViews === "number") enriched.totalViews = Math.max(enriched.totalViews, stats.totalViews);
-          lastActive = mostRecent(lastActive, stats.lastUpload);
-        } else {
-          warn(warnings, {
-            creator: row.name,
-            scope: "youtube",
-            level: "warning",
-            message: "Could not resolve channel",
-            source: row.youtube,
-          });
-        }
-      } catch (err: any) {
-        warn(warnings, {
-          creator: row.name,
-          scope: "youtube",
-          level: "error",
-          message: err?.message || "YouTube lookup failed",
-          source: row.youtube,
-        });
-      }
-    }
-  }
 
   if (row.twitch) {
     if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET) {
@@ -339,10 +195,30 @@ async function hydrateCreator(
   return enriched;
 }
 
+let previousCreators: Creator[] = [];
+async function centralYouTube() {
+  const base = process.env.AUTH_BASE_URL || process.env.VITE_AUTH_BASE_URL;
+  const token = process.env.UPLOAD_INBOX_TOKEN;
+  if (!base || !token) throw new Error("Central creator sync requires AUTH_BASE_URL and UPLOAD_INBOX_TOKEN (server-side only).");
+  let response: Response;
+  try {
+    response = await fetch(`${base.replace(/\/$/, "")}/internal/creators/youtube/refresh-snapshot?videos=10`, {
+      method: "POST", headers: { "x-internal-token": token }, signal: AbortSignal.timeout(230000),
+    });
+  } catch { throw new Error("Central creator synchronization is unreachable."); }
+  if (!response.ok) throw new Error(`Central creator synchronization failed (HTTP ${response.status}). Existing snapshot retained.`);
+  const payload = await response.json();
+  if (!isYouTubeSnapshot(payload?.youtube)) throw new Error("Central YouTube snapshot is incomplete.");
+  return payload.youtube as NonNullable<CreatorSnapshot["youtube"]>;
+}
 async function run() {
+  const previous: CreatorSnapshot = JSON.parse(await fs.readFile(OUTPUT, "utf8"));
+  previousCreators = previous.data;
+  // A static export is not a YouTube refresh: use the actual central generator.
+  const youtube = await centralYouTube();
   logStep(`Syncing ${sheetRows.length} creators`);
   const warnings: CreatorWarning[] = [];
-  const counters = { youtubeLookups: 0, twitchLookups: 0 };
+  const counters = { youtubeLookups: youtube.requests, twitchLookups: 0 };
   const data: Creator[] = [];
 
   for (const row of sheetRows) {
@@ -353,6 +229,7 @@ async function run() {
   const snapshot: CreatorSnapshot = {
     generatedAt: new Date().toISOString(),
     data,
+    youtube,
     warnings,
     stats: counters,
   };

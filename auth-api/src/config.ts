@@ -19,6 +19,7 @@ const secrets = {
   SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
   TWITCH_CLIENT_SECRET: defineSecret("TWITCH_CLIENT_SECRET"),
   GOATCOUNTER_API_TOKEN: defineSecret("GOATCOUNTER_API_TOKEN"),
+  YOUTUBE_API_KEY: defineSecret("YOUTUBE_API_KEY"),
 } as const;
 
 const strings = {
@@ -34,6 +35,7 @@ const strings = {
   SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
   TWITCH_CLIENT_ID: defineString("TWITCH_CLIENT_ID"),
   TWITCH_CHANNELS: defineString("TWITCH_CHANNELS"),
+  YOUTUBE_SOURCES: defineString("YOUTUBE_SOURCES"),
   TWITCH_GAME_ID: defineString("TWITCH_GAME_ID"),
   TWITCH_LOG_FULL_RESPONSE: defineString("TWITCH_LOG_FULL_RESPONSE"),
   GOATCOUNTER_API_BASE_URL: defineString("GOATCOUNTER_API_BASE_URL"),
@@ -54,6 +56,9 @@ const requireValue = (key: string, param?: Param): string => {
   }
   return value;
 };
+
+export const YOUTUBE_API_KEY = readRuntimeValue("YOUTUBE_API_KEY", secrets.YOUTUBE_API_KEY);
+export const YOUTUBE_SOURCES = readRuntimeValue("YOUTUBE_SOURCES", strings.YOUTUBE_SOURCES);
 
 export const PORT = Number(process.env.PORT ?? 4000);
 export const AUTH_JWT_SECRET = requireValue("AUTH_JWT_SECRET", strings.AUTH_JWT_SECRET);

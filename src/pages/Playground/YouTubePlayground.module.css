@@ -1,0 +1,6 @@
+.page { min-width: 0; color: #f5f9ff; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; color: #b0c4d9; font-size: 12px; }
+.toolbar button { border: 1px solid #6cc4eb; border-radius: 7px; color: #e7f5ff; background: #103349; padding: 7px 12px; cursor: pointer; }
+.toolbar button:disabled { opacity: .6; cursor: wait; }
+.toolbar button:focus-visible { outline: 2px solid #9be7ff; outline-offset: 4px; }
+.status { color: #c1dfef; font-size: 13px; margin: 10px 0; }

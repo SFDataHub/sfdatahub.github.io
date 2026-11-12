@@ -82,8 +82,8 @@ Required environment values:
 - `GOATCOUNTER_API_BASE_URL` (recommended: `https://<your-site>.goatcounter.com`; `/api/v0` is also accepted)
 - `GOATCOUNTER_API_TOKEN` (Bearer token)
 
-The existing hourly job now publishes the v2 public footer snapshot at
-`visitor_metrics_public/current`. It no longer generates the private admin details.
+The existing hourly job publishes the current v3 public footer snapshot at
+`visitor_metrics_public/live`. It no longer generates the private admin details.
 Repeated runs within an hour reuse the current snapshot unless configuration changed.
 The job uses the existing token, API rate gap and bounded retries. It reads complete
 `stats/hits` pages using `exclude_paths`, never `stats/total` as a website visitor count.
@@ -109,16 +109,36 @@ existing v2 events within the selected period count; legacy history is never sub
 Saving changes the configuration revision. The next regular hourly job also replaces
 snapshots based on the old later boundary even if the revision has not changed.
 
-The public manifest and immutable per-path documents share one generation. Each path
-has its own SHA-256 document ID and at most 30 daily values, avoiding the 1 MiB document
-limit. No private titles, referrers, API keys or admin top lists are published. A successful
-missing-path read from a complete generation means zero; failed reads do not. Frontend
-reads share a single manifest and per-path promises, with no focus/toggle refresh. Cached
-manifests expire after two hours; generations are retained for 48 hours and at most two
-expired generations are removed per job. A failed unpublished generation is also eligible
-for this cleanup. One additional range supplies the full-period total after day 30;
-up to 30 exact Berlin-day ranges supply the average, including current and zero days.
-DST uses calendar days. Provider chart timezone is not used.
+Public storage (Patch 1.1.2):
+
+- `visitor_metrics_public/live`: schemaVersion=3, generation="live", monotonic sequence,
+  complete=true, state, timezone, startDate/collectionStartDate/effectiveStartDate,
+  configRevision, asOf, today, basis, dayCount, pathCount, website={today,total,dailyAverage}.
+- `visitor_metrics_public/live/pages/{SHA256(canonicalPath)}`: schemaVersion=3,
+  path, basis, sequence of the last actual change, today, total, dailyAverage.
+- `analytics/visitor_sync_lease`: stable id/until coordination; released to empty id/0.
+  Its private `page_hashes/{0..f}` documents contain `hashes: {pageId: valueHash}`.
+  These sixteen bounded current indexes avoid reading every public page each run.
+
+Daily ranges stay in calculation memory; only the displayed aggregates/dayCount
+are stored. No history is produced. One transaction updates changed/new/removed
+pages, changed hash shards, the manifest and unlocked lease together. Unchanged
+runs write only lease acquisition, central freshness and lease release (3 writes,
+no page/index writes/deletes). Same-hour duplicates read 3 documents and write none.
+Publication aborts while retaining the previous state if any document would exceed
+512 KiB or the estimated atomic payload (including per-write overhead) exceeds 8 MiB.
+The existing 20,000-path bound also remains. Large all-path configuration/day changes
+can hit the atomic payload bound earlier; partial publication is never used.
+
+New readers get only the manifest and their page. Shared promises/cache and the
+existing hour+2min/one retry at +3min scheduler remain. Page basis/sequence detect
+read races; one shared reconciliation read is allowed, with previous visible values
+retained on failure. A missing mutable page becomes zero only after verifying that
+the manifest did not change. Confirmed zeroes are cached too. There are no new
+listeners, polling loops, focus/toggle/locale reads. Number/date formatting and layout
+remain unchanged; the footer uses central dayCount instead of persisting daily rows.
+One full-period range after day 30 and up to 30 exact Berlin daily ranges still supply
+the same visitor/page totals and averages, including current/zero days and DST.
 
 Private legacy admin details at `analytics/visitor_analytics` are generated/loaded only
 by explicit POST `/api/admin/stats/visitor/refresh`. Their existing shape/top-25 taxonomy
@@ -132,20 +152,43 @@ npm --prefix auth-api run build
 npm --prefix auth-api test -- src/internal/analytics/visitor/metrics.test.ts --cache=false
 ```
 
-Manual deployment, using the existing Firebase authapi workflow, after local review:
+Manual deployment for Danny (Patch 1.1.2):
 
-1. Deploy authApi only with the existing project selection (`firebase deploy --only
-   functions:authapi:authApi`); predeploy runs the auth-api TypeScript build. The local
-   function definition raises the request timeout to 240 seconds for bounded pagination.
-2. Add **only** the `visitor_metrics_public` match from `firestore.rules` to the active
-   rules: public single-document `get` for the manifest/generations and their `pages`
-   subcollection; deny list/write. Keep all other active rules. Do not deploy the whole
-   local rules file without comparing it to the active rules.
-3. Deploy the frontend through its existing workflow. Then configure Visitor Analytics
-   and confirm the deployed v2 tracker plus enabled Sessions as described above.
-4. Preserve the existing hourly scheduler URL/method/internal header. Ensure its request
-   deadline accommodates the 240-second function timeout. No new schedule, secrets,
-   GoatCounter account changes or TTL policy are required.
+1. Use the established **gcloud** authApi deployment with the existing project,
+   region, entry point, environment/secrets and service account; retain
+   `--runtime=nodejs22 --timeout=240s`. Build the auth-api source through the existing
+   gcloud workflow. Do not switch to Firebase deployment or create new secrets.
+   Keep `visitor-analytics-sync`, its hourly cadence, URL
+   `/internal/analytics/visitor/sync-snapshot`, HTTP method and existing authentication.
+2. Existing checked-in Rules already allow individual `get` on every
+   `visitor_metrics_public/{snapshotId}` and its `pages/{pathId}`, while denying
+   list/write. They cover `live` unchanged; no rules change is needed if that match
+   is active. Do not publish the entire local rules file blindly.
+3. Backend first. The old `current` pointer and all generations remain frozen and
+   readable for old open clients. Wait for a successful regular publication at
+   `live`, or use the existing authorized sync endpoint once. No config reset:
+   confirmed start date, revision and source counting stay intact. Before that
+   success the new frontend falls back to the existing v2 pointer.
+4. Publish the frontend through its existing workflow. Old open pages still show
+   their frozen legacy values (and the existing stale indication); ask users to
+   reload those pages. Keep old generations until the agreed legacy-client
+   transition is complete. No ongoing compatibility-generation production.
+5. **Separate, explicit one-time cleanup**, only after legacy readers were reloaded.
+   Preview from `auth-api` using existing ADC/project access (no new secrets):
+
+   ```text
+   node tools/visitor-generations.cjs --project PROJECT --plan D:/SFDataHub/codex/sfdatahub.github.io/tmp/w279/cleanup-plan.json
+   ```
+
+   Inspect the finite JSON list of exact old generation/page paths plus old
+   `visitor_metrics_public/current`. Then explicitly run the same command with
+   `--delete --ack-old-readers-reloaded`. Preview does not delete; apply verifies
+   project, live availability, target paths/update times, and uses conditional
+   batches. It preserves `live`, private config/lease/indexes and every unrelated
+   collection. Interrupted apply can resume with the same plan; changed targets
+   require review and a fresh preview. No recursive or periodic cleanup is installed.
+   Read/list enumeration during this manual preview is distinct from document
+   deletes and is not part of the regular hourly job.
 
 No deployment or production configuration change is performed by these local edits.
 

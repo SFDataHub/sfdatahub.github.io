@@ -93,6 +93,7 @@ import AdminVisitorAnalyticsPage from "./pages/Admin/VisitorAnalytics";
 import { settingsRouteElements } from "./pages/Settings/routes";
 
 // Playground
+const YouTubePlayground = React.lazy(() => import("./pages/Playground/YouTubePlayground"));
 import PlaygroundIndex from "./pages/Playground/index";
 import AMRuneBonusesDemos from "./pages/Playground/AMRuneBonusesDemos";
 import HUDIndex from "./pages/Playground/HUD/index";
@@ -445,6 +446,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.playground", "/playground", <PlaygroundIndex />)}
                 >
                   <Route index element={<div style={{ color: "#B0C4D9" }}>Choose an item on the left.</div>} />
+                  <Route path="youtube" element={<React.Suspense fallback={null}><YouTubePlayground /></React.Suspense>} />
                   <Route path="list-views" element={<ListViews />} />
                   <Route path="rescan-widget" element={<RescanWidget />} />
                   <Route path="upload-sim" element={<UploadSim />} />

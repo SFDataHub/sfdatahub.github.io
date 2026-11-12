@@ -41,7 +41,10 @@ export interface CreatorWarning {
   source?: string;
 }
 
+export type { YouTubeSnapshot, YouTubeChannel, YouTubeVideo } from "../../../auth-api/src/creators/types";
+
 export interface CreatorSnapshot {
+  youtube?: import("../../../auth-api/src/creators/types").YouTubeSnapshot;
   generatedAt: string;
   data: Creator[];
   warnings?: CreatorWarning[];
