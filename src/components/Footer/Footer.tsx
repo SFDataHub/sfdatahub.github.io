@@ -53,7 +53,7 @@ export default function Footer() {
         </div>
         <p className={styles.note} role="status">
           {stateKey === "ready" && manifest?.effectiveStartDate
-            ? t("footer.metrics.period", { start: formatDay(manifest.effectiveStartDate), days: manifest.website?.days.length, asOf })
+            ? t("footer.metrics.period", { start: formatDay(manifest.effectiveStartDate), days: manifest.dayCount, asOf })
             : t(`footer.metrics.${stateKey}`)}
           {manifest?.state === "not_started" && manifest.effectiveStartDate ? ` ${formatDay(manifest.effectiveStartDate)} (Europe/Berlin)` : ""}
           {manifest?.startDate && manifest.effectiveStartDate && manifest.startDate < manifest.effectiveStartDate ? ` ${t("footer.metrics.limitedStart", { start: formatDay(manifest.effectiveStartDate) })}` : ""}

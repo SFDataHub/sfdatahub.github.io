@@ -37,6 +37,9 @@ export default function PlaygroundIndex() {
           <p style={sx.note}>Kleine Spielwiese für UI/Flows. Links wählen, rechts live ansehen.</p>
 
           <nav>
+            <NavLink to="youtube" style={({ isActive }) => ({ ...sx.link, ...(isActive ? sx.active : {}) })}>
+              {t("youtubeCard.navigation")}
+            </NavLink>
             <div style={sx.groupLabel}>Allgemein</div>
             <NavLink
               to="list-views"

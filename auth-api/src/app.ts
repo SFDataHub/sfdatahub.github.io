@@ -19,6 +19,8 @@ import { refreshDiscordNewsSnapshotHandler } from "./internal/news/discord/refre
 import { syncVisitorAnalyticsSnapshotHandler } from "./internal/analytics/visitor/syncSnapshot.handler";
 import { twitchLiveHandler } from "./public/twitch/live.handler";
 
+import { creatorRouter } from "./creators/routes";
+
 const app = express();
 
 app.use(
@@ -47,6 +49,8 @@ app.get("/public/news/discord/latest", latestDiscordNewsHandler);
 app.get("/public/news/discord/list", listDiscordNewsHandler);
 app.get("/public/news/discord/latest-by-channel", latestDiscordNewsByChannelHandler);
 app.get("/api/twitch/live", twitchLiveHandler);
+
+app.use(creatorRouter);
 
 app.get("/health", (_req, res) => {
   // Lightweight readiness probe for Cloud Run/Functions

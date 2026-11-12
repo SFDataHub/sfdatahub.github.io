@@ -1,0 +1,29 @@
+.card { color: #f5f9ff; background: linear-gradient(135deg, #102e43, #091b2b); border: 1px solid #38799e; border-radius: 18px; padding: 16px; min-width: 0; }
+.brand { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 0 0 20px; font-size: 30px; font-weight: 800; }
+.brand > span { height: 2px; flex: 1; max-width: 260px; background: #6598b5; margin: 0 12px; }
+.brand svg { width: 44px; flex-shrink: 0; }
+.channels { display: grid; gap: 12px; }
+.channel { display: grid; grid-template-columns: minmax(155px, 22%) minmax(0, 1fr); border: 1px solid #38799e; border-radius: 14px; padding: 14px; background: #0b2334; }
+.profile { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-right: 1px solid #6497b3; padding-right: 14px; font-size: 12px; line-height: 1.5; }
+.avatar { width: 104px; height: 104px; object-fit: cover; border-radius: 50%; border: 2px solid #80c6e6; background: #152a42; }
+.profile h2 { font-size: 18px; line-height: 1.25; margin: 7px 0; overflow-wrap: anywhere; }
+.languages { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; color: #d3e6f5; }
+.languages span { border: 1px solid #6497b3; border-radius: 4px; padding: 0 4px; }
+.profile small { color: #b0c4d9; font-size: 10px; }
+.channelLink, .expand { border: 1px solid #6cc4eb; border-radius: 7px; color: #e7f5ff; background: #103349; padding: 4px 14px; font-weight: 600; }
+.channelLink { margin-top: 7px; text-decoration: none; }
+.videos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; gap: 12px; padding-left: 16px; }
+.video { color: inherit; text-decoration: none; min-width: 0; }
+.thumbnail { aspect-ratio: 16 / 9; position: relative; background: #152a42; overflow: hidden; border: 1px solid #4f9abd; border-radius: 9px; }
+.thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 6px; padding: 1px 9px; background: #ff0033; color: white; font-size: 17px; }
+.duration { position: absolute; right: 4px; bottom: 4px; padding: 0 4px; border-radius: 3px; background: #07121eee; font-size: 11px; font-variant-numeric: tabular-nums; }
+.video h3 { font-size: 14px; line-height: 1.35; margin: 7px 0 4px; overflow-wrap: anywhere; }
+.metadata { color: #c1dfef; font-size: 11px; line-height: 1.5; }
+.cc { border: 1px solid currentColor; border-radius: 2px; padding: 0 2px; }
+.empty { color: #b0c4d9; grid-column: 1 / -1; }
+.expand { display: block; margin: 18px auto 0; cursor: pointer; }
+.video:hover h3, .channelLink:hover { color: #7bdaff; }
+.card a:focus-visible, .card button:focus-visible { outline: 2px solid #9be7ff; outline-offset: 4px; }
+@media (max-width: 1100px) and (min-width: 761px) { .channel { grid-template-columns: 135px minmax(0, 1fr); padding: 10px; } .videos { gap: 9px; padding-left: 12px; } .avatar { width: 84px; height: 84px; } .profile h2 { font-size: 15px; } }
+@media (max-width: 600px) { .channel { grid-template-columns: minmax(0, 1fr); } .profile { border-right: 0; border-bottom: 1px solid #6497b3; padding: 0 0 12px; } .videos { padding: 14px 0 0; grid-template-columns: minmax(0, 1fr); gap: 20px; } .brand { font-size: 26px; } .brand > span { margin: 0; } }
