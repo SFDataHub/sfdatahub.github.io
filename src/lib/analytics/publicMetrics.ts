@@ -5,7 +5,7 @@ import { cachedPublicRead, readPublicCache, writePublicCache, withPublicReadLock
 
 export type PublicMetric = { today: number; total: number; dailyAverage: number };
 export type PublicManifest = {
-  schemaVersion: 2 | 3 | 4; bundles?: Array<{ prefix: string; hash: string }>; generation: string; sequence?: number; basis?: string; dayCount: number; complete: true; state: "ready" | "not_configured" | "not_started" | "unverified";
+  schemaVersion: 2 | 3 | 4 | 5; inlineEntries?: Record<string, unknown>; bundles?: Array<{ prefix: string; hash: string }>; generation: string; sequence?: number; basis?: string; dayCount: number; complete: true; state: "ready" | "not_configured" | "not_started" | "unverified";
   startDate: string | null; collectionStartDate: string | null; effectiveStartDate: string | null;
   fragments?: Array<{ id: string; hash: string }>;
   asOf: string; today: string; website: PublicMetric | null;
@@ -85,10 +85,11 @@ function scheduleRefresh() {
 
 function parseManifest(value: unknown): PublicManifest {
   const data = record(value);
-  if ((data.schemaVersion !== 2 && data.schemaVersion !== 3 && data.schemaVersion !== 4) || data.complete !== true || typeof data.generation !== "string" || !["ready", "not_configured", "not_started", "unverified"].includes(String(data.state)) || !Number.isFinite(Date.parse(String(data.asOf))) || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.today))) throw new Error("Incompatible snapshot");
-  if (Number(data.schemaVersion) >= 3 && (!Number.isSafeInteger(data.sequence) || Number(data.sequence) < 1 || typeof data.basis !== "string" || data.generation !== (data.schemaVersion === 4 ? "bundled" : "live"))) throw new Error("Invalid live snapshot");
-  if (data.schemaVersion === 4) {
-    if (!Array.isArray(data.bundles) || !data.bundles.length) throw new Error("Missing bundle directory");
+  if ((data.schemaVersion !== 2 && data.schemaVersion !== 3 && data.schemaVersion !== 4 && data.schemaVersion !== 5) || data.complete !== true || typeof data.generation !== "string" || !["ready", "not_configured", "not_started", "unverified"].includes(String(data.state)) || !Number.isFinite(Date.parse(String(data.asOf))) || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.today))) throw new Error("Incompatible snapshot");
+  if (Number(data.schemaVersion) >= 3 && (!Number.isSafeInteger(data.sequence) || Number(data.sequence) < 1 || typeof data.basis !== "string" || data.generation !== (Number(data.schemaVersion) >= 4 ? "bundled" : "live"))) throw new Error("Invalid live snapshot");
+  if (Number(data.schemaVersion) >= 4) {
+    if (!Array.isArray(data.bundles) || (!data.bundles.length && data.inlineEntries === undefined)) throw new Error("Missing bundle directory");
+    if (data.inlineEntries !== undefined) record(data.inlineEntries);
     const prefixes = new Set<string>();
     for (const raw of data.bundles) {
       const item = record(raw);
@@ -187,21 +188,26 @@ async function pageMetric(manifest: PublicManifest, path: string): Promise<PageR
   if (!pages.has(key)) {
     const request = (async () => {
       const id = await sha256(path);
-      if (manifest.schemaVersion === 4) {
-        const bits = [...id].map(char => parseInt(char, 16).toString(2).padStart(4, "0")).join("");
-        const descriptor = manifest.bundles!.find(bundle => bits.startsWith(bundle.prefix));
-        if (!descriptor) throw new Error("Unresolved page bundle");
-        if (!bundles.has(descriptor.hash)) {
-          const request = (async () => {
-            const data = await verifiedDocument("b_" + (descriptor.prefix || "root"), descriptor.hash, manifest.basis!);
-            return record(data.entries);
-          })();
-          bundles.set(descriptor.hash, request);
-          void request.catch(() => { if (bundles.get(descriptor.hash) === request) bundles.delete(descriptor.hash); });
-        }
+      if (manifest.schemaVersion >= 4) {
         try {
-          const entries = await bundles.get(descriptor.hash)!;
-          let row = entries[id];
+          let row: unknown;
+          if (manifest.inlineEntries !== undefined) {
+            // The complete inline page map arrived with the website counters.
+            row = manifest.inlineEntries[id];
+          } else {
+            const bits = [...id].map(char => parseInt(char, 16).toString(2).padStart(4, "0")).join("");
+            const descriptor = manifest.bundles!.find(bundle => bits.startsWith(bundle.prefix));
+            if (!descriptor) throw new Error("Unresolved page bundle");
+            if (!bundles.has(descriptor.hash)) {
+              const request = (async () => {
+                const data = await verifiedDocument("b_" + (descriptor.prefix || "root"), descriptor.hash, manifest.basis!);
+                return record(data.entries);
+              })();
+              bundles.set(descriptor.hash, request);
+              void request.catch(() => { if (bundles.get(descriptor.hash) === request) bundles.delete(descriptor.hash); });
+            }
+            row = (await bundles.get(descriptor.hash)!)[id];
+          }
           if (row !== undefined && Array.isArray(record(row).parts)) {
             const parts = record(row).parts as unknown[];
             if (!parts.length) throw new Error("Empty fragment list");

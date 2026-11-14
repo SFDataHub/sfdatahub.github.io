@@ -13,26 +13,8 @@ import ContentShell from "../../components/ContentShell";
 import { DataHubLoadingState } from "../../components/ui/shared/DataHubLoadingState";
 import AnchoredLineChart from "../../components/ui/charts/AnchoredLineChart";
 import type { AnchoredLineChartVerticalMarker } from "../../components/ui/charts/AnchoredLineChart";
-import {
-  collectionGroup,
-  endAt,
-  getDocs,
-  limit,
-  orderBy,
-  query as fsQuery,
-  startAt,
-  where,
-} from "firebase/firestore";
-import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
-import { db } from "../../lib/firebase";
-import {
-  beginReadScope,
-  endReadScope,
-  traceGetDocs,
-  type FirestoreTraceScope,
-} from "../../lib/debug/firestoreReadTrace";
 import {
   getGuildHubLocalScan,
   listGuildHubScanSummaries,
@@ -2286,21 +2268,10 @@ function GuildSelectionCard({
   title,
   slot,
   selectedGuild,
-  excludeId,
-  onSelect,
   onClear,
   serverFilter,
   onServerChange,
 }: SelectionCardProps) {
-  const [searchValue, setSearchValue] = React.useState("");
-  const debouncedSearch = useDebouncedValue(searchValue, 300);
-
-  React.useEffect(() => {
-    setSearchValue("");
-  }, [selectedGuild, serverFilter]);
-
-  const { results, loading } = useGuildSearchResults(debouncedSearch, serverFilter, excludeId);
-
   return (
     <article className={styles.selectionCard}>
       <div className={styles.slotHeader}>
@@ -2339,33 +2310,12 @@ function GuildSelectionCard({
             <input
               className={styles.searchInput}
               placeholder={hubText("dataHubI18n.enterGuildName")}
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
+              disabled
             />
           </label>
 
-          <div className={styles.resultList} role="list">
-            {loading && <div className={styles.emptyResult}>{hubText("dataHubI18n.loading")}</div>}
-            {!loading && results.length === 0 && (
-              <div className={styles.emptyResult}>{hubText("dataHubI18n.noGuildFound")}</div>
-            )}
-          {!loading && results.map((guild) => (
-            <div key={guild.id} className={styles.resultItem}>
-              <div>
-                <p className={styles.resultName}>{guild.name}</p>
-                <p className={styles.resultMeta}>
-                  {guild.server} - {hubText("hubFavorites.members", { count: guild.members })}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={styles.selectButton}
-                onClick={() => onSelect(slot, guild)}
-              >
-                {hubText("dataHubI18n.select")}
-              </button>
-            </div>
-          ))}
+          <div className={styles.emptyResult} role="status">
+          Datenanbindung vorübergehend nicht verfügbar. Die lokale Anbindung folgt später.
         </div>
 
         {selectedGuild && (
@@ -2562,112 +2512,3 @@ function TransfersPlaceholder() {
   );
 }
 
-function useGuildSearchResults(term: string, server: string, excludeId?: string | null) {
-  const [results, setResults] = React.useState<GuildSummary[]>([]);
-  const [loading, setLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    const q = term.trim();
-    if (q.length === 0) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function run() {
-    const __audit6 = auditBegin("F15", "run");
-  auditFields(__audit6, { consumerArea: "Gildenanalyse", trigger: "cloud-search-effect" });
-    try {
-      const scope: FirestoreTraceScope = beginReadScope("CompareGuilds:search");
-      setLoading(true);
-      try {
-        const folded = q.toLowerCase();
-        const cg = collectionGroup(db, "latest");
-
-        const snapPrefix = await (auditValue(__audit6, auditEnter(__audit6, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
-          getDocs(
-            fsQuery(
-              cg,
-              orderBy("nameFold"),
-              startAt(folded),
-              endAt(folded + "\uf8ff"),
-              limit(15),
-            ),
-          ),
-        ))));
-        const snapNgram = await (auditValue(__audit6, auditEnter(__audit6, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
-          getDocs(fsQuery(cg, where("nameNgrams", "array-contains", folded), limit(15))),
-        ))));
-
-        const seen = new Set<string>();
-        const next: GuildSummary[] = [];
-        const consider = (docSnap: any) => {
-          const data = docSnap.data() as any;
-          const ref = docSnap.ref;
-          const parentDoc = ref.parent?.parent;
-          const rootCol = parentDoc?.parent;
-          const root = rootCol?.id;
-          if (root !== "guilds") return;
-          const id = parentDoc?.id ?? data.guildIdentifier ?? docSnap.id;
-          if (!id || seen.has(id)) return;
-          if (excludeId && id === excludeId) return;
-
-          const name = data.name ?? data.values?.Name ?? hubText("dataHubI18n.unknownGuild");
-          const serverVal = data.server ?? data.values?.Server ?? hubText("dataHubI18n.unknown");
-          if (server !== "all" && serverVal !== server) return;
-
-          const members =
-            data.memberCount ??
-            data.values?.["Guild Member Count"] ??
-            data.values?.GuildMemberCount ??
-            0;
-          const updated =
-            data.updatedAt ??
-            data.values?.UpdatedAt ??
-            (data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString());
-
-          seen.add(id);
-          next.push({
-            id,
-            name,
-            tagline: data.tagline ?? "",
-            server: serverVal,
-            members,
-            avgLevel: data.avgLevel ?? data.values?.AvgLevel ?? 0,
-            lastScanAt: updated,
-            updatedAt: updated,
-            nextUpdateAt: updated,
-            freshness: "unknown",
-            classes: [],
-          });
-        };
-
-        snapPrefix.forEach(consider);
-        snapNgram.forEach(consider);
-
-        if (!cancelled) {
-          next.sort((a, b) => a.name.localeCompare(b.name));
-          setResults(next);
-        }
-      } catch (error) { auditError(__audit6, error);
-        console.error("[GuildHub CompareGuilds] guild search failed", error);
-        if (!cancelled) setResults([]);
-      } finally {
-        endReadScope(scope);
-        if (!cancelled) setLoading(false);
-      }
-
-    } catch (__auditError) { auditError(__audit6, __auditError); throw __auditError; }
-    finally { auditLeave(__audit6); }
-}
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [term, server, excludeId]);
-
-  return { results, loading };
-}

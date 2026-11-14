@@ -54,7 +54,8 @@
   "localSettings": {
     "openToplists": "Toplisten öffnen",
     "invalidToplistNames": "Toplisten: Gib für jede eigene Ansicht einen Namen ein ({{lists}}).",
-    "actionsScope": "Speichern und Verwerfen gelten für alle Bereiche: Allgemein, Toplisten und Profile.",
+    "actionsScope": "Speichern und Verwerfen gelten für die lokalen Seitenmenü-, Toplisten- und Profileinstellungen.",
+    "languageImmediate": "Sprachänderungen gelten sofort und werden getrennt von den lokalen Einstellungen oben gespeichert.",
     "dataHubSections": "DataHub-Einstellungsbereiche",
     "dataHub": "DataHub",
     "toplists": {
@@ -427,6 +428,7 @@
     "admin": "Admin",
     "playground": "Playground",
     "guideHub": "Guide Hub",
+    "sfCollection": "Dons SF Collection",
     "scans": "Scans",
     "overview": "Uebersicht",
     "analytics": "Analytics",
@@ -439,7 +441,6 @@
     "errorLog": "Fehlerprotokoll",
     "feedback": "Feedback",
     "users": "Nutzer",
-    "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
     "scanCoverage": "Scan-Abdeckung",
     "scanArchiveBuilder": "Scan Archive Builder",
@@ -980,117 +981,44 @@
     "languagePreference": "Sidebar-Sprache",
     "languageSwitchEn": "Sprache auf Englisch wechseln",
     "languageSwitchDe": "Sprache auf Deutsch wechseln",
-    "languageSwitchToLocale": "Sprache auf {{language}} wechseln",
-    "connectedCharacters": {
-      "title": "Verknuepfte Charaktere",
-      "empty": "Noch keine Charaktere verknuepft. Verknuepfe einen Charakter in deinem Account, damit er hier erscheint.",
-      "loginPrompt": "Bitte einloggen, um verknuepfte Charaktere zu sehen.",
-      "ctaGuest": "Start-Guide oeffnen",
-      "ctaAuthed": "Zum Account-Tab wechseln",
-      "chip": {
-        "server": "Server",
-        "class": "Klasse"
-      }
-    }
+    "languageSwitchToLocale": "Sprache auf {{language}} wechseln"
   },
   "account": {
-    "settings": {
-      "title": "Einstellungen",
-      "subtitle": "Passe deine persoenlichen Praeferenzen an.",
-      "loading": "Einstellungen werden geladen...",
-      "error": "Einstellungen konnten nicht geladen werden.",
-      "retry": "Erneut versuchen",
-      "language": {
-        "label": "Bevorzugte Sprache"
-      },
-      "defaultSection": {
-        "label": "Standardbereich"
-      },
-      "compactTables": {
-        "label": "Kompaktes Tabellen-Layout nutzen"
-      },
-      "experimental": {
-        "label": "Experimentelle Features aktivieren"
-      },
-      "save": "Einstellungen speichern",
-      "saved": "Einstellungen gespeichert.",
-      "noChanges": "Keine Aenderungen zum Speichern.",
-      "saving": "Speichern...",
-      "saveError": "Einstellungen konnten nicht gespeichert werden. Bitte erneut versuchen."
-    },
-    "tools": {
-      "title": "Tool-Einstellungen",
-      "subtitle": "Konfiguriere, wie die Tools fuer deinen Account arbeiten.",
-      "loading": "Tool-Einstellungen werden geladen...",
-      "loadError": "Tool-Einstellungen konnten nicht geladen werden.",
-      "defaultSet": {
-        "label": "Standard-Set-ID",
-        "placeholder": "Standard-Set-ID eingeben"
-      },
-      "showIntro": {
-        "label": "Tools-Intro anzeigen"
-      },
-      "experimental": {
-        "label": "Experimentelle Tools aktivieren"
-      },
-      "save": {
-        "cta": "Einstellungen speichern",
-        "saving": "Speichern...",
-        "success": "Einstellungen gespeichert.",
-        "noChanges": "Keine Aenderungen zum Speichern.",
-        "error": "Einstellungen konnten nicht gespeichert werden. Bitte erneut versuchen."
-      }
-    },
-    "connectedCharacters": {
-      "title": "Verknuepfte Charaktere",
-      "subtitle": "Diese Spielcharaktere sind mit deinem SFDataHub-Account verknuepft.",
-      "loading": "Charaktere werden aktualisiert...",
-      "empty": {
-        "title": "Noch keine Charaktere verknuepft",
-        "description": "Nutze den Befehl \"!connect char\" im Discord-Bot, verknuepfe deinen Account und klicke dann hier auf \"Refresh\".",
-        "cta": "Klicke hier, um zu erfahren, wie das Verknuepfen funktioniert"
-      },
-      "actions": {
-        "refresh": "Refresh",
-        "refreshing": "Aktualisiere...",
-        "unlink": "Charakter trennen"
-      },
-      "confirmation": {
-        "title": "Moechtest du diesen Charakter wirklich trennen?",
-        "cancel": "Abbrechen",
-        "confirm": "Ja, trennen",
-        "confirming": "Trenne..."
-      },
-      "errors": {
-        "serviceUnavailable": "Auth-Service ist fuer das Trennen nicht konfiguriert.",
-        "unlink": "Charakter konnte nicht getrennt werden."
-      },
-      "columns": {
-        "character": "Charakter",
-        "server": "Server",
-        "playerId": "Player ID",
-        "class": "Klasse",
-        "level": "Level",
-        "guild": "Gilde",
-        "lastVerified": "Zuletzt verknuepft",
-        "source": "Quelle",
-        "actions": "Aktionen"
-      },
-      "method": {
-        "discord": "Discord-Bot"
-      },
-      "help": {
-        "title": "Wie funktioniert das Verknuepfen?",
-        "show": "Anzeigen",
-        "hide": "Ausblenden",
-        "steps": {
-          "link": "Verknuepfe einen Charakter ueber den Discord-Bot mit dem Befehl \"!connect char\".",
-          "verify": "Wir gleichen den Charakter mit deinem letzten verifizierten Scan ab; halte deine Daten aktuell.",
-          "refresh": "Klicke nach dem Verknuepfen auf Refresh, damit die Liste aktualisiert wird.",
-          "unlink": "Du kannst jeden Charakter ueber die Spalte Aktionen trennen; die Quelle zeigt, wie er verknuepft wurde."
-        },
-        "footnote": "Tipp: Nach dem Verknuepfen oder Trennen immer kurz auf Refresh klicken."
-      }
+    "overview": {
+      "tab": "Account",
+      "checkingSession": "Sitzung wird geprüft",
+      "readingSession": "Kontositzung wird gelesen.",
+      "services": "Verbundene Dienste",
+      "servicesHelp": "Verwalte die mit deiner SFDataHub-Identität verknüpften Anmeldedienste.",
+      "connectedAs": "Verbunden als {{name}}",
+      "notConnected": "Nicht verbunden",
+      "connected": "Verbunden",
+      "connect": "Verbinden",
+      "planned": "Geplant",
+      "soon": "Demnächst",
+      "security": "Sicherheit & Sitzung",
+      "securityText": "Wir speichern nur deine SFDataHub-Nutzer-ID, deinen Anzeigenamen, deine Avatar-URL und Anbieterkennungen (etwa deine Discord-ID). Dein Discord-Passwort sehen oder speichern wir nie.",
+      "securityNote": "Die Abmeldung hier löscht nur dein SFDataHub-Sitzungscookie. Dein Discord-Konto bleibt separat angemeldet.",
+      "logout": "Auf diesem Gerät abmelden",
+      "revoke": "Um den Zugriff vollständig zu widerrufen, entferne SFDataHub Auth auf der Anwendungsseite deines Discord-Kontos.",
+      "id": "SFDataHub-ID",
+      "roles": "Rollen",
+      "createdAt": "Erstellt am",
+      "lastLogin": "Letzte Anmeldung",
+      "unnamed": "Unbenannter Nutzer",
+      "providerSignIn": "Anmeldung über {{provider}}",
+      "verified": "Verifiziert",
+      "displayName": "Anzeigename",
+      "namePlaceholder": "Deinen Anzeigenamen eingeben",
+      "nameLength": "Der Name muss zwischen {{min}} und {{max}} Zeichen lang sein.",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "nameUpdated": "Name aktualisiert.",
+      "notConfigured": "Der Anmeldedienst ist nicht konfiguriert.",
+      "invalidCharacters": "Der Name enthält ungültige Zeichen.",
+      "sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+      "accountMissing": "Das Konto wurde nicht gefunden.",
+      "saveError": "Der Name konnte nicht aktualisiert werden. Bitte versuche es erneut."
     },
     "loginOverlay": {
       "modalAriaLabel": "Anmelden",
@@ -1123,18 +1051,16 @@
       "guestHint": "Nutze Discord oder Google auf der Login-Seite.",
       "signInCta": "Anmelden",
       "languageSettingsCta": "Spracheinstellungen",
-      "languageSettingsTitle": "Einstellungen",
-      "languageSettingsSubtitle": "Waehle deine Oberflaechensprache.",
       "languageFieldLabel": "Sprache",
       "languageSaving": "Spracheinstellungen werden gespeichert...",
       "languageSaveError": "Spracheinstellungen konnten nicht gespeichert werden.",
-      "closeLanguageSettings": "Einstellungen schliessen",
       "signedInVia": "Angemeldet via {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
       "accountAndProfile": "Account & Profil",
       "consolePanel": "Konsole",
-      "logout": "Abmelden"
+      "logout": "Abmelden",
+      "languageLoading": "Spracheinstellungen werden geladen..."
     },
     "loginPage": {
       "title": "Kontozugang",
@@ -2389,11 +2315,6 @@
           "answer": "Mit Anmeldung erhältst du den Kontobereich und synchronisierte Kontofavoriten auf mehreren Geräten. Dein lokaler Scanpool wird dadurch nicht automatisch synchronisiert, und eine Eigentümerschaft am Spieler wird nicht nachgewiesen. Öffentliche Scanverwaltung, Imports und Einstellungen bleiben ohne Konto nutzbar."
         }
       }
-    }
-  },
-  "uploadCenter": {
-    "quota": {
-      "unlimited": "Kein Limit"
     }
   },
   "search": {
@@ -4924,6 +4845,18 @@
     "archiveLink": "Archiv öffnen",
     "importLink": "SFtools-Daten importieren",
     "retryPlan": "Archivplanung erneut versuchen",
+    "fullyPrepared": "Vollständig vorbereitete Server-Scans",
+    "currentScan": "Aktueller Scan",
+    "archiveFiles": "Archivdateien",
+    "filesDownloaded": "{{number}} / {{total}} heruntergeladen",
+    "filesReused": "{{number}} lokal wiederverwendet",
+    "filesAvailable": "Verfügbare Archivdateien",
+    "countAfterProcessing": "Jeder Server-Scan wird gezählt, sobald alle Dateien verarbeitet sind.",
+    "activity": {
+      "downloading": "Archivdateien werden heruntergeladen",
+      "checking": "Prüfen und Entpacken",
+      "processing": "Verarbeiten und Speichern"
+    },
     "phase": {
       "acquiring": "Archivscans werden heruntergeladen",
       "preparing": "Daten werden eingelesen und vorbereitet",

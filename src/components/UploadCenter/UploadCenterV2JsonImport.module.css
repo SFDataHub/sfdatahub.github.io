@@ -471,13 +471,6 @@
   letter-spacing: 0.04em;
 }
 
-.importActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .importPreviewWrap {
   display: flex;
   flex-direction: column;

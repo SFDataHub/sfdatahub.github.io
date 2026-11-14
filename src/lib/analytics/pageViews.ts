@@ -1,10 +1,12 @@
 import { guideHubAnalyticsPath } from "../../pages/GuideHubV2/selection";
+import { communityAnalyticsPath } from "../../pages/Community/selection";
 import { helpView } from "../help/view";
 
 /** Keep the existing tracking paths, including individual profile identifiers.
  * Help/GuideHub content and the established toplist tab distinguish paths; display filters do not.
  */
 export function toAnalyticsPath(pathname: string, search = "", hash = ""): string {
+  if (pathname === "/community") return communityAnalyticsPath(pathname, search);
   if (pathname === "/guidehub-v2") return guideHubAnalyticsPath(search);
   if (pathname === "/help") {
     const view = helpView(search, hash);

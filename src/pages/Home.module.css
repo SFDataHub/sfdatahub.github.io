@@ -353,18 +353,10 @@
   .newsImage { max-height: 180px; }
 }
 
-/* ---------- Carousel (YouTube & Live ctrls) ---------- */
+/* ---------- News carousel controls ---------- */
 .carouselCtrls { display: flex; gap: 6px; align-items: center; }
 .navBtn { background: #254364; color: #E7F1FF; border: 1px solid #2B4C73; padding: 4px 8px; border-radius: 6px; }
 .navBtn:hover { background: #2B4C73; }
-.carousel { position: relative; height: 220px; overflow: hidden; border-radius: 12px; background: #152A42; border: 1px solid #2B4C73; display: grid; }
-.slide { grid-area: 1 / 1; display: grid; grid-template-rows: 1fr auto; text-decoration: none; color: inherit; }
-.slideActive { opacity: 1; transition: opacity 300ms; }
-.slideInactive { opacity: 0; pointer-events: none; }
-.slideThumb { width: 100%; height: 160px; object-fit: cover; }
-.slideFallback { width: 100%; height: 160px; display: grid; place-items: center; background: #254364; font-weight: 700; font-size: 24px; }
-.slideCaption { font-size: 13px; padding: 6px 8px; color: #E7F1FF; }
-
 /* ---------- Live Now ---------- */
 .liveList { display: grid; gap: 6px; }
 .liveCard { display: grid; gap: 8px; padding: 8px; background: #152A42; border: 1px solid #2B4C73; border-radius: 12px; }

@@ -10,7 +10,9 @@ import { cacheEntries, restoreCache } from "./cache";
 import { assertAtomicSize, bundleId, digest, packBundles, type Layout } from "../storage/bundles";
 
 const snapshotRef = db.collection("creator_snapshots").doc("creators-live.json");
-const lockRef = db.collection("creator_sync").doc("youtube");
+// Read only during the atomic handover. Old binaries honor this permanent fence.
+const legacyLockRef = db.collection("creator_sync").doc("youtube");
+const legacyFence = { owner: "snapshot-document-v1", expiresAt: Number.MAX_SAFE_INTEGER };
 const cacheRef = (id: string) => db.collection("creator_youtube_cache").doc(id);
 type SyncResult = { snapshot: YouTubeSnapshot; refreshed: boolean };
 let running: Promise<SyncResult> | null = null;
@@ -19,12 +21,10 @@ const checkedSnapshot = (snapshot: YouTubeSnapshot, lock: any): YouTubeSnapshot 
   lock?.snapshotHash === digest(content(snapshot)) && typeof lock.checkedAt === "string" ? { ...snapshot, generatedAt: lock.checkedAt } : snapshot;
 export async function readYouTubeSnapshot(): Promise<YouTubeSnapshot | null> {
   return publicYouTubeCache.read(() => youtubeStorage("YOUTUBE_SNAPSHOT_READ_FAILED", "read_snapshot", async () => {
-    // One transaction avoids pairing a new successful-check time with old data.
-    return db.runTransaction(async tx => {
-      const [doc, lock] = await Promise.all([tx.get(snapshotRef), tx.get(lockRef)]);
-      const snapshot = doc.data()?.youtube as YouTubeSnapshot | undefined;
-      return snapshot ? checkedSnapshot(snapshot, lock.data()) : null;
-    });
+    const doc = await snapshotRef.get();
+    const data = doc.data();
+    const snapshot = data?.youtube as YouTubeSnapshot | undefined;
+    return snapshot ? checkedSnapshot(snapshot, data?.youtubeSync) : null;
   }));
 }
 
@@ -33,19 +33,26 @@ async function synchronize(force: boolean): Promise<SyncResult> {
   if (!YOUTUBE_API_KEY) throw new YouTubeFailure("YOUTUBE_NOT_CONFIGURED", { stage: "configuration" });
   const owner = randomUUID(), started = Date.now();
   const acquired = await youtubeStorage("YOUTUBE_LOCK_FAILED", "acquire_lock", () => db.runTransaction(async tx => {
-    const [lock, snapshot] = await Promise.all([
-      tx.get(lockRef),
-      youtubeStorage("YOUTUBE_SNAPSHOT_READ_FAILED", "read_snapshot", () => tx.get(snapshotRef)),
-    ]);
-    const coordination = lock.data() ?? {};
+    const snapshot = await youtubeStorage("YOUTUBE_SNAPSHOT_READ_FAILED", "read_snapshot", () => tx.get(snapshotRef));
+    const document = snapshot.data() ?? {};
+    const migrated = document.youtubeSync?.version === 1;
+    // Both reads precede writes. The legacy fence and shared lease commit together:
+    // old acquirers conflict/retry; an expired old publisher fails its owner check.
+    const coordination = migrated ? document.youtubeSync : (await tx.get(legacyLockRef)).data() ?? {};
     if ((coordination.expiresAt ?? 0) > started) throw new YouTubeFailure("YOUTUBE_SYNC_BUSY", { stage: "acquire_lock" });
-    const stored = snapshot.data()?.youtube;
+    const stored = document.youtube;
     const previous = stored ? checkedSnapshot(stored, coordination) : undefined;
     const reusable = matchesYouTubeSources(previous, config);
-    if (!force && coordination.cacheLayout && reusable && started >= Date.parse(previous.generatedAt) &&
-        started - Date.parse(previous.generatedAt) < 3600000) return { previous, coordination, skipped: true };
-    tx.set(lockRef, { ...coordination, owner, expiresAt: started + 210000 });
-    return { previous: reusable ? previous : undefined, coordination, skipped: false };
+    const skipped = !force && !!coordination.cacheLayout && reusable && started >= Date.parse(previous.generatedAt) &&
+      started - Date.parse(previous.generatedAt) < 3600000;
+    const shared = { ...coordination, version: 1, owner: skipped ? "" : owner, expiresAt: skipped ? 0 : started + 210000 };
+    if (!migrated || !skipped) {
+      assertAtomicSize([{ path: snapshotRef.path, value: { ...document, youtubeSync: shared } },
+        ...(!migrated ? [{ path: legacyLockRef.path, value: { ...coordination, ...legacyFence } }] : [])]);
+      if (!migrated) tx.set(legacyLockRef, legacyFence, { merge: true });
+      tx.set(snapshotRef, { youtubeSync: shared }, { merge: true });
+    }
+    return { previous: reusable ? previous : undefined, coordination: shared, document, skipped };
   }));
   if (acquired.skipped) {
     publicYouTubeCache.publish(acquired.previous!);
@@ -76,21 +83,23 @@ async function synchronize(force: boolean): Promise<SyncResult> {
       const coordination = { ...acquired.coordination, owner: "", expiresAt: 0, cacheLayout: packed.leaves,
         checkedAt: result.snapshot.generatedAt, snapshotHash };
       assertAtomicSize([...writes.map(write => ({ path: write.ref.path, value: write.value })),
-        ...(changed ? [{ path: snapshotRef.path, value: { youtube: result.snapshot } }] : []), { path: lockRef.path, value: coordination }]);
+        { path: snapshotRef.path, value: { ...acquired.document, ...(changed ? { youtube: result.snapshot } : {}), youtubeSync: coordination } }]);
       await db.runTransaction(async tx => {
-        const lock = await tx.get(lockRef);
-        if (lock.data()?.owner !== owner || lock.data()?.expiresAt <= Date.now()) throw new YouTubeFailure("YOUTUBE_LOCK_EXPIRED", { stage: "publish_snapshot" });
+        const current = (await tx.get(snapshotRef)).data(), lock = current?.youtubeSync;
+        if (lock?.owner !== owner || lock?.expiresAt <= Date.now()) throw new YouTubeFailure("YOUTUBE_LOCK_EXPIRED", { stage: "publish_snapshot" });
+        assertAtomicSize([...writes.map(write => ({ path: write.ref.path, value: write.value })),
+          { path: snapshotRef.path, value: { ...current, ...(changed ? { youtube: result.snapshot } : {}), youtubeSync: coordination } }]);
         for (const { ref, value } of writes) tx.set(ref, value);
-        if (changed) tx.set(snapshotRef, { youtube: result.snapshot }, { merge: true });
-        tx.set(lockRef, coordination);
+        // An unchanged payload is deliberately absent from the write mask.
+        tx.set(snapshotRef, { ...(changed ? { youtube: result.snapshot } : {}), youtubeSync: coordination }, { merge: true });
       });
     });
     publicYouTubeCache.publish(result.snapshot);
     return { snapshot: result.snapshot, refreshed: true };
   } catch (error) {
     await youtubeStorage("YOUTUBE_LOCK_FAILED", "release_lock", () => db.runTransaction(async tx => {
-      const lock = await tx.get(lockRef);
-      if (lock.data()?.owner === owner) tx.set(lockRef, { ...lock.data(), owner: "", expiresAt: 0 });
+      const lock = (await tx.get(snapshotRef)).data()?.youtubeSync;
+      if (lock?.owner === owner) tx.set(snapshotRef, { youtubeSync: { owner: "", expiresAt: 0 } }, { merge: true });
     })).catch(cleanupError => { logYouTubeFailure(cleanupError); });
     throw error;
   }

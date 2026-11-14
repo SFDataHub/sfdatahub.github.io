@@ -5,6 +5,7 @@ import ContentShell from "../components/ContentShell";
 import FeaturedPreviewCard from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard";
 import FeaturedPreviewRow from "../components/wrapper/home/FeaturedPreviewRow/FeaturedPreviewRow";
 import LatestCommunityRecordsCard from "../components/home/LatestCommunityRecordsCard";
+import HomeYouTube from "../components/home/HomeYouTube";
 import featuredPreviewCardStyles from "../components/wrapper/home/FeaturedPreviewCard/FeaturedPreviewCard.module.css";
 import styles from "./Home.module.css";
 import { fetchDiscordNewsSnapshot } from "./Home/newsSnapshot.client";
@@ -30,42 +31,10 @@ const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
 const TWITCH_LIVE_URL = AUTH_BASE_URL ? `${AUTH_BASE_URL}/api/twitch/live` : "";          // Twitch-Live (JSON, gefiltert serverseitig)
 const SCHEDULE_CSV_URL = "";         // Streaming-Plan (CSV, optional)
 
-// Creators CSVs (öffentlich, mergen)
-const CREATOR_CSVS = [
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=0",         // DE
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=805252729",   // EN
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=966577378",   // Czech
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=1783754800",  // Polish
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=1322077146",  // Hungarian
-  "https://docs.google.com/spreadsheets/d/1lbUvWgD_G96CqiZlAevApQC64XqKOVJ0Y1IUBXNCQpE/export?format=csv&gid=2086043774",  // French
-];
-
 const NEWS_SNAPSHOT_CACHE_KEY = "sfh_news_latestByChannel_v1";
 const NEWS_SNAPSHOT_FALLBACK_UPDATE_MS = 10 * 60 * 1000;
 
 type AnyRecord = Record<string, any>;
-
-async function loadCreatorsMerged(): Promise<AnyRecord[]> {
-  const all: AnyRecord[] = [];
-  for (const url of CREATOR_CSVS) {
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      const txt = await res.text();
-      const rows = parseCsv(txt);
-      all.push(...rows);
-    } catch {
-      // ignore single feed errors, continue merging
-    }
-  }
-  const map = new Map<string, AnyRecord>();
-  for (const r of all) {
-    const name = String(r["Creator Name"] || r["creator_name"] || r["name"] || "").trim();
-    if (!name) continue;
-    const key = name.toLowerCase();
-    if (!map.has(key)) map.set(key, r);
-  }
-  return Array.from(map.values());
-}
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -193,21 +162,6 @@ function resolveNextCheckAt(snapshot: DiscordByChannelSnapshot | null): number |
   if (next && next > now) return next;
   return now + NEWS_SNAPSHOT_FALLBACK_UPDATE_MS;
 }
-
-function extractYouTubeVideoId(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1) || null;
-    if (u.hostname.includes("youtube.com")) {
-      if (u.searchParams.get("v")) return u.searchParams.get("v");
-      const p = u.pathname.toLowerCase();
-      if (p.startsWith("/shorts/")) return p.split("/")[2] || null;
-    }
-  } catch {}
-  return null;
-}
-
-
 
 // ---------- Subcomponents ----------
 
@@ -479,71 +433,6 @@ const NewsFeed: React.FC<{ onSnapshotChange?: (snapshot: DiscordByChannelSnapsho
     </section>
   );
 };
-const YouTubeCarousel: React.FC = () => {
-  const { t } = useTranslation();
-  const [items, setItems] = useState<{ title: string; url: string; thumb?: string }[]>([]);
-  const [index, setIndex] = useState(0);
-  const timer = useRef<number | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function load(){
-      try {
-        const merged = await loadCreatorsMerged();
-        const slides = merged.map((r) => {
-          const name = String(r["Creator Name"] || r["creator_name"] || r["name"] || "").trim();
-          const y = String(r["YouTube Link"] || r["youtube"] || r["YouTube"] || "").trim();
-          if(!y) return null;
-          const vid = extractYouTubeVideoId(y);
-          const thumb = vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : undefined;
-          return { title: name, url: y, thumb };
-        }).filter(Boolean).slice(0,12) as { title: string; url: string; thumb?: string }[];
-        if(alive) setItems(slides);
-      } catch { if(alive) setItems([]); }
-    }
-    load();
-    return ()=>{ alive = false; };
-  }, []);
-
-  useEffect(() => {
-    if(items.length <= 1) return;
-    timer.current = window.setInterval(() => setIndex((i)=> (i+1) % items.length), 6000);
-    return ()=>{ if(timer.current) window.clearInterval(timer.current); };
-  }, [items]);
-
-  const prev = () => setIndex((i)=> (i-1 + items.length) % Math.max(items.length,1));
-  const next = () => setIndex((i)=> (i+1) % Math.max(items.length,1));
-  const onKey = (e: React.KeyboardEvent) => { if(e.key==="ArrowLeft"){e.preventDefault();prev();} if(e.key==="ArrowRight"){e.preventDefault();next();} };
-
-  return (
-    <section className={styles.card} data-i18n-scope="home.youtube">
-      <header className={styles.header}>
-        <span className={styles.title} data-i18n="home.youtube.title">{t("home.youtube.title")}</span>
-        <div className={styles.carouselCtrls}>
-          <button className={styles.navBtn} onClick={prev} aria-label={t("home.youtube.prev")}>◀</button>
-          <button className={styles.navBtn} onClick={next} aria-label={t("home.youtube.next")}>▶</button>
-        </div>
-      </header>
-      <div className={styles.carousel} tabIndex={0} onKeyDown={onKey} aria-roledescription={t("home.youtube.carousel")}>
-        {items.length === 0 ? (
-          <div className={styles.empty} data-i18n="home.youtube.empty">{t("home.youtube.empty")}</div>
-        ) : (
-          items.map((it, i) => (
-            <a key={it.url} href={it.url} target="_blank" rel="noreferrer"
-               className={[styles.slide, i===index?styles.slideActive:styles.slideInactive].join(" ")}
-            >
-              {it.thumb ? <img src={it.thumb} alt="" className={styles.slideThumb} /> : (
-                <div className={styles.slideFallback}>{it.title.slice(0,2).toUpperCase()}</div>
-              )}
-              <div className={styles.slideCaption}>{it.title}</div>
-            </a>
-          ))
-        )}
-      </div>
-    </section>
-  );
-};
-
 type TwitchLiveResponse =
   | { live: false }
   | {
@@ -814,7 +703,7 @@ const Home: React.FC = () => {
 
             {/* Row 3 - YouTube */}
             <div className={styles.homeYouTube}>
-              <YouTubeCarousel />
+              <HomeYouTube />
             </div>
           </div>
 

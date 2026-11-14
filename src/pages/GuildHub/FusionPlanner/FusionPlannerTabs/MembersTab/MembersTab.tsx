@@ -124,9 +124,11 @@ export default function MembersTab({
   if (!members || members.length === 0) {
     return (
       <div className={styles.emptyWrap}>
-        <h3 className={styles.emptyTitle}>No members found</h3>
+        <h3 className={styles.emptyTitle}>{setupState.mode === "scan" ? "Datenanbindung vorübergehend nicht verfügbar" : "No members found"}</h3>
         <p className={styles.emptyText}>
-          No members found for the selected guild. Check if scans are available or try again later.
+          {setupState.mode === "scan"
+            ? "Datenanbindung vorübergehend nicht verfügbar. Manuelle Planung bleibt nutzbar."
+            : "No members found for the selected guild."}
         </p>
       </div>
     );

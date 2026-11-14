@@ -1,24 +1,5 @@
-import { auditBegin, auditEnter, auditValue, auditError, auditLeave, auditFields } from "../../../../../lib/data-hub/runtimeAudit";
 import React from "react";
-import {
-  collectionGroup,
-  endAt,
-  getDocs,
-  limit,
-  orderBy,
-  query as fsQuery,
-  startAt,
-  where,
-} from "firebase/firestore";
-import { useDebouncedValue } from "../../../../../hooks/useDebouncedValue";
-import { db } from "../../../../../lib/firebase";
 import type { FusionMode, FusionSetupState } from "../../FusionPlanner";
-import {
-  beginReadScope,
-  endReadScope,
-  traceGetDocs,
-  type FirestoreTraceScope,
-} from "../../../../../lib/debug/firestoreReadTrace";
 import styles from "./SetupTab.module.css";
 
 type GuildForm = {
@@ -47,10 +28,6 @@ export default function SetupTab({
     server: setupState.baseGuild?.server ?? "",
   }));
   const [partnerDraft, setPartnerDraft] = React.useState<GuildForm>({ id: undefined, name: "", server: "" });
-  const debouncedBase = useDebouncedValue(baseDraft.name, 250);
-  const debouncedPartner = useDebouncedValue(partnerDraft.name, 250);
-  const baseResults = useGuildSearchResults(debouncedBase, baseDraft.server || "all");
-  const partnerResults = useGuildSearchResults(debouncedPartner, partnerDraft.server || "all");
   const baseConfigured = Boolean(setupState.baseGuild?.name?.trim() && setupState.baseGuild?.server?.trim());
   const hasPartners = setupState.partnerGuilds.length > 0;
 
@@ -91,7 +68,8 @@ export default function SetupTab({
                 className={`${styles.toggleButton} ${
                   setupState.mode === "scan" ? styles.toggleButtonActive : ""
                 }`}
-                onClick={() => onChangeMode("scan")}
+                disabled
+                title="Datenanbindung vorübergehend nicht verfügbar"
               >
                 Scan-based
               </button>
@@ -107,7 +85,7 @@ export default function SetupTab({
             </div>
             <p className={styles.modeHint}>
               {setupState.mode === "scan"
-                ? "Use existing scan data (empfohlen, wenn aktuelle Scans vorliegen)."
+                ? "Datenanbindung vorübergehend nicht verfügbar. Manuelle Planung bleibt nutzbar."
                 : "Enter guild information manually if no scans are available."}
             </p>
           </div>
@@ -136,24 +114,7 @@ export default function SetupTab({
                   onBlur={() => onChangeBaseGuild({ name: baseDraft.name })}
                   placeholder="z.B. Solaris"
                 />
-                {baseResults.length > 0 && (
-                  <div className={styles.suggestions}>
-                    {baseResults.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={styles.suggestionBtn}
-                        onClick={() => {
-                          setBaseDraft({ name: item.name, server: item.server });
-                          onChangeBaseGuild({ id: item.id, name: item.name, server: item.server });
-                        }}
-                      >
-                        <span className={styles.suggestionName}>{item.name}</span>
-                        <span className={styles.suggestionMeta}>{item.server}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+
               </label>
               <label className={styles.formField}>
                 <span className={styles.formLabel}>Server</span>
@@ -194,21 +155,7 @@ export default function SetupTab({
                   }
                   placeholder="z.B. Nova Alliance"
                 />
-                {partnerResults.length > 0 && (
-                  <div className={styles.suggestions}>
-                    {partnerResults.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={styles.suggestionBtn}
-                        onClick={() => setPartnerDraft({ id: item.id, name: item.name, server: item.server })}
-                      >
-                        <span className={styles.suggestionName}>{item.name}</span>
-                        <span className={styles.suggestionMeta}>{item.server}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+
               </label>
               <label className={styles.formField}>
                 <span className={styles.formLabel}>Server</span>
@@ -334,85 +281,4 @@ export default function SetupTab({
       ) : null}
     </>
   );
-}
-
-type GuildResult = { id: string; name: string; server: string };
-
-function useGuildSearchResults(term: string, server: string) {
-  const [results, setResults] = React.useState<GuildResult[]>([]);
-
-  React.useEffect(() => {
-    const q = term.trim().toLowerCase();
-    if (!q) {
-      setResults([]);
-      return;
-    }
-
-    let cancelled = false;
-    async function run() {
-    const __audit1 = auditBegin("F15", "run");
-  auditFields(__audit1, { consumerArea: "Fusionsplanung", trigger: "cloud-search-effect" });
-    try {
-      const scope: FirestoreTraceScope = beginReadScope("FusionSetup:guildSearch");
-      try {
-        const cg = collectionGroup(db, "latest");
-        const snapPrefix = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
-          getDocs(
-            fsQuery(
-              cg,
-              orderBy("nameFold"),
-              startAt(q),
-              endAt(q + "\uf8ff"),
-              limit(12),
-            ),
-          ),
-        ))));
-        const snapNgram = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDocs"), (traceGetDocs(scope, { path: "guilds/latest (collectionGroup)" }, () =>
-          getDocs(fsQuery(cg, where("nameNgrams", "array-contains", q), limit(12))),
-        ))));
-
-        const seen = new Set<string>();
-        const next: GuildResult[] = [];
-        const consider = (docSnap: any) => {
-          const data = docSnap.data() as any;
-          const ref = docSnap.ref;
-          const parentDoc = ref.parent?.parent;
-          const root = parentDoc?.parent?.id;
-          if (root !== "guilds") return;
-          const id = parentDoc?.id ?? data.guildIdentifier ?? docSnap.id;
-          if (!id || seen.has(id)) return;
-
-          const srv = data.server ?? data.values?.Server ?? "Unknown";
-          if (server !== "all" && srv !== server) return;
-
-          const name = data.name ?? data.values?.Name ?? "Unbekannte Gilde";
-          seen.add(id);
-          next.push({ id, name, server: srv });
-        };
-
-        snapPrefix.forEach(consider);
-        snapNgram.forEach(consider);
-
-        if (!cancelled) {
-          next.sort((a, b) => a.name.localeCompare(b.name));
-          setResults(next);
-        }
-      } catch (err) { auditError(__audit1, err);
-        console.error("[FusionPlanner] guild search failed", err);
-        if (!cancelled) setResults([]);
-      } finally {
-        endReadScope(scope);
-      }
-
-    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
-    finally { auditLeave(__audit1); }
-}
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [term, server]);
-
-  return results;
 }

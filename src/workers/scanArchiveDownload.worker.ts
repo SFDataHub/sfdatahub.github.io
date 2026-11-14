@@ -59,16 +59,16 @@ const postWorkerMessage = (message: Parameters<typeof globalThis.postMessage>[0]
     const compressed = await (auditValue(__audit1, auditEnter(__audit1, "response.arrayBuffer"), (response.arrayBuffer())));
     assertActive();
 
-    if (compressed.byteLength !== request.entry.compressedBytes) {
-      throw new Error("Downloadgroesse stimmt nicht mit dem Manifest ueberein.");
-    }
-
     emitProgress({
       phase: "hashing",
       message: "Pruefsumme wird berechnet.",
       loadedBytes: compressed.byteLength,
       totalBytes: request.entry.compressedBytes,
     });
+    if (compressed.byteLength !== request.entry.compressedBytes) {
+      throw new Error("Downloadgroesse stimmt nicht mit dem Manifest ueberein.");
+    }
+
     const digest = await (auditValue(__audit1, auditEnter(__audit1, "sha256Hex"), (sha256Hex(compressed))));
     assertActive();
     if (digest !== request.entry.sha256.toLowerCase()) {

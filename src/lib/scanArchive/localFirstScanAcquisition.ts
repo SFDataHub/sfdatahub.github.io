@@ -21,6 +21,7 @@ import {
   startScanArchiveDownloadWorkerRun,
 } from "./downloadWorkerClient";
 import type { ScanArchiveEntry } from "./types";
+import type { ScanArchiveDownloadProgress } from "./downloadWorkerTypes";
 import { toScanArchiveEntries, validateScanArchiveManifest } from "./validation";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -74,6 +75,19 @@ export type LocalFirstScanAcquisitionResult = {
   networkAccessed: boolean;
 };
 
+/** Physical-source observation; receipt is distinct from validation and import. */
+export type ArchiveFileProgress = {
+  archiveScanId: string;
+  archiveSha256: string;
+  activity: "pending" | "downloading" | "checking" | "processing" | "ready" | "failed";
+  downloaded: boolean;
+  reused: boolean;
+};
+export type ArchiveAcquisitionProgress = {
+  total: number; succeeded: number; failed: number;
+  files?: ArchiveFileProgress[];
+};
+
 export type LocalFirstScanAcquisitionDependencies = {
   listLocalScanSummaries: () => Promise<GuildHubScanSummary[]>;
   findLocalScanByArchiveBinding: (entry: ScanArchiveEntry) => Promise<GuildHubLocalScan | null>;
@@ -81,7 +95,7 @@ export type LocalFirstScanAcquisitionDependencies = {
   bindLocalScanToArchiveEntry: (entry: ScanArchiveEntry, localScanId: string) => Promise<unknown>;
   createLocalScanImportPreview: typeof createSfDataHubLocalScanImportPreview;
   commitLocalScanPreview: typeof commitSfDataHubLocalScanPreview;
-  downloadArchiveEntry: (entry: ScanArchiveEntry, signal?: AbortSignal) => Promise<{ content: string }>;
+  downloadArchiveEntry: (entry: ScanArchiveEntry, signal?: AbortSignal, onProgress?: (progress: ScanArchiveDownloadProgress) => void) => Promise<{ content: string }>;
   loadManifestEntriesForYears: (years: readonly number[], signal?: AbortSignal) => Promise<LoadManifestEntriesResult>;
   loadCandidateManifestEntries: (request: LocalFirstScanRequest, signal?: AbortSignal) => Promise<LoadManifestEntriesResult>;
 };
@@ -142,7 +156,10 @@ type InFlightArchiveResult =
   | { status: "race-already-local"; archiveScanId: string; localScanId: string; networkAccessed: boolean };
 
 const MAX_DOWNLOAD_CONCURRENCY = 2;
-type ArchiveFlight = { controller: AbortController; consumers: Set<symbol>; promise: Promise<InFlightArchiveResult> };
+type ArchiveFlight = {
+  controller: AbortController; consumers: Set<symbol>; promise: Promise<InFlightArchiveResult>;
+  progress: ArchiveFileProgress; observers: Set<(progress: ArchiveFileProgress) => void>;
+};
 const inFlightArchiveImports = new Map<string, ArchiveFlight>();
 
 const compareText = (left: string, right: string) =>
@@ -161,9 +178,9 @@ const mergeArchiveEntries = (...groups: Array<readonly ScanArchiveEntry[]>) => {
   );
 };
 
-const defaultDownloadArchiveEntry = async (entry: ScanArchiveEntry, signal?: AbortSignal) => {
+const defaultDownloadArchiveEntry: LocalFirstScanAcquisitionDependencies["downloadArchiveEntry"] = async (entry, signal, onProgress) => {
   throwIfAborted(signal);
-  const run = startScanArchiveDownloadWorkerRun({ entry });
+  const run = startScanArchiveDownloadWorkerRun({ entry, onProgress });
   const abortListener = () => run.cancel();
   signal?.addEventListener("abort", abortListener, { once: true });
   try {
@@ -292,6 +309,7 @@ const importArchiveEntry = async (
   entry: ScanArchiveEntry,
   dependencies: LocalFirstScanAcquisitionDependencies,
   signal?: AbortSignal,
+  onProgress?: (progress: Partial<ArchiveFileProgress>) => void,
 ): Promise<InFlightArchiveResult> => {
     const __audit1 = auditBegin("S02", "importArchiveEntry");
   if (__audit1) auditFields(__audit1, { archiveEntryId: entry.id, archiveSha256: entry.sha256, sourceOperationId: __audit1.id });
@@ -310,9 +328,14 @@ const importArchiveEntry = async (
 
   auditEvent(__audit1, "binding-miss-or-unusable-before-download");
   throwIfAborted(signal);
-  const downloaded = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.downloadArchiveEntry"), (dependencies.downloadArchiveEntry(entry, signal))));
+  onProgress?.({ activity: "downloading" });
+  const downloaded = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.downloadArchiveEntry"), (dependencies.downloadArchiveEntry(entry, signal, progress => {
+    if (progress.phase === "downloading") onProgress?.({ activity: "downloading" });
+    else onProgress?.({ downloaded: true, activity: progress.phase === "done" ? "processing" : "checking" });
+  }))));
   throwIfAborted(signal);
 
+  onProgress?.({ downloaded: true, activity: "processing" });
   const boundBeforeCommit = await (auditValue(__audit1, auditEnter(__audit1, "dependencies.findLocalScanByArchiveBinding"), (dependencies.findLocalScanByArchiveBinding(entry))));
   if (boundBeforeCommit) {
     return auditReturn(__audit1, { status: "race-sidecar-local", archiveScanId: entry.id, localScanId: boundBeforeCommit.id, networkAccessed: true });
@@ -361,6 +384,7 @@ const acquireArchiveEntry = (
   entry: ScanArchiveEntry,
   dependencies: LocalFirstScanAcquisitionDependencies,
   signal?: AbortSignal,
+  onProgress?: (progress: ArchiveFileProgress) => void,
 ) => {
   throwIfAborted(signal);
   const key = archiveInflightKey(entry);
@@ -368,8 +392,19 @@ const acquireArchiveEntry = (
   const observer = auditCurrent();
   if (!flight) {
     const controller = new AbortController();
-    const next: ArchiveFlight = { controller, consumers: new Set(), promise: undefined! };
-    const sourceJob = importArchiveEntry(entry, dependencies, controller.signal);
+    const next: ArchiveFlight = { controller, consumers: new Set(), promise: undefined!, observers: new Set(),
+      progress: { archiveScanId: entry.id, archiveSha256: entry.sha256, activity: "pending", downloaded: false, reused: false } };
+    const publish = (update: Partial<ArchiveFileProgress>) => {
+      if (controller.signal.aborted) return;
+      next.progress = { ...next.progress, ...update };
+      for (const observer of next.observers) { try { observer({ ...next.progress }); } catch { /* Observation only. */ } }
+    };
+    const importJob = importArchiveEntry(entry, dependencies, controller.signal, publish);
+    const sourceJob = importJob.then(result => {
+      publish({ activity: "ready", downloaded: result.networkAccessed, reused: !result.networkAccessed });
+      return result;
+    }, error => { publish({ activity: "failed" }); throw error; });
+    auditAliasPromise(sourceJob, importJob);
     next.promise = sourceJob.finally(() => {
       if (inFlightArchiveImports.get(key) === next) inFlightArchiveImports.delete(key);
     });
@@ -381,12 +416,17 @@ const acquireArchiveEntry = (
   }
   const shared = flight, consumer = Symbol();
   shared.consumers.add(consumer);
+  if (onProgress) {
+    shared.observers.add(onProgress);
+    try { onProgress({ ...shared.progress }); } catch { /* Observation only. */ }
+  }
   auditEvent(observer, "archive-consumer-acquire", { archiveScanId: entry.id, consumers: shared.consumers.size });
   return new Promise<InFlightArchiveResult>((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
       signal?.removeEventListener("abort", cancel);
       shared.consumers.delete(consumer);
+      if (onProgress) shared.observers.delete(onProgress);
       auditEvent(observer, "archive-consumer-release", { archiveScanId: entry.id, aborted: signal?.aborted ?? false, consumers: shared.consumers.size });
       if (!shared.consumers.size && inFlightArchiveImports.get(key) === shared) {
         inFlightArchiveImports.delete(key);
@@ -468,7 +508,7 @@ export async function acquireExplicitLocalFirstArchiveScans(
   selectedEntries: readonly ScanArchiveEntry[],
   options: Omit<LocalFirstScanAcquisitionOptions, "archiveEntries" | "availableManifestYears"> & {
     /** Settled physical sources, including local reuse; observation never owns work. */
-    onProgress?: (progress: { total: number; succeeded: number; failed: number }) => void;
+    onProgress?: (progress: ArchiveAcquisitionProgress) => void;
   } = {},
 ): Promise<ExplicitLocalFirstArchiveScansResult> {
     const __audit2 = auditBegin("S01", "acquireExplicitLocalFirstArchiveScans");
@@ -476,9 +516,12 @@ export async function acquireExplicitLocalFirstArchiveScans(
   const dependencies = createDependencies(options);
   const { entries, failures } = uniqueExplicitEntries(selectedEntries);
   let succeeded = 0, failed = failures.length;
+  const files = new Map(entries.map(entry => [archiveInflightKey(entry), {
+    archiveScanId: entry.id, archiveSha256: entry.sha256, activity: "pending", downloaded: false, reused: false,
+  } as ArchiveFileProgress]));
   const report = () => {
     if (options.signal?.aborted) return;
-    try { options.onProgress?.({ total: entries.length + failures.length, succeeded, failed }); }
+    try { options.onProgress?.({ total: entries.length + failures.length, succeeded, failed, files: [...files.values()].map(file => ({ ...file })) }); }
     catch { /* A progress observer must not fail acquisition. */ }
   };
   report();
@@ -491,13 +534,15 @@ export async function acquireExplicitLocalFirstArchiveScans(
     options.signal,
     async (entry): Promise<InFlightArchiveResult | ExplicitLocalFirstArchiveScanFailure> => {
       try {
-        const result = await (__audit2 ? auditCall(__audit2, "source-consumer-wait", () => acquireArchiveEntry(entry, dependencies, options.signal), "async-container") : acquireArchiveEntry(entry, dependencies, options.signal));
+        const observe = (progress: ArchiveFileProgress) => { files.set(archiveInflightKey(entry), progress); report(); };
+        const result = await (__audit2 ? auditCall(__audit2, "source-consumer-wait", () => acquireArchiveEntry(entry, dependencies, options.signal, observe), "async-container") : acquireArchiveEntry(entry, dependencies, options.signal, observe));
         succeeded += 1;
         report();
         return result;
       } catch (error) {
         throwIfAborted(options.signal);
         failed += 1;
+        files.set(archiveInflightKey(entry), { ...files.get(archiveInflightKey(entry))!, activity: "failed" });
         report();
         return {
           archiveScanId: entry.id,

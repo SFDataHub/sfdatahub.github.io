@@ -45,11 +45,11 @@ export function packBundles(entries: Record<string, unknown>, previous: Layout =
   return { documents, leaves };
 }
 export const hashBits = (hash: string) => [...hash].map(char => parseInt(char, 16).toString(2).padStart(4, "0")).join("");
-export function assertAtomicSize(writes: Array<{ path: string; value: Record<string, unknown> }>) {
+export function assertAtomicSize(writes: Array<{ path: string; value: Record<string, unknown> }>, options?: { visitorAnalytics?: true }) {
   let bytes = 0;
   for (const write of writes) {
     const size = documentBytes(write.path, write.value);
-    if (size > SAFE_DOCUMENT_BYTES) throw Error("Document exceeds safe size; previous snapshot retained");
+    if (size > (options?.visitorAnalytics && write.path === "analytics/visitor_analytics" ? 800 * 1024 : SAFE_DOCUMENT_BYTES)) throw Error("Document exceeds safe size; previous snapshot retained");
     bytes += Math.max(size, Buffer.byteLength(JSON.stringify(write.value))) + 1024;
   }
   if (bytes > 8 * 1024 * 1024 || writes.length > 450) throw Error("Atomic publication exceeds safe size; previous snapshot retained");

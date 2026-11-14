@@ -21,7 +21,7 @@ export default function UploadCenterV2Page() {
   return (
     <ContentShell
       title="Upload Center V2"
-      subtitle="JSON mapping preview, COA import, and avatar import"
+      subtitle="JSON mapping, COA preview, and avatar preview"
       centerFramed={false}
       mode="page"
     >

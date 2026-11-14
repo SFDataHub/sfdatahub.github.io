@@ -21,7 +21,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_FETCH_BATCHES = 4;
 const DEFAULT_LOG_LIMIT = 100;
 const MAX_LOG_LIMIT = 500;
-const ROLE_ORDER = ["admin", "mod", "creator", "user"] as const;
+const ROLE_ORDER = ["admin", "mod", "creator", "don", "user"] as const;
 
 type AdminUserRole = (typeof ROLE_ORDER)[number];
 type AdminUserStatus = "active" | "suspended" | "banned";

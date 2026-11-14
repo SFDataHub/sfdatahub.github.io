@@ -22,27 +22,6 @@ export interface ProviderDocEntry {
   avatarUrl?: string;
 }
 
-export interface UploadCenterUsage {
-  date?: string;
-  guilds?: number;
-  players?: number;
-}
-
-export interface UploadCenterState {
-  usage?: UploadCenterUsage;
-}
-
-export interface LinkedPlayer {
-  server: string;
-  playerId: number | string;
-  verifiedAt?: string;
-  method?: string;
-  name?: string;
-  class?: string;
-  level?: number;
-  guildName?: string;
-}
-
 export interface UserDoc {
   userId: string;
   primaryProvider: AuthProvider;
@@ -55,8 +34,6 @@ export interface UserDoc {
   createdAt: Timestamp;
   lastLoginAt: Timestamp;
   profile?: UserProfile;
-  uploadCenter?: UploadCenterState;
-  linkedPlayers?: LinkedPlayer[];
   favorites?: UserFavoritesDoc;
 }
 
@@ -106,8 +83,7 @@ export async function ensureUser(info: ProviderUserInfo): Promise<UserDoc> {
   }
 
   const existing = snapshot.data() as UserDoc;
-  const updated: UserDoc = {
-    ...existing,
+  const loginUpdate: Pick<UserDoc, "providers" | "displayName" | "lastLoginAt" | "avatarUrl"> = {
     providers: {
       ...existing.providers,
       [info.provider]: buildProviderEntry(info),
@@ -116,9 +92,9 @@ export async function ensureUser(info: ProviderUserInfo): Promise<UserDoc> {
     lastLoginAt: now,
   };
   if (info.avatarUrl) {
-    updated.avatarUrl = info.avatarUrl;
+    loginUpdate.avatarUrl = info.avatarUrl;
   }
 
-  await userRef.set(updated, { merge: true });
-  return updated;
+  await userRef.set(loginUpdate, { merge: true });
+  return { ...existing, ...loginUpdate };
 }

@@ -54,7 +54,8 @@
   "localSettings": {
     "openToplists": "Open Toplists",
     "invalidToplistNames": "Toplists: enter a name for every custom view ({{lists}}).",
-    "actionsScope": "Save and Discard changes apply to all sections: General, Toplists and Profiles.",
+    "actionsScope": "Save and Discard changes apply to the local sidebar, Toplists and Profiles settings.",
+    "languageImmediate": "Language changes apply immediately and are saved separately from the local settings above.",
     "dataHubSections": "DataHub settings sections",
     "dataHub": "DataHub",
     "toplists": {
@@ -433,6 +434,7 @@
     "admin": "Admin",
     "playground": "Playground",
     "guideHub": "Guide Hub",
+    "sfCollection": "Dons SF Collection",
     "scans": "Scans",
     "overview": "Overview",
     "analytics": "Analytics",
@@ -445,7 +447,6 @@
     "errorLog": "Error log",
     "feedback": "Feedback",
     "users": "Users",
-    "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
     "scanCoverage": "Scan Coverage",
     "scanArchiveBuilder": "Scan Archive Builder",
@@ -986,117 +987,44 @@
     "languagePreference": "Sidebar language preference",
     "languageSwitchEn": "Switch language to English",
     "languageSwitchDe": "Switch language to German",
-    "languageSwitchToLocale": "Switch language to {{language}}",
-    "connectedCharacters": {
-      "title": "Connected characters",
-      "empty": "No characters linked yet. Link a character in your account to see it here.",
-      "loginPrompt": "Sign in to see your linked characters.",
-      "ctaGuest": "Open start guide",
-      "ctaAuthed": "Open linked characters guide",
-      "chip": {
-        "server": "Server",
-        "class": "Class"
-      }
-    }
+    "languageSwitchToLocale": "Switch language to {{language}}"
   },
   "account": {
-    "settings": {
-      "title": "Settings",
-      "subtitle": "Configure your personal preferences.",
-      "loading": "Loading settings...",
-      "error": "Could not load settings.",
-      "retry": "Retry",
-      "language": {
-        "label": "Preferred language"
-      },
-      "defaultSection": {
-        "label": "Default section"
-      },
-      "compactTables": {
-        "label": "Use compact table layout"
-      },
-      "experimental": {
-        "label": "Enable experimental features"
-      },
-      "save": "Save settings",
-      "saved": "Settings saved.",
-      "noChanges": "No changes to save.",
-      "saving": "Saving...",
-      "saveError": "Could not save settings. Please try again."
-    },
-    "tools": {
-      "title": "Tools settings",
-      "subtitle": "Configure how tools behave for your account.",
-      "loading": "Loading tools settings...",
-      "loadError": "Could not load tools settings.",
-      "defaultSet": {
-        "label": "Default set ID",
-        "placeholder": "Enter a default set ID"
-      },
-      "showIntro": {
-        "label": "Show tools intro"
-      },
-      "experimental": {
-        "label": "Enable experimental tools"
-      },
-      "save": {
-        "cta": "Save settings",
-        "saving": "Saving...",
-        "success": "Settings saved.",
-        "noChanges": "No changes to save.",
-        "error": "Could not save settings. Please try again."
-      }
-    },
-    "connectedCharacters": {
-      "title": "Connected characters",
-      "subtitle": "These game characters are linked to your SFDataHub account.",
-      "loading": "Refreshing characters...",
-      "empty": {
-        "title": "No characters linked yet",
-        "description": "Use the \"!connect char\" command in Discord to link your characters, then click \"Refresh\" here.",
-        "cta": "Click to learn how linking works"
-      },
-      "actions": {
-        "refresh": "Refresh",
-        "refreshing": "Refreshing...",
-        "unlink": "Disconnect character"
-      },
-      "confirmation": {
-        "title": "Are you sure you want to unlink this character?",
-        "cancel": "Cancel",
-        "confirm": "Yes, unlink",
-        "confirming": "Unlinking..."
-      },
-      "errors": {
-        "serviceUnavailable": "Auth service is not configured for unlinking.",
-        "unlink": "Could not unlink character."
-      },
-      "columns": {
-        "character": "Character",
-        "server": "Server",
-        "playerId": "Player ID",
-        "class": "Class",
-        "level": "Level",
-        "guild": "Guild",
-        "lastVerified": "Last linked",
-        "source": "Source",
-        "actions": "Actions"
-      },
-      "method": {
-        "discord": "Discord bot"
-      },
-      "help": {
-        "title": "How does linking work?",
-        "show": "Show",
-        "hide": "Hide",
-        "steps": {
-          "link": "Link a character via the Discord bot using the \"!connect char\" command.",
-          "verify": "We match the character to your latest verified scan; keep your game data up to date.",
-          "refresh": "After linking, click Refresh here to sync the latest characters from the auth service.",
-          "unlink": "You can unlink any character in the Actions column; the source column shows how it was linked."
-        },
-        "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
-      }
+    "overview": {
+      "tab": "Account",
+      "checkingSession": "Checking session",
+      "readingSession": "Reading account session state.",
+      "services": "Connected services",
+      "servicesHelp": "Manage which social logins are linked to your SFDataHub identity.",
+      "connectedAs": "Connected as {{name}}",
+      "notConnected": "Not connected",
+      "connected": "Connected",
+      "connect": "Connect",
+      "planned": "Planned",
+      "soon": "Soon",
+      "security": "Security & session",
+      "securityText": "We only store your SFDataHub user ID, display name, avatar URL and provider identifiers (like your Discord ID). We never see or store your Discord password.",
+      "securityNote": "Logging out here only clears your SFDataHub session cookie. Your Discord account stays signed in separately.",
+      "logout": "Log out from this device",
+      "revoke": "To fully revoke access, remove SFDataHub Auth from your Discord applications page.",
+      "id": "SFDataHub ID",
+      "roles": "Roles",
+      "createdAt": "Created at",
+      "lastLogin": "Last login",
+      "unnamed": "Unnamed user",
+      "providerSignIn": "{{provider}} sign-in",
+      "verified": "Verified",
+      "displayName": "Display name",
+      "namePlaceholder": "Enter your display name",
+      "nameLength": "Name must be between {{min}} and {{max}} characters.",
+      "save": "Save",
+      "saving": "Saving…",
+      "nameUpdated": "Name updated.",
+      "notConfigured": "Auth service is not configured.",
+      "invalidCharacters": "The name contains invalid characters.",
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "accountMissing": "The account could not be found.",
+      "saveError": "Could not update the name. Please try again."
     },
     "loginOverlay": {
       "modalAriaLabel": "Sign in",
@@ -1129,18 +1057,16 @@
       "guestHint": "Use Discord or Google on the sign-in page.",
       "signInCta": "Sign in",
       "languageSettingsCta": "Language settings",
-      "languageSettingsTitle": "Settings",
-      "languageSettingsSubtitle": "Choose your interface language.",
       "languageFieldLabel": "Language",
       "languageSaving": "Saving language settings...",
       "languageSaveError": "Could not save language settings.",
-      "closeLanguageSettings": "Close settings",
       "signedInVia": "Signed in via {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
       "accountAndProfile": "Account & Profile",
       "consolePanel": "Console Panel",
-      "logout": "Logout"
+      "logout": "Logout",
+      "languageLoading": "Loading language settings..."
     },
     "loginPage": {
       "title": "Account Access",
@@ -2394,17 +2320,6 @@
           "answer": "Signing in gives access to the account area and synchronised account favourites across devices. It does not automatically synchronise your local scan pool or prove ownership of a player. Public scan management, imports and settings remain available without an account."
         }
       }
-    }
-  },
-  "uploadCenter": {
-    "scanMode": {
-      "label": "Scan type",
-      "user": "User scan",
-      "monthly": "Monthly scan",
-      "required": "Select a scan type to enable the upload."
-    },
-    "quota": {
-      "unlimited": "No limit"
     }
   },
   "search": {
@@ -4935,6 +4850,18 @@
     "archiveLink": "Open archive",
     "importLink": "Import SFtools data",
     "retryPlan": "Retry archive planning",
+    "fullyPrepared": "Server scans fully prepared",
+    "currentScan": "Current scan",
+    "archiveFiles": "Archive files",
+    "filesDownloaded": "{{number}} / {{total}} downloaded",
+    "filesReused": "{{number}} reused locally",
+    "filesAvailable": "Archive files available",
+    "countAfterProcessing": "Each server scan is counted after all files are processed.",
+    "activity": {
+      "downloading": "Downloading archive files",
+      "checking": "Checking and unpacking",
+      "processing": "Processing and saving"
+    },
     "phase": {
       "acquiring": "Downloading archive scans",
       "preparing": "Reading and preparing data",

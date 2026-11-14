@@ -1,9 +1,7 @@
 import { fusionViewEvents, useAnalyticsView } from "../../../lib/analytics/localEvents";
 import { useRuntimeAuditCommit } from "../../../lib/data-hub/useRuntimeAuditCommit";
-import { auditBegin, auditEnter, auditValue, auditError, auditLeave, auditAccept, auditFinish } from "../../../lib/data-hub/runtimeAudit";
 import GuildHubBackLink from "../../../components/guildhub/GuildHubBackLink";
 import React from "react";
-import { doc, getDoc } from "firebase/firestore";
 import ContentShell from "../../../components/ContentShell";
 import styles from "./FusionPlanner.module.css";
 import SetupTab from "./FusionPlannerTabs/SetupTab/SetupTab";
@@ -11,15 +9,7 @@ import MembersTab from "./FusionPlannerTabs/MembersTab/MembersTab";
 import OverviewTab from "./FusionPlannerTabs/OverviewTab/OverviewTab";
 import ScenariosTab from "./FusionPlannerTabs/ScenariosTab/ScenariosTab";
 import ResultTab from "./FusionPlannerTabs/ResultTab/ResultTab";
-import { db } from "../../../lib/firebase";
-import type { MemberSummaryLike } from "../../../components/guilds/GuildProfileInfo/GuildProfileInfo.types";
 import type { Member as GuildMember } from "../../../components/guilds/guild-tabs/guild-members/types";
-import {
-  beginReadScope,
-  endReadScope,
-  traceGetDoc,
-  type FirestoreTraceScope,
-} from "../../../lib/debug/firestoreReadTrace";
 
 type TabKey = "setup" | "members" | "overview" | "scenarios" | "result";
 
@@ -150,46 +140,6 @@ const createEmptyTargetGuildAssignments = (list: FusionMember[]) =>
     return acc;
   }, {});
 
-const mapMemberToFusionMember = (
-  entry: MemberSummaryLike,
-  guildName: string,
-  guildServer: string | null,
-): FusionMember => ({
-  id: entry.id,
-  name: entry.name ?? "Unknown",
-  class: entry.class ?? "Unknown",
-  className: entry.class ?? undefined,
-  role: entry.role ?? "Unknown",
-  level: entry.level ?? undefined,
-  guildName,
-  server: guildServer,
-  scrapbook: undefined,
-  lastOnline: entry.lastActivityMs ?? null,
-  baseStats: {
-    main: entry.baseMain ?? undefined,
-    con: entry.conBase ?? undefined,
-    sumBaseTotal: entry.sumBaseTotal ?? undefined,
-  },
-  totalStats: entry.totalStats ?? undefined,
-  values: {
-    treasury: entry.treasury ?? undefined,
-    mine: entry.mine ?? undefined,
-    attrTotal: entry.attrTotal ?? undefined,
-    conTotal: entry.conTotal ?? undefined,
-    lastScan: entry.lastScan ?? undefined,
-    lastActivity: entry.lastActivity ?? undefined,
-  },
-});
-
-const resolveGuildIdentifier = (guild?: PlannerGuildConfig | null): string | null => {
-  if (!guild) return null;
-  const idCandidate = guild.id?.trim();
-  if (idCandidate && !idCandidate.startsWith("base-")) return idCandidate;
-  const nameCandidate = guild.name?.trim();
-  if (nameCandidate) return nameCandidate;
-  return null;
-};
-
 const createScenarioId = () => `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 const TABS: Tab[] = [
@@ -239,7 +189,6 @@ export default function FusionPlanner() {
   const [activeTab, setActiveTab] = React.useState<TabKey>("setup");
   useAnalyticsView(fusionViewEvents[activeTab]);
   const [members, setMembers] = React.useState<FusionMember[]>(INITIAL_MEMBERS);
-  const [membersLoading, setMembersLoading] = React.useState(false);
   const [setupState, setSetupState] = React.useState<FusionSetupState>({
     mode: "scan",
     baseGuild: undefined,
@@ -282,13 +231,13 @@ export default function FusionPlanner() {
       notes.push("Setup incomplete - no base guild selected.");
     }
     if (hasBaseGuild && !hasMembers) {
-      notes.push("No members loaded yet. Check scans or setup.");
+      notes.push(setupState.mode === "scan" ? "Datenanbindung vorübergehend nicht verfügbar. Manuelle Planung bleibt nutzbar." : "No members loaded yet.");
     }
     if (!hasScenarios) {
       notes.push("No scenarios defined yet. Create at least one plan in the Scenarios tab.");
     }
     return notes;
-  }, [hasBaseGuild, hasMembers, hasScenarios]);
+  }, [hasBaseGuild, hasMembers, hasScenarios, setupState.mode]);
 
   const handleChangeScenarioDecision = (id: string, value: MemberDecision) => {
     setScenarios((prev) =>
@@ -378,94 +327,12 @@ export default function FusionPlanner() {
     });
   };
 
+  // Scan members are temporarily unavailable; manual mode keeps its existing inputs.
   React.useEffect(() => {
-    if (setupState.mode !== "scan") {
-      setMembersLoading(false);
-      setMembers(INITIAL_MEMBERS);
-      return;
-    }
-
-    const guildsToLoad = [
-      setupState.baseGuild,
-      ...setupState.partnerGuilds,
-    ].filter(Boolean) as PlannerGuildConfig[];
-
-    if (guildsToLoad.length === 0) {
-      setMembersLoading(false);
-      setMembers([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadMembers() {
-    const __audit1 = auditBegin("F32", "loadMembers");
-    try {
-      const scope: FirestoreTraceScope = beginReadScope("FusionPlanner:loadMembers");
-      setMembersLoading(true);
-      try {
-        const allMembers: FusionMember[] = [];
-
-        for (const guildConfig of guildsToLoad) {
-          const targetGuildId = resolveGuildIdentifier(guildConfig);
-          if (!targetGuildId) continue;
-
-          const latestRef = doc(db, `guilds/${targetGuildId}/latest/latest`);
-          const latestSnap = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDoc"), (traceGetDoc(scope, latestRef, () => getDoc(latestRef)))));
-          const latestData = latestSnap.exists() ? (latestSnap.data() as any) : null;
-          const guildName =
-            guildConfig.name?.trim() ??
-            latestData?.name ??
-            latestData?.values?.Name ??
-            targetGuildId;
-          const guildServer =
-            guildConfig.server?.trim() ??
-            latestData?.server ??
-            latestData?.values?.Server ??
-            null;
-
-          const membersRef = doc(db, `guilds/${targetGuildId}/snapshots/members_summary`);
-          const membersSnap = await (auditValue(__audit1, auditEnter(__audit1, "traceGetDoc"), (traceGetDoc(scope, membersRef, () => getDoc(membersRef)))));
-          if (!membersSnap.exists()) continue;
-          const rawMembers = membersSnap.data() as any;
-          const list = Array.isArray(rawMembers.members) ? (rawMembers.members as MemberSummaryLike[]) : [];
-
-          list.forEach((entry) => {
-            allMembers.push(mapMemberToFusionMember(entry, guildName, guildServer));
-          });
-        }
-
-        if (!cancelled) {
-          auditAccept(__audit1, allMembers);
-          (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setMembers", "sync-elapsed"), (setMembers(allMembers))));
-        }
-        if (cancelled) auditFinish(__audit1, "stale-discarded");
-      } catch (error) { auditError(__audit1, error);
-        console.error("[FusionPlanner] Failed to load members", error);
-        if (!cancelled) {
-          (auditValue(__audit1, auditEnter(__audit1, "state-enqueue:setMembers", "sync-elapsed"), (setMembers([]))));
-        }
-      } finally {
-        if (!cancelled) {
-          setMembersLoading(false);
-        }
-        endReadScope(scope);
-      }
-
-    } catch (__auditError) { auditError(__audit1, __auditError); throw __auditError; }
-    finally { auditLeave(__audit1); }
-}
-
-    setMembers([]);
-    loadMembers();
-    return () => {
-      cancelled = true;
-    };
-  }, [setupState.baseGuild, setupState.partnerGuilds, setupState.mode]);
-
-  useRuntimeAuditCommit(members, !membersLoading && members.length > 0, "fusion-members");
+    setMembers(setupState.mode === "manual" ? INITIAL_MEMBERS : []);
+  }, [setupState.mode]);
+  useRuntimeAuditCommit(members, members.length > 0, "fusion-members");
   React.useEffect(() => {
-    if (membersLoading) return;
     setScenarios((prev) =>
       prev.map((scenario) => {
         const memberIds = new Set(members.map((member) => member.id));
@@ -492,7 +359,7 @@ export default function FusionPlanner() {
         return { ...scenario, decisions, targetGuildAssignments };
       }),
     );
-  }, [members, membersLoading]);
+  }, [members]);
 
   const handleChangeMode = (mode: FusionMode) => {
     setSetupState((prev) => ({ ...prev, mode }));

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../../context/AuthContext";
-import LanguageSettingsOverlay from "./LanguageSettingsOverlay";
+import AccountGuestContent from "./AccountGuestContent";
 import styles from "./Topbar.module.css";
 
 const PLACEHOLDER_AVATAR = "https://i.pravatar.cc/72";
@@ -17,7 +17,6 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [isLanguageOverlayOpen, setIsLanguageOverlayOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const isAuthed = status === "authenticated";
@@ -46,7 +45,6 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   }, [isLoading]);
 
   const closeMenu = useCallback(() => setIsOpen(false), []);
-  const closeLanguageOverlay = useCallback(() => setIsLanguageOverlayOpen(false), []);
 
   const handleToggle = () => {
     setIsOpen((prev) => !prev);
@@ -62,13 +60,13 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
   };
 
   const handleAccountClick = () => {
-    navigate("/settings/account");
+    navigate("/settings?tab=account");
     closeMenu();
   };
 
   const handleOpenLanguageSettings = () => {
     closeMenu();
-    setIsLanguageOverlayOpen(true);
+    navigate("/settings?tab=general&section=language");
   };
 
   const handleLogout = useCallback(async () => {
@@ -88,15 +86,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
     if (status === "unauthenticated") {
       return (
         <div className={styles.accountGuestContent}>
-          <div className={`${styles.accountHeader} ${styles.accountGuestHeader}`}>
-            <p className={styles.accountName}>{t("account.menu.guestTitle")}</p>
-            <p className={styles.accountSub}>
-              {t("account.menu.guestSubtitle")}
-            </p>
-          </div>
-          <button type="button" className={`${styles.accountPrimary} ${styles.accountGuestPrimary}`} onClick={handleSignIn}>
-            {t("account.menu.signInCta")}
-          </button>
+          <AccountGuestContent onSignIn={handleSignIn} />
           <hr className={`${styles.accountDivider} ${styles.accountGuestDivider}`} />
           <button type="button" className={styles.accountItem} onClick={handleOpenLanguageSettings}>
             {t("account.menu.languageSettingsCta", "Language settings")}
@@ -181,7 +171,6 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ fallbackName }) => {
           {renderDropdownContent()}
         </div>
       )}
-      <LanguageSettingsOverlay isOpen={isLanguageOverlayOpen} onClose={closeLanguageOverlay} />
     </div>
   );
 };

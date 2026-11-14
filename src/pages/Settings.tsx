@@ -1,7 +1,9 @@
 import { trackLocalEvent } from "../lib/analytics/localEvents";
+import LanguageSelection from "./Settings/LanguageSelection";
+import AccountOverview from "../components/account/AccountOverview";
 import ToplistColumnSettings from "./Settings/ToplistColumnSettings";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ContentShell from "../components/ContentShell";
 import { preferencesStore, GUILD_PROFILE_MODES, type GuildProfileMode, type NavigationMode, type AttributeSumMode } from "../lib/settings/preferences";
@@ -14,9 +16,27 @@ export const PROFILE_SETTINGS_URL = "/settings?tab=datahub&section=profiles";
 export default function SettingsIndex() {
   const { t } = useTranslation();
   const [params] = useSearchParams();
-  const tab = params.get("tab") === "datahub" ? "datahub" : "general";
+  const location = useLocation();
+  const languageRequested = params.get("section") === "language";
+  const tab = params.get("tab") === "account" ? "account" : params.get("tab") === "datahub" ? "datahub" : "general";
+  useEffect(() => {
+    if (tab !== "general" || !languageRequested) return;
+    const target = document.getElementById("settings-language");
+    let scroller = target?.parentElement;
+    while (scroller && !/^(auto|scroll)$/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    if (!target || !scroller) return;
+    const rect = target.getBoundingClientRect();
+    const top = scroller.getBoundingClientRect().top + scroller.clientTop;
+    const bottom = top + scroller.clientHeight;
+    if (rect.top < top || rect.bottom > bottom) {
+      const delta = rect.top < top ? rect.top - top - 24 : Math.min(rect.top - top - 24, rect.bottom - bottom + 24);
+      scroller.scrollTo({ top: scroller.scrollTop + delta, behavior: "instant" });
+    }
+  }, [tab, languageRequested, location.key]);
+  const [accountVisited, setAccountVisited] = useState(tab === "account");
+  useEffect(() => { if (tab === "account") setAccountVisited(true); }, [tab]);
   const section = params.get("section") === "profiles" ? "profiles" : "toplists";
-  function selectionUrl(nextTab: "general" | "datahub", nextSection = "toplists") {
+  function selectionUrl(nextTab: "general" | "datahub" | "account", nextSection = "toplists") {
     const next = new URLSearchParams(params);
     next.set("tab", nextTab);
     if (nextTab === "datahub") next.set("section", nextSection);
@@ -28,8 +48,12 @@ export default function SettingsIndex() {
       subheader={<nav aria-label={t("localSettings.topics")} className={styles.tabs}>
         <Link to={selectionUrl("general")} aria-current={tab === "general" ? "page" : undefined}>{t("localSettings.general")}</Link>
         <Link to={selectionUrl("datahub")} aria-current={tab === "datahub" ? "page" : undefined}>{t("localSettings.dataHub")}</Link>
+        <Link to={selectionUrl("account")} aria-current={tab === "account" ? "page" : undefined}>{t("account.overview.tab")}</Link>
       </nav>}>
-      <ProfilePreferences tab={tab} section={section} toplistsUrl={selectionUrl("datahub")} profilesUrl={selectionUrl("datahub", "profiles")} />
+      <div hidden={tab === "account"}>
+      <ProfilePreferences tab={tab === "account" ? "general" : tab} section={section} toplistsUrl={selectionUrl("datahub")} profilesUrl={selectionUrl("datahub", "profiles")} />
+      </div>
+      {(accountVisited || tab === "account") && <div hidden={tab !== "account"} className={`${styles.content} ${styles.accountContent}`}><AccountOverview /></div>}
     </ContentShell>
   );
 }
@@ -160,6 +184,7 @@ function ProfilePreferences({ tab, section, toplistsUrl, profilesUrl }: {
           <div role="status" aria-live="polite">{message === "saved" ? t("localSettings.saved") : ""}</div>
         </div>
       </form>
+      <LanguageSelection hidden={tab !== "general"} />
     </div>
   );
 }

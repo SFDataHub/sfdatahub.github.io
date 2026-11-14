@@ -9,17 +9,12 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import {
-  type FirestoreLatestGuildToplistResult,
-} from "../../lib/api/toplistsFirestore";
-import type { ToplistGuildRow, ToplistGuildSnapshot } from "../../lib/toplists/toplistContracts";
+import type { ToplistGuildRow } from "../../lib/toplists/toplistContracts";
 import { SERVERS } from "../../data/servers";
 import { useFilters } from "../../components/Filters/FilterContext";
 import { useFavoriteMembership } from "../../lib/data-hub/useFavoriteMembership";
-import { useToplistsData } from "../../context/ToplistsDataContextCore";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import type { ToplistCaptureStatus } from "../../components/export/ToplistExportController";
-import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
@@ -45,7 +40,6 @@ type GuildToplistsProps = LocalTableColumnsProps & {
   presetReadOnlyData?: GuildToplistsPresetData | null;
   onPresetReadOnlyDataChange?: (data: GuildToplistsPresetData) => void;
   onAvgModeChange?: (nextMode: "base" | "total") => void;
-  renderFirestoreGuildOverlay?: boolean;
   focusIdentifier?: string | null;
   focusNonce?: number | string | null;
   focusRequest?: ToplistFocusRequest | null;
@@ -338,30 +332,6 @@ const toFiniteNumber = (value: unknown): number | null => {
   return null;
 };
 
-const normalizeGuildNumericRow = (row: ToplistGuildRow): ToplistGuildRow => ({
-  ...row,
-  hofRank: toFiniteNumber(row.hofRank),
-  honor: toFiniteNumber(row.honor),
-  raids: toFiniteNumber(row.raids),
-  portalFloor: toFiniteNumber(row.portalFloor),
-  hydra: toFiniteNumber(row.hydra),
-  petLevel: toFiniteNumber(row.petLevel),
-  instructor: toFiniteNumber(row.instructor),
-  memberCount: toFiniteNumber(row.memberCount),
-  avgLevel: toFiniteNumber(row.avgLevel),
-  avgBaseMain: toFiniteNumber(row.avgBaseMain),
-  avgConBase: toFiniteNumber(row.avgConBase),
-  avgSumBaseTotal: toFiniteNumber(row.avgSumBaseTotal),
-  avgAttrTotal: toFiniteNumber(row.avgAttrTotal),
-  avgConTotal: toFiniteNumber(row.avgConTotal),
-  avgTotalStats: toFiniteNumber(row.avgTotalStats),
-  avgMine: toFiniteNumber(row.avgMine),
-  avgTreasury: toFiniteNumber(row.avgTreasury),
-  sumAvg: toFiniteNumber(row.sumAvg),
-  latestScanAtSec: toFiniteNumber(row.latestScanAtSec),
-  lastScan: row.lastScan == null ? null : String(row.lastScan).trim() || null,
-});
-
 const resolveGuildLastScanSec = (row: ToplistGuildRow): number | null => {
   const latestScanAtSec = toFiniteNumber(row.latestScanAtSec);
   if (latestScanAtSec != null) return latestScanAtSec;
@@ -484,7 +454,6 @@ export default function GuildToplists({
   onCaptureStatusChange,
   presetReadOnlyData = null,
   onAvgModeChange,
-  renderFirestoreGuildOverlay = true,
   focusIdentifier = null,
   focusNonce = null,
   focusRequest, onFocusResult, onOpenGuildProfile,
@@ -497,19 +466,14 @@ export default function GuildToplists({
   const lastScanLabelStyle: React.CSSProperties = centerCellContents ? { ...TOPLIST_LAST_SCAN_LABEL_STYLE, flex: "0 1 auto", textAlign: "center" as const } : TOPLIST_LAST_SCAN_LABEL_STYLE;
 
   const tableStyle = localColumns ? { ...TOPLIST_TABLE_STYLE, width: activeColumns.reduce((sum, c) => sum + (localColumnWidths?.[c.key] ?? customColumnWidth(c.key)), 0) } : TOPLIST_TABLE_STYLE;
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { favoritesOnly } = useFilters();
   const { filterFavorites: sharedFavorites } = useFavoriteMembership();
-  const { getGuildToplistSnapshotCached } = useToplistsData();
   const isPresetRender = renderMode === "preset";
   const hasReadOnlyData = Boolean(presetReadOnlyData);
   const resolvedPresetAmount = presetAmount ?? 50;
   const captureRowLimit = isPresetRender ? resolvedPresetAmount : null;
   const isCompactToplistView = useMediaQuery("(max-width: 1099px)") && !isPresetRender;
-  const [rows, setRows] = useState<ToplistGuildRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [guildAvgMode, setGuildAvgMode] = useState<"base" | "total">("base");
   const [guildAvgModeSlot, setGuildAvgModeSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -525,12 +489,6 @@ export default function GuildToplists({
   }, [localLayout, isPresetRender, showAvgModeControl]);
 
   const [expandedMobileGuildKey, setExpandedMobileGuildKey] = useState<string | null>(null);
-  const [selectedGuildProfile, setSelectedGuildProfile] = useState<{
-    identifier: string;
-    guildId: string;
-    name: string | null;
-    server: string | null;
-  } | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const captureStatusSignatureRef = useRef<string>("");
   const navigate = useNavigate();
@@ -544,149 +502,6 @@ export default function GuildToplists({
     const fallbackCode = String(fallback).toUpperCase();
     return fallbackCode ? [fallbackCode] : [];
   }, [hasReadOnlyData, serverCodes]);
-  const resolvedServerKey = useMemo(() => resolvedServers.join(","), [resolvedServers]);
-  const i18nLanguageKey = i18n.resolvedLanguage || i18n.language || "";
-  const tNoSnapshot = useMemo(
-    () => i18n.t("toplistsPage.errors.noSnapshot", "No snapshot yet for this server."),
-    [i18n, i18nLanguageKey]
-  );
-  const tFirestoreError = useMemo(
-    () => i18n.t("toplistsPage.errors.firestore", "Firestore error"),
-    [i18n, i18nLanguageKey]
-  );
-  const tDecodeError = useMemo(
-    () => i18n.t("toplistsPage.errors.decode", "Could not decode data"),
-    [i18n, i18nLanguageKey]
-  );
-  const tUnexpectedError = useMemo(
-    () => i18n.t("toplistsPage.errors.unexpectedLoad", "Unexpected error while loading"),
-    [i18n, i18nLanguageKey]
-  );
-  const getGuildToplistSnapshotCachedRef = useRef(getGuildToplistSnapshotCached);
-  const errorMessagesRef = useRef({
-    noSnapshot: tNoSnapshot,
-    firestore: tFirestoreError,
-    decode: tDecodeError,
-    unexpected: tUnexpectedError,
-  });
-
-  useEffect(() => {
-    getGuildToplistSnapshotCachedRef.current = getGuildToplistSnapshotCached;
-  }, [getGuildToplistSnapshotCached]);
-
-  useEffect(() => {
-    errorMessagesRef.current = {
-      noSnapshot: tNoSnapshot,
-      firestore: tFirestoreError,
-      decode: tDecodeError,
-      unexpected: tUnexpectedError,
-    };
-  }, [tNoSnapshot, tFirestoreError, tDecodeError, tUnexpectedError]);
-
-  useEffect(() => {
-    if (isPresetRender || hasReadOnlyData) return;
-    let active = true;
-    const currentMessages = errorMessagesRef.current;
-    const serversForFetch = resolvedServerKey
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    setLoading(true);
-    setError(null);
-
-    if (!serversForFetch.length) {
-      setRows([]);
-      setUpdatedAt(null);
-      setError(currentMessages.noSnapshot);
-      setLoading(false);
-      return () => {
-        active = false;
-      };
-    }
-
-    Promise.all(serversForFetch.map((serverCode) => getGuildToplistSnapshotCachedRef.current(serverCode)))
-      .then((results) => {
-        if (!active) return;
-        const snapshots: ToplistGuildSnapshot[] = [];
-        let firstErrorCode: string | null = null;
-        let firstErrorDetail: string | null = null;
-
-        results.forEach((result: FirestoreLatestGuildToplistResult) => {
-          if (result.ok) {
-            snapshots.push(result.snapshot);
-          } else if (!firstErrorCode) {
-            const err: any = result;
-            firstErrorCode = err.error ?? null;
-            firstErrorDetail = err.detail ?? null;
-          }
-        });
-
-        if (!snapshots.length) {
-          const detail = firstErrorDetail ? ` (${firstErrorDetail})` : "";
-          let errorMsg = currentMessages.firestore;
-          if (firstErrorCode === "not_found") {
-            errorMsg = currentMessages.noSnapshot;
-          } else if (firstErrorCode === "decode_error") {
-            errorMsg = currentMessages.decode;
-          }
-          setRows([]);
-          setUpdatedAt(null);
-          setError(`${errorMsg}${detail}`);
-          return;
-        }
-
-        let nextUpdatedAt: number | null = null;
-        const mergedByIdentifier = new Map<string, ToplistGuildRow>();
-        const mergedWithoutIdentifier: ToplistGuildRow[] = [];
-
-        snapshots.forEach((snapshot) => {
-          if (snapshot.updatedAt != null) {
-            nextUpdatedAt = nextUpdatedAt == null ? snapshot.updatedAt : Math.max(nextUpdatedAt, snapshot.updatedAt);
-          }
-
-          const guilds = Array.isArray(snapshot.guilds) ? snapshot.guilds : [];
-          guilds.forEach((rawRow: ToplistGuildRow) => {
-            const row = normalizeGuildNumericRow(rawRow);
-            const identifier = resolveGuildIdentifier(row);
-            if (!identifier) {
-              mergedWithoutIdentifier.push(row);
-              return;
-            }
-
-            const existing = mergedByIdentifier.get(identifier);
-            if (!existing) {
-              mergedByIdentifier.set(identifier, row);
-              return;
-            }
-
-            const existingScanSec = resolveGuildLastScanSec(existing);
-            const nextScanSec = resolveGuildLastScanSec(row);
-            if (nextScanSec != null && (existingScanSec == null || nextScanSec > existingScanSec)) {
-              mergedByIdentifier.set(identifier, row);
-            }
-          });
-        });
-
-        setRows([...mergedByIdentifier.values(), ...mergedWithoutIdentifier]);
-        setUpdatedAt(nextUpdatedAt);
-        setError(null);
-      })
-      .catch((err) => {
-        if (!active) return;
-        console.error("[GuildToplists] unexpected error", err);
-        setRows([]);
-        setUpdatedAt(null);
-        setError(currentMessages.unexpected);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [hasReadOnlyData, isPresetRender, resolvedServerKey]);
-
   const fmtNum = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("de-DE").format(n));
   const fmtGroupedInt = (n: number | null | undefined) => {
     if (n == null || !Number.isFinite(n)) return "";
@@ -728,9 +543,9 @@ export default function GuildToplists({
   const activeSortKey = resolveGuildSort(sortKey);
   const activeGuildAvgMode = guildAvgMode === "total" ? "total" : "base";
   const effectiveGuildAvgMode = hasReadOnlyData ? (presetReadOnlyData?.avgMode ?? activeGuildAvgMode) : activeGuildAvgMode;
-  const effectiveLoading = hasReadOnlyData ? (presetReadOnlyData?.loading ?? false) : loading;
-  const effectiveError = hasReadOnlyData ? (presetReadOnlyData?.error ?? null) : error;
-  const effectiveUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.updatedAt ?? null) : updatedAt;
+  const effectiveLoading = hasReadOnlyData ? (presetReadOnlyData?.loading ?? false) : false;
+  const effectiveError = hasReadOnlyData ? (presetReadOnlyData?.error ?? null) : null;
+  const effectiveUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.updatedAt ?? null) : null;
   const compareLoading = hasReadOnlyData ? (presetReadOnlyData?.compareLoading ?? false) : false;
   const compareExpected = hasReadOnlyData ? (presetReadOnlyData?.compareExpected ?? false) : false;
   const showCompare = hasReadOnlyData ? (presetReadOnlyData?.showCompare ?? false) : false;
@@ -746,7 +561,7 @@ export default function GuildToplists({
 
 
   const computedDisplayRows = useMemo(() => {
-    let list = hasReadOnlyData ? [...(presetReadOnlyData?.rows ?? [])] : Array.isArray(rows) ? [...rows] : [];
+    let list = hasReadOnlyData ? [...(presetReadOnlyData?.rows ?? [])] : [];
     if (!list.length) return list;
     if (hasReadOnlyData) return list;
 
@@ -791,7 +606,7 @@ export default function GuildToplists({
     });
 
     return list;
-  }, [activeSortKey, avgSumSortMode, effectiveGuildAvgMode, favoriteGuildSet, favoritesOnly, hasReadOnlyData, presetReadOnlyData?.rows, rows]);
+  }, [activeSortKey, avgSumSortMode, effectiveGuildAvgMode, favoriteGuildSet, favoritesOnly, hasReadOnlyData, presetReadOnlyData?.rows]);
   const displayRows = useMemo(
     () => (hasReadOnlyData && isPresetRender ? (presetReadOnlyData?.rows ?? []) : computedDisplayRows),
     [computedDisplayRows, hasReadOnlyData, isPresetRender, presetReadOnlyData]
@@ -878,15 +693,6 @@ export default function GuildToplists({
   const openGuildProfile = (row: ToplistGuildRow) => {
     if (isPresetRender) return;
     if (onOpenGuildProfile) { onOpenGuildProfile(row); return; }
-    const guildId = String(row.guildId ?? "").trim();
-    if (!guildId) return;
-    const rowIdentifier = resolveGuildIdentifier(row);
-    setSelectedGuildProfile({
-      identifier: rowIdentifier ?? buildGuildToplistIdentifier(row.server, guildId) ?? guildId,
-      guildId,
-      name: typeof row.name === "string" ? row.name : null,
-      server: typeof row.server === "string" ? row.server : null,
-    });
   };
 
   const getGuildSortMetric = (row: ToplistGuildRow) => {
@@ -1230,18 +1036,6 @@ default: return null;
             {renderGuildBody()}
           </div>
         </div>
-      )}
-      {!isPresetRender && renderFirestoreGuildOverlay && (
-        <GuildProfileOverlay
-          isOpen={Boolean(selectedGuildProfile?.guildId)}
-          guildId={selectedGuildProfile?.guildId ?? null}
-          guildName={
-            selectedGuildProfile
-              ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
-              : null
-          }
-          onClose={() => setSelectedGuildProfile(null)}
-        />
       )}
     </div>
   );

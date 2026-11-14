@@ -1,0 +1,7 @@
+.frame {
+  display: block;
+  width: 100%;
+  /* Start/fallback only; a validated height message overrides this value. */
+  height: max(700px, calc(100dvh - var(--topbar-h)));
+  border: 0;
+}

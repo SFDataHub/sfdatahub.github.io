@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { eventNames, dungeonBookIds, COLLECTION_DISPLAY, TOOL_CLICK_PREFIX, normalizeToolTarget, normalizeToolName } from "../../../auth-api/src/internal/analytics/visitor/events";
 import { getQaQuestion } from "../help/qaCatalog";
 import { resolveServer } from "../servers/serverResolver";
 
@@ -53,93 +54,14 @@ export const fusionViewEvents = {
   "result": "datahub/fusion/result"
 } as const;
 
-const eventNames = [
-  "datahub/analytics/compare",
-  "datahub/analytics/details",
-  "datahub/analytics/filters",
-  "datahub/analytics/overview",
-  "datahub/analytics/progress",
-  "datahub/dashboard/scan-inventory",
-  "datahub/favorites/open",
-  "datahub/fight/attack",
-  "datahub/fight/manager",
-  "datahub/fight/member-list",
-  "datahub/fight/members",
-  "datahub/fight/participation",
-  "datahub/fight/manager-members",
-  "datahub/fight/manager-fights",
-  "datahub/fight/participation-export",
-  "datahub/fight/participation-preview",
-  "datahub/fight/screenshot-review",
-  "datahub/fight/screenshots",
-  "datahub/fight/sync",
-  "datahub/fight/sync-details",
-  "datahub/fusion/members",
-  "datahub/fusion/overview",
-  "datahub/fusion/result",
-  "datahub/fusion/scenarios",
-  "datahub/fusion/setup",
-  "datahub/guild/base",
-  "datahub/guild/chart-details",
-  "datahub/guild/compare",
-  "datahub/guild/fortress",
-  "datahub/guild/general",
-  "datahub/guild/members-cards",
-  "datahub/guild/members-list",
-  "datahub/guild/overlay",
-  "datahub/guild/progress",
-  "datahub/guild/ranking",
-  "datahub/guild/scan-details",
-  "datahub/guild/total",
-  "datahub/guild/transfers",
-  "datahub/guild/trend",
-  "datahub/identity/dashboard",
-  "datahub/identity/analyze-success",
-  "datahub/identity/details",
-  "datahub/identity/evidence",
-  "datahub/identity/link-success",
-  "datahub/identity/manual-link",
-  "datahub/identity/matching-success",
-  "datahub/identity/workspace",
-  "datahub/planner/form",
-  "datahub/player/base",
-  "datahub/player/chart-details",
-  "datahub/player/composition",
-  "datahub/player/fortress",
-  "datahub/player/general",
-  "datahub/player/overlay",
-  "datahub/player/progress",
-  "datahub/player/total",
-  "datahub/search/guild-select",
-  "datahub/search/open",
-  "datahub/search/player-select",
-  "datahub/settings/save-success",
-  "datahub/toplist/compare",
-  "datahub/toplist/filters",
-  "datahub/toplist/guilds",
-  "datahub/toplist/players",
-  "datahub/toplist/png-dialog",
-  "datahub/toplist/png-export-success",
-  "datahub/uploads/archive",
-  "datahub/uploads/delete-success",
-  "datahub/uploads/fight-tracker",
-  "datahub/uploads/guild-details",
-  "datahub/uploads/import-preview",
-  "datahub/uploads/import-success",
-  "datahub/uploads/player-details",
-  "datahub/uploads/scan-overview",
-  "datahub/uploads/sftools-import-success",
-  "datahub/uploads/update-success",
-  "datahub/uploads/user-scans",
-  "datahub/waitlist/form"
-] as const;
 export type LocalEvent = typeof eventNames[number];
 const allowed = new Set<string>(eventNames);
 type ToplistTab = "players" | "guilds";
-type ActionEvent = `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}` | `datahub/toplist/${ToplistTab}/server-view/${string}` | `datahub/setup/completed/servers/${number}`;
+type ActionEvent = `home/youtube/video-click/${string}/${string}` | `home/twitch/live-click/${string}` | `dungeons/library/book-open/${string}` | `help/qa/question-open/${string}` | `datahub/toplist/${ToplistTab}/server-view/${string}` | `datahub/setup/completed/servers/${number}` | typeof COLLECTION_DISPLAY | `${typeof TOOL_CLICK_PREFIX}${string}`;
 type EventPath = LocalEvent | ActionEvent;
-const dungeonBookIds = new Set(["light-world", "shadow-world", "class-world", "fairy-tower", "continuous-loop", "twister", "sandstorm"]);
-type Payload = { path: EventPath; title: EventPath; event: true; referrer: ""; no_session: true };
+const dungeonBooks = new Set<string>(dungeonBookIds);
+
+type Payload = { path: EventPath; title: string; event: true; referrer: ""; no_session: true };
 type CounterWindow = Window & { goatcounter?: { count?: (payload: Payload) => void } };
 const queue: Array<{ payload: Payload; expires: number }> = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -157,10 +79,10 @@ function flush() {
   if (queue.length) timer = setTimeout(flush, 200);
 }
 
-function enqueueEvent(path: EventPath) {
+function enqueueEvent(path: EventPath, title?: string) {
   if (typeof window === "undefined") return;
   if (queue.length >= 64) queue.shift();
-  queue.push({ payload: { path, title: path, event: true, referrer: "", no_session: true }, expires: Date.now() + 10_000 });
+  queue.push({ payload: { path, title: title ?? path, event: true, referrer: "", no_session: true }, expires: Date.now() + 10_000 });
   if (timer !== undefined) clearTimeout(timer);
   flush();
 }
@@ -170,15 +92,31 @@ export function trackLocalEvent(path: LocalEvent) {
   if (allowed.has(path)) enqueueEvent(path);
 }
 
+/** Once per successfully displayed iframe mount, guarded by CollectionFrame. */
+export function trackCollectionDisplay() { enqueueEvent(COLLECTION_DISPLAY); }
+
+/** Count the activation, not a confirmed view of the external tab. */
+export function trackCollectionToolClick(url: unknown, toolName?: unknown) {
+  const target = normalizeToolTarget(url);
+  if (target) enqueueEvent(`${TOOL_CLICK_PREFIX}${target}`, normalizeToolName(toolName) ?? undefined);
+}
+
 /** Count each outgoing click using the existing channel login, never its label or URL. */
 export function trackTwitchLiveClick(login: string) {
   const channel = login.trim().toLowerCase();
   if (/^[a-z0-9_]+$/.test(channel)) enqueueEvent(`home/twitch/live-click/${channel}`);
 }
 
+/** Outgoing home video activations only; stable YouTube IDs, never translated labels. */
+export function trackYouTubeVideoClick(channelId: string, videoId: string) {
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(channelId) && /^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+    enqueueEvent(`home/youtube/video-click/${channelId}/${videoId}`);
+  }
+}
+
 /** Only the seven stable book IDs are accepted; reopening counts again. */
 export function trackDungeonBookOpen(worldId: string) {
-  if (dungeonBookIds.has(worldId)) enqueueEvent(`dungeons/library/book-open/${worldId}`);
+  if (dungeonBooks.has(worldId)) enqueueEvent(`dungeons/library/book-open/${worldId}`);
 }
 
 /** Only catalog IDs; called by deliberate closed-to-open actions, never restoration. */

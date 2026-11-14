@@ -464,6 +464,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
             { value: "admin", label: "Admin" },
             { value: "mod", label: "Mod" },
             { value: "creator", label: "Creator" },
+            { value: "don", label: "Don" },
             { value: "user", label: "User" },
           ]}
         />
@@ -980,7 +981,7 @@ function UserDetailPanel({
       <section className="rounded-2xl border p-4" style={{ borderColor: "#2B4C73" }}>
         <h3 className="mb-3 text-sm font-semibold text-white">Roles</h3>
         <div className="flex flex-wrap gap-2">
-          {(["admin", "mod", "creator", "user"] as AdminUserRole[]).map((role) => (
+          {(["admin", "mod", "creator", "don", "user"] as AdminUserRole[]).map((role) => (
             <button
               key={role}
               type="button"
@@ -1271,7 +1272,7 @@ function ProviderBadge({
 }
 
 function getPrimaryRole(roles: AdminUserRole[]): AdminUserRole {
-  const order: AdminUserRole[] = ["admin", "mod", "creator", "user"];
+  const order: AdminUserRole[] = ["admin", "mod", "creator", "don", "user"];
   for (const role of order) {
     if (roles.includes(role)) {
       return role;

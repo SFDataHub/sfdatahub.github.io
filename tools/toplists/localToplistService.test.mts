@@ -460,9 +460,11 @@ const withToplistSet = (entries: readonly ScanArchiveEntry[]) => {
   ]);
   assert.equal(leftProgress.length, atUnsubscribe);
   assert.ok(rightProgress.some(p => p.phase === "preparing" && p.succeeded === 1));
+  assert.ok(rightProgress.some(p => p.files?.some(file => file.downloaded && !file.reused)));
   const warmProgress: LocalToplistLoadProgress[] = [];
   await loadOrBuildLocalToplistSnapshots([parallel], {dependencies:h.dependencies,onProgress:p=>warmProgress.push(p)});
   assert.ok(warmProgress.some(p=>p.phase==="preparing"&&p.succeeded===1));
+  assert.ok(warmProgress.some(p=>p.files?.every(file=>file.reused && !file.downloaded)));
   assert.equal(left.status, "complete");
   assert.equal(right.status, "complete");
   assert.deepEqual(h.calls.downloads, [parallel.id]);

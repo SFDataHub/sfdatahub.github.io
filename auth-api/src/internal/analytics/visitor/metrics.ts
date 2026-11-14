@@ -1,7 +1,8 @@
+import { isVisitorContinuationPause } from "./continuationState";
 import { createHash, randomUUID } from "crypto";
 import { db } from "../../../firebase";
 import { fragmentEntries } from "../../../storage/fragments";
-import { assertAtomicSize, bundleId, digest, packBundles } from "../../../storage/bundles";
+import { assertAtomicSize, bundleId, digest, documentBytes, SAFE_DOCUMENT_BYTES, packBundles } from "../../../storage/bundles";
 
 export const METRIC_VERSION = 2;
 export const WEBSITE_VISIT_PATH = "sfdatahub/website-visit-v2";
@@ -31,10 +32,10 @@ export function berlinMidnight(day: string): string {
   const offsetMs = (Number(match[2]) * 60 + Number(match[3] ?? 0)) * 60000 * (match[1] === "+" ? 1 : -1);
   return new Date(utc - offsetMs).toISOString();
 }
-export type Hit = { path: string; path_id: number; event: boolean; count: number };
-export type FetchRange = (start: string, end: string) => Promise<Hit[]>;
+export type Hit = { path: string; path_id: number; event: boolean; count: number; title?: string };
+export type FetchRange = ((start: string, end: string) => Promise<Hit[]>) & { assertBudget?: () => void } & import("./continuationState").VisitorPublicationHooks;
 export type Metric = { today: number; total: number; dailyAverage: number; days: Array<{ day: string; count: number }> };
-export type MetricsConfig = { startDate: string | null; collectionStartDate: string | null; sessionsVerified: boolean; revision: string };
+export type MetricsConfig = { startDate: string | null; collectionStartDate: string | null; sessionsVerified: boolean; revision: string; legacyPublicClients?: boolean };
 export function parseConfig(data: FirebaseFirestore.DocumentData | undefined): MetricsConfig {
   return {
     startDate: validDay(data?.startDate) ? data!.startDate : null,
@@ -43,6 +44,7 @@ export function parseConfig(data: FirebaseFirestore.DocumentData | undefined): M
     collectionStartDate: data?.sessionsVerified === true && validDay(data?.startDate) ? data!.startDate : null,
     sessionsVerified: data?.sessionsVerified === true,
     revision: typeof data?.revision === "string" ? data.revision : "",
+    legacyPublicClients: data?.legacyPublicClients !== false,
   };
 }
 export function pathId(path: string): string { return createHash("sha256").update(path).digest("hex"); }
@@ -104,25 +106,47 @@ export async function buildMetrics(config: MetricsConfig, now: Date, fetchRange:
 export const liveRef = () => db.collection(PUBLIC_COLLECTION).doc("bundled");
 const compact = ({ today, total, dailyAverage }: Metric) => ({ today, total, dailyAverage });
 
-/** Stable size-bounded bundles; manifest hashes replace private page indexes. */
+// Compare evaluation settings only, never mutable coordination fields.
+export const settingsHash = (data: FirebaseFirestore.DocumentData | undefined) => digest({
+  ...parseConfig(data), collectionTrackingStartedAt: data?.collectionTrackingStartedAt ?? null,
+});
+const legacyFence = { id: "config-document-v1", until: Number.MAX_SAFE_INTEGER };
+
+/** Inline small snapshots, retain stable addressed bundles for larger histories. */
 export async function publishMetrics(fetchRange: FetchRange, now = new Date()) {
-  const leaseRef = db.collection("analytics").doc("visitor_sync_lease");
+  const legacyLeaseRef = db.collection("analytics").doc("visitor_sync_lease");
   const leaseId = randomUUID();
   const acquired = await db.runTransaction(async tx => {
-    const [lease, configDoc, current] = await Promise.all([tx.get(leaseRef), tx.get(configRef()), tx.get(liveRef())]);
-    const config = parseConfig(configDoc.data());
-    const previous = current.data();
-    if ((lease.data()?.until ?? 0) > now.getTime()) return null;
-    if (previous?.complete === true && previous?.schemaVersion === 4 && previous?.configRevision === config.revision && previous?.effectiveStartDate === config.startDate && Math.floor(Date.parse(previous.asOf) / 3600000) === Math.floor(now.getTime() / 3600000)) return null;
-    tx.set(leaseRef, { id: leaseId, until: now.getTime() + 240000 });
-    return { config, previous, sequence: (previous?.sequence ?? 0) + 1 };
+    const [configDoc, current] = await Promise.all([tx.get(configRef()), tx.get(liveRef())]);
+    const document = configDoc.data() ?? {}, config = parseConfig(document), previous = current.data();
+    const migrated = document.syncLease?.version === 1;
+    const lease = migrated ? document.syncLease : (await tx.get(legacyLeaseRef)).data() ?? {};
+    // An old settings handler used replace-set and may erase our coordination.
+    // Never steal an unprovable active owner after such a mixed-version write.
+    if (!migrated && lease.id === legacyFence.id) throw new Error("Visitor coordination removed; stop old configuration writers before restoring the shared lease");
+    const work = document.visitorWork;
+    if (work && work.owner !== fetchRange.workOwner && (work.until > Date.now() || work.state === "pending" && work.configSettingsHash === settingsHash(document)))
+      return { skipped: true as const, reason: "busy" as const, asOf: previous?.asOf ?? null };
+    if ((lease.until ?? 0) > Date.now()) return { skipped: true as const, reason: "busy" as const, asOf: previous?.asOf ?? null };
+    if (Date.parse(previous?.asOf) > now.getTime()) return { skipped: true as const, reason: "current" as const, asOf: previous?.asOf };
+    const skipped = previous?.complete === true && previous?.storageVersion === 1 && previous?.lastRefresh?.state !== "error" &&
+      previous?.configSettingsHash === settingsHash(document) &&
+      Math.floor(Date.parse(previous.asOf) / 3600000) >= Math.floor(now.getTime() / 3600000);
+    if (!migrated || !skipped) {
+      const shared = { version: 1, id: skipped ? "" : leaseId, until: skipped ? 0 : Date.now() + 240000 };
+      assertAtomicSize([{ path: configRef().path, value: { ...document, syncLease: shared } },
+        ...(!migrated ? [{ path: legacyLeaseRef.path, value: legacyFence }] : [])]);
+      if (!migrated) tx.set(legacyLeaseRef, legacyFence);
+      tx.set(configRef(), { syncLease: shared }, { merge: true });
+    }
+    return skipped ? { skipped: true as const, reason: "current" as const, asOf: previous.asOf }
+      : { skipped: false as const, config, previous, sequence: (previous?.sequence ?? 0) + 1, settings: settingsHash(document) };
   });
-  if (!acquired) return { skipped: true };
-  let committed = false;
+  if (acquired.skipped) return acquired;
+  let committed = false, paused = false;
   try {
     const { config, previous, sequence } = acquired;
     const { manifest, pages } = await buildMetrics(config, now, fetchRange);
-    if (pages.size > 20000) throw new Error("Visitor snapshot exceeds 20000 paths; previous snapshot retained");
     const dayCount = manifest.website?.days.length ?? 0;
     const basis = JSON.stringify([manifest.state, manifest.effectiveStartDate, manifest.today, dayCount]);
     const entries: Record<string, unknown> = {};
@@ -135,28 +159,58 @@ export async function publishMetrics(fetchRange: FetchRange, now = new Date()) {
     const bundles = packed.leaves.map(prefix => ({ prefix, hash: digest(packed.documents.get(bundleId(prefix))) }));
     const fragments = [...prepared.fragments].map(([id, value]) => ({ id, hash: digest(value) }));
     const oldFragments = (previous?.fragments ?? []) as Array<{ id: string; hash: string }>;
-    const snapshot = { ...manifest, schemaVersion: 4, generation: "bundled", sequence, basis, bundles, fragments,
-      dayCount, website: manifest.website ? compact(manifest.website) : null, pathCount: pages.size, complete: true };
-    const writes = bundles.filter(bundle => oldBundles.find(old => old.prefix === bundle.prefix)?.hash !== bundle.hash)
+    // During rollout schema-4 clients still need their addressed page bundles.
+    // Admin can retire that bridge explicitly after old clients/backends stop.
+    const compatibility = config.legacyPublicClients !== false;
+    const base = { ...manifest, schemaVersion: compatibility ? 4 : 5, storageVersion: 1,
+      generation: "bundled", sequence, basis, fragments, dayCount, configSettingsHash: acquired.settings,
+      lastRefresh: { state: "ok", attemptedAt: now.toISOString() },
+      website: manifest.website ? compact(manifest.website) : null, pathCount: pages.size, complete: true };
+    const inline = { ...base, bundles: compatibility ? bundles : [], inlineEntries: prepared.entries };
+    const fitsInline = documentBytes(liveRef().path, inline) <= SAFE_DOCUMENT_BYTES;
+    const snapshot = fitsInline ? inline : { ...base, bundles };
+    const externalBundles = compatibility || !fitsInline ? bundles : [];
+    const writes = externalBundles.filter(bundle => oldBundles.find(old => old.prefix === bundle.prefix)?.hash !== bundle.hash)
       .map(bundle => ({ ref: pageCollection.doc(bundleId(bundle.prefix)), value: packed.documents.get(bundleId(bundle.prefix))! }));
     for (const fragment of fragments) if (oldFragments.find(old => old.id === fragment.id)?.hash !== fragment.hash) {
       writes.push({ ref: pageCollection.doc(fragment.id), value: prepared.fragments.get(fragment.id)! });
     }
     assertAtomicSize([...writes.map(write => ({ path: write.ref.path, value: write.value })), { path: liveRef().path, value: snapshot }]);
+    const progress = fetchRange.preparePublication?.();
     const operations = await db.runTransaction(async tx => {
-      const [latest, lease] = await Promise.all([tx.get(configRef()), tx.get(leaseRef)]);
-      if (JSON.stringify(parseConfig(latest.data())) !== JSON.stringify(config) || lease.data()?.id !== leaseId || lease.data()?.until < Date.now()) throw new Error("Visitor configuration or sync lease changed; previous snapshot retained");
+      const latest = (await tx.get(configRef())).data(), lease = latest?.syncLease;
+      fetchRange.assertBudget?.();
+      fetchRange.assertCurrent?.(latest);
+      if (settingsHash(latest) !== acquired.settings || lease?.id !== leaseId || !(lease?.until > Date.now())) throw new Error("Visitor configuration or sync lease changed; previous snapshot retained");
+      const configPatch = { syncLease: { version: 1, id: "", until: 0 }, ...progress?.configPatch };
+      assertAtomicSize([...writes.map(write => ({ path: write.ref.path, value: write.value })),
+        ...(progress?.writes ?? []).map(write => ({ path: write.ref.path, value: write.value })),
+        { path: liveRef().path, value: snapshot }, { path: configRef().path, value: { ...latest, ...configPatch } }]);
       for (const { ref, value } of writes) tx.set(ref, value);
       tx.set(liveRef(), snapshot);
-      tx.set(leaseRef, { id: "", until: 0 });
+      for (const write of progress?.writes ?? []) tx.set(write.ref, write.value);
+      tx.set(configRef(), configPatch, { merge: true });
       return { pageWrites: writes.length, pageDeletes: 0, indexWrites: 0 };
     });
     committed = true;
-    return { skipped: false, generation: "bundled", sequence, state: manifest.state, pathCount: pages.size, ...operations };
+    progress?.committed();
+    return { skipped: false, generation: "bundled", sequence, state: manifest.state, asOf: manifest.asOf, pathCount: pages.size, ...operations };
+  } catch (error) {
+    paused = isVisitorContinuationPause(error);
+    throw error;
   } finally {
     if (!committed) await db.runTransaction(async tx => {
-      const lease = await tx.get(leaseRef);
-      if (lease.data()?.id === leaseId) tx.set(leaseRef, { id: "", until: 0 });
+      const latest = (await tx.get(configRef())).data(), lease = latest?.syncLease;
+      if (lease?.id !== leaseId) return;
+      // A superseded/expired attempt must never change a newer result.
+      if (!paused && lease.until > Date.now() && settingsHash(latest) === acquired.settings) {
+        const lastRefresh = { state: "error", attemptedAt: now.toISOString(), code: "refresh_failed" };
+        try {
+          assertAtomicSize([{ path: liveRef().path, value: { ...acquired.previous, lastRefresh } }]);
+          tx.set(liveRef(), { lastRefresh }, { merge: true });
+        } catch { /* Keep a full valid public document intact. */ }
+      }
+      tx.set(configRef(), { syncLease: { version: 1, id: "", until: 0 } }, { merge: true });
     });
   }
 }

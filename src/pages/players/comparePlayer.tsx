@@ -1,25 +1,7 @@
 import React from "react";
 import ContentShell from "../../components/ContentShell";
-import {
-  collectionGroup,
-  endAt,
-  getDocs,
-  limit,
-  orderBy,
-  query as fsQuery,
-  startAt,
-  where,
-} from "firebase/firestore";
-import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
-import { db } from "../../lib/firebase";
-import {
-  beginReadScope,
-  endReadScope,
-  traceGetDocs,
-  type FirestoreTraceScope,
-} from "../../lib/debug/firestoreReadTrace";
 import styles from "../GuildHub/Fusion.module.css";
 import {
   type FreshnessCode,
@@ -335,21 +317,10 @@ function PlayerSelectionCard({
   title,
   slot,
   selectedPlayer,
-  excludeId,
-  onSelect,
   onClear,
   serverFilter,
   onServerChange,
 }: PlayerSelectionCardProps) {
-  const [searchValue, setSearchValue] = React.useState("");
-  const debouncedSearch = useDebouncedValue(searchValue, 300);
-
-  React.useEffect(() => {
-    setSearchValue("");
-  }, [selectedPlayer, serverFilter]);
-
-  const { results, loading } = usePlayerSearchResults(debouncedSearch, serverFilter, excludeId);
-
   return (
     <article className={styles.selectionCard}>
       <div className={styles.slotHeader}>
@@ -388,34 +359,12 @@ function PlayerSelectionCard({
           <input
             className={styles.searchInput}
             placeholder="Spielernamen eingeben"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
+              disabled
           />
         </label>
 
-        <div className={styles.resultList} role="list">
-          {loading && <div className={styles.emptyResult}>Lade...</div>}
-          {!loading && results.length === 0 && (
-            <div className={styles.emptyResult}>Kein Spieler gefunden.</div>
-          )}
-          {!loading &&
-            results.map((player) => (
-              <div key={player.id} className={styles.resultItem}>
-                <div>
-                  <p className={styles.resultName}>{player.name}</p>
-                  <p className={styles.resultMeta}>
-                    {player.server} - Level {player.level} - {player.className}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className={styles.selectButton}
-                  onClick={() => onSelect(slot, player)}
-                >
-                  Waehlen
-                </button>
-              </div>
-            ))}
+        <div className={styles.emptyResult} role="status">
+          Datenanbindung vorübergehend nicht verfügbar. Die lokale Anbindung folgt später.
         </div>
 
         {selectedPlayer && (
@@ -622,152 +571,3 @@ function TransfersPlaceholder() {
   );
 }
 
-function usePlayerSearchResults(term: string, server: string, excludeId?: string | null) {
-  const [results, setResults] = React.useState<PlayerSummary[]>([]);
-  const [loading, setLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    const q = term.trim();
-    if (q.length === 0) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function run() {
-      const scope: FirestoreTraceScope = beginReadScope("PlayersCompare:search");
-      setLoading(true);
-      try {
-        const folded = q.toLowerCase();
-        const cg = collectionGroup(db, "latest");
-
-        const snapPrefix = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
-          getDocs(
-            fsQuery(
-              cg,
-              orderBy("nameFold"),
-              startAt(folded),
-              endAt(folded + "\uf8ff"),
-              limit(15),
-            ),
-          ),
-        );
-        const snapNgram = await traceGetDocs(scope, { path: "players/latest (collectionGroup)" }, () =>
-          getDocs(fsQuery(cg, where("nameNgrams", "array-contains", folded), limit(15))),
-        );
-
-        const seen = new Set<string>();
-        const next: PlayerSummary[] = [];
-        const consider = (docSnap: any) => {
-          const data = docSnap.data() as any;
-          const ref = docSnap.ref;
-          const parentDoc = ref.parent?.parent;
-          const rootCol = parentDoc?.parent;
-          const root = rootCol?.id;
-          if (root !== "players") return;
-          const id = parentDoc?.id ?? data.playerIdentifier ?? docSnap.id;
-          if (!id || seen.has(id)) return;
-          if (excludeId && id === excludeId) return;
-
-          const name = data.name ?? data.values?.Name ?? "Unbekannter Spieler";
-          const serverVal = data.server ?? data.values?.Server ?? "Unknown";
-          if (server !== "all" && serverVal !== server) return;
-
-          const className = data.className ?? data.values?.Class ?? data.values?.["Class"] ?? "Unbekannte Klasse";
-          const guildName = data.guildName ?? data.values?.Guild ?? "";
-          const level =
-            toPlayerNumber(data.level) ||
-            toPlayerNumber(data.values?.Level) ||
-            toPlayerNumber(data.values?.["Level"]);
-          const scrapbookPct =
-            toPlayerNumber(data.scrapbookPct) ||
-            toPlayerNumber(data.values?.["Album %"]) ||
-            toPlayerNumber(data.values?.AlbumPct) ||
-            toPlayerNumber(data.values?.["Scrapbook %"]);
-          const updated =
-            data.updatedAt ??
-            data.values?.UpdatedAt ??
-            (data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString());
-          const nextUpdate = data.nextUpdateAt ?? hoursFromNowISO(12);
-          const stats = buildPlayerStatSlices(data.values ?? data.stats);
-
-          seen.add(id);
-          next.push({
-            id,
-            name,
-            tagline: data.tagline ?? (guildName ? `Mitglied in ${guildName}` : className),
-            server: serverVal,
-            className,
-            guildName,
-            level: level || 0,
-            scrapbookPct,
-            lastScanAt: updated,
-            updatedAt: updated,
-            nextUpdateAt: nextUpdate,
-            freshness: (data.freshness as FreshnessCode) ?? "unknown",
-            stats,
-          });
-        };
-
-        snapPrefix.forEach(consider);
-        snapNgram.forEach(consider);
-
-        if (!cancelled) {
-          next.sort((a, b) => a.name.localeCompare(b.name));
-          setResults(next);
-        }
-      } catch (error) {
-        console.error("[Players Compare] player search failed", error);
-        if (!cancelled) setResults([]);
-      } finally {
-        endReadScope(scope);
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [term, server, excludeId]);
-
-  return { results, loading };
-}
-
-const STAT_LABELS: Record<string, string> = {
-  Strength: "Staerke",
-  Dexterity: "Geschick",
-  Intelligence: "Intelligenz",
-  Constitution: "Ausdauer",
-};
-
-function buildPlayerStatSlices(values: Record<string, any> = {}): PlayerStatSlice[] {
-  const entries = Object.keys(STAT_LABELS)
-    .map((key) => {
-      const raw = values?.[key] ?? values?.[key.toLowerCase()];
-      return { label: STAT_LABELS[key], value: toPlayerNumber(raw) };
-    })
-    .filter((entry) => entry.value > 0);
-
-  const total = entries.reduce((sum, entry) => sum + entry.value, 0);
-  if (!total) return [];
-
-  return entries.map((entry) => ({
-    label: entry.label,
-    percent: Math.max(1, Math.round((entry.value / total) * 100)),
-  }));
-}
-
-function toPlayerNumber(value: unknown) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : 0;
-}
-
-
-function hoursFromNowISO(hours: number) {
-  const date = new Date();
-  date.setHours(date.getHours() + hours);
-  return date.toISOString();
-}

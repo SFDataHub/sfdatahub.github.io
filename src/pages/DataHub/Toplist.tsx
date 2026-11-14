@@ -1919,7 +1919,7 @@ function GuildHubToplistInner() {
               onPlayerAvgModeChange={handlePlayerValueModeChange}
               onOpenPlayerProfile={handleOpenProfile}
               onOpenGuildProfile={handlePlayerGuildProfile}
-              renderFirestoreProfileOverlay={false}
+
             />
           ) : (
             <GuildToplists
@@ -1934,7 +1934,7 @@ function GuildHubToplistInner() {
               renderMode="live"
               presetReadOnlyData={guildReadOnlyData}
               onAvgModeChange={handleGuildValueModeChange}
-              renderFirestoreGuildOverlay={false}
+
               onOpenGuildProfile={handleGuildProfile}
               focusIdentifier={guildFocusTarget?.identifier ?? null}
               focusNonce={guildFocusTarget?.nonce ?? null}
@@ -2001,7 +2001,7 @@ function GuildHubToplistInner() {
                     presetAmount={amount}
                     onCaptureStatusChange={onCaptureStatusChange}
                     presetReadOnlyData={snapshot.presetReadOnlyData}
-                    renderFirestoreProfileOverlay={false}
+
                   />
                 );
               }
@@ -2017,7 +2017,7 @@ function GuildHubToplistInner() {
                   presetAmount={amount}
                   onCaptureStatusChange={onCaptureStatusChange}
                   presetReadOnlyData={snapshot.presetReadOnlyData}
-                  renderFirestoreGuildOverlay={false}
+
                 />
               );
             }}

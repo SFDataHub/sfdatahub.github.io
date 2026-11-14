@@ -6,11 +6,19 @@ import request from "supertest";
 
 const storedPage = (path: string): any => {
   const id = pathId(path), manifest = state.store.get("visitor_metrics_public/bundled");
+  if (manifest.inlineEntries !== undefined) return manifest.inlineEntries[id];
   const prefix = manifest.bundles.find((bundle: any) => hashBits(id).startsWith(bundle.prefix)).prefix;
   return state.store.get("visitor_metrics_public/bundled/pages/b_" + (prefix || "root")).entries[id];
 };
 const state = vi.hoisted(() => ({ store: new Map<string, any>(), writes: [] as string[], reads: [] as string[], deletes: [] as string[], failCommit: false }));
 vi.mock("../../../firebase", () => {
+  function merge(target: any, patch: any): any {
+    const result = { ...target };
+    for (const [key, value] of Object.entries(patch)) result[key] = value && typeof value === "object" && !Array.isArray(value)
+      ? merge(result[key], value) : structuredClone(value);
+    return result;
+  }
+  let queue = Promise.resolve();
   const ref = (path: string): any => ({
     path, id: path.split("/").at(-1), collection: (name: string) => collection(path + "/" + name),
     get: async () => { state.reads.push(path); return { exists: state.store.has(path), data: () => state.store.get(path) }; },
@@ -26,16 +34,18 @@ vi.mock("../../../firebase", () => {
   });
   return { admin: { firestore: { FieldValue: { serverTimestamp: () => null } } }, db: {
     collection,
-    runTransaction: async (work: any) => {
+    runTransaction: (work: any) => {
+      const operation = queue.then(async () => {
       const pending: Array<() => void> = [];
       let publishing = false;
-      const result = await work({ get: (r: any) => r.get(), set: (r: any, value: any) => {
-        publishing ||= r.path === "visitor_metrics_public/bundled";
-        pending.push(() => { state.writes.push(r.path); state.store.set(r.path, value); });
+      const result = await work({ get: (r: any) => r.get(), set: (r: any, value: any, options: any) => {
+        publishing ||= r.path === "visitor_metrics_public/bundled" && !options?.merge;
+        pending.push(() => { state.writes.push(r.path); state.store.set(r.path, options?.merge ? merge(state.store.get(r.path), value) : structuredClone(value)); });
       }, delete: (r: any) => pending.push(() => { state.deletes.push(r.path); state.store.delete(r.path); }) });
       if (publishing && state.failCommit) throw Error("Commit interrupted");
       for (const write of pending) write();
       return result;
+      }); queue = operation.catch(() => {}); return operation;
     },
   } };
 });
@@ -115,13 +125,14 @@ describe("Public visitor metric contract", () => {
     expect(storedPage("/help")).toMatchObject({ today: 9, total: 9, dailyAverage: 9 / days });
     expect(read.mock.calls[0][0]).toBe(berlinMidnight(startDate));
     expect(read.mock.calls.at(-1)).toEqual([berlinMidnight("2026-11-08"), now.toISOString()]);
-    expect(await publishMetrics(read, now)).toEqual({ skipped: true });
+    expect(await publishMetrics(read, now)).toMatchObject({ skipped: true });
     expect(read).toHaveBeenCalledTimes(days);
     const saved = await request(app).put("/visitor/config").set("Cookie", cookie).send({ startDate, sessionsVerified: true });
     expect(saved.status).toBe(200);
     expect(saved.body).toMatchObject({ startDate, collectionStartDate: startDate, sessionsVerified: true });
     expect(saved.body.revision).not.toBe(legacy.revision);
-    expect(state.store.get("analytics/visitor_config")).toEqual(saved.body);
+    const {syncLease: _lease, ...storedConfig} = state.store.get("analytics/visitor_config");
+    expect(storedConfig).toEqual(saved.body);
     // Saving alone publishes nothing; the next job sees the new revision.
     expect(state.store.get("visitor_metrics_public/bundled")).toEqual(first);
     const next = await publishMetrics(read, now);
@@ -145,16 +156,16 @@ describe("Public visitor metric contract", () => {
   it("publishes arbitrary profile paths atomically and retains the previous snapshot on failure", async () => {
     const now = new Date();
     const today = berlinDay(now);
-    state.store.set("analytics/visitor_config", { ...config, startDate: today, collectionStartDate: today });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: today, collectionStartDate: today });
     const many = Array.from({ length: 35 }, (_, i) => page("/player/profile-" + i, i + 1, i + 1));
     const result = await publishMetrics(async () => [hit(WEBSITE_VISIT_PATH, 2, true, 99), ...many], now);
     const manifest = state.store.get("visitor_metrics_public/bundled");
     expect(manifest.website.total).toBe(2); expect(manifest.pathCount).toBe(35);
     expect(storedPage("/player/profile-34").total).toBe(35);
     expect(state.writes.indexOf("visitor_metrics_public/bundled")).toBeGreaterThan(state.writes.findIndex(path => path.includes("/pages/")));
-    expect(await publishMetrics(async () => { throw Error("Must not query twice"); }, now)).toEqual({ skipped: true });
+    expect(await publishMetrics(async () => { throw Error("Must not query twice"); }, now)).toMatchObject({ skipped: true });
     await expect(publishMetrics(async () => { throw Error("Upstream failed"); }, new Date(now.getTime() + 3600001))).rejects.toThrow("Upstream failed");
-    expect(state.store.get("visitor_metrics_public/bundled")).toEqual(manifest);
+    expect({ ...state.store.get("visitor_metrics_public/bundled"), lastRefresh: manifest.lastRefresh }).toEqual(manifest);
   });
   it.each([
     ["2026-11-08T19:00:22+01:00", "2026-11-08T20:00:17+01:00"],
@@ -164,7 +175,7 @@ describe("Public visitor metric contract", () => {
   ])("publishes the new absolute hour from %s to %s, then reuses that hour", async (before, after) => {
     const firstTime = new Date(before), nextTime = new Date(after);
     const startDate = berlinDay(firstTime);
-    state.store.set("analytics/visitor_config", { ...config, startDate });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate });
     const clock = vi.spyOn(Date, "now").mockReturnValue(firstTime.getTime());
     const read = vi.fn(async () => [hit(WEBSITE_VISIT_PATH, 4, true), page("/help", 9)]);
     await publishMetrics(read, firstTime);
@@ -176,44 +187,44 @@ describe("Public visitor metric contract", () => {
     expect(next.asOf).toBe(nextTime.toISOString());
     const repeated = new Date(Math.floor(nextTime.getTime() / 3600000) * 3600000 + 59 * 60000);
     clock.mockReturnValue(repeated.getTime());
-    expect(await publishMetrics(read, repeated)).toEqual({ skipped: true });
+    expect(await publishMetrics(read, repeated)).toMatchObject({ skipped: true });
     expect(read).toHaveBeenCalledTimes(2);
     // A saved configuration must still invalidate an otherwise current hour.
-    state.store.set("analytics/visitor_config", { ...config, startDate, revision: "changed" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate, revision: "changed" });
     expect(await publishMetrics(read, repeated)).toMatchObject({ skipped: false });
     expect(read).toHaveBeenCalledTimes(3);
   });
   it("keeps the lease and the last complete generation through overlapping and failed publications", async () => {
     const now = new Date("2026-11-08T19:00:17Z");
     vi.spyOn(Date, "now").mockReturnValue(now.getTime());
-    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-08" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: "2026-11-08" });
     const previous = { sequence: 7, generation: "bundled", asOf: "2026-11-08T18:00:22Z", complete: true };
     state.store.set("visitor_metrics_public/bundled", previous);
     let release!: () => void;
     const wait = new Promise<void>(resolve => { release = resolve; });
     const first = publishMetrics(async () => { await wait; throw Error("Provider failed"); }, now);
     // Let the first transaction acquire its lease before the second caller.
-    await vi.waitFor(() => expect(state.store.has("analytics/visitor_sync_lease")).toBe(true));
+    await vi.waitFor(() => expect(state.store.get("analytics/visitor_config")?.syncLease?.id).toBeTruthy());
     const read = vi.fn(async () => []);
-    expect(await publishMetrics(read, now)).toEqual({ skipped: true });
+    expect(await publishMetrics(read, now)).toMatchObject({ skipped: true });
     expect(read).not.toHaveBeenCalled();
     release();
     await expect(first).rejects.toThrow("Provider failed");
-    expect(state.store.get("visitor_metrics_public/bundled")).toEqual(previous);
-    expect(state.store.get("analytics/visitor_sync_lease").until).toBe(0);
+    expect(Object.fromEntries(Object.entries(state.store.get("visitor_metrics_public/bundled")).filter(([key]) => key !== "lastRefresh"))).toEqual(previous);
+    expect(state.store.get("analytics/visitor_config").syncLease.until).toBe(0);
     // A config change during construction must not publish staged page documents.
     await expect(publishMetrics(async () => {
-      state.store.set("analytics/visitor_config", { ...config, revision: "changed-during-build" });
+      state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, revision: "changed-during-build" });
       return [page("/help", 9)];
     }, now)).rejects.toThrow("configuration or sync lease changed");
     expect(state.writes.some(path => path.includes("/pages/"))).toBe(false);
-    expect(state.store.get("visitor_metrics_public/bundled")).toEqual(previous);
+    expect(Object.fromEntries(Object.entries(state.store.get("visitor_metrics_public/bundled")).filter(([key]) => key !== "lastRefresh"))).toEqual(previous);
     expect(await publishMetrics(read, now)).toMatchObject({ skipped: false });
   });
   it("measures current-only document operations for 125 paths, unchanged, changed and new paths", async () => {
     const now = new Date("2026-11-12T10:00:00Z");
     const clock = vi.spyOn(Date, "now").mockReturnValue(now.getTime());
-    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-12" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: "2026-11-12" });
     const frozenLive = {schemaVersion: 3, complete: true, marker: "unchanged-W279"};
     state.store.set("visitor_metrics_public/live", frozenLive);
     const legacy = { generation: "legacy", complete: true, website: { total: 99 } };
@@ -230,7 +241,8 @@ describe("Public visitor metric contract", () => {
       ledger[label] = counts;
       expect(result.pageWrites).toBe(label === "unchanged" ? 0 : 1);
       expect(counts.deletes).toBe(0);
-      expect(counts.writes).toBe(label === "unchanged" ? 3 : 4);
+      expect(counts.writes).toBe(label === "initial" ? 5 : label === "unchanged" ? 3 : 4);
+      expect(counts.reads).toBe(label === "initial" ? 4 : 3);
       expect(state.store.get("visitor_metrics_public/current")).toEqual(legacy);
       expect(state.store.get("visitor_metrics_public/live")).toEqual(frozenLive);
       expect(state.writes.some(path => /^visitor_metrics_public\/(?!bundled)/.test(path))).toBe(false);
@@ -242,24 +254,25 @@ describe("Public visitor metric contract", () => {
   it("preserves the complete public/index state on commit failure, then handles day/start/removal", async () => {
     const now = new Date("2026-11-12T22:00:00Z");
     const clock = vi.spyOn(Date, "now").mockReturnValue(now.getTime());
-    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-12" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: "2026-11-12" });
     await publishMetrics(async () => [page("/help", 4)], now);
-    const before = JSON.stringify([...state.store].filter(([key]) => key !== "analytics/visitor_sync_lease"));
+    const contents = () => JSON.stringify([...state.store].filter(([key]) => key !== "analytics/visitor_sync_lease").map(([key, value]) => [key, key === "visitor_metrics_public/bundled" ? { ...value, lastRefresh: null } : value]));
+    const before = contents();
     state.failCommit = true;
     const midnight = new Date("2026-11-12T23:00:00Z"); clock.mockReturnValue(midnight.getTime());
     await expect(publishMetrics(async () => [page("/help", 8)], midnight)).rejects.toThrow("Commit interrupted");
-    expect(JSON.stringify([...state.store].filter(([key]) => key !== "analytics/visitor_sync_lease"))).toBe(before);
+    expect(contents()).toBe(before);
     state.failCommit = false;
     await publishMetrics(async () => [page("/help", 8)], midnight);
     expect(state.store.get("visitor_metrics_public/bundled")).toMatchObject({ today: "2026-11-13", dayCount: 2 });
-    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-13", revision: "new" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: "2026-11-13", revision: "new" });
     const result = await publishMetrics(async () => [], midnight);
     expect(result.pageDeletes).toBe(0);
     expect(state.store.get("visitor_metrics_public/bundled")).toMatchObject({ dayCount: 1, pathCount: 0, effectiveStartDate: "2026-11-13" });
   });
   it("measures 512 KiB overflow and lossless oversized single-entry publication", async () => {
     const now = new Date("2026-11-12T10:00:00Z"), clock = vi.spyOn(Date, "now").mockReturnValue(now.getTime());
-    state.store.set("analytics/visitor_config", { ...config, startDate: "2026-11-12" });
+    state.store.set("analytics/visitor_config", { ...state.store.get("analytics/visitor_config"), ...config, startDate: "2026-11-12" });
     const hugePath = "/player/" + "x".repeat(630000);
     const rows = Array.from({ length: 4000 }, (_, i) => page("/player/p" + i, i + 1));
     rows.push(page(hugePath, 7));
@@ -333,5 +346,117 @@ describe("Public visitor metric contract", () => {
     expect(changed.body.revision).not.toBe(saved.body.revision);
     expect(parseConfig(state.store.get("analytics/visitor_config")).startDate).toBe("2027-01-01");
     expect(state.store.has("analytics/visitor_analytics")).toBe(false);
+  });
+});
+
+
+describe("combined public metrics and private coordination", () => {
+  const cfgPath = "analytics/visitor_config", rootPath = "visitor_metrics_public/bundled", legacyPath = "analytics/visitor_sync_lease";
+  const start = new Date("2026-11-14T10:00:00Z");
+  const resetLedger = () => { state.reads.length = state.writes.length = state.deletes.length = 0; };
+  function configure(compatibility = false) {
+    state.store.set(cfgPath, {...config,startDate:"2026-11-14",collectionTrackingStartedAt:"2026-11-12T10:00:00Z",legacyPublicClients:compatibility,unrelated:{keep:true}});
+    return vi.spyOn(Date,"now").mockReturnValue(start.getTime());
+  }
+  it("inlines a complete small snapshot and measures its hourly publications without page-bundle writes", async () => {
+    const clock = configure();
+    const rows = [hit(WEBSITE_VISIT_PATH,32,true),page("/help",301),page("/player/separate-a",2),page("/player/separate-b",5)];
+    const ledger: Record<string,unknown> = {};
+    for (const [index,label] of ["initial","unchanged","changed"].entries()) {
+      clock.mockReturnValue(start.getTime()+index*3600000);
+      if(label==="changed")rows[1]=page("/help",302);
+      resetLedger(); await publishMetrics(async()=>rows,new Date(Date.now()));
+      const snapshot=state.store.get(rootPath);
+      ledger[label]={reads:state.reads.length,writes:state.writes.length,deletes:state.deletes.length,pageWrites:state.writes.filter(path=>path.includes("/pages/")).length};
+      expect(snapshot).toMatchObject({schemaVersion:5,storageVersion:1,website:{today:32,total:32,dailyAverage:32},pathCount:3,bundles:[]});
+      expect(Object.keys(snapshot.inlineEntries)).toHaveLength(3);
+      expect(storedPage("/help").total).toBe(label==="changed"?302:301);
+      expect(snapshot).not.toHaveProperty("syncLease");expect(snapshot).not.toHaveProperty("collectionTrackingStartedAt");
+      expect(state.store.get(cfgPath)).toMatchObject({startDate:"2026-11-14",collectionTrackingStartedAt:"2026-11-12T10:00:00Z",unrelated:{keep:true},syncLease:{version:1,id:"",until:0}});
+    }
+    resetLedger(); expect(await publishMetrics(async()=>{throw Error("unexpected provider call");},new Date(Date.now()))).toMatchObject({skipped:true});
+    ledger.sameHour={reads:state.reads.length,writes:state.writes.length,deletes:state.deletes.length};
+    expect(ledger).toEqual({initial:{reads:4,writes:4,deletes:0,pageWrites:0},unchanged:{reads:3,writes:3,deletes:0,pageWrites:0},changed:{reads:3,writes:3,deletes:0,pageWrites:0},sameHour:{reads:2,writes:0,deletes:0}});
+    console.log("SIMULATED_COMBINED_GOATCOUNTER_OPERATIONS "+JSON.stringify(ledger));
+  });
+  it("splits an oversized complete snapshot, retains every profile and rewrites only changed external leaves", async () => {
+    const clock=configure(); const {documentBytes,SAFE_DOCUMENT_BYTES}=await import("../../../storage/bundles");
+    const rows=Array.from({length:4000},(_,i)=>page("/player/separate-"+i,i+1));
+    let old:any; const ledger:Record<string,unknown>={};
+    for(const [index,label]of ["initial","unchanged","changed"].entries()){
+      clock.mockReturnValue(start.getTime()+index*3600000);if(label==="changed")rows[0]=page("/player/separate-0",20);
+      resetLedger();await publishMetrics(async()=>rows,new Date(Date.now()));const snapshot=state.store.get(rootPath);
+      expect(snapshot.schemaVersion).toBe(5);expect(snapshot.inlineEntries).toBeUndefined();expect(snapshot.bundles.length).toBeGreaterThan(1);
+      let entries=0;for(const descriptor of snapshot.bundles){const key=rootPath+"/pages/b_"+(descriptor.prefix||"root"),bundle=state.store.get(key);entries+=Object.keys(bundle.entries).length;expect(documentBytes(key,bundle)).toBeLessThanOrEqual(SAFE_DOCUMENT_BYTES);}
+      expect(entries).toBe(4000);expect(snapshot.pathCount).toBe(4000);expect(documentBytes(rootPath,snapshot)).toBeLessThanOrEqual(SAFE_DOCUMENT_BYTES);
+      expect(storedPage("/player/separate-3999").total).toBe(4000);
+      const pageWrites=state.writes.filter(path=>path.includes("/pages/")).length;
+      if(label==="unchanged")expect(pageWrites).toBe(0);if(label==="changed")expect(pageWrites).toBe(1);
+      if(old)expect(snapshot.bundles.map((b:any)=>b.prefix)).toEqual(old.bundles.map((b:any)=>b.prefix));
+      ledger[label]={reads:state.reads.length,writes:state.writes.length,deletes:state.deletes.length,pageWrites};old=structuredClone(snapshot);
+      expect(state.deletes).toEqual([]);
+    }
+    console.log("SIMULATED_COMBINED_GOATCOUNTER_OVERFLOW "+JSON.stringify(ledger));
+  });
+  it("maintains schema-4 bundles for open clients until the explicitly retired compatibility bridge", async () => {
+    const clock=configure(true);const {digest}=await import("../../../storage/bundles");
+    await publishMetrics(async()=>[page("/help",9)],start);
+    const previous=state.store.get(rootPath),descriptor=previous.bundles[0],bundle=state.store.get(rootPath+"/pages/b_root");
+    expect(previous.schemaVersion).toBe(4);expect(previous.inlineEntries[pathId("/help")].total).toBe(9);
+    expect(digest(bundle)).toBe(descriptor.hash);expect(bundle.entries[pathId("/help")].total).toBe(9);
+    clock.mockReturnValue(start.getTime()+3600000);resetLedger();await publishMetrics(async()=>[page("/help",10)],new Date(Date.now()));
+    expect(state.store.get(rootPath+"/pages/b_root").entries[pathId("/help")].total).toBe(10);
+    // Retiring old clients does not delete any of their stored documents.
+    state.store.get(cfgPath).legacyPublicClients=false;state.store.get(cfgPath).revision="retire-old-clients";
+    const frozen=structuredClone(state.store.get(rootPath+"/pages/b_root"));resetLedger();await publishMetrics(async()=>[page("/help",11)],new Date(Date.now()));
+    expect(state.store.get(rootPath)).toMatchObject({schemaVersion:5,bundles:[]});expect(storedPage("/help").total).toBe(11);
+    expect(state.store.get(rootPath+"/pages/b_root")).toEqual(frozen);expect(state.writes.some(path=>path.includes("/pages/"))).toBe(false);expect(state.deletes).toEqual([]);
+  });
+  it("preserves settings and an active shared lease through ordinary config saves and explicit tracking-date removal", async () => {
+    configure();const lease={version:1,id:"active-other-instance",until:Date.now()+240000};state.store.get(cfgPath).syncLease=lease;
+    const app=express();app.use(express.json(),cookieParser());app.use("/visitor",router);
+    const cookie=`sfdatahub_session=${createSessionToken({userId:"test",roles:["admin"]})}`;
+    const response=await request(app).put("/visitor/config").set("Cookie",cookie).send({startDate:"2026-11-14",sessionsVerified:true});
+    expect(response.status).toBe(200);expect(response.body).not.toHaveProperty("syncLease");expect(response.body.collectionTrackingStartedAt).toBe("2026-11-12T10:00:00.000Z");
+    expect(state.store.get(cfgPath)).toMatchObject({syncLease:lease,legacyPublicClients:false,unrelated:{keep:true}});
+    expect(await publishMetrics(async()=>{throw Error("must not fetch");},start)).toMatchObject({skipped:true});
+    const cleared=await request(app).put("/visitor/config").set("Cookie",cookie).send({startDate:"2026-11-14",sessionsVerified:true,collectionTrackingStartedAt:null});
+    expect(cleared.status).toBe(200);expect(state.store.get(cfgPath).collectionTrackingStartedAt).toBeUndefined();expect(state.store.get(cfgPath).syncLease).toEqual(lease);
+    const loaded=await request(app).get("/visitor/config").set("Cookie",cookie);expect(loaded.body).not.toHaveProperty("syncLease");
+  });
+  it.each(["lease-only","config","tracking-date","expired","replaced"])("validates %s during fetch without mistaking lease metadata for settings",async mode=>{
+    const clock=configure();await publishMetrics(async()=>[page("/help",1)],start);const previous=structuredClone(state.store.get(rootPath));
+    clock.mockReturnValue(start.getTime()+3600000);resetLedger();
+    const operation=publishMetrics(async()=>{
+      const data=state.store.get(cfgPath);
+      if(mode==="lease-only")data.syncLease.until+=100;
+      if(mode==="config")data.startDate="2026-11-13";
+      if(mode==="tracking-date")data.collectionTrackingStartedAt="2026-11-13T00:00:00Z";
+      if(mode==="expired")clock.mockReturnValue(Date.now()+240001);
+      if(mode==="replaced")data.syncLease={version:1,id:"replacement",until:Date.now()+480000};
+      return [page("/help",2)];
+    },new Date(Date.now()));
+    if(mode==="lease-only"){await expect(operation).resolves.toMatchObject({skipped:false});expect(storedPage("/help").total).toBe(2);}
+    else {await expect(operation).rejects.toThrow("configuration or sync lease changed");expect(state.store.get(rootPath)).toEqual(previous);expect(state.writes).not.toContain(rootPath);}
+    expect(state.store.get(cfgPath).syncLease.id).toBe(mode==="replaced"?"replacement":"");
+  });
+  it("blocks active legacy writers, takes expired leases and fails closed if an old config replacement erases coordination",async()=>{
+    configure();state.store.set(legacyPath,{id:"old-instance",until:Date.now()+1});
+    expect(await publishMetrics(async()=>{throw Error("must not fetch");},start)).toMatchObject({skipped:true});expect(state.writes).toEqual([]);
+    state.store.set(legacyPath,{id:"old-instance",until:Date.now()-1});await publishMetrics(async()=>[page("/help",1)],start);
+    expect(state.store.get(legacyPath)).toEqual({id:"config-document-v1",until:Number.MAX_SAFE_INTEGER});
+    const previous=structuredClone(state.store.get(rootPath));delete state.store.get(cfgPath).syncLease;resetLedger();
+    await expect(publishMetrics(async()=>[page("/help",2)],new Date(start.getTime()+3600000))).rejects.toThrow("coordination removed");
+    expect(state.store.get(rootPath)).toEqual(previous);expect(state.writes).toEqual([]);
+  });
+  it("keeps W298/W300/W301 dashboard website and private 800-KiB details available with public schema 5",async()=>{
+    configure();await publishMetrics(async()=>[hit(WEBSITE_VISIT_PATH,32,true),page("/help",301)],start);
+    const {readVisitorSnapshot,clearVisitorReadCache}=await import("./readSnapshot");clearVisitorReadCache();
+    const details={schemaVersion:2,updatedAtIso:start.toISOString(),totals:{today:{visits:42}},screenSizes:{asOf:start.toISOString()},collectionDisplays:{today:{count:3}},toolClicks:{today:{count:4}},eventUsage:{today:{count:5}}};
+    state.store.set("analytics/visitor_analytics",details);
+    const response=await readVisitorSnapshot(start);
+    expect(response.website).toMatchObject({state:"available",asOf:start.toISOString(),data:{schemaVersion:5,website:{today:32,total:32,dailyAverage:32}}});
+    expect(response.details.data).toEqual(details);expect(response.availability.screenSizes).toBe("per_window");
+    expect(state.store.get(rootPath)).not.toHaveProperty("screenSizes");expect(state.store.get(rootPath)).not.toHaveProperty("collectionDisplays");
   });
 });

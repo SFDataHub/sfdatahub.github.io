@@ -16,7 +16,6 @@ const secrets = {
   GOOGLE_CLIENT_SECRET: defineSecret("GOOGLE_CLIENT_SECRET"),
   DISCORD_NEWS_BOT_TOKEN: defineSecret("DISCORD_NEWS_BOT_TOKEN"),
   UPLOAD_INBOX_TOKEN: defineSecret("UPLOAD_INBOX_TOKEN"),
-  SCAN_UPLOAD_TOKEN: defineSecret("SCAN_UPLOAD_TOKEN"),
   TWITCH_CLIENT_SECRET: defineSecret("TWITCH_CLIENT_SECRET"),
   GOATCOUNTER_API_TOKEN: defineSecret("GOATCOUNTER_API_TOKEN"),
   YOUTUBE_API_KEY: defineSecret("YOUTUBE_API_KEY"),
@@ -31,8 +30,6 @@ const strings = {
   SESSION_COOKIE_DOMAIN: defineString("SESSION_COOKIE_DOMAIN"),
   GOOGLE_CLIENT_ID: defineString("GOOGLE_CLIENT_ID"),
   GOOGLE_LINK_REDIRECT_URI: defineString("GOOGLE_LINK_REDIRECT_URI"),
-  UPLOAD_INBOX_BUCKET: defineString("UPLOAD_INBOX_BUCKET"),
-  SCAN_UPLOAD_CSV_BUCKET: defineString("SCAN_UPLOAD_CSV_BUCKET"),
   TWITCH_CLIENT_ID: defineString("TWITCH_CLIENT_ID"),
   TWITCH_CHANNELS: defineString("TWITCH_CHANNELS"),
   YOUTUBE_SOURCES: defineString("YOUTUBE_SOURCES"),
@@ -140,13 +137,7 @@ const parseCorsOrigins = (value?: string): string[] => {
 export const DISCORD_NEWS_CORS_ORIGINS_LIST = parseCorsOrigins(DISCORD_NEWS_CORS_ORIGINS);
 export const FRONTEND_BASE_URL =
   readRuntimeValue("FRONTEND_BASE_URL", strings.FRONTEND_BASE_URL) ?? "http://localhost:5173";
-export const UPLOAD_INBOX_BUCKET = requireValue("UPLOAD_INBOX_BUCKET", strings.UPLOAD_INBOX_BUCKET);
 export const UPLOAD_INBOX_TOKEN = requireValue("UPLOAD_INBOX_TOKEN", secrets.UPLOAD_INBOX_TOKEN);
-export const SCAN_UPLOAD_CSV_BUCKET = requireValue(
-  "SCAN_UPLOAD_CSV_BUCKET",
-  strings.SCAN_UPLOAD_CSV_BUCKET,
-);
-export const SCAN_UPLOAD_TOKEN = requireValue("SCAN_UPLOAD_TOKEN", secrets.SCAN_UPLOAD_TOKEN);
 
 // Optionale Cookie-Domain: explizit oder aus FRONTEND_BASE_URL abgeleitet (kein Domain-Flag für localhost/127.*)
 const resolveCookieDomain = () => {

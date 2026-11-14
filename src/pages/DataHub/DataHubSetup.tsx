@@ -136,6 +136,19 @@ export default function DataHubSetup() {
   const displayedPlan = step === 4 ? confirmedPlan : plan;
   const unresolved = displayedPlan && (displayedPlan.missing.length > 0 || displayedPlan.failedYears.length > 0);
   const helpQuestion = step === 1 ? "local-pool" : step === 2 ? "select-servers" : step === 5 ? "identity-purpose" : "load-archive";
+  const current = progress.current;
+  const downloaded = current?.files.filter(file => file.downloaded).length ?? 0;
+  const reused = current?.files.filter(file => file.reused).length ?? 0;
+  const available = downloaded + reused;
+  const filesReady = !!current && available === current.totalFiles;
+  const activities = {
+    downloading: { active: current?.files.some(file => file.activity === "downloading"), done: filesReady },
+    checking: { active: current?.files.some(file => file.activity === "checking"),
+      done: filesReady && current.files.every(file => file.activity === "processing" || file.activity === "ready") },
+    processing: { active: current?.processing || current?.files.some(file => file.activity === "processing"), done: current?.status === "complete" },
+  };
+  const fileText = text("filesDownloaded", { number: hubNumber(downloaded), total: hubNumber(current?.totalFiles ?? 0) }) +
+    (reused ? ` · ${text("filesReused", { number: hubNumber(reused) })}` : "");
   return <>
     <div className={styles.entry}>
       <button type="button" ref={trigger} onClick={reopen} className={styles.entryButton} data-setup-open>{text("entry")}</button>
@@ -221,20 +234,29 @@ export default function DataHubSetup() {
           {step === 4 && <>
             <p>{text("selected")}: {selected}</p>
             <div className={styles.progressMeta}>
-              <span role="status" aria-live="polite">{text(running ? `phase.${progress.phase}` : stopped ? "stopped" : runError || progress.failed.length ? "failed" : "partial")}</span>
+              <span>{text("fullyPrepared")}</span>
               <span>{hubNumber(progress.complete.length)} / {hubNumber(progress.total)}</span>
             </div>
             <div className={styles.track} role="progressbar" aria-label={text("progress")} aria-valuemin={0} aria-valuemax={Math.max(1, progress.total)} aria-valuenow={progress.complete.length}
               aria-valuetext={text("prepared", { count: progress.complete.length, number: hubNumber(progress.complete.length), total: hubNumber(progress.total) })}>
               <div className={styles.trackFill} style={{ width: `${progress.total ? progress.complete.length / progress.total * 100 : 0}%` }} />
             </div>
-            <div className={styles.loadRows}>
-              {(["acquiring", "preparing", "composing"] as const).map((phase, index, phases) => <div key={phase} className={styles.loadRow}
-                data-active={running && phase === progress.phase} data-done={index < phases.indexOf(progress.phase)}>
-                <span className={styles.statusDot} aria-hidden="true" /><span>{text(`phase.${phase}`)}</span>
-              </div>)}
-            </div>
-            <p className={styles.summaryText} data-setup-progress>{text("prepared", { count: progress.complete.length, number: hubNumber(progress.complete.length), total: hubNumber(progress.total) })}</p>
+            {current && <div className={styles.scanDetail}>
+              <div className={styles.scanMeta}><span>{text("currentScan")}</span><strong>{current.server} · {hubDate(current.timestamp, { month: "long", year: "numeric", timeZone: "UTC" })}</strong></div>
+              <div className={styles.scanMeta}><span>{text("archiveFiles")}</span><span>{fileText}</span></div>
+              <div className={`${styles.track} ${styles.fileTrack}`} role="progressbar" aria-label={text("filesAvailable")}
+                aria-valuemin={0} aria-valuemax={current.totalFiles} aria-valuenow={available} aria-valuetext={fileText}>
+                <div className={styles.trackFill} style={{ width: `${available / current.totalFiles * 100}%` }} />
+              </div>
+              <div className={styles.loadRows}>
+                {(["downloading", "checking", "processing"] as const).map(activity => <div key={activity} className={styles.loadRow}
+                  data-active={running && activities[activity].active} data-done={activities[activity].done}>
+                  <span className={styles.statusDot} aria-hidden="true" /><span>{text(`activity.${activity}`)}</span>
+                </div>)}
+              </div>
+            </div>}
+            {!running && <p role="status" className={styles.summaryText}>{text(stopped ? "stopped" : runError || progress.failed.length ? "failed" : "partial")}</p>}
+            <p className={styles.summaryText} data-setup-progress>{text("countAfterProcessing")}</p>
             <p className={styles.summaryText}>{text("keepData")}</p>
             {!!progress.failed.length && <p role="alert" className={styles.warning}>{text("failedScans", { count: progress.failed.length, number: hubNumber(progress.failed.length) })}</p>}
             <div className={styles.actions}>

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ImageOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { YouTubeSnapshot } from "../../lib/creators/shared";
@@ -45,15 +45,25 @@ function relativeDate(date: string, locale: string) {
   const [unit, divisor]: [Intl.RelativeTimeFormatUnit, number] = Math.abs(seconds) >= 86400 ? ["day", 86400] : Math.abs(seconds) >= 3600 ? ["hour", 3600] : ["minute", 60];
   return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Math.round(seconds / divisor), unit);
 }
-export default function YouTubeCard({ snapshot }: { snapshot: YouTubeSnapshot }) {
+export function YouTubeCardFrame({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  return <section className={styles.card} aria-label={t("youtubeCard.title")}>
+    <h1 className={styles.brand}><span /><svg aria-hidden="true" viewBox="0 0 60 42"><rect width="60" height="42" rx="11" fill="#ff0033"/><path d="m24 11 18 10-18 10z" fill="white"/></svg>{t("youtubeCard.navigation")}<span /></h1>
+    {children}
+  </section>;
+}
+export default function YouTubeCard({ snapshot, onVideoActivate }: { snapshot: YouTubeSnapshot; onVideoActivate?: (channelId: string, videoId: string) => void }) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const listId = useId(), locale = i18n.resolvedLanguage || "en";
   const number = new Intl.NumberFormat(locale), dates = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
   const languages = new Intl.DisplayNames([locale], { type: "language" });
   const channels = [...snapshot.channels].sort((a, b) => (Date.parse(b.videos[0]?.publishedAt || "") || 0) - (Date.parse(a.videos[0]?.publishedAt || "") || 0) || a.id.localeCompare(b.id));
-  return <section className={styles.card} aria-label={t("youtubeCard.title")}>
-    <h1 className={styles.brand}><span /><svg aria-hidden="true" viewBox="0 0 60 42"><rect width="60" height="42" rx="11" fill="#ff0033"/><path d="m24 11 18 10-18 10z" fill="white"/></svg>YouTube<span /></h1>
+  function activateVideo(channelId: string, videoId: string) {
+    try { onVideoActivate?.(channelId, videoId); } catch { /* Optional analytics must never interrupt navigation. */ }
+  }
+  return <YouTubeCardFrame>
+    {!channels.length && <p className={styles.empty}>{t("youtubeCard.noVideos")}</p>}
     <div id={listId} className={styles.channels}>
       {channels.slice(0, expanded ? channels.length : 3).map(channel => <article key={channel.id} className={styles.channel}>
         <div className={styles.profile}>
@@ -61,13 +71,12 @@ export default function YouTubeCard({ snapshot }: { snapshot: YouTubeSnapshot })
           <h2>{channel.name}</h2>
           <div className={styles.languages}>{channel.languages.length ? channel.languages.map(code => <span key={code}>{languages.of(code) || code}</span>) : t("youtubeCard.languageUnknown")}</div>
           {channel.languageSource === "creator" && <small>{t("youtubeCard.creatorLanguage")}</small>}
-          <div>{channel.subscribers === null ? t("youtubeCard.subscribersUnknown") : t("youtubeCard.subscribers", { count: channel.subscribers, value: number.format(channel.subscribers) })}</div>
           <div>{t(channel.complete ? "youtubeCard.recent" : "youtubeCard.recentPartial", { count: channel.recentVideoCount, value: number.format(channel.recentVideoCount) })}</div>
           {!channel.complete && <small>{t("youtubeCard.partial")}</small>}
           <a className={styles.channelLink} href={channel.url} target="_blank" rel="noopener noreferrer" aria-label={t("youtubeCard.openChannel", { name: channel.name })}>{t("youtubeCard.channel")} ↗</a>
         </div>
         <div className={styles.videos}>
-          {channel.videos.length ? channel.videos.slice(0, 3).map(video => <a className={styles.video} key={video.id} href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" aria-label={t("youtubeCard.openVideo", { title: video.title })}>
+          {channel.videos.length ? channel.videos.slice(0, 3).map(video => <a className={styles.video} key={video.id} href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} onClick={() => activateVideo(channel.id, video.id)} onAuxClick={event => { if (event.button === 1) activateVideo(channel.id, video.id); }} target="_blank" rel="noopener noreferrer" aria-label={t("youtubeCard.openVideo", { title: video.title })}>
             <div className={styles.thumbnail}><CardImage key={video.thumbnail} src={video.thumbnail} alt="" thumbnail/><span className={styles.play} aria-hidden="true">▶</span>{durationLabel(video.duration) && <span className={styles.duration} aria-label={t("youtubeCard.duration", { value: durationLabel(video.duration) })}>{durationLabel(video.duration)}</span>}</div>
             <h3>{video.title}</h3>
             <div className={styles.metadata}><time dateTime={video.publishedAt} title={dates.format(new Date(video.publishedAt))}>{relativeDate(video.publishedAt, locale)}</time>{video.caption && <span> · <span className={styles.cc}>CC</span> {t("youtubeCard.captions")}</span>}</div>
@@ -76,5 +85,5 @@ export default function YouTubeCard({ snapshot }: { snapshot: YouTubeSnapshot })
       </article>)}
     </div>
     {channels.length > 3 && <button className={styles.expand} aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)}>{expanded ? t("youtubeCard.collapse") : t("youtubeCard.expand", { count: channels.length - 3, value: number.format(channels.length - 3) })}</button>}
-  </section>;
+  </YouTubeCardFrame>;
 }

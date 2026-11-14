@@ -144,6 +144,7 @@
     "admin": "Admin",
     "playground": "Playground",
     "guideHub": "Guide Hub",
+    "sfCollection": "Dons SF Collection",
     "scans": "Szkenek",
     "overview": "Áttekintés",
     "analytics": "Analytics",
@@ -156,7 +157,6 @@
     "errorLog": "Hibanapló",
     "feedback": "Visszajelzés",
     "users": "Felhasználók",
-    "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
     "scanCoverage": "Scan Coverage",
     "scanArchiveBuilder": "Scan Archive Builder",
@@ -516,117 +516,44 @@
     "languagePreference": "Oldalsáv nyelve",
     "languageSwitchEn": "Nyelv váltása angolra",
     "languageSwitchDe": "Nyelv váltása németre",
-    "languageSwitchToLocale": "Nyelv váltása erre: {{language}}",
-    "connectedCharacters": {
-      "title": "Összekapcsolt karakterek",
-      "empty": "Még nincs összekapcsolt karakter. Kösd össze a karaktert a fiókodban, hogy itt megjelenjen.",
-      "loginPrompt": "Jelentkezz be az összekapcsolt karakterek megtekintéséhez.",
-      "ctaGuest": "Kezdő útmutató megnyitása",
-      "ctaAuthed": "Ugrás a fiók fülre",
-      "chip": {
-        "server": "Szerver",
-        "class": "Kaszt"
-      }
-    }
+    "languageSwitchToLocale": "Nyelv váltása erre: {{language}}"
   },
   "account": {
-    "settings": {
-      "title": "Beállítások",
-      "subtitle": "Személyes beállításaid kezelése.",
-      "loading": "Beállítások betöltése...",
-      "error": "A beállítások betöltése sikertelen.",
-      "retry": "Újra",
-      "language": {
-        "label": "Előnyben részesített nyelv"
-      },
-      "defaultSection": {
-        "label": "Alapértelmezett szekció"
-      },
-      "compactTables": {
-        "label": "Kompakt táblázatnézet használata"
-      },
-      "experimental": {
-        "label": "Kísérleti funkciók engedélyezése"
-      },
-      "save": "Beállítások mentése",
-      "saved": "Beállítások elmentve.",
-      "noChanges": "Nincs menthető módosítás.",
-      "saving": "Mentés...",
-      "saveError": "A beállítások mentése sikertelen. Próbáld újra."
-    },
-    "tools": {
-      "title": "Eszközbeállítások",
-      "subtitle": "Állítsd be, hogyan működjenek az eszközök a fiókodban.",
-      "loading": "Eszközbeállítások betöltése...",
-      "loadError": "Az eszközbeállítások betöltése sikertelen.",
-      "defaultSet": {
-        "label": "Alapértelmezett set ID",
-        "placeholder": "Add meg az alapértelmezett set ID-t"
-      },
-      "showIntro": {
-        "label": "Eszköz bemutató megjelenítése"
-      },
-      "experimental": {
-        "label": "Kísérleti eszközök engedélyezése"
-      },
-      "save": {
-        "cta": "Beállítások mentése",
-        "saving": "Mentés...",
-        "success": "Beállítások elmentve.",
-        "noChanges": "Nincs menthető módosítás.",
-        "error": "A beállítások mentése sikertelen. Próbáld újra."
-      }
-    },
-    "connectedCharacters": {
-      "title": "Összekapcsolt karakterek",
-      "subtitle": "Ezek a játékkarakterek a SFDataHub fiókodhoz vannak kapcsolva.",
-      "loading": "Karakterek frissítése...",
-      "empty": {
-        "title": "Még nincs összekapcsolt karakter",
-        "description": "Használd a \"!connect char\" parancsot Discordon, majd kattints itt a \"Frissítés\" gombra.",
-        "cta": "Kattints ide az összekapcsolás működéséhez"
-      },
-      "actions": {
-        "refresh": "Frissítés",
-        "refreshing": "Frissítés...",
-        "unlink": "Karakter leválasztása"
-      },
-      "confirmation": {
-        "title": "Biztosan leválasztod ezt a karaktert?",
-        "cancel": "Mégse",
-        "confirm": "Igen, leválasztás",
-        "confirming": "Leválasztás..."
-      },
-      "errors": {
-        "serviceUnavailable": "Az auth szolgáltatás nincs beállítva leválasztásra.",
-        "unlink": "A karakter leválasztása sikertelen."
-      },
-      "columns": {
-        "character": "Karakter",
-        "server": "Szerver",
-        "playerId": "Player ID",
-        "class": "Kaszt",
-        "level": "Szint",
-        "guild": "Céh",
-        "lastVerified": "Legutóbb összekapcsolva",
-        "source": "Forrás",
-        "actions": "Műveletek"
-      },
-      "method": {
-        "discord": "Discord bot"
-      },
-      "help": {
-        "title": "Hogyan működik az összekapcsolás?",
-        "show": "Megjelenítés",
-        "hide": "Elrejtés",
-        "steps": {
-          "link": "Kapcsold össze a karaktert a Discord bot \"!connect char\" parancsával.",
-          "verify": "A karaktert a legutóbbi ellenőrzött szkeneddel párosítjuk; tartsd naprakészen az adataid.",
-          "refresh": "Összekapcsolás után kattints a Frissítés gombra a lista frissítéséhez.",
-          "unlink": "A Műveletek oszlopban bármely karakter leválasztható; a Forrás oszlop mutatja, hogyan lett kapcsolva."
-        },
-        "footnote": "Tipp: Összekapcsolás vagy leválasztás után mindig nyomj egy Frissítést."
-      }
+    "overview": {
+      "tab": "Fiók",
+      "checkingSession": "Munkamenet ellenőrzése",
+      "readingSession": "A fiók munkamenetének beolvasása.",
+      "services": "Kapcsolt szolgáltatások",
+      "servicesHelp": "Kezeld az SFDataHub-azonosítódhoz kapcsolt bejelentkezési szolgáltatásokat.",
+      "connectedAs": "Csatlakoztatva mint {{name}}",
+      "notConnected": "Nincs csatlakoztatva",
+      "connected": "Csatlakoztatva",
+      "connect": "Csatlakoztatás",
+      "planned": "Tervezett",
+      "soon": "Hamarosan",
+      "security": "Biztonság és munkamenet",
+      "securityText": "Csak az SFDataHub felhasználói azonosítódat, megjelenített nevedet, avatárod URL-jét és a szolgáltatói azonosítókat (például Discord-azonosítódat) tároljuk. Discord-jelszavadat soha nem látjuk és nem tároljuk.",
+      "securityNote": "Az itteni kijelentkezés csak az SFDataHub munkamenetsütijét törli. Discord-fiókod külön bejelentkezve marad.",
+      "logout": "Kijelentkezés ezen az eszközön",
+      "revoke": "A hozzáférés teljes visszavonásához távolítsd el az SFDataHub Auth alkalmazást a Discord alkalmazásaid oldalán.",
+      "id": "SFDataHub-azonosító",
+      "roles": "Szerepkörök",
+      "createdAt": "Létrehozva",
+      "lastLogin": "Utolsó bejelentkezés",
+      "unnamed": "Névtelen felhasználó",
+      "providerSignIn": "Bejelentkezés: {{provider}}",
+      "verified": "Ellenőrizve",
+      "displayName": "Megjelenített név",
+      "namePlaceholder": "Add meg a megjelenített neved",
+      "nameLength": "A név hossza {{min}} és {{max}} karakter között lehet.",
+      "save": "Mentés",
+      "saving": "Mentés…",
+      "nameUpdated": "Név frissítve.",
+      "notConfigured": "A bejelentkezési szolgáltatás nincs beállítva.",
+      "invalidCharacters": "A név érvénytelen karaktereket tartalmaz.",
+      "sessionExpired": "A munkameneted lejárt. Jelentkezz be újra.",
+      "accountMissing": "A fiók nem található.",
+      "saveError": "A név frissítése nem sikerült. Próbáld újra."
     },
     "loginOverlay": {
       "modalAriaLabel": "Bejelentkezés",
@@ -659,18 +586,16 @@
       "guestHint": "Használd a Discordot vagy a Google-t a bejelentkezési oldalon.",
       "signInCta": "Bejelentkezés",
       "languageSettingsCta": "Nyelvi beállítások",
-      "languageSettingsTitle": "Beállítások",
-      "languageSettingsSubtitle": "Válaszd ki a felület nyelvét.",
       "languageFieldLabel": "Nyelv",
       "languageSaving": "Nyelvi beállítások mentése...",
       "languageSaveError": "A nyelvi beállítások mentése sikertelen.",
-      "closeLanguageSettings": "Beállítások bezárása",
       "signedInVia": "Bejelentkezve ezzel: {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
       "accountAndProfile": "Fiók és profil",
       "consolePanel": "Konzol panel",
-      "logout": "Kijelentkezés"
+      "logout": "Kijelentkezés",
+      "languageLoading": "Nyelvi beállítások betöltése..."
     },
     "loginPage": {
       "title": "Fiókhozzáférés",
@@ -2617,7 +2542,8 @@
     "general": "Általános",
     "openToplists": "Toplisták megnyitása",
     "invalidToplistNames": "Toplisták: adj nevet minden egyéni nézetnek ({{lists}}).",
-    "actionsScope": "A Mentés és a Módosítások elvetése minden területre érvényes: Általános, Toplisták és Profilok.",
+    "actionsScope": "A Mentés és az Elvetés a helyi oldalmenü, toplisták és profilok beállításaira vonatkozik.",
+    "languageImmediate": "A nyelvváltás azonnal érvénybe lép, és a fenti helyi beállításoktól külön kerül mentésre.",
     "dataHubSections": "DataHub-beállítások területei",
     "dataHub": "DataHub",
     "toplists": {
@@ -4542,6 +4468,18 @@
     "archiveLink": "Archívum megnyitása",
     "importLink": "SFtools-adatok importálása",
     "retryPlan": "Archív tervezés újrapróbálása",
+    "fullyPrepared": "Teljesen előkészített szerverszkennelések",
+    "currentScan": "Aktuális szkennelés",
+    "archiveFiles": "Archív fájlok",
+    "filesDownloaded": "{{number}} / {{total}} letöltve",
+    "filesReused": "{{number}} helyben újra felhasználva",
+    "filesAvailable": "Elérhető archív fájlok",
+    "countAfterProcessing": "Egy szerverszkennelés csak az összes fájl feldolgozása után számít késznek.",
+    "activity": {
+      "downloading": "Archív fájlok letöltése",
+      "checking": "Ellenőrzés és kicsomagolás",
+      "processing": "Feldolgozás és mentés"
+    },
     "phase": {
       "acquiring": "Archív beolvasások letöltése",
       "preparing": "Adatok beolvasása és előkészítése",

@@ -37,3 +37,6 @@
 .selectedColumns li span { flex: 1; }
 .selectedColumns button { padding: 4px 8px; }
 @media (max-width: 600px) { .columnPicker { grid-template-columns: 1fr; } }
+
+.accountContent { display: flex; flex-direction: column; gap: 20px; }
+.accountContent[hidden] { display: none; }
