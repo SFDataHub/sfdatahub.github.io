@@ -1,0 +1,111 @@
+.languageSection{
+  margin-top: 24px;
+  scroll-margin-block: 24px;
+}
+
+.languageLabel{
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.languageOptions{
+  display: grid;
+  gap: 8px;
+}
+
+.languageOption{
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--tile-hover);
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, transform .12s ease;
+}
+
+.languageOption:hover{
+  background: var(--active);
+  transform: translateY(-1px);
+}
+
+.languageOption:disabled{
+  cursor: default;
+  opacity: 0.8;
+  transform: none;
+}
+
+.languageOption.languageOptionDisabled,
+.languageOption.languageOptionDisabled:disabled{
+  background: rgba(16, 25, 38, 0.55);
+  border-color: rgba(118, 138, 160, 0.35);
+  color: rgba(176, 196, 217, 0.72);
+  opacity: 1;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.languageOption.languageOptionDisabled:hover{
+  background: rgba(16, 25, 38, 0.55);
+  transform: none;
+}
+
+.languageOption.languageOptionDisabled .languageFlag{
+  filter: grayscale(0.75) saturate(0.45) brightness(0.86);
+}
+
+.languageOptionActive{
+  border-color: rgba(158, 199, 255, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(158, 199, 255, 0.35);
+}
+
+.languageFlag{
+  width: 28px;
+  height: 18px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+  flex: 0 0 auto;
+}
+
+.languageOptionLabel{
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.languageOptionCheck{
+  width: 18px;
+  height: 18px;
+  color: #9ec7ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.languageHint{
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.languageError{
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: var(--danger, #ff7a7a);
+}
+
+
+.ico{
+  width: 20px;
+  height: 20px;
+  color: var(--text);
+}

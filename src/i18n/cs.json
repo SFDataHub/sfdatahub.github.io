@@ -154,6 +154,7 @@
     "admin": "Admin",
     "playground": "Playground",
     "guideHub": "Guide Hub",
+    "sfCollection": "Dons SF Collection",
     "scans": "Skeny",
     "overview": "Přehled",
     "analytics": "Analytics",
@@ -166,7 +167,6 @@
     "errorLog": "Chybový log",
     "feedback": "Zpětná vazba",
     "users": "Uživatelé",
-    "uploadCenter": "Upload Center",
     "uploadCenterV2": "Upload Center V2",
     "scanCoverage": "Scan Coverage",
     "scanArchiveBuilder": "Scan Archive Builder",
@@ -534,117 +534,44 @@
     "languagePreference": "Jazyk postranního panelu",
     "languageSwitchEn": "Přepnout jazyk na angličtinu",
     "languageSwitchDe": "Přepnout jazyk na němčinu",
-    "languageSwitchToLocale": "Přepnout jazyk na {{language}}",
-    "connectedCharacters": {
-      "title": "Propojené postavy",
-      "empty": "Zatím nejsou propojené žádné postavy. Propoj postavu v účtu, aby se tu zobrazila.",
-      "loginPrompt": "Pro zobrazení propojených postav se přihlas.",
-      "ctaGuest": "Otevřít úvodní průvodce",
-      "ctaAuthed": "Otevřít průvodce propojenými postavami",
-      "chip": {
-        "server": "Server",
-        "class": "Třída"
-      }
-    }
+    "languageSwitchToLocale": "Přepnout jazyk na {{language}}"
   },
   "account": {
-    "settings": {
-      "title": "Nastavení",
-      "subtitle": "Nastav si osobní preference.",
-      "loading": "Načítání nastavení...",
-      "error": "Nastavení se nepodařilo načíst.",
-      "retry": "Zkusit znovu",
-      "language": {
-        "label": "Preferovaný jazyk"
-      },
-      "defaultSection": {
-        "label": "Výchozí sekce"
-      },
-      "compactTables": {
-        "label": "Používat kompaktní rozložení tabulek"
-      },
-      "experimental": {
-        "label": "Povolit experimentální funkce"
-      },
-      "save": "Uložit nastavení",
-      "saved": "Nastavení uloženo.",
-      "noChanges": "Žádné změny k uložení.",
-      "saving": "Ukládání...",
-      "saveError": "Nastavení se nepodařilo uložit. Zkus to prosím znovu."
-    },
-    "tools": {
-      "title": "Tools settings",
-      "subtitle": "Configure how tools behave for your account.",
-      "loading": "Loading tools settings...",
-      "loadError": "Could not load tools settings.",
-      "defaultSet": {
-        "label": "Default set ID",
-        "placeholder": "Enter a default set ID"
-      },
-      "showIntro": {
-        "label": "Show tools intro"
-      },
-      "experimental": {
-        "label": "Enable experimental tools"
-      },
-      "save": {
-        "cta": "Save settings",
-        "saving": "Saving...",
-        "success": "Settings saved.",
-        "noChanges": "No changes to save.",
-        "error": "Could not save settings. Please try again."
-      }
-    },
-    "connectedCharacters": {
-      "title": "Connected characters",
-      "subtitle": "These game characters are linked to your SFDataHub account.",
-      "loading": "Refreshing characters...",
-      "empty": {
-        "title": "No characters linked yet",
-        "description": "Use the \"!connect char\" command in Discord to link your characters, then click \"Refresh\" here.",
-        "cta": "Click to learn how linking works"
-      },
-      "actions": {
-        "refresh": "Refresh",
-        "refreshing": "Refreshing...",
-        "unlink": "Disconnect character"
-      },
-      "confirmation": {
-        "title": "Are you sure you want to unlink this character?",
-        "cancel": "Cancel",
-        "confirm": "Yes, unlink",
-        "confirming": "Unlinking..."
-      },
-      "errors": {
-        "serviceUnavailable": "Auth service is not configured for unlinking.",
-        "unlink": "Could not unlink character."
-      },
-      "columns": {
-        "character": "Character",
-        "server": "Server",
-        "playerId": "Player ID",
-        "class": "Class",
-        "level": "Level",
-        "guild": "Guild",
-        "lastVerified": "Last linked",
-        "source": "Source",
-        "actions": "Actions"
-      },
-      "method": {
-        "discord": "Discord bot"
-      },
-      "help": {
-        "title": "How does linking work?",
-        "show": "Show",
-        "hide": "Hide",
-        "steps": {
-          "link": "Link a character via the Discord bot using the \"!connect char\" command.",
-          "verify": "We match the character to your latest verified scan; keep your game data up to date.",
-          "refresh": "After linking, click Refresh here to sync the latest characters from the auth service.",
-          "unlink": "You can unlink any character in the Actions column; the source column shows how it was linked."
-        },
-        "footnote": "Tip: Click Refresh after linking or unlinking to update this table."
-      }
+    "overview": {
+      "tab": "Účet",
+      "checkingSession": "Kontrola relace",
+      "readingSession": "Načítání relace účtu.",
+      "services": "Propojené služby",
+      "servicesHelp": "Spravuj přihlašovací služby propojené s tvou identitou SFDataHub.",
+      "connectedAs": "Připojeno jako {{name}}",
+      "notConnected": "Nepřipojeno",
+      "connected": "Připojeno",
+      "connect": "Připojit",
+      "planned": "Plánováno",
+      "soon": "Již brzy",
+      "security": "Zabezpečení a relace",
+      "securityText": "Ukládáme pouze tvé uživatelské ID SFDataHub, zobrazované jméno, URL avataru a identifikátory poskytovatelů (například tvé Discord ID). Tvé heslo k Discordu nikdy nevidíme ani neukládáme.",
+      "securityNote": "Odhlášení zde odstraní pouze soubor cookie relace SFDataHub. Tvůj účet Discord zůstane samostatně přihlášený.",
+      "logout": "Odhlásit se na tomto zařízení",
+      "revoke": "Pro úplné odvolání přístupu odeber SFDataHub Auth na stránce aplikací svého účtu Discord.",
+      "id": "SFDataHub ID",
+      "roles": "Role",
+      "createdAt": "Vytvořeno",
+      "lastLogin": "Poslední přihlášení",
+      "unnamed": "Nepojmenovaný uživatel",
+      "providerSignIn": "Přihlášení přes {{provider}}",
+      "verified": "Ověřeno",
+      "displayName": "Zobrazované jméno",
+      "namePlaceholder": "Zadej své zobrazované jméno",
+      "nameLength": "Jméno musí mít {{min}} až {{max}} znaků.",
+      "save": "Uložit",
+      "saving": "Ukládání…",
+      "nameUpdated": "Jméno aktualizováno.",
+      "notConfigured": "Přihlašovací služba není nakonfigurována.",
+      "invalidCharacters": "Jméno obsahuje neplatné znaky.",
+      "sessionExpired": "Tvá relace vypršela. Přihlas se znovu.",
+      "accountMissing": "Účet nebyl nalezen.",
+      "saveError": "Jméno se nepodařilo aktualizovat. Zkus to znovu."
     },
     "loginOverlay": {
       "modalAriaLabel": "Přihlášení",
@@ -677,18 +604,16 @@
       "guestHint": "Použij Discord nebo Google na přihlašovací stránce.",
       "signInCta": "Přihlásit se",
       "languageSettingsCta": "Nastavení jazyka",
-      "languageSettingsTitle": "Nastavení",
-      "languageSettingsSubtitle": "Vyber jazyk rozhraní.",
       "languageFieldLabel": "Jazyk",
       "languageSaving": "Ukládám jazyk...",
       "languageSaveError": "Nastavení jazyka se nepodařilo uložit.",
-      "closeLanguageSettings": "Zavřít nastavení",
       "signedInVia": "Přihlášen přes {{provider}}",
       "providerGoogle": "Google",
       "providerDiscord": "Discord",
       "accountAndProfile": "Účet a profil",
       "consolePanel": "Console Panel",
-      "logout": "Odhlásit"
+      "logout": "Odhlásit",
+      "languageLoading": "Načítání nastavení jazyka..."
     },
     "loginPage": {
       "title": "Přístup k účtu",
@@ -2649,7 +2574,8 @@
     "general": "Obecné",
     "openToplists": "Otevřít žebříčky",
     "invalidToplistNames": "Žebříčky: zadej název každého vlastního zobrazení ({{lists}}).",
-    "actionsScope": "Uložení i zahození změn platí pro všechny oblasti: Obecné, Žebříčky a Profily.",
+    "actionsScope": "Uložení a zahození změn se vztahuje na místní nastavení postranní nabídky, žebříčků a profilů.",
+    "languageImmediate": "Změna jazyka se projeví okamžitě a ukládá se odděleně od místních nastavení výše.",
     "dataHubSections": "Oblasti nastavení DataHubu",
     "dataHub": "DataHub",
     "toplists": {
@@ -4592,6 +4518,18 @@
     "archiveLink": "Otevřít archiv",
     "importLink": "Importovat data ze SFtools",
     "retryPlan": "Znovu naplánovat archiv",
+    "fullyPrepared": "Plně připravené skeny serverů",
+    "currentScan": "Aktuální sken",
+    "archiveFiles": "Archivní soubory",
+    "filesDownloaded": "{{number}} / {{total}} staženo",
+    "filesReused": "{{number}} znovu použito místně",
+    "filesAvailable": "Dostupné archivní soubory",
+    "countAfterProcessing": "Každý sken serveru se započítá až po zpracování všech souborů.",
+    "activity": {
+      "downloading": "Stahování archivních souborů",
+      "checking": "Kontrola a rozbalování",
+      "processing": "Zpracování a ukládání"
+    },
     "phase": {
       "acquiring": "Stahování archivních skenů",
       "preparing": "Načítání a příprava dat",

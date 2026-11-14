@@ -91,6 +91,7 @@ export type LocalToplistServiceDependencies = {
 /** Phase-local physical-source counts, never an overall completion percentage. */
 export type LocalToplistLoadProgress = {
   phase: "acquiring" | "preparing" | "composing";
+  files?: import("../scanArchive/localFirstScanAcquisition").ArchiveFileProgress[];
   total: number;
   succeeded: number;
   failed: number;

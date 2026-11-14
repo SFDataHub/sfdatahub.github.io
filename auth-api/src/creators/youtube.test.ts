@@ -8,15 +8,21 @@ import { parseYouTubeSources, configuredYouTubeSources, matchesYouTubeSources } 
 import { isYouTubeSnapshot } from "./types";
 vi.mock("../../../src/lib/auth/config", () => ({AUTH_BASE_URL: "https://fixture.invalid"}));
 import { YouTubeFailure, youtubeDiagnostic, youtubeReason, logYouTubeFailure } from "./errors";
-const state = vi.hoisted(() => ({ store: new Map<string, any>(), key: "fixture-key", sources: "", failRead: "", failPublish: false, fault: null as unknown, reads: [] as string[], writes: [] as string[], deletes: [] as string[] }));
+const state = vi.hoisted(() => ({ store: new Map<string, any>(), key: "fixture-key", sources: "", failRead: "", failPublish: false, fault: null as unknown, reads: [] as string[], writes: [] as string[], deletes: [] as string[], writeData: [] as { path: string; data: any }[] }));
 vi.mock("../config", () => ({ get YOUTUBE_API_KEY() { return state.key; }, get YOUTUBE_SOURCES() { return state.sources; }, UPLOAD_INBOX_TOKEN: "fixture-internal", AUTH_JWT_SECRET: "fixture-signing-only", FRONTEND_BASE_URL: "http://localhost", SESSION_COOKIE_DOMAIN: undefined }));
 vi.mock("../firebase", () => {
+  function merge(target: any, patch: any): any {
+    const result = { ...target };
+    for (const [key, value] of Object.entries(patch)) result[key] = value && typeof value === "object" && !Array.isArray(value)
+      ? merge(result[key], value) : structuredClone(value);
+    return result;
+  }
   function doc(path: string): any { return { path, get: async () => { state.reads.push(path); if (state.failRead === path) throw state.fault; return { exists: state.store.has(path), data: () => state.store.get(path) }; } }; }
   let queue = Promise.resolve();
   return { db: { collection: (name: string) => ({ doc: (id: string) => doc(`${name}/${id}`) }), runTransaction: (fn: any) => {
     const operation = queue.then(async () => {
       const writes: (() => void)[] = []; let publishesSnapshot = false;
-      const result = await fn({ get: (ref: any) => ref.get(), set: (ref: any, data: any, options: any) => { if (ref.path === "creator_snapshots/creators-live.json") publishesSnapshot = true; writes.push(() => { state.writes.push(ref.path); state.store.set(ref.path, options?.merge ? { ...state.store.get(ref.path), ...structuredClone(data) } : structuredClone(data)); }); }, delete: (ref: any) => writes.push(() => { state.deletes.push(ref.path); state.store.delete(ref.path); }) });
+      const result = await fn({ get: (ref: any) => ref.get(), set: (ref: any, data: any, options: any) => { if (data.youtube || (data.youtubeSync?.checkedAt && data.youtubeSync.owner === "")) publishesSnapshot = true; writes.push(() => { state.writes.push(ref.path); state.writeData.push({ path: ref.path, data: structuredClone(data) }); state.store.set(ref.path, options?.merge ? merge(state.store.get(ref.path), data) : structuredClone(data)); }); }, delete: (ref: any) => writes.push(() => { state.deletes.push(ref.path); state.store.delete(ref.path); }) });
       if (state.failPublish && publishesSnapshot) throw state.fault;
       writes.forEach(write => write()); return result;
     }); queue = operation.catch(() => {}); return operation;
@@ -28,7 +34,7 @@ import { creatorRouter } from "./routes";
 import { createSessionToken, SESSION_COOKIE_NAME } from "../session";
 const app = express(); app.use(cookieParser()); app.use(creatorRouter);
 const cookie = (roles: string[]) => `${SESSION_COOKIE_NAME}=${createSessionToken({ userId: "test-admin", roles })}`;
-beforeEach(() => { publicYouTubeCache.clear(); state.store.clear(); state.reads.length = state.writes.length = state.deletes.length = 0; state.key = "fixture-key"; state.sources = JSON.stringify(FIXTURE_SOURCES); state.failRead = ""; state.failPublish = false; state.fault = null; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+beforeEach(() => { publicYouTubeCache.clear(); state.store.clear(); state.writeData.length = 0; state.reads.length = state.writes.length = state.deletes.length = 0; state.key = "fixture-key"; state.sources = JSON.stringify(FIXTURE_SOURCES); state.failRead = ""; state.failPublish = false; state.fault = null; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe("central YouTube snapshot", () => {
   it("uses the provider medium channel image while retaining video thumbnails", async () => {
     const fake = fakeYouTube();
@@ -51,11 +57,11 @@ describe("central YouTube snapshot", () => {
     const [three, ten] = await Promise.all([request(app).get("/public/creators-live.json"), request(app).get("/public/creators-live.json?videos=10")]);
     expect(three.body.youtube.channels[0].videos).toHaveLength(3);
     expect(ten.body.youtube.channels[0].videos).toHaveLength(7);
-    expect(state.reads).toHaveLength(2); expect(state.writes).toHaveLength(0); expect(state.deletes).toHaveLength(0);
+    expect(state.reads).toHaveLength(1); expect(state.writes).toHaveLength(0); expect(state.deletes).toHaveLength(0);
     expect(three.headers["cache-control"]).toContain("public");
-    await request(app).get("/public/creators-live.json?videos=10"); expect(state.reads).toHaveLength(2);
+    await request(app).get("/public/creators-live.json?videos=10"); expect(state.reads).toHaveLength(1);
     clock.mockReturnValue(NOW + 60001);
-    await request(app).get("/public/creators-live.json"); expect(state.reads).toHaveLength(4);
+    await request(app).get("/public/creators-live.json"); expect(state.reads).toHaveLength(2);
     expect(fake.calls).toHaveLength(data.snapshot.requests);
   });
   it("uses all exact sources, paginates oldest-first lists, deduplicates, counts publication dates and reuses ETags", async () => {
@@ -104,7 +110,7 @@ describe("central YouTube snapshot", () => {
     const last = await readYouTubeSnapshot();
     vi.stubGlobal("fetch", async () => new Response("secret upstream body", { status: 500 }));
     await expect(refreshYouTubeSnapshot(true)).rejects.toThrow("YOUTUBE_API_REJECTED");
-    expect(await readYouTubeSnapshot()).toEqual(last); expect(state.store.get("creator_sync/youtube")).toMatchObject({owner: "", expiresAt: 0});
+    expect(await readYouTubeSnapshot()).toEqual(last); expect(state.store.get("creator_snapshots/creators-live.json").youtubeSync).toMatchObject({owner: "", expiresAt: 0});
     vi.unstubAllGlobals();
   });
   it("rejects direct unauthorized calls, revoked admins and concurrent instance leases; GET never generates", async () => {
@@ -365,7 +371,7 @@ describe("safe YouTube failure transparency (simulated upstream/storage)", () =>
     const failed = await adminPost();
     expect(failed.status).toBe(503); expect(failed.body.error).toBe("YOUTUBE_API_REJECTED");
     expect(await readYouTubeSnapshot()).toBeNull();
-    expect(state.store.get("creator_sync/youtube")).toMatchObject({owner: "", expiresAt: 0});
+    expect(state.store.get("creator_snapshots/creators-live.json").youtubeSync).toMatchObject({owner: "", expiresAt: 0});
     vi.stubGlobal("fetch", fakeYouTube().fetcher);
     expect((await adminPost()).status).toBe(200);
     expect(await readYouTubeSnapshot()).not.toBeNull();
@@ -385,7 +391,7 @@ describe("safe YouTube failure transparency (simulated upstream/storage)", () =>
     const missing = await adminPost();
     expect(missing.body.error).toBe("YOUTUBE_PLAYLIST_MISSING");
     expect(missing.body.diagnostic).toMatchObject({stage:"playlist_items",httpStatus:404,reason:"playlistNotFound",channelId:FIXTURE_SOURCES[1].channelId});
-    state.store.set("creator_sync/youtube", {owner:"other-instance",expiresAt:Date.now()+60000});
+    state.store.get(snapshotPath).youtubeSync = {version:1,owner:"other-instance",expiresAt:Date.now()+60000};
     const busy = await adminPost();
     expect(busy.status).toBe(409); expect(busy.headers["retry-after"]).toBe("5");
     expect(busy.body).toEqual({error:"YOUTUBE_SYNC_BUSY",diagnostic:{code:"YOUTUBE_SYNC_BUSY",stage:"acquire_lock"}});
@@ -467,22 +473,23 @@ describe("Patch 1.1.2 storage", () => {
     for (const [index, label] of ["initial", "unchanged", "changed"].entries()) {
       clock.mockReturnValue(NOW + index * 3600001);
       if (label === "changed") fake.videos.get("0-1").snippet.title = "One small change";
-      state.reads.length = state.writes.length = state.deletes.length = 0;
+      state.reads.length = state.writes.length = state.deletes.length = state.writeData.length = 0;
       const result = await refreshYouTubeSnapshot(true);
-      ledger[label] = { reads: state.reads.length, writes: state.writes.length, deletes: state.deletes.length, cacheWrites: state.writes.filter(path => path.startsWith("creator_youtube_cache/")).length, payloadWrites: state.writes.filter(path => path.startsWith("creator_snapshots/")).length };
+      ledger[label] = { reads: state.reads.length, writes: state.writes.length, deletes: state.deletes.length, cacheWrites: state.writes.filter(path => path.startsWith("creator_youtube_cache/")).length, payloadWrites: state.writeData.filter(write => write.data.youtube).length };
       if (label === "unchanged") {
-        expect(state.store.get("creator_snapshots/creators-live.json")).toEqual(previous);
-        expect(state.writes).toEqual(["creator_sync/youtube", "creator_sync/youtube"]);
+        expect(state.store.get("creator_snapshots/creators-live.json").youtube).toEqual(previous);
+        expect(state.writes).toEqual(["creator_snapshots/creators-live.json", "creator_snapshots/creators-live.json"]);
+        expect(state.writeData.every(write => !write.data.youtube)).toBe(true);
         expect(result.generatedAt).toBe(new Date(NOW + 3600001).toISOString());
       }
       expect(state.deletes).toHaveLength(0);
-      previous = structuredClone(state.store.get("creator_snapshots/creators-live.json"));
+      previous = structuredClone(state.store.get("creator_snapshots/creators-live.json").youtube);
     }
     state.reads.length = state.writes.length = state.deletes.length = 0;
     await request(app).get("/public/creators-live.json?videos=10");
     ledger.public = { reads: state.reads.length, writes: state.writes.length, deletes: state.deletes.length };
     console.log("SIMULATED_YOUTUBE_DOCUMENT_OPERATIONS " + JSON.stringify(ledger));
-    expect(ledger).toMatchObject({ initial: { reads: 10, writes: 4, deletes: 0 }, unchanged: { reads: 4, writes: 2, deletes: 0 }, changed: { reads: 4, writes: 4, cacheWrites: 1, payloadWrites: 1 }, public: { reads: 0, writes: 0, deletes: 0 } });
+    expect(ledger).toMatchObject({ initial: { reads: 10, writes: 4, deletes: 0 }, unchanged: { reads: 3, writes: 2, deletes: 0, cacheWrites: 0, payloadWrites: 0 }, changed: { reads: 3, writes: 3, cacheWrites: 1, payloadWrites: 1 }, public: { reads: 0, writes: 0, deletes: 0 } });
   });
   it("reuses legacy channel pages before migration and retains cache-read diagnostics", async () => {
     const fake = fakeYouTube(), first = await collectYouTube({ key: state.key, config: FIXTURE_CONFIG, now: NOW, fetcher: fake.fetcher });
@@ -575,5 +582,137 @@ describe("current uploads and persistent source membership", () => {
     expect(result.snapshot.channels[0].videos.map(v => v.id)).toEqual(fake.ids.slice(2, 12).reverse());
     expect(result.snapshot.channels[0].recentVideoCount).toBe(12);
     expect(fake.calls.some(c => c.playlistId === fake.playlistId)).toBe(false);
+  });
+});
+
+
+describe("single-document YouTube coordination", () => {
+  const snapshotPath = "creator_snapshots/creators-live.json", legacyPath = "creator_sync/youtube";
+  const resetLedger = () => { state.reads.length = state.writes.length = state.deletes.length = state.writeData.length = 0; };
+  async function seeded() {
+    const fake = fakeYouTube(); vi.stubGlobal("fetch", fake.fetcher);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(NOW);
+    const snapshot = await refreshYouTubeSnapshot(true);
+    return { fake, clock, snapshot };
+  }
+  function makeLegacy() {
+    const document = state.store.get(snapshotPath), { version: _version, ...legacy } = document.youtubeSync;
+    state.store.set(legacyPath, legacy); delete document.youtubeSync;
+    return legacy;
+  }
+  it("reads exactly one document on cold/expired GET, zero on warm GET, and exposes only the public snapshot", async () => {
+    const { clock, snapshot } = await seeded();
+    clock.mockReturnValue(NOW + 3600001);
+    await refreshYouTubeSnapshot(true);
+    const stored = state.store.get(snapshotPath);
+    expect(stored.youtube).toEqual(snapshot);
+    expect(stored.youtubeSync.checkedAt).toBe(new Date(NOW + 3600001).toISOString());
+    publicYouTubeCache.clear(); resetLedger();
+    const cold = await request(app).get("/public/creators-live.json?videos=10");
+    expect(cold.status).toBe(200);
+    expect(cold.body).toEqual({generatedAt: stored.youtubeSync.checkedAt, youtube: {...snapshot, generatedAt: stored.youtubeSync.checkedAt}});
+    expect(state.reads).toEqual([snapshotPath]); expect(state.writes).toEqual([]);
+    const coldReads = state.reads.length;
+    await request(app).get("/public/creators-live.json");
+    expect(state.reads).toHaveLength(coldReads);
+    clock.mockReturnValue(NOW + 3660002);
+    await request(app).get("/public/creators-live.json");
+    expect(state.reads).toEqual([snapshotPath, snapshotPath]);
+    expect(state.writes).toEqual([]); expect(state.deletes).toEqual([]);
+    console.log("SIMULATED_SINGLE_DOCUMENT_PUBLIC " + JSON.stringify({cold:{reads:1,writes:0},warm:{reads:0,writes:0},expired:{reads:1,writes:0}}));
+  });
+  it("keeps missing and failed cold reads to one document without migration writes", async () => {
+    resetLedger();
+    expect((await request(app).get("/public/creators-live.json")).status).toBe(503);
+    expect(state.reads).toEqual([snapshotPath]); expect(state.writes).toEqual([]);
+    publicYouTubeCache.clear(); resetLedger(); state.failRead = snapshotPath; state.fault = {code:14};
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await request(app).get("/public/creators-live.json")).body).toEqual({error:"YOUTUBE_SNAPSHOT_UNAVAILABLE"});
+    expect(state.reads).toEqual([snapshotPath]); expect(state.writes).toEqual([]);
+  });
+  it("migrates legacy successful check/layout atomically even on an hourly skip, preserving cache and unrelated fields", async () => {
+    const { fake, clock, snapshot } = await seeded();
+    const legacy = makeLegacy(); legacy.checkedAt = new Date(NOW + 3600001).toISOString();
+    state.store.get(snapshotPath).otherProvider = {keep:true};
+    const caches = structuredClone([...state.store].filter(([path]) => path.startsWith("creator_youtube_cache/")));
+    clock.mockReturnValue(NOW + 3600002); publicYouTubeCache.clear(); resetLedger();
+    // Pre-handover readers can use the old payload timestamp without a second read.
+    expect((await readYouTubeSnapshot())?.generatedAt).toBe(snapshot.generatedAt);
+    expect(state.reads).toEqual([snapshotPath]); expect(state.writes).toEqual([]);
+    resetLedger(); const calls = fake.calls.length;
+    expect((await refreshYouTubeSnapshot(false)).generatedAt).toBe(legacy.checkedAt);
+    expect(state.reads).toEqual([snapshotPath, legacyPath]);
+    expect(state.writes).toEqual([legacyPath, snapshotPath]);
+    expect(state.writeData.every(write => !write.data.youtube)).toBe(true);
+    expect(fake.calls).toHaveLength(calls);
+    expect(state.store.get(snapshotPath)).toMatchObject({youtube:snapshot,otherProvider:{keep:true},youtubeSync:{version:1,checkedAt:legacy.checkedAt,cacheLayout:legacy.cacheLayout,owner:"",expiresAt:0}});
+    expect([...state.store].filter(([path]) => path.startsWith("creator_youtube_cache/"))).toEqual(caches);
+    expect(state.store.get(legacyPath)).toMatchObject({owner:"snapshot-document-v1",expiresAt:Number.MAX_SAFE_INTEGER});
+    publicYouTubeCache.clear(); resetLedger();
+    expect((await readYouTubeSnapshot())?.generatedAt).toBe(legacy.checkedAt);
+    expect(state.reads).toEqual([snapshotPath]);
+    resetLedger(); await refreshYouTubeSnapshot(false);
+    expect(state.reads).toEqual([snapshotPath]); expect(state.writes).toEqual([]);
+    console.log("SIMULATED_SINGLE_DOCUMENT_HANDOVER " + JSON.stringify({handoverSkip:{reads:2,writes:2},steadySkip:{reads:1,writes:0}}));
+  });
+  it("waits for active legacy owners, takes expired leases, and fences old acquisition/publication after handover", async () => {
+    const { snapshot } = await seeded(); const legacy = makeLegacy();
+    state.store.set(legacyPath, {...legacy, owner:"old-instance",expiresAt:NOW+1}); resetLedger();
+    await expect(refreshYouTubeSnapshot(true)).rejects.toThrow("YOUTUBE_SYNC_BUSY");
+    expect(state.writes).toEqual([]);
+    state.store.set(legacyPath, {...legacy,owner:"old-instance",expiresAt:NOW-1});
+    await refreshYouTubeSnapshot(true);
+    const { db } = await import("../firebase");
+    const lockRef = db.collection("creator_sync").doc("youtube");
+    // These are the owner/expiry checks used by the previous backend revision.
+    await expect(db.runTransaction(async tx => {
+      const lock = (await tx.get(lockRef)).data();
+      if ((lock?.expiresAt ?? 0) > Date.now()) throw new Error("YOUTUBE_SYNC_BUSY");
+      tx.set(lockRef, {owner:"old-new-attempt",expiresAt:NOW+210000});
+    })).rejects.toThrow("YOUTUBE_SYNC_BUSY");
+    await expect(db.runTransaction(async tx => {
+      const lock = (await tx.get(lockRef)).data();
+      if (lock?.owner !== "old-instance" || lock.expiresAt <= Date.now()) throw new Error("YOUTUBE_LOCK_EXPIRED");
+      tx.set(db.collection("creator_snapshots").doc("creators-live.json"), {youtube:{broken:true}}, {merge:true});
+    })).rejects.toThrow("YOUTUBE_LOCK_EXPIRED");
+    expect(state.store.get(snapshotPath).youtube).toEqual(snapshot);
+    expect(state.deletes).toEqual([]);
+  });
+  it("coordinates separate backend modules while coalescing scheduler/admin triggers within one module", async () => {
+    const { fake } = await seeded();
+    vi.resetModules(); const other = await import("./service");
+    let enter!: () => void, release!: () => void;
+    const entered = new Promise<void>(resolve => {enter=resolve;}), gate = new Promise<void>(resolve => {release=resolve;});
+    vi.stubGlobal("fetch", async (input, init) => {enter(); await gate; return fake.fetcher(input, init);});
+    const active = refreshYouTubeSnapshot(true), scheduled = refreshYouTubeSnapshot(false);
+    await entered;
+    try { await expect(other.refreshYouTubeSnapshot(true)).rejects.toThrow("YOUTUBE_SYNC_BUSY"); }
+    finally { release(); }
+    const [manualResult, schedulerResult] = await Promise.all([active, scheduled]);
+    expect(schedulerResult).toEqual(manualResult);
+    await expect(other.refreshYouTubeSnapshot(true)).resolves.toEqual(manualResult);
+  });
+  it.each(["expired", "replaced"])("rejects a %s publisher and releases only its own lease without losing the last success", async mode => {
+    const { fake, clock, snapshot } = await seeded();
+    const before = structuredClone(state.store.get(snapshotPath)), cache = structuredClone([...state.store].filter(([path]) => path.startsWith("creator_youtube_cache/")));
+    fake.videos.get("0-1").snippet.title = "Must not publish";
+    let touched = false;
+    vi.stubGlobal("fetch", async (input, init) => {
+      if (!touched) {
+        touched = true;
+        if (mode === "expired") state.store.get(snapshotPath).youtubeSync.expiresAt = NOW - 1;
+        else state.store.get(snapshotPath).youtubeSync = {...before.youtubeSync,owner:"replacement",expiresAt:NOW+420000};
+      }
+      return fake.fetcher(input, init);
+    });
+    resetLedger();
+    await expect(refreshYouTubeSnapshot(true)).rejects.toThrow("YOUTUBE_LOCK_EXPIRED");
+    const after = state.store.get(snapshotPath);
+    expect(after.youtube).toEqual(snapshot); expect(after.youtubeSync.checkedAt).toBe(before.youtubeSync.checkedAt);
+    expect(after.youtubeSync.owner).toBe(mode === "expired" ? "" : "replacement");
+    expect([...state.store].filter(([path]) => path.startsWith("creator_youtube_cache/"))).toEqual(cache);
+    expect(state.writeData.every(write => !write.data.youtube)).toBe(true);
+    publicYouTubeCache.clear();
+    expect(await readYouTubeSnapshot()).toEqual(snapshot);
   });
 });

@@ -5,38 +5,18 @@ import ToplistViewPicker from "./ToplistViewControls";
 import LocalSortHeader from "./LocalSortHeader";
 import { toplistColumnLabel, type LocalTableColumnsProps } from "../../lib/toplists/toplistColumns";
 ﻿import React, { useEffect } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createPortal } from "react-dom";
-import i18n from "../../i18n";
-import ContentShell from "../../components/ContentShell";
-import ProfileOverlay from "../../components/ProfileOverlay/ProfileOverlay";
-import GuildProfileOverlay from "../../components/ProfileOverlay/GuildProfileOverlay";
 import { useFilters, type DaysFilter } from "../../components/Filters/FilterContext";
-import HudFilters from "../../components/Filters/HudFilters";
-import ServerSheet from "../../components/Filters/ServerSheet";
-import BottomFilterSheet from "../../components/Filters/BottomFilterSheet";
-import ListSwitcher from "../../components/Filters/ListSwitcher";
 import { getClassIconUrl } from "../../components/ui/shared/classIcons";
-import SectionDividerHeader from "../../components/ui/shared/SectionDividerHeader";
-import ToplistExportController, {
-  type ToplistCaptureStatus,
-  type ToplistExportControllerHandle,
-} from "../../components/export/ToplistExportController";
+import { type ToplistCaptureStatus } from "../../components/export/ToplistExportController";
 import NeonCoreButton from "../../components/ui/NeonCoreButton";
 
-import { ToplistsProvider } from "../../context/ToplistsDataContext";
-import { useToplistsData, type Filters, type PlayerScopeStatus, type SortSpec } from "../../context/ToplistsDataContextCore";
+import { useToplistsData, type PlayerScopeStatus } from "../../context/ToplistsDataContextCore";
 import { useFavoriteMembership } from "../../lib/data-hub/useFavoriteMembership";
-import GuildToplists, { type GuildToplistsPresetData } from "./guildtoplists";
-import type { RegionKey } from "../../components/Filters/serverGroups";
-import {
-  getPlayerToplistSnapshotByDocIdCached,
-  type FirestoreLatestToplistResult,
-} from "../../lib/api/toplistsFirestore";
-import type { ToplistPlayerRow, ToplistPlayerSnapshot } from "../../lib/toplists/toplistContracts";
-import { normalizeServerKeyFromInput } from "../../lib/players/identifier";
+import type { ToplistPlayerRow } from "../../lib/toplists/toplistContracts";
 import { formatScanDateTimeLabel } from "../../lib/ui/formatScanDateTimeLabel";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
@@ -48,9 +28,7 @@ import {
   getPlayerToplistFrameStyle as getFrameStyle,
   getPlayerToplistMineTone as getMineTone,
   getPlayerToplistRankTone as getRankTone,
-  normalizePlayerToplistCompareServerKey as normalizeCompareServerKey,
   resolvePlayerToplistRowIdentifier,
-  toPlayerToplistNumberSafe as toNumberSafe,
 } from "./playerToplistDecor";
 import {
   formatToplistDelta,
@@ -60,12 +38,6 @@ import {
 import { useToplistRowFocus, type ToplistFocusRequest, type ToplistFocusResult } from "./useToplistRowFocus";
 import "../../styles/Toplist.css";
 
-const splitListParam = (value: string | null) =>
-  (value ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
 const normalizeServerList = (list: string[]) => {
   const set = new Set<string>();
   list.forEach((entry) => {
@@ -73,29 +45,6 @@ const normalizeServerList = (list: string[]) => {
     if (normalized) set.add(normalized);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-};
-
-const normalizeCompareServerList = (list: string[]) => {
-  const set = new Set<string>();
-  list.forEach((entry) => {
-    const normalized = normalizeCompareServerKey(entry);
-    if (normalized) set.add(normalized);
-  });
-  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-};
-
-const buildCompareDocId = (serverKey: string, month: string) =>
-  `${normalizeCompareServerKey(serverKey)}__${month}`;
-type CompareSnapshotScope = "players" | "guilds";
-type ToplistsCompareMode = "off" | "progress" | "months";
-type CompareSnapshotState = {
-  rows: ToplistPlayerRow[];
-  baselineServers: string[];
-  missingServers: string[];
-  error: string | null;
-};
-type CompareSnapshotUiState = CompareSnapshotState & {
-  loading: boolean;
 };
 
 export type PlayerPresetReadOnlyData = {
@@ -122,78 +71,6 @@ type TableDataViewHandle = {
   getPresetReadOnlyData: () => PlayerPresetReadOnlyData;
 };
 
-const COMPARE_SNAPSHOT_CACHE_PREFIX = "sf_compare_snapshot";
-
-const normalizeCompareSnapshotServers = (servers: string[]) => {
-  const set = new Set<string>();
-  servers.forEach((server) => {
-    const normalized = normalizeCompareServerKey(server).trim().toLowerCase();
-    if (normalized) set.add(normalized);
-  });
-  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-};
-
-const buildCompareSnapshotCacheKey = ({
-  scope,
-  servers,
-  month,
-  mode,
-}: {
-  scope: CompareSnapshotScope;
-  servers: string[];
-  month: string;
-  mode?: string;
-}) => {
-  const monthKey = String(month ?? "").trim();
-  const serversKey = normalizeCompareSnapshotServers(servers).join("+");
-  const modeKey = String(mode ?? "").trim();
-  const modeSuffix = modeKey ? `__${modeKey.toLowerCase()}` : "";
-  return `${COMPARE_SNAPSHOT_CACHE_PREFIX}__${scope}__${serversKey}__${monthKey}${modeSuffix}`;
-};
-
-const readCompareSnapshotCache = (key: string): CompareSnapshotState | null => {
-  try {
-    if (typeof localStorage === "undefined") return null;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    const maybe = parsed as Partial<CompareSnapshotState>;
-    if (!Array.isArray(maybe.rows)) return null;
-    if (!Array.isArray(maybe.baselineServers)) return null;
-    if (!Array.isArray(maybe.missingServers)) return null;
-    if (maybe.error != null && typeof maybe.error !== "string") return null;
-    return {
-      rows: maybe.rows as ToplistPlayerRow[],
-      baselineServers: maybe.baselineServers.map((server) => String(server || "").trim()).filter(Boolean),
-      missingServers: maybe.missingServers.map((server) => String(server || "").trim()).filter(Boolean),
-      error: maybe.error ?? null,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const writeCompareSnapshotCache = (key: string, value: CompareSnapshotState) => {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore storage write errors (quota/privacy mode)
-  }
-};
-
-const compareSnapshotStateMemory = new Map<string, CompareSnapshotUiState>();
-const compareSnapshotStateInFlight = new Map<string, Promise<CompareSnapshotUiState>>();
-
-const mergeCompareSnapshotRows = (snapshots: ToplistPlayerSnapshot[]) => {
-  const mergedRows: ToplistPlayerRow[] = [];
-  for (const snapshot of snapshots) {
-    const players = Array.isArray(snapshot.players) ? snapshot.players : [];
-    for (const row of players) mergedRows.push({ ...row, server: snapshot.server || row.server });
-  }
-  return mergedRows;
-};
 const normalizeClassList = (list: string[]) => {
   const set = new Set<string>();
   list.forEach((entry) => {
@@ -209,40 +86,6 @@ const normalizeClassList = (list: string[]) => {
 
 const normalizeGuildKey = (value: string | null | undefined) =>
   (value ?? "").toString().trim().toLowerCase();
-
-const normalizeGuildIdentifierServer = (value: unknown): string => {
-  const raw = String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
-  if (!raw) return "";
-  const withoutSuffix = raw.replace(/\.(eu|net)$/, "");
-  const hostMatch = withoutSuffix.match(/^s(\d+)$/);
-  if (hostMatch) return `eu${hostMatch[1]}`;
-  return withoutSuffix;
-};
-
-const buildGuildToplistIdentifier = (server: unknown, guildId: unknown): string | null => {
-  const normalizedServer = normalizeGuildIdentifierServer(server);
-  const normalizedGuildId = String(guildId ?? "").trim().toLowerCase();
-  if (!normalizedServer || !normalizedGuildId) return null;
-  return `${normalizedServer}__${normalizedGuildId}`;
-};
-
-const resolveDirectGuildIdFromPlayerRow = (row: ToplistPlayerRow): string | null => {
-  const candidates = [
-    (row as any).guildId,
-    (row as any).guild_id,
-    (row as any).guildIdentifier,
-    (row as any).guild_identifier,
-    (row as any).guild?.id,
-    (row as any).value?.guildId,
-    (row as any).value?.guild?.id,
-    (row as any).data?.guildId,
-  ];
-  for (const candidate of candidates) {
-    const value = String(candidate ?? "").trim();
-    if (value) return value;
-  }
-  return null;
-};
 
 const normalizeFavoriteIdentifier = (value: unknown): string | null => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -438,42 +281,6 @@ const CENTERED_TOPLIST_CELL_STYLE_BY_KEY = TOPLIST_COLUMNS.reduce((acc, column) 
   return acc;
 }, {} as Record<ToplistColumnKey, React.CSSProperties>);
 
-const listEqual = (a: string[], b: string[]) =>
-  a.length === b.length && a.every((v, i) => v === b[i]);
-
-const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
-const formatMonth = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
-const parseMonthKeyUtc = (value: string): Date | null => {
-  const raw = String(value ?? "").trim();
-  const match = raw.match(/^(\d{4})-(\d{2})$/);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
-  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-};
-const getDaysBetweenMonthKeys = (fromMonth: string, toMonth: string): number | null => {
-  const from = parseMonthKeyUtc(fromMonth);
-  const to = parseMonthKeyUtc(toMonth);
-  if (!from || !to) return null;
-  const diffDays = Math.round(Math.abs(to.getTime() - from.getTime()) / MS_PER_DAY);
-  return Math.max(1, diffDays || 1);
-};
-
-const generateRecentMonths = (count: number) => {
-  const months: string[] = [];
-  const cursor = new Date();
-  // Only include fully completed months: start from previous month.
-  cursor.setUTCDate(1);
-  cursor.setUTCMonth(cursor.getUTCMonth() - 1);
-  for (let i = 0; i < count; i++) {
-    months.push(formatMonth(cursor));
-    cursor.setUTCMonth(cursor.getUTCMonth() - 1);
-  }
-  return months;
-};
-
-const MIN_COMPARE_MONTH = "2026-01";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const computeLastScanColor = (lastScan: unknown, nowMs: number): string | null => {
   if (!lastScan) return null;
@@ -502,15 +309,6 @@ const computeLastScanColor = (lastScan: unknown, nowMs: number): string | null =
   return "#b91c1c";
 };
 
-const normalizeServerCode = (value: string) => value.trim().toUpperCase();
-const normalizeClass = (value: string | null | undefined) =>
-  value != null
-    ? value
-        .toLowerCase()
-        .trim()
-        .replace(/[\s_]+/g, "-")
-        .replace(/-+/g, "-")
-    : "";
 function parseLastScanString(value: string): number | null {
   const raw = value.trim();
   if (!raw) return null;
@@ -542,162 +340,8 @@ function parseLastScanString(value: string): number | null {
   }
   return date.getTime();
 }
-const toMsFromLastScan = (value: string | number | null | undefined): number | null => {
-  if (value == null) return null;
-  if (typeof value === "number") return value < 1e12 ? value * 1000 : value;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  if (/^\d{10,13}$/.test(raw)) {
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return null;
-    return n < 1e12 ? n * 1000 : n;
-  }
-  return parseLastScanString(raw);
-};
 const formatLastScanDisplay = (value: string | number | null | undefined): string => {
   return formatScanDateTimeLabel(value);
-};
-const deriveRatioMain = (main: number | null, con: number | null) => {
-  const m = typeof main === "number" && Number.isFinite(main) ? main : 0;
-  const c = typeof con === "number" && Number.isFinite(con) ? con : 0;
-  const total = m + c;
-  if (!(total > 0)) return null;
-  return Math.round((m / total) * 100);
-};
-const computeStatsDay = (
-  current: ToplistPlayerRow | null | undefined,
-  baseline: ToplistPlayerRow | null | undefined,
-  sumDeltaOverride?: number | null,
-  daysOverride?: number | null,
-  sumField: "sum" | "sumTotal" = "sum",
-) => {
-  if (!current || !baseline) return { days: null as number | null, perDay: null as number | null };
-  let days: number | null = null;
-  if (typeof daysOverride === "number" && Number.isFinite(daysOverride) && daysOverride > 0) {
-    days = Math.max(1, Math.round(daysOverride));
-  } else {
-    const currentMs = toMsFromLastScan((current as any).lastScan);
-    const baselineMs = toMsFromLastScan((baseline as any).lastScan);
-    if (currentMs == null || baselineMs == null) {
-      return { days: null as number | null, perDay: null as number | null };
-    }
-    const daysRaw = Math.abs(currentMs - baselineMs) / MS_PER_DAY;
-    days = Math.max(1, Math.round(daysRaw));
-  }
-  let sumDelta = sumDeltaOverride;
-  if (sumDelta == null) {
-    const currSum = toNumberSafe((current as any)[sumField]);
-    const prevSum = toNumberSafe((baseline as any)[sumField]);
-    if (prevSum != null) {
-      sumDelta = (currSum ?? 0) - prevSum;
-    }
-  }
-  const perDay = sumDelta != null ? Math.round(sumDelta / days) : null;
-  return { days, perDay };
-};
-const buildTieKey = (row: ToplistPlayerRow) => {
-  const serverKey = normalizeServerCode(String(row.server ?? ""));
-  const identifier = resolveToplistRowIdentifier(row);
-  const idKey = String(identifier ?? row.name ?? "").trim();
-  const classKey = String(row.class ?? "").trim();
-  return `${serverKey}__${idKey}__${classKey}`;
-};
-const filterToplistRows = (rows: ToplistPlayerRow[], filters: Filters) => {
-  const serverFilter = Array.isArray(filters.servers) ? filters.servers : [];
-  const serverSet = serverFilter.length ? new Set(serverFilter.map(normalizeServerCode)) : null;
-  const classFilter = Array.isArray(filters.classes) ? filters.classes : [];
-  const classSet = classFilter.length ? new Set(classFilter.map(normalizeClass)) : null;
-  const rangeDays = filters.timeRange === "all" ? null : Number(String(filters.timeRange).replace("d", ""));
-  const cutoffMs = rangeDays && Number.isFinite(rangeDays) ? Date.now() - rangeDays * 86400000 : null;
-
-  return rows.filter((row) => {
-    if (serverSet && !serverSet.has(normalizeServerCode(String(row.server ?? "")))) return false;
-    if (classSet && !classSet.has(normalizeClass(row.class))) return false;
-    if (cutoffMs != null) {
-      const lastScanMs = toMsFromLastScan(row.lastScan);
-      if (lastScanMs != null && lastScanMs < cutoffMs) return false;
-    }
-    return true;
-  });
-};
-const sortToplistRows = (rows: ToplistPlayerRow[], sort: SortSpec) => {
-  const compareNumber = (aVal: number | null, bVal: number | null) => {
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
-    const diff = aVal - bVal;
-    return sort.dir === "asc" ? diff : -diff;
-  };
-  const compareTie = (a: ToplistPlayerRow, b: ToplistPlayerRow) => {
-    const cmp = buildTieKey(a).localeCompare(buildTieKey(b), undefined, { numeric: true, sensitivity: "base" });
-    return sort.dir === "asc" ? cmp : -cmp;
-  };
-
-  rows.sort((a, b) => {
-    let result = 0;
-    switch (sort.key) {
-      case "name": {
-        const aName = String(a.name ?? "");
-        const bName = String(b.name ?? "");
-        const cmp = aName.localeCompare(bName, undefined, { sensitivity: "base" });
-        result = sort.dir === "asc" ? cmp : -cmp;
-        break;
-      }
-      case "lastScan": {
-        const aMs = toMsFromLastScan(a.lastScan);
-        const bMs = toMsFromLastScan(b.lastScan);
-        result = compareNumber(aMs == null ? null : aMs, bMs == null ? null : bMs);
-        break;
-      }
-      case "main":
-        result = compareNumber(a.main, b.main);
-        break;
-      case "con":
-        result = compareNumber(a.con, b.con);
-        break;
-      case "sum":
-        result = compareNumber((a as any)._calculatedSum, (b as any)._calculatedSum);
-        break;
-      case "statsDay":
-        result = compareNumber((a as any)._statsPerDayBase ?? (a as any)._statsPerDay, (b as any)._statsPerDayBase ?? (b as any)._statsPerDay);
-        break;
-      case "statsDayTotal":
-        result = compareNumber((a as any)._statsPerDayTotal, (b as any)._statsPerDayTotal);
-        break;
-      case "ratio":
-        result = compareNumber((a as any)._ratioMain, (b as any)._ratioMain);
-        break;
-      case "mine":
-        result = compareNumber(a.mine, b.mine);
-        break;
-      case "treasury":
-        result = compareNumber(a.treasury, b.treasury);
-        break;
-      case "mainTotal":
-        result = compareNumber(a.mainTotal, b.mainTotal);
-        break;
-      case "conTotal":
-        result = compareNumber(a.conTotal, b.conTotal);
-        break;
-      case "sumTotal":
-        result = compareNumber(a.sumTotal, b.sumTotal);
-        break;
-      case "xpProgress":
-        result = compareNumber(a.xpProgress, b.xpProgress);
-        break;
-      case "xpTotal":
-        result = compareNumber(a.xpTotal, b.xpTotal);
-        break;
-      case "level":
-      default:
-        result = compareNumber(a.level, b.level);
-        break;
-    }
-    if (result !== 0) return result;
-    return compareTie(a, b);
-  });
-
-  return rows;
 };
 function ValueCrossfade({
   value,
@@ -883,18 +527,6 @@ function mapSort(sortBy: string): { key: string; dir: "asc" | "desc" } {
   }
 }
 
-const DEFAULT_GUILD_SORT = "guildAvgLevel";
-const GUILD_SORT_KEYS = new Set([
-  "guildMembers",
-  "guildAvgLevel",
-  "guildAvgMain",
-  "guildAvgCon",
-  "guildAvgSum",
-  "guildRaids",
-  "guildHydra",
-]);
-const resolveGuildSort = (value: string | null | undefined) =>
-  GUILD_SORT_KEYS.has(String(value ?? "").trim()) ? String(value).trim() : DEFAULT_GUILD_SORT;
 let PLAYER_AVG_MODE_CACHE: "base" | "total" = "base";
 
 function deriveGroupFromServers(servers: string[]): string {
@@ -904,547 +536,6 @@ function deriveGroupFromServers(servers: string[]): string {
   if (first.startsWith("F")) return "FUSION";
   if (first) return "INT";
   return "EU";
-}
-
-export default function PlayerToplistsPage() {
-  return (
-    <ToplistsProvider>
-      <PlayerToplistsPageContent />
-    </ToplistsProvider>
-  );
-}
-
-function PlayerToplistsPageContent() {
-  const { t } = useTranslation();
-  const filterCollapseStorageKey = "sf_toplists_hud_filters_collapsed_v1";
-  const f = useFilters(); // MUSS innerhalb FilterProvider laufen
-  const serverPickerShellRef = React.useRef<HTMLDivElement>(null);
-  const {
-    filterMode,
-    listView,
-    bottomFilterOpen, setBottomFilterOpen,
-    serverSheetOpen, setServerSheetOpen,
-    servers, setServers,
-    classes, setClasses,
-    setGuilds,
-    range,
-    sortBy,
-    setSortBy,
-  } = f;
-  const { serverGroups, player } = useToplistsData();
-  useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const serverParam = searchParams.get("server");
-  const serversParam = searchParams.get("servers");
-  const classParam = searchParams.get("class");
-  const classesParam = searchParams.get("classes");
-  const tabParam = searchParams.get("tab");
-  const focusParamRaw = searchParams.get("focus");
-  const focusIdentifierParam = focusParamRaw?.trim() ? focusParamRaw.trim() : null;
-  const rankParamRaw = searchParams.get("rank");
-  const focusRankParam = React.useMemo(() => {
-    if (!rankParamRaw) return null;
-    const parsed = Number(rankParamRaw);
-    if (!Number.isFinite(parsed)) return null;
-    return Math.max(1, Math.trunc(parsed));
-  }, [rankParamRaw]);
-  const activeTab = tabParam === "guilds" ? "guilds" : "players";
-  const setActiveTab = React.useCallback((next: "players" | "guilds") => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", next);
-    setSearchParams(nextParams);
-  }, [searchParams, setSearchParams]);
-  const [guildSortBy, setGuildSortBy] = React.useState<string>(DEFAULT_GUILD_SORT);
-  const initialProgressCompareMonth = searchParams.get("compare") ?? "";
-  const initialCompareModeParam = String(searchParams.get("compareMode") ?? "").trim().toLowerCase();
-  const [compareMode, setCompareMode] = React.useState<ToplistsCompareMode>(() => {
-    if (initialCompareModeParam === "months") return "months";
-    if (initialCompareModeParam === "progress") return "progress";
-    return initialProgressCompareMonth ? "progress" : "off";
-  });
-  const [progressSinceMonth, setProgressSinceMonth] = React.useState<string>(initialProgressCompareMonth);
-  const [compareFromMonth, setCompareFromMonth] = React.useState<string>(searchParams.get("compareFrom") ?? "");
-  const [compareToMonth, setCompareToMonth] = React.useState<string>(searchParams.get("compareTo") ?? "");
-  const [filtersCollapsed, setFiltersCollapsed] = React.useState<boolean>(() => {
-    try {
-      if (typeof localStorage === "undefined") return false;
-      return localStorage.getItem(filterCollapseStorageKey) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const monthOptions = React.useMemo(
-    () => {
-      // Keep completed months, but also allow selecting the current month for freshly generated backfill snapshots.
-      const currentMonth = formatMonth(new Date());
-      return Array.from(new Set([currentMonth, ...generateRecentMonths(17)])).filter((m) => m >= MIN_COMPARE_MONTH);
-    },
-    [],
-  );
-  const normalizeCompareMonthPair = React.useCallback((from: string, to: string) => {
-    const nextFrom = String(from ?? "").trim();
-    const nextTo = String(to ?? "").trim();
-    if (nextFrom && nextTo && nextFrom > nextTo) {
-      return { from: nextTo, to: nextFrom };
-    }
-    return { from: nextFrom, to: nextTo };
-  }, []);
-  const resolveDefaultCompareMonths = React.useCallback(() => {
-    const latest = monthOptions[0] ?? "";
-    if (!latest) return { from: "", to: "" };
-    const latestIdx = monthOptions.indexOf(latest);
-    const previous = latestIdx >= 0 ? (monthOptions[latestIdx + 1] ?? latest) : (monthOptions[1] ?? latest);
-    return normalizeCompareMonthPair(previous, latest);
-  }, [monthOptions, normalizeCompareMonthPair]);
-  const isValidCompareMonth = React.useCallback(
-    (value: string) => {
-      const normalized = String(value ?? "").trim();
-      return normalized.length > 0 && monthOptions.includes(normalized);
-    },
-    [monthOptions]
-  );
-  const handleCompareModeChange = React.useCallback((nextMode: ToplistsCompareMode) => {
-    setCompareMode(nextMode);
-    if (nextMode === "off") {
-      setProgressSinceMonth("");
-      setCompareFromMonth("");
-      setCompareToMonth("");
-      return;
-    }
-    if (nextMode === "progress") {
-      setCompareFromMonth("");
-      setCompareToMonth("");
-      return;
-    }
-    setProgressSinceMonth("");
-    const fallback = resolveDefaultCompareMonths();
-    const nextToCandidate = isValidCompareMonth(compareToMonth) ? compareToMonth : fallback.to;
-    const nextFromCandidate = isValidCompareMonth(compareFromMonth) ? compareFromMonth : fallback.from;
-    const normalized = normalizeCompareMonthPair(nextFromCandidate, nextToCandidate);
-    setCompareFromMonth(normalized.from);
-    setCompareToMonth(normalized.to);
-  }, [
-    compareFromMonth,
-    compareToMonth,
-    isValidCompareMonth,
-    normalizeCompareMonthPair,
-    resolveDefaultCompareMonths,
-  ]);
-
-  React.useEffect(() => {
-    try {
-      if (typeof localStorage === "undefined") return;
-      localStorage.setItem(filterCollapseStorageKey, filtersCollapsed ? "1" : "0");
-    } catch {
-      // ignore storage write errors
-    }
-  }, [filterCollapseStorageKey, filtersCollapsed]);
-  const handleProgressSinceMonthChange = React.useCallback((value: string) => {
-    const nextValue = String(value ?? "").trim();
-    setProgressSinceMonth(nextValue);
-    if (!nextValue) {
-      setCompareMode("off");
-    }
-  }, []);
-  const handleCompareFromMonthChange = React.useCallback((value: string) => {
-    const nextFromRaw = String(value ?? "").trim();
-    setCompareFromMonth((prevFrom) => {
-      void prevFrom;
-      const normalized = normalizeCompareMonthPair(nextFromRaw, compareToMonth);
-      if (normalized.to !== compareToMonth) {
-        setCompareToMonth(normalized.to);
-      }
-      return normalized.from;
-    });
-  }, [compareToMonth, normalizeCompareMonthPair]);
-  const handleCompareToMonthChange = React.useCallback((value: string) => {
-    const nextToRaw = String(value ?? "").trim();
-    setCompareToMonth((prevTo) => {
-      void prevTo;
-      const normalized = normalizeCompareMonthPair(compareFromMonth, nextToRaw);
-      if (normalized.from !== compareFromMonth) {
-        setCompareFromMonth(normalized.from);
-      }
-      return normalized.to;
-    });
-  }, [compareFromMonth, normalizeCompareMonthPair]);
-  React.useEffect(() => {
-    if (compareMode !== "months") return;
-    const fallback = resolveDefaultCompareMonths();
-    const nextToCandidate = isValidCompareMonth(compareToMonth) ? compareToMonth : fallback.to;
-    const nextFromCandidate = isValidCompareMonth(compareFromMonth) ? compareFromMonth : fallback.from;
-    const normalized = normalizeCompareMonthPair(nextFromCandidate, nextToCandidate);
-    if (normalized.from !== compareFromMonth) setCompareFromMonth(normalized.from);
-    if (normalized.to !== compareToMonth) setCompareToMonth(normalized.to);
-  }, [
-    compareMode,
-    compareFromMonth,
-    compareToMonth,
-    isValidCompareMonth,
-    normalizeCompareMonthPair,
-    resolveDefaultCompareMonths,
-  ]);
-  const hasServersSelected = (servers?.length ?? 0) > 0;
-  const normalizedServers = React.useMemo(() => normalizeServerList(servers ?? []), [servers]);
-  const normalizedClasses = React.useMemo(() => normalizeClassList(classes ?? []), [classes]);
-
-  const urlServers = React.useMemo(() => {
-    const raw = serverParam ?? serversParam;
-    return normalizeServerList(splitListParam(raw));
-  }, [serverParam, serversParam]);
-  const urlClasses = React.useMemo(() => {
-    const raw = classParam ?? classesParam;
-    return normalizeClassList(splitListParam(raw));
-  }, [classParam, classesParam]);
-
-  const urlServersProvided = serverParam != null || serversParam != null;
-  const urlClassesProvided = classParam != null || classesParam != null;
-
-  const searchKey = React.useMemo(() => searchParams.toString(), [searchParams]);
-  const normalizedServersKey = normalizedServers.join(",");
-  const normalizedClassesKey = normalizedClasses.join(",");
-  const urlServersKey = urlServers.join(",");
-  const urlClassesKey = urlClasses.join(",");
-  const prevServersKeyRef = React.useRef<string | null>(null);
-
-  const normalizedServersRef = React.useRef(normalizedServers);
-  const normalizedClassesRef = React.useRef(normalizedClasses);
-  const setServersRef = React.useRef(setServers);
-  const setClassesRef = React.useRef(setClasses);
-  const lastUrlWriteRef = React.useRef<string | null>(null);
-  const prevUrlSyncedServersKeyRef = React.useRef<string | null>(null);
-  const tableRef = React.useRef<HTMLDivElement | null>(null);
-  const livePlayerTableDataRef = React.useRef<TableDataViewHandle | null>(null);
-  const exportControllerRef = React.useRef<ToplistExportControllerHandle | null>(null);
-  const [playerPresetReadOnlyData, setPlayerPresetReadOnlyData] = React.useState<PlayerPresetReadOnlyData | null>(null);
-  const [guildPresetReadOnlyData, setGuildPresetReadOnlyData] = React.useState<GuildToplistsPresetData | null>(null);
-  const guildPresetSignatureRef = React.useRef<string>("");
-
-  const handleGuildPresetReadOnlyDataChange = React.useCallback((nextData: GuildToplistsPresetData) => {
-    const limitedRows = (Array.isArray(nextData.rows) ? nextData.rows : []).slice(0, 150);
-    const signature = JSON.stringify({
-      rows: limitedRows,
-      loading: nextData.loading,
-      error: nextData.error,
-      updatedAt: nextData.updatedAt,
-      avgMode: nextData.avgMode,
-    });
-    if (guildPresetSignatureRef.current === signature) return;
-    guildPresetSignatureRef.current = signature;
-    setGuildPresetReadOnlyData({
-      ...nextData,
-      rows: limitedRows,
-    });
-  }, []);
-
-  const openExportDialog = React.useCallback(() => {
-    if (activeTab === "players") {
-      const snapshot = livePlayerTableDataRef.current?.getPresetReadOnlyData();
-      if (snapshot) {
-        setPlayerPresetReadOnlyData({
-          ...snapshot,
-          rows: (Array.isArray(snapshot.rows) ? snapshot.rows : []).slice(0, 150),
-        });
-      }
-    }
-    exportControllerRef.current?.open();
-  }, [activeTab]);
-
-  const handleLivePlayerCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
-    exportControllerRef.current?.notifyLiveCaptureStatus("players", status);
-  }, []);
-
-  const handleLiveGuildCaptureStatusChange = React.useCallback((status: ToplistCaptureStatus) => {
-    exportControllerRef.current?.notifyLiveCaptureStatus("guilds", status);
-  }, []);
-
-  React.useEffect(() => {
-    normalizedServersRef.current = normalizedServers;
-  }, [normalizedServers]);
-
-  React.useEffect(() => {
-    normalizedClassesRef.current = normalizedClasses;
-  }, [normalizedClasses]);
-
-  React.useEffect(() => {
-    setServersRef.current = setServers;
-  }, [setServers]);
-
-  React.useEffect(() => {
-    setClassesRef.current = setClasses;
-  }, [setClasses]);
-
-  React.useEffect(() => {
-    const prevKey = prevServersKeyRef.current;
-    prevServersKeyRef.current = normalizedServersKey;
-    if (prevKey != null && prevKey !== normalizedServersKey) {
-      setGuilds([]);
-    }
-  }, [normalizedServersKey, setGuilds]);
-
-  useEffect(() => {
-    if (lastUrlWriteRef.current === searchKey) {
-      lastUrlWriteRef.current = null;
-      return;
-    }
-
-    if (urlServersProvided) {
-      const nextServers = urlServers;
-      if (!listEqual(normalizedServersRef.current, nextServers)) {
-        setServersRef.current(nextServers);
-      }
-    }
-
-    if (urlClassesProvided && !listEqual(normalizedClassesRef.current, urlClasses)) {
-      setClassesRef.current(urlClasses);
-    }
-  }, [
-    searchKey,
-    urlServersProvided,
-    urlClassesProvided,
-    urlServersKey,
-    urlClassesKey,
-  ]);
-
-  useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
-    const nextServers = normalizedServersKey;
-    const nextClasses = normalizedClassesKey;
-    const prevServersKey = prevUrlSyncedServersKeyRef.current;
-    const serverSelectionChanged = prevServersKey != null && prevServersKey !== nextServers;
-    prevUrlSyncedServersKeyRef.current = nextServers;
-
-    if (nextServers) {
-      nextParams.set("server", nextServers);
-    } else {
-      nextParams.delete("server");
-    }
-    nextParams.delete("servers");
-
-    if (nextClasses) {
-      nextParams.set("class", nextClasses);
-    } else {
-      nextParams.delete("class");
-    }
-    nextParams.delete("classes");
-
-    // Focus deep-link should apply once. When server selection changes, clear it to avoid repeated re-highlighting.
-    if (serverSelectionChanged) {
-      nextParams.delete("focus");
-      nextParams.delete("rank");
-    }
-
-    const nextKey = nextParams.toString();
-    if (nextKey !== searchKey) {
-      lastUrlWriteRef.current = nextKey;
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [normalizedServersKey, normalizedClassesKey, searchKey, searchParams, setSearchParams]);
-
-  const guildOptions = React.useMemo(() => {
-    const rows = Array.isArray(player?.rows) ? player.rows : [];
-    if (!rows.length) return [];
-    const map = new Map<string, { value: string; label: string }>();
-    rows.forEach((row) => {
-      const name = String(row.guild ?? "").trim();
-      if (!name) return;
-      const key = normalizeGuildKey(name);
-      if (!key) return;
-      const serverCode =
-        (row.server && String(row.server).trim().toUpperCase()) ||
-        (normalizedServers.length === 1 ? normalizedServers[0] : "");
-      const label = serverCode ? `${name} (${serverCode})` : name;
-      if (!map.has(key)) {
-        map.set(key, { value: name, label });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
-    );
-  }, [player?.rows, normalizedServers]);
-
-  React.useEffect(() => {
-    setGuildSortBy((prev) => resolveGuildSort(prev));
-  }, []);
-  const resolvedGuildSortBy = React.useMemo(() => resolveGuildSort(guildSortBy), [guildSortBy]);
-  return (
-    <>
-      <div ref={serverPickerShellRef} data-server-picker-shell>
-        <ContentShell
-        mode="card"
-        leftWidth={0}
-        rightWidth={0}
-        subheader={
-          filterMode === "hud" ? (
-            <>
-              <SectionDividerHeader title={t("toplists.headerLabel", "Toplists")} />
-              <div className="mt-2 pb-3 grid grid-cols-[auto_auto_auto] justify-center items-center gap-6">
-                <TopTab active={activeTab === "players"} onClick={() => setActiveTab("players")} label={t("nav.players", "Players")} />
-                <button
-                  type="button"
-                  className="flex flex-col items-center justify-center gap-0.5 py-1 px-2"
-                  style={{ transform: "translateY(50%)" }}
-                  onClick={() => setFiltersCollapsed((prev) => !prev)}
-                  aria-expanded={!filtersCollapsed}
-                  aria-controls="toplists-hud-filters"
-                  aria-label={
-                    filtersCollapsed
-                      ? t("toplists.filters.showHud", "Show filters")
-                      : t("toplists.filters.hideHud", "Hide filters")
-                  }
-                >
-                  <span style={{ color: "#B0C4D9", fontSize: 11, lineHeight: 1 }}>
-                    {filtersCollapsed
-                      ? t("toplists.filters.showHud", "Show filters")
-                      : t("toplists.filters.hideHud", "Hide filters")}
-                  </span>
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    className="h-4 w-4 transition-transform duration-200"
-                    style={{
-                      color: "#B0C4D9",
-                      transform: filtersCollapsed ? "rotate(0deg)" : "rotate(180deg)",
-                    }}
-                  >
-                    <path
-                      d="M6 9l6 6 6-6"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                <TopTab active={activeTab === "guilds"} onClick={() => setActiveTab("guilds")} label={t("nav.guilds", "Guilds")} />
-              </div>
-              {!filtersCollapsed && (
-                <div id="toplists-hud-filters" className="mt-2">
-                  <HudFilters
-                    mode={activeTab}
-                    sortValue={activeTab === "guilds" ? guildSortBy : (sortBy ?? "level")}
-                    onSortValueChange={activeTab === "guilds" ? setGuildSortBy : setSortBy}
-                    compareMode={compareMode}
-                    onCompareModeChange={handleCompareModeChange}
-                    progressSinceMonth={progressSinceMonth}
-                    onProgressSinceMonthChange={handleProgressSinceMonthChange}
-                    compareFromMonth={compareFromMonth}
-                    onCompareFromMonthChange={handleCompareFromMonthChange}
-                    compareToMonth={compareToMonth}
-                    onCompareToMonthChange={handleCompareToMonthChange}
-                    monthOptions={monthOptions}
-                    guildOptions={guildOptions}
-                    onExportPng={openExportDialog}
-                    exportDisabled={!hasServersSelected || (activeTab === "players" && listView !== "table")}
-                  />
-                </div>
-              )}
-            </>
-          ) : null
-        }
-        centerFramed={false}
-        stickyTopbar
-        stickySubheader={false}
-        topbarHeight={56}
-      >
-        <ListSwitcher />
-
-        {activeTab === "players" && listView === "table" && (
-          <TableDataView
-            ref={livePlayerTableDataRef}
-            servers={servers ?? []}
-            classes={classes ?? []}
-            range={(range ?? "all") as any}
-            sortKey={sortBy ?? "level"}
-            compareMode={compareMode}
-            progressSinceMonth={progressSinceMonth}
-            compareFromMonth={compareFromMonth}
-            compareToMonth={compareToMonth}
-            showAvgModeControl={!filtersCollapsed}
-            focusIdentifier={focusIdentifierParam}
-            focusRank={focusRankParam}
-            tableRef={tableRef}
-            renderMode="live"
-            onCaptureStatusChange={handleLivePlayerCaptureStatusChange}
-          />
-        )}
-        {activeTab === "guilds" && (
-          <GuildToplists
-            serverCodes={servers ?? []}
-            sortKey={resolvedGuildSortBy}
-            showAvgModeControl={!filtersCollapsed}
-            tableRef={tableRef}
-            renderMode="live"
-            onCaptureStatusChange={handleLiveGuildCaptureStatusChange}
-            onPresetReadOnlyDataChange={handleGuildPresetReadOnlyDataChange}
-          />
-        )}
-      </ContentShell>
-        </div>
-
-      <ServerSheet
-        mode="modal"
-        open={serverSheetOpen}
-        onClose={() => setServerSheetOpen(false)}
-        shellRef={serverPickerShellRef}
-        serversByRegion={serverGroups}
-        selected={servers}
-        onToggle={(s: string) =>
-          setServers((prev: string[]) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
-        }
-        onSelectAllInRegion={(region: RegionKey) => setServers(serverGroups[region] ?? [])}
-        onClearAll={() => setServers([])}
-      />
-
-      <BottomFilterSheet
-        open={filterMode === "sheet" && bottomFilterOpen}
-        onClose={() => setBottomFilterOpen(false)}
-      />
-
-      <ToplistExportController
-        ref={exportControllerRef}
-        activeKind={activeTab === "guilds" ? "guilds" : "players"}
-        liveTableRef={tableRef}
-        renderPresetContent={({ kind, amount, tableRef: presetTableRef, onCaptureStatusChange }) => {
-          if (kind === "guilds") {
-            return (
-              <GuildToplists
-                serverCodes={servers ?? []}
-                sortKey={resolvedGuildSortBy}
-                showAvgModeControl={false}
-                tableRef={presetTableRef}
-                renderMode="preset"
-                presetAmount={amount}
-                onCaptureStatusChange={onCaptureStatusChange}
-                presetReadOnlyData={guildPresetReadOnlyData}
-              />
-            );
-          }
-          return (
-            <TableDataView
-              servers={servers ?? []}
-              classes={classes ?? []}
-              range={(range ?? "all") as any}
-              sortKey={sortBy ?? "level"}
-              compareMode={compareMode}
-              progressSinceMonth={progressSinceMonth}
-              compareFromMonth={compareFromMonth}
-              compareToMonth={compareToMonth}
-              showAvgModeControl={false}
-              focusIdentifier={null}
-              focusRank={null}
-              tableRef={presetTableRef}
-              renderMode="preset"
-              presetAmount={amount}
-              onCaptureStatusChange={onCaptureStatusChange}
-              presetReadOnlyData={playerPresetReadOnlyData}
-            />
-          );
-        }}
-      />
-    </>
-  );
 }
 
 type TableDataViewProps = LocalTableColumnsProps & {
@@ -1458,7 +549,7 @@ type TableDataViewProps = LocalTableColumnsProps & {
   classes: string[];
   range: DaysFilter;
   sortKey: string;
-  compareMode: ToplistsCompareMode;
+  compareMode: "off" | "progress" | "months";
   progressSinceMonth: string;
   compareFromMonth: string;
   compareToMonth: string;
@@ -1478,11 +569,10 @@ type TableDataViewProps = LocalTableColumnsProps & {
   onReadOnlyRowsEndVisible?: () => void;
   onOpenPlayerProfile?: (row: ToplistPlayerRow) => void;
   onOpenGuildProfile?: (row: ToplistPlayerRow) => void;
-  renderFirestoreProfileOverlay?: boolean;
 };
 
 export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataViewProps>(function TableDataView({
-  localLayout = false, centerCellContents = localLayout, localLoadingContent, localNoticeContent, localColumns, localColumnWidths, localSort, onLocalSort, servers, classes, range, sortKey, compareMode, progressSinceMonth, compareFromMonth, compareToMonth, showAvgModeControl, focusIdentifier, focusRank, focusNonce = null, focusRequest, onFocusResult, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPlayerAvgModeChange, readOnlyHasMoreRows = false, onReadOnlyRowsEndVisible, onOpenPlayerProfile, onOpenGuildProfile, renderFirestoreProfileOverlay = true,
+  localLayout = false, centerCellContents = localLayout, localLoadingContent, localNoticeContent, localColumns, localColumnWidths, localSort, onLocalSort, servers, classes, range, sortKey, compareMode, showAvgModeControl, focusIdentifier, focusRank, focusNonce = null, focusRequest, onFocusResult, tableRef, renderMode = "live", presetAmount = null, onCaptureStatusChange, presetReadOnlyData = null, onPlayerAvgModeChange, readOnlyHasMoreRows = false, onReadOnlyRowsEndVisible, onOpenPlayerProfile, onOpenGuildProfile,
 }, ref) {
   const activeColumns = localColumns ? localColumns.flatMap(key => { const column = TOPLIST_COLUMNS.find(c => c.key === key); return column ? [column] : []; }) : TOPLIST_VISIBLE_COLUMNS;
   const columnCount = activeColumns.length;
@@ -1505,10 +595,8 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     playerError,
     playerLastUpdatedAt,
     playerScopeStatus,
-    filters,
     setFilters,
     setSort,
-    getGuildToplistSnapshotCached,
   } = useToplistsData();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1652,16 +740,6 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
   const readOnlyAllRows = hasReadOnlyData ? (presetReadOnlyData?.allRows ?? presetReadOnlyData?.rows ?? []) : [];
   const readOnlyVisibleRows = hasReadOnlyData ? (presetReadOnlyData?.rows ?? readOnlyAllRows) : [];
   const rows = hasReadOnlyData ? readOnlyAllRows : (playerRows || []);
-  const isCompareMonthsMode = compareMode === "months";
-  const progressBaselineMonth = String(progressSinceMonth ?? "").trim();
-  const compareFromMonthValue = String(compareFromMonth ?? "").trim();
-  const compareToMonthValue = String(compareToMonth ?? "").trim();
-  const activeBaselineCompareMonth = compareMode === "progress"
-    ? progressBaselineMonth
-    : compareMode === "months"
-      ? compareFromMonthValue
-      : "";
-  const activeTargetCompareMonth = isCompareMonthsMode ? compareToMonthValue : "";
   const favoritePlayerSet = React.useMemo(() => {
     const keys = Object.keys(sharedFavorites.players ?? {});
     return new Set(keys.map((key) => key.trim().toLowerCase()).filter(Boolean));
@@ -1694,676 +772,17 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     return nextRows;
   }, [rows, selectedGuildSet, hasGuildData, favoritesOnly, favoritePlayerSet]);
 
-  const [compareState, setCompareState] = React.useState<CompareSnapshotUiState>({
-    rows: [],
-    loading: false,
-    baselineServers: [],
-    missingServers: [],
-    error: null,
-  });
-  const [compareTargetState, setCompareTargetState] = React.useState<CompareSnapshotUiState>({
-    rows: [],
-    loading: false,
-    baselineServers: [],
-    missingServers: [],
-    error: null,
-  });
-
-  const compareServersKey = React.useMemo(
-    () => normalizeCompareServerList(servers).join(","),
-    [servers]
-  );
-  const compareBaselineRequestKeyRef = React.useRef<string>("");
-  const compareTargetRequestKeyRef = React.useRef<string>("");
-  const baselineServerSet = React.useMemo(() => {
-    const normalized = (compareState.baselineServers || [])
-      .map((server) => normalizeCompareServerKey(server))
-      .filter(Boolean);
-    return new Set(normalized);
-  }, [compareState.baselineServers]);
-  const derivedCompareLoading =
-    compareState.loading || (isCompareMonthsMode ? compareTargetState.loading : false);
-  const derivedShowCompare =
-    Boolean(activeBaselineCompareMonth) &&
-    (!isCompareMonthsMode || Boolean(activeTargetCompareMonth)) &&
-    !derivedCompareLoading;
-  const compareLoading = hasReadOnlyData ? (presetReadOnlyData?.compareLoading ?? false) : derivedCompareLoading;
-  const showCompare = hasReadOnlyData ? (presetReadOnlyData?.showCompare ?? false) : derivedShowCompare;
-
-  // Load monthly baseline snapshot(s) for comparison
-  useEffect(() => {
-    if (isPresetRender || hasReadOnlyData) return;
-    let cancelled = false;
-    const normalizedCompareMonth = activeBaselineCompareMonth;
-    const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
-    const compareDisabled =
-      !normalizedCompareMonth || normalizedCompareMonth.toLowerCase() === "off";
-
-    if (compareDisabled) {
-      compareBaselineRequestKeyRef.current = "";
-      setCompareState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!compareServersList.length) {
-      compareBaselineRequestKeyRef.current = "";
-      setCompareState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const requestKey = `${normalizedCompareMonth}__${compareServersKey}`;
-    if (compareBaselineRequestKeyRef.current === requestKey) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    compareBaselineRequestKeyRef.current = requestKey;
-    const stateCacheKey = `players:baseline:${requestKey}`;
-
-    const cachedState = compareSnapshotStateMemory.get(stateCacheKey);
-    if (cachedState) {
-      setCompareState({ ...cachedState, loading: false });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const docIds = compareServersList.map((s) => buildCompareDocId(s, normalizedCompareMonth));
-    const compareCacheKey = buildCompareSnapshotCacheKey({
-      scope: "players",
-      servers: compareServersList,
-      month: normalizedCompareMonth,
-    });
-    const cachedCompareState = readCompareSnapshotCache(compareCacheKey);
-    if (cachedCompareState) {
-      setCompareState({
-        ...cachedCompareState,
-        loading: false,
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const existingInFlight = compareSnapshotStateInFlight.get(stateCacheKey);
-    if (existingInFlight) {
-      setCompareState((prev) => ({
-        ...prev,
-        loading: true,
-        baselineServers: [],
-        missingServers: [],
-        error: null,
-      }));
-      existingInFlight.then((nextState) => {
-        if (cancelled) return;
-        setCompareState(nextState);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setCompareState((prev) => ({
-      ...prev,
-      loading: true,
-      baselineServers: [],
-      missingServers: [],
-      error: null,
-    }));
-
-    const fetchPromise = (async (): Promise<CompareSnapshotUiState> => {
-      const results: FirestoreLatestToplistResult[] = await Promise.all(
-        docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
-      );
-      const snapshots: ToplistPlayerSnapshot[] = [];
-      const baselineServers: string[] = [];
-      const missingServers: string[] = [];
-      let firstErrorCode: string | null = null;
-      let firstErrorDetail: string | null = null;
-
-      results.forEach((result: FirestoreLatestToplistResult, idx) => {
-        const docId = docIds[idx];
-        if (result.ok) {
-          const serverKey = (docId.split("__")[0] || "").trim();
-          baselineServers.push(serverKey);
-          snapshots.push({
-            ...result.snapshot,
-            server: serverKey || result.snapshot.server,
-          });
-        } else {
-          const err: any = result;
-          missingServers.push(docId);
-          if (!firstErrorCode) {
-            firstErrorCode = err.error ?? null;
-            firstErrorDetail = err.detail ?? null;
-          }
-        }
-      });
-
-      const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
-      const missingKey = missingServers.length ? missingServers.join(", ") : null;
-      const errorMsg = missingServers.length
-        ? i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
-        : (firstErrorDetail ?? firstErrorCode ?? null);
-      return {
-        rows: mergedRows,
-        loading: false,
-        baselineServers,
-        missingServers,
-        error: errorMsg,
-      };
-    })()
-      .catch((err) => {
-        const missingKey = docIds.join(", ");
-        const msg = i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
-        console.warn("[ToplistsPlayersCompare] snapshot fetch failed", err);
-        return {
-          rows: [],
-          loading: false,
-          baselineServers: [],
-          missingServers: docIds,
-          error: msg,
-        } satisfies CompareSnapshotUiState;
-      })
-      .finally(() => {
-        compareSnapshotStateInFlight.delete(stateCacheKey);
-      });
-
-    compareSnapshotStateInFlight.set(stateCacheKey, fetchPromise);
-    fetchPromise.then((nextState) => {
-      compareSnapshotStateMemory.set(stateCacheKey, nextState);
-      if (cancelled) return;
-      setCompareState(nextState);
-      if (!nextState.missingServers.length) {
-        writeCompareSnapshotCache(compareCacheKey, {
-          rows: nextState.rows,
-          baselineServers: nextState.baselineServers,
-          missingServers: [],
-          error: null,
-        });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeBaselineCompareMonth, compareServersKey, hasReadOnlyData, isPresetRender]);
-
-  // Load compare target snapshot(s) when comparing month-to-month (visible list = "to" month)
-  useEffect(() => {
-    if (isPresetRender || hasReadOnlyData) return;
-    let cancelled = false;
-    const normalizedTargetMonth = activeTargetCompareMonth;
-    const compareServersList = compareServersKey ? compareServersKey.split(",").filter(Boolean) : [];
-    const compareDisabled =
-      !isCompareMonthsMode ||
-      !normalizedTargetMonth ||
-      normalizedTargetMonth.toLowerCase() === "off";
-
-    if (compareDisabled) {
-      compareTargetRequestKeyRef.current = "";
-      setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!compareServersList.length) {
-      compareTargetRequestKeyRef.current = "";
-      setCompareTargetState({ rows: [], loading: false, baselineServers: [], missingServers: [], error: null });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const requestKey = `${normalizedTargetMonth}__${compareServersKey}`;
-    if (compareTargetRequestKeyRef.current === requestKey) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    compareTargetRequestKeyRef.current = requestKey;
-    const stateCacheKey = `players:target:${requestKey}`;
-
-    const cachedState = compareSnapshotStateMemory.get(stateCacheKey);
-    if (cachedState) {
-      setCompareTargetState({ ...cachedState, loading: false });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const docIds = compareServersList.map((s) => buildCompareDocId(s, normalizedTargetMonth));
-
-    const existingInFlight = compareSnapshotStateInFlight.get(stateCacheKey);
-    if (existingInFlight) {
-      setCompareTargetState((prev) => ({
-        ...prev,
-        loading: true,
-        baselineServers: [],
-        missingServers: [],
-        error: null,
-      }));
-      existingInFlight.then((nextState) => {
-        if (cancelled) return;
-        setCompareTargetState(nextState);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setCompareTargetState((prev) => ({
-      ...prev,
-      loading: true,
-      baselineServers: [],
-      missingServers: [],
-      error: null,
-    }));
-
-    const fetchPromise = (async (): Promise<CompareSnapshotUiState> => {
-      const results: FirestoreLatestToplistResult[] = await Promise.all(
-        docIds.map((docId) => getPlayerToplistSnapshotByDocIdCached(docId))
-      );
-      const snapshots: ToplistPlayerSnapshot[] = [];
-      const snapshotServers: string[] = [];
-      const missingServers: string[] = [];
-      let firstErrorCode: string | null = null;
-      let firstErrorDetail: string | null = null;
-
-      results.forEach((result: FirestoreLatestToplistResult, idx) => {
-        const docId = docIds[idx];
-        if (result.ok) {
-          const serverKey = (docId.split("__")[0] || "").trim();
-          snapshotServers.push(serverKey);
-          snapshots.push({
-            ...result.snapshot,
-            server: serverKey || result.snapshot.server,
-          });
-        } else {
-          const err: any = result;
-          missingServers.push(docId);
-          if (!firstErrorCode) {
-            firstErrorCode = err.error ?? null;
-            firstErrorDetail = err.detail ?? null;
-          }
-        }
-      });
-
-      const mergedRows = snapshots.length ? mergeCompareSnapshotRows(snapshots) : [];
-      const missingKey = missingServers.length ? missingServers.join(", ") : null;
-      const errorMsg = missingServers.length
-        ? i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey ?? "" })
-        : (firstErrorDetail ?? firstErrorCode ?? null);
-      return {
-        rows: mergedRows,
-        loading: false,
-        baselineServers: snapshotServers,
-        missingServers,
-        error: errorMsg,
-      };
-    })()
-      .catch((err) => {
-        const missingKey = docIds.join(", ");
-        const msg = i18n.t("toplists.compareMissingSnapshot", "Baseline missing for {{key}}.", { key: missingKey });
-        console.warn("[ToplistsPlayersCompare] target snapshot fetch failed", err);
-        return {
-          rows: [],
-          loading: false,
-          baselineServers: [],
-          missingServers: docIds,
-          error: msg,
-        } satisfies CompareSnapshotUiState;
-      })
-      .finally(() => {
-        compareSnapshotStateInFlight.delete(stateCacheKey);
-      });
-
-    compareSnapshotStateInFlight.set(stateCacheKey, fetchPromise);
-    fetchPromise.then((nextState) => {
-      compareSnapshotStateMemory.set(stateCacheKey, nextState);
-      if (cancelled) return;
-      setCompareTargetState(nextState);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTargetCompareMonth, compareServersKey, hasReadOnlyData, isCompareMonthsMode, isPresetRender]);
-
-  const compareMonthsTargetRows = React.useMemo(() => {
-    if (!isCompareMonthsMode) return [] as ToplistPlayerRow[];
-
-    let nextRows = Array.isArray(compareTargetState.rows) ? [...compareTargetState.rows] : [];
-    if (!nextRows.length) return nextRows;
-
-    nextRows = nextRows.map((row) => {
-      const mainRatio = deriveRatioMain(row.main, row.con);
-      const existingRatioLabelRaw = typeof row.ratio === "string" ? row.ratio.trim() : "";
-      const existingRatioLabel = existingRatioLabelRaw && existingRatioLabelRaw.includes("/")
-        ? existingRatioLabelRaw
-        : null;
-      const ratioLabel = existingRatioLabel ?? (mainRatio == null ? "-" : `${mainRatio}/${100 - mainRatio}`);
-      const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
-      return {
-        ...row,
-        ratio: ratioLabel,
-        _ratioLabel: ratioLabel,
-        _ratioMain: mainRatio,
-        _calculatedSum: calculatedSum,
-      } as any;
-    });
-
-    nextRows = filterToplistRows(nextRows, filters);
-
-    if (selectedGuildSet && hasGuildData) {
-      nextRows = nextRows.filter((row) => {
-        const key = normalizeGuildKey(row.guild);
-        return key ? selectedGuildSet.has(key) : false;
-      });
-    }
-
-    if (favoritesOnly) {
-      nextRows = nextRows.filter((row) => {
-        const identifier = buildPlayerFavoriteIdentifierFromRow(row);
-        return !!(identifier && favoritePlayerSet.has(identifier));
-      });
-    }
-
-    if (effectiveSort.key !== "statsDay" && effectiveSort.key !== "statsDayTotal") {
-      sortToplistRows(nextRows, effectiveSort);
-    }
-
-    return nextRows;
-  }, [
-    isCompareMonthsMode,
-    compareTargetState.rows,
-    filters,
-    selectedGuildSet,
-    hasGuildData,
-    favoritesOnly,
-    favoritePlayerSet,
-    effectiveSort,
-  ]);
-
-  const effectiveCompareMode: ToplistsCompareMode = React.useMemo(() => {
-    if (compareMode === "months") {
-      return activeBaselineCompareMonth && activeTargetCompareMonth ? "months" : "off";
-    }
-    if (compareMode === "progress") {
-      return activeBaselineCompareMonth ? "progress" : "off";
-    }
-    return "off";
-  }, [compareMode, activeBaselineCompareMonth, activeTargetCompareMonth]);
-  const effectiveCompareDaysOverride = React.useMemo(() => {
-    if (effectiveCompareMode !== "months") return null;
-    return getDaysBetweenMonthKeys(activeBaselineCompareMonth, activeTargetCompareMonth);
-  }, [effectiveCompareMode, activeBaselineCompareMonth, activeTargetCompareMonth]);
-  const effectiveCurrentRows = effectiveCompareMode === "months" ? compareMonthsTargetRows : filteredRows;
-  const effectiveBaselineRows = effectiveCompareMode === "off" ? [] : compareState.rows;
-  const derivedActiveCompareError =
-    effectiveCompareMode === "months"
-      ? (compareTargetState.error ?? compareState.error)
-      : compareState.error;
-  const derivedTableLoading =
-    effectiveCompareMode === "months"
-      ? (compareTargetState.loading || compareState.loading)
-      : playerLoading;
-  const activeCompareError = isPresetRender ? (presetReadOnlyData?.compareError ?? null) : derivedActiveCompareError;
-  const tableLoading = hasReadOnlyData ? (presetReadOnlyData?.tableLoading ?? false) : derivedTableLoading;
+  const compareLoading = presetReadOnlyData?.compareLoading ?? false;
+  const showCompare = presetReadOnlyData?.showCompare ?? false;
+  const activeCompareError = presetReadOnlyData?.compareError ?? null;
+  const tableLoading = hasReadOnlyData ? (presetReadOnlyData?.tableLoading ?? false) : playerLoading;
   const effectivePlayerError = hasReadOnlyData ? (presetReadOnlyData?.playerError ?? null) : playerError;
   const effectivePlayerLastUpdatedAt = hasReadOnlyData ? (presetReadOnlyData?.playerLastUpdatedAt ?? null) : playerLastUpdatedAt;
   const effectivePlayerScopeStatus = hasReadOnlyData ? (presetReadOnlyData?.playerScopeStatus ?? null) : playerScopeStatus;
-
-  React.useCallback((row: ToplistPlayerRow, fallbackIndex?: number) => {
-    const identifier = resolveToplistRowIdentifier(row);
-    if (identifier) return identifier;
-    const serverKey = normalizeServerCode(String(row.server ?? ""));
-    const nameKey = String(row.name ?? "").trim();
-    const classKey = String(row.class ?? "").trim();
-    const suffix = fallbackIndex != null ? String(fallbackIndex) : "na";
-    return `missing-identifier:${serverKey}__${nameKey}__${classKey}__${suffix}`;
-  }, []);
-
-  const buildCompareKey = React.useCallback((row: ToplistPlayerRow) => {
-    return buildPlayerToplistCompareKey(row);
-  }, []);
-
-  const baselineRowByKey = React.useMemo(() => {
-    const map = new Map<string, ToplistPlayerRow>();
-    if (!showCompare) return map;
-    effectiveBaselineRows.forEach((row) => {
-      const key = buildCompareKey(row);
-      if (!map.has(key)) {
-        map.set(key, row);
-      }
-    });
-    return map;
-  }, [showCompare, effectiveBaselineRows, buildCompareKey]);
-
-  const currentRowsWithCompare = React.useMemo(() => {
-    if (!showCompare) return effectiveCurrentRows;
-    return effectiveCurrentRows.map((row) => {
-      const key = buildCompareKey(row);
-      const past = baselineRowByKey.get(key);
-      const serverKey = normalizeCompareServerKey(String((row as any).server ?? ""));
-      const baselineExists = baselineServerSet.has(serverKey);
-      const compareMissing = !baselineExists || !past;
-      const delta = (field: keyof ToplistPlayerRow) => {
-        if (compareMissing || !past) return null;
-        if (field === "ratio") return null;
-        const curr = toNumberSafe((row as any)[field]);
-        const prev = toNumberSafe((past as any)[field]);
-        if (prev == null) return null;
-        return (curr ?? 0) - prev;
-      };
-      const levelDelta = delta("level");
-      const mainDelta = delta("main");
-      const conDelta = delta("con");
-      const sumDelta = delta("sum");
-      const mainTotalDelta = delta("mainTotal");
-      const conTotalDelta = delta("conTotal");
-      const sumTotalDelta = delta("sumTotal");
-      const xpProgressDelta = delta("xpProgress");
-      const xpTotalDelta = delta("xpTotal");
-      const ratioDelta = delta("ratio");
-      const mineDelta = delta("mine");
-      const treasuryDelta = delta("treasury");
-      let statsDays: number | null = null;
-      let statsPerDay: number | null = null;
-      let statsDaysBase: number | null = null;
-      let statsPerDayBase: number | null = null;
-      let statsDaysTotal: number | null = null;
-      let statsPerDayTotal: number | null = null;
-      if (!compareMissing && past) {
-        const statsBase = computeStatsDay(row, past, sumDelta, effectiveCompareDaysOverride, "sum");
-        const statsTotal = computeStatsDay(row, past, sumTotalDelta, effectiveCompareDaysOverride, "sumTotal");
-        statsDaysBase = statsBase.days;
-        statsPerDayBase = statsBase.perDay;
-        statsDaysTotal = statsTotal.days;
-        statsPerDayTotal = statsTotal.perDay;
-        if (effectivePlayerAvgMode === "total") {
-          statsDays = statsDaysTotal;
-          statsPerDay = statsPerDayTotal;
-        } else {
-          statsDays = statsDaysBase;
-          statsPerDay = statsPerDayBase;
-        }
-      }
-      return {
-        ...row,
-        _compareMissing: compareMissing,
-        _statsPerDay: statsPerDay,
-        _statsDays: statsDays,
-        _statsPerDayBase: statsPerDayBase,
-        _statsDaysBase: statsDaysBase,
-        _statsPerDayTotal: statsPerDayTotal,
-        _statsDaysTotal: statsDaysTotal,
-        _delta: {
-          level: levelDelta,
-          main: mainDelta,
-          con: conDelta,
-          sum: sumDelta,
-          mainTotal: mainTotalDelta,
-          conTotal: conTotalDelta,
-          sumTotal: sumTotalDelta,
-          xpProgress: xpProgressDelta,
-          xpTotal: xpTotalDelta,
-          ratio: ratioDelta,
-          mine: mineDelta,
-          treasury: treasuryDelta,
-        },
-      };
-    });
-  }, [
-    showCompare,
-    effectiveCurrentRows,
-    buildCompareKey,
-    baselineRowByKey,
-    baselineServerSet,
-    effectiveCompareDaysOverride,
-    effectivePlayerAvgMode,
-  ]);
-
-  const currentRowByKey = React.useMemo(() => {
-    const map = new Map<string, ToplistPlayerRow>();
-    currentRowsWithCompare.forEach((row) => {
-      const key = buildCompareKey(row);
-      if (!map.has(key)) {
-        map.set(key, row);
-      }
-    });
-    return map;
-  }, [currentRowsWithCompare, buildCompareKey]);
-
-  const baselineRowLimit = React.useMemo(() => {
-    if (!showCompare) return null;
-    const counts = new Map<string, number>();
-    effectiveBaselineRows.forEach((row) => {
-      const serverKey = normalizeServerCode(String(row.server ?? ""));
-      const next = (counts.get(serverKey) || 0) + 1;
-      counts.set(serverKey, next);
-    });
-    let max = 0;
-    counts.forEach((value) => {
-      if (value > max) max = value;
-    });
-    return max || null;
-  }, [showCompare, effectiveBaselineRows]);
-
-  const baselineCombinedRows = React.useMemo(() => {
-    if (!showCompare) return [];
-    let rows = Array.isArray(effectiveBaselineRows) ? [...effectiveBaselineRows] : [];
-    if (!rows.length) return rows;
-
-    rows = rows.map((row) => {
-      const mainRatio = deriveRatioMain(row.main, row.con);
-      const currentMatch = currentRowByKey.get(buildCompareKey(row));
-      const stats = currentMatch
-        ? {
-            base: computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride, "sum"),
-            total: computeStatsDay(currentMatch, row, undefined, effectiveCompareDaysOverride, "sumTotal"),
-          }
-        : { base: { days: null, perDay: null }, total: { days: null, perDay: null } };
-      const calculatedSum = (row.main ?? 0) + (row.con ?? 0);
-      return {
-        ...row,
-        _ratioMain: mainRatio,
-        _statsPerDay: effectivePlayerAvgMode === "total" ? stats.total.perDay : stats.base.perDay,
-        _statsDays: effectivePlayerAvgMode === "total" ? stats.total.days : stats.base.days,
-        _statsPerDayBase: stats.base.perDay,
-        _statsDaysBase: stats.base.days,
-        _statsPerDayTotal: stats.total.perDay,
-        _statsDaysTotal: stats.total.days,
-        _calculatedSum: calculatedSum,
-      } as any;
-    });
-
-    rows = filterToplistRows(rows, filters);
-
-    rows = sortToplistRows(rows, effectiveSort);
-
-    if (baselineRowLimit != null && baselineRowLimit > 0 && rows.length > baselineRowLimit) {
-      rows = rows.slice(0, baselineRowLimit);
-    }
-
-    if (selectedGuildSet && hasGuildData) {
-      rows = rows.filter((row) => {
-        const key = normalizeGuildKey(row.guild);
-        return key ? selectedGuildSet.has(key) : false;
-      });
-    }
-
-    return rows;
-  }, [
-    showCompare,
-    effectiveBaselineRows,
-    filters,
-    effectiveSort,
-    selectedGuildSet,
-    hasGuildData,
-    baselineRowLimit,
-    currentRowByKey,
-    buildCompareKey,
-    effectiveCompareDaysOverride,
-    effectivePlayerAvgMode,
-  ]);
-
-  const baselineRankByKey = React.useMemo(() => {
-    const map = new Map<string, number>();
-    if (!showCompare) return map;
-    baselineCombinedRows.forEach((row, idx) => {
-      const key = buildCompareKey(row);
-      if (!map.has(key)) {
-        map.set(key, idx + 1);
-      }
-    });
-    return map;
-  }, [showCompare, baselineCombinedRows, buildCompareKey]);
-
-  const currentSortedRows = React.useMemo(() => {
-    if (!showCompare || (effectiveSort.key !== "statsDay" && effectiveSort.key !== "statsDayTotal")) {
-      return currentRowsWithCompare;
-    }
-    const next = [...currentRowsWithCompare];
-    sortToplistRows(next, effectiveSort);
-    return next;
-  }, [showCompare, currentRowsWithCompare, effectiveSort]);
-
-  const currentRankByKey = React.useMemo(() => {
-    const map = new Map<string, number>();
-    currentSortedRows.forEach((row, idx) => {
-      const key = buildCompareKey(row);
-      if (!map.has(key)) {
-        map.set(key, idx + 1);
-      }
-    });
-    return map;
-  }, [currentSortedRows, buildCompareKey]);
-
-  const enhancedRows = React.useMemo(() => {
-    if (hasReadOnlyData) {
-      return readOnlyAllRows;
-    }
-    return currentSortedRows.map((row, idx) => {
-      if (!showCompare) {
-        return { ...row, _rank: idx + 1 };
-      }
-      const key = buildCompareKey(row);
-      const currentRank = currentRankByKey.get(key) ?? (idx + 1);
-      const baselineRank = baselineRankByKey.get(key);
-      const rankDelta = baselineRank != null && currentRank != null ? baselineRank - currentRank : null;
-      return {
-        ...row,
-        _rank: idx + 1,
-        _rankDelta: rankDelta,
-      };
-    });
-  }, [hasReadOnlyData, readOnlyAllRows, showCompare, currentSortedRows, buildCompareKey, baselineRankByKey, currentRankByKey]);
+  const buildCompareKey = React.useCallback((row: ToplistPlayerRow) => buildPlayerToplistCompareKey(row), []);
+  const enhancedRows = React.useMemo(() => hasReadOnlyData
+    ? readOnlyAllRows
+    : filteredRows.map((row, idx) => ({ ...row, _rank: idx + 1 })), [hasReadOnlyData, readOnlyAllRows, filteredRows]);
   const renderedRows = React.useMemo(
     () => {
       if (hasReadOnlyData && !isPresetRender) return readOnlyVisibleRows;
@@ -2425,20 +844,8 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
       : effectivePlayerError
         ? t("toplists.status.error", "Error")
         : t("toplists.status.ready", "Ready");
-  const [selectedPlayerProfile, setSelectedPlayerProfile] = React.useState<{
-    identifier: string;
-    name: string | null;
-    server: string | null;
-  } | null>(null);
-  const [selectedGuildProfile, setSelectedGuildProfile] = React.useState<{
-    identifier: string;
-    guildId: string;
-    name: string | null;
-    server: string | null;
-  } | null>(null);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const readOnlyLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null);
-  const guildLookupCacheRef = React.useRef<Map<string, string | null>>(new Map());
   const [tableScrollbarWidth, setTableScrollbarWidth] = React.useState(0);
   const virtualRowHeight = showCompare ? 72 : 64;
   const virtualRowKeys = React.useMemo(
@@ -2486,7 +893,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
       rowVirtualizer.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
     },
   });
-  const compareExpected = isPresetRender ? (presetReadOnlyData?.compareExpected ?? false) : effectiveCompareMode !== "off";
+  const compareExpected = presetReadOnlyData?.compareExpected ?? false;
   const virtualTotalSize = Math.round(rowVirtualizer.getTotalSize());
   const firstRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[0]) : "";
   const lastRenderedKey = renderedRows.length > 0 ? buildCompareKey(renderedRows[renderedRows.length - 1]) : "";
@@ -2496,7 +903,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
     (!compareExpected || (!compareLoading && showCompare && virtualRowHeight === 72));
   const captureStabilityKey = [
     renderMode,
-    effectiveCompareMode,
+    compareMode,
     compareExpected ? "cmp:1" : "cmp:0",
     compareLoading ? "cmpLoading:1" : "cmpLoading:0",
     showCompare ? "showCompare:1" : "showCompare:0",
@@ -2588,64 +995,6 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
   React.useImperativeHandle(ref, () => ({
     getPresetReadOnlyData,
   }), [getPresetReadOnlyData]);
-
-  const resolveGuildOverlayTarget = React.useCallback(
-    async (row: ToplistPlayerRow): Promise<{ guildId: string; serverCode: string } | null> => {
-      const directGuildId = resolveDirectGuildIdFromPlayerRow(row);
-      const serverCode = normalizeServerKeyFromInput(row.server) ?? "";
-      if (directGuildId) {
-        return { guildId: directGuildId, serverCode };
-      }
-
-      const guildName = String(row.guild ?? "").trim();
-      if (!guildName || !serverCode) return null;
-
-      const cacheKey = `${serverCode.toLowerCase()}::${normalizeGuildKey(guildName)}`;
-      if (guildLookupCacheRef.current.has(cacheKey)) {
-        const cached = guildLookupCacheRef.current.get(cacheKey);
-        if (!cached) return null;
-        return { guildId: cached, serverCode };
-      }
-
-      try {
-        const result = await getGuildToplistSnapshotCached(serverCode);
-        if (!result.ok) {
-          guildLookupCacheRef.current.set(cacheKey, null);
-          return null;
-        }
-
-        const guildNameKey = normalizeGuildKey(guildName);
-        const match = result.snapshot.guilds.find((guildRow) => normalizeGuildKey(guildRow.name) === guildNameKey);
-        const guildId = String(match?.guildId ?? "").trim();
-        guildLookupCacheRef.current.set(cacheKey, guildId || null);
-        if (!guildId) return null;
-        return { guildId, serverCode };
-      } catch {
-        guildLookupCacheRef.current.set(cacheKey, null);
-        return null;
-      }
-    },
-    [getGuildToplistSnapshotCached]
-  );
-
-  const handleGuildCellClick = React.useCallback(
-    async (row: ToplistPlayerRow) => {
-      if (onOpenGuildProfile) { onOpenGuildProfile(row); return; }
-      const guildName = String(row.guild ?? "").trim();
-      if (!guildName) return;
-
-      const resolved = await resolveGuildOverlayTarget(row);
-      if (!resolved) return;
-
-      setSelectedGuildProfile({
-        identifier: buildGuildToplistIdentifier(resolved.serverCode || row.server, resolved.guildId) ?? resolved.guildId,
-        guildId: resolved.guildId,
-        name: guildName,
-        server: typeof row.server === "string" ? row.server : resolved.serverCode || null,
-      });
-    },
-    [onOpenGuildProfile, resolveGuildOverlayTarget]
-  );
 
   React.useEffect(() => {
     if (isPresetRender) return;
@@ -2837,12 +1186,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
         const detailId = `toplist-mobile-details-${i}`;
         const openPlayerProfile = () => {
           if (onOpenPlayerProfile) { onOpenPlayerProfile(r); return; }
-          if (!row.profileIdentifier) return;
-          setSelectedPlayerProfile({
-            identifier: row.profileIdentifier,
-            name: typeof r.name === "string" ? r.name : null,
-            server: typeof r.server === "string" ? r.server : null,
-          });
+
         };
 
         const content = (
@@ -2918,7 +1262,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
                     className="toplists-mobile-action-button"
                     onClick={() => {
                       if (!guildName) return;
-                      void handleGuildCellClick(r);
+                      void onOpenGuildProfile?.(r);
                     }}
                   />
                 </div>
@@ -3071,12 +1415,7 @@ export const TableDataView = React.forwardRef<TableDataViewHandle, TableDataView
               onOpenPlayerProfile(r);
               return;
             }
-            if (!profileIdentifier) return;
-            setSelectedPlayerProfile({
-              identifier: profileIdentifier,
-              name: typeof r.name === "string" ? r.name : null,
-              server: typeof r.server === "string" ? r.server : null,
-            });
+
           };
 
           return (
@@ -3149,7 +1488,7 @@ case "guild": return (<td key={column.key} style={cellStyles.guild}>
                     <NeonCoreButton
                       onClick={() => {
                         if (isPresetRender) return;
-                        void handleGuildCellClick(r);
+                        void onOpenGuildProfile?.(r);
                       }}
                       title={String(r.guild ?? "")}
                       label={String(r.guild ?? "")}
@@ -3277,7 +1616,7 @@ default: return null;
           />,
           playerAvgModeSlot
         )}
-      {!localLayout && (activeBaselineCompareMonth || activeTargetCompareMonth) && activeCompareError && (
+      {!localLayout && compareMode !== "off" && activeCompareError && (
         <div style={{ fontSize: 12, color: "#ffb347" }}>
           {activeCompareError}
         </div>
@@ -3347,53 +1686,7 @@ default: return null;
           </div>
         </>
       )}
-      {!isPresetRender && renderFirestoreProfileOverlay && (
-        <>
-          <ProfileOverlay
-            isOpen={Boolean(selectedPlayerProfile?.identifier)}
-            playerIdentifier={selectedPlayerProfile?.identifier ?? null}
-            playerName={
-              selectedPlayerProfile
-                ? [selectedPlayerProfile.name, selectedPlayerProfile.server].filter(Boolean).join(" - ")
-                : null
-            }
-            onClose={() => setSelectedPlayerProfile(null)}
-          />
-          <GuildProfileOverlay
-            isOpen={Boolean(selectedGuildProfile?.guildId)}
-            guildId={selectedGuildProfile?.guildId ?? null}
-            guildName={
-              selectedGuildProfile
-                ? [selectedGuildProfile.name, selectedGuildProfile.server].filter(Boolean).join(" - ")
-                : null
-            }
-            onClose={() => setSelectedGuildProfile(null)}
-          />
-        </>
-      )}
     </div>
   );
 });
 
-function TopTab({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-lg px-3 py-1.5 text-sm text-white border",
-        active ? "bg-[#25456B] border-[#5C8BC6]" : "border-transparent",
-      ].join(" ")}
-    >
-      {label}
-    </button>
-  );
-}

@@ -9,7 +9,6 @@ import PortraitPreview from "../avatar/PortraitPreview";
 import {
   createAvatarSnapshotPortraitFromSfJsonPortrait,
   createPortraitOptionsFromAvatarSnapshot,
-  saveAvatarSnapshotForIdentifier,
 } from "../../lib/firebase/avatarSnapshots";
 import {
   AVATAR_SEARCH_RESULT_LIMIT,
@@ -19,14 +18,6 @@ import {
   getPortraitStatusLabel,
   normalizeAvatarEntry,
 } from "./avatarImportPlayers";
-import { mergeCoaStringIntoMembersSummaryLatest } from "../../lib/import/importer";
-import {
-  isFirestoreReadTraceEnabled,
-  isFirestoreWriteTraceEnabled,
-  reportReadSummary,
-  reportWriteSummary,
-  startReadTraceSession,
-} from "../../lib/debug/firestoreReadTrace";
 import {
   collectGuildCoaCandidates,
   extractGuildCoaString as extractNormalizedGuildCoaString,
@@ -34,7 +25,6 @@ import {
   isValidGuildCoaString,
   type RawGuildSaveToken,
 } from "../../lib/guilds/guildCoa";
-import { useAuth } from "../../context/AuthContext";
 import { CoaRenderer } from "https://sf-libs.12hp.de/coa-lib/coa-lib-1.0.0.min.js";
 import styles from "./UploadCenterV2JsonImport.module.css";
 
@@ -51,21 +41,6 @@ type CoaPreviewCandidate = {
   coaString: string;
   guildName: string | null;
 };
-type CoaBatchTarget = {
-  guildId: string;
-  guildName: string | null;
-  coaString: string;
-  source: string;
-};
-type CoaBatchExtraction = {
-  recognizedGuilds: number;
-  recognizedGuildEntries: number;
-  duplicateGuildEntries: number;
-  skippedMissingCoa: number;
-  skippedInvalidCoa: number;
-  targets: CoaBatchTarget[];
-};
-
 const FIELD_DEFINITIONS: FieldDefinition[] = [
   { key: "identifier", label: "Identifier" },
   { key: "playerId", label: "Player ID" },
@@ -506,79 +481,6 @@ const extractAllCoaCandidates = (
   return Array.from(unique.values());
 };
 
-const extractCoaBatchTargets = (
-  rawJson: unknown,
-  fallbackGuildName: string | null,
-  rawGuildSaveTokens: RawGuildSaveToken[],
-): CoaBatchExtraction => {
-  const groups = getRawGroups(rawJson);
-
-  const seenGuildIds = new Set<string>();
-  const targetsByGuildId = new Map<string, CoaBatchTarget>();
-  let recognizedGuildEntries = 0;
-  let duplicateGuildEntries = 0;
-  let skippedMissingCoa = 0;
-  let skippedInvalidCoa = 0;
-
-  groups.forEach((group, index) => {
-    const guildId = readIdentifierString(group, [
-      "identifier",
-      "id",
-      "group",
-      "groupIdentifier",
-      "groupId",
-      "guildId",
-      "guildIdentifier",
-    ]);
-    if (!guildId) return;
-
-    recognizedGuildEntries += 1;
-    if (seenGuildIds.has(guildId)) {
-      duplicateGuildEntries += 1;
-    } else {
-      seenGuildIds.add(guildId);
-    }
-
-    const guildName = extractGuildNameFromRecord(group) ?? fallbackGuildName;
-    const sourcePrefix = `groups[${index}] (${guildId})`;
-    const coaCandidates = collectCoaCandidatesFromObject(
-      group,
-      sourcePrefix,
-      guildName,
-      getRawSaveSlot1ForGroup(rawGuildSaveTokens, index),
-    );
-
-    if (coaCandidates.length === 0) {
-      skippedMissingCoa += 1;
-      return;
-    }
-
-    const validCandidate = coaCandidates.find((candidate) => isValidGuildCoaString(candidate.coaString));
-    if (!validCandidate) {
-      skippedInvalidCoa += 1;
-      return;
-    }
-
-    if (!targetsByGuildId.has(guildId)) {
-      targetsByGuildId.set(guildId, {
-        guildId,
-        guildName,
-        coaString: validCandidate.coaString,
-        source: validCandidate.source,
-      });
-    }
-  });
-
-  return {
-    recognizedGuilds: seenGuildIds.size,
-    recognizedGuildEntries,
-    duplicateGuildEntries,
-    skippedMissingCoa,
-    skippedInvalidCoa,
-    targets: Array.from(targetsByGuildId.values()),
-  };
-};
-
 function CoaPreviewCanvas({
   coaString,
   guildName,
@@ -785,7 +687,6 @@ const buildParsedGroupSaveFieldValues = (
 };
 
 export default function UploadCenterV2JsonImport() {
-  const { user } = useAuth();
   const [jsonInput, setJsonInput] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [rawJson, setRawJson] = React.useState<unknown>(null);
@@ -799,12 +700,6 @@ export default function UploadCenterV2JsonImport() {
   const [selectedAvatarKey, setSelectedAvatarKey] = React.useState("");
   const [tableMode, setTableMode] = React.useState<TableMode>("overview");
   const [avatarSectionOpen, setAvatarSectionOpen] = React.useState(false);
-  const [coaImportStatus, setCoaImportStatus] = React.useState<string | null>(null);
-  const [coaImportError, setCoaImportError] = React.useState<string | null>(null);
-  const [isCoaImporting, setIsCoaImporting] = React.useState(false);
-  const [avatarImportStatus, setAvatarImportStatus] = React.useState<string | null>(null);
-  const [avatarImportError, setAvatarImportError] = React.useState<string | null>(null);
-  const [isAvatarImporting, setIsAvatarImporting] = React.useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -815,10 +710,6 @@ export default function UploadCenterV2JsonImport() {
       setFileName(file.name);
       setParseStatus(`Loaded ${file.name}. Click parse to evaluate parser fields.`);
       setParseError(null);
-      setCoaImportStatus(null);
-      setCoaImportError(null);
-      setAvatarImportStatus(null);
-      setAvatarImportError(null);
       setRawJson(null);
       setRawGuildSaveTokens([]);
       setParseResult(null);
@@ -850,10 +741,6 @@ export default function UploadCenterV2JsonImport() {
       setRawGuildSaveTokens(guildSaveTokens);
       setParseResult(parsed);
       setParseError(null);
-      setCoaImportStatus(null);
-      setCoaImportError(null);
-      setAvatarImportStatus(null);
-      setAvatarImportError(null);
       setAvatarSearchQuery("");
 
       const avatarEntries = buildAvatarImportPlayerEntries(parsedJson);
@@ -875,10 +762,6 @@ export default function UploadCenterV2JsonImport() {
       setSelectedIdentifier("");
       setSelectedAvatarKey("");
       setAvatarSearchQuery("");
-      setCoaImportStatus(null);
-      setCoaImportError(null);
-      setAvatarImportStatus(null);
-      setAvatarImportError(null);
     }
   };
 
@@ -947,141 +830,6 @@ export default function UploadCenterV2JsonImport() {
     () => extractAllCoaCandidates(rawJson, selectedRawPlayer, selectedGuildName, rawGuildSaveTokens),
     [rawJson, selectedRawPlayer, selectedGuildName, rawGuildSaveTokens],
   );
-  const coaBatchExtraction = React.useMemo(
-    () => extractCoaBatchTargets(rawJson, selectedGuildName, rawGuildSaveTokens),
-    [rawJson, selectedGuildName, rawGuildSaveTokens],
-  );
-  const coaBatchTargets = coaBatchExtraction.targets;
-
-  const handleCoaImport = React.useCallback(async () => {
-    const traceSession = `UploadCenterV2:CoaImportBatch:${coaBatchExtraction.recognizedGuilds}`;
-    startReadTraceSession(traceSession);
-    setCoaImportStatus(null);
-    setCoaImportError(null);
-
-    if (!isFirestoreReadTraceEnabled() && !isFirestoreWriteTraceEnabled()) {
-      console.info(
-        "[UploadCenterV2][COA Import] Firestore trace disabled. Enable via localStorage keys sfh:debug:firestoreReads=1 and/or sfh:debug:firestoreWrites=1.",
-      );
-    }
-
-    if (!parseResult) {
-      setCoaImportError("Parse JSON first.");
-      reportReadSummary(traceSession);
-      reportWriteSummary(traceSession);
-      return;
-    }
-
-    if (coaBatchTargets.length === 0) {
-      setCoaImportError("No importable guild COA targets found in the loaded JSON.");
-      reportReadSummary(traceSession);
-      reportWriteSummary(traceSession);
-      return;
-    }
-
-    setIsCoaImporting(true);
-    try {
-      let updated = 0;
-      let skippedSameValue = 0;
-      let skippedMissingLatest = 0;
-      let failed = 0;
-      const failedEntries: string[] = [];
-
-      for (const target of coaBatchTargets) {
-        try {
-          const result = await mergeCoaStringIntoMembersSummaryLatest({
-            guildId: target.guildId,
-            coaString: target.coaString,
-          });
-
-          if (result.status === "updated") {
-            updated += 1;
-          } else if (result.status === "skipped_missing_latest") {
-            skippedMissingLatest += 1;
-          } else {
-            skippedSameValue += 1;
-          }
-        } catch (error: unknown) {
-          failed += 1;
-          const message = error instanceof Error ? error.message : String(error);
-          failedEntries.push(`${target.guildId}: ${message}`);
-        }
-      }
-
-      const summary = [
-        `COA batch finished.`,
-        `Guilds recognized: ${coaBatchExtraction.recognizedGuilds} (${coaBatchExtraction.recognizedGuildEntries} entries).`,
-        `Processed targets: ${coaBatchTargets.length}.`,
-        `Imported: ${updated}.`,
-        `Unchanged/skipped: ${skippedSameValue}.`,
-        `Skipped missing latest: ${skippedMissingLatest}.`,
-        `Skipped missing/invalid coaString: ${coaBatchExtraction.skippedMissingCoa + coaBatchExtraction.skippedInvalidCoa}.`,
-      ].join(" ");
-
-      setCoaImportStatus(summary);
-
-      if (failed > 0) {
-        const failedPreview = failedEntries.slice(0, 3).join(" | ");
-        const extra = failedEntries.length > 3 ? ` (+${failedEntries.length - 3} more)` : "";
-        setCoaImportError(`COA batch had ${failed} failed writes. ${failedPreview}${extra}`);
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      setCoaImportError(`COA import failed: ${message}`);
-    } finally {
-      setIsCoaImporting(false);
-      reportReadSummary(traceSession);
-      reportWriteSummary(traceSession);
-    }
-  }, [parseResult, coaBatchExtraction, coaBatchTargets]);
-
-  const handleAvatarImport = React.useCallback(async () => {
-    setAvatarImportStatus(null);
-    setAvatarImportError(null);
-
-    if (!parseResult) {
-      setAvatarImportError("Parse JSON first.");
-      return;
-    }
-
-    if (!selectedAvatarEntry) {
-      setAvatarImportError("Select a player to import avatar data.");
-      return;
-    }
-
-    if (!selectedAvatarPortrait) {
-      setAvatarImportError(`Selected player is not importable. Portrait status: ${getPortraitStatusLabel(selectedAvatarNormalized)}.`);
-      return;
-    }
-
-    const playerId = selectedAvatarNormalized?.identity.id ?? selectedAvatarEntry.playerId ?? 0;
-    const server = selectedAvatarNormalized?.identity.server ?? selectedAvatarEntry.server ?? "";
-
-    if (!user?.id) {
-      setAvatarImportError("Missing authenticated user id.");
-      return;
-    }
-
-    setIsAvatarImporting(true);
-    try {
-      await saveAvatarSnapshotForIdentifier({
-        userId: user.id,
-        identifier: selectedAvatarEntry.identifier,
-        playerId,
-        server,
-        source: "scanUpload",
-        portrait: createAvatarSnapshotPortraitFromSfJsonPortrait(selectedAvatarPortrait),
-      });
-      setAvatarImportStatus(
-        `Avatar imported for ${selectedAvatarEntry.name || selectedAvatarEntry.identifier} (${server || "unknown-server"}).`,
-      );
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      setAvatarImportError(`Avatar import failed: ${message}`);
-    } finally {
-      setIsAvatarImporting(false);
-    }
-  }, [parseResult, selectedAvatarEntry, selectedAvatarNormalized, selectedAvatarPortrait, user?.id]);
   const avatarPreviewConfig = React.useMemo(() => {
     if (!selectedAvatarEntry || !selectedAvatarPortrait) return null;
     return createPortraitOptionsFromAvatarSnapshot({
@@ -1167,7 +915,7 @@ export default function UploadCenterV2JsonImport() {
         <div>
           <h3 className={styles.title}>Upload Center v2 - JSON Importer</h3>
           <p className={styles.subtitle}>
-            Mapping mode keeps the existing parser preview. COA Import and Avatar Import write through existing import paths.
+            Inspect JSON mapping, guild coats of arms, and player portraits locally.
           </p>
         </div>
 
@@ -1195,12 +943,8 @@ export default function UploadCenterV2JsonImport() {
           setSelectedIdentifier("");
           setSelectedAvatarKey("");
           setAvatarSearchQuery("");
-          setCoaImportStatus(null);
-          setCoaImportError(null);
-          setAvatarImportStatus(null);
-          setAvatarImportError(null);
         }}
-        placeholder='Paste full SF JSON here (requires "players" with complete player saves for avatar import).'
+        placeholder='Paste full SF JSON here (requires "players" with complete player saves for avatar preview).'
         rows={10}
       />
 
@@ -1224,14 +968,14 @@ export default function UploadCenterV2JsonImport() {
           className={`${styles.modeToggleBtn} ${importMode === "coa_import" ? styles.modeToggleBtnActive : ""}`}
           onClick={() => setImportMode("coa_import")}
         >
-          COA Import
+          COA Preview
         </button>
         <button
           type="button"
           className={`${styles.modeToggleBtn} ${importMode === "avatar_import" ? styles.modeToggleBtnActive : ""}`}
           onClick={() => setImportMode("avatar_import")}
         >
-          Avatar Import
+          Avatar Preview
         </button>
       </div>
 
@@ -1497,24 +1241,6 @@ export default function UploadCenterV2JsonImport() {
         parseResult ? (
           <div className={styles.importCard}>
             <div className={styles.importRow}>
-              <span className={styles.importLabel}>Recognized Guilds</span>
-              <span className={styles.summaryValueMono}>
-                {coaBatchExtraction.recognizedGuilds} ({coaBatchExtraction.recognizedGuildEntries} entries)
-              </span>
-            </div>
-            <div className={styles.importRow}>
-              <span className={styles.importLabel}>Importable Targets</span>
-              <span className={styles.summaryValueMono}>{coaBatchTargets.length}</span>
-            </div>
-            <div className={styles.importRow}>
-              <span className={styles.importLabel}>Skipped Before Import</span>
-              <span className={styles.summaryValueMono}>
-                missing coaString: {coaBatchExtraction.skippedMissingCoa}, invalid coaString:{" "}
-                {coaBatchExtraction.skippedInvalidCoa}, duplicate guild entries:{" "}
-                {coaBatchExtraction.duplicateGuildEntries}
-              </span>
-            </div>
-            <div className={styles.importRow}>
               <span className={styles.importLabel}>Guild Name</span>
               <span className={styles.summaryValue}>{selectedGuildName ?? "(missing)"}</span>
             </div>
@@ -1541,21 +1267,9 @@ export default function UploadCenterV2JsonImport() {
                 )}
               </div>
             </div>
-            {!!coaImportStatus && <p className={styles.statusOk}>{coaImportStatus}</p>}
-            {!!coaImportError && <p className={styles.statusError}>{coaImportError}</p>}
-            <div className={styles.importActions}>
-              <button
-                type="button"
-                className={styles.parseButton}
-                onClick={handleCoaImport}
-                disabled={isCoaImporting || coaBatchTargets.length === 0}
-              >
-                {isCoaImporting ? "Importing..." : "Import COA for All Recognized Guilds"}
-              </button>
-            </div>
           </div>
         ) : (
-          <div className={styles.emptyState}>Parse JSON first to run COA import.</div>
+          <div className={styles.emptyState}>Parse JSON first to preview guild coats of arms.</div>
         )
       ) : parseResult ? (
         <div className={styles.importCard}>
@@ -1586,8 +1300,6 @@ export default function UploadCenterV2JsonImport() {
                     className={`${styles.avatarResultButton} ${entry.key === selectedAvatarKey ? styles.avatarResultButtonActive : ""}`}
                     onClick={() => {
                       setSelectedAvatarKey(entry.key);
-                      setAvatarImportStatus(null);
-                      setAvatarImportError(null);
                     }}
                   >
                     <span className={styles.avatarResultMain}>
@@ -1710,21 +1422,9 @@ export default function UploadCenterV2JsonImport() {
               Portrait preview unavailable for this player. Status: {getPortraitStatusLabel(selectedAvatarNormalized)}.
             </div>
           ) : null}
-          {!!avatarImportStatus && <p className={styles.statusOk}>{avatarImportStatus}</p>}
-          {!!avatarImportError && <p className={styles.statusError}>{avatarImportError}</p>}
-          <div className={styles.importActions}>
-            <button
-              type="button"
-              className={styles.parseButton}
-              onClick={handleAvatarImport}
-              disabled={isAvatarImporting || !selectedAvatarEntry || !selectedAvatarPortrait || !user?.id}
-            >
-              {isAvatarImporting ? "Importing..." : "Import Avatar"}
-            </button>
-          </div>
         </div>
       ) : (
-        <div className={styles.emptyState}>Parse JSON first to run avatar import.</div>
+        <div className={styles.emptyState}>Parse JSON first to preview player portraits.</div>
       )}
     </section>
   );

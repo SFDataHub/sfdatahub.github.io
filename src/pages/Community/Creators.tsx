@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import "./creators.css";
 
 import creatorSheet from "../../data/creatorSheet";
@@ -181,6 +182,7 @@ function TableView({ data }: { data: Creator[] }) {
 }
 
 export default function CommunityCreators() {
+  const { t } = useTranslation();
   const [dataMode, setDataMode] = useState<DataMode>("static");
   const [displayMode, setDisplayMode] = useState<DisplayMode>("cards");
   const [sortKey, setSortKey] = useState<SortKey>("subs");
@@ -259,7 +261,7 @@ export default function CommunityCreators() {
   return (
     <section className="cc-wrap">
       <div className="cc-heading">
-        <h1>Content Creator Hub</h1>
+        <h1>{t("nav.creatorHub")}</h1>
         <p className="cc-sub">Profiles, stats and links to community creators.</p>
         {snapshot && (
           <p className="cc-sync">

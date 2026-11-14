@@ -2,7 +2,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 /**
- * Grundschema für SFDataHub – passt zu den Upserts in src/lib/import/upsert.ts
+ * Grundschema für SFDataHub
  */
 export type PlayerRow = {
   id: string;           // z.B. "eu1:12345"

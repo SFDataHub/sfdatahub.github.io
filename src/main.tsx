@@ -7,7 +7,7 @@ import { cleanupLegacySearchStorage } from "./lib/search/legacySearchStorageMigr
 import "./styles/index.css";
 import "./i18n";
 
-import { HashRouter, Route, Routes, Navigate, useLocation, createRoutesFromChildren } from "react-router-dom";
+import { HashRouter, Route, Routes, Navigate, createRoutesFromChildren } from "react-router-dom";
 import RootLayout from "./layout/RootLayout";
 
 import Home from "./pages/Home";
@@ -32,27 +32,23 @@ import HelpPage from "./pages/Help/HelpPage";
 
 
 // Toplists
-import ToplistsIndex from "./pages/Toplists/index";
 
 // Entity Hubs – Players
 import PlayersIndex from "./pages/players/Index";
 import PlayersRankings from "./pages/players/Rankings";
 import PlayersStats from "./pages/players/Stats";
-import PlayerProfile from "./pages/players/PlayerProfile";
 import PlayersCompare from "./pages/players/comparePlayer";
 
 // Entity Hubs – Guilds
 import GuildsIndex from "./pages/guilds/Index";
 import GuildsRankings from "./pages/guilds/Rankings";
 import GuildsStats from "./pages/guilds/Stats";
-import GuildProfile from "./pages/guilds/Profile"; // ✨ NEU
 
 // Entity Hubs – Servers
 import ServersIndex from "./pages/servers/Index";
 import ServersRankings from "./pages/servers/Rankings";
 import ServersStats from "./pages/servers/Stats";
 import ServersOverviewPage from "./pages/servers/overview/Index";
-import ServerProfilePage from "./pages/servers/Profile"; // ✨ NEU
 
 // Public Profile
 import PublicProfilePage from "./pages/PublicProfile/PublicProfilePage";
@@ -60,15 +56,14 @@ import PublicProfilePage from "./pages/PublicProfile/PublicProfilePage";
 // Guide Hub
 import GuidesIndex from "./pages/GuideHub/Index";
 import GuideHubV2 from "./pages/GuideHubV2/Index";
+import SFCollection from "./pages/SFCollection/Index";
 // SF Magazin
 // Community
-import CommunityIndex from "./pages/Community/Index";
+import CommunityIndex, { CommunityLegacyRedirect } from "./pages/Community/Index";
 import CommunityScans from "./pages/Community/Scans";
 import CommunityPredictions from "./pages/Community/Predictions";
-import CommunityCreators from "./pages/Community/Creators";
 import CommunityFeedback from "./pages/Community/Feedback";
 import CommunityNews from "./pages/Community/News";
-import CommunityRecords from "./pages/Community/Records";
 
 // Scans
 import ScansIndex from "./pages/Scans/Index";
@@ -82,7 +77,6 @@ import { registerAppReturnRoutes } from "./lib/data-hub/routes";
 import DataHubRouteHost from "./pages/DataHub/RouteHost";
 
 // Admin
-import AdminScansUploaded from "./pages/Admin/ScansUploaded";
 import AdminCreatorsAPI from "./pages/Admin/CreatorsAPI";
 import AdminScanCoveragePage from "./pages/Admin/ScanCoverage";
 import AdminScanArchiveBuilderPage from "./pages/Admin/ScanArchiveBuilder";
@@ -174,20 +168,16 @@ import A11yPassPage from "./pages/Playground/QA/A11yPassPage";
 
 // Tools
 import ToolsPage from "./pages/tools/ToolsPage";
-import SearchResultsPage from "./pages/search/SearchResults";
 
 /** Upload Center */
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
-import { UploadCenterSessionsProvider } from "./components/UploadCenter/UploadCenterSessionsContext";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import { DataJobsProvider } from "./context/DataJobsContext";
 import FeatureGate from "./components/FeatureGate";
-import LegacyToplistsGate from "./components/LegacyToplistsGate";
 import { FeatureAccessProvider } from "./lib/featureAccessConfig";
-import UploadCenterPage from "./pages/UploadCenter/Index";
 import UploadCenterV2Page from "./pages/UploadCenter/V2";
 
 const P = (t: string) => () => (
@@ -196,22 +186,6 @@ const P = (t: string) => () => (
   </div>
 );
 const NotFoundOld = P("Diese Unterseite existiert in der neuen Struktur nicht mehr.");
-const ToplistsLegacyRedirect = ({ tab }: { tab: "players" | "guilds" }) => {
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  params.set("tab", tab);
-  const query = params.toString();
-  return <Navigate to={`/toplists${query ? `?${query}` : ""}`} replace />;
-};
-
-const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
-  const { status, user } = useAuth();
-  if (status === "loading" || status === "idle") return null;
-  if (!user?.roles?.includes("admin")) {
-    return <Navigate to="/admin" replace />;
-  }
-  return <>{children}</>;
-};
 
 const withFeatureGate = (
   featureId: string,
@@ -241,7 +215,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <LocalePreferencesProvider>
             <FeatureAccessProvider>
               <UploadCenterProvider>
-                <UploadCenterSessionsProvider>
                   <HashRouter>
                   <DataHubRouteHost>{routeLocation => <AppRoutes location={routeLocation}>
                     <Route element={<RootLayout />}>
@@ -277,10 +250,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
 
                 {/* Toplists */}
-                <Route
-                  path="/toplists"
-                  element={<LegacyToplistsGate>{withFeatureGate("main.toplists", "/toplists", <ToplistsIndex />)}</LegacyToplistsGate>}
-                />
 
                 {/* SF Magazine */}
                 <Route path="/sfmagazine" element={<SFMagazineIndex />} />
@@ -289,36 +258,26 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Help (public) */}
                 <Route path="/help" element={<HelpPage />} />
-                <Route path="/search" element={<SearchResultsPage />} />
 
                 {/* Players */}
                 <Route path="/players" element={<PlayersIndex />} />
                 <Route path="/players/rankings" element={<PlayersRankings />} />
                 <Route path="/players/stats" element={<PlayersStats />} />
-                <Route path="/players/profile" element={<PlayerProfile />} />
-                <Route path="/players/profile/:identifier" element={<PlayerProfile />} />
                 <Route path="/players/compare" element={<PlayersCompare />} />
                 {/* kurze Route f?r Suche */}
-                <Route path="/player/:identifier" element={<PlayerProfile />} />
 
                 {/* Guilds */}
                 <Route path="/guilds" element={<GuildsIndex />} />
                 <Route path="/guilds/rankings" element={<GuildsRankings />} />
                 <Route path="/guilds/stats" element={<GuildsStats />} />
                 {/* ?o? Gildenprofil */}
-                <Route path="/guilds/profile" element={<GuildProfile />} />
-                <Route path="/guilds/profile/:guildId" element={<GuildProfile />} />
                 {/* kurze Route f?r Suche */}
-                <Route path="/guild/:guildId" element={<GuildProfile />} />
 
                 {/* Servers */}
                 <Route path="/servers" element={<ServersIndex />} />
                 <Route path="/servers/rankings" element={<ServersRankings />} />
                 <Route path="/servers/stats" element={<ServersStats />} />
                 <Route path="/servers/overview" element={<ServersOverviewPage />} />
-                <Route path="/servers/profile" element={<ServerProfilePage />} />
-                <Route path="/servers/profile/:serverId" element={<ServerProfilePage />} />
-                <Route path="/server/:serverId" element={<ServerProfilePage />} />
 
                 {/* Public Profiles */}
                 <Route path="/u/:profileId" element={<PublicProfilePage />} />
@@ -333,6 +292,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   element={withFeatureGate("main.guidehub", "/guidehub-v2", <GuideHubV2 />)}
                 />
 
+                <Route path="/sf-collection" element={<SFCollection />} />
+
                 {/* Tools */}
                 <Route
                   path="/tools"
@@ -341,14 +302,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Upload Center */}
                 <Route
-                  path="/upload-center"
-                  element={withFeatureGate("main.uploadCenter", "/upload-center", <UploadCenterPage />, <Navigate to="/login" replace />)}
-                />
-                <Route
                   path="/upload-center-v2"
                   element={withFeatureGate("main.uploadCenter", "/upload-center-v2", <UploadCenterV2Page />, <Navigate to="/login" replace />)}
                 />
-                <Route path="/UploadCenter" element={<Navigate to="/upload-center" replace />} />
 
                 {/* Community */}
                 <Route
@@ -365,7 +321,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
                 <Route
                   path="/community/creators"
-                  element={withFeatureGate("main.community", "/community", <CommunityCreators />)}
+                  element={withFeatureGate("main.community", "/community", <CommunityLegacyRedirect tab="creators" />)}
                 />
                 <Route
                   path="/community/feedback"
@@ -377,7 +333,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
                 <Route
                   path="/community/records"
-                  element={withFeatureGate("main.community", "/community", <CommunityRecords />)}
+                  element={withFeatureGate("main.community", "/community", <CommunityLegacyRedirect tab="records" />)}
                 />
 
                 {/* Scans */}
@@ -402,14 +358,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Admin */}
                 <Route
-                  path="/admin"
-                  element={withFeatureGate("main.admin", "/admin", <Navigate to="/upload-center" replace />)}
-                />
-                <Route
-                  path="/admin/scans-uploaded"
-                  element={withFeatureGate("main.admin", "/admin", <AdminScansUploaded />)}
-                />
-                <Route
                   path="/admin/scan-coverage"
                   element={withFeatureGate("main.admin", "/admin", <AdminScanCoveragePage />)}
                 />
@@ -427,14 +375,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
                 <Route
                   path="/admin/visitor-analytics"
-                  element={withFeatureGate(
-                    "main.admin",
-                    "/admin",
-                    <AdminOnlyRoute>
-                      <AdminVisitorAnalyticsPage />
-                    </AdminOnlyRoute>,
-                    <Navigate to="/admin" replace />,
-                  )}
+                  element={<AdminVisitorAnalyticsPage />}
                 />
 
                 {/* Settings */}
@@ -538,9 +479,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/guilds/planner" element={NotFoundOld()} />
                 <Route path="/guilds/fusion" element={NotFoundOld()} />
                 <Route path="/guilds/academy" element={NotFoundOld()} />
-                <Route path="/toplists/players" element={<LegacyToplistsGate><ToplistsLegacyRedirect tab="players" /></LegacyToplistsGate>} />
-                <Route path="/toplists/guilds" element={<LegacyToplistsGate><ToplistsLegacyRedirect tab="guilds" /></LegacyToplistsGate>} />
-                <Route path="/toplists/servers" element={NotFoundOld()} />
                 <Route path="/settings/profile" element={NotFoundOld()} />
                 <Route path="/settings/appearance" element={NotFoundOld()} />
                 <Route path="/players/search" element={NotFoundOld()} />
@@ -557,7 +495,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                   {/* Modal am Root */}
                   <UploadCenterModal />
-                </UploadCenterSessionsProvider>
               </UploadCenterProvider>
             </FeatureAccessProvider>
           </LocalePreferencesProvider>

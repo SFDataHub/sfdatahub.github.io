@@ -107,6 +107,9 @@
   transition: margin-left .2s ease;
 }
 
+/* The admin SF Collection preview fills its route without changing shell offsets. */
+#app-shell[data-sf-collection="true"] > .content { padding-inline: 0; }
+
 /* Optional, aber hilfreich: Content-Inner-Struktur */
 #app-shell .content-inner{ min-height: calc(100vh - var(--topbar-h) - var(--content-bottom-inset)); display:flex; flex-direction:column; }
 

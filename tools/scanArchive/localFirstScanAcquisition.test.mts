@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   __localFirstScanAcquisitionTestUtils,
   acquireLocalFirstScans,
+  acquireExplicitLocalFirstArchiveScans,
+  type ArchiveAcquisitionProgress,
   type LocalFirstScanAcquisitionDependencies,
 } from "../../src/lib/scanArchive/localFirstScanAcquisition.ts";
 import type { LocalFirstScanRequest } from "../../src/lib/guilds/localFirstScanResolver.ts";
@@ -346,3 +348,52 @@ __localFirstScanAcquisitionTestUtils.clearInFlightArchiveImports();
 }
 
 console.log("localFirstScanAcquisition.test: ok");
+
+// Receipt, parallel validation/import, local reuse and shared cancellation are separate facts.
+{
+  const h = createHarness();
+  const gate = () => { let release!: () => void; const promise = new Promise<void>(resolve => release = resolve); return { promise, release }; };
+  const receiving = gate(), checking = gate(), importing = gate();
+  const started = gate(), received = gate(), processing = gate();
+  const download = h.deps.downloadArchiveEntry!, preview = h.deps.createLocalScanImportPreview!;
+  h.deps.downloadArchiveEntry = async (archive, signal, report) => {
+    if (archive.id === a.id) {
+      started.release(); await receiving.promise;
+      report?.({ phase: "hashing", message: "received" }); received.release(); await checking.promise;
+    } else { await receiving.promise; }
+    return download(archive, signal, report);
+  };
+  h.deps.createLocalScanImportPreview = async (...args) => {
+    if (args[2].archiveSource?.archiveScanId === a.id) { processing.release(); await importing.promise; }
+    return preview(...args);
+  };
+  const left: ArchiveAcquisitionProgress[] = [], right: ArchiveAcquisitionProgress[] = [];
+  const controller = new AbortController();
+  const run = acquireExplicitLocalFirstArchiveScans([a, b], { dependencies: h.deps, signal: controller.signal, onProgress: p => left.push(p) });
+  await started.promise;
+  assert.equal(left.at(-1)!.files!.filter(file => file.downloaded).length, 0);
+  const shared = acquireExplicitLocalFirstArchiveScans([a], { dependencies: h.deps, onProgress: p => right.push(p) });
+  receiving.release(); await received.promise;
+  assert.ok(left.some(p => p.files?.some(file => file.activity === "checking" && file.downloaded)));
+  const size = left.length;
+  const rejected = assert.rejects(run, error => error instanceof DOMException && error.name === "AbortError");
+  controller.abort(); checking.release(); await processing.promise;
+  assert.equal(left.length, size, "aborted consumer receives no late progress");
+  assert.ok(right.some(p => p.files?.some(file => file.activity === "processing" && file.downloaded)));
+  assert.equal(right.at(-1)!.succeeded, 0, "downloaded does not mean imported");
+  importing.release(); await rejected; assert.equal((await shared).status, "complete");
+  assert.equal(h.calls.downloads.filter(id => id === a.id).length, 1);
+  const warm: ArchiveAcquisitionProgress[] = [];
+  const reused = await acquireExplicitLocalFirstArchiveScans([a], { dependencies: h.deps, onProgress: p => warm.push(p) });
+  assert.equal(reused.networkAccessed, false);
+  assert.equal(warm.at(-1)!.files![0].reused, true);
+  assert.equal(warm.at(-1)!.files![0].downloaded, false);
+  const failed: ArchiveAcquisitionProgress[] = [];
+  const bad = createHarness({ downloadFailures: new Set([c.id]) });
+  await acquireExplicitLocalFirstArchiveScans([c], { dependencies: bad.deps, onProgress: p => failed.push(p) });
+  assert.equal(failed.at(-1)!.succeeded, 0);
+  assert.equal(failed.at(-1)!.files![0].activity, "failed");
+  assert.equal(failed.at(-1)!.files![0].downloaded, false);
+  await acquireExplicitLocalFirstArchiveScans([a], { dependencies: h.deps, onProgress: () => { throw Error("observer only"); } });
+}
+console.log("PASS physical progress: real receipt, import boundary, reuse, errors and shared abort");

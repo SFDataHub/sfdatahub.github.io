@@ -3,15 +3,10 @@ import cors from "cors";
 import express from "express";
 
 import adminRouter from "./routes/admin";
-import adminStatsRouter from "./routes/adminStats";
 import visitorAnalyticsRouter from "./routes/visitorAnalytics";
 import authRouter from "./routes/auth";
 import adminAccessControlRouter from "./routes/adminAccessControl";
 import internalAdminRouter from "./routes/internalAdmin";
-import scanUploadsRouter from "./routes/scanUploads";
-import userUploadInboxRouter from "./routes/userUploadInbox";
-import scanUploadsPublicRouter from "./routes/scanUploadsPublic";
-import playerChartsRouter from "./routes/playerCharts";
 import { latestDiscordNewsHandler } from "./public/news/discord/latest.handler";
 import { listDiscordNewsHandler } from "./public/news/discord/list.handler";
 import { latestDiscordNewsByChannelHandler } from "./public/news/discord/latestByChannel.handler";
@@ -20,6 +15,7 @@ import { syncVisitorAnalyticsSnapshotHandler } from "./internal/analytics/visito
 import { twitchLiveHandler } from "./public/twitch/live.handler";
 
 import { creatorRouter } from "./creators/routes";
+import { creatorHubHandler } from "./creatorHub/route";
 
 const app = express();
 
@@ -36,21 +32,17 @@ app.use(cookieParser());
 app.use("/auth", authRouter);
 app.use("/admin", adminRouter);
 app.use("/api/admin/stats/visitor", visitorAnalyticsRouter);
-app.use("/api/admin/stats", adminStatsRouter);
 app.use("/admin/access-control", adminAccessControlRouter);
 app.use("/internal", internalAdminRouter);
-app.use("/internal/scan-uploads", scanUploadsRouter);
-app.use("/api/players", playerChartsRouter);
 app.post("/internal/news/discord/refresh-snapshot", refreshDiscordNewsSnapshotHandler);
 app.post("/internal/analytics/visitor/sync-snapshot", syncVisitorAnalyticsSnapshotHandler);
-app.use("/", scanUploadsPublicRouter);
-app.use("/user", userUploadInboxRouter);
 app.get("/public/news/discord/latest", latestDiscordNewsHandler);
 app.get("/public/news/discord/list", listDiscordNewsHandler);
 app.get("/public/news/discord/latest-by-channel", latestDiscordNewsByChannelHandler);
 app.get("/api/twitch/live", twitchLiveHandler);
 
 app.use(creatorRouter);
+app.get("/public/creator-hub.json", creatorHubHandler);
 
 app.get("/health", (_req, res) => {
   // Lightweight readiness probe for Cloud Run/Functions

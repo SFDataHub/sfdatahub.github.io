@@ -92,10 +92,16 @@
 .reviewLine > span:first-child { color: var(--sfh-muted); }
 .reviewLine strong { font-weight: 600; text-align: right; max-width: 65%; }
 .reviewLine select { background: #0c1c2e; border: 1px solid #456a8d; border-radius: 5px; color: #eef5ff; padding: 4px 7px; font-size: 12px; max-width: 230px; }
-.progressMeta { display: flex; justify-content: space-between; gap: 10px; margin: 32px 0 10px; font-size: 12px; }
+.progressMeta { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0 10px; font-size: 12px; }
 .track { height: 7px; border-radius: 5px; background: #264058; overflow: hidden; }
 .trackFill { height: 100%; width: 0; background: linear-gradient(90deg, #58a6dd, #3bdbb1); transition: width .25s ease; border-radius: 5px; }
-.loadRows { display: grid; gap: 15px; margin-top: 24px; }
+.scanDetail { margin-top: 10px; padding: 8px 14px; border: 1px solid var(--sfh-line); border-radius: 8px; background: #122b43; }
+.scanMeta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 3px 12px; font-size: 12px; line-height: 1.5; color: var(--sfh-muted); }
+.scanMeta + .scanMeta { margin-top: 3px; }
+.scanMeta strong { font-weight: 600; color: var(--sfh-text); }
+.fileTrack { height: 3px; margin-top: 6px; }
+.loadRows { display: grid; gap: 3px; margin-top: 8px; }
+.body .scanDetail + .summaryText, .body .scanDetail + .summaryText + .summaryText { margin-top: 8px; }
 .loadRow { display: flex; align-items: center; gap: 11px; font-size: 12px; color: #94adc4; }
 .statusDot { height: 7px; width: 7px; border-radius: 50%; background: #45627a; flex-shrink: 0; }
 .loadRow[data-active="true"] { color: #f4f8ff; }

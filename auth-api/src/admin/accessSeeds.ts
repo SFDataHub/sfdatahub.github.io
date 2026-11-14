@@ -273,7 +273,7 @@ export const featureAccessSeeds: FeatureAccessSeed[] = [
   },
   {
     id: "main.uploadCenter",
-    route: "/upload-center",
+    route: "/upload-center-v2",
     area: "main",
     titleKey: "feature.uploadCenter",
     status: "logged_in",

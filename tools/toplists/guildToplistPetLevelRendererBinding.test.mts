@@ -4,15 +4,8 @@ import { readFileSync } from "node:fs";
 import { mapFirestoreGuildRow } from "../../src/lib/api/toplistGuildRowMapper.ts";
 import { readGuildLatestMeta } from "../../src/lib/import/guildLatestMeta.ts";
 
-const csvSource = readFileSync(new URL("../../src/lib/import/csv.ts", import.meta.url), "utf8");
-const importerSource = readFileSync(new URL("../../src/lib/import/importer.ts", import.meta.url), "utf8");
-const monthlyBackfillSource = readFileSync(
-  new URL("../backfill-monthly-guild-toplists.mts", import.meta.url),
-  "utf8",
-);
 const guildToplistsSource = readFileSync(new URL("../../src/pages/Toplists/guildtoplists.tsx", import.meta.url), "utf8");
 const guildHubToplistSource = readFileSync(new URL("../../src/pages/DataHub/Toplist.tsx", import.meta.url), "utf8");
-const firestoreSource = readFileSync(new URL("../../src/lib/api/toplistsFirestore.ts", import.meta.url), "utf8");
 const guildRowMapperSource = readFileSync(new URL("../../src/lib/api/toplistGuildRowMapper.ts", import.meta.url), "utf8");
 const contractsSource = readFileSync(new URL("../../src/lib/toplists/toplistContracts.ts", import.meta.url), "utf8");
 
@@ -79,15 +72,8 @@ assert.match(guildToplistsSource, mobilePetLevelBinding);
 assert.match(guildToplistsSource, desktopPetLevelBinding);
 assert.doesNotMatch(guildToplistsSource, mobilePetLevelUsesInstructor);
 assert.doesNotMatch(guildToplistsSource, desktopPetLevelUsesInstructor);
-assert.match(guildToplistsSource, /petLevel: toFiniteNumber\(row\.petLevel\)/);
-assert.match(guildToplistsSource, /instructor: toFiniteNumber\(row\.instructor\)/);
-assert.doesNotMatch(firestoreSource, /export type \{ ToplistGuildRow \};/);
 assert.match(contractsSource, publicGuildRowTypeIncludesPetLevel);
 assert.match(guildRowMapperSource, firestoreGuildMapperIncludesPetLevel);
 assert.match(guildHubToplistSource, publicGuildAdapterIncludesPetLevel);
-assert.match(csvSource, /petLevel: toFiniteNumberOrNull\(aggregate\.petLevel\)/);
-assert.match(csvSource, /petLevel: latestMeta\.petLevel/);
-assert.match(importerSource, /petLevel: latestMeta\.petLevel/);
-assert.match(monthlyBackfillSource, /petLevel: toFiniteNumberOrNull\(history\?\.petLevel\) \?\? latestMeta\.petLevel/);
 
 console.log("guildToplistPetLevelRendererBinding.test: ok");

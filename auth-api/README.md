@@ -38,35 +38,21 @@ When deploying this service, configure the frontend `.env` to set `VITE_AUTH_BAS
 - Ensure `FRONTEND_BASE_URL` matches your Vite app (default `http://localhost:5173`).
 - Run `npm run dev` in `auth-api/` and set `VITE_AUTH_BASE_URL=http://localhost:4000` in the frontend to test the complete login flow.
 
-### Internal Upload Inbox Endpoint
+### Retired Discord scan integration
 
-An internal endpoint allows the Discord bot to deposit processed scans:
+The legacy upload inbox, its CSV download/status flow and character unlink endpoint
+have been removed. The scan bot no longer links game characters or writes avatar
+snapshots to Firestore. Existing cloud documents and stored CSV files are untouched.
 
-```
-POST /internal/upload-inbox/add
-Header: x-internal-token: $UPLOAD_INBOX_TOKEN
-```
-
-Example:
-
-```bash
-curl -X POST "https://<auth-api-url>/internal/upload-inbox/add" \
-  -H "Content-Type: application/json" \
-  -H "x-internal-token: $UPLOAD_INBOX_TOKEN" \
-  -d '{
-    "discordUserId": "138679453717889024",
-    "scanId": "test-scan-001",
-    "playersCount": 3,
-    "guildsCount": 1,
-    "playerIds": ["p1","p2","p3"],
-    "guildIds": ["g1"],
-    "server": "eu1",
-    "source": "discord",
-    "playersCsvBase64": "UExBQ0VIT0xERVI7..."
-  }'
-```
-
-Configure `UPLOAD_INBOX_TOKEN` and `UPLOAD_INBOX_BUCKET` in your environment (see `.env.example`).
+`UPLOAD_INBOX_TOKEN` remains shared by Creator/YouTube, News and Visitor Analytics;
+keep its mandatory initialization, secret binding and value. The retired
+`SCAN_UPLOAD_TOKEN`, `SCAN_UPLOAD_CSV_BUCKET` and `UPLOAD_INBOX_BUCKET` parameters
+are no longer declared, exported or required at startup. When publishing this
+AuthAPI version through the established gcloud workflow, remove only the obsolete
+`SCAN_UPLOAD_TOKEN` service secret binding and those three environment entries.
+Keep all current shared secrets, provider settings, region, entry point and
+Node22/240s runtime settings. This local cleanup does not alter a running instance
+or delete Secret Manager versions, buckets, stored files or Firestore documents.
 
 ### Internal Visitor Analytics Snapshot Sync
 
@@ -192,9 +178,9 @@ Manual deployment for Danny (Patch 1.1.2):
 
 No deployment or production configuration change is performed by these local edits.
 
-### User Upload Inbox Endpoints
+### Visitor Analytics data basis (W298)
 
-Authenticated users can fetch their inbox entries and download CSVs:
-
-- `GET /user/upload-inbox` — lists non-expired scans (`ready`/`downloaded`).
-- `GET /user/upload-inbox/:scanId/download` — returns CSV contents plus metadata and marks the entry as downloaded (extends expiry by 7 days from first download).
+The private stored-statistics GET for admin/Don, event taxonomy, availability,
+field mapping and manual rollout are documented in
+[src/internal/analytics/visitor/README.md](src/internal/analytics/visitor/README.md).
+Public snapshot publication is unchanged. Dashboard/overlay redesign remains separate.

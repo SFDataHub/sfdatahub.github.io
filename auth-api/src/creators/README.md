@@ -1,5 +1,12 @@
 # Playground YouTube card — Patch 1.1.2
 
+> W303 rollout: the current combined YouTube/GoatCounter storage rollout and
+> optional cleanup prerequisites are in [visitor README](../internal/analytics/visitor/README.md#w303--public-inline-metrics-and-private-configurationlease).
+> Follow its frontend-first order and old-config-writer routing requirement;
+> it supersedes the historical W279–W283 deployment/cleanup sequences below.
+> The legacy cleanup helper fails closed on the new YouTube fence.
+
+
 The Playground reads `GET /public/creators-live.json` from the existing
 `VITE_AUTH_BASE_URL`. A visitor GET never starts YouTube requests. The homepage,
 card layout, three initially visible channels, expand/collapse, three videos per
@@ -175,13 +182,54 @@ limited to the ten displayed-snapshot videos. `YOUTUBE_SOURCES` remains authorit
 Internal YouTube pages/details are fragmented losslessly (16,384 UTF-16 code units,
 without splitting surrogate pairs), then grouped by stable SHA-256 prefix into
 `creator_youtube_cache/b_root` and, only when necessary, `b_<binary-prefix>`.
-The durable `creator_sync/youtube` lease holds the small leaf directory and successful
-`checkedAt`/content hash. Empty leaves remain; splits never cause regular deletes or
-whole-cache repacking. Removed channels stay reusable. Changed cache leaves alone
-are written. Unchanged public content is retained byte-for-byte: successful check
-metadata updates the lease instead. A public read uses two transaction document
-reads (snapshot + coordination) to report the successful-check time accurately;
-the lease content is never exposed. There are no new timers or provider requests.
+The existing `creator_snapshots/creators-live.json` contains the public `youtube`
+payload and private `youtubeSync` coordination (version 1, owner, expiry, cacheLayout,
+checkedAt and content hash). Changed cache leaves alone are written; unchanged
+YouTube payloads stay byte-for-byte intact. A successful unchanged check updates
+only coordination. Payload, successful-check time and lease release commit atomically.
+A cold/expired public backend cache reads this document exactly once, without writes
+or a transaction; a valid warm cache reads none. Only `youtube` is returned, with its
+successful-check timestamp projected into generatedAt. Missing/error reads also
+attempt only that document. Request coalescing, TTLs and stale-error retention remain.
+
+On the first refresh only, one transaction reads the snapshot and old
+`creator_sync/youtube` lease. An active old owner causes the usual busy response;
+there is no polling. Once idle/expired, the transaction copies the legacy coordination
+into youtubeSync and leaves a permanent old-backend fence in the old document:
+owner `snapshot-document-v1`, expiresAt `Number.MAX_SAFE_INTEGER`. This also happens
+if the recent snapshot permits an hourly skip. All later new refreshes use only the
+shared document; old acquirers are blocked and expired old publishers fail their owner
+check. The fence stays after new-owner failures/releases. No documents are deleted.
+Before handover, a public GET uses the payload's original generatedAt (it deliberately
+does not fetch a potentially newer legacy checkedAt). After handover it uses the
+copied successful-check time. Other document fields and existing caches are retained.
+
+Deployment: publish the complete AuthAPI through the existing deployment path; keep
+YOUTUBE_SOURCES, API key, hourly scheduler and Playground admin button unchanged.
+Run one existing admin refresh, or let the next hourly refresh perform the handover.
+If an old lease is active, retry the existing action later after that owner finishes
+or expires. Old backends will report busy after handover, so finish routing traffic
+and scheduler/admin calls to the new revision. A rollback to the old backend needs
+an explicit coordinated reversal; do not remove the fence during mixed-version use.
+Only after every old backend is stopped may the fenced `creator_sync/youtube`
+document optionally be deleted as a separate manual step. No cleanup is required.
+The old snapshot-legacy.cjs cleanup helper intentionally remains unchanged; its
+old idle-lease prerequisite fails closed after this migration, so do not use it as a
+handover or fence-removal tool.
+
+Simulated access accounting (no transaction retries): public cold 1 read/0 writes;
+public warm 0/0; steady hourly skip 1/0. With B addressed internal cache bundles,
+a full steady refresh reads B+2 documents and writes 2+C documents (lease acquisition,
+atomic publication plus C changed cache bundles), regardless of whether YouTube
+content changes. Only a changed payload is included in the publication write mask.
+First handover adds 1 legacy read/1 legacy write; a skipped handover is 2 reads/2
+writes. Without bundled cache history, first collection instead reads N configured
+legacy channel-cache documents (N+3 reads including handover/publication). Each
+Firestore transaction retry adds its actual repeated reads; failed transactions
+commit no writes. Failure cleanup can add one shared-document read and an owner-only
+release write. Larger existing caches add their actual addressed bundles, not a
+fixed one-bundle assumption. These are local simulated counts, not live savings.
+There are no new timers or provider requests.
 
 GoatCounter uses `visitor_metrics_public/bundled` (schema 4) and its existing
 `pages/b_root` / `pages/b_<binary-prefix>` namespace. Private per-page hash shards

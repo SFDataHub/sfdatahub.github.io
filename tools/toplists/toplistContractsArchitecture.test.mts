@@ -31,8 +31,6 @@ const listSourceFiles = (dir: string): string[] => {
 const allSource = sourceRoots.flatMap(listSourceFiles);
 const contractsSource = read("src/lib/toplists/toplistContracts.ts");
 const coreSource = read("src/context/ToplistsDataContextCore.tsx");
-const firestoreProviderSource = read("src/context/ToplistsDataContext.tsx");
-const firestoreSource = read("src/lib/api/toplistsFirestore.ts");
 const guildHubToplistSource = read("src/pages/DataHub/Toplist.tsx");
 const compareModelSource = read("src/pages/DataHub/localToplistCompareModel.ts");
 const exportModelSource = read("src/pages/DataHub/localToplistExportModel.ts");
@@ -58,15 +56,7 @@ assert.match(coreSource, /export function ToplistsDataStaticProvider/);
 assert.match(coreSource, /export function useToplistsData/);
 assert.doesNotMatch(coreSource, /firebase|toplistsFirestore|from "\.\.\/lib\/api\/toplistsFirestore"/);
 assert.equal((coreSource.match(/createContext</g) ?? []).length, 1);
-assert.equal((firestoreProviderSource.match(/createContext</g) ?? []).length, 0);
-assert.match(firestoreProviderSource, /from "\.\/ToplistsDataContextCore"/);
-assert.match(firestoreProviderSource, /<ToplistsDataContext\.Provider value=\{value\}>/);
 
-assert.doesNotMatch(firestoreSource, /export type ToplistPlayerRow = \{/);
-assert.doesNotMatch(firestoreSource, /export type ToplistGuildRow = \{/);
-assert.match(firestoreSource, /from "\.\.\/toplists\/toplistContracts"/);
-assert.match(firestoreSource, /const mapFirestorePlayerRow = \(raw: any\): ToplistPlayerRow \| null => \{/);
-assert.match(firestoreSource, /mapFirestoreGuildRow/);
 
 for (const [name, source] of [
   ["DataHub/Toplist.tsx", guildHubToplistSource],
@@ -81,7 +71,9 @@ assert.match(guildHubToplistSource, /from "\.\.\/\.\.\/lib\/toplists\/toplistCon
 assert.match(compareModelSource, /from "\.\.\/\.\.\/lib\/toplists\/toplistContracts"/);
 assert.match(exportModelSource, /from "\.\.\/\.\.\/lib\/toplists\/toplistContracts"/);
 assert.match(playerToplistsSource, /useToplistsData[\s\S]*from "\.\.\/\.\.\/context\/ToplistsDataContextCore"/);
-assert.match(guildToplistsSource, /from "\.\.\/\.\.\/context\/ToplistsDataContextCore"/);
+for (const source of [playerToplistsSource, guildToplistsSource]) {
+  assert.doesNotMatch(source, /toplistsFirestore|ToplistsDataContext"|components\/ProfileOverlay/);
+}
 assert.match(playerDecorSource, /from "\.\.\/\.\.\/lib\/toplists\/toplistContracts"/);
 
 assert.ok(statSync(new URL("../../src/context/ToplistsDataContextCore.tsx", import.meta.url)).isFile());

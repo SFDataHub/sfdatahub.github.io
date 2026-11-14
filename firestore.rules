@@ -2,35 +2,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ----- Public reads -----
-    match /metadata/{doc}         { allow read: if true; }
-    match /servers/{doc}          { allow read: if true; }
-    match /stats_public/{doc=**}  { allow read: if true; }
-    // Uebergangs-Gate (bis Auth/AppCheck)
-    function isImporter() { return true; }
-
     function isAdmin() {
-      return request.auth != null && request.auth.token.roles != null && request.auth.token.roles.hasAny(['admin', 'owner']);
+      return request.auth != null
+        && request.auth.token.roles != null
+        && request.auth.token.roles.hasAny(['admin', 'owner']);
     }
 
-    // Only these aggregate visitor snapshots are public; config/leases stay private.
+    // Öffentliche Snapshots für Navigation und News.
+    match /stats_public/{doc=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Direkter Zugriff auf private Besucherstatistik nur für Admins.
+    // Das aktuelle Dashboard liest über die rollenprüfende AuthAPI.
+    match /analytics/visitor_analytics {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Öffentliche, vorbereitete Besucher- und Seitenstatistiken.
     match /visitor_metrics_public/{snapshotId} {
       allow get: if true;
       allow list, write: if false;
+
       match /pages/{pathId} {
         allow get: if true;
         allow list, write: if false;
       }
     }
 
-    match /analytics/visitor_analytics {
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    // Access control configuration (used by Control Panel / Access & Features)
+    // Zugriffssteuerung; Änderungen erfolgen über die AuthAPI.
     match /feature_access/{featureId} {
-      // Jeder Client darf die Konfiguration lesen; Mutationen laufen ueber auth-api/Service Account.
       allow read: if true;
       allow write: if false;
     }
@@ -40,207 +43,39 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /upload_quota_config/{configId} {
-      // Quota-Konfiguration ist global lesbar fuer eingeloggte Nutzer,
-      // Schreiben erfolgt nur ueber Admin-Tools / Server (nicht aus dem Frontend).
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    // ---------- Players ----------
-    match /players/{identifier} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-
-      match /scans/{ts} {
-        allow read: if true;
-        allow create: if isImporter();
-        allow update, delete: if false;
-      }
-      match /charts/{docId} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /latest/{docId} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /history_weekly/{wid} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /history_monthly/{ym} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-    }
-
-    // ---------- Guilds ----------
-    match /guilds/{gid} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-
-      // Snapshots der Gildenmitglieder (vom Upload-Center beschrieben)
-      match /snapshots/{docId} {
-        allow read: if true;            // optional: nur eingeloggte Nutzer erlauben
-        allow write: if isImporter();   // aktuell Uebergangs-Gate
-      }
-
-      match /scans/{ts} {
-        allow read: if true;
-        allow create: if isImporter();
-        allow update, delete: if false;
-      }
-      match /latest/{docId} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /history_weekly/{wid} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /history_monthly/{ym} {
-        allow read: if true;
-        allow create, update: if isImporter();
-        allow delete: if false;
-      }
-      match /history_monthly/{ym}/snapshots/{docId} {
-        allow read: if true;
-        allow write: if isImporter();
-      }
-    }
-
-    // ---------- Links ----------
-    match /links_players/{externalKey} {
-      allow read: if isImporter();
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-    match /links_guilds/{externalKey} {
-      allow read: if isImporter();
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    // ---------- Linked player avatars ----------
-    function linkedAvatarUserId() {
-      // Prefer incoming data (write), otherwise existing doc (read)
-      return request.resource.data.userId != null
-        ? request.resource.data.userId
-        : resource.data.userId;
-    }
-
-    // Publicly readable snapshots stored under linked_players/avatars/avatars/{docId}
-    match /linked_players/avatars/avatars/{docId} {
-      allow read: if true;
-      allow create: if isAdmin() || (
-        request.auth != null
-        && request.auth.token.userId != null
-        && request.resource.data.userId == request.auth.token.userId
-      );
-      allow update: if isAdmin() || (
-        request.auth != null
-        && request.auth.token.userId != null
-        && resource.data.userId == request.auth.token.userId
-        && request.resource.data.userId == resource.data.userId
-      );
-      allow delete: if false;
-    }
-
-    match /linked_players/avatars/{playerServerId} {
-      // Bot/Admin darf schreiben (z. B. Avatar-Snapshots aus connectChar/scanUpload)
-      allow write: if isAdmin();
-
-      // Lesen: Besitzer (per Feld userId) oder Admin
-      allow read: if request.auth != null
-        && (isAdmin() || (linkedAvatarUserId() != null && request.auth.token.userId == linkedAvatarUserId()));
-    }
-
-    // ---------- Zusatz nur fuer collectionGroup("latest") ----------
-    // Ermoeglicht READ auf *allen* Subcollections namens "latest"
-    // (z. B. players/*/latest/*, guilds/*/latest/*) - keine Writes.
-    match /{path=**}/latest/{docId} {
-      allow read: if true;
-
-    }
-
-    // ---------- Stats-Cache & Indizes (vom CSV-Importer beschrieben) ----------
-    match /stats_cache_player_derived/{pid} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    match /stats_cache_guild_derived/{docId} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    match /stats_index_players_daily_compact/{docId} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    match /stats_index_guilds_daily_compact/{docId} {
-      allow read: if true;
-      allow create, update: if isImporter();
-      allow delete: if false;
-    }
-
-    // ---------- Users (Profil & Upload-Center-Usage, nur Owner-Read) ----------
+    // Benutzerkonto: Lesen nur durch den jeweiligen Besitzer.
+    // Änderungen erfolgen über die AuthAPI.
     match /users/{userId} {
-      // Nur eingeloggter Besitzer darf seinen eigenen User-Datensatz lesen.
       allow read: if request.auth != null
         && request.auth.token.userId == userId;
 
-      // Favorites are validated/merged by the session API, never written into account metadata.
       allow create, update, delete: if false;
+
       match /users_favorites/{stateId} {
-        allow read: if stateId == 'state' && request.auth != null
+        allow read: if stateId == 'state'
+          && request.auth != null
           && request.auth.token.userId == userId;
+
         allow write: if false;
       }
     }
 
-    // ---------- User settings (per-user) ----------
+    // Persönliche Einstellungen, einschließlich Sprachpräferenzen.
     match /user_settings/{userId} {
       allow read, write: if request.auth != null
         && request.auth.token.userId == userId;
     }
 
-    // ---------- Tools sync (per-user) ----------
+    // Persönliche Tool-Sets und ausgewählte Tools.
     match /user_tools_state/{userId} {
       allow read, write: if request.auth != null
         && request.auth.token.userId == userId;
     }
 
-    // ---------- Scan uploads (per-user) ----------
-    match /scan_uploads/{scanId} {
-      function isScanOwner() {
-        return request.auth != null
-          && request.auth.token.userId != null
-          && resource.data.discordUserId != null
-          && request.auth.token.userId == ("discord:" + resource.data.discordUserId);
-      }
-
-      // Lesen: Besitzer oder Admin
-      allow read: if isScanOwner() || isAdmin();
-
-      // Clientseitige Writes nicht erlaubt; Upload laeuft ueber auth-api/Admin SDK
-      allow write: if false;
+    // Alle übrigen Dokumente und Unterkollektionen:
+    // kein Zugriff über Web-/Mobile-Clients.
+    match /{document=**} {
+      allow read, write: if false;
     }
-
-    // Rest dicht
-    match /{document=**} { allow read, write: if false; }
   }
 }

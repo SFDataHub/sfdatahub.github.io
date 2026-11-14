@@ -1,6 +1,7 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 import { youtubeMessages } from "./youtubeMessages";
+import { creatorDirectoryMessages } from "./creatorDirectoryMessages";
 import en from "./en.json";
 import de from "./de.json";
 import hu from "./hu.json";
@@ -11,11 +12,11 @@ import { getInitialActiveLocale } from "../lib/i18n/localePreferences";
 export type Lang = "en" | "de" | "hu" | "cs" | "pl";
 
 const resources = {
-  en: { translation: { ...en, youtubeCard: youtubeMessages.en } },
-  de: { translation: { ...de, youtubeCard: youtubeMessages.de } },
-  hu: { translation: { ...hu, youtubeCard: youtubeMessages.hu } },
-  cs: { translation: { ...cs, youtubeCard: youtubeMessages.cs } },
-  pl: { translation: { ...pl, youtubeCard: youtubeMessages.pl } },
+  en: { translation: { ...en, youtubeCard: youtubeMessages.en, creatorDirectory: creatorDirectoryMessages.en } },
+  de: { translation: { ...de, youtubeCard: youtubeMessages.de, creatorDirectory: creatorDirectoryMessages.de } },
+  hu: { translation: { ...hu, youtubeCard: youtubeMessages.hu, creatorDirectory: creatorDirectoryMessages.hu } },
+  cs: { translation: { ...cs, youtubeCard: youtubeMessages.cs, creatorDirectory: creatorDirectoryMessages.cs } },
+  pl: { translation: { ...pl, youtubeCard: youtubeMessages.pl, creatorDirectory: creatorDirectoryMessages.pl } },
 };
 
 i18next

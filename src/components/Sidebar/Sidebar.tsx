@@ -3,17 +3,16 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Home, LayoutDashboard, Compass, MessagesSquare,
   Settings as SettingsIco, Shield, FolderSearch, BookOpen,
-  ChevronRight, Pin, PinOff, Aperture, Trophy, ShieldCheck, Wrench, Info, Database
+  ChevronRight, Pin, PinOff, Aperture, ShieldCheck, Wrench, Info, Database, PanelsTopLeft, ChartColumn
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import homeStyles from "../../pages/Home.module.css";
 import SubmenuPortal from "./SubmenuPortal";
 import submenuStyles from "./SubmenuPortal.module.css";
+import { canReadVisitorAnalytics } from "../../lib/analytics/visitorAccess";
 import { useAuth } from "../../context/AuthContext";
 import { useFeatureAccess } from "../../lib/featureAccessConfig";
-import { useLegacyToplistsAccess } from "../../lib/toplists/legacyAccess";
 import { useTranslation } from "react-i18next";
-import { buildPlayerIdentifier } from "../../lib/players/identifier";
 import discordLogo from "../../assets/discord-logo.svg";
 import SidebarLanguageSwitch from "./SidebarLanguageSwitch";
 import { useAnalyticsConstructionAccess } from "../../lib/data-hub/constructionAccess";
@@ -28,8 +27,8 @@ type Item = {
   icon: React.ReactNode;
   end?: boolean;
   featureId?: string;
-  adminOnly?: boolean;
   publicLocalSettings?: boolean;
+  visitorDonOnly?: boolean;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
@@ -41,7 +40,7 @@ const main: Item[] = [
   { to: "/settings",   labelKey: "nav.settings",  icon: <SettingsIco className="ico" />, publicLocalSettings: true },
   { to: "/data-hub/guild-hub",  labelKey: "nav.guildHub",  icon: <Shield className="ico" />, featureId: "main.guildHub" },
   { to: "/admin",      labelKey: "nav.admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
-  { to: "/toplists",  labelKey: "nav.toplists",  icon: <Trophy className="ico" />, featureId: "main.toplists", adminOnly: true },
+  { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", icon: <ChartColumn className="ico" />, visitorDonOnly: true },
   { to: "/playground", labelKey: "nav.playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
 ];
 
@@ -49,6 +48,7 @@ const main: Item[] = [
 const categories: Item[] = [
   { to: "/data-hub",   labelKey: "nav.dataHub",   icon: <Database className="ico" /> },
   { to: "/guidehub-v2",    labelKey: "nav.guideHub",    icon: <BookOpen className="ico" />, featureId: "main.guidehub" },
+  { to: "/sf-collection", labelKey: "nav.sfCollection", icon: <PanelsTopLeft className="ico" /> },
   { to: "/tools",    labelKey: "nav.tools", icon: <Wrench className="ico" />, featureId: "main.tools" },
   { to: "/community", labelKey: "nav.community", icon: <MessagesSquare className="ico" />, featureId: "main.community" },
   { to: "/scans",     labelKey: "nav.scans",     icon: <FolderSearch className="ico" />, featureId: "main.scans" },
@@ -72,7 +72,6 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/discover/favorites", labelKey: "nav.favorites" },
   ],
   "/admin": [
-    { to: "/upload-center", labelKey: "nav.uploadCenter", minRole: "mod" },
     { to: "/upload-center-v2", labelKey: "nav.uploadCenterV2", minRole: "mod" },
     { to: "/admin/scan-coverage", labelKey: "nav.scanCoverage", minRole: "mod" },
     { to: "/admin/scan-archive-builder", labelKey: "nav.scanArchiveBuilder", minRole: "mod" },
@@ -409,23 +408,7 @@ export default function Sidebar({
   const { status, user, logout } = useAuth();
   const isAuthed = status === "authenticated";
   const userRoles = user?.roles ?? [];
-  const linkedPlayers = React.useMemo(() => user?.linkedPlayers ?? [], [user?.linkedPlayers]);
   const { isVisibleInSidebar } = useFeatureAccess();
-  const { canAccess: canAccessLegacyToplists } = useLegacyToplistsAccess();
-  const canSeeConnectedCharacters = React.useMemo(() => {
-    if (!userRoles.length) return false;
-    const normalized = userRoles
-      .filter((role): role is string => typeof role === "string")
-      .map((role) => role.toLowerCase());
-    return (
-      normalized.includes("admin")
-      || normalized.includes("developer")
-      || normalized.includes("dev")
-      || normalized.includes("moderator")
-      || normalized.includes("mod")
-    );
-  }, [userRoles]);
-
   const handleFooterClick = () => {
     if (isAuthed) {
       logout();
@@ -438,45 +421,6 @@ export default function Sidebar({
       }
     }
   };
-
-  const handleCharacterClick = (playerId: string | number, server?: string | null) => {
-    const pid = String(playerId ?? "").trim();
-    if (!pid || pid === "-") return;
-    const profileIdentifier = buildPlayerIdentifier(server ?? null, pid);
-    if (!profileIdentifier) return;
-    navigate(`/player/${encodeURIComponent(profileIdentifier)}`);
-    onNavigate?.();
-  };
-
-  const handleConnectedHintClick = () => {
-    if (linkedPlayers.length > 0) return;
-    if (isAuthed) {
-      navigate("/settings/account?tab=connected-characters&openHelp=1");
-    } else {
-      navigate("/help#linking", { state: helpEntryState });
-    }
-    onNavigate?.();
-  };
-
-  const emptyConnectedText = isAuthed
-    ? t(
-        "sidebar.connectedCharacters.empty",
-        { defaultValue: "No characters linked yet. Link a character in your account to see it here." },
-      )
-    : t(
-        "sidebar.connectedCharacters.loginPrompt",
-        { defaultValue: "Sign in to see your linked characters." },
-      );
-
-  const emptyCta = isAuthed
-    ? t(
-      "sidebar.connectedCharacters.ctaAuthed",
-      { defaultValue: "Open linked characters guide" },
-    )
-    : t(
-      "sidebar.connectedCharacters.ctaGuest",
-      { defaultValue: "Open start guide" },
-    );
 
   return (
     <aside
@@ -513,11 +457,11 @@ export default function Sidebar({
               items={main}
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
-              userRoles={userRoles}
+              userRoles={isAuthed ? userRoles : []}
               translate={t}
-              isItemVisible={(item) => item.publicLocalSettings || (item.adminOnly
-                ? canAccessLegacyToplists
-                : isVisibleInSidebar(item.featureId ?? item.to))}
+              isItemVisible={(item) => item.visitorDonOnly
+                ? canReadVisitorAnalytics(status, user) && userRoles.includes("don") && !userRoles.includes("admin")
+                : item.publicLocalSettings || isVisibleInSidebar(item.featureId ?? item.to)}
               onNavigate={onNavigate}
             />
           </div>
@@ -530,50 +474,13 @@ export default function Sidebar({
               items={categories}
               collapsed={collapsed}
               allowSubmenus={allowSubmenus}
-              userRoles={userRoles}
+              userRoles={isAuthed ? userRoles : []}
               translate={t}
-              isItemVisible={(item) => item.to === "/data-hub" || isVisibleInSidebar(item.featureId ?? item.to)}
+              isItemVisible={(item) => item.to === "/sf-collection" || item.to === "/data-hub" || isVisibleInSidebar(item.featureId ?? item.to)}
               onNavigate={onNavigate}
             />
           </div>
 
-          {canSeeConnectedCharacters ? (
-            <div className={`${styles.segCard} ${styles.mainNavCard} ${styles.connectedCharactersCard}`}>
-              <div className={styles.connectedCharactersTitle}>
-                {t("sidebar.connectedCharacters.title", { defaultValue: "Connected characters" })}
-              </div>
-              {linkedPlayers.length === 0 ? (
-                <button
-                  type="button"
-                  className={styles.connectedCharactersEmpty}
-                  onClick={handleConnectedHintClick}
-                >
-                  <span className={styles.connectedCharactersEmptyText}>{emptyConnectedText}</span>
-                  <span className={styles.connectedCharactersEmptyCta}>{emptyCta}</span>
-                </button>
-              ) : (
-                <div className={styles.connectedCharactersList} data-collapsed={collapsed ? "true" : "false"}>
-                  {linkedPlayers.map((char) => {
-                    const metaParts = [char.server, char.class].filter(Boolean).join(" | ");
-                    const playerId = char.playerId ?? "-";
-                    const key = `${char.server ?? "server"}-${playerId}`;
-
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className={styles.characterChip}
-                        onClick={() => handleCharacterClick(playerId, char.server ?? null)}
-                      >
-                        <span className={styles.characterChipId}>{playerId}</span>
-                        {metaParts && <span className={styles.characterChipMeta}>{metaParts}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
           <a
             href={DISCORD_INVITE_URL}
             className={`${homeStyles.card} ${homeStyles.discordBanner}`}

@@ -127,25 +127,44 @@ export function buildSetupPlan(archive: SetupArchive, draft: DataHubSetupPrefere
   };
 }
 
-export type SetupProgress = { phase: LocalToplistLoadProgress["phase"]; complete: string[]; failed: string[]; total: number };
+export type SetupCurrentScan = {
+  id: string; server: string; timestamp: number; totalFiles: number;
+  files: NonNullable<LocalToplistLoadProgress["files"]>;
+  processing: boolean;
+  status: "running" | "complete" | "failed";
+};
+export type SetupProgress = {
+  phase: LocalToplistLoadProgress["phase"]; complete: string[]; failed: string[]; total: number;
+  current?: SetupCurrentScan;
+};
 
 /** A logical scan is ready only after all source parts and shared projections.
  * The existing acquisition owns transport sharing/cancellation and atomic imports. */
 export async function prepareSetupPlan(plan: SetupPlan, signal: AbortSignal, onProgress: (value: SetupProgress) => void) {
   const complete: string[] = [], failed: string[] = [];
-  const report = (phase: SetupProgress["phase"]) => onProgress({ phase, complete: [...complete], failed: [...failed], total: plan.scans.length });
+  let current: SetupCurrentScan | undefined;
+  const report = (phase: SetupProgress["phase"]) => onProgress({ phase, complete: [...complete], failed: [...failed], total: plan.scans.length,
+    current: current && { ...current, files: current.files.map(file => ({ ...file })) } });
   for (const scan of plan.scans) {
     signal.throwIfAborted();
+    current = { id: scan.id, server: resolveServer(scan.entries[0].server)?.code ?? scan.entries[0].server, timestamp: scan.entries[0].timestamp, totalFiles: scan.requiredEntries.length,
+      files: [], processing: false, status: "running" };
+    report("acquiring");
     try {
       const setEntries = scan.requiredEntries.map(entry => ({ ...entry,
         toplistSetKey: scan.requiredEntries.map(member => archivePhysicalKey(member)).join("|"),
         toplistSetScanIds: scan.requiredEntries.map(member => member.id),
       }));
       const result = await loadOrBuildLocalToplistSnapshots(setEntries, { signal,
-        onProgress: progress => report(progress.phase), auditContext: { consumerArea: "DataHub setup", trigger: "explicit-setup" },
+        onProgress: progress => {
+          if (progress.files) current!.files = progress.files;
+          current!.processing = progress.phase !== "acquiring";
+          report(progress.phase);
+        }, auditContext: { consumerArea: "DataHub setup", trigger: "explicit-setup" },
       });
       signal.throwIfAborted();
       if (result.status !== "complete" || result.failedSelections.length) throw Error("setup_scan_incomplete");
+      current.processing = true;
       report("composing");
       const inventory = await readHubSearchProjectionInventory();
       const summaries = await listSfDataHubScanSummaries();
@@ -165,9 +184,13 @@ export async function prepareSetupPlan(plan: SetupPlan, signal: AbortSignal, onP
         await putHubSearchProjection(projection, { signal });
       }
       complete.push(scan.id);
+      current.status = "complete";
+      current.processing = false;
     } catch (error) {
       signal.throwIfAborted();
       failed.push(scan.id);
+      current.status = "failed";
+      current.processing = false;
     }
     report("composing");
   }

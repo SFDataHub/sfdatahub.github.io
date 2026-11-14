@@ -67,3 +67,12 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
 
   return next();
 };
+
+/** Applied after requireUser: the Don supplement grants only statistics reads. */
+export const requireVisitorReader = (req: Request, res: Response, next: NextFunction) => {
+  const roles = req.sessionUser?.roles ?? [];
+  if (!roles.includes("admin") && !roles.includes("don")) {
+    return res.status(403).json({ error: "Visitor statistics access required." });
+  }
+  return next();
+};

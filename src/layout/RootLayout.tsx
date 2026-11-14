@@ -190,9 +190,10 @@ export default function RootLayout() {
 
   const openNavLabel = t("nav.open", { defaultValue: "Open navigation" });
   const sidebarState = (usesBurger ? isMobileNavOpen : isOpen) ? "expanded" : "collapsed";
+  const isSFCollection = location.pathname === "/sf-collection";
 
   return (
-    <LocalFavoritesMenu><div id="app-shell" data-navigation={usesBurger ? "burger" : "sidebar"} data-sidebar={sidebarState} style={{ ["--left" as any]: leftVar, ["--app-shell-left" as any]: leftVar }}>
+    <LocalFavoritesMenu><div id="app-shell" data-sf-collection={isSFCollection ? "true" : undefined} data-navigation={usesBurger ? "burger" : "sidebar"} data-sidebar={sidebarState} style={{ ["--left" as any]: leftVar, ["--app-shell-left" as any]: leftVar }}>
       <LogoDock src="/logo.png" />
       <Topbar />
 

@@ -1,86 +1,21 @@
 {
   "indexes": [
-    /* ====== latest: CLASS + NAME + TIMESTAMP ====== */
     {
-      "collectionGroup": "latest",
+      "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "values.Class", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
-      ]
-    },
-    /* Spiegel der Reihenfolge (bereits vorhanden war timestamp→name) */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Class", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-
-    /* ====== latest: PREFIX + NAME + TIMESTAMP ====== */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Prefix", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
-      ]
-    },
-    /* Spiegel der Reihenfolge (bereits vorhanden war timestamp→name) */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Prefix", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-
-    /* ====== latest: nur CLASS + NAME (ohne Zeitrange) ====== */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Class", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-
-    /* ====== latest: nur PREFIX + NAME (ohne Zeitrange) ====== */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Prefix", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-
-    /* ====== latest: PREFIX + CLASS + NAME (wenn beide Filter clientseitig nicht greifen) ====== */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Prefix", "order": "ASCENDING" },
-        { "fieldPath": "values.Class", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-    /* optional mit Zeitrange (beide Filter serverseitig + Range): */
-    {
-      "collectionGroup": "latest",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "values.Prefix", "order": "ASCENDING" },
-        { "fieldPath": "values.Class", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "userId",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
