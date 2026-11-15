@@ -28,7 +28,7 @@ type Item = {
   end?: boolean;
   featureId?: string;
   publicLocalSettings?: boolean;
-  visitorDonOnly?: boolean;
+  visitorAnalyticsOnly?: boolean;
 }; // 👈 sauber geschlossen, KEIN submenu hier nötig
 // main
 const DISCORD_INVITE_URL = "https://discord.gg/5hXBuyRssK";
@@ -39,8 +39,8 @@ const main: Item[] = [
   { to: "/dashboard",  labelKey: "nav.dashboard", icon: <LayoutDashboard className="ico" />, featureId: "main.dashboard" },
   { to: "/settings",   labelKey: "nav.settings",  icon: <SettingsIco className="ico" />, publicLocalSettings: true },
   { to: "/data-hub/guild-hub",  labelKey: "nav.guildHub",  icon: <Shield className="ico" />, featureId: "main.guildHub" },
+  { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", icon: <ChartColumn className="ico" />, visitorAnalyticsOnly: true },
   { to: "/admin",      labelKey: "nav.admin",     icon: <ShieldCheck className="ico" />, featureId: "main.admin" },
-  { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", icon: <ChartColumn className="ico" />, visitorDonOnly: true },
   { to: "/playground", labelKey: "nav.playground", icon: <Aperture className="ico" />, featureId: "main.playground" }, // <- ohne "/"
 ];
 
@@ -75,7 +75,6 @@ const SUBTABS: Record<string, SubItem[]> = {
     { to: "/upload-center-v2", labelKey: "nav.uploadCenterV2", minRole: "mod" },
     { to: "/admin/scan-coverage", labelKey: "nav.scanCoverage", minRole: "mod" },
     { to: "/admin/scan-archive-builder", labelKey: "nav.scanArchiveBuilder", minRole: "mod" },
-    { to: "/admin/visitor-analytics", labelKey: "nav.visitorAnalytics", minRole: "admin" },
     { to: "/admin/users",  labelKey: "nav.users", minRole: "mod" },
   ],
    "/playground": [
@@ -176,6 +175,7 @@ function CategoryItem({
   onNavigate?: () => void;
 }) {
   const { canAccess: canOpenAnalytics } = useAnalyticsConstructionAccess();
+  const { pathname } = useLocation();
   const submenuId = React.useId();
   const hasSub = subItems.length > 0;
   const { open, onEnter, onLeave, setOpen } = useDelayedHover();
@@ -205,7 +205,7 @@ function CategoryItem({
     >
       <NavLink
         to={it.to}
-        end={!!it.end}
+        end={!!it.end || (it.to === "/admin" && pathname === "/admin/visitor-analytics")}
         className={({ isActive }) =>
           `${styles.navBtn} ${isActive ? styles.navBtnActive : ""}`
         }
@@ -459,8 +459,8 @@ export default function Sidebar({
               allowSubmenus={allowSubmenus}
               userRoles={isAuthed ? userRoles : []}
               translate={t}
-              isItemVisible={(item) => item.visitorDonOnly
-                ? canReadVisitorAnalytics(status, user) && userRoles.includes("don") && !userRoles.includes("admin")
+              isItemVisible={(item) => item.visitorAnalyticsOnly
+                ? canReadVisitorAnalytics(status, user)
                 : item.publicLocalSettings || isVisibleInSidebar(item.featureId ?? item.to)}
               onNavigate={onNavigate}
             />
