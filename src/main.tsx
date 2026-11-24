@@ -173,6 +173,7 @@ import ToolsPage from "./pages/tools/ToolsPage";
 import { UploadCenterProvider } from "./components/UploadCenter/UploadCenterContext";
 import UploadCenterModal from "./components/UploadCenter/UploadCenterModal";
 import { AuthProvider } from "./context/AuthContext";
+import DataHubGate from "./components/auth/DataHubGate";
 import { LocalePreferencesProvider } from "./context/LocalePreferencesContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import { DataJobsProvider } from "./context/DataJobsContext";
@@ -212,6 +213,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <NotificationsProvider>
       <DataJobsProvider>
         <AuthProvider>
+          <DataHubGate>
           <LocalePreferencesProvider>
             <FeatureAccessProvider>
               <UploadCenterProvider>
@@ -498,6 +500,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               </UploadCenterProvider>
             </FeatureAccessProvider>
           </LocalePreferencesProvider>
+          </DataHubGate>
         </AuthProvider>
       </DataJobsProvider>
     </NotificationsProvider>

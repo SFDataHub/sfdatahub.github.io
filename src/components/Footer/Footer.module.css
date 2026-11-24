@@ -14,3 +14,27 @@
 @media (min-width: 768px) { .footer { padding-inline: 24px; } }
 @media (max-width: 1300px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .head { grid-template-columns: minmax(0, 1fr); } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Dons original textures stay local and apply only to the existing collection shell. */
+:global([data-sf-collection="true"]) .footer {
+  margin-top: 0;
+  background-color: #090909;
+  background-image: url("/assets/sf-collection/scanlines3_donsbg.png"), url("/assets/sf-collection/holographic-blur-2_donsbg.webp");
+  background-repeat: repeat;
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+:global([data-sf-collection="true"]) .surface {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+:global([data-sf-collection="true"]) .toggle,
+:global([data-sf-collection="true"]) .note,
+:global([data-sf-collection="true"]) .body {
+  background: linear-gradient(135deg, rgba(20, 39, 62, 0.9), rgba(9, 21, 41, 0.95));
+}
+:global([data-sf-collection="true"]) .toggle { padding-inline: 12px; }
+:global([data-sf-collection="true"]) .note,
+:global([data-sf-collection="true"]) .body { padding: 12px 16px; }

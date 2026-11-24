@@ -1,5 +1,6 @@
 import { getGuildClassAccent, getGuildMutedAccent } from "../../guilds/classColors";
-import { getClassIconUrl } from "./classIcons";
+import { iconForClassName } from "../../../data/classes";
+import { toDriveDirectProxy } from "../../../lib/urls";
 import type { LucideIcon } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import styles from "./RecordBadge.module.css";
@@ -61,7 +62,8 @@ export function getRecordScopeThemeStyle(scope: RecordBadgeScope): RecordScopeTh
 }
 
 function ClassIcon({ className, tone = "support" }: { className: string; tone?: "dominant" | "support" }) {
-  const iconUrl = getClassIconUrl(className, tone === "dominant" ? 128 : 72);
+  const iconSize = tone === "dominant" ? 128 : 72;
+  const iconUrl = toDriveDirectProxy(iconForClassName(className).url, iconSize, iconSize, "contain");
 
   return (
     <span className={cx(styles.classIcon, tone === "dominant" && styles.classIconDominant)} aria-hidden="true">
